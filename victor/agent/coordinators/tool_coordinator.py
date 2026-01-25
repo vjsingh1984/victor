@@ -419,12 +419,12 @@ class ToolCoordinator:
             }
 
             # Use selector's async select_tools method
+            # Note: ToolSelector.select_tools signature is:
+            # (user_message, use_semantic, conversation_history, conversation_depth, planned_tools)
             tools = await self._selector.select_tools(
-                message=context.message,
-                task_type=context.task_type,
-                max_tools=max_count,
-                threshold=threshold,
-                context=selector_context,
+                user_message=context.message,
+                conversation_history=context.conversation_history,
+                conversation_depth=context.conversation_depth,
             )
 
             # Track selection
@@ -530,7 +530,7 @@ class ToolCoordinator:
             ToolAccessContext with session tools and current mode
         """
         # Get disallowed tools from mode controller
-        disallowed = set()
+        disallowed: Set[str] = set()
         mode_name = None
 
         if self._mode_controller:
@@ -642,14 +642,21 @@ class ToolCoordinator:
                 return cached, True, None
 
         retry_enabled = self._config.retry_enabled
-        max_attempts = self._config.max_retry_attempts if retry_enabled else 1
+        max_retry_attempts = getattr(self._config, 'max_retry_attempts', 3)
+        max_attempts = max_retry_attempts if retry_enabled else 1
         base_delay = self._config.retry_base_delay
         max_delay = self._config.retry_max_delay
 
         last_error = None
         for attempt in range(max_attempts):
             try:
-                result = await self._pipeline._execute_single_tool(tool_name, tool_args, context)
+                # Use the correct method name from ToolPipeline
+                execute_method = getattr(self._pipeline, '_execute_single_call', None)
+                if execute_method is None:
+                    execute_method = getattr(self._pipeline, '_execute_single_tool', None)
+                if execute_method is None:
+                    raise AttributeError("ToolPipeline missing execute method")
+                result = await execute_method(tool_name, tool_args, context)
 
                 if result.success:
                     # Cache successful result
@@ -884,7 +891,12 @@ class ToolCoordinator:
 
             if success:
                 # Format and add result
-                output = exec_result.result if hasattr(exec_result, "result") else exec_result
+                if exec_result is not None and hasattr(exec_result, "result"):
+                    output = exec_result.result
+                elif exec_result is not None:
+                    output = exec_result
+                else:
+                    output = "Tool execution completed but returned no result"
 
                 if formatter:
                     formatted_output = formatter.format_tool_output(

@@ -1035,7 +1035,7 @@ class AgentOrchestrator(
                     project_root=intelligent_project_root,
                 )
                 self._intelligent_integration = OrchestratorIntegration(
-                    orchestrator=self,
+                    orchestrator=self,  # type: ignore[arg-type]
                     pipeline=pipeline,
                     config=self._intelligent_integration_config,
                 )
@@ -1061,7 +1061,9 @@ class AgentOrchestrator(
             try:
                 from victor.agent.subagents import SubAgentOrchestrator
 
-                self._subagent_orchestrator = SubAgentOrchestrator(self._settings, self._provider)  # type: ignore[call-arg]
+                self._subagent_orchestrator = SubAgentOrchestrator(
+                    parent_orchestrator=self, role_provider=None, vertical=None
+                )
                 logger.info("SubAgentOrchestrator initialized")
             except ImportError as e:
                 logger.debug(f"SubAgentOrchestrator module not available: {e}")
@@ -1117,7 +1119,7 @@ class AgentOrchestrator(
                 orchestrator=self,
                 state_coordinator=self._state_coordinator,
                 provider_coordinator=self._provider_coordinator,
-                tools=self.tools,
+                tools=getattr(self, "_tool_pipeline", None) or getattr(self, "tool_registrar", None),
                 conversation=self.conversation,
                 mode_controller=getattr(self, "mode_controller", None),
                 unified_tracker=getattr(self, "unified_tracker", None),
@@ -1218,6 +1220,9 @@ class AgentOrchestrator(
             # Access mode_workflow_team_coordinator to trigger lazy initialization
             _ = self.mode_workflow_team_coordinator
 
+        if self._team_coordinator is None:
+            raise RuntimeError("Team coordinator is not initialized")
+
         return self._team_coordinator.get_team_suggestions(task_type, complexity)
 
     # =========================================================================
@@ -1269,7 +1274,11 @@ class AgentOrchestrator(
             config: TieredToolConfig from the active vertical
         """
         # Delegate to ConfigurationManager for centralized management
-        self._configuration_manager.set_tiered_tool_config(
+        configuration_manager = self._configuration_manager
+        if configuration_manager is None:
+            raise RuntimeError("Configuration manager is not initialized")
+
+        configuration_manager.set_tiered_tool_config(
             config=config,
             vertical_context=self._vertical_context,
             tool_access_controller=self._tool_access_controller,
@@ -1476,11 +1485,15 @@ class AgentOrchestrator(
 
     def apply_vertical_middleware(self, middleware_list: List[Any]) -> None:
         """Apply middleware from vertical extensions (called by FrameworkShim)."""
-        self._vertical_integration_adapter.apply_middleware(middleware_list)
+        adapter = self._vertical_integration_adapter
+        if adapter is not None:
+            adapter.apply_middleware(middleware_list)
 
     def apply_vertical_safety_patterns(self, patterns: List[Any]) -> None:
         """Apply safety patterns from vertical extensions (called by FrameworkShim)."""
-        self._vertical_integration_adapter.apply_safety_patterns(patterns)
+        adapter = self._vertical_integration_adapter
+        if adapter is not None:
+            adapter.apply_safety_patterns(patterns)
 
     def get_middleware_chain(self) -> Optional[Any]:
         """Get the middleware chain for tool execution.
@@ -1598,6 +1611,9 @@ class AgentOrchestrator(
             # Access mode_workflow_team_coordinator to trigger lazy initialization
             _ = self.mode_workflow_team_coordinator
 
+        if self._team_coordinator is None:
+            raise RuntimeError("Team coordinator is not initialized")
+
         self._team_coordinator.set_team_specs(specs)
 
     def get_team_specs(self) -> Dict[str, Any]:
@@ -1614,7 +1630,10 @@ class AgentOrchestrator(
             # Access mode_workflow_team_coordinator to trigger lazy initialization
             _ = self.mode_workflow_team_coordinator
 
-        return self._team_coordinator.get_team_specs()  # type: ignore[no-any-return]
+        if self._team_coordinator is None:
+            return {}
+
+        return self._team_coordinator.get_team_specs()
 
     def _get_model_context_window(self) -> int:
         """Get context window size for the current model.
@@ -1762,7 +1781,9 @@ class AgentOrchestrator(
             usage_data: Optional cumulative token usage from provider API.
                        When provided, enables accurate token counts.
         """
-        return self._metrics_coordinator.finalize_stream_metrics(usage_data)  # type: ignore[no-any-return]
+        if self._metrics_coordinator is None:
+            return None
+        return self._metrics_coordinator.finalize_stream_metrics(usage_data)
 
     def get_last_stream_metrics(self) -> Optional[StreamMetrics]:
         """Get metrics from the last streaming session.
@@ -1770,7 +1791,9 @@ class AgentOrchestrator(
         Returns:
             StreamMetrics from the last session or None if no metrics available
         """
-        return self._metrics_coordinator.get_last_stream_metrics()  # type: ignore[no-any-return]
+        if self._metrics_coordinator is None:
+            return None
+        return self._metrics_coordinator.get_last_stream_metrics()
 
     def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
         """Get comprehensive streaming metrics summary.
@@ -1778,7 +1801,9 @@ class AgentOrchestrator(
         Returns:
             Dictionary with aggregated metrics or None if metrics disabled.
         """
-        return self._metrics_coordinator.get_streaming_metrics_summary()  # type: ignore[no-any-return]
+        if self._metrics_coordinator is None:
+            return None
+        return self._metrics_coordinator.get_streaming_metrics_summary()
 
     def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent streaming metrics history.
@@ -1789,11 +1814,15 @@ class AgentOrchestrator(
         Returns:
             List of recent metrics dictionaries
         """
-        return self._metrics_coordinator.get_streaming_metrics_history(limit)  # type: ignore[no-any-return]
+        if self._metrics_coordinator is None:
+            return []
+        return self._metrics_coordinator.get_streaming_metrics_history(limit)
 
     def get_session_cost_summary(self) -> Dict[str, Any]:
         """Get session cost summary."""
-        return self._metrics_coordinator.get_session_cost_summary()  # type: ignore[no-any-return]
+        if self._metrics_coordinator is None:
+            return {}
+        return self._metrics_coordinator.get_session_cost_summary()
 
     def get_session_cost_formatted(self) -> str:
         """Get formatted session cost string (e.g., "$0.0123")."""

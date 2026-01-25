@@ -52,7 +52,7 @@ def learner(coordinator: RLCoordinator) -> QualityWeightLearner:
 def _record_quality_outcome(
     learner: QualityWeightLearner,
     task_type: str = "analysis",
-    dimension_scores: Dict[str, float] = None,
+    dimension_scores: Dict[str, float] | None = None,
     overall_success: float = 0.8,
 ) -> None:
     """Helper to record a quality outcome."""

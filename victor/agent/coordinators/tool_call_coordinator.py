@@ -174,7 +174,8 @@ class ToolCallCoordinator(IToolCallCoordinator):
         """
         # Delegate to tool registry
         try:
-            return self._tool_registry.is_available(tool_name)
+            result = self._tool_registry.is_available(tool_name)
+            return bool(result) if result is not None else False
         except Exception:
             return False
 

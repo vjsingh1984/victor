@@ -189,7 +189,7 @@ class OrchestratorIntegration:
             ),
         )
 
-        return cls(orchestrator, pipeline, config)
+        return cls(orchestrator, pipeline, config)  # type: ignore[arg-type]
 
     async def prepare_request(
         self,
@@ -229,17 +229,24 @@ class OrchestratorIntegration:
         # Note: ConversationStage uses auto() which returns int values,
         # so we use stage.name.lower() to get a string mode name
         if current_mode is None:
-            stage = self._orchestrator.conversation_state.get_current_stage()
-            current_mode = stage.name.lower() if stage else "explore"
+            conversation_state = getattr(self._orchestrator, "conversation_state", None)
+            if conversation_state is not None:
+                stage = conversation_state.get_current_stage()
+                current_mode = stage.name.lower() if stage else "explore"
+            else:
+                current_mode = "explore"
 
         # Prepare context using pipeline
+        unified_tracker = getattr(self._orchestrator, "unified_tracker", None)
+        iteration_count = unified_tracker.iteration_count if unified_tracker else 0
+
         context = await self._pipeline.prepare_request(
             task=task,
             task_type=task_type,
             current_mode=current_mode,
             tool_calls_made=self._orchestrator.tool_calls_used,
             tool_budget=self._orchestrator.tool_budget,
-            iteration_count=self._orchestrator.unified_tracker.iteration_count,
+            iteration_count=iteration_count,
             iteration_budget=20,  # Default iteration budget
             quality_score=0.5,  # Initial quality estimate
         )
@@ -316,15 +323,15 @@ class OrchestratorIntegration:
 
         # Single-pass observer notification
         if self._quality_observers:
-            for observer in self._quality_observers:
+            for quality_observer in self._quality_observers:
                 try:
-                    observer(result.quality_score, result.quality_details)
+                    quality_observer(result.quality_score, result.quality_details)
                 except Exception:
                     pass
         if self._grounding_observers:
-            for observer in self._grounding_observers:
+            for grounding_observer in self._grounding_observers:
                 try:
-                    observer(result.is_grounded, result.grounding_issues)
+                    grounding_observer(result.is_grounded, result.grounding_issues)
                 except Exception:
                     pass
 
@@ -345,11 +352,14 @@ class OrchestratorIntegration:
         if not self._config.enable_mode_learning:
             return True, "Mode learning disabled"
 
+        unified_tracker = getattr(self._orchestrator, "unified_tracker", None)
+        iteration_count = unified_tracker.iteration_count if unified_tracker else 0
+
         return self._pipeline.should_continue(
             tool_calls_made=self._orchestrator.tool_calls_used,
             tool_budget=self._orchestrator.tool_budget,
             quality_score=self._metrics.avg_quality_score,
-            iteration_count=self._orchestrator.unified_tracker.iteration_count,
+            iteration_count=iteration_count,
             iteration_budget=20,
         )
 
@@ -366,7 +376,9 @@ class OrchestratorIntegration:
             return self._pipeline._mode_controller.get_optimal_tool_budget(task_type)
         return self._orchestrator.tool_budget
 
-    def add_quality_observer(self, observer: Callable[[float, Dict[str, float]], None]) -> None:
+    def add_quality_observer(
+        self, observer: Callable[[float, "Dict[str, float]"], None]
+    ) -> None:
         """Add observer for quality score events.
 
         Args:
@@ -374,7 +386,9 @@ class OrchestratorIntegration:
         """
         self._quality_observers.append(observer)
 
-    def add_grounding_observer(self, observer: Callable[[bool, List[str]], None]) -> None:
+    def add_grounding_observer(
+        self, observer: Callable[[bool, "List[str]"], None]
+    ) -> None:
         """Add observer for grounding verification events.
 
         Args:
@@ -442,7 +456,7 @@ class OrchestratorIntegration:
         self._pipeline.reset_session()
 
     @property
-    def orchestrator(self) -> "AgentOrchestrator":
+    def orchestrator(self) -> "IAgentOrchestrator":
         """Get the wrapped orchestrator."""
         return self._orchestrator
 

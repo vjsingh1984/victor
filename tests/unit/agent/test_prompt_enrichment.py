@@ -49,7 +49,7 @@ class MockEnrichmentStrategy:
 
     def __init__(
         self,
-        enrichments: List[ContextEnrichment] = None,
+        enrichments: List[ContextEnrichment] | None = None,
         delay_ms: float = 0,
         should_fail: bool = False,
     ):

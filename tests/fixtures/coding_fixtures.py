@@ -400,7 +400,7 @@ def create_mock_symbol(
     detail: str = "",
     range_start_line: int = 1,
     range_end_line: int = 2,
-    children: List["DocumentSymbol"] = None,
+    children: List["DocumentSymbol"] | None = None,
 ) -> DocumentSymbol:
     """Create a mock document symbol."""
     return DocumentSymbol(
@@ -829,7 +829,7 @@ def create_mock_code_action(
 def create_mock_code_lens(
     range: Range,
     command: Dict[str, Any] | None = None,
-    data: Any = None,
+    data: Any | None = None,
 ) -> Dict[str, Any]:
     """Create a mock code lens."""
     return {

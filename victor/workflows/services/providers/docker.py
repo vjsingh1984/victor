@@ -102,7 +102,7 @@ class DockerServiceProvider(BaseServiceProvider):
             if self._docker_host:
                 self._client = docker_mod.DockerClient(base_url=self._docker_host)  # type: ignore
             else:
-                self._client = docker_mod.from_env()
+                self._client = docker_mod.from_env()  # type: ignore
         return self._client
 
     def _ensure_network(self) -> None:

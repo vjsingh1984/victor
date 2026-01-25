@@ -84,7 +84,7 @@ def insert_outcome(
     task_type: str,
     vertical: str,
     quality_score: float,
-    mode: str = None,
+    mode: str | None = None,
 ):
     """Helper to insert test outcomes."""
     cursor = db_connection.cursor()

@@ -39,7 +39,7 @@ from victor.evaluation.protocol import (
 class MockBenchmarkRunner(BaseBenchmarkRunner):
     """Mock runner for testing."""
 
-    def __init__(self, tasks: list[BenchmarkTask] = None):
+    def __init__(self, tasks: list[BenchmarkTask] | None = None):
         self._tasks = tasks or []
         self._run_results = {}
 
@@ -90,12 +90,12 @@ def create_test_task(
 def create_test_config(
     benchmark: BenchmarkType = BenchmarkType.HUMAN_EVAL,
     model: str = "test-model",
-    max_tasks: int = None,
+    max_tasks: int | None = None,
     parallel_tasks: int = 1,
-    task_ids: list[str] = None,
-    languages: list[str] = None,
-    categories: list[str] = None,
-    difficulties: list[str] = None,
+    task_ids: list[str] | None = None,
+    languages: list[str] | None = None,
+    categories: list[str] | None = None,
+    difficulties: list[str] | None = None,
 ) -> EvaluationConfig:
     """Create a test evaluation config."""
     return EvaluationConfig(

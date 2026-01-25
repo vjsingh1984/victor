@@ -403,7 +403,7 @@ class TestMCPIntegration:
     warning that occurs when mocking _create_task in synchronous tests.
     """
 
-    def _create_registrar(self, mcp_command: str = None):
+    def _create_registrar(self, mcp_command: str | None = None):
         """Create registrar with MCP disabled during init for proper mocking."""
         tools = MagicMock()
         tools.list_tools.return_value = []

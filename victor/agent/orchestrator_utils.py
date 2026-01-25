@@ -52,9 +52,9 @@ def calculate_max_context_chars(
         Maximum context size in characters
     """
     # Check settings override first
-    settings_max = getattr(settings, "max_context_chars", None)
-    if settings_max and settings_max > 0:
-        return settings_max
+    settings_max: Any = getattr(settings, "max_context_chars", None)
+    if settings_max and isinstance(settings_max, (int, float)) and settings_max > 0:
+        return int(settings_max)
 
     # Use externalized config (YAML-based)
     provider_name = getattr(provider, "name", "").lower()

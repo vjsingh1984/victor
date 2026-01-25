@@ -40,6 +40,8 @@ For coding-specific features:
     from victor.coding.codebase import CodebaseIndex
 """
 
+from typing import Any
+
 import warnings
 
 # Suppress pydantic warnings from third-party libraries (lancedb, etc.)

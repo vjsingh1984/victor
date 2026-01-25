@@ -52,7 +52,7 @@ class MockProvider(BaseProvider):
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: list = None,
+        tools: list | None = None,
         **kwargs,
     ) -> CompletionResponse:
         """Mock chat implementation."""
@@ -77,7 +77,7 @@ class MockProvider(BaseProvider):
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: list = None,
+        tools: list | None = None,
         **kwargs,
     ):
         """Mock stream implementation."""

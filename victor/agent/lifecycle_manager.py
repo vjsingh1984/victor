@@ -121,8 +121,9 @@ class LifecycleManager:
         self._usage_logger: Optional[Any] = None
 
         # Orchestrator-specific callbacks for shutdown
-        self._flush_analytics_callback: Optional[callable] = None
-        self._stop_health_monitoring_callback: Optional[callable] = None
+        from typing import Callable
+        self._flush_analytics_callback: Optional[Callable[[], Any]] = None
+        self._stop_health_monitoring_callback: Optional[Callable[[], Any]] = None
 
     def reset_conversation(self) -> None:
         """Clear conversation history and session state.
@@ -510,8 +511,9 @@ class LifecycleManager:
             result = self._flush_analytics_callback()
             # Handle both async and sync callbacks
             if asyncio.iscoroutine(result):
-                return await result
-            return result
+                result_dict = await result
+                return result_dict if isinstance(result_dict, dict) else {}
+            return result if isinstance(result, dict) else {}
         return {}
 
     async def _stop_health_monitoring(self) -> bool:
@@ -523,7 +525,8 @@ class LifecycleManager:
             True if stopped successfully
         """
         if self._stop_health_monitoring_callback:
-            return await self._stop_health_monitoring_callback()
+            result = await self._stop_health_monitoring_callback()
+            return bool(result) if result is not None else True
         return True
 
     # =========================================================================
@@ -570,7 +573,7 @@ class LifecycleManager:
         """
         self._usage_logger = usage_logger
 
-    def set_flush_analytics_callback(self, callback: callable) -> None:
+    def set_flush_analytics_callback(self, callback: Any) -> None:
         """Set callback for flushing analytics during shutdown.
 
         Args:
@@ -578,7 +581,7 @@ class LifecycleManager:
         """
         self._flush_analytics_callback = callback
 
-    def set_stop_health_monitoring_callback(self, callback: callable) -> None:
+    def set_stop_health_monitoring_callback(self, callback: Any) -> None:
         """Set callback for stopping health monitoring during shutdown.
 
         Args:

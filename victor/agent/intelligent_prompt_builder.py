@@ -459,7 +459,7 @@ class EmbeddingScheduler:
         self._service = embedding_service
         self._state = CacheState.COLD
         self._last_refresh: Optional[datetime] = None
-        self._background_task: Optional[asyncio.Task] = None
+        self._background_task: Optional[asyncio.Task[None]] = None
         self._cache: Dict[str, np.ndarray] = {}
         self._cache_ttl = timedelta(minutes=30)
 

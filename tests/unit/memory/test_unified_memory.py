@@ -53,7 +53,7 @@ from victor.storage.memory.unified import (
 class MockMemoryProvider:
     """Mock memory provider for testing."""
 
-    def __init__(self, memory_type: MemoryType, results: List[MemoryResult] = None):
+    def __init__(self, memory_type: MemoryType, results: List[MemoryResult] | None = None):
         self._memory_type = memory_type
         self._results = results or []
         self._stored: Dict[str, Any] = {}

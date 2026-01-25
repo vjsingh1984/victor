@@ -156,7 +156,7 @@ class TestToolAccessCoordinatorCheckAccess:
         assert decision.allowed is False
         assert decision.tool_name == "unknown_tool"
         assert decision.layer == "strict"
-        assert "strict mode" in decision.reason
+        assert "strict mode" in decision.reason  # type: ignore[operator]
 
     def test_check_access_unregistered_tool_no_default_allow(self, mock_tool_registry: Mock):
         """Test access check for unregistered tool with default_allow_all=False."""
@@ -171,7 +171,7 @@ class TestToolAccessCoordinatorCheckAccess:
         assert decision.allowed is False
         assert decision.tool_name == "unknown_tool"
         assert decision.layer == "default"
-        assert "default_allow_all is False" in decision.reason
+        assert "default_allow_all is False" in decision.reason  # type: ignore[operator]
 
     def test_check_access_with_session_enabled_tools(self, coordinator: ToolAccessCoordinator):
         """Test access check with session-enabled tools."""
@@ -209,7 +209,7 @@ class TestToolAccessCoordinatorCheckAccess:
         # Assert
         assert decision.allowed is False
         assert decision.layer == "mode"
-        assert "disallowed by current mode" in decision.reason
+        assert "disallowed by current mode" in decision.reason  # type: ignore[operator]
 
     def test_check_access_with_mode_controller_allow_all(self, mock_tool_registry: Mock):
         """Test access check with mode controller allowing all tools."""

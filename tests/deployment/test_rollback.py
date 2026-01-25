@@ -251,7 +251,7 @@ def mock_kubectl():
             self.ingress = {}
             self.commands_executed = []
 
-        def apply(self, manifest: str, namespace: str = None):
+        def apply(self, manifest: str, namespace: str | None = None):
             """Mock kubectl apply"""
             self.commands_executed.append(f"apply {manifest} -n {namespace}")
             return True
@@ -266,7 +266,7 @@ def mock_kubectl():
             self.commands_executed.append(f"scale {resource} --replicas={replicas} -n {namespace}")
             return True
 
-        def get_pods(self, namespace: str, labels: str = None):
+        def get_pods(self, namespace: str, labels: str | None = None):
             """Mock kubectl get pods"""
             return self.pods.get(namespace, [])
 

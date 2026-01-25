@@ -265,6 +265,12 @@ class OrchestratorRecoveryIntegration:
             )
 
         # Detect failure type
+        if self._handler is None:
+            return RecoveryAction(
+                action="continue",
+                reason="No recovery handler configured",
+            )
+
         failure_type = self._handler.detect_failure(
             content=content,
             tool_calls=tool_calls,
@@ -297,6 +303,13 @@ class OrchestratorRecoveryIntegration:
             )
 
         # Get recovery outcome from handler
+        if self._handler is None:
+            return RecoveryAction(
+                action="abort",
+                failure_type=failure_type,
+                reason="No recovery handler configured",
+            )
+
         outcome = await self._handler.recover(
             failure_type=failure_type,
             provider=provider_name,

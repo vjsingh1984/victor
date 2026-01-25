@@ -131,6 +131,7 @@ class EvaluationCoordinator:
             except ImportError:
                 logger.debug("Event bus not available, event publishing disabled")
                 self._enable_event_publishing = False
+                self._event_bus = None
 
         return self._event_bus
 

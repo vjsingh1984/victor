@@ -21,7 +21,10 @@ Explore modes that modify agent behavior for different tasks.
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+
+if TYPE_CHECKING:
+    from victor.agent.protocols import ModeControllerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -355,21 +358,19 @@ class AgentModeController:
             from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
 
             hooks = get_rl_hooks()
-            if hooks is None:
-                return
+            if hooks is not None:
+                event = RLEvent(
+                    type=RLEventType.MODE_TRANSITION,
+                    mode_from=old_mode.value,
+                    mode_to=new_mode.value,
+                    success=True,  # Transition always succeeds
+                    quality_score=0.5,  # Will be updated by outcome recording
+                    metadata={
+                        "history_length": len(self._mode_history),
+                    },
+                )
 
-            event = RLEvent(
-                type=RLEventType.MODE_TRANSITION,
-                mode_from=old_mode.value,
-                mode_to=new_mode.value,
-                success=True,  # Transition always succeeds
-                quality_score=0.5,  # Will be updated by outcome recording
-                metadata={
-                    "history_length": len(self._mode_history),
-                },
-            )
-
-            hooks.emit(event)
+                hooks.emit(event)
 
         except Exception as e:
             logger.debug(f"Mode transition event emission failed: {e}")
@@ -454,7 +455,7 @@ class AgentModeController:
                 "mode": mode.value,
                 "name": MODE_CONFIGS[mode].name,
                 "description": MODE_CONFIGS[mode].description,
-                "current": mode == self._current_mode,
+                "current": str(mode == self._current_mode),
             }
             for mode in AgentMode
         ]
@@ -464,7 +465,7 @@ class AgentModeController:
 _mode_controller: Optional[AgentModeController] = None
 
 
-def get_mode_controller() -> "ModeControllerProtocol":
+def get_mode_controller() -> AgentModeController:
     """Get or create the mode controller.
 
     Resolution order:
@@ -482,12 +483,12 @@ def get_mode_controller() -> "ModeControllerProtocol":
         from victor.agent.protocols import ModeControllerProtocol
 
         container = get_container()
+        # Register AgentModeController as the implementation
         if container.is_registered(ModeControllerProtocol):
-            controller = container.get(ModeControllerProtocol)
-            # Ensure we return the actual instance, not the protocol class
-            if isinstance(controller, type):
-                raise RuntimeError("Expected controller instance, got class")
-            return controller
+            controller: Any = container.get(ModeControllerProtocol)
+            # Cast to AgentModeController since we know it's an instance
+            if isinstance(controller, AgentModeController):
+                return controller
     except Exception:
         pass  # Fall back to legacy singleton
 

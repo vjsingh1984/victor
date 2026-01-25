@@ -27,7 +27,7 @@ Thread Safety:
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +161,9 @@ class TeamCoordinator:
 
             registry_specs = get_team_registry().find_by_vertical(vertical_name)
             # Strip namespace prefix for compatibility with local team names
-            normalized: Dict[str, Any] = {}
+            if not isinstance(registry_specs, dict):
+                registry_specs = {}
+            normalized: Dict[str, Any] = cast("Dict[str, Any]", registry_specs)
             for name, spec in registry_specs.items():
                 short_name = name.split(":", 1)[-1] if ":" in name else name
                 normalized[short_name] = spec

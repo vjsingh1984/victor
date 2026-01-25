@@ -65,7 +65,10 @@ if TYPE_CHECKING:
     from victor.agent.tool_selector import ToolSelector
     from victor.agent.protocols import ToolAccessContext
     from victor.agent.prompts.system import SystemPromptBuilder
-    from victor.agent.conversation import Conversation
+    try:
+        from victor.agent.conversation import Conversation
+    except ImportError:
+        Conversation = Any  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +157,7 @@ class OrchestratorProtocolAdapter:
         from victor.core.state import ConversationStage
 
         # StateCoordinator returns stage name, convert to enum
-        stage_name: str = self._state_coordinator.get_stage()
+        stage_name: Optional[str] = self._state_coordinator.get_stage()
         if stage_name:
             return ConversationStage[stage_name]
         return ConversationStage.INITIAL

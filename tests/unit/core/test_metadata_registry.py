@@ -42,18 +42,18 @@ class MockTool:
         self,
         name: str,
         description: str = "Test tool",
-        category: str = None,
-        keywords: list = None,
-        stages: list = None,
+        category: str | None = None,
+        keywords: list | None = None,
+        stages: list | None = None,
         priority: Priority = Priority.MEDIUM,
         access_mode: AccessMode = AccessMode.READONLY,
         danger_level: DangerLevel = DangerLevel.SAFE,
         cost_tier: CostTier = CostTier.FREE,
         # NEW: Semantic selection attributes
-        mandatory_keywords: list = None,
-        task_types: list = None,
-        progress_params: list = None,
-        execution_category: ExecutionCategory = None,
+        mandatory_keywords: list | None = None,
+        task_types: list | None = None,
+        progress_params: list | None = None,
+        execution_category: ExecutionCategory | None = None,
     ):
         self.name = name
         self.description = description

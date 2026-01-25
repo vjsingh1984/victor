@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 # Issue Reference: GAP-15, workflow-test-issues.md Issue #3
 # =============================================================================
 
-GROUNDING_STOPWORDS: frozenset = frozenset(
+GROUNDING_STOPWORDS: frozenset[str] = frozenset(
     {
         # Articles and determiners
         "a",

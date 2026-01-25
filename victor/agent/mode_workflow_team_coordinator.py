@@ -310,8 +310,8 @@ class LearningBasedTeamSelector:
             return None
 
         try:
-            recommendation = self._learner.get_recommendation(task_type)
-            if recommendation and not recommendation.is_baseline:
+            recommendation = self._learner.suggest_team(task_type)
+            if recommendation and hasattr(recommendation, 'is_baseline') and not recommendation.is_baseline:
                 # Map formation to team name
                 return self._find_team_for_recommendation(recommendation, available_teams)
         except Exception as e:
@@ -331,7 +331,7 @@ class LearningBasedTeamSelector:
             return []
 
         try:
-            recommendation = self._learner.get_recommendation(task_type)
+            recommendation = self._learner.suggest_team(task_type)
             if recommendation:
                 return [
                     TeamRecommendation(
@@ -843,9 +843,8 @@ def create_coordinator(
         Configured coordinator
     """
     # Create team selector based on strategy
-    team_selector: TeamSelectionStrategyProtocol
     if selection_strategy == "rule":
-        team_selector = RuleBasedTeamSelector()
+        team_selector: TeamSelectionStrategyProtocol = RuleBasedTeamSelector()
     elif selection_strategy == "learning":
         team_selector = LearningBasedTeamSelector(team_learner)
     else:  # hybrid

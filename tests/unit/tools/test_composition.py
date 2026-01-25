@@ -42,7 +42,7 @@ from victor.tools.composition import (
 class MockRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
     """Mock runnable for testing."""
 
-    def __init__(self, name: str, transform: callable = None):
+    def __init__(self, name: str, transform: callable | None = None):
         self._name = name
         self._transform = transform or (lambda x: x)
         self.invoke_count = 0
@@ -55,7 +55,7 @@ class MockRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
     async def invoke(
         self,
         input: Dict[str, Any],
-        config: RunnableConfig = None,
+        config: RunnableConfig | None = None,
     ) -> Dict[str, Any]:
         self.invoke_count += 1
         self.last_input = input

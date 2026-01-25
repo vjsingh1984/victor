@@ -159,9 +159,8 @@ def deprecated_property(
     """
 
     def decorator(func: F) -> F:
-        @property  # type: ignore
         @functools.wraps(func)
-        def wrapper(self) -> Any:
+        def wrapper(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore[misc]
             # Build deprecation message
             parts = [f"Property '{func.__name__}' is deprecated"]
 
@@ -188,9 +187,10 @@ def deprecated_property(
             logger.debug(f"Deprecated property accessed: {message}")
 
             # Call the original property getter
-            return func(self)  # type: ignore
+            return func(self)
 
-        return wrapper  # type: ignore
+        # Convert to property
+        return property(wrapper)  # type: ignore [return-value]
 
     return decorator
 

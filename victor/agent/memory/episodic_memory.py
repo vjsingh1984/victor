@@ -306,7 +306,7 @@ class MemoryIndex:
     """
 
     embeddings: Dict[str, np.ndarray] = field(default_factory=dict)
-    metadata_index: Dict[str, Dict[str, List[str]]] = field(
+    metadata_index: Dict[str, Any] = field(
         default_factory=lambda: {"by_key": {}}
     )  # key -> value -> [episode_ids]
     action_index: Dict[str, List[str]] = field(default_factory=dict)  # action -> [episode_ids]
@@ -351,8 +351,12 @@ class MemoryIndex:
             episode_id: Episode ID
             metadata: Metadata dictionary
         """
+        # metadata_index structure: {"by_key": {key: {value: [episode_ids]}}}
+        if "by_key" not in self.metadata_index:
+            self.metadata_index["by_key"] = {}
+
+        by_key = self.metadata_index["by_key"]
         for key, value in metadata.items():
-            by_key = self.metadata_index.get("by_key", {})
             if key not in by_key:
                 by_key[key] = {}
 
@@ -410,11 +414,12 @@ class MemoryIndex:
         self.remove_embedding(episode_id)
 
         # Remove from metadata index
-        by_key = self.metadata_index.get("by_key", {})
-        for key in by_key:
-            for value in by_key[key]:
-                if episode_id in by_key[key][value]:
-                    by_key[key][value].remove(episode_id)
+        if "by_key" in self.metadata_index:
+            by_key = self.metadata_index["by_key"]
+            for key in list(by_key.keys()):
+                for value in list(by_key[key].keys()):
+                    if episode_id in by_key[key][value]:
+                        by_key[key][value].remove(episode_id)
 
         # Remove from action index
         for action in self.action_index:
@@ -442,12 +447,13 @@ class MemoryIndex:
             return []
 
         result_sets = []
-        by_key = self.metadata_index.get("by_key", {})
-        for key, value in filters.items():
-            if key in by_key:
-                value_str = str(value)
-                if value_str in by_key[key]:
-                    result_sets.append(set(by_key[key][value_str]))
+        if "by_key" in self.metadata_index:
+            by_key = self.metadata_index["by_key"]
+            for key, value in filters.items():
+                if key in by_key:
+                    value_str = str(value)
+                    if value_str in by_key[key]:
+                        result_sets.append(set(by_key[key][value_str]))
 
         if not result_sets:
             return []

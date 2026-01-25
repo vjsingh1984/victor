@@ -396,7 +396,7 @@ class ProficiencyTracker:
 
         self._cache: Dict[str, ProficiencyScore] = {}
         self._moving_avg_window = moving_avg_window
-        self._moving_avg_cache: Dict[str, deque] = {}
+        self._moving_avg_cache: Dict[str, deque[Any]] = {}
         self._ensure_tables()
 
     def _ensure_tables(self) -> None:
@@ -765,7 +765,8 @@ class ProficiencyTracker:
         if not row or row[1] == 0:
             return 0.0
 
-        return row[0] / row[1]
+        success_rate = row[0] / row[1]
+        return float(success_rate)
 
     def suggest_tool_for_task(self, task: str) -> Optional[str]:
         """Suggest optimal tool for a task.
@@ -798,7 +799,7 @@ class ProficiencyTracker:
         if not row:
             return None
 
-        return row[0]
+        return str(row[0]) if row[0] is not None else None
 
     def get_improvement_suggestions(
         self, agent_id: str, min_executions: int = 10

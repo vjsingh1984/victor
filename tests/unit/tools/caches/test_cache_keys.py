@@ -194,7 +194,7 @@ class TestToolsHashCalculation:
 
         # Create a mock tool registry
         class MockTool:
-            def __init__(self, name: str, description: str = "", parameters: dict = None):
+            def __init__(self, name: str, description: str = "", parameters: dict | None = None):
                 self.name = name
                 self.description = description
                 self.parameters = parameters or {}

@@ -2183,7 +2183,7 @@ class ConversationStore:
             logger.warning(f"Semantic retrieval failed: {e}")
             return []
 
-    def get_relevant_summaries(
+    async def get_relevant_summaries(
         self,
         session_id: str,
         query: str,

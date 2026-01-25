@@ -336,6 +336,7 @@ class SessionRecoveryManager:
             if store is None:
                 logger.warning("Conversation store not available")
                 return False
+
             stats = store.get_session_stats(session_id)
             if stats is None:
                 logger.warning(f"Session {session_id} not found")
