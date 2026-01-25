@@ -162,10 +162,9 @@ class TestProviderSwitchingIntegration:
         with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
-            # Switch provider (keep same model) - use coordinator's async method
-            success = await orchestrator._provider_coordinator.switch_provider(
-                provider_name="mock2", model=initial_model
-            )
+            # Switch provider using orchestrator's sync switch_provider method
+            # This internally handles the async coordinator call
+            success = orchestrator.switch_provider("mock2", model=initial_model)
 
             # ProviderManager's switch_provider doesn't return a value, it just switches
             assert success is True
@@ -180,10 +179,8 @@ class TestProviderSwitchingIntegration:
         with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
-            # Switch provider with different model - use coordinator's async method
-            success = await orchestrator._provider_coordinator.switch_provider(
-                provider_name="mock2", model=new_model
-            )
+            # Switch provider using orchestrator's sync method
+            success = orchestrator.switch_provider("mock2", model=new_model)
 
             assert success is True
             assert orchestrator.model == new_model
@@ -192,17 +189,14 @@ class TestProviderSwitchingIntegration:
     @pytest.mark.asyncio
     async def test_switch_provider_with_custom_settings(self, orchestrator, mock_provider2):
         """Test switching provider with custom provider settings."""
-        # Note: The protocol method doesn't support **kwargs for custom settings
-        # This test verifies that the implementation handles custom settings correctly
+        # Note: Settings are passed through provider_kwargs
         custom_settings = {"base_url": "http://localhost:8080", "timeout": 60}
 
         with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
-            # Switch with custom settings - coordinator's async method
-            success = await orchestrator._provider_coordinator.switch_provider(
-                provider_name="mock2", model="model"
-            )
+            # Switch with custom settings using orchestrator's sync method
+            success = orchestrator.switch_provider("mock2", model="model", **custom_settings)
 
             # Verify registry was called (settings would be passed through internally)
             assert success is True
@@ -220,10 +214,8 @@ class TestProviderModelCombinedSwitching:
         with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
-            # Switch both provider and model - use coordinator's async method
-            success = await orchestrator._provider_coordinator.switch_provider(
-                provider_name="mock2", model="new-model"
-            )
+            # Switch both provider and model using orchestrator's sync method
+            success = orchestrator.switch_provider("mock2", "new-model")
 
             assert success is True
             assert orchestrator.model == "new-model"
@@ -244,10 +236,8 @@ class TestProviderModelCombinedSwitching:
         with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
-            # Switch to profile (both provider and model) - use coordinator's async method
-            success = await orchestrator._provider_coordinator.switch_provider(
-                provider_name=profile.provider, model=profile.model
-            )
+            # Switch to profile using orchestrator's sync method
+            success = orchestrator.switch_provider(profile.provider, profile.model)
 
             assert success is True
             assert orchestrator.model == profile.model
@@ -283,19 +273,15 @@ class TestProfileBasedSwitching:
         with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
-            # Start with fast profile - use coordinator's async method
+            # Start with fast profile - use orchestrator's sync method
             profile1 = profiles_config["fast"]
-            success1 = await orchestrator._provider_coordinator.switch_provider(
-                provider_name=profile1.provider, model=profile1.model
-            )
+            success1 = orchestrator.switch_provider(profile1.provider, profile1.model)
             assert success1 is True
             assert orchestrator.model == profile1.model
 
-            # Switch to smart profile - use coordinator's async method
+            # Switch to smart profile - use orchestrator's sync method
             profile2 = profiles_config["smart"]
-            success2 = await orchestrator._provider_coordinator.switch_provider(
-                provider_name=profile2.provider, model=profile2.model
-            )
+            success2 = orchestrator.switch_provider(profile2.provider, profile2.model)
             assert success2 is True
             assert orchestrator.model == profile2.model
 
@@ -323,8 +309,7 @@ class TestProfileBasedSwitching:
 class TestSwitchSequencePreservation:
     """Integration tests for context and state preservation during switching."""
 
-    @pytest.mark.asyncio
-    async def test_model_switch_preserves_conversation_state(self, orchestrator):
+    def test_model_switch_preserves_conversation_state(self, orchestrator):
         """Test that model switch preserves conversation state."""
         # Add messages to conversation using the correct API
         orchestrator.add_message("user", "Question 1")
@@ -332,8 +317,8 @@ class TestSwitchSequencePreservation:
 
         initial_count = orchestrator.get_message_count()
 
-        # Switch model using coordinator's async method
-        await orchestrator._provider_coordinator.switch_model("new-model")
+        # Switch model using orchestrator's sync method
+        orchestrator.switch_model("new-model")
 
         # Conversation should be preserved
         assert orchestrator.get_message_count() == initial_count
@@ -355,10 +340,8 @@ class TestSwitchSequencePreservation:
         with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
-            # Switch provider using coordinator's async method
-            success = await orchestrator._provider_coordinator.switch_provider(
-                provider_name="mock2", model="new-model"
-            )
+            # Switch provider using orchestrator's sync method
+            success = orchestrator.switch_provider("mock2", "new-model")
 
             assert success is True
             # Conversation should be preserved
@@ -378,20 +361,18 @@ class TestSwitchSequencePreservation:
         with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
 
-            # First switch (model - coordinator's async method)
-            success1 = await orchestrator._provider_coordinator.switch_model("model1")
+            # First switch (model - orchestrator's sync method)
+            success1 = orchestrator.switch_model("model1")
             assert success1 is True
             assert orchestrator.get_message_count() == 2
 
-            # Second switch (model - coordinator's async method)
-            success2 = await orchestrator._provider_coordinator.switch_model("model2")
+            # Second switch (model - orchestrator's sync method)
+            success2 = orchestrator.switch_model("model2")
             assert success2 is True
             assert orchestrator.get_message_count() == 2
 
-            # Provider switch (coordinator's async method)
-            success3 = await orchestrator._provider_coordinator.switch_provider(
-                provider_name="mock2", model="model3"
-            )
+            # Provider switch (orchestrator's sync method)
+            success3 = orchestrator.switch_provider("mock2", "model3")
             assert success3 is True
             assert orchestrator.get_message_count() == 2
 
