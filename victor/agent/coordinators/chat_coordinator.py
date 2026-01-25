@@ -278,7 +278,7 @@ class ChatCoordinator:
         # Apply guidance for analysis/action tasks
         self._apply_task_guidance(
             user_message,
-            stream_ctx.unified_task_type,
+            cast("TrackerTaskType", stream_ctx.unified_task_type),
             stream_ctx.is_analysis_task,
             stream_ctx.is_action_task,
             stream_ctx.needs_execution,
@@ -492,6 +492,7 @@ class ChatCoordinator:
                             f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop"
                         )
                 else:
+                    fallback_msg: str = ""
                     if orch._recovery_coordinator is not None:
                         recovery_ctx = self._create_recovery_context(stream_ctx)
                         fallback_msg = orch._recovery_coordinator.get_recovery_fallback_message(
@@ -511,12 +512,14 @@ class ChatCoordinator:
             for tc in tool_calls or []:
                 tool_name = tc.get("name", "")
                 tool_args = tc.get("arguments", {})
-                orch.unified_tracker.record_tool_call(tool_name, tool_args)
+                if orch.unified_tracker is not None:
+                    orch.unified_tracker.record_tool_call(tool_name, tool_args)
 
             content_length = len(full_content.strip())
 
             # Record iteration in unified tracker
-            orch.unified_tracker.record_iteration(content_length)
+            if orch.unified_tracker is not None:
+                orch.unified_tracker.record_iteration(content_length)
 
             # Intelligent pipeline post-iteration hook: validate response quality
             if full_content and len(full_content.strip()) > 50:
@@ -915,7 +918,7 @@ class ChatCoordinator:
             ctx.unified_task_type = ClassifierTaskType(unified_task_type.value)
         except ValueError:
             ctx.unified_task_type = ClassifierTaskType.DEFAULT
-        ctx.task_classification = task_classification  # type: ignore[assignment]
+        ctx.task_classification = task_classification
         ctx.complexity_tool_budget = complexity_tool_budget
 
         # Add task keyword results
@@ -943,9 +946,6 @@ class ChatCoordinator:
         # Sync tool tracking from orchestrator to context
         ctx.tool_budget = orch.tool_budget
         ctx.tool_calls_used = orch.tool_calls_used
-
-        # Task Completion Detection Enhancement
-        ctx.task_completion_detector = orch._task_completion_detector
 
         return ctx
 
@@ -979,8 +979,9 @@ class ChatCoordinator:
             result = orch.task_coordinator.prepare_task(
                 user_message, unified_task_type, orch.conversation_controller
             )
-            return result  # type: ignore[no-any-return]
-        return None
+            if result is not None:
+                return result
+        return {}, 0  # Default: no classification, no complexity budget
 
     def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task based on keywords in the user message.
@@ -1491,13 +1492,14 @@ class ChatCoordinator:
             Number of seconds to wait before retrying
         """
         orch = self._orch()
+        base_wait: float
         if orch._provider_coordinator is not None:
-            wait_time_val = orch._provider_coordinator.get_rate_limit_wait_time(exc)
+            wait_time_val: Any = orch._provider_coordinator.get_rate_limit_wait_time(exc)
             base_wait = float(wait_time_val) if wait_time_val is not None else 1.0
         else:
             base_wait = 1.0
-        backoff_multiplier = 2**attempt
-        wait_time = base_wait * backoff_multiplier
+        backoff_multiplier: float = 2**attempt
+        wait_time: float = base_wait * backoff_multiplier
         return min(wait_time, 300.0)
 
     async def _stream_with_rate_limit_retry(
