@@ -226,7 +226,8 @@ def create_base_mock_orchestrator(supports_tools: bool = True) -> Mock:
     orch._metrics_coordinator.stop_streaming = Mock()
     orch._metrics_collector = Mock()
     # Create a proper StreamMetrics object for init_stream_metrics
-    from victor.providers.stream_adapter import StreamMetrics
+    # Use stream_handler.StreamMetrics which has both total_content_length and tool_calls_count
+    from victor.agent.stream_handler import StreamMetrics
 
     orch._metrics_collector.init_stream_metrics = Mock(return_value=StreamMetrics(start_time=0.0))
     orch._metrics_collector.record_first_token = Mock()
