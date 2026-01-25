@@ -1270,10 +1270,12 @@ class VictorAPIServer:
                         try:
                             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                                 lines = len(f.readlines())
-                                metrics["lines_of_code"] += lines
-                                metrics["files_by_type"][ext] = (
-                                    metrics["files_by_type"].get(ext, 0) + 1
-                                )
+                                loc_val = metrics.get("lines_of_code", 0)
+                                assert isinstance(loc_val, int)
+                                metrics["lines_of_code"] = loc_val + lines
+                                files_by_type = metrics["files_by_type"]
+                                assert isinstance(files_by_type, dict)
+                                files_by_type[ext] = files_by_type.get(ext, 0) + 1
                                 file_sizes.append(
                                     {
                                         "path": str(path.relative_to(root)),
@@ -1285,7 +1287,7 @@ class VictorAPIServer:
                             pass
 
             # Get largest files
-            file_sizes.sort(key=lambda x: int(x.get("lines", 0) if isinstance(x.get("lines"), int) else 0), reverse=True)  # type: ignore[arg-type]
+            file_sizes.sort(key=lambda x: x.get("lines", 0) if isinstance(x.get("lines"), int) else 0, reverse=True)
             metrics["largest_files"] = file_sizes[:10]
 
             return web.json_response(metrics)
@@ -1763,13 +1765,17 @@ class VictorAPIServer:
                 # Get server entry directly from registry
                 server_entry = registry._servers.get(name)  # type: ignore[attr-defined]
                 if server_entry:
-                    server_info = server_entry.instance.get_server_info() if server_entry.instance else {}
+                    # Check if client is connected
+                    is_connected = (
+                        server_entry.client is not None
+                        and server_entry.status.value == "connected"
+                    )
                     servers.append(
                         {
                             "name": name,
-                            "connected": getattr(server_entry.instance, "is_connected", False) if server_entry.instance else False,
-                            "tools": server_info.get("tools", []),
-                            "endpoint": server_info.get("endpoint"),
+                            "connected": is_connected,
+                            "tools": [tool.name for tool in server_entry.tools_cache],
+                            "endpoint": server_entry.config.endpoint if hasattr(server_entry.config, "endpoint") else None,
                         }
                     )
 

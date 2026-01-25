@@ -315,7 +315,7 @@ def create_auth_middleware(
             )
 
         # Attach client_id to request for downstream use
-        request["client_id"] = client_id  # type: ignore[index]
+        request["client_id"] = client_id
 
         result: Response = await handler(request)
         return result

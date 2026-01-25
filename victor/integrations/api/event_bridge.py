@@ -215,7 +215,7 @@ class EventBroadcaster:
             try:
                 event: BridgeEvent = await asyncio.wait_for(
                     self._event_queue.get(), timeout=1.0
-                )  # type: ignore[arg-type]
+                )
                 await self._send_to_clients(event)
             except asyncio.TimeoutError:
                 continue

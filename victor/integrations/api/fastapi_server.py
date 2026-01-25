@@ -1747,15 +1747,22 @@ Respond with just the command to run."""
                 servers = []
 
                 for name in registry.list_servers():
-                    server_info = registry.get_server_info(name)
-                    servers.append(
-                        {
-                            "name": name,
-                            "connected": server_info.get("connected", False),
-                            "tools": server_info.get("tools", []),
-                            "endpoint": server_info.get("endpoint"),
-                        }
-                    )
+                    # Get server entry directly from registry
+                    server_entry = registry._servers.get(name)  # type: ignore[attr-defined]
+                    if server_entry:
+                        # Check if client is connected
+                        is_connected = (
+                            server_entry.client is not None
+                            and server_entry.status.value == "connected"
+                        )
+                        servers.append(
+                            {
+                                "name": name,
+                                "connected": is_connected,
+                                "tools": [tool.name for tool in server_entry.tools_cache],
+                                "endpoint": server_entry.config.endpoint if hasattr(server_entry.config, "endpoint") else None,
+                            }
+                        )
 
                 return JSONResponse({"servers": servers})
 
@@ -1772,7 +1779,7 @@ Respond with just the command to run."""
                 from victor.integrations.mcp.registry import get_mcp_registry
 
                 registry = get_mcp_registry()
-                success = await registry.connect(request.server, endpoint=request.endpoint)
+                success = await registry.connect(request.server)
 
                 return JSONResponse({"success": success, "server": request.server})
 
@@ -2281,7 +2288,7 @@ Respond with just the command to run."""
             plan["executed_at"] = time.time()
 
             # Execute steps asynchronously (simplified - in production would use background task)
-            async def execute_steps():
+            async def execute_steps() -> None:
                 try:
                     steps = plan.get("steps", [])
                     for i, step in enumerate(steps):
@@ -2454,7 +2461,7 @@ Respond with just the command to run."""
             )
 
             # Start team execution in background
-            async def execute_team():
+            async def execute_team() -> None:
                 try:
                     from victor.teams import (
                         TeamConfig,
@@ -2761,7 +2768,7 @@ Respond with just the command to run."""
                 )
 
                 # Execute in background
-                async def run_workflow():
+                async def run_workflow() -> None:
                     try:
                         orchestrator = await self._get_orchestrator()
                         executor = WorkflowExecutor(orchestrator)
@@ -3210,7 +3217,7 @@ Respond with just the command to run."""
 
             # Create HITL store - SQLite for persistence, in-memory otherwise
             if self.hitl_persistent:
-                self._hitl_store = SQLiteHITLStore()
+                self._hitl_store = SQLiteHITLStore()  # type: ignore[assignment]
                 if hasattr(self._hitl_store, "db_path"):
                     logger.info(f"HITL using SQLite store: {self._hitl_store.db_path}")
                 else:
@@ -3221,7 +3228,7 @@ Respond with just the command to run."""
 
             # Create and include the HITL router
             hitl_router = create_hitl_router(
-                store=self._hitl_store,
+                store=self._hitl_store,  # type: ignore[arg-type]
                 require_auth=bool(self.hitl_auth_token),
                 auth_token=self.hitl_auth_token,
             )

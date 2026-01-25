@@ -476,17 +476,17 @@ def _include_hitl_api(
 
         # Create HITL store
         if persistent:
-            hitl_store = SQLiteHITLStore()
+            hitl_store = SQLiteHITLStore()  # type: ignore[assignment]
             logger.info(f"HITL using SQLite store: {hitl_store.db_path}")
         else:
             hitl_store = HITLStore()
             logger.info("HITL using in-memory store")
 
-        app.state.hitl_store = hitl_store
+        app.state.hitl_store = hitl_store  # type: ignore[assignment]
 
         # Create HITL router
         hitl_router = create_hitl_router(
-            store=hitl_store,
+            store=hitl_store,  # type: ignore[arg-type]
             require_auth=bool(auth_token),
             auth_token=auth_token,
         )
@@ -530,14 +530,14 @@ def _include_workflow_editor_api(app: FastAPI) -> None:
 
             # Create convenience proxies for common endpoints
             @app.get("/api/v1/workflows/nodes/types", tags=["Workflows"])
-            async def get_node_types_proxy():
+            async def get_node_types_proxy() -> JSONResponse:
                 """Get available workflow node types."""
                 from tools.workflow_editor.backend.api import get_node_types
 
                 return await get_node_types()
 
             @app.get("/api/v1/workflows/formations", tags=["Workflows"])
-            async def get_formations_proxy():
+            async def get_formations_proxy() -> JSONResponse:
                 """Get available team formation types."""
                 from tools.workflow_editor.backend.api import get_formations
 
@@ -551,7 +551,7 @@ def _include_workflow_editor_api(app: FastAPI) -> None:
             logger.info("Creating simplified workflow endpoints")
 
             @app.get("/api/v1/workflows/nodes/types", tags=["Workflows"])
-            async def get_node_types_fallback():
+            async def get_node_types_fallback() -> Dict[str, Any]:
                 """Get available workflow node types (simplified)."""
                 return {
                     "agent": {
@@ -582,7 +582,7 @@ def _include_workflow_editor_api(app: FastAPI) -> None:
                 }
 
             @app.get("/api/v1/workflows/formations", tags=["Workflows"])
-            async def get_formations_fallback():
+            async def get_formations_fallback() -> Dict[str, Any]:
                 """Get available team formation types (simplified)."""
                 return {
                     "parallel": {
@@ -618,17 +618,17 @@ def _setup_frontend_routes(app: FastAPI) -> None:
 
     # Redirect root to landing page
     @app.get("/", response_class=RedirectResponse, include_in_schema=False)
-    async def root():
+    async def root() -> RedirectResponse:
         return RedirectResponse(url="/ui")
 
     # Landing page
     @app.get("/ui", response_class=HTMLResponse, include_in_schema=False)
-    async def ui_landing():
+    async def ui_landing() -> HTMLResponse:
         return HTMLResponse(content=LANDING_PAGE_HTML)
 
     # HITL UI
     @app.get("/ui/hitl", response_class=HTMLResponse, include_in_schema=False)
-    async def hitl_ui():
+    async def hitl_ui() -> HTMLResponse:
         try:
             from victor.workflows.hitl_api import get_hitl_ui_html
 
@@ -641,7 +641,7 @@ def _setup_frontend_routes(app: FastAPI) -> None:
 
     # Workflow editor UI
     @app.get("/ui/workflow-editor", response_class=HTMLResponse, include_in_schema=False)
-    async def workflow_editor_ui():
+    async def workflow_editor_ui() -> HTMLResponse:
         workflow_editor_dist = (
             Path(__file__).parent.parent.parent.parent
             / "tools"
