@@ -120,6 +120,7 @@ dev = [
     "pytest-mock>=3.12",
     "pytest-json-report>=1.5.0",
     "pytest-benchmark>=5.0",  # For performance tests
+    "pytest-timeout>=2.3",  # For test timeout protection (prevents hanging)
     "hypothesis>=6.0",  # For property-based testing
     "respx>=0.21",
     "pandas>=2.0",  # For data analysis handler tests
