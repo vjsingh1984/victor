@@ -63,6 +63,7 @@ from typing import (
     Optional,
     Protocol,
     Type,
+    cast,
     runtime_checkable,
 )
 
@@ -579,9 +580,9 @@ class SlackTransport(BaseTransport):
         headers = {}
         if self.slack_config.bot_token:
             headers["Authorization"] = f"Bearer {self.slack_config.bot_token}"
-            url = "https://slack.com/api/chat.postMessage"
+            url: str = "https://slack.com/api/chat.postMessage"
         else:
-            url = self.slack_config.webhook_url
+            url = self.slack_config.webhook_url or ""
 
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload, headers=headers) as resp:
@@ -589,7 +590,7 @@ class SlackTransport(BaseTransport):
                 if not data.get("ok", True):  # Webhook returns no 'ok' field
                     logger.error(f"Slack API error: {data}")
 
-                message_ts = data.get("ts", request.request_id)
+                message_ts: str = data.get("ts", request.request_id)
                 self._message_ts[request.request_id] = message_ts
 
         logger.info(f"Sent Slack message for {request.request_id}")
@@ -633,22 +634,22 @@ class SlackTransport(BaseTransport):
                 "type": "actions",
                 "block_id": f"hitl_{request.request_id}",
                 "elements": [
-                    {
+                    cast(Dict[str, Any], {
                         "type": "button",
                         "text": {"type": "plain_text", "text": "✓ Approve"},
                         "style": "primary",
                         "action_id": "approve",
                         "value": request.request_id,
                         "url": urls.get("approve_url"),
-                    },
-                    {
+                    }),
+                    cast(Dict[str, Any], {
                         "type": "button",
                         "text": {"type": "plain_text", "text": "✗ Reject"},
                         "style": "danger",
                         "action_id": "reject",
                         "value": request.request_id,
                         "url": urls.get("reject_url"),
-                    },
+                    }),
                 ],
             }
         )
@@ -658,12 +659,12 @@ class SlackTransport(BaseTransport):
         blocks.append(
             {
                 "type": "context",
-                "elements": [
+                "elements": cast(List[Dict[str, Any]], [
                     {
                         "type": "mrkdwn",
                         "text": f"⏱️ Timeout: {request.timeout}s | Request ID: `{req_id_short}...`",
                     }
-                ],
+                ]),
             }
         )
 

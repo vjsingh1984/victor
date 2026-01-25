@@ -115,7 +115,11 @@ def discover_workflows(
 
     try:
         package = importlib.import_module(package_path)
-        package_dir = Path(package.__file__).parent
+        package_file = package.__file__
+        if package_file is None:
+            logger.warning(f"Package {package_path} has no __file__ attribute")
+            return workflows
+        package_dir = Path(package_file).parent
 
         for _, module_name, is_pkg in pkgutil.iter_modules([str(package_dir)]):
             if is_pkg or module_name in exclude:

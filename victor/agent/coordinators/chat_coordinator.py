@@ -278,7 +278,7 @@ class ChatCoordinator:
         # Apply guidance for analysis/action tasks
         self._apply_task_guidance(
             user_message,
-            stream_ctx.unified_task_type,  # type: ignore[arg-type]
+            stream_ctx.unified_task_type,
             stream_ctx.is_analysis_task,
             stream_ctx.is_action_task,
             stream_ctx.needs_execution,
@@ -309,7 +309,7 @@ class ChatCoordinator:
                     "Only explore if absolutely necessary to complete the task.",
                 )
 
-        goals = orch._tool_planner.infer_goals_from_message(user_message) if orch._tool_planner else []  # type: ignore[union-attr]
+        goals = orch._tool_planner.infer_goals_from_message(user_message) if orch._tool_planner else []
 
         # Log all limits for debugging
         logger.info(
@@ -456,23 +456,25 @@ class ChatCoordinator:
                     )
             elif not tool_calls:
                 # No content and no tool calls - check for natural completion
-                recovery_ctx = self._create_recovery_context(stream_ctx)
-                final_chunk = orch._recovery_coordinator.check_natural_completion(
-                    recovery_ctx, has_tool_calls=False, content_length=0
-                )
-                if final_chunk:
-                    yield final_chunk
-                    return
+                if orch._recovery_coordinator is not None:
+                    recovery_ctx = self._create_recovery_context(stream_ctx)
+                    final_chunk = orch._recovery_coordinator.check_natural_completion(
+                        recovery_ctx, has_tool_calls=False, content_length=0
+                    )
+                    if final_chunk:
+                        yield final_chunk
+                        return
 
                 # No substantial content yet - attempt aggressive recovery
                 logger.warning("Model returned empty response - attempting aggressive recovery")
 
-                recovery_ctx = self._create_recovery_context(stream_ctx)
-                recovery_chunk, should_force = orch._recovery_coordinator.handle_empty_response(
-                    recovery_ctx
-                )
-                if recovery_chunk:
-                    yield recovery_chunk
+                if orch._recovery_coordinator is not None:
+                    recovery_ctx = self._create_recovery_context(stream_ctx)
+                    recovery_chunk, should_force = orch._recovery_coordinator.handle_empty_response(
+                        recovery_ctx
+                    )
+                    if recovery_chunk:
+                        yield recovery_chunk
                     continue
 
                 # Delegate empty response recovery to helper method
@@ -490,10 +492,11 @@ class ChatCoordinator:
                             f"Recovery produced {len(tool_calls)} tool call(s) - continuing main loop"
                         )
                 else:
-                    recovery_ctx = self._create_recovery_context(stream_ctx)
-                    fallback_msg = orch._recovery_coordinator.get_recovery_fallback_message(
-                        recovery_ctx
-                    )
+                    if orch._recovery_coordinator is not None:
+                        recovery_ctx = self._create_recovery_context(stream_ctx)
+                        fallback_msg = orch._recovery_coordinator.get_recovery_fallback_message(
+                            recovery_ctx
+                        )
                     await orch._record_intelligent_outcome(
                         success=False,
                         quality_score=0.3,
@@ -585,7 +588,7 @@ class ChatCoordinator:
                     if not self._intent_classification_handler:
                         from victor.agent.streaming import create_intent_classification_handler
 
-                        self._intent_classification_handler = create_intent_classification_handler(  # type: ignore[arg-type]
+                        self._intent_classification_handler = create_intent_classification_handler(
                             orch
                         )
 
@@ -605,7 +608,7 @@ class ChatCoordinator:
                     if not hasattr(orch, "_cumulative_prompt_interventions"):
                         orch._cumulative_prompt_interventions = 0
 
-                    tracking_state = create_tracking_state(orch)  # type: ignore[arg-type]
+                    tracking_state = create_tracking_state(orch)
 
                     intent_result = (
                         self._intent_classification_handler.classify_and_determine_action(
@@ -626,7 +629,7 @@ class ChatCoordinator:
                     force_finalize_used = (
                         tracking_state.force_finalize and intent_result.action == "finish"
                     )
-                    apply_tracking_state_updates(  # type: ignore[arg-type]
+                    apply_tracking_state_updates(
                         orch, intent_result.state_updates, force_finalize_used
                     )
 
@@ -641,7 +644,7 @@ class ChatCoordinator:
                     if not self._continuation_handler:
                         from victor.agent.streaming import create_continuation_handler
 
-                        self._continuation_handler = create_continuation_handler(orch)  # type: ignore[arg-type]
+                        self._continuation_handler = create_continuation_handler(orch)
 
                     action_result["action"] = action
 
@@ -666,7 +669,7 @@ class ChatCoordinator:
                 if not self._tool_execution_handler:
                     from victor.agent.streaming import create_tool_execution_handler
 
-                    self._tool_execution_handler = create_tool_execution_handler(orch)  # type: ignore[arg-type]
+                    self._tool_execution_handler = create_tool_execution_handler(orch)
 
                 self._tool_execution_handler.update_observed_files(
                     set(orch.observed_files) if orch.observed_files else set()
@@ -1061,10 +1064,10 @@ class ChatCoordinator:
         orch = self._orch()
 
         # Delegate to TaskCoordinator
-        orch.task_coordinator.apply_intent_guard(user_message, orch._conversation_controller)
-
-        # Sync current_intent back to orchestrator
-        orch._current_intent = orch.task_coordinator.current_intent
+        if orch.task_coordinator is not None:
+            orch.task_coordinator.apply_intent_guard(user_message, orch._conversation_controller)
+            # Sync current_intent back to orchestrator
+            orch._current_intent = orch.task_coordinator.current_intent
 
     def _apply_task_guidance(
         self,

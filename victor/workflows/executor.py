@@ -233,7 +233,7 @@ class TemporalContext:
     period_type: str = "quarters"  # days, weeks, months, quarters, years
     include_end_date: bool = True
 
-    def get_date_range(self) -> tuple:
+    def get_date_range(self) -> tuple[datetime, datetime]:
         """Calculate start and end dates based on lookback.
 
         Returns:
@@ -478,17 +478,23 @@ class WorkflowExecutor:
         elif cache_config is not None:
             from victor.workflows.cache import WorkflowCache
 
-            self._cache: Optional["WorkflowCache"] = WorkflowCache(cache_config)
+            self._cache = WorkflowCache(cache_config)
         else:
-            self._cache = None
+            self._cache: Optional["victor.workflows.cache.WorkflowCache"] = None
 
     @property
     def sub_agents(self) -> "SubAgentOrchestrator":
         """Get or create SubAgentOrchestrator."""
         if self._sub_agents is None:
-            from victor.agent.subagents import SubAgentOrchestrator
+            from victor.agent.subagents.orchestrator import SubAgentOrchestrator
+            from victor.agent.orchestrator import AgentOrchestrator
 
-            self._sub_agents = SubAgentOrchestrator(self.orchestrator)
+            # Cast orchestrator to AgentOrchestrator for SubAgentOrchestrator
+            # This is safe because WorkflowAgentProtocol is compatible
+            parent_orchestrator = AgentOrchestrator(None)  # type: ignore[arg-type]
+            if hasattr(self.orchestrator, '_container'):
+                parent_orchestrator = self.orchestrator  # type: ignore[assignment]
+            self._sub_agents = SubAgentOrchestrator(parent_orchestrator)  # type: ignore[arg-type]
         return self._sub_agents
 
     @property
@@ -937,6 +943,8 @@ class WorkflowExecutor:
             return await self._execute_node_inner(node, context, start_time)
 
         retry_result = await executor.execute(execute_func)
+        # Assert type for mypy
+        assert isinstance(retry_result.result, NodeResult) or retry_result.result is None
 
         if retry_result.success:
             logger.debug(f"Node '{node.id}' succeeded after {retry_result.attempts} attempt(s)")
@@ -944,14 +952,14 @@ class WorkflowExecutor:
         else:
             logger.warning(
                 f"Node '{node.id}' failed after {retry_result.attempts} attempt(s): "
-                f"{retry_result.last_exception}"
+                f"{retry_result.exception}"
             )
             return NodeResult(
                 node_id=node.id,
                 status=ExecutorNodeStatus.FAILED,
                 error=(
-                    str(retry_result.last_exception)
-                    if retry_result.last_exception
+                    str(retry_result.exception)
+                    if retry_result.exception
                     else "Retry exhausted"
                 ),
                 duration_seconds=time.time() - start_time,
@@ -1182,13 +1190,13 @@ class WorkflowExecutor:
         node_results = []
         for r in results:
             if isinstance(r, Exception):
-                node_results.append(
-                    NodeResult(
-                        node_id="unknown",
-                        status=ExecutorNodeStatus.FAILED,
-                        error=str(r),
-                    )
+                error_result = NodeResult(
+                    node_id="unknown",
+                    status=ExecutorNodeStatus.FAILED,
+                    error=str(r),
                 )
+                node_results.append(error_result)
+                context.add_result(error_result)
             else:
                 node_results.append(r)
                 context.add_result(r)
@@ -1300,7 +1308,7 @@ class WorkflowExecutor:
 
             # Default tool execution with constraint enforcement
             tool_params = self._build_compute_params(node, context)
-            outputs = {}
+            outputs: Dict[str, Any] = {}
             tool_calls_used = 0
             constraints = node.constraints
 
@@ -1331,7 +1339,7 @@ class WorkflowExecutor:
 
             if node.parallel and len(allowed_tools) > 1:
                 # Execute tools in parallel
-                async def execute_tool(tool_name: str, exec_context: dict[str, Any]) -> tuple:
+                async def execute_tool(tool_name: str, exec_context: dict[str, Any]) -> tuple[Any, Any]:
                     try:
                         result = await asyncio.wait_for(
                             self.tool_registry.execute(

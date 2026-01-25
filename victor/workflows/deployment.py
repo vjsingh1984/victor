@@ -859,7 +859,12 @@ class DockerDeploymentHandler(DeploymentHandler):
             try:
                 import docker
 
-                self._client = docker.from_env()
+                # docker.from_env() is a runtime function, not in type stubs
+                docker_module = docker
+                if hasattr(docker_module, 'from_env'):
+                    self._client = docker.from_env()  # type: ignore[attr-defined]
+                else:
+                    self._client = docker.DockerClient()  # type: ignore[attr-defined]
             except ImportError:
                 raise RuntimeError("docker package not installed. Install with: pip install docker")
         return self._client
@@ -953,8 +958,10 @@ class DockerDeploymentHandler(DeploymentHandler):
 
         # Parse output if JSON
         try:
-            result = json.loads(output.decode())
-            return result.get("state", state)
+            parsed_result = json.loads(output.decode())
+            if isinstance(parsed_result, dict) and "state" in parsed_result:
+                return parsed_result["state"]
+            return parsed_result if isinstance(parsed_result, dict) else state
         except json.JSONDecodeError:
             return state
 
@@ -1136,8 +1143,10 @@ class KubernetesDeploymentHandler(DeploymentHandler):
 
         # Parse output if JSON
         try:
-            result = json.loads(resp)
-            return result.get("state", state)
+            parsed_result = json.loads(resp)
+            if isinstance(parsed_result, dict) and "state" in parsed_result:
+                return parsed_result["state"]
+            return parsed_result if isinstance(parsed_result, dict) else state
         except json.JSONDecodeError:
             logger.warning(f"Could not parse pod exec output: {resp}")
             return state

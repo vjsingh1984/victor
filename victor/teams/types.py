@@ -901,8 +901,9 @@ class TeamMemberAdapter:
     async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         """Receive and optionally respond to a message."""
         if self.message_handler:
-            result = await self.message_handler(message)
-            return result
+            handler_result = await self.message_handler(message)
+            # The handler is typed to return Optional[AgentMessage], so this should be safe
+            return handler_result if isinstance(handler_result, AgentMessage) or handler_result is None else None
         return None
 
 

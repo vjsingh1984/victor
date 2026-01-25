@@ -174,13 +174,14 @@ class ComputeNodeExecutor:
             output = outputs
 
         # Step 5: Store output in state
-        output_key = node.output or node.id
+        output_key = node.output_key or node.id
         state[output_key] = output
 
         # Step 6: Update node results for observability
         if "_node_results" not in state:
             state["_node_results"] = {}
 
+        from victor.framework.graph import GraphNodeResult
         state["_node_results"][node.id] = GraphNodeResult(
             node_id=node.id,
             status="completed",

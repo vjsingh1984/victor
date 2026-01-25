@@ -712,7 +712,7 @@ ENCLOSING_NAME_FIELDS: Dict[str, List[Tuple[str, str]]] = {
 # Try to import watchdog for file watching
 if TYPE_CHECKING:
     from watchdog.events import FileSystemEventHandler
-    from watchdog.observers import BaseObserver as Observer
+    from watchdog.observers.api import BaseObserver as Observer  # type: ignore[attr-defined]
     WATCHDOG_AVAILABLE: bool = True
 else:
     try:

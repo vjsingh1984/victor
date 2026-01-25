@@ -1210,7 +1210,9 @@ class WorkflowDefinitionCache:
                 result = self._cache.get(str(key))
                 if result is not None:
                     self._stats["hits"] += 1
-                    return result
+                    # Type assertion for mypy
+                    from typing import cast
+                    return cast("WorkflowDefinition", result)
                 self._stats["misses"] += 1
                 return None
         if len(args) == 3:

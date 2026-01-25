@@ -439,13 +439,13 @@ class SQLiteHITLStore:
         self.db_path = db_path
         self.table_name = table_name
         self._events: Dict[str, asyncio.Event] = {}
-        self._subscribers: Dict[str, Set[Callable]] = {}
+        self._subscribers: Dict[str, Set[Callable[..., Any]]] = {}
         self._lock = asyncio.Lock()
 
         # Initialize database
         self._init_db()
 
-    def _get_connection(self):
+    def _get_connection(self) -> Any:
         """Get a database connection."""
         import sqlite3
 
@@ -857,7 +857,7 @@ class SQLiteHITLStore:
                 (cutoff.isoformat(), cutoff.isoformat()),
             )
             conn.commit()
-            return cursor.rowcount
+            return int(cursor.rowcount)
         finally:
             conn.close()
 
@@ -1144,7 +1144,7 @@ def create_hitl_router(
         workflow_id: Optional[str] = None,
         limit: int = 50,
         authorization: Optional[str] = Header(None),
-    ):
+    ) -> Dict[str, Any]:
         """Get approval history for audit purposes."""
         await verify_auth(authorization)
         if hasattr(hitl_store, "get_request_history"):
@@ -2501,7 +2501,7 @@ def create_hitl_app(
     require_auth: bool = False,
     auth_token: Optional[str] = None,
     title: str = "Victor HITL API",
-):
+) -> FastAPI:
     """Create a standalone FastAPI app for HITL service.
 
     Args:
@@ -2522,7 +2522,7 @@ def create_hitl_app(
     hitl_store = store or get_global_store()
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # Startup: start cleanup task
         cleanup_task = asyncio.create_task(cleanup_loop(hitl_store))
         yield
@@ -2558,7 +2558,7 @@ def create_hitl_app(
     app.include_router(router, prefix="/hitl")
 
     @app.get("/")
-    async def root():
+    async def root() -> Dict[str, Any]:
         return {
             "name": "Victor HITL API",
             "version": "0.5.0",
@@ -2567,14 +2567,14 @@ def create_hitl_app(
         }
 
     @app.get("/health")
-    async def health():
+    async def health() -> Dict[str, Any]:
         pending = await hitl_store.list_pending()
         return {"status": "healthy", "pending_requests": len(pending)}
 
     return app
 
 
-async def cleanup_loop(store: HITLStore, interval: float = 60.0):
+async def cleanup_loop(store: HITLStore, interval: float = 60.0) -> None:
     """Background task to cleanup expired requests.
 
     Args:
@@ -2594,11 +2594,11 @@ async def cleanup_loop(store: HITLStore, interval: float = 60.0):
 
 
 async def run_hitl_server(
-    app=None,
+    app: Optional[FastAPI] = None,
     host: str = "0.0.0.0",
     port: int = 8080,
-    **kwargs,
-):
+    **kwargs: Any,
+) -> None:
     """Run the HITL server.
 
     Args:

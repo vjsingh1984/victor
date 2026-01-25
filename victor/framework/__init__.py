@@ -53,6 +53,8 @@ when actually accessed (e.g., when using specific features like circuit breakers
 
 from __future__ import annotations
 
+from typing import Any
+
 # Core imports (always loaded - these are the 5 essential concepts)
 from victor.framework.agent import Agent, ChatSession
 from victor.framework.config import AgentConfig
@@ -648,7 +650,7 @@ def __getattr__(name: str) -> Any:
         import sys
 
         this_module = sys.modules[__name__]
-        setattr(this_module, "discover", discover)  # type: ignore[attr-defined]
+        setattr(this_module, "discover", discover)
 
         return discover
 

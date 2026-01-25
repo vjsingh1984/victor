@@ -20,7 +20,7 @@ Executes agent nodes by spawning sub-agents with role-specific configurations.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict
 
 if TYPE_CHECKING:
     from victor.agent.subagents.base import SubAgentRole
@@ -114,19 +114,20 @@ class AgentNodeExecutor:
         except Exception as e:
             logger.error(f"Agent node {node.id} execution failed: {e}")
             # Store error in state and return
-            if node.output:
-                state[node.output] = {"error": str(e), "success": False}
+            if node.output_key:
+                state[node.output_key] = {"error": str(e), "success": False}
             return state
 
         # Step 6: Store result in state
-        if node.output:
+        if node.output_key:
             # Store the entire result object
-            state[node.output] = result
+            state[node.output_key] = result
 
         # Track node result for observability
         if "_node_results" not in state:
             state["_node_results"] = {}
 
+        from victor.framework.graph import GraphNodeResult
         state["_node_results"][node.id] = GraphNodeResult(
             node_id=node.id,
             status="completed",
@@ -194,9 +195,12 @@ class AgentNodeExecutor:
         if role not in role_map:
             raise ValueError(f"Unknown agent role: {role}. Must be one of {list(role_map.keys())}")
 
-        return role_map[role]
+        from victor.agent.subagents.base import SubAgentRole
 
-    def _substitute_context(self, template: str, context: dict[str, Any]) -> str:
+        result: SubAgentRole = role_map[role]
+        return result
+
+    def _substitute_context(self, template: str, context: Dict[str, Any]) -> str:
         """Substitute context variables in template string.
 
         Args:

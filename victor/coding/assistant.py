@@ -129,9 +129,10 @@ class CodingAssistant(VerticalBase):
         )
     """
 
-    name = "coding"
-    description = "Software development assistant for code exploration, writing, and refactoring"
-    version = "2.0.0"  # Extension support
+    # Override class variables from base
+    name: str = "coding"  # type: ignore[misc]
+    description: str = "Software development assistant for code exploration, writing, and refactoring"  # type: ignore[misc]
+    version: str = "2.0.0"  # Extension support  # type: ignore[misc]
 
     # =========================================================================
     # Phase 3: Framework Capabilities

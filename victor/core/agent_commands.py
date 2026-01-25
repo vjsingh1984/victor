@@ -873,19 +873,19 @@ class AgentCommandBus:
         """Register all command handlers."""
         self.command_bus.register(
             StartSessionCommand,
-            StartSessionHandler(self.event_store, self.dispatcher),
+            StartSessionHandler(self.event_store, self.dispatcher),  # type: ignore[arg-type]
         )
         self.command_bus.register(
             ChatCommand,
-            ChatHandler(self.event_store, self.dispatcher),
+            ChatHandler(self.event_store, self.dispatcher),  # type: ignore[arg-type]
         )
         self.command_bus.register(
             ExecuteToolCommand,
-            ExecuteToolHandler(self.event_store, self.dispatcher),
+            ExecuteToolHandler(self.event_store, self.dispatcher),  # type: ignore[arg-type]
         )
         self.command_bus.register(
             EndSessionCommand,
-            EndSessionHandler(self.event_store, self.dispatcher, self.projection),
+            EndSessionHandler(self.event_store, self.dispatcher, self.projection),  # type: ignore[arg-type]
         )
 
     def _register_query_handlers(self) -> None:
