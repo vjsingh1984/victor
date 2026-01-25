@@ -30,7 +30,7 @@ import logging
 from typing import TYPE_CHECKING, Optional, Set
 
 from victor.protocols.tool_selector import IToolSelector
-from victor.tools.base import ToolRegistry
+from victor.tools.base import ToolRegistry  # type: ignore[attr-defined]
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine
@@ -332,4 +332,4 @@ def _create_hybrid_selector(
         semantic_selector=semantic_selector,
         keyword_selector=keyword_selector,
         config=config,
-    )
+    )  # type: ignore[return-value]

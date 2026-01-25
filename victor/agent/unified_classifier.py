@@ -61,13 +61,13 @@ logger = logging.getLogger(__name__)
 
 # Try to import native extensions for fast keyword detection
 _NATIVE_AVAILABLE = False
-_native = None
+_native_module: Any = None
 
 try:
-    import victor_native as _native
-
+    import victor_native
+    _native_module = victor_native
     _NATIVE_AVAILABLE = True
-    logger.debug(f"Native classifier loaded (v{_native.__version__})")
+    logger.debug(f"Native classifier loaded (v{_native_module.__version__})")
 except ImportError:
     logger.debug("Native extensions not available, using Python classifier")
 
@@ -263,7 +263,7 @@ EXECUTION_KEYWORDS: List[Tuple[str, float]] = [
 # =============================================================================
 
 # Patterns that negate keywords (compiled for performance)
-NEGATION_PATTERNS: List[re.Pattern] = [
+NEGATION_PATTERNS: List[re.Pattern[str]] = [
     # "don't/do not analyze"
     re.compile(r"\b(don't|do\s+not|no\s+need\s+to|skip|without|avoid)\s+(\w+\s+)*", re.IGNORECASE),
     # "not to analyze"
@@ -278,7 +278,7 @@ NEGATION_PATTERNS: List[re.Pattern] = [
 
 # Positive override patterns that cancel earlier negation
 # These indicate a shift from "don't X" to "do Y" in the same sentence
-POSITIVE_OVERRIDE_PATTERNS: List[re.Pattern] = [
+POSITIVE_OVERRIDE_PATTERNS: List[re.Pattern[str]] = [
     # "but do/but please" - signals positive intent after negation
     re.compile(r"\bbut\s+(do|please|just|actually)\b", re.IGNORECASE),
     # "just X" after comma/semicolon - "don't analyze, just run"
@@ -306,8 +306,8 @@ def _has_action_keywords_fast(message: str) -> bool:
     Returns:
         True if action keywords are likely present
     """
-    if _NATIVE_AVAILABLE:
-        return _native.has_action_keywords(message)
+    if _NATIVE_AVAILABLE and _native_module is not None:
+        return _native_module.has_action_keywords(message)  # type: ignore[attr-defined]
     # Fallback to quick string check
     message_lower = message.lower()
     quick_action = ["run", "execute", "deploy", "build", "test", "commit", "push"]
@@ -323,8 +323,8 @@ def _has_analysis_keywords_fast(message: str) -> bool:
     Returns:
         True if analysis keywords are likely present
     """
-    if _NATIVE_AVAILABLE:
-        return _native.has_analysis_keywords(message)
+    if _NATIVE_AVAILABLE and _native_module is not None:
+        return _native_module.has_analysis_keywords(message)  # type: ignore[attr-defined]
     message_lower = message.lower()
     quick_analysis = ["analyze", "explore", "review", "understand", "explain"]
     return any(kw in message_lower for kw in quick_analysis)
@@ -339,8 +339,8 @@ def _has_negation_fast(message: str) -> bool:
     Returns:
         True if negation patterns are present
     """
-    if _NATIVE_AVAILABLE:
-        return _native.has_negation(message)
+    if _NATIVE_AVAILABLE and _native_module is not None:
+        return _native_module.has_negation(message)  # type: ignore[attr-defined]
     message_lower = message.lower()
     negations = ["don't", "do not", "not", "never", "skip", "without", "avoid"]
     return any(neg in message_lower for neg in negations)
@@ -771,7 +771,9 @@ class UnifiedTaskClassifier:
             try:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
-                    asyncio.create_task(bus.emit(event.to_messaging_event()))
+                    # Emit the event properly with event name and data
+                    msg_event = event.to_messaging_event()
+                    asyncio.create_task(bus.emit(msg_event.topic, msg_event.data))
                 else:
                     # Sync context, emit synchronously
                     pass  # Event bus requires async context
@@ -884,9 +886,22 @@ class UnifiedTaskClassifier:
 
         if self.semantic_classifier:
             try:
-                sem_result = self.semantic_classifier.classify(message)
-                semantic_type = self._map_semantic_to_unified(sem_result.task_type)
-                semantic_confidence = sem_result.confidence
+                # Note: classify() is async but we're in sync context
+                # This is a known limitation - semantic classification in sync mode
+                # will use cached results or fallback gracefully
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # Can't await in running loop, skip semantic
+                        logger.debug("Skipping semantic classification in async context")
+                    else:
+                        # We can run the coroutine
+                        sem_result = loop.run_until_complete(self.semantic_classifier.classify(message))
+                        semantic_type = self._map_semantic_to_unified(sem_result.task_type)
+                        semantic_confidence = sem_result.confidence
+                except RuntimeError:
+                    logger.debug("No event loop for semantic classification")
             except Exception as e:
                 logger.debug(f"Semantic classification failed: {e}")
 

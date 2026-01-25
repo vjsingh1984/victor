@@ -409,8 +409,9 @@ class ToolSequenceTracker:
         """Reset all state including learned transitions."""
         self._history = []
         self._transitions = defaultdict(lambda: defaultdict(TransitionStats))
-        self._vertical_dependencies: Dict[str, List[str]] = {}
-        self._vertical_sequences: Dict[str, List[Tuple[str, float]]] = {}
+        # Re-initialize (not reassign) to avoid duplicate attribute errors
+        self._vertical_dependencies.clear()
+        self._vertical_sequences.clear()
 
         if self.config.use_predefined_patterns:
             self._load_predefined_patterns()

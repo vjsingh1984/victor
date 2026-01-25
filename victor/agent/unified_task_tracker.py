@@ -225,9 +225,10 @@ class UnifiedTaskProgress:
     # Loop detection
     unique_resources: Set[str] = field(default_factory=set)
     file_read_ranges: Dict[str, List[FileReadRange]] = field(default_factory=dict)
-    signature_history: deque = field(default_factory=lambda: deque(maxlen=10))
-    base_resource_counts: Counter = field(default_factory=Counter)
+    signature_history: deque[str] = field(default_factory=lambda: deque(maxlen=10))
+    base_resource_counts: Counter[str] = field(default_factory=Counter)
     loop_warning_given: bool = False
+    permanently_blocked: Set[str] = field(default_factory=set)  # Signatures that are permanently blocked
     warned_signature: Optional[str] = None
     consecutive_research_calls: int = 0
 
@@ -453,7 +454,7 @@ class UnifiedTaskConfigLoader:
 
         return config
 
-    DEFAULT_CONFIG: Dict[str, Any] = None  # Set by _get_default_config()
+    DEFAULT_CONFIG: Optional[Dict[str, Any]] = None
 
     _instance: Optional["UnifiedTaskConfigLoader"] = None
     _config: Optional[Dict[str, Any]] = None
@@ -490,14 +491,15 @@ class UnifiedTaskConfigLoader:
                     task_config = yaml.safe_load(f) or {}
 
                 # Merge with default config (YAML overrides defaults, but tool_budget comes from DEFAULT_TOOL_BUDGETS)
+                default_config = self.DEFAULT_CONFIG or {}
                 self._config = {
                     "task_types": {},
-                    "global": self.DEFAULT_CONFIG.get("global", {}).copy(),
-                    "model_overrides": self.DEFAULT_CONFIG.get("model_overrides", {}).copy(),
+                    "global": default_config.get("global", {}).copy(),
+                    "model_overrides": default_config.get("model_overrides", {}).copy(),
                 }
 
                 # Populate task types, using tool_budget from DEFAULT_TOOL_BUDGETS
-                for task_type, default_template in self.DEFAULT_CONFIG.get(
+                for task_type, default_template in default_config.get(
                     "task_types", {}
                 ).items():
                     yaml_config = task_config.get("task_types", {}).get(task_type, {})
@@ -536,6 +538,9 @@ class UnifiedTaskConfigLoader:
     def get_task_config(self, task_type: TrackerTaskType) -> TaskConfig:
         """Get configuration for a specific task type."""
         config = self._config or self.DEFAULT_CONFIG
+        if config is None:
+            # Return default config if nothing is available
+            return TaskConfig()
         task_configs = config.get("task_types", {})
         task_data = task_configs.get(task_type.value, task_configs.get("general", {}))
 
@@ -555,21 +560,32 @@ class UnifiedTaskConfigLoader:
     def get_global_config(self) -> Dict[str, Any]:
         """Get global configuration settings."""
         config = self._config or self.DEFAULT_CONFIG
-        return config.get("global", {})
+        if config is None:
+            return {}
+        result = config.get("global", {})
+        if isinstance(result, dict):
+            return result
+        return {}
 
     def get_model_override(self, model_name: str) -> Dict[str, Any]:
         """Get model-specific override settings."""
         config = self._config or self.DEFAULT_CONFIG
+        if config is None:
+            return {}
         overrides = config.get("model_overrides", {})
+        if not isinstance(overrides, dict):
+            return {}
 
         model_lower = model_name.lower()
         for pattern, settings in overrides.items():
             # Simple glob matching
             if pattern.endswith("*"):
                 if model_lower.startswith(pattern[:-1].lower()):
-                    return settings
+                    if isinstance(settings, dict):
+                        return settings
             elif model_lower == pattern.lower():
-                return settings
+                if isinstance(settings, dict):
+                    return settings
 
         return {}
 
@@ -682,7 +698,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         PLAN/EXPLORE modes get higher limits to allow thorough file exploration.
         """
-        effective = int(self._base_max_overlapping_reads * self.exploration_multiplier)
+        multiplier = float(self.exploration_multiplier)  # type: ignore[arg-type]
+        effective = int(self._base_max_overlapping_reads * multiplier)
         return max(self._base_max_overlapping_reads, effective)
 
     @property
@@ -691,7 +708,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         PLAN/EXPLORE modes get higher limits to allow thorough search exploration.
         """
-        effective = int(self._base_max_searches_per_prefix * self.exploration_multiplier)
+        multiplier = float(self.exploration_multiplier)
+        effective = int(self._base_max_searches_per_prefix * multiplier)
         return max(self._base_max_searches_per_prefix, effective)
 
     # =========================================================================
@@ -802,7 +820,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         if self._task_config is None:
             return 8  # Default fallback
         base = self._task_config.max_exploration_iterations
-        combined_multiplier = self._exploration_multiplier * self.exploration_multiplier
+        combined_multiplier = self._exploration_multiplier * float(self.exploration_multiplier)
         return int(base * combined_multiplier)
 
     def set_mode_exploration_multiplier(self, multiplier: float) -> None:
@@ -1075,10 +1093,6 @@ class UnifiedTaskTracker(ModeAwareMixin):
         so it will be blocked on any future attempt, even if the model tries other
         operations in between.
         """
-        # Initialize permanently blocked set if needed
-        if not hasattr(self._progress, "permanently_blocked"):
-            self._progress.permanently_blocked = set()
-
         if len(self._progress.signature_history) < 3:
             return None
 
@@ -1381,7 +1395,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Apply combined multiplier (model * mode)
         # Mode multipliers: Build=1.0, Plan=2.5, Explore=3.0
-        combined_multiplier = self._exploration_multiplier * self.exploration_multiplier
+        combined_multiplier = self._exploration_multiplier * float(self.exploration_multiplier)
         model_adjusted = int(base_max * combined_multiplier)
 
         # Apply productivity ratio adjustment
@@ -1419,7 +1433,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Apply mode multiplier for PLAN/EXPLORE modes
         # This allows more exploration before triggering loop detection
-        effective_threshold = int(base_threshold * self.exploration_multiplier)
+        effective_threshold = int(base_threshold * float(self.exploration_multiplier))
 
         # Ensure minimum threshold of base to prevent immediate loops
         return max(base_threshold, effective_threshold)
@@ -1556,8 +1570,10 @@ class UnifiedTaskTracker(ModeAwareMixin):
         Returns:
             Detected TrackerTaskType
         """
-        from victor.storage.embeddings.task_classifier import TaskType as ClassifierTaskType
-        from victor.storage.embeddings.task_classifier import TaskTypeClassifier
+        from victor.storage.embeddings.task_classifier import (  # type: ignore[attr-defined]
+            TaskType as ClassifierTaskType,
+            TaskTypeClassifier,
+        )
 
         # Use the singleton classifier instance
         classifier = TaskTypeClassifier.get_instance()
@@ -1759,7 +1775,8 @@ class CompatConfig:
 
     @property
     def max_total_iterations(self) -> int:
-        return self._tracker._max_total_iterations
+        result = self._tracker._max_total_iterations
+        return int(result)
 
     @max_total_iterations.setter
     def max_total_iterations(self, value: int) -> None:
@@ -1811,8 +1828,12 @@ def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, Track
         Tuple of (tracker, detected_task_type)
     """
     # Import here to avoid circular dependency
-    from victor.storage.embeddings.task_classifier import TaskType as ClassifierTaskType
-    from victor.storage.embeddings.task_classifier import classify_task_type
+    from victor.storage.embeddings.task_classifier import (  # type: ignore[attr-defined]
+        TaskType as ClassifierTaskType,
+    )
+    from victor.storage.embeddings.task_classifier import (  # type: ignore[attr-defined]
+        classify_task_type,
+    )
 
     # Classify the message
     classifier_type = classify_task_type(message)
@@ -1933,6 +1954,9 @@ def create_tracker_with_prompt_requirements(
             )
 
         # Also adjust max iterations if needed
+        if tracker._task_config is None:
+            tracker.set_task_type(TrackerTaskType.GENERAL)
+        assert tracker._task_config is not None  # for type checker
         current_iterations = tracker._task_config.max_exploration_iterations
         if (
             prompt_requirements.iteration_budget
