@@ -155,12 +155,11 @@ class HITLCoordinator:
 
             # Create HITL executor
             executor = HITLExecutor(
-                workflow=workflow_def,
                 handler=handler,
             )
 
-            # Execute with HITL
-            result = await executor.execute(initial_state or {})
+            # Execute with HITL (note: executor.process is the correct method)
+            result = await executor.process(workflow_def, initial_state or {})  # type: ignore[attr-defined]
 
             duration = time.time() - start_time
 
@@ -208,12 +207,11 @@ class HITLCoordinator:
 
             # Create HITL executor
             executor = HITLExecutor(
-                workflow=workflow,
                 handler=handler,
             )
 
             # Execute with HITL
-            result = await executor.execute(initial_state or {})
+            result = await executor.process(workflow, initial_state or {})  # type: ignore[attr-defined]
 
             duration = time.time() - start_time
 
