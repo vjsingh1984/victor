@@ -46,7 +46,7 @@ try:
     StateScope = ImportedStateScope
 except ImportError:
     # Fallback for testing - create a simple type
-    class StateScope:
+    class StateScope:  # type: ignore[no-redef]
         """Fallback StateScope for testing."""
 
         CHECKPOINT = "checkpoint"

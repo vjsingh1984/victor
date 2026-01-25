@@ -41,8 +41,8 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Union
 if TYPE_CHECKING:
     from victor.core.tool_dependency_loader import (
         YAMLToolDependencyProvider,
-        EmptyToolDependencyProvider,
     )
+    from victor.core.tool_types import EmptyToolDependencyProvider
 
 from victor.core.tool_dependency_loader import (
     YAMLToolDependencyProvider,
@@ -70,7 +70,7 @@ class DeprecatedToolDependencyProvider(YAMLToolDependencyProvider):
             canonicalize: Whether to canonicalize tool IDs
         """
         self._vertical = vertical
-        self._yaml_path: Optional[Path] = yaml_path
+        self._yaml_path = yaml_path  # type: ignore[assignment]
         self._canonicalize = canonicalize
 
         warnings.warn(

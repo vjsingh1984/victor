@@ -19,7 +19,7 @@ protocols actually implemented by the vertical are registered, rather than
 inheriting from all possible protocol interfaces.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, cast
 
 from victor.core.vertical_types import StageDefinition
 from victor.core.verticals.base import VerticalBase, VerticalConfig
@@ -72,10 +72,9 @@ class BenchmarkVertical(VerticalBase):
     """
 
     # Metadata (inherited from VerticalMetadataProvider)
-    # Note: These class variables override base class instance variables (MyPy limitation)
-    name: str = "benchmark"
-    description: str = "AI coding benchmark evaluation and performance testing"
-    version: str = "0.5.0"
+    name: ClassVar[str] = "benchmark"
+    description: ClassVar[str] = "AI coding benchmark evaluation and performance testing"
+    version: ClassVar[str] = "0.5.0"
 
     # Benchmark-specific stages
     STAGE_UNDERSTANDING = "UNDERSTANDING"

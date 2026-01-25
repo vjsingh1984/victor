@@ -413,24 +413,24 @@ class DistributedCacheInvalidator:
         """
         # Handle graph cache namespace specially
         if namespace == GRAPH_CACHE_NAMESPACE:
-            for cache in self._graph_caches:
-                cleared = cache.invalidate_all()
+            for graph_cache in self._graph_caches:
+                cleared = graph_cache.invalidate_all()
                 self._stats.graph_cache_clears += cleared
             return
 
         # Handle namespace-wide invalidation
         if key == "*":
-            for cache in self._tiered_caches:
+            for tiered_cache in self._tiered_caches:
                 # TieredCache may not have clear() method
-                if hasattr(cache, 'clear'):
-                    cleared = cache.clear(namespace)
+                if hasattr(tiered_cache, 'clear'):
+                    cleared = tiered_cache.clear(namespace)
                     self._stats.tiered_cache_clears += cleared
             return
 
         # Handle specific key invalidation
-        for cache in self._tiered_caches:
-            if hasattr(cache, 'delete'):
-                if cache.delete(key, namespace):
+        for tiered_cache in self._tiered_caches:
+            if hasattr(tiered_cache, 'delete'):
+                if tiered_cache.delete(key, namespace):
                     self._stats.tiered_cache_clears += 1
 
         # Call custom callbacks

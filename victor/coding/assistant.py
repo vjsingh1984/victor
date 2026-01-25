@@ -132,7 +132,7 @@ class CodingAssistant(VerticalBase):
     # Override class variables from base
     name: ClassVar[str] = "coding"
     description: ClassVar[str] = "Software development assistant for code exploration, writing, and refactoring"
-    version: ClassVar[str] = "2.0.0"  # Extension support
+    version: ClassVar[str] = "2.0.0"
 
     # =========================================================================
     # Phase 3: Framework Capabilities

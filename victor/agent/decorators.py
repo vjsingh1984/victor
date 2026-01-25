@@ -191,7 +191,8 @@ def deprecated_property(
             return func(self)
 
         # Convert to property
-        return property(wrapper)
+        # Type: ignore needed because wrapper signature doesn't match property's expected Callable[[Any], Any]
+        return property(wrapper)  # type: ignore[arg-type]
 
     return decorator
 

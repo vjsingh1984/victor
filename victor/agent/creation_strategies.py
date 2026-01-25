@@ -144,9 +144,10 @@ class FrameworkStrategy(AgentCreationStrategy):
 
         # Apply overrides
         from victor.agent.orchestrator import AgentOrchestrator
+        from typing import cast
         self._apply_overrides(cast(AgentOrchestrator, agent), context)
 
-        return agent  # type: ignore[return-value]
+        return cast(AgentOrchestrator, agent)
 
     def supports_observability(self) -> bool:
         return True

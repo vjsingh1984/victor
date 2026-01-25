@@ -38,10 +38,10 @@ from victor.agent.capabilities.base import CapabilitySpec
 
 # Import entry_points function (avoid name conflicts)
 try:
-    import importlib.metadata as importlib_metadata
+    import importlib.metadata as importlib_metadata_module
 except ImportError:
     # Python < 3.8
-    import importlib_metadata as importlib_metadata
+    import importlib_metadata as importlib_metadata_module  # type: ignore[no-redef]
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ class DynamicCapabilityRegistry:
             This ensures the registry remains functional even if some plugins fail.
         """
         try:
-            eps = importlib_metadata.entry_points()
+            eps = importlib_metadata_module.entry_points()
             # Python 3.10+ uses select() method, older versions have different API
             if hasattr(eps, "select"):
                 capability_eps = eps.select(group="victor.capabilities")
