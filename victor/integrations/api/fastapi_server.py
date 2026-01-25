@@ -364,7 +364,7 @@ class VictorFastAPIServer:
         self._orchestrator = None
         self._ws_clients: List[WebSocket] = []
         self._pending_tool_approvals: Dict[str, Dict[str, Any]] = {}
-        self._hitl_store = None
+        self._hitl_store: Optional[Any] = None
         self._event_bridge: Optional[EventBridge] = None
         self._event_clients: List[WebSocket] = []
         self._workflow_event_bridge: Optional[WorkflowEventBridge] = None
@@ -753,36 +753,36 @@ class VictorFastAPIServer:
         async def list_providers() -> JSONResponse:
             """List available LLM providers."""
             try:
-                from victor.providers.registry import get_provider_registry
+                from victor.providers.registry import get_provider_registry, ProviderRegistry
 
-                registry = get_provider_registry()
                 providers_info = []
 
-                for provider_name in registry.list_providers():
+                for provider_name in ProviderRegistry.list_providers():
                     try:
-                        provider = registry.get(provider_name)
-                        providers_info.append(
-                            {
-                                "name": provider_name,
-                                "display_name": provider_name.replace("_", " ").title(),
-                                "is_local": provider_name in ("ollama", "lmstudio", "vllm"),
-                                "configured": (
-                                    provider.is_configured()
-                                    if hasattr(provider, "is_configured")
-                                    else True
-                                ),
-                                "supports_tools": (
-                                    provider.supports_tools()
-                                    if hasattr(provider, "supports_tools")
-                                    else False
-                                ),
-                                "supports_streaming": (
-                                    provider.supports_streaming()
-                                    if hasattr(provider, "supports_streaming")
-                                    else True
-                                ),
-                            }
-                        )
+                        provider = ProviderRegistry.get(provider_name)
+                        if provider is not None:
+                            providers_info.append(
+                                {
+                                    "name": provider_name,
+                                    "display_name": provider_name.replace("_", " ").title(),
+                                    "is_local": provider_name in ("ollama", "lmstudio", "vllm"),
+                                    "configured": (
+                                        provider.is_configured()
+                                        if hasattr(provider, "is_configured")
+                                        else True
+                                    ),
+                                    "supports_tools": (
+                                        provider.supports_tools()
+                                        if hasattr(provider, "supports_tools")
+                                        else False
+                                    ),
+                                    "supports_streaming": (
+                                        provider.supports_streaming()
+                                        if hasattr(provider, "supports_streaming")
+                                        else True
+                                    ),
+                                }
+                            )
                     except Exception as e:
                         logger.debug(f"Provider {provider_name} not available: {e}")
                         providers_info.append(
@@ -821,7 +821,11 @@ class VictorFastAPIServer:
                     return JSONResponse(manifest)
                 else:
                     manifest = discovery.discover_all()
-                    return JSONResponse(manifest.to_dict())
+                    # Handle both dict and manifest object types
+                    if hasattr(manifest, "to_dict"):
+                        return JSONResponse(manifest.to_dict())
+                    else:
+                        return JSONResponse(manifest)
 
             except Exception as e:
                 logger.exception("Capabilities discovery error")
@@ -832,7 +836,7 @@ class VictorFastAPIServer:
         async def list_tools() -> JSONResponse:
             """List available tools with metadata."""
             try:
-                from victor.tools.base import ToolRegistry
+                from victor.tools.registry import ToolRegistry
 
                 registry = ToolRegistry()
                 tools_info = []
@@ -922,17 +926,17 @@ class VictorFastAPIServer:
         async def reset_conversation() -> JSONResponse:
             """Reset conversation history."""
             await self._record_rl_feedback()
-            if self._orchestrator:
-                self._orchestrator.reset_conversation()
+            if self._orchestrator is not None:
+                self._orchestrator.reset_conversation()  # type: ignore[unreachable]
             return JSONResponse({"success": True, "message": "Conversation reset"})
 
         @app.get("/conversation/export", tags=["Conversation"])
         async def export_conversation(format: str = Query("json")) -> Any:
             """Export conversation history."""
-            if not self._orchestrator:
+            if self._orchestrator is None:
                 return JSONResponse({"messages": []})
 
-            messages = self._orchestrator.get_messages()
+            messages = self._orchestrator.get_messages()  # type: ignore[unreachable]
 
             if format == "markdown":
                 content = self._format_messages_markdown(messages)
@@ -978,18 +982,24 @@ class VictorFastAPIServer:
         @app.post("/patch/apply", tags=["Patch"])
         async def apply_patch(request: PatchApplyRequest) -> JSONResponse:
             """Apply a patch."""
-            from victor.tools import patch_tool
+            from victor.tools.patch_tool import patch
 
-            result = await patch_tool.apply_patch(patch=request.patch, dry_run=request.dry_run)
+            result = await patch(
+                operation="apply",
+                patch_content=request.patch,
+                dry_run=request.dry_run,
+            )
             return JSONResponse(result)
 
         @app.post("/patch/create", tags=["Patch"])
         async def create_patch(request: PatchCreateRequest) -> JSONResponse:
             """Create a patch."""
-            from victor.tools import patch_tool
+            from victor.tools.patch_tool import patch
 
-            result = await patch_tool.create_patch(
-                file_path=request.file_path, new_content=request.new_content
+            result = await patch(
+                operation="create",
+                file_path=request.file_path,
+                new_content=request.new_content,
             )
             return JSONResponse(result)
 
@@ -1568,7 +1578,7 @@ Respond with just the command to run."""
                             except Exception:
                                 pass
 
-                file_sizes.sort(key=lambda x: x["lines"], reverse=True)
+                file_sizes.sort(key=lambda x: int(x.get("lines", 0) or 0), reverse=True)  # type: ignore[call-overload]
                 metrics["largest_files"] = file_sizes[:10]
 
                 return JSONResponse(metrics)
@@ -2619,12 +2629,12 @@ Respond with just the command to run."""
         async def list_workflow_templates() -> JSONResponse:
             """List available workflow templates."""
             try:
-                from victor.workflows import get_workflow_registry
+                from victor.workflows.registry import get_global_registry
 
-                registry = get_workflow_registry()
+                registry = get_global_registry()
                 templates = []
 
-                for workflow_id, workflow_def in registry._workflows.items():
+                for workflow_id, workflow_def in registry._definitions.items():
                     templates.append(
                         {
                             "id": workflow_id,
@@ -2659,9 +2669,9 @@ Respond with just the command to run."""
         async def get_workflow_template(template_id: str) -> JSONResponse:
             """Get workflow template details."""
             try:
-                from victor.workflows import get_workflow_registry
+                from victor.workflows.registry import get_global_registry
 
-                registry = get_workflow_registry()
+                registry = get_global_registry()
                 workflow_def = registry.get(template_id)
 
                 if workflow_def is None:
@@ -3199,7 +3209,10 @@ Respond with just the command to run."""
             # Create HITL store - SQLite for persistence, in-memory otherwise
             if self.hitl_persistent:
                 self._hitl_store = SQLiteHITLStore()
-                logger.info(f"HITL using SQLite store: {self._hitl_store.db_path}")
+                if hasattr(self._hitl_store, "db_path"):
+                    logger.info(f"HITL using SQLite store: {self._hitl_store.db_path}")
+                else:
+                    logger.info("HITL using SQLite store")
             else:
                 self._hitl_store = HITLStore()
                 logger.info("HITL using in-memory store")
@@ -3268,7 +3281,7 @@ Respond with just the command to run."""
             if msg_count == 0:
                 return
 
-            metrics = {}
+            metrics: Dict[str, Any] = {}
             if hasattr(self._orchestrator, "get_session_metrics"):
                 metrics = self._orchestrator.get_session_metrics() or {}
 

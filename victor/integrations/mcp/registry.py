@@ -968,3 +968,21 @@ class MCPRegistry:
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit."""
         await self.stop()
+
+
+# Singleton instance for global access
+_mcp_registry_instance: Optional["MCPRegistry"] = None
+
+
+def get_mcp_registry() -> "MCPRegistry":
+    """Get the singleton MCP registry instance.
+
+    Creates a new instance if one doesn't exist.
+
+    Returns:
+        The global MCP registry instance
+    """
+    global _mcp_registry_instance
+    if _mcp_registry_instance is None:
+        _mcp_registry_instance = MCPRegistry()
+    return _mcp_registry_instance
