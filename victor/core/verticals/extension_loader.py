@@ -244,7 +244,7 @@ class VerticalExtensionLoader(ABC):
             # Only add if not already defined in the class
             if method_name not in cls.__dict__:
 
-                def _make_getter(ext_type: str, mod_suffix: str, cls_suffix: str) -> classmethod[Any]:  # type: ignore[misc]
+                def _make_getter(ext_type: str, mod_suffix: str, cls_suffix: str) -> classmethod[Any]:  # type: ignore[misc,type-arg]
                     """Factory to create getter methods with proper closure."""
 
                     def _getter(subcls: type[Any]) -> Any:
@@ -279,7 +279,7 @@ class VerticalExtensionLoader(ABC):
             # Only add if not already defined in the class
             if method_name not in cls.__dict__:
 
-                def _make_cached_getter(ext_type: str) -> classmethod[Any]:  # type: ignore[misc]
+                def _make_cached_getter(ext_type: str) -> classmethod[Any]:  # type: ignore[misc,type-arg]
                     """Factory to create cached getter methods with proper closure."""
 
                     def _getter(subcls: type[Any]) -> Any:

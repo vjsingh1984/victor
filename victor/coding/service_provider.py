@@ -171,8 +171,8 @@ class CodingServiceProvider(ServiceProviderProtocol):
             return CodingModeConfigProvider()
 
         container.register_or_replace(
-            ModeConfigProviderProtocol,
-            create_mode_config,  # type: ignore[arg-type]
+            ModeConfigProviderProtocol,  # type: ignore[arg-type,type-abstract]
+            create_mode_config,
             ServiceLifetime.SINGLETON,
         )
 
@@ -194,8 +194,8 @@ class CodingServiceProvider(ServiceProviderProtocol):
             return create_vertical_tool_dependency_provider("coding")
 
         container.register_or_replace(
-            ToolDependencyProviderProtocol,
-            create_tool_deps,  # type: ignore[arg-type]
+            ToolDependencyProviderProtocol,  # type: ignore[arg-type,type-abstract]
+            create_tool_deps,
             ServiceLifetime.SINGLETON,
         )
 

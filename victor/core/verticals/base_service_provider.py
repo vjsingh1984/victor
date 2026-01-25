@@ -166,8 +166,8 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
             return mode_config_provider
 
         container.register(
-            ModeConfigProviderProtocol,
-            create_mode_config,  # type: ignore[arg-type]
+            ModeConfigProviderProtocol,  # type: ignore[arg-type,type-abstract]
+            create_mode_config,
             ServiceLifetime.SINGLETON,
         )
         logger.debug("Registered %s mode config provider", self.vertical_name)
@@ -189,8 +189,8 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
             return tool_dep_provider
 
         container.register(
-            ToolDependencyProviderProtocol,
-            create_tool_deps,  # type: ignore[arg-type]
+            ToolDependencyProviderProtocol,  # type: ignore[arg-type,type-abstract]
+            create_tool_deps,
             ServiceLifetime.SINGLETON,
         )
         logger.debug("Registered %s tool dependency provider", self.vertical_name)

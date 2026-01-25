@@ -1936,12 +1936,12 @@ class CodebaseIndex:
                 for node in py_ast.walk(tree):
                     if isinstance(node, py_ast.ClassDef):
                         class_name = node.name
-                        for base in node.bases:
+                        for base in node.bases:  # type: ignore[assignment]
                             base_name_result: str | None = None
                             try:
                                 if hasattr(py_ast, "unparse"):
                                     from typing import cast
-                                    base_name_result = py_ast.unparse(cast(py_ast.AST, base))
+                                    base_name_result = py_ast.unparse(cast(py_ast.expr, base))  # type: ignore[arg-type]
                                 else:
                                     base_id_attr: Any = getattr(base, "id", None)
                                     base_name_result = str(base_id_attr) if base_id_attr else None

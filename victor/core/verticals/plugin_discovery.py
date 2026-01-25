@@ -68,8 +68,7 @@ except ImportError:
 try:
     import yaml
 except ImportError:
-    _yaml: Optional[Any] = None
-    yaml: Optional[Any] = None
+    yaml = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:
     from victor.core.verticals.base import VerticalBase
