@@ -992,14 +992,16 @@ class CustomHookTransport(BaseTransport):
         if not self.hook_config.poll_hook:
             return None
 
-        return await self.hook_config.poll_hook(request_id, external_ref)
+        result = await self.hook_config.poll_hook(request_id, external_ref)
+        return cast(Optional[HITLResponse], result)
 
     async def cancel(self, request_id: str, external_ref: str) -> bool:
         """Call custom cancel hook."""
         if not self.hook_config.cancel_hook:
             return False
 
-        return await self.hook_config.cancel_hook(request_id, external_ref)
+        result = await self.hook_config.cancel_hook(request_id, external_ref)
+        return cast(bool, result)
 
 
 # =============================================================================

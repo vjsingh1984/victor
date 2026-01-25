@@ -186,7 +186,7 @@ class SandboxProviderRegistry:
 
     _instance: Optional["SandboxProviderRegistry"] = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._providers: Dict[str, Type[SandboxProvider]] = {}
         self._instances: Dict[str, SandboxProvider] = {}
 
@@ -695,7 +695,7 @@ class DeploymentConfig:
             connection=ConnectionConfig(
                 protocol="http",
                 endpoint=endpoint,
-                auth_method=auth_method,
+                auth_method=cast(Any, auth_method),
             ),
             dag_id=dag_id,
         )
@@ -1002,7 +1002,7 @@ class IsolationMapper:
         logger.debug(f"Registered isolation default for vertical: {vertical}")
 
     @classmethod
-    def list_verticals(cls) -> list:
+    def list_verticals(cls) -> list[str]:
         """List all registered vertical names."""
         return list(cls.VERTICAL_DEFAULTS.keys())
 

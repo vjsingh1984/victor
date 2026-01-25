@@ -302,7 +302,7 @@ class WorkflowLinter:
         Args:
             rules: List of validation rules (uses DEFAULT_RULES if not provided)
         """
-        self.rules: List[ValidationRule] = rules or [rule.__class__() for rule in DEFAULT_RULES]
+        self.rules: List[ValidationRule] = rules or list(DEFAULT_RULES)
         self._rule_map: Dict[str, ValidationRule] = {rule.rule_id: rule for rule in self.rules}
 
     def add_rule(self, rule: ValidationRule) -> None:
