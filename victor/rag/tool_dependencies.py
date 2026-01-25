@@ -151,13 +151,21 @@ def get_rag_tool_graph() -> ToolExecutionGraph:
         return _rag_tool_graph
 
     # Load data from YAML via provider (RAGToolDependencyProvider is already an instance)
-    config = RAGToolDependencyProvider.get_config()
-
-    # Extract components from config
-    transitions = getattr(config, 'transitions', {})
-    clusters = getattr(config, 'clusters', {})
-    sequences = getattr(config, 'sequences', {})
-    dependencies = getattr(config, 'dependencies', [])
+    # RAGToolDependencyProvider is Union[YAMLToolDependencyProvider, EmptyToolDependencyProvider]
+    # Only YAMLToolDependencyProvider has get_config(), so we need to check
+    if hasattr(RAGToolDependencyProvider, "get_config"):
+        config = RAGToolDependencyProvider.get_config()  # type: ignore[attr-defined]
+        # Extract components from config
+        transitions = getattr(config, 'transitions', {})
+        clusters = getattr(config, 'clusters', {})
+        sequences = getattr(config, 'sequences', {})
+        dependencies = getattr(config, 'dependencies', [])
+    else:
+        # Empty provider, use defaults
+        transitions: Dict[str, Any] = {}
+        clusters: Dict[str, Any] = {}
+        sequences: Dict[str, Any] = {}
+        dependencies: List[Any] = []
 
     # Load composed patterns from constants
     composed_patterns = RAG_COMPOSED_PATTERNS

@@ -27,7 +27,7 @@ Features:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Type, cast
 
 if TYPE_CHECKING:
     from victor.framework.stages import StageDefinition
@@ -101,8 +101,11 @@ class RAGAssistant(VerticalBase):
         )
     """
 
-    # NOTE: Metadata (name, description, version) is loaded from YAML config
-    # See victor/rag/config/vertical.yaml for the canonical definition
+    # Metadata attributes (required by VerticalBase)
+    # These are also defined in YAML but must exist at class level for discovery
+    name: ClassVar[str] = "rag"
+    description: ClassVar[str] = "Retrieval-Augmented Generation assistant for document Q&A"
+    version: ClassVar[str] = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:

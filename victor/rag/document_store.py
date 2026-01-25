@@ -671,8 +671,8 @@ class DocumentStore:
 
             h = hashlib.sha256(text.encode()).digest()
             # Convert to list of floats
-            result: List[float] = [b / 255.0 for b in h[: self.config.embedding_dim]]
-            return result
+            embedding_fallback: List[float] = [b / 255.0 for b in h[: self.config.embedding_dim]]
+            return embedding_fallback
 
     async def delete_document(self, doc_id: str) -> int:
         """Delete a document and its chunks.

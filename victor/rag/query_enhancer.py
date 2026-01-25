@@ -232,9 +232,9 @@ class QueryEnhancer:
             )
 
             if hasattr(response, "content"):
-                return response.content.strip()
+                return cast(str, response.content.strip())
             elif hasattr(response, "message"):
-                return response.message.get("content", "").strip()
+                return cast(str, response.message.get("content", "").strip())
             return str(response).strip()
 
         except Exception as e:

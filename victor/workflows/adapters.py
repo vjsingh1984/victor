@@ -231,7 +231,7 @@ class WorkflowToGraphAdapter:
                 }
                 new_state["results"] = results
 
-                return new_state  # type: ignore
+                return new_state
 
             return handler
 
@@ -333,7 +333,7 @@ class WorkflowToGraphAdapter:
             visited.append(node.name)
             new_state["visited_nodes"] = visited
 
-            return new_state  # type: ignore
+            return new_state
 
         # Return sync wrapper that runs async handler
         def sync_handler(state: WorkflowState) -> WorkflowState:
@@ -345,7 +345,11 @@ class WorkflowToGraphAdapter:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
-            return loop.run_until_complete(async_handler(state))
+            # Convert WorkflowState to Dict[str, Any] for async_handler
+            state_dict: Dict[str, Any] = dict(state)
+            result_dict = loop.run_until_complete(async_handler(state_dict))
+            # Convert result back to WorkflowState
+            return cast(WorkflowState, result_dict)
 
         return sync_handler
 

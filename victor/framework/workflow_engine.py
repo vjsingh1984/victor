@@ -703,7 +703,7 @@ class WorkflowEngine:
         else:
             # Fall back to coordinator for backward compatibility
             coordinator = self._get_yaml_coordinator()
-            async for event in coordinator.stream(
+            async for event in coordinator.stream(  # type: ignore[assignment]
                 yaml_path=yaml_path,
                 initial_state=initial_state,
                 workflow_name=workflow_name,
@@ -717,7 +717,7 @@ class WorkflowEngine:
                     yield event
                 else:
                     # Handle tuple format for backward compatibility
-                    event_type, data = cast("tuple[str, Dict[str, Any]]", event)
+                    event_type, data = event
                     yield WorkflowEvent(
                         event_type=event_type,
                         node_id=data.get("node_id", ""),

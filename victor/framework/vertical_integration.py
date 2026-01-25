@@ -897,10 +897,10 @@ class VerticalIntegrationPipeline:
         self._apply_with_step_handlers(orchestrator, vertical_class, context, result)
 
         # Run post-hooks
-        for hook in self._post_hooks:
+        for hook in self._post_hooks:  # type: ignore[assignment]
             try:
                 # Post hooks expect IntegrationResult
-                hook(orchestrator, result)
+                hook(orchestrator, result)  # type: ignore[arg-type]
             except Exception as e:
                 result.add_warning(f"Post-hook error: {e}")
 

@@ -30,7 +30,7 @@ Key Features:
 import asyncio
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
 if TYPE_CHECKING:
     from victor.coding.codebase.embeddings.models import BaseEmbeddingModel
