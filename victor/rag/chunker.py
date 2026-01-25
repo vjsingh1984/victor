@@ -567,7 +567,7 @@ class DocumentChunker:
 
         elif isinstance(data, list):
             # Chunk by array items (batch small items together)
-            current_batch = []
+            current_batch: List[Any] = []
             current_size = 0
 
             for item in data:
