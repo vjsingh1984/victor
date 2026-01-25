@@ -49,7 +49,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
 
 from victor.framework.vertical_integration import (
     VerticalIntegrationPipeline,
@@ -182,7 +182,6 @@ class FrameworkShim:
         from victor.agent.orchestrator import AgentOrchestrator
         from victor.core.bootstrap import ensure_bootstrapped
         from victor.core.protocols import OrchestratorProtocol
-        from typing import cast
 
         logger.debug(
             f"FrameworkShim creating orchestrator: profile={self._profile_name}, "

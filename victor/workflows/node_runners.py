@@ -814,7 +814,7 @@ class NodeRunnerRegistry:
     @classmethod
     def create_default(
         cls,
-        sub_agents: Optional["SubAgentManager"] = None,
+        sub_agents: Optional["SubAgentOrchestrator"] = None,
         tool_registry: Optional["ToolRegistry"] = None,
         hitl_executor: Optional["HITLExecutor"] = None,
         orchestrator: Optional["AgentOrchestrator"] = None,
@@ -822,7 +822,7 @@ class NodeRunnerRegistry:
         """Create a registry with default runners.
 
         Args:
-            sub_agents: SubAgentManager for agent nodes.
+            sub_agents: SubAgentOrchestrator for agent nodes.
             tool_registry: ToolRegistry for compute nodes.
             hitl_executor: HITLExecutor for HITL nodes.
             orchestrator: AgentOrchestrator for team nodes.

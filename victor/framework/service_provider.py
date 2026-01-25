@@ -209,8 +209,8 @@ def _create_agent_bridge(container: ServiceContainer) -> "AgentBridge":
         def provider_name(self) -> str:
             return "minimal"
         @property
-        def tool_budget(self) -> Optional[int]:
-            return None
+        def tool_budget(self) -> int:
+            return 0
         def reset_conversation(self) -> None:
             pass
 
@@ -399,25 +399,18 @@ class FrameworkScope:
 
     def get_configurator(self) -> Any:
         """Get tool configurator service."""
-        from victor.framework.tool_config import ToolConfigurator
         from typing import cast
 
-        # Get the service implementation (concrete class)
-        # Access parent container through scope's _parent attribute
-        parent_container = self._scope._parent
-        service_impl = parent_container._create_tool_configurator(parent_container)
-        # Cast to protocol
+        # Use factory function to get service
+        service_impl = _create_tool_configurator(self._scope._parent)
         return cast(ToolConfiguratorService, service_impl)
 
     def get_registry(self) -> Any:
         """Get event registry service."""
         from typing import cast
 
-        # Get the service implementation (concrete class)
-        # Access parent container through scope's _parent attribute
-        parent_container = self._scope._parent
-        service_impl = parent_container._create_event_registry(parent_container)
-        # Cast to protocol
+        # Use factory function to get service
+        service_impl = _create_event_registry(self._scope._parent)
         return cast(EventRegistryService, service_impl)
 
     def get_builder(self) -> Any:
@@ -427,11 +420,8 @@ class FrameworkScope:
         """
         from typing import cast
 
-        # Get the service implementation (concrete class)
-        # Access parent container through scope's _parent attribute
-        parent_container = self._scope._parent
-        service_impl = parent_container._create_agent_builder(parent_container)
-        # Cast to protocol
+        # Use factory function to get service
+        service_impl = _create_agent_builder(self._scope._parent)
         return cast(AgentBuilderService, service_impl)
 
     async def __aenter__(self) -> "FrameworkScope":

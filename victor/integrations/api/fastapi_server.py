@@ -1920,7 +1920,12 @@ Respond with just the command to run."""
                 # Sort by q_value, handling None values as 0
                 def sort_key(item: dict[str, object]) -> float:
                     val = item.get("q_value")
-                    return float(val) if val is not None else 0.0
+                    if val is None:
+                        return 0.0
+                    # Type narrowing - val is not None here
+                    if isinstance(val, (int, float)):
+                        return float(val)
+                    return 0.0
                 alternatives.sort(key=sort_key, reverse=True)
 
                 return JSONResponse(
