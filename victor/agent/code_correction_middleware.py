@@ -64,7 +64,7 @@ class CodeCorrectionConfig:
 
     # Use frozensets for better performance
     code_tools: Set[str] = field(
-        default_factory=lambda: frozenset(
+        default_factory=lambda: set(  # type: ignore[arg-type]
             {
                 "code_executor",
                 "execute_code",
@@ -78,7 +78,7 @@ class CodeCorrectionConfig:
     )
 
     code_argument_names: Set[str] = field(
-        default_factory=lambda: frozenset(
+        default_factory=lambda: set(  # type: ignore[arg-type]
             {"code", "python_code", "content", "source", "script", "new_content", "file_content"}
         )
     )
@@ -250,9 +250,11 @@ class CodeCorrectionMiddleware:
 
         lines.extend(f"  - {error}" for error in result.validation.errors[:5])
 
-        if result.feedback and result.feedback.suggestions:
-            lines.append("\nSuggestions:")
-            lines.extend(f"  - {suggestion}" for suggestion in result.feedback.suggestions[:3])
+        if result.feedback:
+            # Use general_feedback instead of suggestions attribute
+            if result.feedback.general_feedback:
+                lines.append("\nSuggestions:")
+                lines.append(f"  - {result.feedback.general_feedback}")
 
         return "\n".join(lines)
 

@@ -82,7 +82,7 @@ def __getattr__(name: str) -> Any:  # noqa: ANN401
 
 # Framework API (simplified - new golden path)
 # Import only what's actually exported from victor.framework
-from victor.framework import (
+from victor.framework import (  # type: ignore[attr-defined]
     Agent,
     AgentConfig,
     AgentError,

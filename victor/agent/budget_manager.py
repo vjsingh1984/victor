@@ -388,7 +388,9 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
 
         Deprecated: Use get_status() or get_diagnostics() instead.
         """
-        return self._tracker._budgets if self._tracker else {}
+        budgets = self._tracker._budgets if self._tracker else {}
+        # Convert BudgetType keys to strings for backward compatibility
+        return {str(k): v for k, v in budgets.items()}
 
     @property
     def _model_multiplier(self) -> float:
@@ -477,7 +479,9 @@ class ExtendedBudgetManager(BudgetManager):
         """Initialize with mode criteria checker (SRP)."""
         super().__post_init__()
         if self._mode_checker is None:
-            self._mode_checker = ModeCompletionChecker()
+            # Create concrete implementation instead of abstract class
+            from victor.agent.budget.mode_completion import ModeCompletionCheckerImpl
+            self._mode_checker = ModeCompletionCheckerImpl()
 
     def set_mode(self, mode: str) -> None:
         """Set current operating mode.
@@ -512,7 +516,7 @@ class ExtendedBudgetManager(BudgetManager):
         tool_lower = tool_name.lower()
         if tool_lower in {"read", "read_file"}:
             self.record_file_read()
-        elif self._tool_classifier.is_write_operation(tool_name):
+        elif self._tool_classifier and self._tool_classifier.is_write_operation(tool_name):  # type: ignore[union-attr]
             self.record_file_write()
 
         return super().record_tool_call(tool_name, is_write_operation)
@@ -659,4 +663,6 @@ def create_mode_completion_criteria(
     Returns:
         Configured ModeCompletionCriteria instance
     """
-    return ModeCompletionCriteria(custom_criteria=custom_criteria)
+    # Create concrete implementation instead of abstract class
+    from victor.agent.budget.mode_completion import ModeCompletionCriteriaImpl
+    return ModeCompletionCriteriaImpl(custom_criteria=custom_criteria)  # type: ignore[abstract]

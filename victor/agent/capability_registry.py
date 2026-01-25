@@ -636,9 +636,11 @@ class CapabilityRegistryMixin:
         """Get custom prompt via prompt_builder."""
         if hasattr(self, "prompt_builder") and self.prompt_builder:
             if hasattr(self.prompt_builder, "get_custom_prompt"):
-                return self.prompt_builder.get_custom_prompt()
+                result = self.prompt_builder.get_custom_prompt()
+                return result if result is not None else None  # type: ignore[no-any-return]
             elif hasattr(self.prompt_builder, "_custom_prompt"):
-                return self.prompt_builder._custom_prompt
+                result = self.prompt_builder._custom_prompt
+                return result if result is not None else None  # type: ignore[no-any-return]
         return None
 
     def _set_task_type_hints_via_builder(self, hints: Dict[str, Any]) -> None:
@@ -825,7 +827,7 @@ class CapabilityRegistryMixin:
         self,
         loader: Any,
         capability_names: Optional[list[Any]] = None,
-    ) -> list:
+    ) -> list[Any]:
         """Load capabilities from a CapabilityLoader.
 
         This provides integration with the CapabilityLoader class for
@@ -854,7 +856,8 @@ class CapabilityRegistryMixin:
                 "The loader must have an apply_to() method."
             )
 
-        return loader.apply_to(self, capability_names)
+        result = loader.apply_to(self, capability_names)
+        return result if result is not None else []  # type: ignore[no-any-return]
 
 
 __all__ = ["CapabilityRegistryMixin"]

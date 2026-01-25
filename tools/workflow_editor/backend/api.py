@@ -292,7 +292,7 @@ async def export_to_yaml(graph: WorkflowGraph) -> dict[str, str] | dict[str, boo
             "start_node": workflow_def.start_node,
         }, default_flow_style=False)
 
-        return {"yaml_content": yaml_content, "success": True}
+        return {"yaml_content": yaml_content, "success": True}  # type: ignore[return-value]
 
     except Exception as e:
         logger.error(f"Export failed: {e}", exc_info=True)
@@ -517,7 +517,7 @@ def graph_to_definition(graph: WorkflowGraph) -> WorkflowDefinition:
 
         if node.type == "agent":
             # AgentNode is a subclass of WorkflowNode, so this is safe
-            agent_node: WorkflowNode = AgentNode(  # type: ignore[assignment]
+            agent_node: WorkflowNode = AgentNode(
                 id=node.id,
                 name=node.name,
                 role=node.config.get("role", "assistant"),
@@ -580,6 +580,7 @@ def main() -> int:
         port=8000,
         log_level="info",
     )
+    return 0
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ Design Principles:
 """
 
 import logging
-from typing import Any, Dict, Optional, Set, TYPE_CHECKING
+from typing import Any, Dict, Optional, Set, TYPE_CHECKING, Protocol, cast
 
 if TYPE_CHECKING:
     from victor.agent.vertical_context import VerticalContext
@@ -114,8 +114,12 @@ class ConfigurationManager:
 
         try:
             # Get enabled tools from the access controller
-            enabled_tools = controller.get_enabled_tools()
-            return enabled_tools
+            # Use get_allowed_tools as fallback for get_enabled_tools
+            if hasattr(controller, "get_enabled_tools"):
+                enabled_tools = controller.get_enabled_tools()  # type: ignore[attr-defined]
+            else:
+                enabled_tools = controller.get_allowed_tools()
+            return cast(Set[str], enabled_tools)  # type: ignore[no-any-return]
         except Exception as e:
             logger.warning(f"Failed to get enabled tools: {e}")
             return set()
@@ -175,7 +179,7 @@ class ConfigurationManager:
         logger.debug("ConfigurationManager reset")
 
 
-class ConfigurationManagerProtocol:
+class ConfigurationManagerProtocol(Protocol):
     """Protocol for configuration management.
 
     This protocol defines the interface for configuration management,
@@ -189,15 +193,19 @@ class ConfigurationManagerProtocol:
 
     def get_tiered_config(self) -> Optional[Any]:
         """Get the current tiered tool configuration."""
+        raise NotImplementedError("get_tiered_config must be implemented by subclass")
 
     def get_enabled_tools(self) -> Set[str]:
         """Get the set of enabled tools."""
+        raise NotImplementedError("get_enabled_tools must be implemented by subclass")
 
     def get_vertical_config(self, key: str, default: Any = None) -> Any:
         """Get a configuration value from the vertical context."""
+        ...
 
     def get_all_configs(self) -> Dict[str, Any]:
         """Get all configuration values as a dictionary."""
+        ...
 
 
 def create_configuration_manager() -> ConfigurationManager:

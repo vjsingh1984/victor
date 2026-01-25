@@ -430,7 +430,7 @@ class LazyInvalidationCache:
         with self._lock:
             return len(self._cache) - len(self._stale_keys)
 
-    def items(self):
+    def items(self) -> list[tuple[Any, Any]]:
         """Return all active (non-stale, non-expired) items in the cache.
 
         Thread-safe: Returns snapshot of current items.

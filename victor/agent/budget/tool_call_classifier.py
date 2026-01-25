@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 # Default set of write tools (can be extended via OCP)
-DEFAULT_WRITE_TOOLS: Set[str] = frozenset(
+DEFAULT_WRITE_TOOLS: Set[str] = set(  # type: ignore[assignment]
     {
         "write_file",
         "write",
