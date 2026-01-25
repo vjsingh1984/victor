@@ -50,7 +50,7 @@ Example:
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.framework.config import SafetyEnforcer, SafetyLevel, SafetyRule
 
@@ -567,11 +567,14 @@ def create_source_credibility_safety_rules(
 
     if blocked_domains:
         for domain in blocked_domains:
+            # Type the lambda explicitly to avoid inference issues
+            def check_fn(op: str, d: str = domain) -> bool:
+                return d in op.lower()
             enforcer.add_rule(
                 SafetyRule(
                     name=f"source_block_{domain.replace('.', '_')}",
                     description=f"Block sources from {domain}",
-                    check_fn=lambda op, d=domain: d in op.lower(),
+                    check_fn=check_fn,
                     level=SafetyLevel.HIGH,
                     allow_override=False,
                 )
@@ -923,7 +926,7 @@ def create_all_common_safety_rules(
     include_bulk_operations: bool = False,
     include_ingestion: bool = False,
     include_data_export: bool = False,
-    **kwargs,
+    **kwargs: Any,
 ) -> None:
     """Register all common safety rules at once.
 

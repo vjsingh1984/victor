@@ -346,7 +346,7 @@ class MiddlewareBuilder:
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import LoggingMiddleware
 
-            return LoggingMiddleware(level=level)
+            return LoggingMiddleware(log_level=level)  # type: ignore[return-value]
 
         self._middleware_factories.append(factory)
         return self
@@ -369,7 +369,7 @@ class MiddlewareBuilder:
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import GitSafetyMiddleware
 
-            return GitSafetyMiddleware(
+            return GitSafetyMiddleware(  # type: ignore[return-value]
                 block_dangerous=block_dangerous,
                 warn_on_risky=warn_on_risky,
             )
@@ -390,7 +390,7 @@ class MiddlewareBuilder:
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import SecretMaskingMiddleware
 
-            return SecretMaskingMiddleware(mask_char=mask_char)
+            return SecretMaskingMiddleware(replacement=mask_char)  # type: ignore[return-value]
 
         self._middleware_factories.append(factory)
         return self
@@ -408,7 +408,7 @@ class MiddlewareBuilder:
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import MetricsMiddleware
 
-            return MetricsMiddleware(collect_tool_usage=collect_tool_usage)
+            return MetricsMiddleware(enable_timing=collect_tool_usage)  # type: ignore[return-value]
 
         self._middleware_factories.append(factory)
         return self
@@ -431,10 +431,7 @@ class MiddlewareBuilder:
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import ValidationMiddleware
 
-            return ValidationMiddleware(
-                validate_inputs=validate_inputs,
-                validate_outputs=validate_outputs,
-            )
+            return ValidationMiddleware(enabled=validate_inputs)  # type: ignore[return-value]
 
         self._middleware_factories.append(factory)
         return self
@@ -457,7 +454,7 @@ class MiddlewareBuilder:
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import CacheMiddleware
 
-            return CacheMiddleware(ttl=ttl, max_size=max_size)
+            return CacheMiddleware(ttl_seconds=ttl)  # type: ignore[return-value]
 
         self._middleware_factories.append(factory)
         return self
@@ -480,7 +477,9 @@ class MiddlewareBuilder:
         def factory() -> MiddlewareProtocol:
             from victor.framework.middleware import RateLimitMiddleware
 
-            return RateLimitMiddleware(max_calls=max_calls, window=window)
+            return RateLimitMiddleware(  # type: ignore[return-value]
+                max_calls=max_calls, time_window_seconds=window
+            )
 
         self._middleware_factories.append(factory)
         return self

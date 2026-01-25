@@ -447,7 +447,7 @@ class SecretMaskingMiddleware(MiddlewareProtocol):
         Returns:
             Dictionary with masked values
         """
-        result = {}
+        result: Dict[str, Any] = {}
         for key, value in data.items():
             if isinstance(value, str):
                 result[key] = self._mask_content(value)
@@ -508,16 +508,16 @@ class SecretMaskingMiddleware(MiddlewareProtocol):
 
         # Handle string results
         if isinstance(result, str):
-            masked = self._mask_content(result)
-            if masked != result:
-                return masked
+            masked_str = self._mask_content(result)
+            if masked_str != result:
+                return masked_str
             return None
 
         # Handle dict results
         if isinstance(result, dict):
-            masked = self._mask_dict_values(result)
-            if masked != result:
-                return masked
+            masked_dict = self._mask_dict_values(result)
+            if masked_dict != result:
+                return masked_dict
             return None
 
         return None
@@ -784,7 +784,7 @@ class GitSafetyMiddleware(MiddlewareProtocol):
     """
 
     # Dangerous operations that should be blocked by default
-    BLOCKED_OPERATIONS: frozenset = frozenset(
+    BLOCKED_OPERATIONS: frozenset[str] = frozenset(
         {
             "push --force",
             "push -f",
@@ -799,7 +799,7 @@ class GitSafetyMiddleware(MiddlewareProtocol):
     )
 
     # Operations that should generate warnings
-    WARNED_OPERATIONS: frozenset = frozenset(
+    WARNED_OPERATIONS: frozenset[str] = frozenset(
         {
             "reset --hard",
             "checkout --",
@@ -814,7 +814,7 @@ class GitSafetyMiddleware(MiddlewareProtocol):
     )
 
     # Protected branches that should never be force-pushed to
-    PROTECTED_BRANCHES: frozenset = frozenset(
+    PROTECTED_BRANCHES: frozenset[str] = frozenset(
         {
             "main",
             "master",
@@ -1112,7 +1112,7 @@ class OutputValidationMiddleware(MiddlewareProtocol):
                     )
 
         # Build metadata
-        metadata = {
+        metadata: Dict[str, Any] = {
             "validation_performed": True,
             "validation_passed": len(all_issues) == 0,
             "issue_count": len(all_issues),
@@ -1205,10 +1205,10 @@ class OutputValidationMiddleware(MiddlewareProtocol):
             return content
 
         try:
-            fixed = content
+            fixed: str = content
             for iteration in range(self.max_fix_iterations):
                 # Validator.fix is dynamically implemented by specific validators
-                fixed = self.validator.fix(fixed, issues, context)  # type: ignore
+                fixed = str(self.validator.fix(fixed, issues, context))
                 # Re-validate to check if fix worked
                 result = self._validate_content(fixed, context)
                 if result.is_valid:
@@ -1268,7 +1268,7 @@ class CacheResult:
         cached_result: Optional[Any] = None,
         modified_arguments: Optional[Dict[str, Any]] = None,
         error_message: Optional[str] = None,
-        **metadata,
+        **metadata: Any,
     ):
         self.proceed = proceed
         self.cached_result = cached_result
@@ -1276,7 +1276,7 @@ class CacheResult:
         self.error_message = error_message
         self._metadata = metadata
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         # Provide access to metadata keys as attributes
         if name in self._metadata:
             return self._metadata[name]
@@ -1371,7 +1371,7 @@ class CacheMiddleware(MiddlewareProtocol):
 
         # In-memory cache storage (fallback if no backend)
         if cache_backend is None:
-            self._cache: Dict[str, tuple[Any, float]] = {}
+            self._cache: Optional[Dict[str, tuple[Any, float]]] = {}
         else:
             self._cache = None  # Not used when backend is provided
 
@@ -1453,7 +1453,7 @@ class CacheMiddleware(MiddlewareProtocol):
 
         return time.time() > expiry_time
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> CacheResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> CacheResult:  # type: ignore[override]
         """Check cache before tool execution.
 
         Args:
@@ -1570,19 +1570,20 @@ class CacheMiddleware(MiddlewareProtocol):
         self._hits = 0
         self._misses = 0
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> Dict[str, int | float]:
         """Get cache statistics.
 
         Returns:
-            Dict with total_entries, hits, misses
+            Dict with total_entries, hits, misses, hit_rate
         """
         # Clean up expired entries
         import time
 
         current_time = time.time()
-        self._cache = {k: v for k, v in self._cache.items() if current_time < v[1]}
+        if self._cache is not None:
+            self._cache = {k: v for k, v in self._cache.items() if current_time < v[1]}
 
-        total_entries = len(self._cache)
+        total_entries = len(self._cache) if self._cache else 0
         hit_rate = (
             self._hits / (self._hits + self._misses) if (self._hits + self._misses) > 0 else 0.0
         )
@@ -1632,7 +1633,7 @@ class RateLimitResult:
         retry_after_seconds: Optional[float] = None,
         modified_arguments: Optional[Dict[str, Any]] = None,
         error_message: Optional[str] = None,
-        **metadata,
+        **metadata: Any,
     ):
         self.proceed = proceed
         self.blocked = blocked
@@ -1641,7 +1642,7 @@ class RateLimitResult:
         self.error_message = error_message
         self._metadata = metadata
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         # Provide access to metadata keys as attributes
         if name in self._metadata:
             return self._metadata[name]
@@ -1757,7 +1758,7 @@ class RateLimitMiddleware(MiddlewareProtocol):
 
         return max(0.0, window_end - current_time)
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> RateLimitResult:
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> RateLimitResult:  # type: ignore[override]
         """Check rate limit before tool execution.
 
         Args:
@@ -2031,7 +2032,7 @@ class ValidationMiddleware(MiddlewareProtocol):
             }
 
             expected_python_type = type_mapping.get(expected_type)
-            if expected_python_type and not isinstance(value, expected_python_type):
+            if expected_python_type and not isinstance(value, expected_python_type):  # type: ignore[arg-type]
                 raise ValueError(
                     f"Property '{prop_name}': expected {expected_type}, "
                     f"got {type(value).__name__}"
