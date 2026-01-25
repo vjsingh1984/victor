@@ -1,0 +1,332 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Unified RL Configuration for All Verticals (Phase 9.1)
+#
+# This file consolidates RL configurations that were previously duplicated
+# across vertical Python modules. It provides a single source of truth for
+# RL settings while allowing vertical-specific customization.
+#
+# Design Philosophy:
+# - YAML provides DATA (task mappings, thresholds, patience values)
+# - Python provides BEHAVIOR (methods, learner implementations)
+# - Verticals can override any setting by defining it here
+# - Missing settings fall back to BaseRLConfig defaults
+#
+# Usage:
+#   config = RLConfigFactory.create("coding")
+#   hooks = GenericRLHooks(config)
+#   tools = hooks.get_tool_recommendation("debugging")
+
+version: "1.0"
+
+# Default settings shared by all verticals (can be overridden)
+defaults:
+  active_learners:
+    - tool_selector
+    - continuation_patience
+    - grounding_threshold
+
+  default_patience:
+    anthropic: 4
+    openai: 4
+    google: 4
+    deepseek: 5
+    xai: 4
+    moonshot: 4
+    kimi: 4
+    ollama: 6
+    lmstudio: 6
+    vllm: 6
+
+  exploration_bonus: 0.15
+
+# Vertical-specific configurations
+verticals:
+  # ==========================================================================
+  # Coding Vertical
+  # ==========================================================================
+  coding:
+    # Coding uses additional learners for mode transitions and quality
+    active_learners:
+      - tool_selector
+      - continuation_patience
+      - grounding_threshold
+      - mode_transition
+      - quality_weights
+
+    # Task type to tool mappings (using canonical tool names)
+    task_type_mappings:
+      refactoring:
+        - rename
+        - extract
+        - edit
+        - read
+      debugging:
+        - read
+        - grep
+        - shell
+        - test
+        - git
+        - symbol
+        - refs
+      exploration:
+        - read
+        - grep
+        - code_search
+        - overview
+        - symbol
+        - ls
+      feature:
+        - read
+        - write
+        - edit
+        - shell
+        - git
+      implementation:
+        - read
+        - write
+        - edit
+        - shell
+        - test
+      testing:
+        - test
+        - shell
+        - read
+        - write
+      documentation:
+        - read
+        - write
+        - edit
+        - grep
+      review:
+        - read
+        - grep
+        - git
+        - refs
+
+    # Quality thresholds by task type (0.0-1.0)
+    quality_thresholds:
+      refactoring: 0.90    # High bar for refactoring
+      debugging: 0.85
+      feature: 0.80
+      implementation: 0.80
+      exploration: 0.70    # Lower bar for exploration
+      testing: 0.85
+      documentation: 0.75
+      review: 0.80
+
+    # Coding-specific: different patience values
+    default_patience:
+      anthropic: 3
+      openai: 3
+      google: 3
+      deepseek: 5
+      ollama: 7         # Most patient with local models
+      lmstudio: 7
+      vllm: 7
+
+    # Coding-specific: tools that shouldn't be used together
+    conflicting_tools:
+      write:
+        - edit
+      edit:
+        - write
+
+  # ==========================================================================
+  # DevOps Vertical
+  # ==========================================================================
+  devops:
+    # Uses default active learners
+
+    task_type_mappings:
+      deployment:
+        - shell
+        - docker
+        - git
+        - read
+        - edit
+      containerization:
+        - docker
+        - shell
+        - read
+        - write
+      monitoring:
+        - shell
+        - read
+        - write
+        - grep
+      configuration:
+        - read
+        - write
+        - edit
+        - grep
+      troubleshooting:
+        - shell
+        - read
+        - grep
+        - docker
+
+    quality_thresholds:
+      deployment: 0.90     # High bar for deployments
+      containerization: 0.85
+      monitoring: 0.80
+      configuration: 0.85
+      troubleshooting: 0.80
+
+  # ==========================================================================
+  # RAG Vertical
+  # ==========================================================================
+  rag:
+    # RAG uses different learners (no continuation_patience)
+    active_learners:
+      - tool_selector
+      - grounding_threshold
+      - quality_weights
+
+    task_type_mappings:
+      search:
+        - rag_search
+        - rag_query
+        - read
+      ingest:
+        - rag_ingest
+        - read
+        - ls
+        - web_fetch
+      synthesis:
+        - rag_query
+        - rag_search
+      management:
+        - rag_list
+        - rag_delete
+        - rag_stats
+      exploration:
+        - rag_search
+        - rag_list
+        - rag_stats
+        - read
+
+    quality_thresholds:
+      search: 0.80       # Search relevance threshold
+      synthesis: 0.85    # Higher for factual answers
+      ingest: 0.75
+      management: 0.70
+      exploration: 0.75
+
+    # RAG-specific: lower patience values
+    default_patience:
+      anthropic: 3
+      openai: 3
+      ollama: 5
+      google: 3
+
+  # ==========================================================================
+  # Data Analysis Vertical
+  # ==========================================================================
+  dataanalysis:
+    # Uses default active learners
+
+    task_type_mappings:
+      eda:
+        - read
+        - shell
+        - write
+        - ls
+      cleaning:
+        - shell
+        - read
+        - write
+      visualization:
+        - shell
+        - write
+      statistics:
+        - shell
+        - read
+        - write
+      ml:
+        - shell
+        - read
+        - write
+      profiling:
+        - read
+        - shell
+        - ls
+      reporting:
+        - write
+        - read
+        - shell
+
+    quality_thresholds:
+      eda: 0.75          # Exploratory, lower bar
+      cleaning: 0.85     # Data quality matters
+      visualization: 0.80
+      statistics: 0.90   # High bar for statistical correctness
+      ml: 0.85
+      profiling: 0.75
+      reporting: 0.80
+
+    # DataAnalysis-specific: output length preferences
+    preferred_output_length:
+      eda: medium
+      cleaning: medium
+      visualization: long     # Charts need more code
+      statistics: medium
+      ml: long               # ML pipelines are verbose
+      profiling: short
+      reporting: long
+
+  # ==========================================================================
+  # Research Vertical
+  # ==========================================================================
+  research:
+    # Uses default active learners
+
+    task_type_mappings:
+      research:
+        - web_search
+        - web_fetch
+        - read
+        - write
+      fact_check:
+        - web_search
+        - web_fetch
+        - grep
+      literature:
+        - web_search
+        - web_fetch
+        - read
+      competitive:
+        - web_search
+        - web_fetch
+        - write
+      synthesis:
+        - read
+        - write
+        - edit
+      exploration:
+        - web_search
+        - read
+        - grep
+        - overview
+
+    quality_thresholds:
+      research: 0.85        # High bar for research accuracy
+      fact_check: 0.90      # Very high for fact verification
+      literature: 0.85
+      competitive: 0.80
+      synthesis: 0.80
+      exploration: 0.75
+
+    # Research-specific: provider preferences by task
+    preferred_providers_by_task:
+      research:
+        - anthropic
+        - openai
+        - google
+      fact_check:
+        - anthropic
+        - openai
+      literature:
+        - anthropic
+        - openai
+        - google
