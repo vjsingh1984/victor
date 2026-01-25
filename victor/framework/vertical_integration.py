@@ -1309,6 +1309,74 @@ class VerticalIntegrationPipeline:
             logger.warning(f"Failed to hash source file {source_file}: {e}")
             return f"unknown_{hash(source_file)}"
 
+    def _find_yaml_config(self, vertical: Type["VerticalBase"]) -> Optional[Path]:
+        """Find YAML config file for a vertical.
+
+        Verticals can have their configuration in YAML files located in:
+        - {vertical_module}/config/vertical.yaml
+        - {vertical_dir}/vertical.yaml
+
+        Args:
+            vertical: Vertical class
+
+        Returns:
+            Path to YAML config file, or None if not found
+        """
+        try:
+            # Get module path
+            if hasattr(vertical, "__module__"):
+                import sys
+
+                module_name = vertical.__module__
+                module = sys.modules.get(module_name)
+
+                if module and hasattr(module, "__file__") and module.__file__:
+                    module_file = Path(module.__file__)
+                    module_dir = module_file.parent
+
+                    # Try config/vertical.yaml
+                    yaml_path = module_dir / "config" / "vertical.yaml"
+                    if yaml_path.exists():
+                        return yaml_path
+
+                    # Try vertical.yaml in same directory
+                    yaml_path = module_dir / "vertical.yaml"
+                    if yaml_path.exists():
+                        return yaml_path
+
+            # Try get_config_path() if vertical has it
+            if hasattr(vertical, "get_config_path"):
+                config_path = vertical.get_config_path()
+                if config_path and Path(config_path).exists():
+                    return Path(config_path)
+
+        except Exception as e:
+            logger.debug(f"Failed to find YAML config for {vertical.name}: {e}")
+
+        return None
+
+    def _hash_yaml_config(self, yaml_path: Path) -> str:
+        """Hash YAML config file.
+
+        Args:
+            yaml_path: Path to YAML config file
+
+        Returns:
+            Hex digest hash of the YAML file
+        """
+        try:
+            with open(yaml_path, "rb") as f:
+                content_hash = hashlib.sha256(f.read()).hexdigest()[:16]
+
+            mtime = yaml_path.stat().st_mtime_ns
+            mtime_hash = hashlib.sha256(str(mtime).encode()).hexdigest()[:8]
+
+            return f"{content_hash}_{mtime_hash}"
+
+        except Exception as e:
+            logger.warning(f"Failed to hash YAML config {yaml_path}: {e}")
+            return "unknown"
+
     def _load_from_cache(self, cache_key: str) -> Optional["IntegrationResult"]:
         """Load integration result from in-memory cache.
 

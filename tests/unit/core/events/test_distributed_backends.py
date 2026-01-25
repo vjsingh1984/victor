@@ -398,6 +398,9 @@ class TestKafkaEventBackend:
                 assert handle.pattern == "tool.*"
                 assert len(backend._subscriptions) == 1
 
+                # Clean up: disconnect to stop the background consume loop
+                await backend.disconnect()
+
     @pytest.mark.asyncio
     async def test_unsubscribe(self, config, mock_producer, mock_consumer):
         """Test unsubscribing from events."""
