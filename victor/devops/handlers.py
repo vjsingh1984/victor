@@ -512,4 +512,12 @@ __all__ = [
     "ContainerOpsHandler",
     "TerraformHandler",
     "MLOpsHandler",
+    "HANDLERS",
 ]
+
+# Handler registry for tests and programmatic access
+HANDLERS = {
+    "container_ops": ContainerOpsHandler,
+    "terraform_apply": TerraformHandler,
+    "mlops": MLOpsHandler,
+}

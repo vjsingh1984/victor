@@ -824,4 +824,14 @@ __all__ = [
     "PyCaretHandler",
     "AutoSklearnHandler",
     "RLTrainingHandler",
+    "HANDLERS",
 ]
+
+# Handler registry for tests and programmatic access
+HANDLERS = {
+    "stats_compute": StatsComputeHandler,
+    "ml_training": MLTrainingHandler,
+    "pycaret_automl": PyCaretHandler,
+    "autosklearn_automl": AutoSklearnHandler,
+    "rl_training": RLTrainingHandler,
+}

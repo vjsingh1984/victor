@@ -176,4 +176,11 @@ class CitationFormatterHandler(BaseHandler):
 __all__ = [
     "WebScraperHandler",
     "CitationFormatterHandler",
+    "HANDLERS",
 ]
+
+# Handler registry for tests and programmatic access
+HANDLERS = {
+    "web_scraper": WebScraperHandler,
+    "citation_formatter": CitationFormatterHandler,
+}
