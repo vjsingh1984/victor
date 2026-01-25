@@ -432,7 +432,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
             logger.warning(f"Get function '{definition.get_fn}' not found for capability '{name}'")
             return None
 
-        return get_fn(orchestrator)
+        return get_fn(orchestrator)  # type: ignore[no-any-return]
 
     def get_default_config(self, name: str) -> Dict[str, Any]:
         """Get default configuration for a capability.
@@ -511,7 +511,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
             # Build capability metadata
             cap_metadata = {
                 "name": f"{self._vertical_name}_{name}",
-                "capability_type": definition.type,
+                "capability_type": definition.type,  # type: ignore[arg-type]
                 "version": definition.version,
                 "setter": definition.configure_fn,
                 "description": definition.description,
@@ -521,7 +521,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
             if definition.get_fn:
                 cap_metadata["getter"] = definition.get_fn
 
-            capability = OrchestratorCapability(**cap_metadata)
+            capability = OrchestratorCapability(**cap_metadata)  # type: ignore[arg-type]
 
             # Get handler functions
             handler = getattr(self, definition.configure_fn, None)

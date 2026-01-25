@@ -477,7 +477,7 @@ class AgentBuilder:
         try:
             from victor.framework.service_provider import ToolConfiguratorService
 
-            return self._container.get(ToolConfiguratorService)
+            return self._container.get(ToolConfiguratorService)  # type: ignore[misc]
         except Exception as e:
             logger.debug(f"Could not get ToolConfigurator from container: {e}")
             return None
@@ -493,7 +493,7 @@ class AgentBuilder:
         try:
             from victor.framework.service_provider import EventRegistryService
 
-            return self._container.get(EventRegistryService)
+            return self._container.get(EventRegistryService)  # type: ignore[misc]
         except Exception as e:
             logger.debug(f"Could not get EventRegistry from container: {e}")
             return None
@@ -632,7 +632,7 @@ class AgentBuilder:
     # State Hooks
     # -------------------------------------------------------------------------
 
-    def on_enter_stage(self, callback: Callable[[str, Dict], None]) -> "AgentBuilder":
+    def on_enter_stage(self, callback: Callable[[str, Dict[str, Any]], None]) -> "AgentBuilder":
         """Register callback for stage entry.
 
         Args:
@@ -646,7 +646,7 @@ class AgentBuilder:
         self._options.state_hooks["on_enter"] = callback
         return self
 
-    def on_exit_stage(self, callback: Callable[[str, Dict], None]) -> "AgentBuilder":
+    def on_exit_stage(self, callback: Callable[[str, Dict[str, Any]], None]) -> "AgentBuilder":
         """Register callback for stage exit.
 
         Args:
@@ -1551,6 +1551,9 @@ class AgentBridge:
         if not self._connected or not self._cqrs_bridge:
             raise AgentError("Bridge not connected")
 
+        if self._session_id is None:
+            raise AgentError("No session ID")
+
         return await self._cqrs_bridge.get_session(self._session_id)
 
     async def get_conversation_history(self, limit: int = 100) -> Dict[str, Any]:
@@ -1568,6 +1571,9 @@ class AgentBridge:
         if not self._connected or not self._cqrs_bridge:
             raise AgentError("Bridge not connected")
 
+        if self._session_id is None:
+            raise AgentError("No session ID")
+
         return await self._cqrs_bridge.get_conversation_history(
             self._session_id,
             limit=limit,
@@ -1584,6 +1590,9 @@ class AgentBridge:
         """
         if not self._connected or not self._cqrs_bridge:
             raise AgentError("Bridge not connected")
+
+        if self._session_id is None:
+            raise AgentError("No session ID")
 
         return await self._cqrs_bridge.get_metrics(self._session_id)
 

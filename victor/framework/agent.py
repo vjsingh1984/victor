@@ -107,6 +107,10 @@ class Agent:
         self._cqrs_bridge: Optional["CQRSBridge"] = None
         self._cqrs_session_id: Optional[str] = None
         self._cqrs_adapter: Optional["FrameworkEventAdapter"] = None
+        # Builder metadata (for internal use by AgentBuilder)
+        self._builder_metadata: Dict[str, Any] = {}
+        self._presets_applied: List[str] = []
+        self._container: Optional["ServiceContainer"] = None
 
     @classmethod
     async def create(
@@ -250,7 +254,7 @@ class Agent:
         Returns:
             Agent wrapping the orchestrator
         """
-        provider = getattr(orchestrator.provider, "name", "unknown")
+        provider = getattr(orchestrator, "provider_name", "unknown")
         model = getattr(orchestrator, "model", None)
         return cls(orchestrator, provider=provider, model=model)
 
@@ -261,7 +265,7 @@ class Agent:
         goal: str,
         members: List["TeamMemberSpec"],
         *,
-        formation: "TeamFormation" = None,
+        formation: Optional["TeamFormation"] = None,
         provider: str = "anthropic",
         model: Optional[str] = None,
         total_tool_budget: int = 100,
@@ -662,7 +666,7 @@ class Agent:
         """
         observability = getattr(self._orchestrator, "observability", None)
         if observability:
-            return observability.event_bus
+            return observability.event_bus  # type: ignore[return-value]
         return None
 
     @property
@@ -718,7 +722,7 @@ class Agent:
             )
 
         # Subscribe using canonical event system
-        return event_bus.backend.subscribe(topic_pattern, handler)
+        return event_bus.backend.subscribe(topic_pattern, handler)  # type: ignore[arg-type, return-value]
 
     # =========================================================================
     # CQRS Integration
@@ -909,7 +913,7 @@ class Agent:
             workflow_name, context or {}, timeout=timeout
         )
 
-        return result
+        return result  # type: ignore[return-value]
 
     async def run_team(
         self,

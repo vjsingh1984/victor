@@ -94,7 +94,7 @@ async def create_orchestrator_from_options(
     from victor.agent.orchestrator_factory import OrchestratorFactory
     from victor.config.settings import load_settings
     from victor.core.bootstrap import ensure_bootstrapped
-    from victor.providers.registry import get_provider_class
+    from victor.providers.registry import ProviderRegistry
 
     # Load settings
     settings = load_settings()
@@ -122,7 +122,7 @@ async def create_orchestrator_from_options(
     ensure_bootstrapped(settings, vertical=vertical_name)
 
     # Create OrchestratorFactory with provider
-    provider_class = get_provider_class(provider)
+    provider_class = ProviderRegistry.get(provider)
     provider_instance = provider_class(
         model=model or settings.default_model,
         temperature=temperature,

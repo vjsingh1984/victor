@@ -290,7 +290,7 @@ def privacy_capability(
     anonymize_pii: bool = True,
     detect_secrets: bool = True,
     **kwargs: Any,
-) -> Callable:
+) -> Callable[[Any], None]:
     """Privacy capability handler."""
 
     def handler(orchestrator: Any) -> None:
@@ -315,7 +315,7 @@ def secrets_masking_capability(
     enabled: bool = True,
     replacement: str = "[REDACTED]",
     **kwargs: Any,
-) -> Callable:
+) -> Callable[[Any], None]:
     """Secrets masking capability handler."""
 
     def handler(orchestrator: Any) -> None:
@@ -340,7 +340,7 @@ def audit_logging_capability(
     enabled: bool = True,
     log_data_access: bool = True,
     **kwargs: Any,
-) -> Callable:
+) -> Callable[[Any], None]:
     """Audit logging capability handler."""
 
     def handler(orchestrator: Any) -> None:
@@ -383,7 +383,7 @@ class PrivacyCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
         privacy_cap(orchestrator)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the privacy capability provider."""
         self._applied: Set[str] = set()
         # Map capability names to their handler functions
