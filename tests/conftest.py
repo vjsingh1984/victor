@@ -191,16 +191,31 @@ def reset_singletons():
 
     Design: Reset both before AND after each test ensures bidirectional
     isolation - neither earlier nor later tests can pollute each other.
+
+    Performance: Uses fast reset by default (~0.05s) instead of full reset (~0.8s).
+    Full reset can be enabled via VICTOR_FULL_SINGLETON_RESET=1 env var.
     """
-    from tests.singleton_reset import reset_all_singletons
+    import os
+
+    # Check if full reset is requested
+    use_full_reset = os.environ.get("VICTOR_FULL_SINGLETON_RESET", "0") == "1"
+
+    if use_full_reset:
+        from tests.singleton_reset import reset_all_singletons
+
+        reset_fn = reset_all_singletons
+    else:
+        from tests.singleton_reset_fast import reset_all_singletons_fast
+
+        reset_fn = reset_all_singletons_fast
 
     # Reset before test
-    reset_all_singletons()
+    reset_fn()
 
     yield
 
     # Reset after test
-    reset_all_singletons()
+    reset_fn()
 
 
 @pytest.fixture(autouse=True)
