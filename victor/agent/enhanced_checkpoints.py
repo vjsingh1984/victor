@@ -223,7 +223,10 @@ class StateSerializer:
             JSON-serializable dictionary
         """
         if hasattr(state, "to_dict"):
-            return state.to_dict()
+            result = state.to_dict()
+            if isinstance(result, dict):
+                return result
+            return {"state": result}
         elif isinstance(state, dict):
             return StateSerializer.serialize_context(state)
         else:
@@ -491,7 +494,7 @@ class EnhancedCheckpointManager:
             >>> print(cp.id)
         """
         # Generate unique checkpoint ID
-        checkpoint_id = f"checkpoint_{uuid.uuid4().hex[:12]}"
+        checkpoint_id: str = f"checkpoint_{uuid.uuid4().hex[:12]}"
 
         # Create git checkpoint for working tree
         try:

@@ -227,11 +227,12 @@ class EntityExtractor:
                 if entities_found >= self._config.max_entities_per_message:
                     break
 
-                await self._memory.store(
+                entity = Entity(
                     name=module_name,
                     entity_type=EntityType.MODULE,
                     attributes={"source": "import_statement"},
                 )
+                await self._memory.store(entity)
                 entities_found += 1
 
     async def _extract_natural_language_entities(
@@ -300,14 +301,21 @@ class EntityExtractor:
             source_entities = self._memory.search(source_entity_name, limit=1)
             target_entities = self._memory.search(target_entity_name, limit=1)
 
-            # Await the results
-            source_list = await source_entities if hasattr(source_entities, '__await__') else source_entities  # type: ignore[arg-type]
-            target_list = await target_entities if hasattr(target_entities, '__await__') else target_entities  # type: ignore[arg-type]
+            # Ensure we have lists
+            if hasattr(source_entities, '__await__'):
+                source_list = await source_entities
+            else:
+                source_list = source_entities
+
+            if hasattr(target_entities, '__await__'):
+                target_list = await target_entities
+            else:
+                target_list = target_entities
 
             if source_list and target_list:
-                relation = EntityRelation.create(
-                    source=source_list[0].id,
-                    target=target_list[0].id,
+                relation = EntityRelation(
+                    source_id=source_list[0].id,
+                    target_id=target_list[0].id,
                     relation_type=relation_enum,
                 )
                 await self._memory.store_relation(relation)
@@ -337,7 +345,11 @@ class EntityExtractor:
             List of relevant entity descriptions
         """
         search_result = self._memory.search(query, limit=limit)
-        entities = await search_result if hasattr(search_result, '__await__') else search_result  # type: ignore[arg-type]
+        # Ensure we have a list
+        if hasattr(search_result, '__await__'):
+            entities = await search_result
+        else:
+            entities = search_result
 
         return [f"{e.name} ({e.entity_type.value})" for e in entities]
 
@@ -352,13 +364,18 @@ class EntityExtractor:
         """
         # Get most mentioned entities
         all_entities = self._memory.search("", limit=limit)
+        # Ensure we have a list
+        if hasattr(all_entities, '__await__'):
+            entities_list = await all_entities
+        else:
+            entities_list = all_entities
 
-        if not all_entities:
+        if not entities_list:
             return "No entities tracked in this conversation."
 
         # Group by type
         by_type: Dict[str, List[str]] = {}
-        for entity in all_entities:
+        for entity in entities_list:
             entity_type = entity.entity_type.value
             if entity_type not in by_type:
                 by_type[entity_type] = []

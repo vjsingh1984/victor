@@ -163,7 +163,7 @@ class GitCheckpointManager:
         args: List[str],
         check: bool = True,
         capture_output: bool = True,
-    ) -> "subprocess.CompletedProcess[bytes]":
+    ) -> "subprocess.CompletedProcess[str]":
         """Run a git command in the repository.
 
         Args:

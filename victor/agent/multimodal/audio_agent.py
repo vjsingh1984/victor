@@ -953,7 +953,7 @@ class AudioAgent:
                 audio = whisper.load_audio(str(audio_path))
                 result = model.transcribe(audio, language=None)
 
-                language = result.get("language", "unknown")
+                language: str = result.get("language", "unknown")
                 logger.info(f"Detected language (Whisper): {language}")
                 return language
 
@@ -1065,7 +1065,7 @@ Summary:"""
         audio_paths: List[str],
         operation: str = "transcribe",
         **kwargs: Any,
-    ) -> List[Any]:
+    ) -> List["TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None"]:
         """Process multiple audio files in batch.
 
         Args:
@@ -1366,7 +1366,7 @@ Summary:"""
         )
 
         # Analyze segments to build speaker profiles
-        speaker_segments = {}
+        speaker_segments: Dict[str, List[SpeakerSegment]] = {}
         total_speech_time = 0.0
 
         for seg in segments:
@@ -1537,7 +1537,10 @@ Provide a JSON response with:
 
             try:
                 summary_data = json.loads(response.content)
-                return summary_data
+                if isinstance(summary_data, dict):
+                    return summary_data
+                else:
+                    return {"result": summary_data}
 
             except json.JSONDecodeError:
                 # Fallback to plain text

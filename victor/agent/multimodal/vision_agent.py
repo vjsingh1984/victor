@@ -1162,20 +1162,26 @@ class VisionAgent:
                 f"Invalid operation: {operation}. Must be one of: {', '.join(valid_operations)}"
             )
 
-        results = []
+        results: List[Any] = []
 
         for image_path in image_paths:
             try:
                 if operation == "analyze":
-                    result = await self.analyze_image(image_path, **kwargs)
+                    analysis_result = await self.analyze_image(image_path, **kwargs)
+                    results.append(analysis_result)
                 elif operation == "caption":
-                    result = await self.generate_caption(image_path, **kwargs)
+                    caption_result = await self.generate_caption(image_path, **kwargs)
+                    results.append(caption_result)
                 elif operation == "ocr":
-                    result = await self.ocr_extraction(image_path, **kwargs)
+                    ocr_result = await self.ocr_extraction(image_path, **kwargs)
+                    results.append(ocr_result)
                 elif operation == "detect_objects":
-                    result = await self.detect_objects(image_path, **kwargs)
+                    objects_result = await self.detect_objects(image_path, **kwargs)
+                    results.append(objects_result)
+                else:
+                    # This should never happen due to validation above
+                    raise ValidationError(f"Invalid operation: {operation}")
 
-                results.append(result)
                 logger.debug(f"Processed {image_path}")
 
             except Exception as e:

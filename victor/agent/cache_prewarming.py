@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, List, Optional, Set
 
 if TYPE_CHECKING:
     from victor.agent.tool_selection import ToolSelector
-    from victor.tools.registry import ToolRegistry  # type: ignore[attr-defined]
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

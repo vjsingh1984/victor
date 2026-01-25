@@ -45,7 +45,7 @@ try:
     from victor.agent.coordinators.state_coordinator import StateScope
 except ImportError:
     # Fallback for testing - create a simple enum
-    StateScope_Base = type(  # type: ignore[misc]
+    StateScope_Base = type(
         "StateScope",
         (),
         {

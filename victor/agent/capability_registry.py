@@ -593,7 +593,7 @@ class CapabilityRegistryMixin:
             method_key = f"{name}:get"
             if method_key in self._capability_methods:
                 method = self._capability_methods[method_key]
-                if method:
+                if method is not None:
                     result = method()
                     if result is not None:
                         return result
@@ -641,10 +641,12 @@ class CapabilityRegistryMixin:
         if hasattr(self, "prompt_builder") and self.prompt_builder:
             if hasattr(self.prompt_builder, "get_custom_prompt"):
                 result = self.prompt_builder.get_custom_prompt()
-                return result
+                if result is not None:
+                    return str(result)
             elif hasattr(self.prompt_builder, "_custom_prompt"):
                 result = self.prompt_builder._custom_prompt
-                return result
+                if result is not None:
+                    return str(result)
         return None
 
     def _set_task_type_hints_via_builder(self, hints: Dict[str, Any]) -> None:

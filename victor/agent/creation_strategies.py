@@ -22,12 +22,11 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.agent.protocols import OrchestratorProtocol
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -208,10 +207,12 @@ class LegacyStrategy(AgentCreationStrategy):
     def _apply_overrides(self, agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
         """Apply budget, iteration, and mode overrides to agent."""
         if context.tool_budget is not None:
-            agent.unified_tracker.set_tool_budget(context.tool_budget, user_override=True)
+            if agent.unified_tracker is not None:
+                agent.unified_tracker.set_tool_budget(context.tool_budget, user_override=True)
 
         if context.max_iterations is not None:
-            agent.unified_tracker.set_max_iterations(context.max_iterations, user_override=True)
+            if agent.unified_tracker is not None:
+                agent.unified_tracker.set_max_iterations(context.max_iterations, user_override=True)
 
         if context.mode:
             from victor.agent.mode_controller import AgentMode, get_mode_controller

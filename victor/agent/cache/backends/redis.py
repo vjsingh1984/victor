@@ -200,8 +200,9 @@ class RedisCacheBackend(ICacheBackend):
             )
 
             # Ping to verify connection
-            ping_result: Any = await self._redis.ping()
-            assert ping_result is not None
+            ping_result = await self._redis.ping()
+            if not ping_result:
+                raise ConnectionError("Redis ping failed")
 
             # Create pubsub client for distributed invalidation
             self._pubsub = self._redis.pubsub()
