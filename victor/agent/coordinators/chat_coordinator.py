@@ -429,7 +429,8 @@ class ChatCoordinator:
                 if recovery_chunk:
                     yield recovery_chunk
                     if recovery_chunk.is_final:
-                        orch._recovery_integration.record_outcome(success=False)  # type: ignore[attr-defined]
+                        if orch._recovery_integration:
+                            orch._recovery_integration.record_outcome(success=False)
                         return
                 if recovery_action.action in ("retry", "force_summary"):
                     continue
@@ -548,9 +549,17 @@ class ChatCoordinator:
                     orch._force_finalize = True  # type: ignore[attr-defined]
 
             # Check for loop warning via streaming handler
-            unified_loop_warning = orch.unified_tracker.check_loop_warning()  # type: ignore[attr-defined]
-            loop_warning_chunk = orch._streaming_handler.handle_loop_warning(  # type: ignore[attr-defined]
-                stream_ctx, unified_loop_warning
+            unified_loop_warning = (
+                orch.unified_tracker.check_loop_warning()
+                if orch.unified_tracker is not None
+                else None
+            )
+            loop_warning_chunk = (
+                orch._streaming_handler.handle_loop_warning(
+                    stream_ctx, cast(str, unified_loop_warning)
+                )
+                if orch._streaming_handler is not None
+                else None
             )
             # Only yield if it's a real StreamChunk (not a Mock or None)
             if loop_warning_chunk and not isinstance(loop_warning_chunk, Mock):
@@ -559,12 +568,13 @@ class ChatCoordinator:
             else:
                 # Check UnifiedTaskTracker for stop decision via recovery coordinator
                 recovery_ctx = self._create_recovery_context(stream_ctx)
-                was_triggered, hint = orch._recovery_coordinator.check_force_action(recovery_ctx)  # type: ignore[attr-defined]
-                if was_triggered:
-                    logger.info(
-                        f"UnifiedTaskTracker forcing action: {hint}, "
-                        f"metrics={orch.unified_tracker.get_metrics()}"  # type: ignore[attr-defined]
-                    )
+                if orch._recovery_coordinator is not None:
+                    was_triggered, hint = orch._recovery_coordinator.check_force_action(recovery_ctx)
+                    if was_triggered:
+                        logger.info(
+                            f"UnifiedTaskTracker forcing action: {hint}, "
+                            f"metrics={orch.unified_tracker.get_metrics() if orch.unified_tracker is not None else {}}"
+                        )
 
                 logger.debug(f"After streaming pass, tool_calls = {tool_calls}")
 
@@ -673,8 +683,9 @@ class ChatCoordinator:
                     yield chunk
 
                 # Update tool calls used via internal state
+                # Note: calls_used is read-only, tool_pipeline tracks it internally
                 current_calls = orch.tool_calls_used
-                orch._tool_pipeline.calls_used = current_calls + tool_exec_result.tool_calls_executed  # type: ignore[attr-defined]
+                # The _tool_pipeline automatically tracks calls_used
 
                 if tool_exec_result.should_return:
                     return
@@ -700,11 +711,16 @@ class ChatCoordinator:
         orch = self._orch()
 
         # Initialize streaming state via MetricsCoordinator
-        orch._metrics_coordinator.start_streaming()  # type: ignore[attr-defined]
+        if orch._metrics_coordinator is not None:
+            orch._metrics_coordinator.start_streaming()
 
         # Track performance metrics using StreamMetrics
-        stream_metrics = orch._metrics_collector.init_stream_metrics()  # type: ignore[attr-defined]
-        start_time = stream_metrics.start_time
+        stream_metrics = (
+            orch._metrics_collector.init_stream_metrics()
+            if orch._metrics_collector is not None
+            else cast(Any, None)
+        )
+        start_time = stream_metrics.start_time if stream_metrics else 0.0
         total_tokens: float = 0
 
         # Cumulative token usage from provider
@@ -717,16 +733,23 @@ class ChatCoordinator:
         }
 
         # Ensure system prompt is included once at start of conversation
-        orch.conversation.ensure_system_prompt()  # type: ignore[attr-defined]
-        orch._system_added = True  # type: ignore[attr-defined]
+        if orch.conversation is not None:
+            orch.conversation.ensure_system_prompt()
+        # Set system_added flag
+        if not hasattr(orch, "_system_added"):
+            orch._system_added = False
+        orch._system_added = True
         # Reset session state for new stream via SessionStateManager
-        orch._session_state.reset_for_new_turn()  # type: ignore[attr-defined]
+        if orch._session_state is not None:
+            orch._session_state.reset_for_new_turn()
 
         # Reset unified tracker for new conversation
-        orch.unified_tracker.reset()  # type: ignore[attr-defined]
+        if orch.unified_tracker is not None:
+            orch.unified_tracker.reset()
 
         # Reset context reminder manager for new conversation turn
-        orch.reminder_manager.reset()  # type: ignore[attr-defined]
+        if orch.reminder_manager is not None:
+            orch.reminder_manager.reset()
 
         # Start UsageAnalytics session for this conversation
         if hasattr(orch, "_usage_analytics") and orch._usage_analytics:
@@ -737,23 +760,37 @@ class ChatCoordinator:
             orch._sequence_tracker.clear_history()
 
         # PERF: Start background compaction for async context management
-        if orch._context_manager and hasattr(orch._context_manager, "start_background_compaction"):  # type: ignore[attr-defined]
+        if orch._context_manager is not None and hasattr(orch._context_manager, "start_background_compaction"):
             await orch._context_manager.start_background_compaction(interval_seconds=15.0)  # type: ignore[attr-defined]
 
         # Local aliases for frequently-used values
-        max_total_iterations = orch.unified_tracker.config.get("max_total_iterations", 50)  # type: ignore[attr-defined]
+        max_total_iterations = (
+            orch.unified_tracker.config.get("max_total_iterations", 50)
+            if orch.unified_tracker is not None
+            else 50
+        )
         total_iterations = 0
         force_completion = False
 
         # Add user message to history
-        orch.add_message("user", user_message)  # type: ignore[attr-defined]
+        # Add user message to history
+        if hasattr(orch, "add_message"):
+            orch.add_message("user", user_message)
+        else:
+            # Fallback: add to conversation directly
+            if orch.conversation is not None:
+                orch.conversation.add_message({"role": "user", "content": user_message})
 
         # Record this turn in UsageAnalytics
         if hasattr(orch, "_usage_analytics") and orch._usage_analytics:
             orch._usage_analytics.record_turn()
 
         # Detect task type using unified tracker
-        unified_task_type = orch.unified_tracker.detect_task_type(user_message)  # type: ignore[attr-defined]
+        unified_task_type = (
+            orch.unified_tracker.detect_task_type(user_message)
+            if orch.unified_tracker is not None
+            else TrackerTaskType.GENERAL
+        )
         logger.info(f"Task type detected: {unified_task_type.value}")
 
         # Extract prompt requirements for dynamic budgets
@@ -1944,7 +1981,7 @@ class ChatCoordinator:
         from victor.agent.conversation_memory import MessageRole
 
         # Collect information from conversation
-        messages = orch.messages
+        messages = getattr(orch, "messages", [])  # type: ignore[attr-defined]
         tool_calls_used = stream_ctx.tool_calls_used
         iterations = stream_ctx.total_iterations
         task_type = "analysis" if stream_ctx.is_analysis_task else "general task"
@@ -2033,34 +2070,35 @@ class ChatCoordinator:
         # Call handle_response with individual parameters instead of detect_and_handle
         if orch._recovery_integration:
             return await orch._recovery_integration.handle_response(
-            content=full_content,
-            tool_calls=tool_calls,
-            mentioned_tools=mentioned_tools,
-            provider_name=orch.provider_name,
-            model_name=orch.model,
-            tool_calls_made=orch.tool_calls_used,
-            tool_budget=orch.tool_budget,
-            iteration_count=stream_ctx.total_iterations,
-            max_iterations=stream_ctx.max_total_iterations,
-            current_temperature=getattr(orch, "temperature", 0.7),
-            quality_score=stream_ctx.last_quality_score,
-            task_type=(
+                content=full_content,
+                tool_calls=tool_calls,
+                mentioned_tools=mentioned_tools,
+                provider_name=orch.provider_name,
+                model_name=orch.model,
+                tool_calls_made=orch.tool_calls_used,
+                tool_budget=orch.tool_budget,
+                iteration_count=stream_ctx.total_iterations,
+                max_iterations=stream_ctx.max_total_iterations,
+                current_temperature=getattr(orch, "temperature", 0.7),
+                quality_score=stream_ctx.last_quality_score,
+                task_type=(
                 getattr(orch._task_tracker, "current_task_type", "general")
                 if hasattr(orch, "_task_tracker")
                 else "general"
-            ),
-            is_analysis_task=(
+                ),
+                is_analysis_task=(
                 getattr(orch._task_tracker, "is_analysis_task", False)
                 if hasattr(orch, "_task_tracker")
                 else False
-            ),
-            is_action_task=(
+                ),
+                is_action_task=(
                 getattr(orch._task_tracker, "is_action_task", False)
                 if hasattr(orch, "_task_tracker")
                 else False
-            ),
-            context_utilization=None,
-        )
+                ),
+                context_utilization=None,
+            )
+        return None
 
     def _apply_recovery_action(
         self, recovery_action: Any, stream_ctx: "StreamingChatContext"
