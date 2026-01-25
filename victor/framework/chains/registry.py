@@ -48,7 +48,7 @@ import logging
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.tools.composition import Runnable
@@ -109,6 +109,7 @@ class ChainRegistry:
 
     _instance: Optional["ChainRegistry"] = None
     _lock: threading.Lock = threading.Lock()
+    _initialized: bool = False
 
     def __new__(cls) -> "ChainRegistry":
         """Create or return singleton instance."""
@@ -119,12 +120,12 @@ class ChainRegistry:
                     cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the chain registry."""
         if self._initialized:
             return
 
-        self._chains: Dict[str, Dict[str, "Runnable"]] = {}
+        self._chains: Dict[str, Dict[str, "Runnable[Any, Any]"]] = {}
         self._metadata: Dict[str, Dict[str, ChainMetadata]] = {}
         self._categories: Dict[str, Set[str]] = {
             "exploration": set(),
@@ -139,7 +140,7 @@ class ChainRegistry:
         self,
         name: str,
         version: str,
-        chain: "Runnable",
+        chain: "Runnable[Any, Any]",
         category: str,
         description: str = "",
         tags: Optional[List[str]] = None,
@@ -194,7 +195,7 @@ class ChainRegistry:
 
             logger.debug(f"Registered chain: {name}@{version} (category={category})")
 
-    def get_chain(self, name: str, version: Optional[str] = None) -> Optional["Runnable"]:
+    def get_chain(self, name: str, version: Optional[str] = None) -> Optional["Runnable[Any, Any]"]:
         """Get a chain by name and optional version.
 
         Args:
@@ -363,7 +364,7 @@ class ChainRegistry:
         return re.match(pattern, version) is not None
 
     @staticmethod
-    def _semver_key(version: str) -> tuple:
+    def _semver_key(version: str) -> Tuple[int, ...]:
         """Convert SemVer to tuple for sorting.
 
         Args:

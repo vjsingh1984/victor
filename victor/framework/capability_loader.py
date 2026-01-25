@@ -990,7 +990,7 @@ def capability(
     description: Optional[str] = None,
     setter: Optional[str] = None,
     getter: Optional[str] = None,
-) -> Callable[[Callable], Callable]:
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator to mark a function as a capability handler.
 
     This decorator attaches metadata to functions so they can be
@@ -1020,15 +1020,20 @@ def capability(
                 pass
     """
 
-    def decorator(func: Callable[..., Any]) -> Callable:
-        func._capability_meta = {
-            "name": name,
-            "capability_type": capability_type,
-            "version": version,
-            "description": description or func.__doc__ or "",
-            "setter": setter or name,
-            "getter": getter,
-        }
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        # Use setattr to avoid attr-defined error on Callable
+        setattr(
+            func,
+            "_capability_meta",
+            {
+                "name": name,
+                "capability_type": capability_type,
+                "version": version,
+                "description": description or func.__doc__ or "",
+                "setter": setter or name,
+                "getter": getter,
+            },
+        )
         return func
 
     return decorator

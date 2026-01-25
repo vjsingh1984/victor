@@ -56,13 +56,11 @@ Usage:
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
+from victor.core.verticals.base import VerticalConfig
 from victor.core.verticals.capability_mutation import CapabilityMutation, CapabilityRollback
 from victor.core.verticals.context import VerticalContext
-
-if TYPE_CHECKING:
-    from victor.core.verticals.base import VerticalConfig
 
 logger = __import__("logging").getLogger(__name__)
 
@@ -107,14 +105,14 @@ class MutableVerticalContext(VerticalContext):
             print(f"{mutation.capability}: {mutation.args}")
     """
 
-    def __init__(self, name: str, config: Optional[VerticalConfig]):
+    def __init__(self, name: str, config: Optional[Union[VerticalConfig, Dict[str, Any]]]):
         """Initialize mutable context.
 
         Args:
             name: Vertical name
             config: Vertical configuration dict
         """
-        super().__init__(name=name, config=config if config is not None else {})  # type: ignore[arg-type]
+        super().__init__(name=name, config=config if config is not None else {})
         self._mutations: List[CapabilityMutation] = []
         self._capability_values: Dict[str, Any] = {}
         self._rollback_stack: List[CapabilityRollback] = []
@@ -162,11 +160,11 @@ class MutableVerticalContext(VerticalContext):
         # Update config (but don't mutate orchestrator directly)
         if self.config is not None:
             if "_applied_capabilities" not in self.config:
-                (self.config)["_applied_capabilities"] = {}  # type: ignore[index]
-            (self.config)["_applied_capabilities"][capability_name] = kwargs  # type: ignore[index]
+                (self.config)["_applied_capabilities"] = {}
+            (self.config)["_applied_capabilities"][capability_name] = kwargs
         else:
             # Initialize config if it's None
-            self.config = {"_applied_capabilities": {capability_name: kwargs}}  # type: ignore[assignment]
+            self.config = {"_applied_capabilities": {capability_name: kwargs}}
 
     def get_capability(self, capability_name: str) -> Optional[Any]:
         """Get applied capability value.

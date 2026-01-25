@@ -666,7 +666,7 @@ class CQRSBridge:
 
         # Create the pre-configured command bus which includes
         # its own event_store, dispatcher, and projection
-        command_bus: AgentCommandBus = AgentCommandBus()  # type: ignore[no-untyped-call]
+        command_bus: AgentCommandBus = AgentCommandBus()
 
         # Extract components from the command bus
         event_dispatcher = command_bus.dispatcher

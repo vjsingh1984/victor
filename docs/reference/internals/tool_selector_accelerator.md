@@ -472,7 +472,7 @@ except ImportError:
 
 ## References
 
-- [Rust Implementation](../victor/native/rust/tool_selector.py)
-- [Integration Tests](../../tests/integration/native/test_tool_selector_accelerator.py)
-- [Observability Guide](./observability.md)
-- [Performance Benchmarks](./benchmarks.md)
+- Rust Implementation: `victor/native/rust/tool_selector.py`
+- Integration Tests: `tests/integration/native/test_tool_selector_accelerator.py`
+- [Observability Guide](../../observability/README.md)
+- [Performance Benchmarks](../../performance/benchmark_results.md)

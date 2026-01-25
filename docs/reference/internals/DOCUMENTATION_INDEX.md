@@ -15,21 +15,21 @@ This documentation package provides a comprehensive summary of the Victor AI ref
 ## Quick Navigation
 
 ### For Executives & Stakeholders
-- [VICTOR_REFACTORING_COMPLETE.md](VICTOR_REFACTORING_COMPLETE.md) - Executive summary and all metrics
-- [metrics/success_dashboard.md](metrics/success_dashboard.md) - Visual metrics dashboard
+- [CRITICAL_PHASE_COMPLETE.md](CRITICAL_PHASE_COMPLETE.md) - Executive summary and all metrics
+- [dashboard/README.md](../../dashboard/README.md) - Visual metrics dashboard
 
 ### For Developers & Architects
-- [adr/ADR-001-coordinator-architecture.md](adr/ADR-001-coordinator-architecture.md) - Coordinator-based architecture
-- [adr/ADR-004-protocol-based-design.md](adr/ADR-004-protocol-based-design.md) - Protocol-based design
-- [roadmap/future_roadmap.md](roadmap/future_roadmap.md) - Detailed implementation roadmap
+- [adr/ADR-001-coordinator-architecture.md](../../adr/ADR-001-coordinator-architecture.md) - Coordinator-based architecture
+- [adr/ADR-004-protocol-based-design.md](../../adr/ADR-004-protocol-based-design.md) - Protocol-based design
+- [roadmap/future_roadmap.md](../../roadmap/future_roadmap.md) - Detailed implementation roadmap
 
 ### For Users & Contributors
-- [stories/user_stories.md](stories/user_stories.md) - Real-world user experiences
-- [adr/ADR-002-yaml-vertical-config.md](adr/ADR-002-yaml-vertical-config.md) - YAML configuration guide
+- [stories/user_stories.md](../../stories/user_stories.md) - Real-world user experiences
+- [adr/ADR-002-yaml-vertical-config.md](../../adr/ADR-002-yaml-vertical-config.md) - YAML configuration guide
 
 ### For Performance Engineers
-- [adr/ADR-003-distributed-caching.md](adr/ADR-003-distributed-caching.md) - Caching strategy
-- [adr/ADR-005-performance-optimization.md](adr/ADR-005-performance-optimization.md) - Performance optimization
+- [adr/ADR-003-distributed-caching.md](../../adr/ADR-003-distributed-caching.md) - Caching strategy
+- [adr/ADR-005-performance-optimization.md](../../adr/ADR-005-performance-optimization.md) - Performance optimization
 
 ---
 
@@ -37,7 +37,7 @@ This documentation package provides a comprehensive summary of the Victor AI ref
 
 ### 1. Summary Documents
 
-#### VICTOR_REFACTORING_COMPLETE.md (24KB)
+#### CRITICAL_PHASE_COMPLETE.md (24KB)
 **Purpose**: Complete project summary with all achievements
 **Audience**: All stakeholders
 **Contents**:
@@ -105,7 +105,7 @@ This documentation package provides a comprehensive summary of the Victor AI ref
 
 ### 4. Success Dashboard
 
-#### metrics/success_dashboard.md (13KB)
+#### dashboard/README.md (13KB)
 **Purpose**: All metrics visualized and tracked
 **Audience**: All stakeholders
 **Contents**:
@@ -191,36 +191,36 @@ This documentation package provides a comprehensive summary of the Victor AI ref
 ### First Time Reader?
 
 **Start here**:
-1. Read [VICTOR_REFACTORING_COMPLETE.md](VICTOR_REFACTORING_COMPLETE.md) for overview
-2. Browse [stories/user_stories.md](stories/user_stories.md) for real-world impact
-3. Check [metrics/success_dashboard.md](metrics/success_dashboard.md) for detailed metrics
+1. Read [CRITICAL_PHASE_COMPLETE.md](CRITICAL_PHASE_COMPLETE.md) for overview
+2. Browse [stories/user_stories.md](../../stories/user_stories.md) for real-world impact
+3. Check [dashboard/README.md](../../dashboard/README.md) for detailed metrics
 
 ### Want to Understand Architecture?
 
 **Read in order**:
-1. [ADR-001: Coordinator Architecture](adr/ADR-001-coordinator-architecture.md)
-2. [ADR-004: Protocol-Based Design](adr/ADR-004-protocol-based-design.md)
-3. [ADR-002: YAML Vertical Configuration](adr/ADR-002-yaml-vertical-config.md)
+1. [ADR-001: Coordinator Architecture](../../adr/ADR-001-coordinator-architecture.md)
+2. [ADR-004: Protocol-Based Design](../../adr/ADR-004-protocol-based-design.md)
+3. [ADR-002: YAML Vertical Configuration](../../adr/ADR-002-yaml-vertical-config.md)
 
 ### Planning Next Steps?
 
 **Read**:
-1. [roadmap/future_roadmap.md](roadmap/future_roadmap.md) - Full roadmap
-2. [ADR-003: Distributed Caching](adr/ADR-003-distributed-caching.md) - What's pending
-3. [ADR-005: Performance Optimization](adr/ADR-005-performance-optimization.md) - Optimization guide
+1. [roadmap/future_roadmap.md](../../roadmap/future_roadmap.md) - Full roadmap
+2. [ADR-003: Distributed Caching](../../adr/ADR-003-distributed-caching.md) - What's pending
+3. [ADR-005: Performance Optimization](../../adr/ADR-005-performance-optimization.md) - Optimization guide
 
 ### Evaluating Performance?
 
 **Read**:
-1. [metrics/success_dashboard.md](metrics/success_dashboard.md) - All metrics
-2. [ADR-005: Performance Optimization](adr/ADR-005-performance-optimization.md) - Optimization approach
+1. [dashboard/README.md](../../dashboard/README.md) - All metrics
+2. [ADR-005: Performance Optimization](../../adr/ADR-005-performance-optimization.md) - Optimization approach
 
 ### Want to Contribute?
 
 **Read**:
-1. [stories/user_stories.md](stories/user_stories.md) - User experiences
-2. [roadmap/future_roadmap.md](roadmap/future_roadmap.md) - What's needed
-3. [ADR-001: Coordinator Architecture](adr/ADR-001-coordinator-architecture.md) - How to extend
+1. [stories/user_stories.md](../../stories/user_stories.md) - User experiences
+2. [roadmap/future_roadmap.md](../../roadmap/future_roadmap.md) - What's needed
+3. [ADR-001: Coordinator Architecture](../../adr/ADR-001-coordinator-architecture.md) - How to extend
 
 ---
 

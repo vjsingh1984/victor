@@ -433,6 +433,6 @@ matches = analyzer.analyze_code_accelerated(code, "python")
 
 ## References
 
-- [Tier 1 Accelerators (AST, Embeddings)](/docs/architecture/tier1_accelerators.md)
-- [Performance Optimization Guide](/docs/performance/optimization.md)
-- [Rust Native Module Development](/docs/development/rust_modules.md)
+- [Tier 1 Accelerators (AST, Embeddings)](./native_accelerators.md)
+- [Performance Optimization Guide](../../performance/optimization_guide.md)
+- [Rust Native Module Development](./RUST_MIGRATION_PLAN.md)

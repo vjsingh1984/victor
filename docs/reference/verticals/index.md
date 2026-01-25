@@ -522,6 +522,6 @@ victor chat --mode plan --vertical coding "Understand the caching system"
 
 ## Related Documentation
 
-- [State Machine →](../../development/architecture/state-machine.md) - Stage architecture details
+- [Architecture Overview →](../../architecture/overview.md) - Stage architecture details
 - [Tool Catalog →](../../reference/tools/catalog.md) - Complete tool reference
-- [Development Guide →](../../development/) - Framework entrypoints and structure
+- [Contributing Guide →](../../contributing/index.md) - Framework entrypoints and structure

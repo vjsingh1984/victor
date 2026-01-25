@@ -55,7 +55,10 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from victor.core.verticals.base import VerticalBase
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +88,7 @@ class VerticalDiscovery:
     # Cache for discovered items
     _prompt_contributors_cache: Optional[List[Any]] = None
     _escape_hatches_cache: Optional[Dict[str, Dict[str, Any]]] = None
-    _verticals_cache: Optional[Dict[str, Type]] = None
+    _verticals_cache: Optional[Dict[str, Type[VerticalBase]]] = None
 
     @staticmethod
     def discover_prompt_contributors() -> List[Any]:
@@ -213,7 +216,7 @@ class VerticalDiscovery:
         return escape_hatches
 
     @staticmethod
-    def discover_verticals() -> Dict[str, Type]:
+    def discover_verticals() -> Dict[str, Type[VerticalBase]]:
         """Discover all registered verticals.
 
         Loads verticals from:
@@ -237,7 +240,7 @@ class VerticalDiscovery:
         if VerticalDiscovery._verticals_cache is not None:
             return VerticalDiscovery._verticals_cache
 
-        verticals: Dict[str, Type] = {}
+        verticals: Dict[str, Type[VerticalBase]] = {}
 
         try:
             # Load from entry points first (external verticals)

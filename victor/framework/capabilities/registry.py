@@ -94,7 +94,7 @@ class CapabilityRegistry:
     _instance: Optional["CapabilityRegistry"] = None
     _lock: threading.Lock = threading.Lock()
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the capability registry.
 
         Note: This class should not be instantiated directly.

@@ -9,7 +9,7 @@ Welcome to the Victor testing documentation. This directory contains comprehensi
 ## Quick Links
 
 - **[Test Coverage Report](test_coverage_report.md)** - Comprehensive coverage analysis with module-by-module breakdown
-- **[Coverage Summary](coverage_summary.md)** - Visual coverage summary with heatmaps and priorities
+- **[Test Coverage Report](test_coverage_report.md)** - Visual coverage summary with heatmaps and priorities
 - **[Test Improvement Plan](test_improvement_plan.md)** - Detailed actionable plan for improving coverage
 - **[Coverage Trends](coverage_trends.md)** - Historical data and velocity metrics
 
@@ -311,8 +311,8 @@ jobs:
 
 ### Documentation
 
-- [Testing Strategy](../development/testing/strategy.md) - Overall testing approach
-- [Development Testing Guide](../development/testing.md) - How to write tests
+- [Testing Guide](TESTING_GUIDE.md) - Overall testing approach
+- [Development Testing Guide](../contributing/testing.md) - How to write tests
 - [Pytest Documentation](https://docs.pytest.org/) - Test framework docs
 - [pytest-cov Documentation](https://pytest-cov.readthedocs.io/) - Coverage plugin docs
 
@@ -343,7 +343,7 @@ jobs:
 
 ### Questions About Testing?
 
-- Check the [Testing Strategy](../development/testing/strategy.md)
+- Check the [Testing Guide](TESTING_GUIDE.md)
 - Review existing tests for examples
 - Ask in team chat/Slack
 - Create an issue for bugs or improvements
@@ -362,7 +362,7 @@ If you find coverage gaps or issues:
 ### Contribute Tests
 
 We welcome contributions! See:
-1. [Development Testing Guide](../development/testing.md)
+1. [Development Testing Guide](../contributing/testing.md)
 2. [Test Improvement Plan](test_improvement_plan.md)
 3. Existing test files for examples
 

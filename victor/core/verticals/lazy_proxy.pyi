@@ -149,7 +149,7 @@ class LazyProxy(VerticalBase, Generic[T]):
         ...
 
     @classmethod
-    def get_system_prompt(cls) -> str:  # type: ignore[override]
+    def get_system_prompt(cls) -> str:
         """Get system prompt from the loaded vertical.
 
         Triggers lazy load if not already loaded.

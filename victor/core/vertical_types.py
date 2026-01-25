@@ -559,7 +559,7 @@ class TieredToolConfig:
         registry = ToolMetadataRegistry.get_instance()  # type: ignore[attr-defined]
         base = self.get_base_tools()
         registry_stage_tools = registry.get_tools_by_stage(stage)
-        return base | registry_stage_tools
+        return cast(set[str], base | registry_stage_tools)
 
 
 # =============================================================================

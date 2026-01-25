@@ -15,8 +15,8 @@ This collection provides extensive tutorials and examples for users and develope
 - **[Creating Workflows](CREATING_WORKFLOWS.md)** - Automate complex tasks
 
 ### Examples & Projects
-- **[Example Projects](../examples/projects/README.md)** - Complete working projects
-- **[Jupyter Notebooks](../examples/notebooks/README.md)** - Interactive learning
+- **[Coordinator Examples](../examples/coordinator_examples.md)** - Complete working examples
+- **[Migration Examples](../examples/migration_examples.md)** - Migration reference patterns
 
 ### Video Content
 - **[Video Scripts](../videos/README.md)** - Educational video content

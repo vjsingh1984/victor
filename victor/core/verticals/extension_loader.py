@@ -86,7 +86,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Set, Type
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Set, Type, cast
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
@@ -176,7 +176,13 @@ class VerticalExtensionLoader(ABC):
         - Maintains backward compatibility - all existing getter calls still work
         - Verticals can override any getter for custom logic
         - New extension types automatically supported by adding to _extension_patterns
+
+    Attributes:
+        name: Vertical name (provided by VerticalMetadataProvider in subclasses)
     """
+
+    # Vertical name (provided by VerticalMetadataProvider in subclasses)
+    name: ClassVar[str] = ""
 
     # Extension loading configuration
     # When True, any extension loading failure raises ExtensionLoadError
@@ -238,10 +244,10 @@ class VerticalExtensionLoader(ABC):
             # Only add if not already defined in the class
             if method_name not in cls.__dict__:
 
-                def _make_getter(ext_type: str, mod_suffix: str, cls_suffix: str) -> classmethod:
+                def _make_getter(ext_type: str, mod_suffix: str, cls_suffix: str) -> classmethod[type[Any]]:
                     """Factory to create getter methods with proper closure."""
 
-                    def _getter(subcls: type) -> Any:  # type: ignore[no-untyped-def]
+                    def _getter(subcls: type) -> Any:
                         """Auto-generated getter method."""
                         # Build import path from vertical name
                         from victor.core.verticals.naming import get_vertical_module_name
@@ -259,7 +265,7 @@ class VerticalExtensionLoader(ABC):
                         class_name = f"{vertical_class_name}{cls_suffix}"
 
                         # Use _get_extension_factory to load the extension
-                        return subcls._get_extension_factory(ext_type, import_path, class_name)
+                        return cast(type[VerticalExtensionLoader], subcls)._get_extension_factory(ext_type, import_path, class_name)
 
                     return classmethod(_getter)
 
@@ -273,10 +279,10 @@ class VerticalExtensionLoader(ABC):
             # Only add if not already defined in the class
             if method_name not in cls.__dict__:
 
-                def _make_cached_getter(ext_type: str) -> classmethod:
+                def _make_cached_getter(ext_type: str) -> classmethod[type[Any]]:
                     """Factory to create cached getter methods with proper closure."""
 
-                    def _getter(subcls: type) -> Any:  # type: ignore[no-untyped-def]
+                    def _getter(subcls: type) -> Any:
                         """Auto-generated cached getter method."""
                         # Skip if vertical name is empty (abstract base class)
                         from victor.core.verticals.naming import get_vertical_module_name
@@ -289,7 +295,7 @@ class VerticalExtensionLoader(ABC):
                         # Special handling for middleware
                         if ext_type == "middleware":
 
-                            def _create_middleware() -> list:
+                            def _create_middleware() -> list[Any]:
                                 # Try to import from vertical.middleware
                                 try:
                                     module = __import__(
@@ -312,12 +318,12 @@ class VerticalExtensionLoader(ABC):
                                     # Return empty list on any error
                                     return []
 
-                            return subcls._get_cached_extension(ext_type, _create_middleware)
+                            return cast(type[VerticalExtensionLoader], subcls)._get_cached_extension(ext_type, _create_middleware)
 
                         # Special handling for composed_chains and personas
                         if ext_type in ("composed_chains", "personas"):
 
-                            def _create_extension():
+                            def _create_extension() -> dict[str, Any]:
                                 try:
                                     if ext_type == "composed_chains":
                                         module = __import__(
@@ -332,7 +338,7 @@ class VerticalExtensionLoader(ABC):
                                 except Exception:
                                     return {}
 
-                            return subcls._get_cached_extension(ext_type, _create_extension)
+                            return cast(type[VerticalExtensionLoader], subcls)._get_cached_extension(ext_type, _create_extension)
 
                         # Default: return None
                         return None
@@ -463,7 +469,7 @@ class VerticalExtensionLoader(ABC):
                 )
         """
 
-        def _create() -> Any:  # type: ignore[no-untyped-def]
+        def _create() -> Any:
             # Skip loading if import_path is invalid (empty vertical name)
             # This handles the case where VerticalBase has name="" (abstract base class)
             # which would create invalid paths like "victor..safety" (double dots)
@@ -828,10 +834,10 @@ class VerticalExtensionLoader(ABC):
 
             # Create lazy wrapper that defers loading
             return create_lazy_extensions(
-                vertical_name=cls.name if hasattr(cls, "name") else cls.__name__,
+                vertical_name=cls.name,
                 loader=lambda: cls._load_extensions_eager(use_cache=use_cache, strict=strict),
                 trigger=trigger,
-            )  # type: ignore[return-value]
+            )
 
         # Eager loading path (legacy behavior)
         return cls._load_extensions_eager(use_cache=use_cache, strict=strict)
@@ -871,11 +877,11 @@ class VerticalExtensionLoader(ABC):
             # Handle both ExtensionCacheEntry (new) and raw VerticalExtensions (old for compatibility)
             cached = cls._extensions_cache[cache_key]
             if isinstance(cached, ExtensionCacheEntry):
-                result: "VerticalExtensions" = cached.value  # type: ignore[valid-type]
+                result: Any = cached.value
             else:
-                result = cached  # type: ignore[assignment]
+                result = cached
             # Type: ignore because we're handling cached values that may be Any
-            return result  # type: ignore[no-any-return]
+            return cast("VerticalExtensions", result)
 
         # Determine strict mode
         is_strict = strict if strict is not None else cls.strict_extension_loading
@@ -903,7 +909,7 @@ class VerticalExtensionLoader(ABC):
                 return result
             except Exception as e:
                 is_required = extension_type in cls.required_extensions
-                vertical_name = cls.name if hasattr(cls, "name") else cls.__name__
+                vertical_name = cls.name
                 error = ExtensionLoadError(
                     message=f"Failed to load '{extension_type}' extension for vertical '{vertical_name}': {e}",
                     extension_type=extension_type,
@@ -959,11 +965,11 @@ class VerticalExtensionLoader(ABC):
 
                 logger.debug(
                     f"Loaded {len(dynamic_extensions)} dynamic extension type(s) "
-                    f"for vertical '{cls.name if hasattr(cls, 'name') else cls.__name__}'"
+                    f"for vertical '{cls.name}'"
                 )
         except Exception as e:
             # Dynamic extensions are optional - don't fail if registry not available
-            logger.debug(f"Could not load dynamic extensions for vertical '{cls.name if hasattr(cls, 'name') else cls.__name__}': {e}")
+            logger.debug(f"Could not load dynamic extensions for vertical '{cls.name}': {e}")
 
         # Check for critical failures (strict mode or required extensions)
         critical_errors = [e for e in errors if is_strict or e.is_required]
@@ -973,7 +979,7 @@ class VerticalExtensionLoader(ABC):
 
         # Log summary if there were non-critical errors
         if errors:
-            vertical_name = cls.name if hasattr(cls, "name") else cls.__name__
+            vertical_name = cls.name
             logger.warning(
                 f"Vertical '{vertical_name}' loaded with {len(errors)} extension error(s). "
                 f"Affected extensions: {', '.join(e.extension_type for e in errors)}"

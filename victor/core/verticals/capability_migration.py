@@ -201,8 +201,8 @@ def migrate_to_injector(
             )
 
             # Create property that uses injector
-            def make_property(cap_name: str) -> property:  # type: ignore[no-untyped-def]
-                def getter(self) -> Any:  # type: ignore[no-untyped-def]
+            def make_property(cap_name: str) -> property:
+                def getter(self) -> Any:
                     return injector.get_capability(cap_name)
 
                 return property(getter)
@@ -246,8 +246,8 @@ def get_capability_or_create(
     if capability is None:
         logger.debug(f"Capability '{capability_name}' not in injector, creating with factory")
         capability = factory()
-        return capability  # type: ignore[return-value]
-    return capability  # type: ignore[return-value]
+        return cast(T, capability)
+    return cast(T, capability)
 
 
 # =============================================================================

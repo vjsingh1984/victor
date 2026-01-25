@@ -1213,6 +1213,6 @@ async def call_llm(messages, model):
 
 ## See Also
 
-- [Tool System API Reference](./tools.md)
-- [Workflow Engine API Reference](./workflows.md)
-- [Configuration Guide](../getting-started/configuration.md)
+- [Tool System API Reference](./tools-api.md)
+- [Workflow Engine API Reference](./workflows-api.md)
+- [Configuration Guide](../../getting-started/configuration.md)

@@ -163,7 +163,7 @@ class VerticalLoader:
                 self._activate(vertical)
                 return vertical
 
-            proxy = LazyProxy[Type[VerticalBase]](
+            proxy = LazyProxy[VerticalBase](
                 vertical_name=name, loader=_load_vertical, proxy_type=LazyProxyType.LAZY
             )
             logger.debug(f"Created type-safe lazy proxy for vertical: {name}")
@@ -274,6 +274,8 @@ class VerticalLoader:
                 # Parse "module:attr" format and load
                 vertical_cls = self._load_entry_point(name, value)
                 if isinstance(vertical_cls, type) and issubclass(vertical_cls, VerticalBase):
+                    if self._discovered_verticals is None:
+                        self._discovered_verticals = {}
                     self._discovered_verticals[name] = vertical_cls
                     # Also register in the global registry
                     VerticalRegistry.register(vertical_cls)
@@ -311,7 +313,7 @@ class VerticalLoader:
     def discover_tools(
         self,
         force_refresh: bool = False,
-    ) -> Dict[str, Type]:
+    ) -> Dict[str, Type[Any]]:
         """Discover tools from installed packages via entry points.
 
         Scans the 'victor.tools' entry point group for installed
@@ -355,7 +357,7 @@ class VerticalLoader:
     async def discover_tools_async(
         self,
         force_refresh: bool = False,
-    ) -> Dict[str, Type]:
+    ) -> Dict[str, Type[Any]]:
         """Discover tools asynchronously (non-blocking).
 
         Async version of discover_tools() that offloads entry point
@@ -395,6 +397,8 @@ class VerticalLoader:
         for name, value in ep_entries.items():
             try:
                 tool_cls = self._load_entry_point(name, value)
+                if self._discovered_tools is None:
+                    self._discovered_tools = {}
                 self._discovered_tools[name] = tool_cls
                 logger.debug("Discovered tool plugin: %s", name)
             except Exception as e:
@@ -585,7 +589,7 @@ def discover_vertical_plugins() -> Dict[str, Type[VerticalBase]]:
     return get_vertical_loader().discover_verticals()
 
 
-def discover_tool_plugins() -> Dict[str, Type]:
+def discover_tool_plugins() -> Dict[str, Type[Any]]:
     """Discover tool plugins from entry points (convenience function).
 
     Returns:

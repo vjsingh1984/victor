@@ -536,9 +536,9 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 
 ## See Also
 
-- [AST Processor](ast_processor.md) - Code analysis with tree-sitter
-- [Embedding Operations](embedding_ops.md) - SIMD-optimized embeddings
-- [Tool Selector](tool_selector.md) - High-performance tool selection
+- [AST Processor](ast_processor_integration.md) - Code analysis with tree-sitter
+- [Embedding Operations](embedding_ops_implementation.md) - SIMD-optimized embeddings
+- [Tool Selector](tool_selector_accelerator.md) - High-performance tool selection
 
 ## License
 

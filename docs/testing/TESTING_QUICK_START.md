@@ -965,10 +965,10 @@ pytest tests/unit/agent/coordinators/test_chat_coordinator.py::TestChatCoordinat
 
 ### Getting Help
 
-- Check [TESTING_GUIDE.md](/docs/testing/TESTING_GUIDE.md) for detailed guidance
+- Check [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed guidance
 - Review existing test files in `tests/unit/agent/coordinators/`
 - Consult pytest documentation: https://docs.pytest.org/
-- Check Victor architecture docs: `/docs/architecture/`
+- Check Victor architecture docs: `docs/architecture/overview.md`
 
 ## Quick Reference Card
 
@@ -1055,4 +1055,4 @@ pytest tests/unit/agent/coordinators/ -n 4
 5. **Run tests locally**: Verify everything passes
 6. **Submit PR**: Include coverage report in PR description
 
-For detailed guidance, see [TESTING_GUIDE.md](/docs/testing/TESTING_GUIDE.md).
+For detailed guidance, see [TESTING_GUIDE.md](TESTING_GUIDE.md).

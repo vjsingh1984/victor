@@ -424,10 +424,10 @@ pytest tests/unit/agent/coordinators/ -n 4
 
 ### Additional Resources
 
-- [Victor Architecture Documentation](/docs/architecture/)
-- [Testing README](/docs/testing/README.md)
-- [Test Coverage Report](/docs/testing/test_coverage_report.md)
-- [Test Improvement Plan](/docs/testing/test_improvement_plan.md)
+- [Victor Architecture Documentation](../architecture/overview.md)
+- [Testing README](README.md)
+- [Test Coverage Report](test_coverage_report.md)
+- [Test Improvement Plan](test_improvement_plan.md)
 
 ## Best Practices
 
@@ -618,6 +618,6 @@ Status: ✅ COMPLETE
 - [TESTING_QUICK_START.md](TESTING_QUICK_START.md) - Quick reference guide
 
 **For project information, see:**
-- [Victor README](/README.md) - Project overview
-- [Architecture Documentation](/docs/architecture/) - System design
-- [Contributing Guide](/CONTRIBUTING.md) - How to contribute
+- [Victor Documentation](../index.md) - Project overview
+- [Architecture Documentation](../architecture/overview.md) - System design
+- [Contributing Guide](../contributing/index.md) - How to contribute

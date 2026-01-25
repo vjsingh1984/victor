@@ -165,7 +165,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
         def create_mode_config(_: Any) -> Any:
             return mode_config_provider
 
-        container.register(  # type: ignore[type-abstract]
+        container.register(
             ModeConfigProviderProtocol,
             create_mode_config,
             ServiceLifetime.SINGLETON,
@@ -188,7 +188,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
         def create_tool_deps(_: Any) -> Any:
             return tool_dep_provider
 
-        container.register(  # type: ignore[type-abstract]
+        container.register(
             ToolDependencyProviderProtocol,
             create_tool_deps,
             ServiceLifetime.SINGLETON,

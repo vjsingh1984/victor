@@ -58,17 +58,17 @@ from enum import Enum
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
-from typing import Dict, Type, Optional, Any, TYPE_CHECKING, cast
+from typing import Dict, Type, Optional, Any, TYPE_CHECKING, cast, List
 
 try:
-    from importlib.metadata import EntryPoint, entry_points as _entry_points
+    from importlib.metadata import EntryPoint, entry_points
 except ImportError:
-    from importlib_metadata import EntryPoint, entry_points as _entry_points
+    from importlib_metadata import EntryPoint, entry_points
 
 try:
     import yaml
 except ImportError:
-    yaml = None
+    yaml: Optional[Any] = None
 
 if TYPE_CHECKING:
     from victor.core.verticals.base import VerticalBase

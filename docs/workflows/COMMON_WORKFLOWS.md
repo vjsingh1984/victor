@@ -223,7 +223,7 @@ victor chat "How does the ToolCoordinator work?"
 
 **Documentation:**
 - [Architecture Overview](../architecture/overview.md)
-- [30 Mermaid Diagrams](../diagrams/)
+- [30 Mermaid Diagrams](../diagrams/index.md)
 - [Component Reference](../architecture/COMPONENT_REFERENCE.md)
 
 ---
@@ -466,7 +466,7 @@ victor keys --set anthropic --keyring
 
 ### For Advanced Users
 1. [Architecture Overview](../architecture/overview.md) - System design
-2. [30 Mermaid Diagrams](../diagrams/) - Visual documentation
+2. [30 Mermaid Diagrams](../diagrams/index.md) - Visual documentation
 3. [API Reference](../reference/api.md) - Python API
 4. [Contributing Guide](../contributing/index.md) - Development
 

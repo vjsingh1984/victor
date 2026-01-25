@@ -156,7 +156,7 @@ class WebSearchFormatter:
         if query and not self._header:
             header: str = f"Web search results for: {query}"
         else:
-            header: str = self._header  # type: ignore[assignment]
+            header = self._header or ""
 
         return format_web_results(
             results,

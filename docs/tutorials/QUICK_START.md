@@ -90,7 +90,7 @@ export GOOGLE_API_KEY="..."
 victor chat --provider google --model gemini-1.5-pro
 ```
 
-See the [Provider Reference](../reference/providers/) for the current list.
+See the [Provider Reference](../reference/providers/index.md) for the current list.
 
 ### 2. Basic Chat
 

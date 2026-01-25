@@ -67,7 +67,7 @@ class PromptContributionCapability:
 
     def __init__(
         self,
-        contributions: List[PromptContribution] = None,
+        contributions: Optional[List[PromptContribution]] = None,
     ):
         """Initialize prompt contribution capability.
 

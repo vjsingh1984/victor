@@ -8,7 +8,7 @@
 
 ## Validation Documents
 
-### 1. [VALIDATION_SUMMARY.md](./VALIDATION_SUMMARY.md)
+### 1. VALIDATION_SUMMARY.md (not currently published)
 **Quick reference guide** (2.5 KB)
 
 Contains:
@@ -23,7 +23,7 @@ Contains:
 
 ---
 
-### 2. [FINAL_VALIDATION_REPORT.md](./FINAL_VALIDATION_REPORT.md)
+### 2. FINAL_VALIDATION_REPORT.md (not currently published)
 **Comprehensive validation report** (17 KB)
 
 Contains:

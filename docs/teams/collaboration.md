@@ -856,7 +856,7 @@ class CollaborationMixin:
 
 ## See Also
 
-- [Team Coordination Documentation](../teams/README.md)
-- [Workflow Examples](../../victor/coding/workflows/examples/)
-- [Negotiation Framework Tests](../../../tests/integration/teams/test_collaboration.py)
-- [Team Formations](../formations/README.md)
+- [Team Templates](./team_templates.md)
+- [Workflow Examples](../workflows/COMMON_WORKFLOWS.md)
+- Negotiation Framework Tests: `tests/integration/teams/test_collaboration.py`
+- [Team Formations](../workflows/advanced_formations.md)

@@ -279,11 +279,11 @@ config = orchestrator._config_coordinator.get_config()
 **Host (voiceover)**:
 "Want to learn more? Check out these resources:"
 
-- [Quick Start Guide](link) - Get started in 5 minutes
-- [Usage Examples](link) - 10 detailed code examples
-- [Recipes](link) - Step-by-step solutions for common tasks
-- [Migration Guide](link) - How to migrate from legacy code
-- [Architecture Deep Dive](link) - Technical details
+- [Quick Start Guide](QUICK_START.md) - Get started in 5 minutes
+- [Usage Examples](../examples/coordinator_examples.md) - 10 detailed code examples
+- [Recipes](coordinator_recipes.md) - Step-by-step solutions for common tasks
+- [Migration Guide](../migration/orchestrator_refactoring_guide.md) - How to migrate from legacy code
+- [Architecture Deep Dive](../architecture/coordinator_based_architecture.md) - Technical details
 
 [Closing slide]
 

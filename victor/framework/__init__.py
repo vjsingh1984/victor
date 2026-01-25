@@ -577,7 +577,7 @@ __all__ = (
 )
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Lazy load optional framework subsystems on first access.
 
     This function is called by Python when an attribute is not found in the module.
@@ -614,7 +614,7 @@ def __getattr__(name: str):
         # Special case for discover function
         from victor.ui.commands.capabilities import get_capability_discovery
 
-        def discover() -> dict:
+        def discover() -> dict[str, Any]:
             """Discover all Victor framework capabilities programmatically.
 
             Returns a dictionary containing all available tools, verticals, personas,
@@ -648,7 +648,7 @@ def __getattr__(name: str):
         import sys
 
         this_module = sys.modules[__name__]
-        this_module.discover = discover
+        setattr(this_module, "discover", discover)  # type: ignore[attr-defined]
 
         return discover
 

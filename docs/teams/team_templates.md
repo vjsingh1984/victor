@@ -276,7 +276,7 @@ python -m scripts.teams.template_manager create --output my_template.yaml
 
 ## Template Catalog
 
-See the [Template Catalog](TEMPLATE_CATALOG.md) for detailed information about each template including:
+See the catalog below for detailed information about each template including:
 - Complete descriptions
 - Use case scenarios
 - Member details
@@ -402,4 +402,4 @@ To contribute new templates:
 4. Add tests
 5. Update documentation
 
-See [Contributing Guide](../CONTRIBUTING.md) for details.
+See [Contributing Guide](../contributing/index.md) for details.

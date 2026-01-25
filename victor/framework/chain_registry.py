@@ -340,7 +340,7 @@ class ChainRegistry:
 
         with self._lock:
             if key in self._factories:
-                factory: Callable[[], Any] = self._factories[key]  # type: ignore[assignment]
+                factory: Optional[Callable[[], Any]] = self._factories[key]
             elif vertical:
                 # Try without vertical prefix
                 factory = self._factories.get(name)
