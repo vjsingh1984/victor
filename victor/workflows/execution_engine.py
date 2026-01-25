@@ -1051,12 +1051,22 @@ class WorkflowExecutor:
                     self._context.current_state = state
             else:
                 # Fall back to regular execution
-                result = await workflow.invoke(inputs or {})
+                # Check if this is a WorkflowDefinition that needs compilation
+                if hasattr(workflow, "nodes"):
+                    # WorkflowDefinition - needs compilation
+                    from victor.workflows.graph_compiler import WorkflowDefinitionCompiler
+
+                    compiler = WorkflowDefinitionCompiler()
+                    compiled = compiler.compile(workflow)
+                    result = await compiled.invoke(inputs or {})
+                else:
+                    # Already compiled graph
+                    result = await workflow.invoke(inputs or {})
 
                 if hasattr(result, "state"):
-                    final_state = result.state
+                    final_state = cast("Dict[str, Any]", result.state)
                 else:
-                    final_state = {"result": result}
+                    final_state = cast("Dict[str, Any]", {"result": result})
 
                 self._context.current_state = final_state
 
