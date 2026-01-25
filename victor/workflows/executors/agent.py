@@ -204,7 +204,7 @@ class AgentNodeExecutor:
         if role not in role_map:
             raise ValueError(f"Unknown agent role: {role}. Must be one of {list(role_map.keys())}")
 
-        return role_map[role]
+        return cast("SubAgentRole", role_map[role])
 
     def _substitute_context(self, template: str, context: Dict[str, Any]) -> str:
         """Substitute context variables in template string.

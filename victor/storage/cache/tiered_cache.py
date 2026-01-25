@@ -20,7 +20,10 @@ import logging
 from typing import Any, Optional, Dict
 import threading
 
-from cachetools import TTLCache  # type: ignore[import-untyped]
+try:
+    from cachetools import TTLCache
+except ImportError:
+    TTLCache = None  # type: ignore[misc]
 import diskcache
 
 from victor.storage.cache.config import CacheConfig

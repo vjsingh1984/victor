@@ -102,6 +102,7 @@ from typing import (
     Type,
     TYPE_CHECKING,
     Union,
+    cast,
 )
 from typing import Protocol as TypingProtocol
 
@@ -300,11 +301,12 @@ class VerticalBase(
         YAML config is loaded automatically when available. Set use_yaml=False
         in get_config() to disable YAML loading.
 
-    Subclasses must override:
-    - name: Vertical identifier
-    - description: Human-readable description
-    - get_tools(): List of tool names (used as fallback if no YAML)
-    - get_system_prompt(): System prompt text (used as fallback if no YAML)
+    Subclasses must define:
+    - name: Vertical identifier (class attribute)
+
+    Subclasses should provide ONE of:
+    - YAML config: victor/{vertical_name}/config/vertical.yaml (recommended)
+    - Method overrides: get_tools() and get_system_prompt() (for custom logic)
 
     Optional overrides:
     - get_stages(): Stage definitions (used as fallback if no YAML)
@@ -365,28 +367,160 @@ class VerticalBase(
     _extension_registry: ClassVar[Optional["ExtensionRegistry"]] = None
 
     # =========================================================================
-    # Required Abstract Methods
+    # Core Configuration Methods (YAML-First, Override for Custom Logic)
     # =========================================================================
 
     @classmethod
-    @abstractmethod
     def get_tools(cls) -> List[str]:
         """Get the list of tool names for this vertical.
 
+        YAML-First: Attempts to load tools from YAML configuration.
+        Override this method only if you need custom tool logic
+        (e.g., dynamic tool selection based on runtime conditions).
+
         Returns:
             List of tool names to enable.
+
+        Raises:
+            NotImplementedError: If no YAML config found and method not overridden.
+
+        Example (YAML-only vertical):
+            # victor_security/config/vertical.yaml
+            core:
+              tools: [read, write, security_scan]
+
+            # victor_security/assistant.py
+            class SecurityAssistant(VerticalBase):
+                name = "security"
+                # No get_tools() needed - loaded from YAML!
         """
-        pass
+        # Try YAML configuration first
+        yaml_tools = cls._get_tools_from_yaml()
+        if yaml_tools is not None:
+            return yaml_tools
+
+        # No YAML - subclass must override
+        raise NotImplementedError(
+            f"{cls.__name__} must either provide a YAML config with 'core.tools' "
+            f"or override get_tools(). "
+            f"See docs/verticals/CREATING_VERTICALS.md for examples."
+        )
 
     @classmethod
-    @abstractmethod
+    def _get_tools_from_yaml(cls) -> Optional[List[str]]:
+        """Load tools from YAML configuration.
+
+        Returns:
+            List of tool names if YAML config has tools, None otherwise.
+        """
+        yaml_path = cls._get_yaml_config_path()
+        if yaml_path is None:
+            return None
+
+        try:
+            import yaml
+
+            with open(yaml_path) as f:
+                config = yaml.safe_load(f)
+
+            if config and "core" in config and "tools" in config["core"]:
+                tools = config["core"]["tools"]
+                if isinstance(tools, list):
+                    return tools
+        except Exception:
+            pass  # Fall through to return None
+
+        return None
+
+    @classmethod
     def get_system_prompt(cls) -> str:
         """Get the system prompt for this vertical.
 
+        YAML-First: Attempts to load prompt from YAML configuration.
+        Override this method only if you need custom prompt logic
+        (e.g., dynamic prompt based on runtime context).
+
         Returns:
             System prompt text with domain expertise.
+
+        Raises:
+            NotImplementedError: If no YAML config found and method not overridden.
+
+        Example (YAML-only vertical):
+            # victor_security/config/vertical.yaml
+            core:
+              system_prompt:
+                source: inline
+                text: "You are a security expert..."
+
+            # victor_security/assistant.py
+            class SecurityAssistant(VerticalBase):
+                name = "security"
+                # No get_system_prompt() needed - loaded from YAML!
         """
-        pass
+        # Try YAML configuration first
+        yaml_prompt = cls._get_system_prompt_from_yaml()
+        if yaml_prompt is not None:
+            return yaml_prompt
+
+        # No YAML - subclass must override
+        raise NotImplementedError(
+            f"{cls.__name__} must either provide a YAML config with 'core.system_prompt' "
+            f"or override get_system_prompt(). "
+            f"See docs/verticals/CREATING_VERTICALS.md for examples."
+        )
+
+    @classmethod
+    def _get_system_prompt_from_yaml(cls) -> Optional[str]:
+        """Load system prompt from YAML configuration.
+
+        Supports multiple prompt formats:
+        - source: inline, text: "..."
+        - source: file, path: "prompt.txt"
+        - Simple string value
+
+        Returns:
+            System prompt string if YAML config has prompt, None otherwise.
+        """
+        yaml_path = cls._get_yaml_config_path()
+        if yaml_path is None:
+            return None
+
+        try:
+            import yaml
+
+            with open(yaml_path) as f:
+                config = yaml.safe_load(f)
+
+            if config and "core" in config and "system_prompt" in config["core"]:
+                prompt_config = config["core"]["system_prompt"]
+
+                # Handle different prompt formats
+                if isinstance(prompt_config, str):
+                    return prompt_config
+
+                if isinstance(prompt_config, dict):
+                    source = prompt_config.get("source", "inline")
+
+                    if source == "inline":
+                        return cast("str | None", prompt_config.get("text", ""))
+
+                    if source == "file":
+                        prompt_path = yaml_path.parent / prompt_config.get("path", "")
+                        if prompt_path.exists():
+                            return cast("str | None", prompt_path.read_text())
+
+                    if source == "template":
+                        # Template-based prompts require the template class
+                        template_class = prompt_config.get("class")
+                        if template_class:
+                            # Defer to template loading (advanced use case)
+                            return None
+
+        except Exception:
+            pass  # Fall through to return None
+
+        return None
 
     # =========================================================================
     # Configurable Override Points

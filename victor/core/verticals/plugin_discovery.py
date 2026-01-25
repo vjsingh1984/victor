@@ -309,7 +309,7 @@ class PluginDiscovery:
         # Check if yaml is available
         # Note: yaml is None when not installed, but MyPy sees it as always available
         # This check is kept for runtime safety even if MyPy thinks it's unreachable
-        if yaml is None:  # type: ignore[unreachable]
+        if yaml is None:
             self.logger.warning("YAML library not available, skipping YAML discovery")
             return result
 

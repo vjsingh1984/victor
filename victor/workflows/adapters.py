@@ -351,7 +351,7 @@ class WorkflowToGraphAdapter:
             # Convert result back to WorkflowState
             return cast(WorkflowState, result_dict)
 
-        return sync_handler
+        return sync_handler  # type: ignore[return-value]
 
 
 class GraphToWorkflowAdapter:

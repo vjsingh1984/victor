@@ -432,12 +432,12 @@ class WorkflowGraphCompiler(Generic[S]):
                 # Dataclass - convert to dict
                 from dataclasses import asdict
 
-                return asdict(result)
+                return asdict(result)  # type: ignore[return-value]
             elif isinstance(result, dict):
                 return result
             else:
                 # Unknown type, return as-is
-                return cast(Dict[str, Any], result)
+                return result  # type: ignore[return-value]
 
         return state_converting_wrapper
 
@@ -733,7 +733,7 @@ def compile_workflow_graph(
     Returns:
         CompiledGraph ready for execution.
     """
-    compiler: "WorkflowGraphCompiler[Dict[str, Any]]" = WorkflowGraphCompiler[Dict[str, Any]](config)
+    compiler = WorkflowGraphCompiler(config)  # type: ignore[type-var]
     return compiler.compile(graph)
 
 

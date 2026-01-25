@@ -59,7 +59,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 from enum import Enum
 
 from victor.framework.graph import StateGraph
@@ -435,7 +435,7 @@ class WorkflowGenerationPipeline:
         # Handle both sync and async validators
         if isinstance(result, asyncio.Future) or hasattr(result, '__await__'):
             return await result
-        return result
+        return cast("WorkflowGenerationValidationResult", result)
 
     async def _refine_schema(
         self, schema: Dict[str, Any], validation: WorkflowGenerationValidationResult
@@ -462,12 +462,12 @@ class WorkflowGenerationPipeline:
         # Handle both sync and async refiners
         if isinstance(result, asyncio.Future) or hasattr(result, '__await__'):
             refined_result = await result
-            return refined_result
+            return cast("tuple[dict[str, Any], RefinementResult]", refined_result)
         # If result is a tuple, return it directly
         if isinstance(result, tuple):
-            return result
+            return cast("tuple[dict[str, Any], RefinementResult]", result)
         # Otherwise, it should be a RefinementResult, wrap it
-        return schema, result
+        return cast("tuple[dict[str, Any], RefinementResult]", (schema, result))
 
     async def _compile_to_graph(self, schema: Dict[str, Any]) -> StateGraph[Any]:
         """Compile schema to executable StateGraph.

@@ -246,8 +246,8 @@ def get_capability_or_create(
     if capability is None:
         logger.debug(f"Capability '{capability_name}' not in injector, creating with factory")
         created = factory()
-        return created
-    return capability
+        return created  # type: ignore[return-value]
+    return capability  # type: ignore[return-value]
 
 
 # =============================================================================

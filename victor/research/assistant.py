@@ -56,7 +56,7 @@ class ResearchAssistant(VerticalBase):
         - HandlerProvider: Provides workflow compute handlers
     """
 
-    name = "research"  # type: ignore
+    name = "research"
     description = "Web research, fact-checking, literature synthesis, and report generation"
     version = "0.5.0"
 

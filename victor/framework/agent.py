@@ -671,8 +671,8 @@ class Agent:
         observability = getattr(self._orchestrator, "observability", None)
         if observability:
             event_bus = getattr(observability, "event_bus", None)
-            if event_bus and isinstance(event_bus, ObservabilityBus):
-                return cast(ObservabilityBus, event_bus)
+            if event_bus:
+                return cast("ObservabilityBus | None", event_bus)
         return None
 
     @property
