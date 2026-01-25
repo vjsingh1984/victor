@@ -126,7 +126,7 @@ def get_default_registry() -> QueryEnhancementRegistry:
     global _default_registry
 
     if _default_registry is None:
-        _default_registry: "QueryEnhancementRegistry" = QueryEnhancementRegistry()  # type: ignore[no-untyped-call]
+        _default_registry = QueryEnhancementRegistry()  # type: ignore[no-untyped-call]
         _register_default_strategies(_default_registry)
 
     return _default_registry

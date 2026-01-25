@@ -99,7 +99,7 @@ class TaskManager:
             )
         """
         # Create the task with optional name
-        task = asyncio.create_task(coro, name=name)
+        task: asyncio.Task[Any] = asyncio.create_task(coro, name=name)  # type: ignore[arg-type]
 
         # Add to tracking set
         self._background_tasks.add(task)

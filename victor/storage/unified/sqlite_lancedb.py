@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 """SQLite + LanceDB implementation of UnifiedSymbolStore.
 
 Default backend for local/air-gapped deployments:
@@ -28,7 +30,10 @@ Key Features:
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from victor.coding.codebase.embeddings.models import BaseEmbeddingModel
 
 from victor.storage.unified.protocol import (
     GraphEdge,

@@ -166,7 +166,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
             return mode_config_provider
 
         container.register(
-            ModeConfigProviderProtocol,  # type: ignore[arg-type,type-abstract]
+            ModeConfigProviderProtocol,  # type: ignore[type-abstract]
             create_mode_config,
             ServiceLifetime.SINGLETON,
         )
@@ -189,7 +189,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
             return tool_dep_provider
 
         container.register(
-            ToolDependencyProviderProtocol,  # type: ignore[arg-type,type-abstract]
+            ToolDependencyProviderProtocol,  # type: ignore[type-abstract]
             create_tool_deps,
             ServiceLifetime.SINGLETON,
         )

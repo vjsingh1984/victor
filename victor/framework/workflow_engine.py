@@ -286,7 +286,7 @@ class WorkflowEngine:
         # Lazy-loaded unified compiler for consistent compilation and caching
         self._unified_compiler: Optional["UnifiedWorkflowCompiler[Any]"] = None
 
-    def _emit_workflow_event(
+    async def _emit_workflow_event(
         self,
         event_type: str,
         workflow_id: str,
@@ -479,7 +479,7 @@ class WorkflowEngine:
         workflow_id = kwargs.get("workflow_id") or uuid.uuid4().hex
 
         # Emit workflow started event
-        self._emit_workflow_event(
+        await self._emit_workflow_event(
             "workflow_started",
             workflow_id,
             {
@@ -498,7 +498,7 @@ class WorkflowEngine:
             duration = time.time() - start_time
 
             # Emit workflow completed event
-            self._emit_workflow_event(
+            await self._emit_workflow_event(
                 "workflow_completed",
                 workflow_id,
                 {
@@ -521,7 +521,7 @@ class WorkflowEngine:
             duration = time.time() - start_time
 
             # Emit workflow error event
-            self._emit_workflow_event(
+            await self._emit_workflow_event(
                 "workflow_error",
                 workflow_id,
                 {

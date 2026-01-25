@@ -370,7 +370,6 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
             # Use definition.name for external name (not the dict key)
             cap_metadata = {
                 "name": f"{self._vertical_name}_{definition.name}",
-                "capability_type": definition.type.value if hasattr(definition.type, "value") else str(definition.type),
                 "version": definition.version,
                 "setter": definition.configure_fn,
                 "description": definition.description,
