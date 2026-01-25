@@ -268,7 +268,7 @@ class AdvancedFormationConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
-        result = {"type": self.type}
+        result: Dict[str, Any] = {"type": self.type}
 
         if self.dynamic_config:
             result["dynamic_config"] = self.dynamic_config.to_dict()

@@ -337,8 +337,9 @@ class CacheLevel:
             key = self.get_entry_for_eviction()
             if key is None:
                 break
-            del self._cache[key]
-            self._evictions += 1
+            if key is not None:
+                del self._cache[key]
+                self._evictions += 1
 
     def size(self) -> int:
         """Get current cache size."""

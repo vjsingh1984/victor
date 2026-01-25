@@ -73,9 +73,9 @@ class TestTargetAnalyzer:
                     functions.append(sig)
 
             elif isinstance(node, ast.ClassDef):
-                sig = self._analyze_class(node)
-                if sig and not sig.name.startswith("_"):
-                    classes.append(sig)
+                class_sig = self._analyze_class(node)
+                if class_sig and not class_sig.name.startswith("_"):
+                    classes.append(class_sig)
 
         return functions, classes
 

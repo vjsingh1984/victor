@@ -186,7 +186,7 @@ class SemanticCache:
         self._embedding_service = None
         self._embedding_lock = threading.Lock()
 
-    def _get_embedding_service(self):
+    def _get_embedding_service(self) -> Any:
         """Get or create embedding service.
 
         Returns:
@@ -209,7 +209,7 @@ class SemanticCache:
                         logger.error(f"Failed to initialize embedding service: {e}")
                         raise
 
-        return self._embedding_service
+        return self._embedding_service  # type: ignore[no-any-return]
 
     def _generate_key(self, messages: List[Message]) -> str:
         """Generate exact match cache key from messages.

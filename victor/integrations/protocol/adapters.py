@@ -453,7 +453,8 @@ class HTTPProtocolAdapter(VictorProtocol):
             json={"patch": patch, "dry_run": dry_run},
         )
         response.raise_for_status()
-        return response.json()
+        data: dict[str, Any] = response.json()
+        return data
 
     async def get_definition(self, file: str, line: int, character: int) -> list[dict[str, Any]]:
         """Get definition locations for symbol at position."""
@@ -462,7 +463,9 @@ class HTTPProtocolAdapter(VictorProtocol):
             json={"file": file, "line": line, "character": character},
         )
         response.raise_for_status()
-        return response.json().get("locations", [])
+        data: dict[str, Any] = response.json()
+        locations = data.get("locations", [])
+        return locations if isinstance(locations, list) else []
 
     async def get_references(self, file: str, line: int, character: int) -> list[dict[str, Any]]:
         """Get reference locations for symbol at position."""
@@ -471,7 +474,9 @@ class HTTPProtocolAdapter(VictorProtocol):
             json={"file": file, "line": line, "character": character},
         )
         response.raise_for_status()
-        return response.json().get("locations", [])
+        data: dict[str, Any] = response.json()
+        locations = data.get("locations", [])
+        return locations if isinstance(locations, list) else []
 
     async def get_hover(self, file: str, line: int, character: int) -> str | None:
         """Get hover information for symbol at position."""
@@ -481,7 +486,9 @@ class HTTPProtocolAdapter(VictorProtocol):
                 json={"file": file, "line": line, "character": character},
             )
             response.raise_for_status()
-            return response.json().get("contents")
+            data: dict[str, Any] = response.json()
+            contents = data.get("contents")
+            return contents if isinstance(contents, str) else None
         except Exception:
             return None
 

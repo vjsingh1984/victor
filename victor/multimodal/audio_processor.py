@@ -201,6 +201,7 @@ class AudioProcessor:
                 self._whisper_model = whisper.load_model(model_size)
 
             # Transcribe
+            assert self._whisper_model is not None
             result = self._whisper_model.transcribe(
                 str(path),
                 fp16=False,  # Use FP32 for compatibility

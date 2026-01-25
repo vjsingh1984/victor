@@ -248,7 +248,7 @@ class ResponseCache:
         if persist_path and persist_path.exists():
             self._load_from_disk()
 
-    def _get_embedding_service(self):
+    def _get_embedding_service(self) -> Any:
         """Get or create embedding service.
 
         Returns:
@@ -272,11 +272,8 @@ class ResponseCache:
                             "Semantic caching disabled."
                         )
                         self.enable_semantic = False
-                    except Exception as e:
-                        logger.error(f"Failed to initialize embedding service: {e}")
-                        self.enable_semantic = False
-
-        return self._embedding_service
+                        return None
+        return self._embedding_service  # type: ignore[no-any-return]
 
     def _generate_key(self, messages: List[Message]) -> str:
         """Generate cache key from messages.

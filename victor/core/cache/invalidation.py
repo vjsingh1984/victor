@@ -261,13 +261,13 @@ class InvalidationDependencyGraph:
         - Analysis result depends on multiple files
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize dependency graph."""
         # resource -> set of dependent (key, namespace) tuples
-        self._dependencies: Dict[str, Set[tuple[str, str]]] = defaultdict(set)
+        self._dependencies: Dict[str, Set[Tuple[str, str]]] = defaultdict(set)
 
         # (key, namespace) -> set of resources it depends on
-        self._dependents: Dict[tuple[str, str], Set[str]] = defaultdict(set)
+        self._dependents: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
 
         self._lock = threading.RLock()
 

@@ -183,7 +183,7 @@ class ImageProcessor:
 
     def _extract_metadata(self, image: "Image.Image", path: Path) -> Dict[str, Any]:
         """Extract image metadata."""
-        metadata = {
+        metadata: Dict[str, Any] = {
             "format": image.format,
             "mode": image.mode,
             "size": image.size,
@@ -194,7 +194,7 @@ class ImageProcessor:
         }
 
         # Extract EXIF data if available
-        if hasattr(image, "info"):
+        if hasattr(image, "info") and isinstance(image.info, dict):
             metadata["exif"] = image.info
 
         return metadata
@@ -233,7 +233,7 @@ class ImageProcessor:
             # Use pytesseract
             text = pytesseract.image_to_string(image_gray)
 
-            return text.strip()
+            return str(text).strip()
 
         except Exception as e:
             logger.warning(f"OCR extraction failed: {e}")
@@ -385,10 +385,10 @@ class ImageProcessor:
             return None
 
         try:
-            image = Image.open(image_path)
+            img = Image.open(image_path)
 
             # Calculate new size
-            width, height = image.size
+            width, height = img.size
             if max(width, height) > max_size:
                 if width > height:
                     new_width = max_size
@@ -397,11 +397,11 @@ class ImageProcessor:
                     new_height = max_size
                     new_width = int(width * max_size / height)
 
-                image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
             # Save
             output = output_path or image_path
-            image.save(output, optimize=True, quality=95)
+            img.save(output, optimize=True, quality=95)
 
             return str(output)
 

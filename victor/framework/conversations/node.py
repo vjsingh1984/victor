@@ -181,9 +181,37 @@ class ConversationalNode:
         self._history = ConversationHistory(conversation_id=conversation_id)
         self._router = MessageRouter(strategy=self.config.routing_strategy)
 
+    @property
+    def _ctx(self) -> ConversationContext:
+        """Get non-None context (asserts for type checker)."""
+        assert self._context is not None, "Context accessed before initialization"
+        return self._context
+
         # Initialize protocol if present
         if self.protocol:
-            await self.protocol.initialize(self.participants, self._context)
+            assert self._context is not None
+            # Convert types.ConversationParticipant to protocols.ConversationParticipant
+            from victor.framework.conversations.protocols import ConversationParticipant as ProtocolParticipant, ConversationContext as ProtocolContext
+            protocol_participants = [
+                ProtocolParticipant(
+                    agent_id=p.id,
+                    role=p.role,
+                    capabilities=p.capabilities,
+                    persona=p.persona,
+                )
+                for p in self.participants
+            ]
+            # Convert context
+            protocol_context = ProtocolContext(
+                conversation_id=self._ctx.conversation_id,
+                participants={},  # Will be populated by protocol
+                shared_state=self._ctx.shared_state,
+                current_turn=self._ctx.current_turn,
+                current_speaker=self._ctx.current_speaker,
+                is_terminated=self._ctx.is_terminated,
+                termination_reason=self._ctx.termination_reason,
+            )
+            await self.protocol.initialize(protocol_participants, protocol_context)
 
         # Run conversation loop
         try:
@@ -231,6 +259,7 @@ class ConversationalNode:
         Returns:
             Conversation result
         """
+        assert self._context is not None, "Context must be initialized before conversation loop"
         start_time = time.time()
 
         while self._context.current_turn < self.config.max_turns:

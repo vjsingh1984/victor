@@ -271,7 +271,7 @@ class UnifiedMessage:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "UnifiedMessage":
         """Create from dictionary."""
-        content = []
+        content: List[MessageContent] = []
         for block in data.get("content", []):
             block_type = block.get("type", "text")
             if block_type == "text":
@@ -296,14 +296,7 @@ class UnifiedMessage:
                 id=tc.get("id", ""),
                 name=tc.get("name", ""),
                 arguments=tc.get("arguments", {}),
-                status=ToolCallStatus(tc.get("status", "pending")),
-                result=tc.get("result"),
-                error=tc.get("error"),
-                start_time=tc.get("start_time"),
-                end_time=tc.get("end_time"),
-                category=tc.get("category"),
-                cost_tier=tc.get("cost_tier"),
-                is_dangerous=tc.get("is_dangerous", False),
+                raw=tc,  # Store entire tc in raw to preserve extra fields
             )
             for tc in data.get("tool_calls", [])
         ]
@@ -311,7 +304,7 @@ class UnifiedMessage:
         return cls(
             id=data.get("id", ""),
             role=MessageRole(data.get("role", "user")),
-            content=content,
+            content=content,  # type: ignore[arg-type]
             timestamp=data.get("timestamp", time.time()),
             tool_calls=tool_calls,
             metadata=data.get("metadata", {}),

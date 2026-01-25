@@ -736,9 +736,15 @@ class AdaptiveFormation(BaseFormationStrategy):
             selection_error = None
 
             if self.use_ml and self._ml_selector:
-                selected_formation, scores = await self._ml_selector.predict_formation(
+                ml_result = await self._ml_selector.predict_formation(
                     task, context, agents, return_scores=True
                 )
+                # Handle both tuple and single return value
+                if isinstance(ml_result, tuple):
+                    selected_formation, scores = ml_result
+                else:
+                    selected_formation = ml_result
+                    scores = {}
                 # Extract characteristics for metadata
                 characteristics = await self._analyze_task(task, context, agents)
                 selection_method = "ml"
@@ -751,7 +757,7 @@ class AdaptiveFormation(BaseFormationStrategy):
                 scores = self._score_formations(characteristics)
 
                 # Select best formation
-                selected_formation = max(scores, key=scores.get)
+                selected_formation = max(scores.keys(), key=lambda k: scores[k])
                 selection_method = "heuristic"
 
             # Check if we're using fallback (selection failed to find good match)
@@ -1011,7 +1017,8 @@ class AdaptiveFormation(BaseFormationStrategy):
             module_path, class_name = formations[formation_name]
             module = importlib.import_module(module_path)
             formation_class = getattr(module, class_name)
-            return formation_class()
+            instance = formation_class()
+            return cast("BaseFormationStrategy", instance)
 
         # Raise error for unknown formations
         raise ValueError(
@@ -1249,7 +1256,7 @@ class HybridFormation(BaseFormationStrategy):
             total_duration = time.time() - start_time
 
             # Return final results with metadata
-            final_results = phase_results[-1]["results"] if phase_results else []
+            final_results: List[MemberResult] = phase_results[-1]["results"] if phase_results else []
             return self._enhance_results(
                 final_results,
                 phases_completed,
@@ -1302,7 +1309,8 @@ class HybridFormation(BaseFormationStrategy):
             module_path, class_name = formations[formation_name]
             module = importlib.import_module(module_path)
             formation_class = getattr(module, class_name)
-            return formation_class()
+            instance = formation_class()
+            return cast("BaseFormationStrategy", instance)
 
         # Raise error for unknown formations
         raise ValueError(

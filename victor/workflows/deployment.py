@@ -66,6 +66,7 @@ from typing import (
     List,
     Optional,
     Type,
+    cast,
 )
 
 if TYPE_CHECKING:
@@ -862,9 +863,9 @@ class DockerDeploymentHandler(DeploymentHandler):
                 # docker.from_env() is a runtime function, not in type stubs
                 docker_module = docker
                 if hasattr(docker_module, 'from_env'):
-                    self._client = docker.from_env()  # type: ignore[attr-defined]
+                    self._client = docker.from_env()
                 else:
-                    self._client = docker.DockerClient()  # type: ignore[attr-defined]
+                    self._client = docker.DockerClient()
             except ImportError:
                 raise RuntimeError("docker package not installed. Install with: pip install docker")
         return self._client
@@ -960,10 +961,10 @@ class DockerDeploymentHandler(DeploymentHandler):
         try:
             parsed_result = json.loads(output.decode())
             if isinstance(parsed_result, dict) and "state" in parsed_result:
-                return parsed_result["state"]
-            return parsed_result if isinstance(parsed_result, dict) else state
+                return cast("Dict[str, Any]", parsed_result["state"])
+            return cast("Dict[str, Any]", parsed_result if isinstance(parsed_result, dict) else state)
         except json.JSONDecodeError:
-            return state
+            return cast("Dict[str, Any]", state)
 
     async def cleanup(self) -> None:
         """Stop and remove Docker container."""
@@ -1145,11 +1146,11 @@ class KubernetesDeploymentHandler(DeploymentHandler):
         try:
             parsed_result = json.loads(resp)
             if isinstance(parsed_result, dict) and "state" in parsed_result:
-                return parsed_result["state"]
-            return parsed_result if isinstance(parsed_result, dict) else state
+                return cast("Dict[str, Any]", parsed_result["state"])
+            return cast("Dict[str, Any]", parsed_result if isinstance(parsed_result, dict) else state)
         except json.JSONDecodeError:
             logger.warning(f"Could not parse pod exec output: {resp}")
-            return state
+            return cast("Dict[str, Any]", state)
 
     async def cleanup(self) -> None:
         """Delete Kubernetes pod."""

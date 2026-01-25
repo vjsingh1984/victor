@@ -409,7 +409,7 @@ class CacheWarmer:
         self.tracker = AccessTracker()
 
         # Background task
-        self._warming_task: Optional[asyncio.Task] = None
+        self._warming_task: Optional["asyncio.Task[None]"] = None
         self._stop_event = asyncio.Event()
 
         # Persistence
@@ -518,7 +518,7 @@ class CacheWarmer:
             logger.warning("Background warming already running")
             return
 
-        async def warming_loop():
+        async def warming_loop() -> None:
             """Background warming loop."""
             while not self._stop_event.is_set():
                 try:

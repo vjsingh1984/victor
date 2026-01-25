@@ -521,7 +521,13 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
             if definition.get_fn:
                 cap_metadata["getter"] = definition.get_fn
 
-            capability = OrchestratorCapability(**cap_metadata)
+            capability = OrchestratorCapability(
+                name=name,
+                capability_type=cap_metadata.get("capability_type", "setting"),
+                version=cap_metadata["version"],
+                setter=cap_metadata["setter"],
+                description=cap_metadata["description"],
+            )
 
             # Get handler functions
             handler = getattr(self, definition.configure_fn, None)
