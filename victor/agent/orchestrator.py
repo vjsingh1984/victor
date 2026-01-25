@@ -1826,11 +1826,14 @@ class AgentOrchestrator(
 
     def get_session_cost_formatted(self) -> str:
         """Get formatted session cost string (e.g., "$0.0123")."""
-        return self._metrics_coordinator.get_session_cost_formatted()  # type: ignore[no-any-return]
+        if self._metrics_coordinator is None:
+            return "$0.00"
+        return self._metrics_coordinator.get_session_cost_formatted()
 
     def export_session_costs(self, path: str, format: str = "json") -> None:
         """Export session costs to file."""
-        self._metrics_coordinator.export_session_costs(path, format)
+        if self._metrics_coordinator is not None:
+            self._metrics_coordinator.export_session_costs(path, format)
 
     async def _preload_embeddings(self) -> None:
         """Preload tool embeddings in background to avoid blocking first query.

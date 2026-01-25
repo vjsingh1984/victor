@@ -480,15 +480,14 @@ def get_mode_controller() -> AgentModeController:
     # Try DI container first
     try:
         from victor.core.container import get_container
-        from victor.agent.protocols import ModeControllerProtocol
 
         container = get_container()
-        # Register AgentModeController as the implementation
-        if container.is_registered(ModeControllerProtocol):
-            controller: Any = container.get(ModeControllerProtocol)
-            # Cast to AgentModeController since we know it's an instance
-            if isinstance(controller, AgentModeController):
-                return controller
+        # Try to get AgentModeController from container
+        try:
+            controller = container.get(AgentModeController)
+            return controller
+        except Exception:
+            pass  # Not registered
     except Exception:
         pass  # Fall back to legacy singleton
 

@@ -333,19 +333,18 @@ class SessionRecoveryManager:
         try:
             # Validate session exists
             store = self._memory_manager._conversation_store
-            if store is None:
+            if store is not None:
+                stats = store.get_session_stats(session_id)
+                if stats is not None:
+                    # Update session ID
+                    self._memory_manager.session_id = session_id
+                    logger.info(f"Recovered session {session_id[:8]}... via direct recovery")
+                    return True
+                else:
+                    logger.warning(f"Session {session_id} not found")  # type: ignore[unreachable]
+            else:
                 logger.warning("Conversation store not available")
-                return False
-
-            stats = store.get_session_stats(session_id)
-            if stats is None:
-                logger.warning(f"Session {session_id} not found")
-                return False
-
-            # Update session ID
-            self._memory_manager.session_id = session_id
-            logger.info(f"Recovered session {session_id[:8]}... via direct recovery")
-            return True
+            return False
         except Exception as e:
             logger.warning(f"Failed to recover session {session_id}: {e}")
             return False
