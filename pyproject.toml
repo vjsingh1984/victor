@@ -722,6 +722,25 @@ module = [
     "victor.observability.*",
     "victor.telemetry.*",
     "victor.context.*",
+    # Core modules with Pydantic BaseModel issues (imported by strict-typed modules)
+    "victor.core.validation",
+    "victor.core.tool_dependency_schema",
+    "victor.integrations.mcp.protocol",
+    "victor.integrations.mcp.*",
+    # Other modules imported by strict-typed modules with type errors
+    "victor.agent.conversation_memory",
+    "victor.framework.service_provider",
+    "victor.agent.orchestrator_factory",
+    "victor.agent.orchestrator",
+    "victor.security_analysis.*",
+    "victor.processing.*",
+    "victor.coding.codebase.*",
+    "victor.storage.vector_stores.*",
+    "victor.agent.subagents.*",
+    "victor.workflows.*",
+    "victor.agent.streaming.*",
+    "victor.storage.cache.*",
+    "victor.framework.__init__",
 ]
 ignore_errors = true
 

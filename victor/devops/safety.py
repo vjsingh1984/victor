@@ -24,7 +24,7 @@ backward compatibility for existing interfaces.
 
 from typing import Any, Dict, List, Tuple
 
-from victor.security_analysis.patterns.infrastructure import (
+from victor.core.security.patterns.infrastructure import (
     InfrastructureScanner,
     InfraScanResult,
     DESTRUCTIVE_PATTERNS,
@@ -36,9 +36,9 @@ from victor.security_analysis.patterns.infrastructure import (
     validate_kubernetes_manifest as core_validate_kubernetes_manifest,
     get_safety_reminders as core_get_safety_reminders,
 )
-from victor.security_analysis.patterns.secrets import CREDENTIAL_PATTERNS, SecretScanner
+from victor.core.security.patterns.secrets import CREDENTIAL_PATTERNS, SecretScanner
 from victor.core.verticals.protocols import SafetyExtensionProtocol
-from victor.security_analysis.patterns.types import SafetyPattern
+from victor.core.security.patterns.types import SafetyPattern
 
 
 # Risk levels (kept for backward compatibility)
@@ -119,7 +119,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
     def get_credential_patterns(self) -> Dict[str, str]:
         """Return patterns for detecting credentials.
 
-        Uses patterns from victor.security_analysis.patterns.secrets for comprehensive detection.
+        Uses patterns from victor.core.security.patterns.secrets for comprehensive detection.
 
         Returns:
             Dict of credential_type -> regex_pattern.

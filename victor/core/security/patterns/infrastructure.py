@@ -19,7 +19,7 @@ The old location (victor.security.safety.infrastructure) is deprecated.
 """
 
 # Import from local implementation (canonical location)
-from victor.security_analysis.patterns.infrastructure_impl import (
+from victor.core.security.patterns.infrastructure_impl import (
     InfraPatternCategory,
     RiskLevel,
     DESTRUCTIVE_PATTERNS,

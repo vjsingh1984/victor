@@ -26,7 +26,7 @@ from victor.core.verticals.protocols import (
 )
 
 # Import SafetyPattern from its canonical location
-from victor.security.safety.types import SafetyPattern
+from victor.security_analysis.patterns.types import SafetyPattern
 
 
 class TestMiddlewarePriority:

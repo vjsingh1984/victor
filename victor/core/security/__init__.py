@@ -16,7 +16,7 @@
 
 This module provides security infrastructure components that are used
 across the Victor framework. It separates security infrastructure
-(RBAC, audit, authorization) from security analysis tools.
+(RBAC, audit, authorization, patterns, extensions) from security analysis tools.
 
 Structure:
 - victor.core.security.pickle: Safe pickle utilities for cache security
@@ -24,6 +24,8 @@ Structure:
 - victor.core.security.audit: Audit logging and compliance
 - victor.core.security.authorization: Enhanced authorization (RBAC + ABAC)
 - victor.core.security.protocol: CVE/vulnerability type definitions
+- victor.core.security.patterns: Security patterns (secrets, PII, code safety, etc.)
+- victor.core.security.safety_extensions: Safety extensions for vertical integration
 
 Note: For security analysis tools (scanners, CVE databases, penetration testing),
 use victor.security_analysis instead.
@@ -33,6 +35,8 @@ Usage:
     from victor.core.security import RBACManager, Permission
     from victor.core.security.audit import AuditManager
     from victor.core.security.authorization import EnhancedAuthorizer
+    from victor.core.security.patterns import detect_secrets, PIIScanner
+    from victor.core.security import SafetyExtensions
 """
 
 from __future__ import annotations
@@ -110,6 +114,57 @@ from victor.core.security.authorization import (
     User as AuthzUser,
 )
 
+# Import security patterns (cross-cutting framework services)
+from victor.core.security.patterns import (
+    SafetyPattern,
+    ISafetyScanner,
+    SafetyRegistry,
+    CREDENTIAL_PATTERNS,
+    SecretMatch,
+    SecretScanner,
+    SecretSeverity,
+    detect_secrets,
+    ANONYMIZATION_SUGGESTIONS,
+    PII_COLUMN_PATTERNS,
+    PII_CONTENT_PATTERNS,
+    PII_SEVERITY,
+    PIIMatch,
+    PIIScanner,
+    PIISeverity,
+    PIIType,
+    detect_pii_columns,
+    detect_pii_in_content,
+    get_anonymization_suggestion,
+    get_pii_severity,
+    get_pii_types,
+    get_safety_reminders,
+    has_pii,
+    CodePatternCategory,
+    CodePatternScanner,
+    RiskLevel,
+    GIT_PATTERNS,
+    REFACTORING_PATTERNS,
+    PACKAGE_MANAGER_PATTERNS,
+    BUILD_DEPLOY_PATTERNS,
+    SENSITIVE_FILE_PATTERNS,
+    ScanResult,
+    scan_command,
+    is_sensitive_file,
+    get_all_patterns,
+    InfraPatternCategory,
+    InfrastructureScanner,
+    CredibilityLevel,
+    CredibilityMatch,
+    SourceCredibilityScanner,
+    validate_source_credibility,
+    ContentWarningLevel,
+    ContentWarningMatch,
+    ContentPatternScanner,
+)
+
+# Import safety extensions (framework integration for safety patterns)
+from victor.core.security.safety_extensions import SafetyExtensions
+
 __all__ = [
     # Pickle utilities
     "safe_pickle_dumps",
@@ -161,4 +216,51 @@ __all__ = [
     "AuthzPermission",
     "AuthzRole",
     "AuthzUser",
+    # Security Patterns
+    "SafetyPattern",
+    "ISafetyScanner",
+    "SafetyRegistry",
+    "CREDENTIAL_PATTERNS",
+    "SecretMatch",
+    "SecretScanner",
+    "SecretSeverity",
+    "detect_secrets",
+    "ANONYMIZATION_SUGGESTIONS",
+    "PII_COLUMN_PATTERNS",
+    "PII_CONTENT_PATTERNS",
+    "PII_SEVERITY",
+    "PIIMatch",
+    "PIIScanner",
+    "PIISeverity",
+    "PIIType",
+    "detect_pii_columns",
+    "detect_pii_in_content",
+    "get_anonymization_suggestion",
+    "get_pii_severity",
+    "get_pii_types",
+    "get_safety_reminders",
+    "has_pii",
+    "CodePatternCategory",
+    "CodePatternScanner",
+    "RiskLevel",
+    "GIT_PATTERNS",
+    "REFACTORING_PATTERNS",
+    "PACKAGE_MANAGER_PATTERNS",
+    "BUILD_DEPLOY_PATTERNS",
+    "SENSITIVE_FILE_PATTERNS",
+    "ScanResult",
+    "scan_command",
+    "is_sensitive_file",
+    "get_all_patterns",
+    "InfraPatternCategory",
+    "InfrastructureScanner",
+    "CredibilityLevel",
+    "CredibilityMatch",
+    "SourceCredibilityScanner",
+    "validate_source_credibility",
+    "ContentWarningLevel",
+    "ContentWarningMatch",
+    "ContentPatternScanner",
+    # Safety Extensions
+    "SafetyExtensions",
 ]

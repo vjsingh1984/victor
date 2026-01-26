@@ -90,7 +90,7 @@ class SecurityAnalysisServiceProvider(ServiceProviderProtocol):
 
     def _create_secret_scanner(self) -> Any:
         """Create secret scanner instance."""
-        from victor.security_analysis.patterns import SecretScanner
+        from victor.core.security.patterns import SecretScanner
 
         return SecretScanner()
 

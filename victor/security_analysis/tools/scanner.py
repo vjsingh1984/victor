@@ -12,27 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Secret detection patterns.
+"""Security dependency scanner.
 
-This is the canonical location for secret detection utilities.
-The old location (victor.security.safety.secrets) is deprecated.
+This is the canonical location for the security scanner.
+The old location (victor.security.scanner) is deprecated.
 """
 
 # Import from local implementation (canonical location)
-from victor.security_analysis.patterns.secrets_impl import (
-    CREDENTIAL_PATTERNS,
-    SecretMatch,
-    SecretScanner,
-    SecretSeverity,
-    detect_secrets,
-    has_secrets,
+from victor.security_analysis.tools.scanner_impl import (
+    BaseDependencyParser,
+    DependencyParser,
+    GoDependencyParser,
+    NodeDependencyParser,
+    PythonDependencyParser,
+    RustDependencyParser,
+    SecurityScanner,
+    get_scanner,
 )
 
 __all__ = [
-    "CREDENTIAL_PATTERNS",
-    "SecretMatch",
-    "SecretScanner",
-    "SecretSeverity",
-    "detect_secrets",
-    "has_secrets",
+    "BaseDependencyParser",
+    "DependencyParser",
+    "GoDependencyParser",
+    "NodeDependencyParser",
+    "PythonDependencyParser",
+    "RustDependencyParser",
+    "SecurityScanner",
+    "get_scanner",
 ]

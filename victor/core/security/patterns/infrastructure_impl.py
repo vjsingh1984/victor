@@ -56,7 +56,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple
 
-from victor.security_analysis.patterns.types_impl import SafetyPattern
+from victor.core.security.patterns.types_impl import SafetyPattern
 
 
 # =============================================================================

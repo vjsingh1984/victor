@@ -43,7 +43,7 @@ from typing import TYPE_CHECKING, Dict, List, Protocol, runtime_checkable
 # Import SafetyPattern for use in type hints
 # Note: Using TYPE_CHECKING to avoid circular import with security_analysis assistant
 if TYPE_CHECKING:
-    from victor.security_analysis.patterns.types import SafetyPattern
+    from victor.core.security.patterns.types import SafetyPattern
 
 
 # =============================================================================

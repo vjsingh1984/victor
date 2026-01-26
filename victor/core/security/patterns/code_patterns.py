@@ -19,7 +19,7 @@ The old location (victor.security.safety.code_patterns) is deprecated.
 """
 
 # Import from local implementation (canonical location)
-from victor.security_analysis.patterns.code_patterns_impl import (
+from victor.core.security.patterns.code_patterns_impl import (
     CodePatternCategory,
     CodePatternScanner,
     RiskLevel,

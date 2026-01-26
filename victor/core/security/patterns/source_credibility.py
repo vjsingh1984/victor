@@ -19,7 +19,7 @@ The old location (victor.security.safety.source_credibility) is deprecated.
 """
 
 # Import from local implementation (canonical location)
-from victor.security_analysis.patterns.source_credibility_impl import (
+from victor.core.security.patterns.source_credibility_impl import (
     CredibilityLevel,
     CredibilityMatch,
     SOURCE_CREDIBILITY_PATTERNS,

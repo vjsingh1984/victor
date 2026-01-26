@@ -40,8 +40,8 @@ import re
 from typing import Any, Dict, List, Tuple
 
 from victor.core.verticals.protocols import SafetyExtensionProtocol
-from victor.security_analysis.patterns.types import SafetyPattern
-from victor.security_analysis.patterns.pii import (
+from victor.core.security.patterns.types import SafetyPattern
+from victor.core.security.patterns.pii import (
     PIIScanner,
     PIIType,
     PIISeverity,

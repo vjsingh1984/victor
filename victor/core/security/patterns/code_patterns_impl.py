@@ -24,7 +24,7 @@ These patterns are used across verticals (coding, devops) to detect
 potentially dangerous commands and file operations.
 
 Example usage:
-    from victor.security_analysis.patterns.code_patterns import (
+    from victor.core.security.patterns.code_patterns import (
         CodePatternScanner,
         CodePatternCategory,
         scan_command,
@@ -49,7 +49,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple
 
-from victor.security_analysis.patterns.types_impl import SafetyPattern
+from victor.core.security.patterns.types_impl import SafetyPattern
 
 
 # =============================================================================

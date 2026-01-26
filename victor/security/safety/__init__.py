@@ -23,7 +23,7 @@ Migration Guide:
         from victor.security.safety import detect_secrets, SafetyPattern
 
     New (recommended):
-        from victor.security_analysis.patterns import detect_secrets, SafetyPattern
+        from victor.core.security.patterns import detect_secrets, SafetyPattern
 
 This module provides consolidated safety utilities for:
 - Secret detection (API keys, credentials, tokens)
@@ -43,7 +43,7 @@ warnings.warn(
 )
 
 # Re-export from canonical location
-from victor.security_analysis.patterns import (
+from victor.core.security.patterns import (
     # Types
     SafetyPattern,
     # Registry
@@ -55,6 +55,7 @@ from victor.security_analysis.patterns import (
     SecretScanner,
     SecretSeverity,
     detect_secrets,
+    mask_secrets,
     # PII
     ANONYMIZATION_SUGGESTIONS,
     PII_COLUMN_PATTERNS,
@@ -136,6 +137,7 @@ __all__ = [
     "SecretScanner",
     "SecretSeverity",
     "detect_secrets",
+    "mask_secrets",
     # PII
     "ANONYMIZATION_SUGGESTIONS",
     "PII_COLUMN_PATTERNS",

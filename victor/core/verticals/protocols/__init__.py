@@ -66,7 +66,7 @@ from victor.core.verticals.protocols.safety_provider import (
 # Import SafetyPattern at runtime for re-export
 # Note: Must use TYPE_CHECKING to avoid circular import with security_analysis assistant
 if TYPE_CHECKING:
-    from victor.security_analysis.patterns.types import SafetyPattern
+    from victor.core.security.patterns.types import SafetyPattern
 
 # Team Provider
 from victor.core.verticals.protocols.team_provider import (
@@ -229,7 +229,7 @@ class VerticalExtensions:
             Combined list of safety patterns
         """
         # Import locally to avoid circular import at module level
-        from victor.security_analysis.patterns.types import SafetyPattern
+        from victor.core.security.patterns.types import SafetyPattern
 
         patterns: List[SafetyPattern] = []
         for ext in self.safety_extensions:

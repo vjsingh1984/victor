@@ -12,13 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Safety pattern type definitions.
+"""Secret detection patterns.
 
-This is the canonical location for SafetyPattern type.
-The old location (victor.security.safety.types) is deprecated.
+This is the canonical location for secret detection utilities.
+The old location (victor.security.safety.secrets) is deprecated.
 """
 
 # Import from local implementation (canonical location)
-from victor.security_analysis.patterns.types_impl import SafetyPattern
+from victor.core.security.patterns.secrets_impl import (
+    CREDENTIAL_PATTERNS,
+    SecretMatch,
+    SecretScanner,
+    SecretSeverity,
+    detect_secrets,
+    has_secrets,
+    mask_secrets,
+)
 
-__all__ = ["SafetyPattern"]
+__all__ = [
+    "CREDENTIAL_PATTERNS",
+    "SecretMatch",
+    "SecretScanner",
+    "SecretSeverity",
+    "detect_secrets",
+    "has_secrets",
+    "mask_secrets",
+]

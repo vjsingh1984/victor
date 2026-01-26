@@ -12,40 +12,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Safety patterns and utilities for Victor.
+"""Security patterns and utilities for Victor.
 
-This is the canonical location for safety pattern utilities.
-The old location (victor.security.safety) is deprecated.
+This is the canonical location for security pattern utilities.
+These are cross-cutting framework services used by multiple verticals.
 
 Migration Guide:
     Old (deprecated):
         from victor.security.safety import detect_secrets, SafetyPattern
-
-    New (recommended):
         from victor.security_analysis.patterns import detect_secrets, SafetyPattern
 
-This module provides consolidated safety utilities for:
+    New (recommended):
+        from victor.core.security.patterns import detect_secrets, SafetyPattern
+
+This module provides consolidated security utilities for:
 - Secret detection (API keys, credentials, tokens)
 - PII detection (email, SSN, credit cards, etc.)
 - Code safety patterns (git, refactoring, package management)
 - Infrastructure safety patterns (Kubernetes, Docker, Terraform)
+- Source credibility checking
+- Content safety patterns
 - Unified safety registry for pluggable scanners
 """
 
 # Import from local submodules (canonical location)
-from victor.security_analysis.patterns.types import SafetyPattern
-from victor.security_analysis.patterns.registry import (
+from victor.core.security.patterns.types import SafetyPattern
+from victor.core.security.patterns.registry import (
     ISafetyScanner,
     SafetyRegistry,
 )
-from victor.security_analysis.patterns.secrets import (
+from victor.core.security.patterns.secrets import (
     CREDENTIAL_PATTERNS,
     SecretMatch,
     SecretScanner,
     SecretSeverity,
     detect_secrets,
 )
-from victor.security_analysis.patterns.pii import (
+from victor.core.security.patterns.pii import (
     ANONYMIZATION_SUGGESTIONS,
     PII_COLUMN_PATTERNS,
     PII_CONTENT_PATTERNS,
@@ -62,7 +65,7 @@ from victor.security_analysis.patterns.pii import (
     get_safety_reminders,
     has_pii,
 )
-from victor.security_analysis.patterns.code_patterns import (
+from victor.core.security.patterns.code_patterns import (
     CodePatternCategory,
     CodePatternScanner,
     RiskLevel,
@@ -76,7 +79,7 @@ from victor.security_analysis.patterns.code_patterns import (
     is_sensitive_file,
     get_all_patterns,
 )
-from victor.security_analysis.patterns.infrastructure import (
+from victor.core.security.patterns.infrastructure import (
     InfraPatternCategory,
     RiskLevel as InfraRiskLevel,
     DESTRUCTIVE_PATTERNS,
@@ -92,7 +95,7 @@ from victor.security_analysis.patterns.infrastructure import (
     get_all_infrastructure_patterns,
     get_safety_reminders as get_infrastructure_safety_reminders,
 )
-from victor.security_analysis.patterns.source_credibility import (
+from victor.core.security.patterns.source_credibility import (
     CredibilityLevel,
     CredibilityMatch,
     SOURCE_CREDIBILITY_PATTERNS,
@@ -103,7 +106,7 @@ from victor.security_analysis.patterns.source_credibility import (
     is_low_credibility,
     get_source_safety_reminders,
 )
-from victor.security_analysis.patterns.content_patterns import (
+from victor.core.security.patterns.content_patterns import (
     ContentWarningLevel,
     ContentWarningMatch,
     CONTENT_WARNING_PATTERNS,

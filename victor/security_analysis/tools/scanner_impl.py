@@ -23,9 +23,11 @@ import re
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 
-from victor.security.cve_database import BaseCVEDatabase, get_cve_database
+if TYPE_CHECKING:
+    from victor.security_analysis.tools.cve_database_impl import BaseCVEDatabase
+
 from victor.security.protocol import (
     Dependency,
     SecurityScanResult,
@@ -556,7 +558,7 @@ class SecurityScanner:
 
     def __init__(
         self,
-        cve_db: Optional[BaseCVEDatabase] = None,
+        cve_db: "Optional[BaseCVEDatabase]" = None,
         parsers: Optional[list[BaseDependencyParser]] = None,
         offline: bool = False,
     ):
@@ -567,7 +569,11 @@ class SecurityScanner:
             parsers: List of dependency parsers
             offline: Whether to use offline mode
         """
-        self._cve_db = cve_db or get_cve_database(offline=offline)
+        if cve_db is None:
+            # Lazy import to avoid circular dependency
+            from victor.security_analysis.tools.cve_database_impl import get_cve_database
+            cve_db = get_cve_database(offline=offline)
+        self._cve_db = cve_db
         self._parsers = parsers or [cls() for cls in DEPENDENCY_PARSERS]
 
     async def scan(

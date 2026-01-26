@@ -37,7 +37,7 @@ Migration Guide:
     New (recommended):
         from victor.core.security.auth import RBACManager, Permission
         from victor.core.security.audit import AuditManager
-        from victor.security_analysis.patterns import detect_secrets
+        from victor.core.security.patterns import detect_secrets
 
 This module provides comprehensive security capabilities including:
 
@@ -56,9 +56,9 @@ Also includes:
 
 Example usage:
     from victor.security import get_security_manager, SecurityPolicy
-    from victor.security.auth import RBACManager, Permission
-    from victor.security.safety import detect_secrets, CodePatternScanner
-    from victor.security.audit import AuditManager
+    from victor.core.security.auth import RBACManager, Permission
+    from victor.core.security.patterns import detect_secrets, CodePatternScanner
+    from victor.core.security.audit import AuditManager
     from pathlib import Path
     import asyncio
 
@@ -123,7 +123,8 @@ from victor.security.protocol import (
     Vulnerability,
     VulnerabilityStatus,
 )
-from victor.security.cve_database import (
+# Import from canonical location (no shims)
+from victor.security_analysis.tools.cve_database import (
     BaseCVEDatabase,
     CachingCVEDatabase,
     CVEDatabase,
@@ -132,7 +133,7 @@ from victor.security.cve_database import (
     OSVDatabase,
     get_cve_database,
 )
-from victor.security.scanner import (
+from victor.security_analysis.tools.scanner import (
     BaseDependencyParser,
     DependencyParser,
     GoDependencyParser,

@@ -23,8 +23,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from victor.security_analysis.patterns.types import SafetyPattern
-from victor.security_analysis.patterns.secrets import SecretScanner
+from victor.core.security.patterns.types import SafetyPattern
+from victor.core.security.patterns.secrets import SecretScanner
 from victor.core.verticals.protocols import SafetyExtensionProtocol
 
 
@@ -172,11 +172,11 @@ class SecurityAnalysisSafetyExtension(SafetyExtensionProtocol):
         # Convert SecretMatch objects to dicts for compatibility
         return [  # type: ignore[return-value]
             {
-                "pattern": secret.pattern,
-                "match": secret.match,
+                "secret_type": secret.secret_type,
+                "matched_text": secret.matched_text,
                 "severity": secret.severity.value,
-                "start_index": secret.start_index,
-                "end_index": secret.end_index,
+                "start": secret.start,
+                "end": secret.end,
             }
             for secret in secrets
         ]

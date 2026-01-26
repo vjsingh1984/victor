@@ -19,7 +19,7 @@ The old location (victor.security.safety.content_patterns) is deprecated.
 """
 
 # Import from local implementation (canonical location)
-from victor.security_analysis.patterns.content_patterns_impl import (
+from victor.core.security.patterns.content_patterns_impl import (
     ContentWarningLevel,
     ContentWarningMatch,
     ContentPatternScanner,

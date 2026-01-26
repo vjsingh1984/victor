@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from victor.security_analysis.patterns.code_patterns import (
+from victor.core.security.patterns.code_patterns import (
     CodePatternScanner,
     GIT_PATTERNS,
     REFACTORING_PATTERNS,
@@ -35,7 +35,7 @@ from victor.security_analysis.patterns.code_patterns import (
     SENSITIVE_FILE_PATTERNS,
 )
 from victor.core.verticals.protocols import SafetyExtensionProtocol
-from victor.security_analysis.patterns.types import SafetyPattern
+from victor.core.security.patterns.types import SafetyPattern
 
 
 # Re-export core patterns with legacy names for backward compatibility
@@ -88,7 +88,7 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
         Args:
             pattern: Regex pattern to add as dangerous
         """
-        from victor.security_analysis.patterns.types import SafetyPattern
+        from victor.core.security.patterns.types import SafetyPattern
 
         custom_pattern = SafetyPattern(
             pattern=pattern,

@@ -19,7 +19,7 @@ The old location (victor.security.safety.pii) is deprecated.
 """
 
 # Import from local implementation (canonical location)
-from victor.security_analysis.patterns.pii_impl import (
+from victor.core.security.patterns.pii_impl import (
     ANONYMIZATION_SUGGESTIONS,
     PII_COLUMN_PATTERNS,
     PII_CONTENT_PATTERNS,

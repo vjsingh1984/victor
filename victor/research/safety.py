@@ -7,15 +7,15 @@ for source credibility and content warnings, extending with research-specific pa
 from typing import Dict, List, Tuple
 
 from victor.core.verticals.protocols import SafetyExtensionProtocol
-from victor.security_analysis.patterns.types import SafetyPattern
+from victor.core.security.patterns.types import SafetyPattern
 
 # Import framework safety patterns (DRY principle)
-from victor.security_analysis.patterns.source_credibility import (
+from victor.core.security.patterns.source_credibility import (
     SOURCE_CREDIBILITY_PATTERNS as _FRAMEWORK_CREDIBILITY_PATTERNS,
     validate_source_credibility as _framework_validate_credibility,
     get_source_safety_reminders as _framework_source_reminders,
 )
-from victor.security_analysis.patterns.content_patterns import (
+from victor.core.security.patterns.content_patterns import (
     CONTENT_WARNING_PATTERNS as _FRAMEWORK_CONTENT_PATTERNS,
     scan_content_warnings as _framework_scan_warnings,
 )

@@ -90,7 +90,7 @@ class SecretScanHandler:
     def _get_scanner(self) -> Any:
         """Get or create secret scanner."""
         if self._scanner is None:
-            from victor.security_analysis.patterns import SecretScanner
+            from victor.core.security.patterns import SecretScanner
 
             self._scanner = SecretScanner()
         return self._scanner

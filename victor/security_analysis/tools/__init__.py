@@ -22,44 +22,48 @@ This module provides security scanning tools including:
 
 These are the canonical locations for security analysis tools.
 The tools in victor.security are deprecated in favor of these.
+
+Migration Guide:
+    Old (deprecated):
+        from victor.security.scanner import SecurityScanner
+        from victor.security.cve_database import CVEDatabase
+
+    New (recommended):
+        from victor.security_analysis.tools import SecurityScanner, CVEDatabase
+
+Note: The old scanner.py and cve_database.py shims have been removed.
+Use the canonical imports directly.
 """
 
-# Re-export from victor.security for now
-# These will be migrated to this location in the future
-# Suppress deprecation warning for this internal re-export
+# Import from local modules (canonical location)
+from victor.security_analysis.tools.scanner import (
+    BaseDependencyParser,
+    DependencyParser,
+    GoDependencyParser,
+    NodeDependencyParser,
+    PythonDependencyParser,
+    RustDependencyParser,
+    SecurityScanner,
+    get_scanner,
+)
+from victor.security_analysis.tools.cve_database import (
+    BaseCVEDatabase,
+    CachingCVEDatabase,
+    CVEDatabase,
+    LocalCVECache,
+    OfflineCVEDatabase,
+    OSVDatabase,
+    get_cve_database,
+)
+
+# Manager and penetration_testing still in victor.security (not migrated yet)
 import warnings
-
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
-    from victor.security.scanner import (
-        BaseDependencyParser,
-        DependencyParser,
-        GoDependencyParser,
-        NodeDependencyParser,
-        PythonDependencyParser,
-        RustDependencyParser,
-        SecurityScanner,
-        get_scanner,
-    )
-
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     from victor.security.manager import (
         SecurityManager,
         get_security_manager,
         reset_security_manager,
-    )
-
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
-    from victor.security.cve_database import (
-        BaseCVEDatabase,
-        CachingCVEDatabase,
-        CVEDatabase,
-        LocalCVECache,
-        OfflineCVEDatabase,
-        OSVDatabase,
-        get_cve_database,
     )
 
 with warnings.catch_warnings():

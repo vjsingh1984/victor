@@ -19,11 +19,13 @@ security testing. This vertical provides:
 - Vulnerability scanning and CVE database integration
 - Dependency security analysis
 - Penetration testing tools
-- Secret and PII detection
-- Security pattern scanning
 
-This package separates security ANALYSIS (tools for security work) from
-security INFRASTRUCTURE (RBAC, audit, authorization), which is located in
+Note: Security patterns (secrets, PII, code safety) are now in
+victor.core.security.patterns as cross-cutting framework services.
+Use: from victor.core.security.patterns import detect_secrets, PIIScanner
+
+This package separates security ANALYSIS (domain-specific orchestration)
+from security INFRASTRUCTURE (RBAC, audit, patterns), which is located in
 victor.core.security.
 
 Package Structure:
@@ -33,8 +35,7 @@ Package Structure:
     prompts.py          - Security task hints and prompt contributions
     handlers.py         - Workflow handlers
     service_provider.py - DI service registration
-    tools/              - Security scanning tools
-    patterns/           - Safety pattern scanners (secrets, PII, etc.)
+    tools/              - Security scanning tools (scanner, CVE database)
 
 Usage:
     from victor.security_analysis import SecurityAnalysisAssistant
@@ -44,6 +45,12 @@ Usage:
 
     # Get extensions for framework integration
     extensions = SecurityAnalysisAssistant.get_extensions()
+
+    # Use security tools
+    from victor.security_analysis.tools import SecurityScanner, CVEDatabase
+
+    # Use security patterns (from core)
+    from victor.core.security.patterns import detect_secrets, PIIScanner
 """
 
 from victor.security_analysis.assistant import SecurityAnalysisAssistant
@@ -60,8 +67,8 @@ from victor.security_analysis.tools import (
     get_security_manager,
 )
 
-# Import patterns
-from victor.security_analysis.patterns import (
+# Import patterns from core (cross-cutting framework services)
+from victor.core.security.patterns import (
     # Types
     SafetyPattern,
     # Registry

@@ -23,7 +23,7 @@ following Interface Segregation Principle (ISP).
 
 Usage:
     from victor.core.verticals.extensions import SafetyExtensions
-    from victor.security_analysis.patterns.types import SafetyPattern
+    from victor.core.security.patterns.types import SafetyPattern
 
     safety_ext = SafetyExtensions(
         safety_patterns=[
@@ -43,7 +43,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
-from victor.security_analysis.patterns.types import SafetyPattern
+from victor.core.security.patterns.types import SafetyPattern
 
 
 @dataclass

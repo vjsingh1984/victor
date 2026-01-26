@@ -30,7 +30,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from victor.security.safety.types import SafetyPattern
+from victor.security_analysis.patterns.types import SafetyPattern
 from victor.dataanalysis.safety import DataAnalysisSafetyExtension
 
 

@@ -19,8 +19,11 @@ VerticalExtensions class. Each composite groups related protocols:
 
 - ToolExtensions: Middleware and tool dependencies
 - PromptExtensions: Prompt contributors and enrichment strategies
-- SafetyExtensions: Safety patterns and validators
+- SafetyExtensions: Safety patterns and validators (from victor.core.security)
 - ConfigExtensions: Mode, RL, and team configurations
+
+Note: SafetyExtensions is now imported from victor.core.security to keep
+all safety-related functionality (patterns + extensions) together.
 
 This follows the Interface Segregation Principle (ISP) - clients only depend
 on the interfaces they actually use, rather than being forced to know about
@@ -30,7 +33,7 @@ Usage:
     from victor.core.verticals.extensions import (
         ToolExtensions,
         PromptExtensions,
-        SafetyExtensions,
+        SafetyExtensions,  # Re-exported from victor.core.security
         ConfigExtensions,
     )
 
@@ -62,7 +65,7 @@ Migration from VerticalExtensions:
 
 from victor.core.verticals.extensions.tool_extensions import ToolExtensions
 from victor.core.verticals.extensions.prompt_extensions import PromptExtensions
-from victor.core.verticals.extensions.safety_extensions import SafetyExtensions
+from victor.core.security.safety_extensions import SafetyExtensions
 from victor.core.verticals.extensions.config_extensions import ConfigExtensions
 
 __all__ = [

@@ -27,7 +27,7 @@ from victor.security.protocol import (
     SecurityScanResult,
     Severity,
 )
-from victor.security.scanner import get_scanner
+from victor.security_analysis.tools.scanner import get_scanner
 
 logger = logging.getLogger(__name__)
 
