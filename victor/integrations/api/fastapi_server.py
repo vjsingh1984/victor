@@ -2383,7 +2383,7 @@ Respond with just the command to run."""
 
             import asyncio
 
-            execute_steps_task: asyncio.Task[None] = asyncio.create_task(execute_steps())
+            asyncio.create_task(execute_steps())
 
             return JSONResponse(
                 {
@@ -2624,7 +2624,7 @@ Respond with just the command to run."""
                             }
                         )
 
-            execute_team_task: asyncio.Task[None] = asyncio.create_task(execute_team())
+            asyncio.create_task(execute_team())
 
             return JSONResponse(
                 {

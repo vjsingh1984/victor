@@ -393,7 +393,7 @@ class NodeExecutorFactory:
                     # Execute with timeout if configured
                     if timeout_seconds:
                         try:
-                            result = await asyncio.wait_for(
+                            await asyncio.wait_for(
                                 _run_sub_agent(),
                                 timeout=timeout_seconds,
                             )

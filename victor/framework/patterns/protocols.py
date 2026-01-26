@@ -119,7 +119,7 @@ class CollaborationPattern:
         from victor.teams import create_coordinator
 
         # Map participants to agent IDs
-        agent_ids = [p.get("agent_id") for p in self.participants]
+        [p.get("agent_id") for p in self.participants]
 
         # Use existing team coordinator factory - create_coordinator signature
         # accepts orchestrator as optional first positional argument

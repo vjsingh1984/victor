@@ -362,7 +362,7 @@ class ComputeNodeRunner(BaseNodeRunner):
 
             if handler:
                 # Prepare inputs
-                inputs = self._resolve_inputs(node_config.get("inputs", {}), context)
+                self._resolve_inputs(node_config.get("inputs", {}), context)
                 # Call handler with expected signature (node, context, tool_registry)
                 # Note: Using inputs as node dict for compatibility
                 # TODO: Create proper ComputeNode and WorkflowContext objects

@@ -164,7 +164,7 @@ class CodeGroundingHook:
             Tuple of (should_proceed, validation_result)
         """
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # We're in an async context, need to use run_in_executor or similar
             # For now, use synchronous validation
             return self._validate_sync(content, file_path, strict, config)

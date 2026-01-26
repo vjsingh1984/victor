@@ -298,7 +298,7 @@ class TreeSitterExtractor:
 
             # captures is a dict: {"name": [nodes], "definition.class": [nodes], ...}
             # We need to match name nodes with their parent definitions
-            name_nodes = captures.get("name", [])
+            captures.get("name", [])
 
             # Extract from definition captures
             for capture_name, nodes in captures.items():

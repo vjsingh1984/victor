@@ -404,19 +404,9 @@ class ToolCoordinator:
             logger.warning("No tool selector configured, returning empty list")
             return []
 
-        max_count = max_tools or self._config.max_tools_per_selection
-        threshold = self._config.selection_threshold
 
         try:
             # Build context dict for selector
-            selector_context = {
-                "message": context.message,
-                "task_type": context.task_type,
-                "observed_files": context.observed_files,
-                "executed_tools": context.executed_tools,
-                "conversation_depth": context.conversation_depth,
-                "conversation_history": context.conversation_history,
-            }
 
             # Use selector's async select_tools method
             # Note: ToolSelector.select_tools signature is:

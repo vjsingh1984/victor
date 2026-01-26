@@ -352,7 +352,7 @@ class OrchestratorFactory(ModeAwareMixin):
         orchestrator._profile_name = profile_name
         # Track active session ID for parallel session support
         if not hasattr(orchestrator, "active_session_id"):
-            setattr(orchestrator, "active_session_id", None)
+            orchestrator.active_session_id = None
         # Bootstrap DI container - ensures all services are available
         # This is idempotent and will only bootstrap if not already done
         orchestrator._container = self.container

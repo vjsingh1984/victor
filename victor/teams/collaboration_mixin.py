@@ -719,10 +719,10 @@ class CollaborationMixin:
         """
         if not self._collaboration_enabled:
             # Fall back to regular execution
-            return cast("Dict[str, Any]", await getattr(self, "execute_task")(task, context))
+            return cast("Dict[str, Any]", await self.execute_task(task, context))
 
         # Execute task
-        result = cast("Dict[str, Any]", await getattr(self, "execute_task")(task, context))
+        result = cast("Dict[str, Any]", await self.execute_task(task, context))
 
         # Add collaboration metadata
         if self._communication_protocol:

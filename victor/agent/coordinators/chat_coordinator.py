@@ -700,7 +700,6 @@ class ChatCoordinator:
 
                 # Update tool calls used via internal state
                 # Note: calls_used is read-only, tool_pipeline tracks it internally
-                current_calls = orch.tool_calls_used
                 # The _tool_pipeline automatically tracks calls_used
 
                 if tool_exec_result.should_return:

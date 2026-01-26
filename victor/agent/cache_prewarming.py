@@ -276,7 +276,7 @@ class CachePrewarmer:
         # Create minimal context for pre-warming
         from victor.agent.protocols import AgentToolSelectionContext
 
-        context = AgentToolSelectionContext(
+        AgentToolSelectionContext(
             stage=None,  # No specific stage
             conversation_stage=None,  # No specific stage
             task_type="default",  # Default task type

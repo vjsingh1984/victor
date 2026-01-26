@@ -250,7 +250,7 @@ def _process_file_parallel(
                         node_text = node.text
                         if node_text is None:
                             continue
-                        text = decoded_text = node_text.decode("utf-8", errors="ignore")
+                        text = node_text.decode("utf-8", errors="ignore")
                         if text:
                             name_line = node.start_point[0]
                             # Default end_line to name node's end
@@ -2212,7 +2212,7 @@ class CodebaseIndex:
             lang = parser.language
             if lang is None:
                 return []
-            query = Query(lang, query_src)
+            Query(lang, query_src)
         except Exception:
             return []
 

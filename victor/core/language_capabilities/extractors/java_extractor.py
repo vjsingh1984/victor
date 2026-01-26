@@ -184,16 +184,15 @@ class JavaExtractor(BaseLanguageProcessor):
             line = node.position[0]
 
         # Extract visibility
-        visibility = None
         if hasattr(node, "modifiers") and node.modifiers:
             if "public" in node.modifiers:
-                visibility = "public"
+                pass
             elif "protected" in node.modifiers:
-                visibility = "protected"
+                pass
             elif "private" in node.modifiers:
-                visibility = "private"
+                pass
             else:
-                visibility = "package"
+                pass
 
         symbols.append(
             ExtractedSymbol(

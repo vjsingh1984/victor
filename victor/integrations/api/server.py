@@ -2027,7 +2027,7 @@ class VictorAPIServer:
                 return web.json_response({"error": "rate must be a number"}, status=400)
 
             old_rate = getattr(learner, "epsilon", 0.3)
-            setattr(learner, "epsilon", rate)
+            learner.epsilon = rate
 
             return web.json_response(
                 {
@@ -2077,7 +2077,7 @@ class VictorAPIServer:
                 old_strategy_value = old_strategy.value
             else:
                 old_strategy_value = "unknown"
-            setattr(learner, "strategy", strategy)
+            learner.strategy = strategy
 
             return web.json_response(
                 {
