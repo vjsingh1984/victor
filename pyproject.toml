@@ -725,8 +725,15 @@ module = [
     # Modules with Pydantic BaseModel type Any issues (Pydantic v2 type stubs)
     "victor.core.validation",
     "victor.core.tool_dependency_schema",
+    "victor.core.tool_dependency_loader",
     "victor.config.settings",
-    # Other modules imported by strict-typed modules with type errors
+    # Modules with watchdog FileSystemEventHandler type Any issues
+    "victor.framework.module_loader",
+    "victor.core.events.*",
+    "victor.agent.cache.file_watcher",
+    # Other modules with type errors
+    "victor.agent.conversation_memory",
+    "victor.agent.tool_result_cache",
     "victor.framework.service_provider",
     "victor.agent.orchestrator_factory",
     "victor.agent.orchestrator",
@@ -739,9 +746,6 @@ module = [
     "victor.agent.streaming.*",
     "victor.storage.cache.*",
     "victor.framework.__init__",
-    # Modules with watchdog FileSystemEventHandler type Any issues
-    "victor.core.events.*",
-    "victor.agent.cache.*",
     # MCP protocol modules (Pydantic BaseModel issues)
     "victor.integrations.mcp.protocol",
     "victor.integrations.mcp.*",
