@@ -397,8 +397,20 @@ class TestYAMLExport:
     def test_export_valid_workflow(self, client, sample_workflow_graph):
         """Test exporting a valid workflow to YAML."""
         with patch("tools.workflow_editor.backend.api.graph_to_definition") as mock_convert:
+            # Create a proper mock with the attributes the code accesses
+            from tools.workflow_editor.backend.api import WorkflowNode
+
+            mock_node = WorkflowNode(
+                id="test_node",
+                type="agent",
+                name="Test Agent",
+                config={"role": "assistant", "goal": "Test goal"},
+            )
+
             mock_def = MagicMock()
-            mock_def.to_yaml.return_value = "name: test\nnodes: []"
+            mock_def.name = "test_workflow"
+            mock_def.nodes = {"node1": mock_node}
+            mock_def.start_node = "node1"
             mock_convert.return_value = mock_def
 
             response = client.post("/api/workflows/export/yaml", json=sample_workflow_graph)
