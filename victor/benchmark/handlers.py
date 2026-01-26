@@ -207,11 +207,7 @@ class EnvironmentSetupHandler(BaseHandler):
         language = node.input_mapping.get("language", "python")
         deps_input: Any = node.input_mapping.get("dependencies", [])
         dependencies: List[str] = (
-            deps_input
-            if isinstance(deps_input, list)
-            else [deps_input]
-            if deps_input
-            else []
+            deps_input if isinstance(deps_input, list) else [deps_input] if deps_input else []
         )
         workspace = node.input_mapping.get("workspace", "")
 
@@ -376,9 +372,7 @@ class LanguageDetectorHandler(BaseHandler):
         files: List[str] = (
             files_input
             if isinstance(files_input, list)
-            else [files_input]
-            if isinstance(files_input, str)
-            else []
+            else [files_input] if isinstance(files_input, str) else []
         )
 
         # Resolve context variables
@@ -511,17 +505,13 @@ class MultiSolutionValidatorHandler(BaseHandler):
         solutions: List[str] = (
             solutions_input
             if isinstance(solutions_input, list)
-            else [solutions_input]
-            if isinstance(solutions_input, str)
-            else []
+            else [solutions_input] if isinstance(solutions_input, str) else []
         )
         test_cases_input: Any = node.input_mapping.get("test_cases", [])
         test_cases: List[str] = (
             test_cases_input
             if isinstance(test_cases_input, list)
-            else [test_cases_input]
-            if isinstance(test_cases_input, str)
-            else []
+            else [test_cases_input] if isinstance(test_cases_input, str) else []
         )
         timeout_per = node.input_mapping.get("timeout_per_solution", 30)
 
@@ -626,9 +616,7 @@ class CodeTesterHandler(BaseHandler):
         test_cases: List[str] = (
             test_cases_input
             if isinstance(test_cases_input, list)
-            else [test_cases_input]
-            if isinstance(test_cases_input, str)
-            else []
+            else [test_cases_input] if isinstance(test_cases_input, str) else []
         )
 
         # Resolve context variables

@@ -342,19 +342,23 @@ class BenchmarkRunner:
                 change_pct = ((current_median - baseline_median) / baseline_median) * 100
 
                 if change_pct > 10:  # Regression threshold
-                    regressions.append({
-                        "name": bench_name,
-                        "baseline_ms": baseline_median,
-                        "current_ms": current_median,
-                        "change_pct": change_pct,
-                    })
+                    regressions.append(
+                        {
+                            "name": bench_name,
+                            "baseline_ms": baseline_median,
+                            "current_ms": current_median,
+                            "change_pct": change_pct,
+                        }
+                    )
                 elif change_pct < -10:  # Improvement threshold
-                    improvements.append({
-                        "name": bench_name,
-                        "baseline_ms": baseline_median,
-                        "current_ms": current_median,
-                        "change_pct": change_pct,
-                    })
+                    improvements.append(
+                        {
+                            "name": bench_name,
+                            "baseline_ms": baseline_median,
+                            "current_ms": current_median,
+                            "change_pct": change_pct,
+                        }
+                    )
 
         return {
             "suite": suite_name,
@@ -413,7 +417,6 @@ class BenchmarkRunner:
         else:
             logger.error(f"Unknown format: {format}")
             return ""
-
 
     def _generate_markdown_summary(self) -> str:
         """Generate markdown summary of benchmark results."""
@@ -484,10 +487,10 @@ class BenchmarkRunner:
             suite = BENCHMARK_SUITES[suite_name]
             benchmarks = suite_result["data"].get("benchmarks", {})
 
-            html += f'    <h2>{suite.name}</h2>\n'
-            html += f'    <p>{suite.description}</p>\n'
-            html += '    <table>\n'
-            html += '        <tr><th>Benchmark</th><th>Median (ms)</th><th>Min (ms)</th><th>Max (ms)</th><th>Iterations</th></tr>\n'
+            html += f"    <h2>{suite.name}</h2>\n"
+            html += f"    <p>{suite.description}</p>\n"
+            html += "    <table>\n"
+            html += "        <tr><th>Benchmark</th><th>Median (ms)</th><th>Min (ms)</th><th>Max (ms)</th><th>Iterations</th></tr>\n"
 
             for bench_name, bench_data in benchmarks.items():
                 stats = bench_data.get("stats", {})
@@ -496,9 +499,9 @@ class BenchmarkRunner:
                 max_val = stats.get("max", 0)
                 iterations = stats.get("iterations", 0)
 
-                html += f'        <tr><td>{bench_name}</td><td>{median:.2f}</td><td>{min_val:.2f}</td><td>{max_val:.2f}</td><td>{iterations}</td></tr>\n'
+                html += f"        <tr><td>{bench_name}</td><td>{median:.2f}</td><td>{min_val:.2f}</td><td>{max_val:.2f}</td><td>{iterations}</td></tr>\n"
 
-            html += '    </table>\n'
+            html += "    </table>\n"
 
         html += """
 </body>

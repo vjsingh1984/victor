@@ -233,7 +233,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
             try:
                 cur = conn.execute(
                     "SELECT node_id, type, name, file, line, lang, embedding_ref, metadata FROM nodes WHERE node_id=?",
-                    [node_id]
+                    [node_id],
                 )
                 row = cur.fetchone()
                 if not row:
@@ -258,7 +258,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
             try:
                 cur = conn.execute(
                     "SELECT node_id, type, name, file, line, lang, embedding_ref, metadata FROM nodes WHERE file=?",
-                    [file]
+                    [file],
                 )
                 return [
                     GraphNode(
@@ -294,8 +294,14 @@ class DuckDBGraphStore(GraphStoreProtocol):
             conn = self._connect()
             try:
                 # Delete nodes for this file
-                conn.execute("DELETE FROM edges WHERE src IN (SELECT node_id FROM nodes WHERE file=?)", [file])
-                conn.execute("DELETE FROM edges WHERE dst IN (SELECT node_id FROM nodes WHERE file=?)", [file])
+                conn.execute(
+                    "DELETE FROM edges WHERE src IN (SELECT node_id FROM nodes WHERE file=?)",
+                    [file],
+                )
+                conn.execute(
+                    "DELETE FROM edges WHERE dst IN (SELECT node_id FROM nodes WHERE file=?)",
+                    [file],
+                )
                 conn.execute("DELETE FROM nodes WHERE file=?", [file])
             finally:
                 conn.close()

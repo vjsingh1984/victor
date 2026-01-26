@@ -381,7 +381,14 @@ def _create_default_capabilities() -> List[UnifiedLanguageCapability]:
 
     tier3_languages = [
         # Language, extensions, filenames, grammar_package, lsp_server, lsp_language_id
-        ("ruby", [".rb", ".rake"], ["Gemfile", "Rakefile"], "tree_sitter_ruby", "solargraph", "ruby"),
+        (
+            "ruby",
+            [".rb", ".rake"],
+            ["Gemfile", "Rakefile"],
+            "tree_sitter_ruby",
+            "solargraph",
+            "ruby",
+        ),
         ("php", [".php", ".phtml"], ["composer.json"], "tree_sitter_php", "phpactor", "php"),
         ("csharp", [".cs"], [], "tree_sitter_c_sharp", "omnisharp", "csharp"),
         ("scala", [".scala", ".sc"], ["build.sbt"], "tree_sitter_scala", "metals", "scala"),
@@ -389,11 +396,25 @@ def _create_default_capabilities() -> List[UnifiedLanguageCapability]:
         ("swift", [".swift"], ["Package.swift"], "tree_sitter_swift", "sourcekit-lsp", "swift"),
         ("lua", [".lua"], [], "tree_sitter_lua", "lua-language-server", "lua"),
         ("elixir", [".ex", ".exs"], ["mix.exs"], "tree_sitter_elixir", "elixir-ls", "elixir"),
-        ("haskell", [".hs", ".lhs"], ["*.cabal"], "tree_sitter_haskell", "haskell-language-server", "haskell"),
+        (
+            "haskell",
+            [".hs", ".lhs"],
+            ["*.cabal"],
+            "tree_sitter_haskell",
+            "haskell-language-server",
+            "haskell",
+        ),
         ("r", [".r", ".R"], [".Rprofile"], "tree_sitter_r", "languageserver", "r"),
         ("julia", [".jl"], ["Project.toml"], "tree_sitter_julia", "LanguageServer.jl", "julia"),
         ("perl", [".pl", ".pm"], [], "tree_sitter_perl", "Perl-LanguageServer", "perl"),
-        ("bash", [".sh", ".bash"], [".bashrc", ".bash_profile"], "tree_sitter_bash", "bash-language-server", "shellscript"),
+        (
+            "bash",
+            [".sh", ".bash"],
+            [".bashrc", ".bash_profile"],
+            "tree_sitter_bash",
+            "bash-language-server",
+            "shellscript",
+        ),
         ("sql", [".sql"], [], "tree_sitter_sql", None, "sql"),
         ("yaml", [".yaml", ".yml"], [], "tree_sitter_yaml", "yaml-language-server", "yaml"),
         ("json", [".json"], [], "tree_sitter_json", None, "json"),
@@ -406,32 +427,74 @@ def _create_default_capabilities() -> List[UnifiedLanguageCapability]:
         ("zig", [".zig"], [], "tree_sitter_zig", "zls", "zig"),
         ("nim", [".nim"], [], "tree_sitter_nim", "nimlsp", "nim"),
         ("dart", [".dart"], ["pubspec.yaml"], "tree_sitter_dart", "dart", "dart"),
-        ("clojure", [".clj", ".cljs", ".cljc"], ["deps.edn"], "tree_sitter_clojure", "clojure-lsp", "clojure"),
+        (
+            "clojure",
+            [".clj", ".cljs", ".cljc"],
+            ["deps.edn"],
+            "tree_sitter_clojure",
+            "clojure-lsp",
+            "clojure",
+        ),
         ("erlang", [".erl", ".hrl"], ["rebar.config"], "tree_sitter_erlang", "erlang_ls", "erlang"),
         ("terraform", [".tf", ".tfvars"], [], "tree_sitter_hcl", "terraform-ls", "terraform"),
-        ("dockerfile", [], ["Dockerfile"], "tree_sitter_dockerfile", "dockerfile-language-server-nodejs", "dockerfile"),
+        (
+            "dockerfile",
+            [],
+            ["Dockerfile"],
+            "tree_sitter_dockerfile",
+            "dockerfile-language-server-nodejs",
+            "dockerfile",
+        ),
         ("make", [], ["Makefile", "GNUmakefile"], "tree_sitter_make", None, "makefile"),
         # Additional configuration and documentation formats
         ("xml", [".xml", ".xsd", ".xsl", ".xslt", ".pom"], [], "tree_sitter_xml", "lemminx", "xml"),
-        ("hocon", [".conf", ".hocon"], ["application.conf", "reference.conf"], "tree_sitter_hocon", None, "hocon"),
+        (
+            "hocon",
+            [".conf", ".hocon"],
+            ["application.conf", "reference.conf"],
+            "tree_sitter_hocon",
+            None,
+            "hocon",
+        ),
         ("ini", [".ini", ".cfg"], [".editorconfig", ".gitconfig"], "tree_sitter_ini", None, "ini"),
         ("properties", [".properties"], [], "tree_sitter_properties", None, "properties"),
         ("graphql", [".graphql", ".gql"], [], "tree_sitter_graphql", "graphql-lsp", "graphql"),
         ("proto", [".proto"], [], "tree_sitter_proto", "bufls", "proto"),
-        ("jsonnet", [".jsonnet", ".libsonnet"], [], "tree_sitter_jsonnet", "jsonnet-language-server", "jsonnet"),
+        (
+            "jsonnet",
+            [".jsonnet", ".libsonnet"],
+            [],
+            "tree_sitter_jsonnet",
+            "jsonnet-language-server",
+            "jsonnet",
+        ),
         ("rst", [".rst"], [], "tree_sitter_rst", None, "restructuredtext"),
         ("latex", [".tex", ".latex"], [], "tree_sitter_latex", "texlab", "latex"),
-        ("gitignore", [], [".gitignore", ".dockerignore", ".npmignore"], "tree_sitter_gitignore", None, "gitignore"),
-        ("dotenv", [".env"], [".env.local", ".env.development", ".env.production"], "tree_sitter_dotenv", None, "dotenv"),
+        (
+            "gitignore",
+            [],
+            [".gitignore", ".dockerignore", ".npmignore"],
+            "tree_sitter_gitignore",
+            None,
+            "gitignore",
+        ),
+        (
+            "dotenv",
+            [".env"],
+            [".env.local", ".env.development", ".env.production"],
+            "tree_sitter_dotenv",
+            None,
+            "dotenv",
+        ),
         ("csv", [".csv", ".tsv"], [], "tree_sitter_csv", None, "csv"),
     ]
 
     # Config languages that have native Python library validators
     # These get NATIVE validation in addition to tree-sitter
     config_languages_with_native = {
-        "json": "json",      # Built-in json module
-        "yaml": "pyyaml",    # PyYAML library
-        "toml": "tomllib",   # Built-in (Python 3.11+) or tomli
+        "json": "json",  # Built-in json module
+        "yaml": "pyyaml",  # PyYAML library
+        "toml": "tomllib",  # Built-in (Python 3.11+) or tomli
         "xml": "xml.etree",  # Built-in xml.etree.ElementTree
         "hocon": "pyhocon",  # pyhocon library
         "markdown": "markdown-it-py",  # markdown-it-py or mistune
@@ -596,17 +659,11 @@ class LanguageCapabilityRegistry:
             return None
         return cap.get_best_validation_method()
 
-    def list_supported_languages(
-        self,
-        tier: Optional[LanguageTier] = None
-    ) -> List[str]:
+    def list_supported_languages(self, tier: Optional[LanguageTier] = None) -> List[str]:
         """List all supported languages, optionally filtered by tier."""
         languages = list(self._capabilities.keys())
         if tier:
-            languages = [
-                lang for lang in languages
-                if self._capabilities[lang].tier == tier
-            ]
+            languages = [lang for lang in languages if self._capabilities[lang].tier == tier]
         return sorted(languages)
 
     def list_extensions(self) -> Set[str]:

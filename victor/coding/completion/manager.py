@@ -376,6 +376,7 @@ class CompletionManager:
                 # Check if it's a coroutine or an async iterator
                 import inspect
                 from typing import AsyncIterator, Any, cast
+
                 if inspect.iscoroutine(stream_result):
                     # It's a coroutine returning an iterator
                     result = await stream_result

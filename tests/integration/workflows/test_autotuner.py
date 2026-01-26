@@ -419,7 +419,9 @@ class TestPerformanceAutotuner:
         )
 
     @pytest.mark.asyncio
-    async def test_apply_optimizations_dry_run(self, sample_metrics, sample_workflow_config) -> None:
+    async def test_apply_optimizations_dry_run(
+        self, sample_metrics, sample_workflow_config
+    ) -> None:
         """Test applying optimizations in dry-run mode."""
         analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
         autotuner = PerformanceAutotuner(analyzer=analyzer)
@@ -497,7 +499,9 @@ class TestPerformanceAutotuner:
 
         assert not success
 
-    def test_get_optimization_history(self, sample_metrics: Any, sample_workflow_config: Any) -> None:
+    def test_get_optimization_history(
+        self, sample_metrics: Any, sample_workflow_config: Any
+    ) -> None:
         """Test getting optimization history."""
         analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
         autotuner = PerformanceAutotuner(analyzer=analyzer)
@@ -547,7 +551,9 @@ class TestAutotunerIntegration:
     """Integration tests for complete auto-tuning workflow."""
 
     @pytest.mark.asyncio
-    async def test_complete_autotuning_workflow(self, sample_metrics, sample_workflow_config) -> None:
+    async def test_complete_autotuning_workflow(
+        self, sample_metrics, sample_workflow_config
+    ) -> None:
         """Test complete auto-tuning workflow from analysis to rollback."""
         # 1. Analyze performance
         analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
@@ -635,7 +641,9 @@ class TestAutotunerIntegration:
         assert "oversized_team" in slow_bottlenecks
 
     @pytest.mark.asyncio
-    async def test_ab_test_threshold_validation(self, sample_metrics, sample_workflow_config) -> None:
+    async def test_ab_test_threshold_validation(
+        self, sample_metrics, sample_workflow_config
+    ) -> None:
         """Test A/B test threshold behavior."""
         analyzer = PerformanceAnalyzer(metrics_history=sample_metrics)
 

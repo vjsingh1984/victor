@@ -87,9 +87,7 @@ patterns:
     severity: high
     message: A custom dangerous pattern
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_path = Path(f.name)
 
@@ -106,9 +104,7 @@ patterns:
 
     def test_register_with_invalid_yaml_returns_zero(self, fresh_registry):
         """Test registering from invalid YAML returns 0."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("invalid: yaml: content: [")
             temp_path = Path(f.name)
 
@@ -239,13 +235,9 @@ class TestPatternScanning:
         """Test scanning detects kubectl delete namespace."""
         register_vertical_patterns("devops", registry=fresh_registry)
 
-        violations = fresh_registry.scan(
-            "kubectl delete namespace production", domain="devops"
-        )
+        violations = fresh_registry.scan("kubectl delete namespace production", domain="devops")
         assert len(violations) > 0
-        assert any(
-            v.pattern_name == "devops_kubectl_delete_namespace" for v in violations
-        )
+        assert any(v.pattern_name == "devops_kubectl_delete_namespace" for v in violations)
 
     def test_scan_filters_by_domain(self, fresh_registry):
         """Test that scanning filters patterns by domain."""

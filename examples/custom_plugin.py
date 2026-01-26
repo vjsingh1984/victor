@@ -183,7 +183,9 @@ async def main():
         compiled_workflow = compiler.compile("simple_task", validate=True)
         print("✅ Workflow compiled successfully!")
         print(f"   Workflow: {EXAMPLE_WORKFLOW['workflows']['simple_task']['metadata']['name']}")
-        print(f"   Description: {EXAMPLE_WORKFLOW['workflows']['simple_task']['metadata']['description']}")
+        print(
+            f"   Description: {EXAMPLE_WORKFLOW['workflows']['simple_task']['metadata']['description']}"
+        )
     except Exception as e:
         print(f"❌ Compilation failed: {e}")
         return

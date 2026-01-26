@@ -60,6 +60,7 @@ class CodeGroundingHook:
         """
         if registry is None:
             from .registry import LanguageCapabilityRegistry
+
             registry = LanguageCapabilityRegistry.instance()
 
         self._validator = validator or UnifiedLanguageValidator(registry=registry)
@@ -169,9 +170,7 @@ class CodeGroundingHook:
             return self._validate_sync(content, file_path, strict, config)
         except RuntimeError:
             # No running loop, can use asyncio.run
-            return asyncio.run(
-                self.validate_before_write(content, file_path, strict, config)
-            )
+            return asyncio.run(self.validate_before_write(content, file_path, strict, config))
 
     def _validate_sync(
         self,

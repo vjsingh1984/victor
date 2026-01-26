@@ -117,15 +117,21 @@ class LoadTestReport:
             "total_operations": len(self.results),
             "successful_operations": sum(1 for r in self.results if r.success),
             "failed_operations": sum(1 for r in self.results if not r.success),
-            "overall_success_rate": sum(1 for r in self.results if r.success) / len(self.results) * 100,
-            "test_duration_seconds": (self.end_time - self.start_time).total_seconds() if self.end_time else 0,
+            "overall_success_rate": sum(1 for r in self.results if r.success)
+            / len(self.results)
+            * 100,
+            "test_duration_seconds": (
+                (self.end_time - self.start_time).total_seconds() if self.end_time else 0
+            ),
             "throughput_ops_per_second": 0,
             "by_operation": {},
         }
 
         # Calculate throughput
         if metrics["test_duration_seconds"] > 0:
-            metrics["throughput_ops_per_second"] = len(self.results) / metrics["test_duration_seconds"]
+            metrics["throughput_ops_per_second"] = (
+                len(self.results) / metrics["test_duration_seconds"]
+            )
 
         # Calculate per-operation metrics
         for op_type, results in by_operation.items():
@@ -351,7 +357,9 @@ class CoordinatorLoadTester:
         await asyncio.gather(*tasks)
         progress.update(task, advance=1)
 
-        console.print(f"[green]✓[/green] Switched formations {self.config.operations_per_user} times")
+        console.print(
+            f"[green]✓[/green] Switched formations {self.config.operations_per_user} times"
+        )
 
     async def _test_checkpoint_load(self, progress, task) -> None:
         """Test checkpoint operations under load."""
@@ -410,7 +418,9 @@ class CoordinatorLoadTester:
         await asyncio.gather(*tasks)
         progress.update(task, advance=1)
 
-        console.print(f"[green]✓[/green] Performed {self.config.operations_per_user} checkpoint operations")
+        console.print(
+            f"[green]✓[/green] Performed {self.config.operations_per_user} checkpoint operations"
+        )
 
     async def _test_evaluation_load(self, progress, task) -> None:
         """Test evaluation recording under load."""
@@ -586,7 +596,9 @@ class CoordinatorLoadTester:
         await asyncio.gather(*tasks)
         progress.update(task, advance=1)
 
-        console.print(f"[green]✓[/green] Completed {self.config.concurrent_users} concurrent user sessions")
+        console.print(
+            f"[green]✓[/green] Completed {self.config.concurrent_users} concurrent user sessions"
+        )
 
     async def _op_formation_switch(self, coordinator):
         """Operation: Switch formation."""
@@ -595,7 +607,9 @@ class CoordinatorLoadTester:
             TeamFormation.PARALLEL,
             TeamFormation.HIERARCHICAL,
         ]
-        coordinator.set_formation(formations[len(coordinator.set_formation.__self__.__dict__) % len(formations)])
+        coordinator.set_formation(
+            formations[len(coordinator.set_formation.__self__.__dict__) % len(formations)]
+        )
 
     async def _op_checkpoint(self):
         """Operation: Checkpoint."""
@@ -618,7 +632,10 @@ class CoordinatorLoadTester:
 
         table.add_row("Total Operations", f"{metrics['total_operations']:,}")
         table.add_row("Successful", f"[green]{metrics['successful_operations']:,}[/green]")
-        table.add_row("Failed", f"[{'red' if metrics['failed_operations'] > 0 else 'green'}]{metrics['failed_operations']:,}[/]")
+        table.add_row(
+            "Failed",
+            f"[{'red' if metrics['failed_operations'] > 0 else 'green'}]{metrics['failed_operations']:,}[/]",
+        )
         table.add_row("Success Rate", f"{metrics['overall_success_rate']:.2f}%")
         table.add_row("Test Duration", f"{metrics['test_duration_seconds']:.1f}s")
         table.add_row("Throughput", f"{metrics['throughput_ops_per_second']:.2f} ops/sec")
@@ -653,7 +670,9 @@ class CoordinatorLoadTester:
         mem_table.add_row("Initial Memory", f"{mem_metrics['initial_memory_mb']:.2f} MB")
         mem_table.add_row("Final Memory", f"{mem_metrics['final_memory_mb']:.2f} MB")
         mem_table.add_row("Memory Increase", f"{mem_metrics['memory_increase_mb']:.2f} MB")
-        mem_table.add_row("Peak Memory (tracemalloc)", f"{mem_metrics['tracemalloc_peak_mb']:.2f} MB")
+        mem_table.add_row(
+            "Peak Memory (tracemalloc)", f"{mem_metrics['tracemalloc_peak_mb']:.2f} MB"
+        )
 
         console.print(mem_table)
 
@@ -668,7 +687,9 @@ class CoordinatorLoadTester:
         )
 
         if slowest_op[0]:
-            console.print(f"  • Slowest operation: {slowest_op[0]} ({slowest_op[1]['avg_latency_ms']:.2f}ms avg)")
+            console.print(
+                f"  • Slowest operation: {slowest_op[0]} ({slowest_op[1]['avg_latency_ms']:.2f}ms avg)"
+            )
 
         # Find highest failure rate
         failure_rates = {
@@ -680,7 +701,9 @@ class CoordinatorLoadTester:
         if failure_rates:
             highest_failure = max(failure_rates.items(), key=lambda x: x[1])
             if highest_failure[1] > 0:
-                console.print(f"  • Highest failure rate: {highest_failure[0]} ({highest_failure[1]:.2f}%)")
+                console.print(
+                    f"  • Highest failure rate: {highest_failure[0]} ({highest_failure[1]:.2f}%)"
+                )
 
         # Performance assessment
         console.print("\n[bold cyan]Performance Assessment[/bold cyan]")
@@ -690,11 +713,15 @@ class CoordinatorLoadTester:
             issues.append(f"Success rate below 99%: {metrics['overall_success_rate']:.2f}%")
 
         if metrics["throughput_ops_per_second"] < 100:
-            issues.append(f"Throughput below 100 ops/sec: {metrics['throughput_ops_per_second']:.2f}")
+            issues.append(
+                f"Throughput below 100 ops/sec: {metrics['throughput_ops_per_second']:.2f}"
+            )
 
         for op_type, op_metrics in metrics["by_operation"].items():
             if op_metrics["p95_latency_ms"] > 100:
-                issues.append(f"High P95 latency for {op_type}: {op_metrics['p95_latency_ms']:.2f}ms")
+                issues.append(
+                    f"High P95 latency for {op_type}: {op_metrics['p95_latency_ms']:.2f}ms"
+                )
 
         if mem_metrics["memory_increase_mb"] > 500:
             issues.append(f"High memory increase: {mem_metrics['memory_increase_mb']:.2f} MB")
@@ -712,12 +739,18 @@ async def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Load testing for coordinators")
-    parser.add_argument("--concurrent-users", type=int, default=10, help="Number of concurrent users")
+    parser.add_argument(
+        "--concurrent-users", type=int, default=10, help="Number of concurrent users"
+    )
     parser.add_argument("--duration", type=int, default=60, help="Test duration in seconds")
     parser.add_argument("--ramp-up", type=int, default=10, help="Ramp-up time in seconds")
     parser.add_argument("--operations", type=int, default=100, help="Operations per user")
-    parser.add_argument("--think-time", type=int, default=100, help="Think time between operations (ms)")
-    parser.add_argument("--output", type=str, default="/tmp/load_test_report.json", help="Output report path")
+    parser.add_argument(
+        "--think-time", type=int, default=100, help="Think time between operations (ms)"
+    )
+    parser.add_argument(
+        "--output", type=str, default="/tmp/load_test_report.json", help="Output report path"
+    )
     args = parser.parse_args()
 
     try:

@@ -188,22 +188,47 @@ def check_alerts(metrics: Dict[str, Any]) -> list:
     # Check hit rate
     hit_rate = combined["hit_rate"]
     if hit_rate < THRESHOLDS["hit_rate_critical"]:
-        alerts.append(("CRITICAL", f"Hit rate is {hit_rate:.1%} (threshold: {THRESHOLDS['hit_rate_critical']:.1%})"))
+        alerts.append(
+            (
+                "CRITICAL",
+                f"Hit rate is {hit_rate:.1%} (threshold: {THRESHOLDS['hit_rate_critical']:.1%})",
+            )
+        )
     elif hit_rate < THRESHOLDS["hit_rate_warning"]:
-        alerts.append(("WARNING", f"Hit rate is {hit_rate:.1%} (threshold: {THRESHOLDS['hit_rate_warning']:.1%})"))
+        alerts.append(
+            (
+                "WARNING",
+                f"Hit rate is {hit_rate:.1%} (threshold: {THRESHOLDS['hit_rate_warning']:.1%})",
+            )
+        )
 
     # Check utilization
     utilization = combined["utilization"]
     if utilization > THRESHOLDS["utilization_warning"]:
-        alerts.append(("WARNING", f"Cache utilization is {utilization:.1%} (threshold: {THRESHOLDS['utilization_warning']:.1%})"))
+        alerts.append(
+            (
+                "WARNING",
+                f"Cache utilization is {utilization:.1%} (threshold: {THRESHOLDS['utilization_warning']:.1%})",
+            )
+        )
 
     # Check memory (if available)
     if "memory_usage_mb" in metrics:
         memory_mb = metrics["memory_usage_mb"]
         if memory_mb > THRESHOLDS["memory_critical_mb"]:
-            alerts.append(("CRITICAL", f"Memory usage is {memory_mb:.1f}MB (threshold: {THRESHOLDS['memory_critical_mb']}MB)"))
+            alerts.append(
+                (
+                    "CRITICAL",
+                    f"Memory usage is {memory_mb:.1f}MB (threshold: {THRESHOLDS['memory_critical_mb']}MB)",
+                )
+            )
         elif memory_mb > THRESHOLDS["memory_warning_mb"]:
-            alerts.append(("WARNING", f"Memory usage is {memory_mb:.1f}MB (threshold: {THRESHOLDS['memory_warning_mb']}MB)"))
+            alerts.append(
+                (
+                    "WARNING",
+                    f"Memory usage is {memory_mb:.1f}MB (threshold: {THRESHOLDS['memory_warning_mb']}MB)",
+                )
+            )
 
     return alerts
 

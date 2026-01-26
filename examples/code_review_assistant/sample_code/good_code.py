@@ -8,6 +8,7 @@ from enum import Enum
 
 class Status(Enum):
     """Enumeration for status values."""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     PENDING = "pending"
@@ -16,6 +17,7 @@ class Status(Enum):
 @dataclass
 class User:
     """User data model with type hints."""
+
     id: int
     name: str
     email: str
@@ -87,8 +89,7 @@ def main():
     """Main function demonstrating proper usage."""
     # Configure logging
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
     # Create service

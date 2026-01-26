@@ -300,7 +300,9 @@ class SharedToolRegistry:
                         # Handle @tool decorated functions
                         if inspect.isfunction(obj) and getattr(obj, "_is_tool", False):
                             if hasattr(obj, "Tool"):
-                                tool_instance = getattr(obj, "Tool")  # Dynamically attached attribute
+                                tool_instance = getattr(
+                                    obj, "Tool"
+                                )  # Dynamically attached attribute
                                 tool_name = tool_instance.name
                                 # Store the class, not the instance
                                 self._tool_classes[tool_name] = type(tool_instance)

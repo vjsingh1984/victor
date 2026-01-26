@@ -394,9 +394,7 @@ class TestGenManager:
             )
 
             if not should_proceed:
-                logger.error(
-                    f"Validation failed for generated test file {generated.file_path}"
-                )
+                logger.error(f"Validation failed for generated test file {generated.file_path}")
                 for issue in result.errors:
                     logger.error(f"  {issue}")
                 return False

@@ -454,9 +454,9 @@ class TestMultipleJsonObjectParsing:
     def test_parse_json_with_trailing_metadata(self):
         """Test parsing JSON with trailing token/time stats."""
         adapter = ConcreteToolCallingAdapter()
-        content = '''{"name": "read", "arguments": {"path": "/tmp/file.py"}}
+        content = """{"name": "read", "arguments": {"path": "/tmp/file.py"}}
 
-📊 ~49 tokens (est.) | 30.7s | 1.6 tok/s'''
+📊 ~49 tokens (est.) | 30.7s | 1.6 tok/s"""
 
         result = adapter.parse_json_from_content(content)
 
@@ -487,7 +487,7 @@ class TestMultipleJsonObjectParsing:
     def test_parse_json_array(self):
         """Test parsing JSON array of tool calls."""
         adapter = ConcreteToolCallingAdapter()
-        content = '''[{"name": "read", "arguments": {"path": "/tmp/file.py"}}, {"name": "write", "arguments": {"path": "/tmp/out.py"}}]'''
+        content = """[{"name": "read", "arguments": {"path": "/tmp/file.py"}}, {"name": "write", "arguments": {"path": "/tmp/out.py"}}]"""
 
         result = adapter.parse_json_from_content(content)
 
@@ -534,7 +534,7 @@ class TestMultipleJsonObjectParsing:
         adapter = ConcreteToolCallingAdapter()
 
         # Simulate real Ollama output with duplicate calls and stats
-        content = '''{
+        content = """{
   "name": "read",
   "arguments": {
     "path": "/private/var/folders/.../workspace/sample.py"
@@ -546,7 +546,7 @@ class TestMultipleJsonObjectParsing:
   }
 }
 
-📊 ~49 tokens (est.) | 30.7s | 1.6 tok/s'''
+📊 ~49 tokens (est.) | 30.7s | 1.6 tok/s"""
 
         result = adapter.parse_json_from_content(content)
 

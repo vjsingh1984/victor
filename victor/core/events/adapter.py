@@ -146,7 +146,9 @@ class EventBusAdapter:
 
         if self._forward_to_new:
             # Subscribe to all legacy events using wildcard pattern
-            self._unsubscribe_handle = await self._legacy_bus.subscribe("*", self._on_legacy_event_async)
+            self._unsubscribe_handle = await self._legacy_bus.subscribe(
+                "*", self._on_legacy_event_async
+            )
 
         self._enabled = True
         logger.debug("EventBusAdapter forwarding enabled")

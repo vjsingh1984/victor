@@ -1220,6 +1220,7 @@ class WorkflowDefinitionCache:
                     self._stats["hits"] += 1
                     # Type assertion for mypy
                     from typing import cast
+
                     return cast("WorkflowDefinition", result)
                 self._stats["misses"] += 1
                 return None

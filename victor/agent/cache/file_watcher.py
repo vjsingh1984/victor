@@ -102,7 +102,9 @@ class FileChangeHandler(FileSystemEventHandler):
             return  # Skip directory events
 
         # Convert bytes to str if necessary
-        file_path = event.src_path if isinstance(event.src_path, str) else event.src_path.decode('utf-8')
+        file_path = (
+            event.src_path if isinstance(event.src_path, str) else event.src_path.decode("utf-8")
+        )
 
         change_event = FileChangeEvent(
             file_path=str(file_path),
@@ -121,7 +123,9 @@ class FileChangeHandler(FileSystemEventHandler):
             return  # Skip directory events
 
         # Convert bytes to str if necessary
-        file_path = event.src_path if isinstance(event.src_path, str) else event.src_path.decode('utf-8')
+        file_path = (
+            event.src_path if isinstance(event.src_path, str) else event.src_path.decode("utf-8")
+        )
 
         change_event = FileChangeEvent(
             file_path=str(file_path),
@@ -140,7 +144,9 @@ class FileChangeHandler(FileSystemEventHandler):
             return  # Skip directory events
 
         # Convert bytes to str if necessary
-        file_path = event.src_path if isinstance(event.src_path, str) else event.src_path.decode('utf-8')
+        file_path = (
+            event.src_path if isinstance(event.src_path, str) else event.src_path.decode("utf-8")
+        )
 
         change_event = FileChangeEvent(
             file_path=str(file_path),
@@ -159,8 +165,12 @@ class FileChangeHandler(FileSystemEventHandler):
             return  # Skip directory events
 
         # Convert bytes to str if necessary
-        dest_path = event.dest_path if isinstance(event.dest_path, str) else event.dest_path.decode('utf-8')
-        src_path = event.src_path if isinstance(event.src_path, str) else event.src_path.decode('utf-8')
+        dest_path = (
+            event.dest_path if isinstance(event.dest_path, str) else event.dest_path.decode("utf-8")
+        )
+        src_path = (
+            event.src_path if isinstance(event.src_path, str) else event.src_path.decode("utf-8")
+        )
 
         change_event = FileChangeEvent(
             file_path=str(dest_path),

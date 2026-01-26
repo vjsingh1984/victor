@@ -194,7 +194,9 @@ def cmd_show(args: argparse.Namespace) -> int:
         if template.examples:
             lines.append(f"\nExamples ({len(template.examples)}):")
             for example in template.examples[:3]:
-                lines.append(f"  - {example.get('name', 'Example')}: {example.get('description', '')}")
+                lines.append(
+                    f"  - {example.get('name', 'Example')}: {example.get('description', '')}"
+                )
 
         if template.metadata:
             lines.append(f"\nMetadata:")
@@ -307,9 +309,17 @@ def cmd_create(args: argparse.Namespace) -> int:
 
     display_name = input("Display name: ").strip() or name
     description = input("Description: ").strip()
-    vertical = input(f"Vertical [{', '.join([v.value for v in VerticalType])}]: ").strip() or "general"
-    formation = input("Formation (sequential/parallel/hierarchical/consensus/pipeline): ").strip() or "sequential"
-    complexity = input(f"Complexity [{', '.join([c.value for c in TaskComplexity])}]: ").strip() or "standard"
+    vertical = (
+        input(f"Vertical [{', '.join([v.value for v in VerticalType])}]: ").strip() or "general"
+    )
+    formation = (
+        input("Formation (sequential/parallel/hierarchical/consensus/pipeline): ").strip()
+        or "sequential"
+    )
+    complexity = (
+        input(f"Complexity [{', '.join([c.value for c in TaskComplexity])}]: ").strip()
+        or "standard"
+    )
 
     # Members
     print("\nAdd team members (press Enter with empty name to finish):")
@@ -319,18 +329,22 @@ def cmd_create(args: argparse.Namespace) -> int:
         if not member_id:
             break
 
-        member_role = input("Role (researcher/planner/executor/reviewer/writer): ").strip() or "researcher"
+        member_role = (
+            input("Role (researcher/planner/executor/reviewer/writer): ").strip() or "researcher"
+        )
         member_name = input("Display name: ").strip() or member_id
         member_goal = input("Goal: ").strip()
         member_budget = input("Tool budget [15]: ").strip() or "15"
 
-        members.append({
-            "id": member_id,
-            "role": member_role,
-            "name": member_name,
-            "goal": member_goal,
-            "tool_budget": int(member_budget),
-        })
+        members.append(
+            {
+                "id": member_id,
+                "role": member_role,
+                "name": member_name,
+                "goal": member_goal,
+                "tool_budget": int(member_budget),
+            }
+        )
 
     if not members:
         print("Error: At least one member is required")
@@ -407,6 +421,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
 
         if args.json:
             import yaml
+
             # Convert to dict for YAML serialization
             print(yaml.dump(node.to_dict(), default_flow_style=False))
         else:

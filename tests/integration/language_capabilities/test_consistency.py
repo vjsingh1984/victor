@@ -64,9 +64,9 @@ class TestIndexingValidationConsistency:
 
             # All languages should have at least tree-sitter validation
             validation_method = cap.get_best_validation_method()
-            assert validation_method is not None, (
-                f"No validation method for {lang} (tier={cap.tier.name})"
-            )
+            assert (
+                validation_method is not None
+            ), f"No validation method for {lang} (tier={cap.tier.name})"
 
     def test_indexing_implies_validation(self, registry):
         """Test that if indexing works, validation should too."""
@@ -79,8 +79,7 @@ class TestIndexingValidationConsistency:
 
             if indexing_method is not None:
                 assert validation_method is not None, (
-                    f"Language {lang} has indexing ({indexing_method}) "
-                    f"but no validation"
+                    f"Language {lang} has indexing ({indexing_method}) " f"but no validation"
                 )
 
     def test_tier_1_languages_have_advanced_support(self, registry):
@@ -91,13 +90,9 @@ class TestIndexingValidationConsistency:
             cap = registry.get(lang)
             # Tier 1 should have at least one advanced parsing method
             has_advanced = (
-                cap.native_ast is not None or
-                cap.tree_sitter is not None or
-                cap.lsp is not None
+                cap.native_ast is not None or cap.tree_sitter is not None or cap.lsp is not None
             )
-            assert has_advanced, (
-                f"Tier 1 language {lang} missing advanced support"
-            )
+            assert has_advanced, f"Tier 1 language {lang} missing advanced support"
 
     def test_all_languages_have_tree_sitter_capability(self, registry):
         """Test that Tier 1/2 languages have tree-sitter capability defined."""
@@ -108,9 +103,9 @@ class TestIndexingValidationConsistency:
             cap = registry.get(lang)
             # Tier 1/2 languages should have tree-sitter capability defined
             # (even if the grammar is not installed)
-            assert cap.tree_sitter is not None or cap.native_ast is not None, (
-                f"Tier 1/2 language {lang} missing tree-sitter or native AST capability"
-            )
+            assert (
+                cap.tree_sitter is not None or cap.native_ast is not None
+            ), f"Tier 1/2 language {lang} missing tree-sitter or native AST capability"
 
 
 class TestLanguageDetectionConsistency:
@@ -127,32 +122,35 @@ class TestLanguageDetectionConsistency:
         with tempfile.TemporaryDirectory() as tmpdir:
             yield Path(tmpdir)
 
-    @pytest.mark.parametrize("extension,expected_language", [
-        (".py", "python"),
-        (".js", "javascript"),
-        (".ts", "typescript"),
-        (".tsx", "tsx"),
-        (".jsx", "jsx"),
-        (".go", "go"),
-        (".rs", "rust"),
-        (".java", "java"),
-        (".c", "c"),
-        (".cpp", "cpp"),
-        (".rb", "ruby"),
-        (".php", "php"),
-        (".swift", "swift"),
-        (".kt", "kotlin"),
-        (".scala", "scala"),
-        (".lua", "lua"),
-        (".sh", "bash"),
-        (".html", "html"),
-        (".css", "css"),
-        (".json", "json"),
-        (".yaml", "yaml"),
-        (".yml", "yaml"),
-        (".md", "markdown"),
-        (".toml", "toml"),
-    ])
+    @pytest.mark.parametrize(
+        "extension,expected_language",
+        [
+            (".py", "python"),
+            (".js", "javascript"),
+            (".ts", "typescript"),
+            (".tsx", "tsx"),
+            (".jsx", "jsx"),
+            (".go", "go"),
+            (".rs", "rust"),
+            (".java", "java"),
+            (".c", "c"),
+            (".cpp", "cpp"),
+            (".rb", "ruby"),
+            (".php", "php"),
+            (".swift", "swift"),
+            (".kt", "kotlin"),
+            (".scala", "scala"),
+            (".lua", "lua"),
+            (".sh", "bash"),
+            (".html", "html"),
+            (".css", "css"),
+            (".json", "json"),
+            (".yaml", "yaml"),
+            (".yml", "yaml"),
+            (".md", "markdown"),
+            (".toml", "toml"),
+        ],
+    )
     def test_extension_detection(self, registry, temp_dir, extension, expected_language):
         """Test that file extensions are correctly detected."""
         file_path = temp_dir / f"test{extension}"
@@ -162,15 +160,18 @@ class TestLanguageDetectionConsistency:
         if cap is None:
             pytest.skip(f"Language not registered for {extension}")
 
-        assert cap.name == expected_language, (
-            f"Expected {expected_language} for {extension}, got {cap.name}"
-        )
+        assert (
+            cap.name == expected_language
+        ), f"Expected {expected_language} for {extension}, got {cap.name}"
 
-    @pytest.mark.parametrize("filename,expected_language", [
-        ("Dockerfile", "dockerfile"),
-        ("Makefile", "make"),
-        ("CMakeLists.txt", "cmake"),
-    ])
+    @pytest.mark.parametrize(
+        "filename,expected_language",
+        [
+            ("Dockerfile", "dockerfile"),
+            ("Makefile", "make"),
+            ("CMakeLists.txt", "cmake"),
+        ],
+    )
     def test_filename_detection(self, registry, temp_dir, filename, expected_language):
         """Test that special filenames are correctly detected."""
         file_path = temp_dir / filename
@@ -180,9 +181,9 @@ class TestLanguageDetectionConsistency:
         if cap is None:
             pytest.skip(f"Language not registered for {filename}")
 
-        assert cap.name == expected_language, (
-            f"Expected {expected_language} for {filename}, got {cap.name}"
-        )
+        assert (
+            cap.name == expected_language
+        ), f"Expected {expected_language} for {filename}, got {cap.name}"
 
 
 class TestValidationConsistency:
@@ -220,14 +221,17 @@ class TestValidationConsistency:
         validator_result = validator.validate(invalid_code, file_path)
         assert hook_result[1].is_valid == validator_result.is_valid
 
-    @pytest.mark.parametrize("language,extension,valid_code,invalid_code", [
-        ("python", ".py", "x = 1", "x = ("),
-        ("javascript", ".js", "const x = 1;", "const x = (;"),
-        ("typescript", ".ts", "const x: number = 1;", "const x: number = (;"),
-        ("go", ".go", "package main\nfunc main() {}", "package main\nfunc main( {}"),
-        ("rust", ".rs", "fn main() {}", "fn main( {}"),
-        ("java", ".java", "class Main {}", "class Main {"),
-    ])
+    @pytest.mark.parametrize(
+        "language,extension,valid_code,invalid_code",
+        [
+            ("python", ".py", "x = 1", "x = ("),
+            ("javascript", ".js", "const x = 1;", "const x = (;"),
+            ("typescript", ".ts", "const x: number = 1;", "const x: number = (;"),
+            ("go", ".go", "package main\nfunc main() {}", "package main\nfunc main( {}"),
+            ("rust", ".rs", "fn main() {}", "fn main( {}"),
+            ("java", ".java", "class Main {}", "class Main {"),
+        ],
+    )
     def test_multi_language_validation(
         self, validator, temp_dir, language, extension, valid_code, invalid_code
     ):
@@ -236,16 +240,14 @@ class TestValidationConsistency:
 
         # Valid code should pass
         result = validator.validate(valid_code, file_path)
-        assert result.is_valid is True, (
-            f"{language} validation failed for valid code: {result.issues}"
-        )
+        assert (
+            result.is_valid is True
+        ), f"{language} validation failed for valid code: {result.issues}"
         assert result.language == language
 
         # Invalid code should fail
         result = validator.validate(invalid_code, file_path)
-        assert result.is_valid is False, (
-            f"{language} validation passed for invalid code"
-        )
+        assert result.is_valid is False, f"{language} validation passed for invalid code"
         assert result.language == language
 
 
@@ -286,7 +288,7 @@ class Calculator:
     def test_javascript_extraction(self, extractor, temp_dir):
         """Test JavaScript symbol extraction."""
         file_path = temp_dir / "test.js"
-        code = '''
+        code = """
 function greet(name) {
     return `Hello, ${name}!`;
 }
@@ -296,7 +298,7 @@ class Calculator {
         return a + b;
     }
 }
-'''
+"""
         file_path.write_text(code)
 
         symbols = extractor.extract(code, file_path, "javascript")
@@ -307,7 +309,7 @@ class Calculator {
     def test_go_extraction(self, extractor, temp_dir):
         """Test Go symbol extraction."""
         file_path = temp_dir / "main.go"
-        code = '''
+        code = """
 package main
 
 func main() {
@@ -317,7 +319,7 @@ func main() {
 func add(a, b int) int {
     return a + b
 }
-'''
+"""
         file_path.write_text(code)
 
         symbols = extractor.extract(code, file_path, "go")
@@ -356,9 +358,9 @@ class TestRegistryConsistency:
 
         for lang in languages:
             cap = registry.get(lang)
-            assert len(cap.extensions) > 0 or len(cap.filenames) > 0, (
-                f"Language {lang} has no extensions or filenames"
-            )
+            assert (
+                len(cap.extensions) > 0 or len(cap.filenames) > 0
+            ), f"Language {lang} has no extensions or filenames"
 
     def test_tier_consistency(self, registry):
         """Test that tier values are valid."""

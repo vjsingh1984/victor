@@ -566,6 +566,7 @@ class QAOrchestrator:
         # Check version
         try:
             from victor import __version__
+
             checks.append(("Version Defined", __version__ is not None and __version__ != "0.0.0"))
         except ImportError:
             checks.append(("Version Defined", False))
@@ -642,9 +643,9 @@ class QAOrchestrator:
         """Generate text format report."""
         lines = [
             "",
-            "="*70,
+            "=" * 70,
             "QA SUMMARY",
-            "="*70,
+            "=" * 70,
             "",
             f"Total Duration: {duration:.2f}s",
             f"Total Checks: {total}",
@@ -654,9 +655,9 @@ class QAOrchestrator:
             f"Errors: {errored}",
             f"Success Rate: {100.0 * passed / total:.1f}%",
             "",
-            "="*70,
+            "=" * 70,
             "DETAILED RESULTS",
-            "="*70,
+            "=" * 70,
             "",
         ]
 
@@ -671,11 +672,13 @@ class QAOrchestrator:
                 "ERROR": "✗",
             }.get(status, "?")
 
-            lines.extend([
-                f"{status_symbol} {name}",
-                f"  Status: {status}",
-                f"  Duration: {duration:.2f}s",
-            ])
+            lines.extend(
+                [
+                    f"{status_symbol} {name}",
+                    f"  Status: {status}",
+                    f"  Duration: {duration:.2f}s",
+                ]
+            )
 
             if status == "FAIL" and "output" in result:
                 output_lines = result["output"].split("\n")[:10]
@@ -764,9 +767,7 @@ class QAOrchestrator:
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Run comprehensive QA validation for Victor AI"
-    )
+    parser = argparse.ArgumentParser(description="Run comprehensive QA validation for Victor AI")
 
     parser.add_argument(
         "--fast",

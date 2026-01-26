@@ -14,6 +14,7 @@ from collections import OrderedDict
 # Optimized Cosine Similarity
 # =============================================================================
 
+
 class OptimizedEmbeddingSearch:
     """
     High-performance embedding search using techniques validated by benchmarks.
@@ -59,10 +60,7 @@ class OptimizedEmbeddingSearch:
         return embeddings / norms
 
     def search(
-        self,
-        query: np.ndarray,
-        k: int = 10,
-        use_cache: bool = True
+        self, query: np.ndarray, k: int = 10, use_cache: bool = True
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Search for top-k similar embeddings.
@@ -101,9 +99,7 @@ class OptimizedEmbeddingSearch:
         return top_k, top_scores
 
     def batch_search(
-        self,
-        queries: np.ndarray,
-        k: int = 10
+        self, queries: np.ndarray, k: int = 10
     ) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         """
         Batch search for multiple queries.
@@ -158,6 +154,7 @@ class OptimizedEmbeddingSearch:
 # =============================================================================
 # Usage Examples
 # =============================================================================
+
 
 def example_basic_search():
     """Basic search usage."""
@@ -307,7 +304,8 @@ if __name__ == "__main__":
     print("=" * 60)
     print("Summary of Optimizations")
     print("=" * 60)
-    print("""
+    print(
+        """
 1. Pre-normalize embeddings: 2x speedup
    - Normalize once during indexing, not at query time
    - Reduces computation from O(n*d) to O(d) per query
@@ -326,4 +324,5 @@ if __name__ == "__main__":
 
 See tests/benchmarks/test_embedding_operations_baseline.py for
 comprehensive benchmarks validating these optimizations.
-    """)
+    """
+    )

@@ -32,7 +32,9 @@ class ReviewConfig:
     @property
     def enabled_checks(self) -> list:
         """Enabled check types."""
-        return self.config.get("review", {}).get("checks", ["security", "style", "complexity", "quality"])
+        return self.config.get("review", {}).get(
+            "checks", ["security", "style", "complexity", "quality"]
+        )
 
     @property
     def ignore_patterns(self) -> list:

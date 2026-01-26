@@ -28,8 +28,13 @@ class DocumentationGenerator:
         self.parser = Parser()
         self.codebase_indexer = CodebaseIndexer()
 
-    def generate(self, project_path: str, output_format: str = "markdown",
-                 include_diagrams: bool = True, include_examples: bool = True) -> Dict[str, Any]:
+    def generate(
+        self,
+        project_path: str,
+        output_format: str = "markdown",
+        include_diagrams: bool = True,
+        include_examples: bool = True,
+    ) -> Dict[str, Any]:
         """Generate documentation for a project.
 
         Args:
@@ -43,7 +48,7 @@ class DocumentationGenerator:
         """
         # Extract project if zip
         temp_dir = None
-        if project_path.endswith('.zip'):
+        if project_path.endswith(".zip"):
             temp_dir = self._extract_zip(project_path)
             project_path = temp_dir
 
@@ -53,11 +58,13 @@ class DocumentationGenerator:
 
             # Generate documentation sections
             sections = {
-                'overview': self._generate_overview(analysis),
-                'installation': self._generate_installation(analysis),
-                'api': self._generate_api_docs(analysis),
-                'architecture': self._generate_architecture_docs(analysis) if include_diagrams else None,
-                'examples': self._generate_examples(analysis) if include_examples else None,
+                "overview": self._generate_overview(analysis),
+                "installation": self._generate_installation(analysis),
+                "api": self._generate_api_docs(analysis),
+                "architecture": (
+                    self._generate_architecture_docs(analysis) if include_diagrams else None
+                ),
+                "examples": self._generate_examples(analysis) if include_examples else None,
             }
 
             # Format output
@@ -67,17 +74,18 @@ class DocumentationGenerator:
             self._index_documentation(formatted_docs, project_path)
 
             return {
-                'content': formatted_docs,
-                'format': output_format,
-                'file_count': analysis['file_count'],
-                'function_count': analysis['function_count'],
-                'class_count': analysis['class_count'],
+                "content": formatted_docs,
+                "format": output_format,
+                "file_count": analysis["file_count"],
+                "function_count": analysis["function_count"],
+                "class_count": analysis["class_count"],
             }
 
         finally:
             # Cleanup temp directory
             if temp_dir and os.path.exists(temp_dir):
                 import shutil
+
                 shutil.rmtree(temp_dir)
 
     def _extract_zip(self, zip_path: str) -> str:
@@ -85,9 +93,9 @@ class DocumentationGenerator:
         import tempfile
         import shutil
 
-        temp_dir = tempfile.mkdtemp(prefix='victor_docs_')
+        temp_dir = tempfile.mkdtemp(prefix="victor_docs_")
 
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(temp_dir)
 
         return temp_dir
@@ -98,8 +106,8 @@ class DocumentationGenerator:
 
         # Find all code files
         code_files = []
-        for ext in ['.py', '.js', '.ts', '.go', '.java']:
-            code_files.extend(project_path.rglob(f'*{ext}'))
+        for ext in [".py", ".js", ".ts", ".go", ".java"]:
+            code_files.extend(project_path.rglob(f"*{ext}"))
 
         # Parse each file
         all_functions = []
@@ -108,7 +116,7 @@ class DocumentationGenerator:
 
         for file_path in code_files:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
 
                 # Parse AST
@@ -122,22 +130,24 @@ class DocumentationGenerator:
 
                 all_functions.extend(functions)
                 all_classes.extend(classes)
-                all_modules.append({
-                    'path': str(file_path),
-                    'name': file_path.stem,
-                    'docstring': modules.get('docstring', ''),
-                })
+                all_modules.append(
+                    {
+                        "path": str(file_path),
+                        "name": file_path.stem,
+                        "docstring": modules.get("docstring", ""),
+                    }
+                )
 
             except Exception as e:
                 print(f"Error parsing {file_path}: {e}")
 
         return {
-            'file_count': len(code_files),
-            'function_count': len(all_functions),
-            'class_count': len(all_classes),
-            'functions': all_functions,
-            'classes': all_classes,
-            'modules': all_modules,
+            "file_count": len(code_files),
+            "function_count": len(all_functions),
+            "class_count": len(all_classes),
+            "functions": all_functions,
+            "classes": all_classes,
+            "modules": all_modules,
         }
 
     def _generate_overview(self, analysis: Dict[str, Any]) -> str:
@@ -154,8 +164,7 @@ class DocumentationGenerator:
         """
 
         overview = self.orchestrator.process_request(
-            "Generate a concise project overview",
-            context={"analysis": analysis}
+            "Generate a concise project overview", context={"analysis": analysis}
         )
 
         return f"""
@@ -174,13 +183,9 @@ class DocumentationGenerator:
         """Generate installation instructions."""
         # Detect package managers
         has_requirements = any(
-            Path(m['path']).parent / 'requirements.txt'
-            for m in analysis['modules']
+            Path(m["path"]).parent / "requirements.txt" for m in analysis["modules"]
         )
-        has_package_json = any(
-            Path(m['path']).parent / 'package.json'
-            for m in analysis['modules']
-        )
+        has_package_json = any(Path(m["path"]).parent / "package.json" for m in analysis["modules"])
 
         instructions = "# Installation\n\n"
 
@@ -209,35 +214,37 @@ npm install
         docs = "# API Documentation\n\n"
 
         # Document classes
-        for cls in analysis['classes'][:20]:  # Limit to 20 classes
+        for cls in analysis["classes"][:20]:  # Limit to 20 classes
             docs += f"## {cls['name']}\n\n"
-            if cls.get('docstring'):
+            if cls.get("docstring"):
                 docs += f"{cls['docstring']}\n\n"
 
             # Document methods
-            if 'methods' in cls:
-                for method in cls['methods']:
+            if "methods" in cls:
+                for method in cls["methods"]:
                     docs += f"### {method['name']}\n\n"
-                    if method.get('docstring'):
+                    if method.get("docstring"):
                         docs += f"{method['docstring']}\n\n"
 
-                    if method.get('parameters'):
+                    if method.get("parameters"):
                         docs += "**Parameters:**\n"
-                        for param in method['parameters']:
+                        for param in method["parameters"]:
                             docs += f"- `{param['name']}` ({param['type']}): {param.get('description', '')}\n"
                         docs += "\n"
 
         # Document top-level functions
         docs += "\n## Functions\n\n"
-        for func in analysis['functions'][:50]:  # Limit to 50 functions
+        for func in analysis["functions"][:50]:  # Limit to 50 functions
             docs += f"### {func['name']}\n\n"
-            if func.get('docstring'):
+            if func.get("docstring"):
                 docs += f"{func['docstring']}\n\n"
 
-            if func.get('parameters'):
+            if func.get("parameters"):
                 docs += "**Parameters:**\n"
-                for param in func['parameters']:
-                    docs += f"- `{param['name']}` ({param['type']}): {param.get('description', '')}\n"
+                for param in func["parameters"]:
+                    docs += (
+                        f"- `{param['name']}` ({param['type']}): {param.get('description', '')}\n"
+                    )
                 docs += "\n"
 
         return docs
@@ -251,7 +258,7 @@ npm install
         docs += "```mermaid\n"
         docs += "graph TD\n"
 
-        for i, module in enumerate(analysis['modules'][:10]):
+        for i, module in enumerate(analysis["modules"][:10]):
             docs += f"    {i}[{module['name']}]\n"
             if i > 0:
                 docs += f"    {i-1} --> {i}\n"
@@ -259,14 +266,14 @@ npm install
         docs += "```\n\n"
 
         # Generate class hierarchy diagram
-        if analysis['classes']:
+        if analysis["classes"]:
             docs += "## Class Hierarchy\n\n"
             docs += "```mermaid\n"
             docs += "graph TB\n"
 
-            for i, cls in enumerate(analysis['classes'][:10]):
+            for i, cls in enumerate(analysis["classes"][:10]):
                 docs.append(f"    {i}[{cls['name']}]\n")
-                if 'base_class' in cls and cls['base_class']:
+                if "base_class" in cls and cls["base_class"]:
                     docs += f"    {i} -.-> {cls['base_class']}\n"
 
             docs += "```\n\n"
@@ -278,12 +285,9 @@ npm install
         # Extract examples from docstrings
         examples = []
 
-        for func in analysis['functions']:
-            if func.get('docstring') and 'Example' in func['docstring']:
-                examples.append({
-                    'name': func['name'],
-                    'example': func['docstring']
-                })
+        for func in analysis["functions"]:
+            if func.get("docstring") and "Example" in func["docstring"]:
+                examples.append({"name": func["name"], "example": func["docstring"]})
 
         docs = "# Usage Examples\n\n"
 
@@ -347,21 +351,19 @@ npm install
         # Index chunks
         for i, chunk in enumerate(chunks):
             self.doc_indexer.add_document(
-                doc_id=f"{project_path}_{i}",
-                content=chunk,
-                metadata={"source": project_path}
+                doc_id=f"{project_path}_{i}", content=chunk, metadata={"source": project_path}
             )
 
     def _chunk_documentation(self, documentation: str, chunk_size: int = 1000) -> List[str]:
         """Split documentation into chunks for indexing."""
         chunks = []
-        lines = documentation.split('\n')
+        lines = documentation.split("\n")
         current_chunk = []
         current_size = 0
 
         for line in lines:
             if current_size + len(line) > chunk_size and current_chunk:
-                chunks.append('\n'.join(current_chunk))
+                chunks.append("\n".join(current_chunk))
                 current_chunk = []
                 current_size = 0
 
@@ -369,7 +371,7 @@ npm install
             current_size += len(line)
 
         if current_chunk:
-            chunks.append('\n'.join(current_chunk))
+            chunks.append("\n".join(current_chunk))
 
         return chunks
 

@@ -39,13 +39,25 @@ def cli():
 
 @cli.command()
 @click.argument("query", type=str)
-@click.option("--formation", "-f", type=click.Choice(["pipeline", "parallel", "hierarchical", "sequential", "consensus"]),
-              default="parallel", help="Team formation type")
+@click.option(
+    "--formation",
+    "-f",
+    type=click.Choice(["pipeline", "parallel", "hierarchical", "sequential", "consensus"]),
+    default="parallel",
+    help="Team formation type",
+)
 @click.option("--roles", "-r", multiple=True, help="Agent roles to include")
 @click.option("--max-iterations", type=int, default=3, help="Maximum team iterations")
 @click.option("--output", "-o", type=click.Path(), help="Output file for report")
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")
-def research(query: str, formation: str, roles: tuple, max_iterations: int, output: Optional[str], verbose: bool):
+def research(
+    query: str,
+    formation: str,
+    roles: tuple,
+    max_iterations: int,
+    output: Optional[str],
+    verbose: bool,
+):
     """Execute research task with multi-agent team.
 
     Examples:
@@ -56,15 +68,24 @@ def research(query: str, formation: str, roles: tuple, max_iterations: int, outp
     asyncio.run(_research(query, formation, roles, max_iterations, output, verbose))
 
 
-async def _research(query: str, formation: str, roles: tuple, max_iterations: int, output: Optional[str], verbose: bool):
+async def _research(
+    query: str,
+    formation: str,
+    roles: tuple,
+    max_iterations: int,
+    output: Optional[str],
+    verbose: bool,
+):
     """Execute research task."""
     # Display banner
-    console.print(Panel.fit(
-        "[bold blue]Victor AI Multi-Agent Research Team[/bold blue]\n"
-        f"Formation: {formation}\n"
-        f"Query: {query}",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Victor AI Multi-Agent Research Team[/bold blue]\n"
+            f"Formation: {formation}\n"
+            f"Query: {query}",
+            border_style="blue",
+        )
+    )
 
     # Create orchestrator
     console.print("[dim]Initializing Victor AI orchestrator...[/dim]")
@@ -88,7 +109,7 @@ async def _research(query: str, formation: str, roles: tuple, max_iterations: in
         orchestrator=orchestrator,
         formation=TeamFormation(formation),
         agents=agent_list,
-        max_iterations=max_iterations
+        max_iterations=max_iterations,
     )
 
     # Execute research with progress
@@ -121,7 +142,9 @@ def _display_results(result, verbose: bool):
     summary_table.add_column("Metric", style="cyan")
     summary_table.add_column("Value", style="green")
 
-    summary_table.add_row("Query", result.query[:50] + "..." if len(result.query) > 50 else result.query)
+    summary_table.add_row(
+        "Query", result.query[:50] + "..." if len(result.query) > 50 else result.query
+    )
     summary_table.add_row("Formation", result.formation)
     summary_table.add_row("Agents Involved", str(len(result.agent_insights)))
     summary_table.add_row("Execution Time", f"{result.execution_time:.2f}s")
@@ -135,19 +158,25 @@ def _display_results(result, verbose: bool):
         console.print("[bold yellow]Agent Insights:[/bold yellow]\n")
 
         for agent_name, insight in result.agent_insights.items():
-            confidence_color = "green" if insight['confidence'] > 0.8 else "yellow" if insight['confidence'] > 0.6 else "red"
+            confidence_color = (
+                "green"
+                if insight["confidence"] > 0.8
+                else "yellow" if insight["confidence"] > 0.6 else "red"
+            )
 
-            console.print(Panel(
-                f"[bold]{agent_name}[/bold]\n"
-                f"Confidence: [{confidence_color}]{insight['confidence']:.1%}[/{confidence_color}]\n"
-                f"Findings: {len(insight.get('findings', []))}\n"
-                f"Time: {insight.get('execution_time', 0):.2f}s",
-                title=agent_name,
-                border_style="cyan"
-            ))
+            console.print(
+                Panel(
+                    f"[bold]{agent_name}[/bold]\n"
+                    f"Confidence: [{confidence_color}]{insight['confidence']:.1%}[/{confidence_color}]\n"
+                    f"Findings: {len(insight.get('findings', []))}\n"
+                    f"Time: {insight.get('execution_time', 0):.2f}s",
+                    title=agent_name,
+                    border_style="cyan",
+                )
+            )
 
-            if verbose and insight.get('findings'):
-                for finding in insight['findings'][:3]:
+            if verbose and insight.get("findings"):
+                for finding in insight["findings"][:3]:
                     console.print(f"  • {finding}")
 
     # Final report
@@ -174,8 +203,8 @@ def _save_report(result, output_path: str):
         report_content += f"### {agent_name}\n\n"
         report_content += f"Confidence: {insight['confidence']:.1%}\n\n"
 
-        if insight.get('findings'):
-            for finding in insight['findings']:
+        if insight.get("findings"):
+            for finding in insight["findings"]:
                 report_content += f"- {finding}\n"
         report_content += "\n"
 
@@ -190,7 +219,7 @@ def _save_report(result, output_path: str):
 - Agents: {len(result.agent_insights)}
 """
 
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         f.write(report_content)
 
 
@@ -205,11 +234,7 @@ def list_agents():
     table.add_column("Capabilities", style="green", width=30)
 
     for name, agent in agents.items():
-        table.add_row(
-            name,
-            agent.get('description', ''),
-            ', '.join(agent.get('capabilities', []))
-        )
+        table.add_row(name, agent.get("description", ""), ", ".join(agent.get("capabilities", [])))
 
     console.print(table)
 
@@ -223,11 +248,13 @@ def interactive():
     """
     from src.interactive_session import InteractiveSession
 
-    console.print(Panel.fit(
-        "[bold blue]Victor AI Interactive Research Team[/bold blue]\n"
-        "Type your research queries for real-time analysis",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Victor AI Interactive Research Team[/bold blue]\n"
+            "Type your research queries for real-time analysis",
+            border_style="blue",
+        )
+    )
 
     # Create orchestrator
     settings = Settings()

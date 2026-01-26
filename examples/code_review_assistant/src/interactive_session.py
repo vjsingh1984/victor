@@ -35,15 +35,14 @@ class InteractiveSession:
     async def run(self):
         """Run interactive session."""
         console.print("\n[green]Interactive session started![/green]")
-        console.print("Commands: [bold]review[/bold], [bold]ask[/bold], [bold]help[/bold], [bold]quit[/bold]\n")
+        console.print(
+            "Commands: [bold]review[/bold], [bold]ask[/bold], [bold]help[/bold], [bold]quit[/bold]\n"
+        )
 
         while self.running:
             try:
                 # Get user input
-                command = Prompt.ask(
-                    "[bold cyan]victor-review[/bold cyan]",
-                    default="help"
-                )
+                command = Prompt.ask("[bold cyan]victor-review[/bold cyan]", default="help")
 
                 # Process command
                 await self._process_command(command)
@@ -113,16 +112,18 @@ class InteractiveSession:
         results = await self.engine.review(path)
 
         # Display summary
-        console.print(Panel(
-            f"[bold]Files Analyzed:[/bold] {results['files_analyzed']}\n"
-            f"[bold]Total Issues:[/bold] {results['total_issues']}\n"
-            f"[red][bold]Critical:[/bold] {results['critical']}[/red]\n"
-            f"[orange1][bold]High:[/bold] {results['high']}[/orange1]\n"
-            f"[yellow][bold]Medium:[/bold] {results['medium']}[/yellow]\n"
-            f"[blue][bold]Low:[/bold] {results['low']}[/blue]",
-            title="Review Results",
-            border_style="cyan"
-        ))
+        console.print(
+            Panel(
+                f"[bold]Files Analyzed:[/bold] {results['files_analyzed']}\n"
+                f"[bold]Total Issues:[/bold] {results['total_issues']}\n"
+                f"[red][bold]Critical:[/bold] {results['critical']}[/red]\n"
+                f"[orange1][bold]High:[/bold] {results['high']}[/orange1]\n"
+                f"[yellow][bold]Medium:[/bold] {results['medium']}[/yellow]\n"
+                f"[blue][bold]Low:[/bold] {results['low']}[/blue]",
+                title="Review Results",
+                border_style="cyan",
+            )
+        )
 
         # Show top issues
         if results["top_issues"]:
@@ -143,13 +144,8 @@ class InteractiveSession:
 
         # Use Victor AI orchestrator to answer
         response = await self.orchestrator.process_request(
-            question,
-            context={"mode": "code_review"}
+            question, context={"mode": "code_review"}
         )
 
         # Display response
-        console.print(Panel(
-            response,
-            title="Victor AI Response",
-            border_style="green"
-        ))
+        console.print(Panel(response, title="Victor AI Response", border_style="green"))

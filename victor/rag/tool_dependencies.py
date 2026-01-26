@@ -156,10 +156,10 @@ def get_rag_tool_graph() -> ToolExecutionGraph:
     if hasattr(RAGToolDependencyProvider, "get_config"):
         config = RAGToolDependencyProvider.get_config()
         # Extract components from config
-        transitions = getattr(config, 'transitions', {})
-        clusters = getattr(config, 'clusters', {})
-        sequences = getattr(config, 'sequences', {})
-        dependencies = getattr(config, 'dependencies', [])
+        transitions = getattr(config, "transitions", {})
+        clusters = getattr(config, "clusters", {})
+        sequences = getattr(config, "sequences", {})
+        dependencies = getattr(config, "dependencies", [])
     else:
         # Empty provider, use defaults
         transitions = {}

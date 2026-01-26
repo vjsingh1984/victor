@@ -145,6 +145,7 @@ class FrameworkStrategy(AgentCreationStrategy):
         # Apply overrides
         from victor.agent.orchestrator import AgentOrchestrator
         from typing import cast
+
         self._apply_overrides(cast(AgentOrchestrator, agent), context)
 
         return cast(AgentOrchestrator, agent)
@@ -157,10 +158,18 @@ class FrameworkStrategy(AgentCreationStrategy):
 
     def _apply_overrides(self, agent: "AgentOrchestrator", context: AgentCreationContext) -> None:
         """Apply budget, iteration, and mode overrides to agent."""
-        if context.tool_budget is not None and hasattr(agent, 'unified_tracker') and agent.unified_tracker is not None:
+        if (
+            context.tool_budget is not None
+            and hasattr(agent, "unified_tracker")
+            and agent.unified_tracker is not None
+        ):
             agent.unified_tracker.set_tool_budget(context.tool_budget, user_override=True)
 
-        if context.max_iterations is not None and hasattr(agent, 'unified_tracker') and agent.unified_tracker is not None:
+        if (
+            context.max_iterations is not None
+            and hasattr(agent, "unified_tracker")
+            and agent.unified_tracker is not None
+        ):
             agent.unified_tracker.set_max_iterations(context.max_iterations, user_override=True)
 
         if context.mode:

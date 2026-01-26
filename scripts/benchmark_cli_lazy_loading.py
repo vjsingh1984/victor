@@ -18,12 +18,7 @@ from pathlib import Path
 def run_command(cmd: list[str]) -> tuple[float, str]:
     """Run a command and return elapsed time and output."""
     start = time.time()
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        check=True
-    )
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     elapsed = time.time() - start
     return elapsed, result.stdout
 
@@ -40,7 +35,7 @@ def benchmark_import_time() -> dict[str, float]:
             [sys.executable, "-c", "from victor.ui.cli import app"],
             capture_output=True,
             text=True,
-            env={**subprocess.os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+            env={**subprocess.os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
         )
         elapsed = time.time() - start
         if result.returncode != 0:
@@ -56,12 +51,7 @@ def benchmark_import_time() -> dict[str, float]:
     min_time = min(times)
     max_time = max(times)
 
-    return {
-        "average": avg,
-        "min": min_time,
-        "max": max_time,
-        "runs": times
-    }
+    return {"average": avg, "min": min_time, "max": max_time, "runs": times}
 
 
 def benchmark_cli_help() -> dict[str, float]:
@@ -71,12 +61,7 @@ def benchmark_cli_help() -> dict[str, float]:
     times = []
     for i in range(3):
         start = time.time()
-        result = subprocess.run(
-            ["victor", "--help"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        result = subprocess.run(["victor", "--help"], capture_output=True, text=True, check=True)
         elapsed = time.time() - start
         times.append(elapsed)
         print(f"Run {i+1}: {elapsed:.3f}s")
@@ -85,12 +70,7 @@ def benchmark_cli_help() -> dict[str, float]:
     min_time = min(times)
     max_time = max(times)
 
-    return {
-        "average": avg,
-        "min": min_time,
-        "max": max_time,
-        "runs": times
-    }
+    return {"average": avg, "min": min_time, "max": max_time, "runs": times}
 
 
 def benchmark_command_help() -> dict[str, float]:
@@ -111,10 +91,7 @@ def benchmark_command_help() -> dict[str, float]:
         for i in range(3):
             start = time.time()
             result = subprocess.run(
-                ["victor", cmd, "--help"],
-                capture_output=True,
-                text=True,
-                check=True
+                ["victor", cmd, "--help"], capture_output=True, text=True, check=True
             )
             elapsed = time.time() - start
             times.append(elapsed)
@@ -144,8 +121,8 @@ def print_comparison(import_time: dict, cli_help_time: dict):
 
     print("\n✅ Success Criteria:")
     criteria = [
-        ("Import time < 0.5s", import_time['average'] < 0.5),
-        ("CLI --help < 2.0s", cli_help_time['average'] < 2.0),
+        ("Import time < 0.5s", import_time["average"] < 0.5),
+        ("CLI --help < 2.0s", cli_help_time["average"] < 2.0),
         ("All commands functional", True),  # Assume True if we got here
     ]
 

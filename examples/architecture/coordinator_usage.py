@@ -46,9 +46,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s: %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -501,11 +499,14 @@ class SimpleOrchestrator:
         self.cache.set(cache_key, result, ttl=60)
 
         # Record analytics
-        self.analytics.record_event("task_completed", {
-            "task": task,
-            "tools": selected_tools,
-            "duration": result["execution_time"],
-        })
+        self.analytics.record_event(
+            "task_completed",
+            {
+                "task": task,
+                "tools": selected_tools,
+                "duration": result["execution_time"],
+            },
+        )
         self.analytics.record_metric("task.duration", result["execution_time"])
 
         return result

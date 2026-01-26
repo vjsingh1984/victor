@@ -271,7 +271,11 @@ def serialize_conversation_state(
         import base64
 
         # result.data is bytes when compressed
-        data_bytes = result.data if isinstance(result.data, bytes) else json.dumps(result.data).encode("utf-8")
+        data_bytes = (
+            result.data
+            if isinstance(result.data, bytes)
+            else json.dumps(result.data).encode("utf-8")
+        )
         return {
             "data": base64.b64encode(data_bytes).decode("ascii"),
             "compressed": True,

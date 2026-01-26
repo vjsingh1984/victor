@@ -9,15 +9,15 @@ def process_data(data_list, user_input):
     for item in data_list:
         if item is not None:
             if isinstance(item, dict):
-                if 'value' in item:
-                    if item['value'] > 0:
-                        if item['value'] < 100:
-                            for i in range(item['value']):
+                if "value" in item:
+                    if item["value"] > 0:
+                        if item["value"] < 100:
+                            for i in range(item["value"]):
                                 if i % 2 == 0:
                                     results.append(i * 2)
                                 else:
                                     results.append(i)
-                    elif item['value'] == 0:
+                    elif item["value"] == 0:
                         results.append(0)
             elif isinstance(item, list):
                 for sub_item in item:
@@ -49,6 +49,7 @@ class DataProcessor:
 # Hardcoded secret (security issue)
 API_KEY = "sk-1234567890abcdef"
 DATABASE_URL = "postgres://user:password@localhost/db"
+
 
 # SQL injection vulnerability
 def get_user(user_id):

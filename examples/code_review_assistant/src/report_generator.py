@@ -128,8 +128,7 @@ class ReportGenerator:
 
         template = Template(html_template)
         html = template.render(
-            results=results,
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            results=results, timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         )
 
         with open(output_path, "w") as f:

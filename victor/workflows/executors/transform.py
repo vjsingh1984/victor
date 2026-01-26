@@ -72,6 +72,7 @@ class TransformNodeExecutor:
         @dataclass
         class GraphNodeResult:
             """Result from a graph node execution."""
+
             node_id: str
             status: str
             result: Optional[Dict[str, Any]] = None
@@ -116,14 +117,16 @@ class TransformNodeExecutor:
             if "_node_results" not in state_dict:
                 state_dict["_node_results"] = {}
 
-            state_dict["_node_results"][node.id] = dataclasses.asdict(GraphNodeResult(
-                node_id=node.id,
-                status="failed",
-                error=str(e),
-                metadata={
-                    "duration_seconds": time.time() - start_time,
-                },
-            ))
+            state_dict["_node_results"][node.id] = dataclasses.asdict(
+                GraphNodeResult(
+                    node_id=node.id,
+                    status="failed",
+                    error=str(e),
+                    metadata={
+                        "duration_seconds": time.time() - start_time,
+                    },
+                )
+            )
 
             raise
 

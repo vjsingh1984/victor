@@ -82,7 +82,9 @@ class RAGEnrichmentConfig:
 
     use_entity_resolution: bool = True
     use_llm_enhancement: bool = True  # Enabled by default for RAG vertical
-    enhancement_techniques: Optional[List[str]] = None  # ["rewrite", "decomposition", "entity_expand"]
+    enhancement_techniques: Optional[List[str]] = (
+        None  # ["rewrite", "decomposition", "entity_expand"]
+    )
     include_metadata: bool = True
     context_window_chars: int = 4000
     prioritize_recent: bool = True

@@ -628,15 +628,13 @@ def pytest_runtest_makereport(item, call):
         exc_value = call.excinfo.value
 
         # Check for pytest-timeout's timeout error
-        is_timeout = (
-            "Timeout" in str(exc_type.__name__)
-            or "timeout" in str(exc_value).lower()
-        )
+        is_timeout = "Timeout" in str(exc_type.__name__) or "timeout" in str(exc_value).lower()
 
         # Only skip timeouts in CI environment
-        in_ci = os.environ.get("CI", "").lower() == "true" or os.environ.get(
-            "GITHUB_ACTIONS", ""
-        ).lower() == "true"
+        in_ci = (
+            os.environ.get("CI", "").lower() == "true"
+            or os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
+        )
 
         if is_timeout and in_ci:
             # Mark as skipped instead of failed

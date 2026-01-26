@@ -309,6 +309,7 @@ class YAMLWorkflowCoordinator:
 
                 # Create WorkflowExecutionResult with proper type
                 from victor.framework.workflow_engine import WorkflowExecutionResult as WER
+
                 exec_result: WER = WorkflowExecutionResult(
                     success=success,
                     final_state=final_state,
@@ -341,7 +342,11 @@ class YAMLWorkflowCoordinator:
                 # Convert WorkflowResult to WorkflowExecutionResult
                 return WorkflowExecutionResult(
                     success=workflow_result.success,
-                    final_state=workflow_result.context.get_outputs() if hasattr(workflow_result.context, "get_outputs") else {},
+                    final_state=(
+                        workflow_result.context.get_outputs()
+                        if hasattr(workflow_result.context, "get_outputs")
+                        else {}
+                    ),
                     nodes_executed=[],
                     duration_seconds=duration,
                     error=workflow_result.error if not workflow_result.success else None,
@@ -422,7 +427,11 @@ class YAMLWorkflowCoordinator:
 
                 # Create stream context
                 stream_context = WorkflowStreamContext(
-                    workflow_id=workflow_def.id if hasattr(workflow_def, "id") else str(hash(workflow_def.name)),
+                    workflow_id=(
+                        workflow_def.id
+                        if hasattr(workflow_def, "id")
+                        else str(hash(workflow_def.name))
+                    ),
                     workflow_name=workflow_def.name,
                 )
 

@@ -119,9 +119,7 @@ def example_compare_results():
             {
                 "name": "Cold Start",
                 "category": "startup",
-                "metrics": [
-                    {"name": "startup_time", "value": 8000.0, "unit": "ms"}
-                ],
+                "metrics": [{"name": "startup_time", "value": 8000.0, "unit": "ms"}],
             }
         ],
     }
@@ -133,9 +131,7 @@ def example_compare_results():
             {
                 "name": "Cold Start",
                 "category": "startup",
-                "metrics": [
-                    {"name": "startup_time", "value": 150.0, "unit": "ms"}
-                ],
+                "metrics": [{"name": "startup_time", "value": 150.0, "unit": "ms"}],
             }
         ],
     }

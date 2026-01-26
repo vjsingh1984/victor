@@ -85,6 +85,7 @@ def setup_prometheus_rules(
         print_step("Dry Run", f"Would copy {source_path} → {target_path}")
     else:
         import shutil
+
         shutil.copy(source_path, target_path)
         print_step("✓ Success", f"Copied to {target_path}")
 
@@ -185,7 +186,7 @@ def setup_logging_config(
     # Show example configuration
     print_step("Example", "Add this to your application:")
 
-    example_code = '''
+    example_code = """
 from victor.observability.coordinator_logging import (
     setup_coordinator_logging,
     get_coordinator_logger,
@@ -201,7 +202,7 @@ setup_coordinator_logging(
 # Get logger
 logger = get_coordinator_logger("ChatCoordinator")
 logger.info("Coordinator started", extra={"coordinator": "ChatCoordinator"})
-'''
+"""
     print(example_code)
 
     return True
@@ -220,7 +221,7 @@ def setup_health_checks(
     # Show example configuration
     print_step("Example", "Add this to your FastAPI application:")
 
-    example_code = '''
+    example_code = """
 from fastapi import FastAPI
 from victor.observability.health import setup_health_endpoints
 
@@ -234,7 +235,7 @@ setup_health_endpoints(app)
 # GET /health/ready - Readiness probe
 # GET /health/live - Liveness probe
 # GET /health/detailed - Comprehensive health
-'''
+"""
     print(example_code)
 
     return True
@@ -253,7 +254,7 @@ def setup_prometheus_exporter(
     # Show example configuration
     print_step("Example", "Add this to your FastAPI application:")
 
-    example_code = '''
+    example_code = """
 from fastapi import FastAPI
 from victor.observability import get_prometheus_exporter
 
@@ -266,17 +267,17 @@ exporter = get_prometheus_exporter()
 app.add_route("/metrics", exporter.get_endpoint())
 
 # Metrics available at http://localhost:8000/metrics
-'''
+"""
     print(example_code)
 
     print_step("Standalone Server", "Or run standalone metrics server:")
 
-    standalone_code = '''
+    standalone_code = """
 from victor.observability import get_prometheus_exporter
 
 exporter = get_prometheus_exporter()
 exporter.start_server(port=9090)
-'''
+"""
     print(standalone_code)
 
     return True
@@ -286,7 +287,7 @@ def generate_docker_compose(dry_run: bool = False) -> bool:
     """Generate docker-compose configuration."""
     print_section("Generating Docker Compose Configuration")
 
-    compose_content = '''version: '3.8'
+    compose_content = """version: '3.8'
 
 services:
   victor-coordinators:
@@ -325,7 +326,7 @@ services:
 
 volumes:
   grafana-storage:
-'''
+"""
 
     output_path = Path("docker-compose.monitoring.yml")
 

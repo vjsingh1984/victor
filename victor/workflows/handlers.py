@@ -53,7 +53,9 @@ if TYPE_CHECKING:
     from victor.workflows.definition import ComputeNode
     from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
 
-    ComputeHandlerType = Callable[[ComputeNode, WorkflowContext, ToolRegistry], Coroutine[Any, Any, NodeResult]]
+    ComputeHandlerType = Callable[
+        [ComputeNode, WorkflowContext, ToolRegistry], Coroutine[Any, Any, NodeResult]
+    ]
 else:
     ComputeHandlerType = Any
 
@@ -940,6 +942,7 @@ class ConditionalBranchHandler:
         - Boolean: and, or, not
         - Context variables: ${var_name} or just var_name
         """
+
         # Replace context variables
         def replace_var(match: Any) -> str:
             var_name = match.group(1)

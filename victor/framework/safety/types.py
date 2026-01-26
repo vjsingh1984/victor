@@ -158,9 +158,7 @@ class SafetyPattern:
     message: str
     domains: List[str] = field(default_factory=lambda: ["all"])
     action: Action = field(default=Action.BLOCK)
-    _compiled_pattern: Optional[re.Pattern[str]] = field(
-        default=None, repr=False, compare=False
-    )
+    _compiled_pattern: Optional[re.Pattern[str]] = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         """Compile the regex pattern after initialization."""

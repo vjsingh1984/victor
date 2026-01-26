@@ -472,7 +472,7 @@ class FallbackParsingMixin:
                     brace_count -= 1
                     if brace_count == 0 and start_pos >= 0:
                         # Found a complete JSON object
-                        json_obj = content[start_pos:i+1]
+                        json_obj = content[start_pos : i + 1]
                         json_objects.append(json_obj)
                         start_pos = -1
 

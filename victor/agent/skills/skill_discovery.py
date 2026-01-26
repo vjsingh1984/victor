@@ -672,14 +672,19 @@ class SkillDiscoveryEngine:
                 if isinstance(result, list):
                     # result is List[ToolDefinition]
                     from victor.tools.tool import ToolDefinition
+
                     tool_map = {t.name: t for t in available_tools}
                     matched_tools = [
-                        tool_map[td.name] for td in result if isinstance(td, ToolDefinition) and td.name in tool_map
+                        tool_map[td.name]
+                        for td in result
+                        if isinstance(td, ToolDefinition) and td.name in tool_map
                     ]
                 else:
                     # result is ToolSelectionResult
                     tool_map = {t.name: t for t in available_tools}
-                    matched_tools = [tool_map[name] for name in result.tool_names if name in tool_map]
+                    matched_tools = [
+                        tool_map[name] for name in result.tool_names if name in tool_map
+                    ]
 
                 logger.info(f"Matched {len(matched_tools)} tools using selector")
                 return matched_tools

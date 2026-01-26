@@ -259,9 +259,7 @@ class SafetyPatternRegistry:
         """
         with self._op_lock:
             return [
-                name
-                for name, pattern in self._patterns.items()
-                if pattern.severity == severity
+                name for name, pattern in self._patterns.items() if pattern.severity == severity
             ]
 
     def list_by_domain(self, domain: str) -> List[str]:

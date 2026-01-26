@@ -14,6 +14,7 @@ from victor.coding.review import CodeReviewer
 @dataclass
 class Issue:
     """Represents a code issue found during review."""
+
     file: str
     line: int
     column: int
@@ -27,6 +28,7 @@ class Issue:
 @dataclass
 class ReviewResult:
     """Results from a code review."""
+
     files_analyzed: int
     total_issues: int
     issues_by_severity: Dict[str, int]
@@ -159,15 +161,17 @@ class ReviewEngine:
 
         except Exception as e:
             # Add error as an issue
-            issues.append(Issue(
-                file=str(file_path),
-                line=0,
-                column=0,
-                severity="low",
-                category="error",
-                message=f"Failed to analyze file: {str(e)}",
-                confidence=1.0
-            ))
+            issues.append(
+                Issue(
+                    file=str(file_path),
+                    line=0,
+                    column=0,
+                    severity="low",
+                    category="error",
+                    message=f"Failed to analyze file: {str(e)}",
+                    confidence=1.0,
+                )
+            )
 
         return issues
 
@@ -177,21 +181,22 @@ class ReviewEngine:
 
         # Use Victor AI's code reviewer for security analysis
         security_result = await self.code_reviewer.security_scan(
-            file_path=str(file_path),
-            content=content
+            file_path=str(file_path), content=content
         )
 
         for finding in security_result.findings:
-            issues.append(Issue(
-                file=str(file_path),
-                line=finding.line,
-                column=finding.column,
-                severity=finding.severity,
-                category="security",
-                message=finding.message,
-                suggestion=finding.suggestion,
-                confidence=finding.confidence
-            ))
+            issues.append(
+                Issue(
+                    file=str(file_path),
+                    line=finding.line,
+                    column=finding.column,
+                    severity=finding.severity,
+                    category="security",
+                    message=finding.message,
+                    suggestion=finding.suggestion,
+                    confidence=finding.confidence,
+                )
+            )
 
         return issues
 
@@ -205,29 +210,33 @@ class ReviewEngine:
         for i, line in enumerate(lines, 1):
             # Check line length
             if len(line) > max_line_length:
-                issues.append(Issue(
-                    file=str(file_path),
-                    line=i,
-                    column=max_line_length,
-                    severity="low",
-                    category="style",
-                    message=f"Line too long ({len(line)} > {max_line_length} characters)",
-                    suggestion=f"Break line into multiple lines",
-                    confidence=1.0
-                ))
+                issues.append(
+                    Issue(
+                        file=str(file_path),
+                        line=i,
+                        column=max_line_length,
+                        severity="low",
+                        category="style",
+                        message=f"Line too long ({len(line)} > {max_line_length} characters)",
+                        suggestion=f"Break line into multiple lines",
+                        confidence=1.0,
+                    )
+                )
 
             # Check for trailing whitespace
             if line.rstrip() != line:
-                issues.append(Issue(
-                    file=str(file_path),
-                    line=i,
-                    column=len(line),
-                    severity="low",
-                    category="style",
-                    message="Trailing whitespace",
-                    suggestion="Remove trailing whitespace",
-                    confidence=1.0
-                ))
+                issues.append(
+                    Issue(
+                        file=str(file_path),
+                        line=i,
+                        column=len(line),
+                        severity="low",
+                        category="style",
+                        message="Trailing whitespace",
+                        suggestion="Remove trailing whitespace",
+                        confidence=1.0,
+                    )
+                )
 
         return issues
 
@@ -237,8 +246,7 @@ class ReviewEngine:
 
         # Use Victor AI's complexity analyzer
         complexity_result = await self.code_reviewer.complexity_analysis(
-            file_path=str(file_path),
-            ast=ast
+            file_path=str(file_path), ast=ast
         )
 
         max_complexity = self.config.max_complexity
@@ -248,16 +256,18 @@ class ReviewEngine:
                 # Find function line number from AST
                 line = complexity_result.function_lines.get(func_name, 0)
 
-                issues.append(Issue(
-                    file=str(file_path),
-                    line=line,
-                    column=0,
-                    severity="medium",
-                    category="complexity",
-                    message=f"Function '{func_name}' has complexity {complexity} (threshold: {max_complexity})",
-                    suggestion="Consider refactoring into smaller functions",
-                    confidence=1.0
-                ))
+                issues.append(
+                    Issue(
+                        file=str(file_path),
+                        line=line,
+                        column=0,
+                        severity="medium",
+                        category="complexity",
+                        message=f"Function '{func_name}' has complexity {complexity} (threshold: {max_complexity})",
+                        suggestion="Consider refactoring into smaller functions",
+                        confidence=1.0,
+                    )
+                )
 
         return issues
 
@@ -267,22 +277,22 @@ class ReviewEngine:
 
         # Use Victor AI for quality assessment
         quality_result = await self.code_reviewer.quality_check(
-            file_path=str(file_path),
-            content=content,
-            ast=ast
+            file_path=str(file_path), content=content, ast=ast
         )
 
         for issue in quality_result.issues:
-            issues.append(Issue(
-                file=str(file_path),
-                line=issue.line,
-                column=issue.column,
-                severity=issue.severity,
-                category="quality",
-                message=issue.message,
-                suggestion=issue.suggestion,
-                confidence=issue.confidence
-            ))
+            issues.append(
+                Issue(
+                    file=str(file_path),
+                    line=issue.line,
+                    column=issue.column,
+                    severity=issue.severity,
+                    category="quality",
+                    message=issue.message,
+                    suggestion=issue.suggestion,
+                    confidence=issue.confidence,
+                )
+            )
 
         return issues
 
@@ -313,8 +323,7 @@ class ReviewEngine:
         # Sort issues by severity and confidence
         severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
         sorted_issues = sorted(
-            issues,
-            key=lambda i: (severity_order.get(i.severity, 4), -i.confidence)
+            issues, key=lambda i: (severity_order.get(i.severity, 4), -i.confidence)
         )
 
         # Convert issues to dicts for output

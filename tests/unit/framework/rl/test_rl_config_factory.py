@@ -48,7 +48,9 @@ class TestRLConfigFactory:
         # Coding has additional learners
         assert LearnerType.TOOL_SELECTOR in config.active_learners
         # Should have coding-specific task mappings
-        assert "debugging" in config.task_type_mappings or "refactoring" in config.task_type_mappings
+        assert (
+            "debugging" in config.task_type_mappings or "refactoring" in config.task_type_mappings
+        )
 
     def test_create_devops_config(self):
         """Test creating devops vertical config."""
@@ -59,7 +61,10 @@ class TestRLConfigFactory:
         assert config is not None
         assert isinstance(config, BaseRLConfig)
         # DevOps should have deployment-related mappings
-        assert "deployment" in config.task_type_mappings or "containerization" in config.task_type_mappings
+        assert (
+            "deployment" in config.task_type_mappings
+            or "containerization" in config.task_type_mappings
+        )
 
     def test_create_rag_config(self):
         """Test creating RAG vertical config."""
@@ -124,17 +129,10 @@ class TestRLConfigFactory:
             "verticals": {
                 "test_vertical": {
                     "active_learners": ["tool_selector", "continuation_patience"],
-                    "task_type_mappings": {
-                        "custom_task": ["read", "write"]
-                    },
-                    "quality_thresholds": {
-                        "custom_task": 0.85
-                    },
-                    "default_patience": {
-                        "anthropic": 5,
-                        "openai": 4
-                    },
-                    "exploration_bonus": 0.2
+                    "task_type_mappings": {"custom_task": ["read", "write"]},
+                    "quality_thresholds": {"custom_task": 0.85},
+                    "default_patience": {"anthropic": 5, "openai": 4},
+                    "exploration_bonus": 0.2,
                 }
             }
         }

@@ -54,7 +54,7 @@ def render_template(user_input):
 # Path traversal vulnerability
 def read_file(filename):
     """No path validation."""
-    with open(filename, 'r') as f:
+    with open(filename, "r") as f:
         return f.read()
 
 

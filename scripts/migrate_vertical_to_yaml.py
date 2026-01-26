@@ -11,15 +11,15 @@ Usage:
 
 Example Output:
     Analyzing ResearchAssistant...
-    
+
     Methods Found:
     - get_tools() -> tools.list
     - get_system_prompt() -> core.system_prompt
     - get_stages() -> core.stages
     - get_middleware() -> extensions.middleware
-    
+
     Generated YAML: victor/research/config/vertical.yaml
-    
+
     Migration Report:
     - Lines before: 317 (assistant.py)
     - Lines after: 30 (assistant.py + YAML)
@@ -125,7 +125,9 @@ class VerticalAnalyzer:
                 if tools:
                     analysis["tools"] = tools
 
-    def _extract_system_prompt(self, method_node: ast.FunctionDef, analysis: Dict[str, Any]) -> None:
+    def _extract_system_prompt(
+        self, method_node: ast.FunctionDef, analysis: Dict[str, Any]
+    ) -> None:
         """Extract system prompt from get_system_prompt method."""
         for stmt in ast.walk(method_node):
             if isinstance(stmt, ast.Return):
@@ -255,11 +257,17 @@ class YAMLGenerator:
         lines.append("")
 
         # Metadata
-        lines.append("# =============================================================================")
+        lines.append(
+            "# ============================================================================="
+        )
         lines.append("# Metadata")
-        lines.append("# =============================================================================")
+        lines.append(
+            "# ============================================================================="
+        )
         lines.append("metadata:")
-        lines.append(f"  name: {self.analysis['metadata'].get('name', self.analysis['vertical_name'])}")
+        lines.append(
+            f"  name: {self.analysis['metadata'].get('name', self.analysis['vertical_name'])}"
+        )
         if "version" in self.analysis["metadata"]:
             lines.append(f"  version: \"{self.analysis['metadata']['version']}\"")
         if "description" in self.analysis["metadata"]:
@@ -267,9 +275,13 @@ class YAMLGenerator:
         lines.append("")
 
         # Core configuration
-        lines.append("# =============================================================================")
+        lines.append(
+            "# ============================================================================="
+        )
         lines.append("# Core Configuration")
-        lines.append("# =============================================================================")
+        lines.append(
+            "# ============================================================================="
+        )
         lines.append("core:")
 
         # Tools
@@ -306,9 +318,13 @@ class YAMLGenerator:
 
         # Extensions
         if self.analysis["extensions"] or self.analysis["middleware"]:
-            lines.append("# =============================================================================")
+            lines.append(
+                "# ============================================================================="
+            )
             lines.append("# Extensions")
-            lines.append("# =============================================================================")
+            lines.append(
+                "# ============================================================================="
+            )
             lines.append("extensions:")
 
             if self.analysis["middleware"]:

@@ -205,9 +205,7 @@ class TestRegistryIntegration:
         register_vertical_patterns("devops", registry=fresh_registry)
 
         # Test various devops commands
-        violations = fresh_registry.scan(
-            "kubectl delete namespace production", domain="devops"
-        )
+        violations = fresh_registry.scan("kubectl delete namespace production", domain="devops")
         assert len(violations) > 0
 
         violations = fresh_registry.scan("terraform destroy", domain="devops")

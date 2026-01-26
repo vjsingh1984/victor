@@ -119,21 +119,25 @@ def validate_files(
         }
 
         for issue in result.errors:
-            file_result["errors"].append({
-                "line": issue.line,
-                "column": issue.column,
-                "message": issue.message,
-                "source": issue.source,
-            })
+            file_result["errors"].append(
+                {
+                    "line": issue.line,
+                    "column": issue.column,
+                    "message": issue.message,
+                    "source": issue.source,
+                }
+            )
             total_errors += 1
 
         for warning in result.warnings:
-            file_result["warnings"].append({
-                "line": warning.line,
-                "column": warning.column,
-                "message": warning.message,
-                "source": warning.source,
-            })
+            file_result["warnings"].append(
+                {
+                    "line": warning.line,
+                    "column": warning.column,
+                    "message": warning.message,
+                    "source": warning.source,
+                }
+            )
             total_warnings += 1
 
         results.append(file_result)
@@ -144,6 +148,7 @@ def validate_files(
     # Output results
     if json_output:
         import json
+
         output = {
             "results": results,
             "summary": {
@@ -152,7 +157,7 @@ def validate_files(
                 "invalid_files": sum(1 for r in results if not r["valid"]),
                 "total_errors": total_errors,
                 "total_warnings": total_warnings,
-            }
+            },
         }
         console.print(json.dumps(output, indent=2))
     else:
@@ -196,18 +201,18 @@ def _print_results(
             console.print(f"[red]✗[/red] {file_path}")
 
             for error in errors:
-                line_info = f":{error['line']}" if error['line'] else ""
-                col_info = f":{error['column']}" if error['column'] else ""
-                source_info = f" [{error['source']}]" if verbose and error['source'] else ""
+                line_info = f":{error['line']}" if error["line"] else ""
+                col_info = f":{error['column']}" if error["column"] else ""
+                source_info = f" [{error['source']}]" if verbose and error["source"] else ""
                 console.print(
                     f"  [red]error{line_info}{col_info}:[/red] {error['message']}{source_info}"
                 )
 
         if show_warnings and warnings:
             for warning in warnings:
-                line_info = f":{warning['line']}" if warning['line'] else ""
-                col_info = f":{warning['column']}" if warning['column'] else ""
-                source_info = f" [{warning['source']}]" if verbose and warning['source'] else ""
+                line_info = f":{warning['line']}" if warning["line"] else ""
+                col_info = f":{warning['column']}" if warning["column"] else ""
+                source_info = f" [{warning['source']}]" if verbose and warning["source"] else ""
                 console.print(
                     f"  [yellow]warning{line_info}{col_info}:[/yellow] {warning['message']}{source_info}"
                 )

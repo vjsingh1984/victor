@@ -228,7 +228,9 @@ class UnifiedTaskProgress:
     signature_history: deque[str] = field(default_factory=lambda: deque(maxlen=10))
     base_resource_counts: Counter[str] = field(default_factory=Counter)
     loop_warning_given: bool = False
-    permanently_blocked: Set[str] = field(default_factory=set)  # Signatures that are permanently blocked
+    permanently_blocked: Set[str] = field(
+        default_factory=set
+    )  # Signatures that are permanently blocked
     warned_signature: Optional[str] = None
     consecutive_research_calls: int = 0
 
@@ -499,9 +501,7 @@ class UnifiedTaskConfigLoader:
                 }
 
                 # Populate task types, using tool_budget from DEFAULT_TOOL_BUDGETS
-                for task_type, default_template in default_config.get(
-                    "task_types", {}
-                ).items():
+                for task_type, default_template in default_config.get("task_types", {}).items():
                     yaml_config = task_config.get("task_types", {}).get(task_type, {})
 
                     # Start with default template

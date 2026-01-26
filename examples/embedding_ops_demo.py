@@ -206,9 +206,7 @@ def demo_semantic_search():
 
     # Search
     start = time.perf_counter()
-    similarities = accelerator.batch_cosine_similarity(
-        query_embedding, corpus_embeddings
-    )
+    similarities = accelerator.batch_cosine_similarity(query_embedding, corpus_embeddings)
     top_k = accelerator.topk_indices(similarities, k=3)
     duration = (time.perf_counter() - start) * 1000
 
@@ -245,7 +243,9 @@ def benchmark_rust_vs_numpy(dim: int = 384, num_runs: int = 100):
 
     # Benchmark Rust implementation
     rust_accelerator = EmbeddingOpsAccelerator(force_numpy=False)
-    logger.info(f"Rust Implementation: {'Available' if rust_accelerator.is_rust_available else 'Unavailable'}")
+    logger.info(
+        f"Rust Implementation: {'Available' if rust_accelerator.is_rust_available else 'Unavailable'}"
+    )
 
     if rust_accelerator.is_using_rust:
         times_rust = []
@@ -350,9 +350,7 @@ def demo_cache_effectiveness():
 
 def main():
     """Main demo entry point."""
-    parser = argparse.ArgumentParser(
-        description="Embedding Operations Accelerator Demo"
-    )
+    parser = argparse.ArgumentParser(description="Embedding Operations Accelerator Demo")
     parser.add_argument(
         "--benchmark",
         action="store_true",

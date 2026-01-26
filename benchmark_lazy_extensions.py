@@ -24,12 +24,14 @@ def benchmark_eager_loading():
     # Test 1: Import core verticals module
     start = time.time()
     from victor.core.verticals import VerticalRegistry, list_verticals
+
     times["Import victor.core.verticals"] = time.time() - start
     print(f"✓ Import victor.core.verticals: {times['Import victor.core.verticals']:.3f}s")
 
     # Test 2: Import coding vertical
     start = time.time()
     from victor.coding import CodingAssistant
+
     times["Import coding vertical"] = time.time() - start
     print(f"✓ Import coding vertical: {times['Import coding vertical']:.3f}s")
 
@@ -76,12 +78,14 @@ def benchmark_lazy_loading():
     # Test 1: Import core verticals module
     start = time.time()
     from victor.core.verticals import VerticalRegistry, list_verticals
+
     times["Import victor.core.verticals"] = time.time() - start
     print(f"✓ Import victor.core.verticals: {times['Import victor.core.verticals']:.3f}s")
 
     # Test 2: Import coding vertical
     start = time.time()
     from victor.coding import CodingAssistant
+
     times["Import coding vertical"] = time.time() - start
     print(f"✓ Import coding vertical: {times['Import coding vertical']:.3f}s")
 
@@ -135,7 +139,9 @@ def print_comparison(eager_times, lazy_times, total_eager, total_lazy):
             print(f"{op:<40} {eager_time:>10.3f}s {lazy_time:>10.3f}s {speedup:>+10.1f}%")
 
     print("-" * 76)
-    print(f"{'TOTAL':<40} {total_eager:>10.3f}s {total_lazy:>10.3f}s {((total_eager - total_lazy) / total_eager * 100):>+10.1f}%")
+    print(
+        f"{'TOTAL':<40} {total_eager:>10.3f}s {total_lazy:>10.3f}s {((total_eager - total_lazy) / total_eager * 100):>+10.1f}%"
+    )
     print("=" * 60)
 
     # Calculate improvement

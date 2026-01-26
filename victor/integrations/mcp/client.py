@@ -442,9 +442,10 @@ class MCPClient:
             await loop.run_in_executor(
                 None,
                 lambda: (
-                    self.process.stdin.write(request_json + "\n"),
-                    self.process.stdin.flush()
-                ) if self.process and self.process.stdin else None,
+                    (self.process.stdin.write(request_json + "\n"), self.process.stdin.flush())
+                    if self.process and self.process.stdin
+                    else None
+                ),
             )
 
             # Read response with timeout to avoid indefinite blocking

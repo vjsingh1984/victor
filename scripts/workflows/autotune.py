@@ -414,7 +414,9 @@ async def cmd_apply(args):
             save_config(backup_path, workflow_config)
             print(f"\nBackup saved to: {backup_path}")
 
-            updated_config = autotuner._apply_optimization_to_config(workflow_config, suggestions[0])
+            updated_config = autotuner._apply_optimization_to_config(
+                workflow_config, suggestions[0]
+            )
             save_config(config_path, updated_config)
             print(f"Updated config saved to: {config_path}")
 
@@ -511,8 +513,10 @@ async def cmd_validate(args):
     baseline_metrics = {"duration_seconds": 45.0, "success_rate": 0.95}
     optimized_metrics = {"duration_seconds": 38.0, "success_rate": 0.97}
 
-    improvement = ((baseline_metrics["duration_seconds"] - optimized_metrics["duration_seconds"])
-                   / baseline_metrics["duration_seconds"]) * 100
+    improvement = (
+        (baseline_metrics["duration_seconds"] - optimized_metrics["duration_seconds"])
+        / baseline_metrics["duration_seconds"]
+    ) * 100
 
     print(f"\nBaseline:   {baseline_metrics['duration_seconds']:.2f}s")
     print(f"Optimized:  {optimized_metrics['duration_seconds']:.2f}s")
@@ -562,13 +566,9 @@ def main():
     apply_parser.add_argument("--team-id", required=True, help="Team ID")
     apply_parser.add_argument("--config", "-c", help="Path to workflow config file")
     apply_parser.add_argument("--metrics", help="Path to metrics JSON file")
-    apply_parser.add_argument(
-        "--interactive", "-i", action="store_true", help="Interactive mode"
-    )
+    apply_parser.add_argument("--interactive", "-i", action="store_true", help="Interactive mode")
     apply_parser.add_argument("--auto", action="store_true", help="Apply all automatically")
-    apply_parser.add_argument(
-        "--dry-run", action="store_true", help="Simulate without applying"
-    )
+    apply_parser.add_argument("--dry-run", action="store_true", help="Simulate without applying")
     apply_parser.add_argument(
         "--no-ab-test", action="store_false", dest="ab_test", help="Skip A/B testing"
     )
@@ -588,9 +588,7 @@ def main():
     # Validate command
     validate_parser = subparsers.add_parser("validate", help="A/B test optimizations")
     validate_parser.add_argument("--team-id", required=True, help="Team ID")
-    validate_parser.add_argument(
-        "--runs", type=int, default=10, help="Number of validation runs"
-    )
+    validate_parser.add_argument("--runs", type=int, default=10, help="Number of validation runs")
 
     args = parser.parse_args()
 

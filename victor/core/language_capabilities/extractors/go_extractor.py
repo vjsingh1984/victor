@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 # Check if gopygo is available
 try:
     import gopygo
+
     GOPYGO_AVAILABLE = True
 except ImportError:
     GOPYGO_AVAILABLE = False
@@ -112,28 +113,32 @@ class GoExtractor(BaseLanguageProcessor):
             tree = gopygo.parse(code)
 
             # Extract package declaration
-            if hasattr(tree, 'package') and tree.package:
-                symbols.append(ExtractedSymbol(
-                    name=tree.package.name,
-                    symbol_type="package",
-                    file_path=str(file_path),
-                    line_number=1,
-                ))
+            if hasattr(tree, "package") and tree.package:
+                symbols.append(
+                    ExtractedSymbol(
+                        name=tree.package.name,
+                        symbol_type="package",
+                        file_path=str(file_path),
+                        line_number=1,
+                    )
+                )
 
             # Extract imports
-            if hasattr(tree, 'imports'):
+            if hasattr(tree, "imports"):
                 for imp in tree.imports:
-                    name = getattr(imp, 'path', str(imp))
-                    line = getattr(imp, 'line', 1)
-                    symbols.append(ExtractedSymbol(
-                        name=name,
-                        symbol_type="import",
-                        file_path=str(file_path),
-                        line_number=line,
-                    ))
+                    name = getattr(imp, "path", str(imp))
+                    line = getattr(imp, "line", 1)
+                    symbols.append(
+                        ExtractedSymbol(
+                            name=name,
+                            symbol_type="import",
+                            file_path=str(file_path),
+                            line_number=line,
+                        )
+                    )
 
             # Extract type declarations (struct, interface)
-            if hasattr(tree, 'decls'):
+            if hasattr(tree, "decls"):
                 for decl in tree.decls:
                     self._extract_decl(decl, file_path, symbols)
 
@@ -152,62 +157,68 @@ class GoExtractor(BaseLanguageProcessor):
         decl_type = type(decl).__name__
 
         # Handle function declarations
-        if decl_type == 'FuncDecl':
-            name = getattr(decl, 'name', None)
+        if decl_type == "FuncDecl":
+            name = getattr(decl, "name", None)
             if name:
-                line = getattr(decl, 'line', 1)
+                line = getattr(decl, "line", 1)
                 # Check if it's a method (has receiver)
-                recv = getattr(decl, 'recv', None)
+                recv = getattr(decl, "recv", None)
                 symbol_type = "method" if recv else "function"
 
-                symbols.append(ExtractedSymbol(
-                    name=name,
-                    symbol_type=symbol_type,
-                    file_path=str(file_path),
-                    line_number=line,
-                ))
+                symbols.append(
+                    ExtractedSymbol(
+                        name=name,
+                        symbol_type=symbol_type,
+                        file_path=str(file_path),
+                        line_number=line,
+                    )
+                )
 
         # Handle type declarations
-        elif decl_type == 'GenDecl':
-            specs = getattr(decl, 'specs', [])
+        elif decl_type == "GenDecl":
+            specs = getattr(decl, "specs", [])
             for spec in specs:
                 spec_type = type(spec).__name__
 
-                if spec_type == 'TypeSpec':
-                    name = getattr(spec, 'name', None)
+                if spec_type == "TypeSpec":
+                    name = getattr(spec, "name", None)
                     if name:
-                        line = getattr(spec, 'line', 1)
-                        type_def = getattr(spec, 'type', None)
+                        line = getattr(spec, "line", 1)
+                        type_def = getattr(spec, "type", None)
                         type_def_name = type(type_def).__name__ if type_def else "type"
 
                         # Determine symbol type
-                        if type_def_name == 'StructType':
+                        if type_def_name == "StructType":
                             symbol_type = "struct"
-                        elif type_def_name == 'InterfaceType':
+                        elif type_def_name == "InterfaceType":
                             symbol_type = "interface"
                         else:
                             symbol_type = "type"
 
-                        symbols.append(ExtractedSymbol(
-                            name=name,
-                            symbol_type=symbol_type,
-                            file_path=str(file_path),
-                            line_number=line,
-                        ))
+                        symbols.append(
+                            ExtractedSymbol(
+                                name=name,
+                                symbol_type=symbol_type,
+                                file_path=str(file_path),
+                                line_number=line,
+                            )
+                        )
 
-                elif spec_type == 'ValueSpec':
+                elif spec_type == "ValueSpec":
                     # Variable or constant declarations
-                    names = getattr(spec, 'names', [])
-                    line = getattr(spec, 'line', 1)
+                    names = getattr(spec, "names", [])
+                    line = getattr(spec, "line", 1)
                     for name in names:
-                        if hasattr(name, 'name'):
+                        if hasattr(name, "name"):
                             name = name.name
-                        symbols.append(ExtractedSymbol(
-                            name=name,
-                            symbol_type="variable",
-                            file_path=str(file_path),
-                            line_number=line,
-                        ))
+                        symbols.append(
+                            ExtractedSymbol(
+                                name=name,
+                                symbol_type="variable",
+                                file_path=str(file_path),
+                                line_number=line,
+                            )
+                        )
 
     def has_syntax_errors(self, code: str) -> bool:
         """Check if Go code has syntax errors.

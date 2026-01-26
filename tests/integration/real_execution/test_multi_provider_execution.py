@@ -92,21 +92,24 @@ def pytest_generate_tests(metafunc):
     # Check Ollama (skip for cloud-only tests)
     if not is_cloud_only_test:
         if is_ollama_running() and any(
-            is_ollama_model_available(model)
-            for model in PROVIDER_MODELS["ollama"]
+            is_ollama_model_available(model) for model in PROVIDER_MODELS["ollama"]
         ):
-            provider_configs.append({
-                "provider_name": "ollama",
-                "model": PROVIDER_MODELS["ollama"][0],
-            })
+            provider_configs.append(
+                {
+                    "provider_name": "ollama",
+                    "model": PROVIDER_MODELS["ollama"][0],
+                }
+            )
 
     # Check cloud providers
     for provider in ["deepseek", "xai", "mistral", "openai", "zai"]:
         if has_provider_api_key(provider):
-            provider_configs.append({
-                "provider_name": provider,
-                "model": PROVIDER_MODELS[provider][0],
-            })
+            provider_configs.append(
+                {
+                    "provider_name": provider,
+                    "model": PROVIDER_MODELS[provider][0],
+                }
+            )
 
     # Skip all tests if no providers available
     if not provider_configs:
@@ -139,6 +142,7 @@ async def provider(provider_name: str, model: str):
     # Create provider directly without using getfixturevalue to avoid event loop issues
     if provider_name == "ollama":
         from victor.providers.ollama_provider import OllamaProvider
+
         provider_instance = OllamaProvider(
             base_url="http://localhost:11434",
             timeout=120,
@@ -147,6 +151,7 @@ async def provider(provider_name: str, model: str):
         provider_instance._selected_model = model
     elif provider_name == "deepseek":
         from victor.providers.deepseek_provider import DeepSeekProvider
+
         api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
             pytest.skip("DEEPSEEK_API_KEY not set")
@@ -158,6 +163,7 @@ async def provider(provider_name: str, model: str):
         provider_instance._selected_model = model
     elif provider_name == "xai":
         from victor.providers.xai_provider import XAIProvider
+
         api_key = os.getenv("XAI_API_KEY")
         if not api_key:
             pytest.skip("XAI_API_KEY not set")
@@ -169,6 +175,7 @@ async def provider(provider_name: str, model: str):
         provider_instance._selected_model = model
     elif provider_name == "mistral":
         from victor.providers.mistral_provider import MistralProvider
+
         api_key = os.getenv("MISTRAL_API_KEY")
         if not api_key:
             pytest.skip("MISTRAL_API_KEY not set")
@@ -180,6 +187,7 @@ async def provider(provider_name: str, model: str):
         provider_instance._selected_model = model
     elif provider_name == "openai":
         from victor.providers.openai_provider import OpenAIProvider
+
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             pytest.skip("OPENAI_API_KEY not set")
@@ -191,6 +199,7 @@ async def provider(provider_name: str, model: str):
         provider_instance._selected_model = model
     elif provider_name == "zai":
         from victor.providers.zai_provider import ZAIProvider
+
         api_key = os.getenv("ZAI_API_KEY")
         if not api_key:
             pytest.skip("ZAI_API_KEY not set")
@@ -237,7 +246,7 @@ async def test_multi_provider_read_tool(
     settings.provider = provider_name
     settings.model = model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (provider_name == "ollama")
+    settings.airgapped_mode = provider_name == "ollama"
 
     orchestrator = AgentOrchestrator(
         settings=settings,
@@ -290,7 +299,7 @@ async def test_multi_provider_edit_tool(
     settings.provider = provider_name
     settings.model = model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (provider_name == "ollama")
+    settings.airgapped_mode = provider_name == "ollama"
 
     orchestrator = AgentOrchestrator(
         settings=settings,
@@ -358,7 +367,7 @@ async def test_multi_provider_shell_tool(
     settings.provider = provider_name
     settings.model = model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (provider_name == "ollama")
+    settings.airgapped_mode = provider_name == "ollama"
 
     orchestrator = AgentOrchestrator(
         settings=settings,
@@ -383,8 +392,19 @@ async def test_multi_provider_shell_tool(
     # Check for command-related keywords
     command_keywords = any(
         word in response_lower
-        for word in ["file", "ls", "list", "sample.py", "readme", ".py", ".md",
-                     "directory", "folder", "content", "output"]
+        for word in [
+            "file",
+            "ls",
+            "list",
+            "sample.py",
+            "readme",
+            ".py",
+            ".md",
+            "directory",
+            "folder",
+            "content",
+            "output",
+        ]
     )
 
     # Check for JSON output (model returned structured directory info)
@@ -392,8 +412,7 @@ async def test_multi_provider_shell_tool(
 
     # Check for directory names that might appear in a listing
     has_dir_names = any(
-        word in response_lower
-        for word in ["victor", "tests", "docs", "src", "examples", "scripts"]
+        word in response_lower for word in ["victor", "tests", "docs", "src", "examples", "scripts"]
     )
 
     # At least one indicator should be true
@@ -496,7 +515,7 @@ async def test_multi_provider_multi_tool(
     settings.provider = provider_name
     settings.model = model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (provider_name == "ollama")
+    settings.airgapped_mode = provider_name == "ollama"
 
     orchestrator = AgentOrchestrator(
         settings=settings,
@@ -532,8 +551,7 @@ async def test_multi_provider_multi_tool(
     response_lower = response2.content.lower()
 
     edit_keywords = any(
-        word in response_lower
-        for word in ["edit", "modify", "update", "change", "docstring"]
+        word in response_lower for word in ["edit", "modify", "update", "change", "docstring"]
     )
     has_tool_call = '{"name"' in response2.content or "'name'" in response2.content
     substantial_response = len(response2.content) > 50

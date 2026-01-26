@@ -35,9 +35,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s: %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -89,6 +87,7 @@ class EventBus:
             handler: Function to call when event is published
             filter_fn: Function to filter events (return True to handle)
         """
+
         def filtered_handler(event_data: Dict[str, Any]) -> None:
             if filter_fn(event_data):
                 handler(event_data)
@@ -342,9 +341,7 @@ class QualityMonitor:
     def _on_low_quality(self, event: Dict[str, Any]) -> None:
         """Handle low quality evaluation."""
         data = event["data"]
-        logger.warning(
-            f"[QualityMonitor] Low quality detected: {data['quality_score']:.2f}"
-        )
+        logger.warning(f"[QualityMonitor] Low quality detected: {data['quality_score']:.2f}")
 
         alert = {
             "session_id": data["session_id"],
@@ -384,11 +381,13 @@ class SessionTracker:
         if session_id not in self._sessions:
             self._sessions[session_id] = []
 
-        self._sessions[session_id].append({
-            "topic": event["topic"],
-            "data": data,
-            "timestamp": event["timestamp"],
-        })
+        self._sessions[session_id].append(
+            {
+                "topic": event["topic"],
+                "data": data,
+                "timestamp": event["timestamp"],
+            }
+        )
 
         logger.info(f"[SessionTracker] Tracking event for session: {session_id}")
 
@@ -435,6 +434,7 @@ class EvaluationOrchestrator:
 
         # Generate random results
         import random
+
         success = random.choice([True, True, False])  # 66% success rate
         quality_score = random.uniform(0.3, 0.95)
         tool_calls_used = random.randint(3, 15)

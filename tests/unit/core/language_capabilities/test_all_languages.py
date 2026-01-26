@@ -96,7 +96,7 @@ class Greeter:
         "extension": ".py",
     },
     "javascript": {
-        "valid": '''function hello(name) {
+        "valid": """function hello(name) {
     return `Hello, ${name}!`;
 }
 
@@ -105,12 +105,12 @@ class Greeter {
         console.log(hello(name));
     }
 }
-''',
+""",
         "invalid": "function foo( {",
         "extension": ".js",
     },
     "typescript": {
-        "valid": '''function hello(name: string): string {
+        "valid": """function hello(name: string): string {
     return `Hello, ${name}!`;
 }
 
@@ -123,33 +123,33 @@ class MyGreeter implements Greeter {
         console.log(hello(name));
     }
 }
-''',
+""",
         "invalid": "function foo(: string {",
         "extension": ".ts",
     },
     "jsx": {
-        "valid": '''function App() {
+        "valid": """function App() {
     return <div className="app">Hello World</div>;
 }
-''',
+""",
         "invalid": "function App() { return <div>; }",
         "extension": ".jsx",
     },
     "tsx": {
-        "valid": '''interface Props {
+        "valid": """interface Props {
     name: string;
 }
 
 function Hello({ name }: Props): JSX.Element {
     return <div>Hello, {name}!</div>;
 }
-''',
+""",
         "invalid": "function Hello(: Props) { return <div>; }",
         "extension": ".tsx",
     },
     # Tier 2 Languages
     "go": {
-        "valid": '''package main
+        "valid": """package main
 
 import "fmt"
 
@@ -160,24 +160,24 @@ func main() {
 func add(a, b int) int {
     return a + b
 }
-''',
+""",
         "invalid": "package main\n\nfunc main( {",
         "extension": ".go",
     },
     "rust": {
-        "valid": '''fn main() {
+        "valid": """fn main() {
     println!("Hello, World!");
 }
 
 fn add(a: i32, b: i32) -> i32 {
     a + b
 }
-''',
+""",
         "invalid": "fn main( {",
         "extension": ".rs",
     },
     "java": {
-        "valid": '''public class Main {
+        "valid": """public class Main {
     public static void main(String[] args) {
         System.out.println("Hello, World!");
     }
@@ -186,12 +186,12 @@ fn add(a: i32, b: i32) -> i32 {
         return a + b;
     }
 }
-''',
+""",
         "invalid": "public class Main {\n    public static void main(String[] args {",
         "extension": ".java",
     },
     "c": {
-        "valid": '''#include <stdio.h>
+        "valid": """#include <stdio.h>
 
 int main() {
     printf("Hello, World!\\n");
@@ -201,12 +201,12 @@ int main() {
 int add(int a, int b) {
     return a + b;
 }
-''',
+""",
         "invalid": "int main( {\n    return 0;\n}",
         "extension": ".c",
     },
     "cpp": {
-        "valid": '''#include <iostream>
+        "valid": """#include <iostream>
 
 int main() {
     std::cout << "Hello, World!" << std::endl;
@@ -219,13 +219,13 @@ public:
         return a + b;
     }
 };
-''',
+""",
         "invalid": "int main( {\n    return 0;\n}",
         "extension": ".cpp",
     },
     # Tier 3 Languages
     "ruby": {
-        "valid": '''def hello(name)
+        "valid": """def hello(name)
   "Hello, #{name}!"
 end
 
@@ -234,12 +234,12 @@ class Greeter
     puts hello(name)
   end
 end
-''',
+""",
         "invalid": "def hello(name\n  puts name\nend",
         "extension": ".rb",
     },
     "php": {
-        "valid": '''<?php
+        "valid": """<?php
 function hello($name) {
     return "Hello, " . $name . "!";
 }
@@ -250,12 +250,12 @@ class Greeter {
     }
 }
 ?>
-''',
+""",
         "invalid": "<?php\nfunction hello($name {\n    return $name;\n}\n?>",
         "extension": ".php",
     },
     "csharp": {
-        "valid": '''using System;
+        "valid": """using System;
 
 class Program {
     static void Main(string[] args) {
@@ -266,24 +266,24 @@ class Program {
         return a + b;
     }
 }
-''',
+""",
         "invalid": "class Program {\n    static void Main(string[] args {",
         "extension": ".cs",
     },
     "scala": {
-        "valid": '''object Main {
+        "valid": """object Main {
   def main(args: Array[String]): Unit = {
     println("Hello, World!")
   }
 
   def add(a: Int, b: Int): Int = a + b
 }
-''',
+""",
         "invalid": "object Main {\n  def main(args: Array[String] {",
         "extension": ".scala",
     },
     "kotlin": {
-        "valid": '''fun main() {
+        "valid": """fun main() {
     println("Hello, World!")
 }
 
@@ -294,12 +294,12 @@ class Greeter {
         println("Hello, $name!")
     }
 }
-''',
-        "invalid": "fun main( {\n    println(\"Hello\")\n}",
+""",
+        "invalid": 'fun main( {\n    println("Hello")\n}',
         "extension": ".kt",
     },
     "swift": {
-        "valid": '''import Foundation
+        "valid": """import Foundation
 
 func hello(name: String) -> String {
     return "Hello, \\(name)!"
@@ -310,12 +310,12 @@ class Greeter {
         print(hello(name: name))
     }
 }
-''',
+""",
         "invalid": "func hello(name: String -> String {",
         "extension": ".swift",
     },
     "lua": {
-        "valid": '''function hello(name)
+        "valid": """function hello(name)
     return "Hello, " .. name .. "!"
 end
 
@@ -324,12 +324,12 @@ local Greeter = {}
 function Greeter:greet(name)
     print(hello(name))
 end
-''',
+""",
         "invalid": "function hello(name\n    return name\nend",
         "extension": ".lua",
     },
     "bash": {
-        "valid": '''#!/bin/bash
+        "valid": """#!/bin/bash
 
 hello() {
     echo "Hello, $1!"
@@ -340,12 +340,12 @@ main() {
 }
 
 main
-''',
-        "invalid": "hello( {\n    echo \"Hello\"\n}",
+""",
+        "invalid": 'hello( {\n    echo "Hello"\n}',
         "extension": ".sh",
     },
     "sql": {
-        "valid": '''SELECT id, name, email
+        "valid": """SELECT id, name, email
 FROM users
 WHERE active = true
 ORDER BY name ASC;
@@ -355,12 +355,12 @@ CREATE TABLE products (
     name VARCHAR(255) NOT NULL,
     price DECIMAL(10, 2)
 );
-''',
+""",
         "invalid": "SELECT * FROM WHERE id = 1;",
         "extension": ".sql",
     },
     "html": {
-        "valid": '''<!DOCTYPE html>
+        "valid": """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -371,12 +371,12 @@ CREATE TABLE products (
     <p>Welcome to my page.</p>
 </body>
 </html>
-''',
+""",
         "invalid": "<html><body><div>Unclosed",
         "extension": ".html",
     },
     "css": {
-        "valid": '''body {
+        "valid": """body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
@@ -391,13 +391,13 @@ CREATE TABLE products (
     background-color: #333;
     color: white;
 }
-''',
+""",
         "invalid": "body { font-family: ",
         "extension": ".css",
     },
     # Config file formats
     "json": {
-        "valid": '''{
+        "valid": """{
     "name": "test",
     "version": "1.0.0",
     "dependencies": {
@@ -407,12 +407,12 @@ CREATE TABLE products (
         "test": "jest"
     }
 }
-''',
+""",
         "invalid": '{"name": "test", value: 42}',
         "extension": ".json",
     },
     "yaml": {
-        "valid": '''name: test
+        "valid": """name: test
 version: 1.0.0
 dependencies:
   - lodash
@@ -420,12 +420,12 @@ dependencies:
 config:
   port: 3000
   debug: true
-''',
+""",
         "invalid": "name: test\n  invalid: indentation",
         "extension": ".yaml",
     },
     "toml": {
-        "valid": '''[package]
+        "valid": """[package]
 name = "test"
 version = "1.0.0"
 
@@ -434,12 +434,12 @@ lodash = "^4.17.21"
 
 [build]
 target = "release"
-''',
-        "invalid": "[package\nname = \"test\"",
+""",
+        "invalid": '[package\nname = "test"',
         "extension": ".toml",
     },
     "xml": {
-        "valid": '''<?xml version="1.0" encoding="UTF-8"?>
+        "valid": """<?xml version="1.0" encoding="UTF-8"?>
 <project>
     <name>test</name>
     <version>1.0.0</version>
@@ -447,12 +447,12 @@ target = "release"
         <dependency>lodash</dependency>
     </dependencies>
 </project>
-''',
+""",
         "invalid": "<project><name>test</project>",
         "extension": ".xml",
     },
     "markdown": {
-        "valid": '''# Hello World
+        "valid": """# Hello World
 
 This is a **markdown** document with *formatting*.
 
@@ -465,7 +465,7 @@ This is a **markdown** document with *formatting*.
 def hello():
     print("Hello!")
 ```
-''',
+""",
         "invalid": "",  # Markdown is very permissive, hard to make invalid
         "extension": ".md",
     },
@@ -475,6 +475,7 @@ def hello():
 # =============================================================================
 # Tier 1 Language Tests (Full Support)
 # =============================================================================
+
 
 class TestPythonAllMechanisms:
     """Test Python with all applicable mechanisms."""
@@ -608,6 +609,7 @@ class TestTypeScriptAllMechanisms:
 # =============================================================================
 # Tier 2 Language Tests (Good Support)
 # =============================================================================
+
 
 class TestGoAllMechanisms:
     """Test Go with all applicable mechanisms."""
@@ -763,16 +765,20 @@ class TestCppAllMechanisms:
 # Tier 3 Language Tests (Tree-sitter only)
 # =============================================================================
 
+
 class TestTier3LanguagesTreeSitter:
     """Test Tier 3 languages with tree-sitter."""
 
-    @pytest.mark.parametrize("language,sample", [
-        ("ruby", LANGUAGE_SAMPLES["ruby"]),
-        ("lua", LANGUAGE_SAMPLES["lua"]),
-        ("bash", LANGUAGE_SAMPLES["bash"]),
-        ("html", LANGUAGE_SAMPLES["html"]),
-        ("css", LANGUAGE_SAMPLES["css"]),
-    ])
+    @pytest.mark.parametrize(
+        "language,sample",
+        [
+            ("ruby", LANGUAGE_SAMPLES["ruby"]),
+            ("lua", LANGUAGE_SAMPLES["lua"]),
+            ("bash", LANGUAGE_SAMPLES["bash"]),
+            ("html", LANGUAGE_SAMPLES["html"]),
+            ("css", LANGUAGE_SAMPLES["css"]),
+        ],
+    )
     def test_tier3_tree_sitter_extractor(self, ts_extractor, temp_dir, language, sample):
         """Test Tier 3 language extraction with tree-sitter."""
         if not ts_extractor.is_available():
@@ -784,13 +790,16 @@ class TestTier3LanguagesTreeSitter:
 
         assert isinstance(symbols, list)
 
-    @pytest.mark.parametrize("language,sample", [
-        ("ruby", LANGUAGE_SAMPLES["ruby"]),
-        ("lua", LANGUAGE_SAMPLES["lua"]),
-        ("bash", LANGUAGE_SAMPLES["bash"]),
-        ("html", LANGUAGE_SAMPLES["html"]),
-        ("css", LANGUAGE_SAMPLES["css"]),
-    ])
+    @pytest.mark.parametrize(
+        "language,sample",
+        [
+            ("ruby", LANGUAGE_SAMPLES["ruby"]),
+            ("lua", LANGUAGE_SAMPLES["lua"]),
+            ("bash", LANGUAGE_SAMPLES["bash"]),
+            ("html", LANGUAGE_SAMPLES["html"]),
+            ("css", LANGUAGE_SAMPLES["css"]),
+        ],
+    )
     def test_tier3_tree_sitter_validator_valid(self, ts_validator, temp_dir, language, sample):
         """Test Tier 3 language validation - valid code."""
         if not ts_validator.is_available():
@@ -807,6 +816,7 @@ class TestTier3LanguagesTreeSitter:
 # =============================================================================
 # Config File Validators
 # =============================================================================
+
 
 class TestJsonMechanisms:
     """Test JSON with native and tree-sitter validators."""
@@ -931,13 +941,13 @@ class TestHoconMechanisms:
         if not validator.is_available():
             pytest.skip("pyhocon not available")
 
-        code = '''
+        code = """
 app {
     name = "test"
     version = "1.0.0"
     port = 8080
 }
-'''
+"""
         result = validator.validate(code, temp_dir / "application.conf")
 
         assert result.is_valid
@@ -947,6 +957,7 @@ app {
 # =============================================================================
 # Registry Integration Tests
 # =============================================================================
+
 
 class TestRegistryLanguageSupport:
     """Test that all expected languages are registered."""
@@ -976,8 +987,21 @@ class TestRegistryLanguageSupport:
         registry = LanguageCapabilityRegistry.instance()
 
         tier3_langs = [
-            "ruby", "php", "csharp", "scala", "kotlin", "swift", "lua",
-            "bash", "sql", "yaml", "json", "toml", "html", "css", "markdown",
+            "ruby",
+            "php",
+            "csharp",
+            "scala",
+            "kotlin",
+            "swift",
+            "lua",
+            "bash",
+            "sql",
+            "yaml",
+            "json",
+            "toml",
+            "html",
+            "css",
+            "markdown",
         ]
         for lang in tier3_langs:
             cap = registry.get(lang)
@@ -1015,7 +1039,9 @@ class TestRegistryLanguageSupport:
         for ext, expected_lang in extensions.items():
             cap = registry.get_for_file(Path(f"test{ext}"))
             assert cap is not None, f"No capability for {ext}"
-            assert cap.name == expected_lang, f"{ext} detected as {cap.name}, expected {expected_lang}"
+            assert (
+                cap.name == expected_lang
+            ), f"{ext} detected as {cap.name}, expected {expected_lang}"
 
     def test_all_languages_have_tree_sitter_capability(self):
         """Test all languages have tree-sitter capability defined."""

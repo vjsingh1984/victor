@@ -278,7 +278,9 @@ class DirectProtocolAdapter(VictorProtocol):
                     target.write_text(new_content)
                     results.append({"success": True, "file_path": str(target)})
                 else:
-                    results.append({"success": False, "error": "; ".join(errors), "file_path": str(target)})
+                    results.append(
+                        {"success": False, "error": "; ".join(errors), "file_path": str(target)}
+                    )
 
             return {
                 "success": all(r.get("success", False) for r in results),

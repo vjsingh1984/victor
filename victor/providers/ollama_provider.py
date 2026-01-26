@@ -661,7 +661,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         import re
 
         # Match markdown code blocks: ```json\n{...}\n```
-        json_block_pattern = r'```(?:json)?\s*\n?(.*?)\n?```'
+        json_block_pattern = r"```(?:json)?\s*\n?(.*?)\n?```"
         matches = re.findall(json_block_pattern, content, re.DOTALL)
 
         if matches:

@@ -392,6 +392,7 @@ def _find_enclosing_function(node: Any, language: str) -> Optional[str]:
                     child_bytes = child.text
                     if child_bytes is not None:
                         from typing import cast
+
                         result = cast(str, child_bytes.decode("utf-8", errors="ignore"))
                         return result
         current = current.parent
@@ -713,6 +714,7 @@ ENCLOSING_NAME_FIELDS: Dict[str, List[Tuple[str, str]]] = {
 if TYPE_CHECKING:
     from watchdog.events import FileSystemEventHandler
     from watchdog.observers.api import BaseObserver as Observer
+
     WATCHDOG_AVAILABLE: bool = True
 else:
     try:
@@ -831,14 +833,18 @@ class CodebaseFileHandler(FileSystemEventHandler):
         super().__init__()
         self.on_change = on_change
         self.file_patterns = file_patterns if file_patterns is not None else ["*.py"]
-        self.ignore_patterns = ignore_patterns if ignore_patterns is not None else [
-            "__pycache__",
-            ".git",
-            "node_modules",
-            ".pytest_cache",
-            "venv",
-            ".venv",
-        ]
+        self.ignore_patterns = (
+            ignore_patterns
+            if ignore_patterns is not None
+            else [
+                "__pycache__",
+                ".git",
+                "node_modules",
+                ".pytest_cache",
+                "venv",
+                ".venv",
+            ]
+        )
         self._debounce_lock = threading.Lock()
         self._pending_changes: Set[str] = set()
         self._debounce_timer: Optional[threading.Timer] = None
@@ -1288,9 +1294,11 @@ class CodebaseIndex:
         # Flush graph buffers to store
         if self.graph_store and self._graph_nodes:
             from typing import cast
+
             await self.graph_store.upsert_nodes(cast(Any, self._graph_nodes))
         if self.graph_store and self._graph_edges:
             from typing import cast
+
             await self.graph_store.upsert_edges(cast(Any, self._graph_edges))
 
         # Build embeddings for all indexed symbols (batched for performance)
@@ -1580,7 +1588,11 @@ class CodebaseIndex:
         added = stats["added"]
         removed = stats["removed"]
         unchanged = stats["unchanged"]
-        total_changes = (len(updated) if isinstance(updated, list) else 0) + (len(added) if isinstance(added, list) else 0) + (len(removed) if isinstance(removed, list) else 0)
+        total_changes = (
+            (len(updated) if isinstance(updated, list) else 0)
+            + (len(added) if isinstance(added, list) else 0)
+            + (len(removed) if isinstance(removed, list) else 0)
+        )
         if total_changes > 0:
             logger.info(
                 f"Incremental reindex: {len(updated) if isinstance(updated, list) else 0} updated, "
@@ -1941,6 +1953,7 @@ class CodebaseIndex:
                             try:
                                 if hasattr(py_ast, "unparse"):
                                     from typing import cast
+
                                     base_name_result = py_ast.unparse(cast(py_ast.expr, base))
                                 else:
                                     base_id_attr: Any = getattr(base, "id", None)
@@ -1950,7 +1963,9 @@ class CodebaseIndex:
                                         if isinstance(base, py_ast.Name):
                                             base_name_result = base.id
                                         elif isinstance(base, py_ast.Attribute):
-                                            base_name_result = f"{cast(py_ast.Name, base.value).id}.{base.attr}"
+                                            base_name_result = (
+                                                f"{cast(py_ast.Name, base.value).id}.{base.attr}"
+                                            )
                                         else:
                                             base_name_result = None
                             except Exception:

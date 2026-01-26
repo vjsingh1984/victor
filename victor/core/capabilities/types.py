@@ -73,9 +73,7 @@ class CapabilityType(str, Enum):
             if member.value == normalized:
                 return member
         valid_types = [m.value for m in cls]
-        raise ValueError(
-            f"Invalid capability type: '{value}'. Valid types: {valid_types}"
-        )
+        raise ValueError(f"Invalid capability type: '{value}'. Valid types: {valid_types}")
 
 
 # Type alias for JSON Schema definitions

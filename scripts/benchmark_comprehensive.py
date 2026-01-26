@@ -131,8 +131,7 @@ class BenchmarkResult:
 
         # Latency and memory metrics: higher is worse
         if any(
-            word in metric_name_lower
-            for word in ["latency", "time", "memory", "bytes", "ms", "mb"]
+            word in metric_name_lower for word in ["latency", "time", "memory", "bytes", "ms", "mb"]
         ):
             return metric.value > threshold
 
@@ -582,8 +581,12 @@ class MarkdownFormatter(ReportFormatter):
 
                 for m in result.metrics:
                     threshold_str = f"{m.threshold}" if m.threshold else "N/A"
-                    status_str = "✓" if m.threshold is None else ("✓" if m.value <= m.threshold else "✗")
-                    lines.append(f"| {m.name} | {m.value:.2f} | {m.unit} | {threshold_str} | {status_str} |")
+                    status_str = (
+                        "✓" if m.threshold is None else ("✓" if m.value <= m.threshold else "✗")
+                    )
+                    lines.append(
+                        f"| {m.name} | {m.value:.2f} | {m.unit} | {threshold_str} | {status_str} |"
+                    )
 
                 lines.append("")
 
@@ -668,32 +671,40 @@ class HtmlFormatter(ReportFormatter):
 
             for result in results:
                 status_class = "pass" if result.passed else "fail"
-                lines.append(f"        <h3>{result.name} - <span class='{status_class}'>{status_class.upper()}</span></h3>")
+                lines.append(
+                    f"        <h3>{result.name} - <span class='{status_class}'>{status_class.upper()}</span></h3>"
+                )
                 lines.append("        <table>")
-                lines.append("            <tr><th>Metric</th><th>Value</th><th>Unit</th><th>Threshold</th><th>Status</th></tr>")
+                lines.append(
+                    "            <tr><th>Metric</th><th>Value</th><th>Unit</th><th>Threshold</th><th>Status</th></tr>"
+                )
 
                 for m in result.metrics:
                     threshold_str = f"{m.threshold}" if m.threshold else "N/A"
                     passed = m.threshold is None or m.value <= m.threshold
                     status_class = "metric-pass" if passed else "metric-fail"
                     status = "✓" if passed else "✗"
-                    lines.append(f"            <tr class='{status_class}'><td>{m.name}</td><td>{m.value:.2f}</td><td>{m.unit}</td><td>{threshold_str}</td><td>{status}</td></tr>")
+                    lines.append(
+                        f"            <tr class='{status_class}'><td>{m.name}</td><td>{m.value:.2f}</td><td>{m.unit}</td><td>{threshold_str}</td><td>{status}</td></tr>"
+                    )
 
                 lines.append("        </table>")
 
         # Close HTML
-        lines.extend([
-            "        <h2>Performance Improvements</h2>",
-            "        <table>",
-            "            <tr><th>Metric</th><th>Before</th><th>After</th><th>Improvement</th></tr>",
-            "            <tr><td>Startup Time</td><td>~8000ms</td><td>&lt;200ms</td><td>98.7%</td></tr>",
-            "            <tr><td>Runtime</td><td>Baseline</td><td>+30-50%</td><td>Caching</td></tr>",
-            "            <tr><td>Memory</td><td>N/A</td><td>&lt;50MB</td><td>Optimized</td></tr>",
-            "        </table>",
-            "    </div>",
-            "</body>",
-            "</html>",
-        ])
+        lines.extend(
+            [
+                "        <h2>Performance Improvements</h2>",
+                "        <table>",
+                "            <tr><th>Metric</th><th>Before</th><th>After</th><th>Improvement</th></tr>",
+                "            <tr><td>Startup Time</td><td>~8000ms</td><td>&lt;200ms</td><td>98.7%</td></tr>",
+                "            <tr><td>Runtime</td><td>Baseline</td><td>+30-50%</td><td>Caching</td></tr>",
+                "            <tr><td>Memory</td><td>N/A</td><td>&lt;50MB</td><td>Optimized</td></tr>",
+                "        </table>",
+                "    </div>",
+                "</body>",
+                "</html>",
+            ]
+        )
 
         return "\n".join(lines)
 

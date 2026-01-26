@@ -119,13 +119,13 @@ class HealthReport:
             "total_checks": self.total_checks,
             "passed": self.passed_checks,
             "failed": self.failed_checks,
-            "success_rate": (self.passed_checks / self.total_checks * 100) if self.total_checks > 0 else 0,
+            "success_rate": (
+                (self.passed_checks / self.total_checks * 100) if self.total_checks > 0 else 0
+            ),
             "critical_failures": len(self.critical_failures),
             "warnings": len(self.warnings),
             "total_duration_seconds": (
-                (self.end_time - self.start_time).total_seconds()
-                if self.end_time
-                else 0
+                (self.end_time - self.start_time).total_seconds() if self.end_time else 0
             ),
         }
 
@@ -224,25 +224,31 @@ class HealthReport:
         # Generate tables for each category
         for category, results in categories.items():
             html += f'<div class="category-header">{category}</div>'
-            html += '<table>'
-            html += '<thead><tr><th>Check Name</th><th>Status</th><th>Duration (ms)</th><th>Details</th></tr></thead>'
-            html += '<tbody>'
+            html += "<table>"
+            html += "<thead><tr><th>Check Name</th><th>Status</th><th>Duration (ms)</th><th>Details</th></tr></thead>"
+            html += "<tbody>"
 
             for result in results:
-                critical_badge = ' <span class="critical-badge">CRITICAL</span>' if result.critical else ''
-                status = f'<span class="status-pass">PASS</span>{critical_badge}' if result.passed else f'<span class="status-fail">FAIL</span>{critical_badge}'
+                critical_badge = (
+                    ' <span class="critical-badge">CRITICAL</span>' if result.critical else ""
+                )
+                status = (
+                    f'<span class="status-pass">PASS</span>{critical_badge}'
+                    if result.passed
+                    else f'<span class="status-fail">FAIL</span>{critical_badge}'
+                )
                 details = result.details or result.error or "N/A"
-                html += f'<tr><td>{result.name}</td><td>{status}</td><td>{result.duration_ms:.2f}</td><td>{details}</td></tr>'
+                html += f"<tr><td>{result.name}</td><td>{status}</td><td>{result.duration_ms:.2f}</td><td>{details}</td></tr>"
 
-            html += '</tbody></table>'
+            html += "</tbody></table>"
 
         # Critical failures
         if self.critical_failures:
             html += '<h2 style="color: #f44336;">Critical Failures - Rollback Recommended</h2>'
-            html += '<ul>'
+            html += "<ul>"
             for failure in self.critical_failures:
-                html += f'<li>{failure}</li>'
-            html += '</ul>'
+                html += f"<li>{failure}</li>"
+            html += "</ul>"
 
         html += """
     </div>
@@ -339,7 +345,10 @@ class PostRolloutVerifier:
                 critical=True,
                 duration_ms=duration,
                 details=f"Memory usage: {memory_percent:.1f}% ({memory_info.rss / 1024 / 1024:.1f} MB)",
-                metrics={"memory_percent": memory_percent, "memory_mb": memory_info.rss / 1024 / 1024},
+                metrics={
+                    "memory_percent": memory_percent,
+                    "memory_mb": memory_info.rss / 1024 / 1024,
+                },
             )
         )
         progress.update(task, advance=1)
@@ -414,7 +423,12 @@ class PostRolloutVerifier:
             ("MetricsCoordinator", MetricsCoordinator),
             ("WorkflowCoordinator", WorkflowCoordinator),
             ("TeamCoordinator (Lightweight)", lambda: create_coordinator(lightweight=True)),
-            ("TeamCoordinator (Full)", lambda: create_coordinator(lightweight=False, with_observability=True, with_rl=True)),
+            (
+                "TeamCoordinator (Full)",
+                lambda: create_coordinator(
+                    lightweight=False, with_observability=True, with_rl=True
+                ),
+            ),
         ]
 
         for name, coordinator_factory in coordinators_to_check:
@@ -759,6 +773,7 @@ class PostRolloutVerifier:
                 WorkflowCoordinator,
             )
             from victor.teams import create_coordinator, TeamFormation
+
             duration = (time.time() - start) * 1000
 
             self.report.add_result(
@@ -791,6 +806,7 @@ class PostRolloutVerifier:
         start = time.time()
         try:
             from victor.framework.coordinators import FrameworkTeamCoordinator
+
             coordinator = FrameworkTeamCoordinator()
             duration = (time.time() - start) * 1000
 
@@ -857,13 +873,17 @@ class PostRolloutVerifier:
         summary = self.report.calculate_summary()
 
         # Create summary table
-        table = Table(title="Post-Rollout Verification Summary", show_header=True, header_style="bold magenta")
+        table = Table(
+            title="Post-Rollout Verification Summary", show_header=True, header_style="bold magenta"
+        )
         table.add_column("Metric", style="cyan")
         table.add_column("Value", justify="right")
 
         table.add_row("Total Checks", str(summary["total_checks"]))
         table.add_row("Passed", f"[green]{summary['passed']}[/green]")
-        table.add_row("Failed", f"[{'red' if summary['failed'] > 0 else 'green'}]{summary['failed']}[/]")
+        table.add_row(
+            "Failed", f"[{'red' if summary['failed'] > 0 else 'green'}]{summary['failed']}[/]"
+        )
         table.add_row("Success Rate", f"{summary['success_rate']:.1f}%")
         table.add_row("Critical Failures", str(summary["critical_failures"]))
         table.add_row("Warnings", str(summary["warnings"]))
@@ -878,7 +898,9 @@ class PostRolloutVerifier:
         sys_table.add_column("Value", justify="right")
 
         sys_table.add_row("CPU Usage", f"{self.report.system_metrics.get('cpu_percent', 0):.1f}%")
-        sys_table.add_row("Memory Usage", f"{self.report.system_metrics.get('memory_percent', 0):.1f}%")
+        sys_table.add_row(
+            "Memory Usage", f"{self.report.system_metrics.get('memory_percent', 0):.1f}%"
+        )
         sys_table.add_row("Disk Usage", f"{self.report.system_metrics.get('disk_percent', 0):.1f}%")
         sys_table.add_row("Uptime", f"{self.report.system_metrics.get('uptime_seconds', 0):.0f}s")
 
@@ -902,7 +924,9 @@ class PostRolloutVerifier:
         elif summary["failed"] > 0:
             console.print("\n[bold yellow]HEALTH STATUS: DEGRADED - Monitor Closely[/bold yellow]")
         else:
-            console.print("\n[bold green]HEALTH STATUS: HEALTHY - All Systems Operational[/bold green]")
+            console.print(
+                "\n[bold green]HEALTH STATUS: HEALTHY - All Systems Operational[/bold green]"
+            )
 
 
 async def main():
@@ -910,7 +934,9 @@ async def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Post-rollout verification")
-    parser.add_argument("--output", type=str, default="/tmp/post_rollout_report.html", help="Output report path")
+    parser.add_argument(
+        "--output", type=str, default="/tmp/post_rollout_report.html", help="Output report path"
+    )
     parser.add_argument("--json", type=str, help="Output JSON report path")
     args = parser.parse_args()
 
@@ -947,10 +973,14 @@ async def main():
         # Exit with appropriate code
         summary = verifier.report.calculate_summary()
         if summary["critical_failures"] > 0:
-            console.print("\n[bold red]Action Required: Consider rollback due to critical failures[/bold red]")
+            console.print(
+                "\n[bold red]Action Required: Consider rollback due to critical failures[/bold red]"
+            )
             sys.exit(2)
         elif summary["failed"] > 0:
-            console.print("\n[bold yellow]Action Required: Monitor and address non-critical failures[/bold yellow]")
+            console.print(
+                "\n[bold yellow]Action Required: Monitor and address non-critical failures[/bold yellow]"
+            )
             sys.exit(1)
         else:
             console.print("\n[bold green]All systems operational - No action required[/bold green]")

@@ -26,7 +26,11 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
-from victor.workflows.yaml_loader import load_workflow_from_file, load_workflow_from_yaml, YAMLWorkflowConfig
+from victor.workflows.yaml_loader import (
+    load_workflow_from_file,
+    load_workflow_from_yaml,
+    YAMLWorkflowConfig,
+)
 from victor.workflows.definition import WorkflowDefinition
 from victor.core.errors import ConfigurationValidationError
 
@@ -221,9 +225,7 @@ async def validate_workflow_graph(graph: WorkflowGraph) -> ValidationResponse:
 
         elif node.type == "condition":
             if "condition" not in node.config and "branches" not in node.config:
-                errors.append(
-                    f"Condition node '{node.id}' must have 'condition' and 'branches'"
-                )
+                errors.append(f"Condition node '{node.id}' must have 'condition' and 'branches'")
 
     return ValidationResponse(
         valid=len(errors) == 0,
@@ -286,11 +288,15 @@ async def export_to_yaml(graph: WorkflowGraph) -> dict[str, str] | dict[str, boo
 
         # Export to YAML - create YAML content directly
         import yaml
-        yaml_content = yaml.dump({
-            "name": workflow_def.name,
-            "nodes": {node_id: node.__dict__ for node_id, node in workflow_def.nodes.items()},
-            "start_node": workflow_def.start_node,
-        }, default_flow_style=False)
+
+        yaml_content = yaml.dump(
+            {
+                "name": workflow_def.name,
+                "nodes": {node_id: node.__dict__ for node_id, node in workflow_def.nodes.items()},
+                "start_node": workflow_def.start_node,
+            },
+            default_flow_style=False,
+        )
 
         return {"yaml_content": yaml_content, "success": True}  # type: ignore[return-value]
 
@@ -351,9 +357,7 @@ async def get_node_types() -> dict[str, dict[str, Any]]:
                 "tools": {"type": "array", "items": "string"},
                 "llm_config": {
                     "type": "object",
-                    "properties": {
-                        "temperature": {"type": "number", "minimum": 0, "maximum": 1}
-                    },
+                    "properties": {"temperature": {"type": "number", "minimum": 0, "maximum": 1}},
                 },
             },
         },

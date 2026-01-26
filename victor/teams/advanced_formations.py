@@ -1121,7 +1121,9 @@ Rationale: [your reasoning]
         consensus = 0.0
 
         if self.voting_method == VotingMethod.MAJORITY:
-            winner = max(distribution, key=lambda k: distribution[k] if distribution[k] is not None else 0)
+            winner = max(
+                distribution, key=lambda k: distribution[k] if distribution[k] is not None else 0
+            )
             total_votes = sum(distribution.values())
             consensus = distribution[winner] / total_votes if total_votes > 0 else 0.0
 
@@ -1134,7 +1136,10 @@ Rationale: [your reasoning]
                     break
 
             if not winner:
-                winner = max(distribution, key=lambda k: distribution[k] if distribution[k] is not None else 0)
+                winner = max(
+                    distribution,
+                    key=lambda k: distribution[k] if distribution[k] is not None else 0,
+                )
                 consensus = distribution.get(winner, 0) / sum(distribution.values())
 
         elif self.voting_method == VotingMethod.UNANIMOUS:
@@ -1148,17 +1153,23 @@ Rationale: [your reasoning]
                 consensus = distribution.get(winner, 0) / sum(distribution.values())
 
         elif self.voting_method == VotingMethod.WEIGHTED:
-            winner = max(distribution, key=lambda k: distribution[k] if distribution[k] is not None else 0)
+            winner = max(
+                distribution, key=lambda k: distribution[k] if distribution[k] is not None else 0
+            )
             total_weight = sum(distribution.values())
             consensus = distribution[winner] / total_weight if total_weight > 0 else 0.0
 
         else:  # RANKED_CHOICE or default
-            winner = max(distribution, key=lambda k: distribution[k] if distribution[k] is not None else 0)
+            winner = max(
+                distribution, key=lambda k: distribution[k] if distribution[k] is not None else 0
+            )
             total_votes = sum(1 for vote in votes if vote.choice == winner)
             consensus = total_votes / len(votes) if votes else 0.0
 
         # Cast distribution to expected type for return
-        distribution_typed: Dict[str, int] = {k: int(v) if v is not None else 0 for k, v in distribution.items()}
+        distribution_typed: Dict[str, int] = {
+            k: int(v) if v is not None else 0 for k, v in distribution.items()
+        }
         return winner, distribution_typed, consensus
 
     def _apply_tiebreaker(self, distribution: Dict[str, int]) -> Optional[str]:

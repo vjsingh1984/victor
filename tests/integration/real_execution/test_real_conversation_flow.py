@@ -93,7 +93,9 @@ async def test_conversation_context_preservation(
 
     # Turn 2: Reference previous information
     async with skip_on_timeout(90, "context_preservation"):
-        response2 = await orchestrator.chat(user_message="What project did I mention I'm working on?")
+        response2 = await orchestrator.chat(
+            user_message="What project did I mention I'm working on?"
+        )
 
     assert response2.content is not None
 
@@ -154,11 +156,11 @@ async def test_conversation_stage_transitions(
     # Verify stage history exists (if method is available)
     # Note: Some implementations may not expose stage history
     try:
-        if hasattr(orchestrator.conversation_state, 'get_stage_history'):
+        if hasattr(orchestrator.conversation_state, "get_stage_history"):
             history = orchestrator.conversation_state.get_stage_history()
             assert len(history) > 0, "Stage history should be recorded"
             print(f"✓ Stage history: {[(h['from'], h['to']) for h in history]}")
-        elif hasattr(orchestrator.conversation_state, 'get_state_summary'):
+        elif hasattr(orchestrator.conversation_state, "get_state_summary"):
             # Alternative method to get state information
             summary = orchestrator.conversation_state.get_state_summary()
             print(f"✓ State summary available: stage changed from {initial_stage} to {final_stage}")
@@ -323,7 +325,9 @@ async def test_conversation_multi_turn_task_completion(
 
     # Turn 3: Verify the changes
     async with skip_on_timeout(turn_timeout, "multi_turn_task"):
-        response3 = await orchestrator.chat(user_message="Read the file again to verify the changes.")
+        response3 = await orchestrator.chat(
+            user_message="Read the file again to verify the changes."
+        )
 
     assert response3.content is not None
 

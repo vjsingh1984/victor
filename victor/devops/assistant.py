@@ -65,7 +65,9 @@ class DevOpsAssistant(VerticalBase):
 
     # Note: These class variables override base class instance variables (MyPy limitation)
     name: ClassVar[str] = "devops"
-    description: ClassVar[str] = "Infrastructure automation, container management, CI/CD, and deployment"
+    description: ClassVar[str] = (
+        "Infrastructure automation, container management, CI/CD, and deployment"
+    )
     version: ClassVar[str] = "0.5.0"
 
     @classmethod
@@ -277,7 +279,10 @@ class DevOpsAssistant(VerticalBase):
             provider = create_vertical_tool_dependency_provider("devops")
             return cast("ToolDependencyProviderProtocol", provider)
 
-        return cast("ToolDependencyProviderProtocol | None", cls._get_cached_extension("tool_dependency_provider", _create))
+        return cast(
+            "ToolDependencyProviderProtocol | None",
+            cls._get_cached_extension("tool_dependency_provider", _create),
+        )
 
     @classmethod
     def get_handlers(cls) -> Dict[str, Any]:

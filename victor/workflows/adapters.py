@@ -45,7 +45,18 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Set, TypedDict, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    TypedDict,
+    cast,
+)
 
 from victor.workflows.definition import (
     WorkflowDefinition,

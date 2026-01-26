@@ -50,7 +50,14 @@ class FeatureFlagToggle:
             }.get(level, "•")
             print(f"{prefix} {message}")
 
-    def log_action(self, action: str, previous_value: Optional[bool], new_value: bool, success: bool, notes: str = ""):
+    def log_action(
+        self,
+        action: str,
+        previous_value: Optional[bool],
+        new_value: bool,
+        success: bool,
+        notes: str = "",
+    ):
         """Log an action to history."""
         entry = {
             "timestamp": datetime.now().isoformat(),
@@ -74,7 +81,11 @@ class FeatureFlagToggle:
             settings = Settings()
             return {
                 "enabled": settings.use_coordinator_orchestrator,
-                "source": "environment_override" if "VICTOR_USE_COORDINATOR_ORCHESTRATOR" in __import__('os').environ else "settings",
+                "source": (
+                    "environment_override"
+                    if "VICTOR_USE_COORDINATOR_ORCHESTRATOR" in __import__("os").environ
+                    else "settings"
+                ),
                 "profiles_path": str(self.profiles_path),
                 "profiles_exists": self.profiles_path.exists(),
             }
@@ -96,6 +107,7 @@ class FeatureFlagToggle:
         backup_path = self.backup_dir / f"profiles.yaml.backup_{timestamp}"
 
         import shutil
+
         shutil.copy2(self.profiles_path, backup_path)
 
         self.log(f"Settings backed up to: {backup_path}", "SUCCESS")
@@ -108,6 +120,7 @@ class FeatureFlagToggle:
             return False
 
         import shutil
+
         shutil.copy2(backup_path, self.profiles_path)
 
         self.log(f"Settings restored from: {backup_path}", "SUCCESS")
@@ -119,12 +132,14 @@ class FeatureFlagToggle:
             return {"profiles": {}}
 
         import yaml
+
         with open(self.profiles_path, "r") as f:
             return yaml.safe_load(f) or {"profiles": {}}
 
     def save_profiles(self, data: dict) -> bool:
         """Save profiles.yaml."""
         import yaml
+
         try:
             with open(self.profiles_path, "w") as f:
                 yaml.dump(data, f, default_flow_style=False, sort_keys=False)
@@ -164,13 +179,15 @@ class FeatureFlagToggle:
             # Validate the change (note: Settings may be cached in current process)
             # The file has been updated and will take effect in new Victor instances
             self.log("Settings file updated successfully!", "SUCCESS")
-            self.log("Note: Changes will take effect in new Victor instances (restart required)", "INFO")
+            self.log(
+                "Note: Changes will take effect in new Victor instances (restart required)", "INFO"
+            )
             self.log_action(
                 "enable",
                 previous_value,
                 True,
                 True,
-                f"Backup: {backup_path}" if backup_path else "No backup"
+                f"Backup: {backup_path}" if backup_path else "No backup",
             )
             return True
 
@@ -216,13 +233,15 @@ class FeatureFlagToggle:
             # Validate the change (note: Settings may be cached in current process)
             # The file has been updated and will take effect in new Victor instances
             self.log("Settings file updated successfully!", "SUCCESS")
-            self.log("Note: Changes will take effect in new Victor instances (restart required)", "INFO")
+            self.log(
+                "Note: Changes will take effect in new Victor instances (restart required)", "INFO"
+            )
             self.log_action(
                 "disable",
                 previous_value,
                 False,
                 True,
-                f"Backup: {backup_path}" if backup_path else "No backup"
+                f"Backup: {backup_path}" if backup_path else "No backup",
             )
             return True
 
@@ -312,10 +331,10 @@ class FeatureFlagToggle:
 
                 for line in reversed(lines):
                     entry = json.loads(line.strip())
-                    status_icon = "✓" if entry['success'] else "✗"
+                    status_icon = "✓" if entry["success"] else "✗"
                     print(f"{status_icon} {entry['timestamp']} - {entry['action'].upper()}")
                     print(f"  {entry['previous_value']} → {entry['new_value']}")
-                    if entry.get('notes'):
+                    if entry.get("notes"):
                         print(f"  Note: {entry['notes']}")
                     print()
             except Exception as e:
@@ -326,21 +345,21 @@ class FeatureFlagToggle:
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Toggle coordinator orchestrator feature flag"
-    )
+    parser = argparse.ArgumentParser(description="Toggle coordinator orchestrator feature flag")
     parser.add_argument(
         "action",
         choices=["enable", "disable", "status", "validate"],
         help="Action to perform",
     )
     parser.add_argument(
-        "--backup", "-b",
+        "--backup",
+        "-b",
         action="store_true",
         help="Backup settings before making changes (recommended)",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Verbose output",
     )
@@ -355,7 +374,9 @@ def main():
             if success:
                 print("\n★ Coordinator orchestrator enabled successfully!")
                 print("  Run 'victor chat' to test the new architecture.")
-                print("  Use 'python scripts/toggle_coordinator_orchestrator.py validate' to verify.")
+                print(
+                    "  Use 'python scripts/toggle_coordinator_orchestrator.py validate' to verify."
+                )
                 sys.exit(0)
             else:
                 print("\n✗ Failed to enable coordinator orchestrator")
@@ -390,6 +411,7 @@ def main():
     except Exception as e:
         print(f"\n✗ Error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

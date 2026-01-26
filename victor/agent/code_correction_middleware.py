@@ -76,7 +76,15 @@ class CodeCorrectionConfig:
     )
 
     code_argument_names: Set[str] = field(
-        default_factory=lambda: {"code", "python_code", "content", "source", "script", "new_content", "file_content"}
+        default_factory=lambda: {
+            "code",
+            "python_code",
+            "content",
+            "source",
+            "script",
+            "new_content",
+            "file_content",
+        }
     )
 
 

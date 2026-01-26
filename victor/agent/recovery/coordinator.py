@@ -164,12 +164,18 @@ class RecoveryCoordinator:
         self._circuit_registry = circuit_breaker_registry
 
         # Initialize recovery-specific components (these extend framework)
-        self._strategy = CompositeRecoveryStrategy(q_store=cast("QLearningStoreProtocol | None", q_store))
-        self._temperature = ProgressiveTemperatureAdjuster(q_store=cast("QLearningStoreProtocol | None", q_store))
+        self._strategy = CompositeRecoveryStrategy(
+            q_store=cast("QLearningStoreProtocol | None", q_store)
+        )
+        self._temperature = ProgressiveTemperatureAdjuster(
+            q_store=cast("QLearningStoreProtocol | None", q_store)
+        )
 
         # Prompt registry can use separate persistence
         prompts_db = data_dir / "prompt_templates.db" if data_dir else None
-        self._prompts = ModelSpecificPromptRegistry(q_store=cast("QLearningStoreProtocol | None", q_store), db_path=prompts_db)
+        self._prompts = ModelSpecificPromptRegistry(
+            q_store=cast("QLearningStoreProtocol | None", q_store), db_path=prompts_db
+        )
 
         # Current recovery context for learning
         self._current_context: Optional[RecoveryContext] = None

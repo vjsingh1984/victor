@@ -464,6 +464,7 @@ class ObservabilityToCQRSBridge:
 
         # Subscribe to all observability events using wildcard pattern
         handle = await self._event_bus.subscribe("*", self._handle_event_async)
+
         # Store unsubscribe function
         def unsubscribe() -> None:
             asyncio.create_task(self._event_bus.unsubscribe(handle))
@@ -487,9 +488,9 @@ class ObservabilityToCQRSBridge:
     async def _handle_event_async(self, event: Any) -> None:
         """Handle an observability event (MessagingEvent format)."""
         # Extract topic and data from MessagingEvent
-        topic = getattr(event, 'topic', '')
-        data = getattr(event, 'data', {})
-        metadata = getattr(event, 'headers', {})
+        topic = getattr(event, "topic", "")
+        data = getattr(event, "data", {})
+        metadata = getattr(event, "headers", {})
         self._handle_event(topic, data, **metadata)
 
     def _handle_event(self, topic: str, data: Dict[str, Any], **metadata: Any) -> None:
@@ -1075,17 +1076,21 @@ class CQRSBridge:
                     handler(event)
 
             self._event_dispatcher.subscribe_all(filtered_handler)
+
             # Return an unsubscribe function
             def unsubscribe() -> None:
                 if self._event_dispatcher is not None:
                     self._event_dispatcher._all_handlers.remove(filtered_handler)
+
             return unsubscribe
         else:
             self._event_dispatcher.subscribe_all(handler)
+
             # Return an unsubscribe function
             def unsubscribe() -> None:
                 if self._event_dispatcher is not None:
                     self._event_dispatcher._all_handlers.remove(handler)
+
             return unsubscribe
 
     # =========================================================================

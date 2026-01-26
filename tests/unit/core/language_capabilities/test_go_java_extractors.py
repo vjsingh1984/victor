@@ -45,7 +45,7 @@ class TestGoExtractor:
     def test_extract_function(self, extractor, temp_dir):
         """Test extracting functions from Go code."""
         file_path = temp_dir / "main.go"
-        code = '''
+        code = """
 package main
 
 func main() {
@@ -55,7 +55,7 @@ func main() {
 func add(a, b int) int {
     return a + b
 }
-'''
+"""
         symbols = extractor.extract(code, file_path)
 
         # Should extract at least main function via tree-sitter fallback
@@ -66,7 +66,7 @@ func add(a, b int) int {
     def test_extract_struct(self, extractor, temp_dir):
         """Test extracting structs from Go code."""
         file_path = temp_dir / "types.go"
-        code = '''
+        code = """
 package main
 
 type Person struct {
@@ -81,7 +81,7 @@ type Calculator struct {
 func (c *Calculator) Add(n int) int {
     return c.value + n
 }
-'''
+"""
         symbols = extractor.extract(code, file_path)
 
         # Should extract at least the method via tree-sitter fallback
@@ -91,7 +91,7 @@ func (c *Calculator) Add(n int) int {
     def test_extract_interface(self, extractor, temp_dir):
         """Test extracting interfaces from Go code."""
         file_path = temp_dir / "interfaces.go"
-        code = '''
+        code = """
 package main
 
 type Reader interface {
@@ -101,7 +101,7 @@ type Reader interface {
 func ProcessReader(r Reader) {
     // Use the reader
 }
-'''
+"""
         symbols = extractor.extract(code, file_path)
 
         # Should extract at least the function via tree-sitter fallback
@@ -110,25 +110,25 @@ func ProcessReader(r Reader) {
 
     def test_has_syntax_errors_valid(self, extractor):
         """Test has_syntax_errors returns False for valid Go code."""
-        code = '''
+        code = """
 package main
 
 func main() {
     fmt.Println("Hello")
 }
-'''
+"""
         result = extractor.has_syntax_errors(code)
         assert result is False
 
     def test_has_syntax_errors_invalid(self, extractor):
         """Test has_syntax_errors returns True for invalid Go code."""
-        code = '''
+        code = """
 package main
 
 func main( {  // Missing closing parenthesis
     fmt.Println("Hello")
 }
-'''
+"""
         result = extractor.has_syntax_errors(code)
         assert result is True
 
@@ -155,13 +155,13 @@ class TestJavaExtractor:
     def test_extract_class(self, extractor, temp_dir):
         """Test extracting classes from Java code."""
         file_path = temp_dir / "Main.java"
-        code = '''
+        code = """
 public class Main {
     public static void main(String[] args) {
         System.out.println("Hello");
     }
 }
-'''
+"""
         symbols = extractor.extract(code, file_path)
 
         # Should extract at least the class via tree-sitter fallback
@@ -172,7 +172,7 @@ public class Main {
     def test_extract_methods(self, extractor, temp_dir):
         """Test extracting methods from Java code."""
         file_path = temp_dir / "Calculator.java"
-        code = '''
+        code = """
 public class Calculator {
     public int add(int a, int b) {
         return a + b;
@@ -182,7 +182,7 @@ public class Calculator {
         return a - b;
     }
 }
-'''
+"""
         symbols = extractor.extract(code, file_path)
 
         # Should extract class and methods
@@ -191,13 +191,13 @@ public class Calculator {
     def test_extract_interface(self, extractor, temp_dir):
         """Test extracting interfaces from Java code."""
         file_path = temp_dir / "Service.java"
-        code = '''
+        code = """
 public interface Service {
     void start();
     void stop();
     boolean isRunning();
 }
-'''
+"""
         symbols = extractor.extract(code, file_path)
 
         # Should extract interface
@@ -206,7 +206,7 @@ public interface Service {
     def test_extract_enum(self, extractor, temp_dir):
         """Test extracting enums from Java code."""
         file_path = temp_dir / "Color.java"
-        code = '''
+        code = """
 public enum Color {
     RED, GREEN, BLUE;
 
@@ -219,7 +219,7 @@ public enum Color {
         }
     }
 }
-'''
+"""
         symbols = extractor.extract(code, file_path)
 
         # Should extract at least the method via tree-sitter fallback
@@ -228,25 +228,25 @@ public enum Color {
 
     def test_has_syntax_errors_valid(self, extractor):
         """Test has_syntax_errors returns False for valid Java code."""
-        code = '''
+        code = """
 public class Main {
     public static void main(String[] args) {
         System.out.println("Hello");
     }
 }
-'''
+"""
         result = extractor.has_syntax_errors(code)
         assert result is False
 
     def test_has_syntax_errors_invalid(self, extractor):
         """Test has_syntax_errors returns True for invalid Java code."""
-        code = '''
+        code = """
 public class Main {
     public static void main(String[] args {  // Missing closing parenthesis
         System.out.println("Hello");
     }
 }
-'''
+"""
         result = extractor.has_syntax_errors(code)
         assert result is True
 
@@ -273,7 +273,7 @@ class TestGoValidator:
     def test_validate_valid_code(self, validator, temp_dir):
         """Test validation passes for valid Go code."""
         file_path = temp_dir / "main.go"
-        code = '''
+        code = """
 package main
 
 import "fmt"
@@ -281,7 +281,7 @@ import "fmt"
 func main() {
     fmt.Println("Hello, World!")
 }
-'''
+"""
         result = validator.validate(code, file_path)
         assert result.is_valid is True
         assert result.language == "go"
@@ -289,13 +289,13 @@ func main() {
     def test_validate_invalid_code(self, validator, temp_dir):
         """Test validation fails for invalid Go code."""
         file_path = temp_dir / "main.go"
-        code = '''
+        code = """
 package main
 
 func main( {  // Missing closing parenthesis
     fmt.Println("Hello")
 }
-'''
+"""
         result = validator.validate(code, file_path)
         assert result.is_valid is False
         assert result.language == "go"
@@ -323,13 +323,13 @@ class TestJavaValidator:
     def test_validate_valid_code(self, validator, temp_dir):
         """Test validation passes for valid Java code."""
         file_path = temp_dir / "Main.java"
-        code = '''
+        code = """
 public class Main {
     public static void main(String[] args) {
         System.out.println("Hello, World!");
     }
 }
-'''
+"""
         result = validator.validate(code, file_path)
         assert result.is_valid is True
         assert result.language == "java"
@@ -337,13 +337,13 @@ public class Main {
     def test_validate_invalid_code(self, validator, temp_dir):
         """Test validation fails for invalid Java code."""
         file_path = temp_dir / "Main.java"
-        code = '''
+        code = """
 public class Main {
     public static void main(String[] args {  // Missing closing parenthesis
         System.out.println("Hello");
     }
 }
-'''
+"""
         result = validator.validate(code, file_path)
         assert result.is_valid is False
         assert result.language == "java"
@@ -364,13 +364,13 @@ class TestTreeSitterFallback:
 
         # Even without gopygo, should still extract symbols via tree-sitter
         file_path = temp_dir / "main.go"
-        code = '''
+        code = """
 package main
 
 func main() {
     fmt.Println("Hello")
 }
-'''
+"""
         symbols = extractor.extract(code, file_path)
         # Tree-sitter should extract at least the function
         assert len(symbols) >= 1
@@ -381,13 +381,13 @@ func main() {
 
         # Even without javalang, should still extract symbols via tree-sitter
         file_path = temp_dir / "Main.java"
-        code = '''
+        code = """
 public class Main {
     public static void main(String[] args) {
         System.out.println("Hello");
     }
 }
-'''
+"""
         symbols = extractor.extract(code, file_path)
         # Tree-sitter should extract class and method
         assert len(symbols) >= 1
@@ -397,13 +397,13 @@ public class Main {
         validator = GoValidator()
 
         file_path = temp_dir / "main.go"
-        code = '''
+        code = """
 package main
 
 func main() {
     fmt.Println("Hello")
 }
-'''
+"""
         result = validator.validate(code, file_path)
         assert result.is_valid is True
         assert result.language == "go"
@@ -413,13 +413,13 @@ func main() {
         validator = JavaValidator()
 
         file_path = temp_dir / "Main.java"
-        code = '''
+        code = """
 public class Main {
     public static void main(String[] args) {
         System.out.println("Hello");
     }
 }
-'''
+"""
         result = validator.validate(code, file_path)
         assert result.is_valid is True
         assert result.language == "java"
@@ -429,14 +429,14 @@ public class Main {
         extractor = CppExtractor()
 
         file_path = temp_dir / "main.cpp"
-        code = '''
+        code = """
 #include <iostream>
 
 int main() {
     std::cout << "Hello" << std::endl;
     return 0;
 }
-'''
+"""
         symbols = extractor.extract(code, file_path)
         # Tree-sitter should extract at least the function
         assert isinstance(symbols, list)
@@ -446,14 +446,14 @@ int main() {
         validator = CppValidator()
 
         file_path = temp_dir / "main.cpp"
-        code = '''
+        code = """
 #include <iostream>
 
 int main() {
     std::cout << "Hello" << std::endl;
     return 0;
 }
-'''
+"""
         result = validator.validate(code, file_path)
         assert result.is_valid is True
         assert result.language == "cpp"
@@ -481,7 +481,7 @@ class TestCppExtractor:
     def test_extract_function(self, extractor, temp_dir):
         """Test extracting functions from C++ code."""
         file_path = temp_dir / "main.cpp"
-        code = '''
+        code = """
 #include <iostream>
 
 int main() {
@@ -492,7 +492,7 @@ int main() {
 int add(int a, int b) {
     return a + b;
 }
-'''
+"""
         symbols = extractor.extract(code, file_path)
 
         # Should extract at least one symbol via tree-sitter fallback
@@ -501,7 +501,7 @@ int add(int a, int b) {
     def test_extract_class(self, extractor, temp_dir):
         """Test extracting classes from C++ code."""
         file_path = temp_dir / "calculator.cpp"
-        code = '''
+        code = """
 class Calculator {
 public:
     int add(int a, int b) {
@@ -512,27 +512,27 @@ public:
         return a - b;
     }
 };
-'''
+"""
         symbols = extractor.extract(code, file_path)
         assert isinstance(symbols, list)
 
     def test_has_syntax_errors_valid(self, extractor):
         """Test has_syntax_errors returns False for valid C++ code."""
-        code = '''
+        code = """
 int main() {
     return 0;
 }
-'''
+"""
         result = extractor.has_syntax_errors(code, "cpp")
         assert result is False
 
     def test_has_syntax_errors_invalid(self, extractor):
         """Test has_syntax_errors returns True for invalid C++ code."""
-        code = '''
+        code = """
 int main( {  // Missing closing parenthesis
     return 0;
 }
-'''
+"""
         result = extractor.has_syntax_errors(code, "cpp")
         assert result is True
 
@@ -559,14 +559,14 @@ class TestCppValidator:
     def test_validate_valid_code(self, validator, temp_dir):
         """Test validation passes for valid C++ code."""
         file_path = temp_dir / "main.cpp"
-        code = '''
+        code = """
 #include <iostream>
 
 int main() {
     std::cout << "Hello, World!" << std::endl;
     return 0;
 }
-'''
+"""
         result = validator.validate(code, file_path)
         assert result.is_valid is True
         assert result.language == "cpp"
@@ -574,11 +574,11 @@ int main() {
     def test_validate_invalid_code(self, validator, temp_dir):
         """Test validation fails for invalid C++ code."""
         file_path = temp_dir / "main.cpp"
-        code = '''
+        code = """
 int main( {  // Missing closing parenthesis
     return 0;
 }
-'''
+"""
         result = validator.validate(code, file_path)
         assert result.is_valid is False
         assert result.language == "cpp"
@@ -586,14 +586,14 @@ int main( {  // Missing closing parenthesis
     def test_validate_c_code(self, validator, temp_dir):
         """Test validation works for C code."""
         file_path = temp_dir / "main.c"
-        code = '''
+        code = """
 #include <stdio.h>
 
 int main() {
     printf("Hello, World!");
     return 0;
 }
-'''
+"""
         result = validator.validate(code, file_path, language="c")
         assert result.is_valid is True
         assert result.language == "c"

@@ -203,6 +203,7 @@ class ParallelToolExecutor:
                 else:
                     # res is ToolExecutionResult
                     from typing import cast
+
                     exec_result = cast(ToolExecutionResult, res)
                     # Check if res has success attribute (it should be ToolExecutionResult)
                     if hasattr(res, "success") and res.success:

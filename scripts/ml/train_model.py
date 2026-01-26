@@ -55,9 +55,7 @@ logger = logging.getLogger(__name__)
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Train ML models for formation selection")
-    parser.add_argument(
-        "--training-data", required=True, help="Path to training data JSON file"
-    )
+    parser.add_argument("--training-data", required=True, help="Path to training data JSON file")
     parser.add_argument(
         "--algorithm",
         choices=["random_forest", "gradient_boosting", "neural_network"],
@@ -74,15 +72,11 @@ def main():
         default="models/formation_selector/metrics.json",
         help="Path to save training metrics",
     )
-    parser.add_argument(
-        "--test-size", type=float, default=0.2, help="Fraction of data for testing"
-    )
+    parser.add_argument("--test-size", type=float, default=0.2, help="Fraction of data for testing")
     parser.add_argument(
         "--random-state", type=int, default=42, help="Random seed for reproducibility"
     )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose logging"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
 

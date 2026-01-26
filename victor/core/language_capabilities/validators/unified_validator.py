@@ -148,9 +148,7 @@ class UnifiedLanguageValidator(BaseLanguageProcessor):
             if not cap._method_available(method):
                 continue
 
-            validator_result = self._run_validator(
-                method, code, file_path, cap.name, config
-            )
+            validator_result = self._run_validator(method, code, file_path, cap.name, config)
 
             if validator_result:
                 ran_any_validator = True
@@ -342,6 +340,7 @@ class UnifiedLanguageValidator(BaseLanguageProcessor):
         if lang == "python":
             try:
                 import ast
+
                 ast.parse(code)
                 return True
             except SyntaxError:

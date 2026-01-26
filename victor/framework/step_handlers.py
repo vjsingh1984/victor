@@ -261,7 +261,9 @@ def _invoke_capability(
     # Delegate to consolidated CapabilityHelper (DRY principle)
     from victor.agent.capability_registry import CapabilityHelper
 
-    return CapabilityHelper.invoke_capability(obj, capability_name, *args, strict=strict_mode, **kwargs)
+    return CapabilityHelper.invoke_capability(
+        obj, capability_name, *args, strict=strict_mode, **kwargs
+    )
 
 
 # =============================================================================

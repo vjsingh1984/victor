@@ -422,14 +422,14 @@ class DistributedCacheInvalidator:
         if key == "*":
             for tiered_cache in self._tiered_caches:
                 # TieredCache may not have clear() method
-                if hasattr(tiered_cache, 'clear'):
+                if hasattr(tiered_cache, "clear"):
                     cleared = tiered_cache.clear(namespace)
                     self._stats.tiered_cache_clears += cleared
             return
 
         # Handle specific key invalidation
         for tiered_cache in self._tiered_caches:
-            if hasattr(tiered_cache, 'delete'):
+            if hasattr(tiered_cache, "delete"):
                 if tiered_cache.delete(key, namespace):
                     self._stats.tiered_cache_clears += 1
 

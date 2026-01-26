@@ -233,30 +233,14 @@ class MetricsReportGenerator:
         """
         if self.prometheus_url:
             # Query Prometheus
-            p50 = self._query_prometheus_value(
-                'job:victor_request_duration:p50:5m'
-            )
-            p95 = self._query_prometheus_value(
-                'job:victor_request_duration:p95:5m'
-            )
-            p99 = self._query_prometheus_value(
-                'job:victor_request_duration:p99:5m'
-            )
-            tool_p95 = self._query_prometheus_value(
-                'victor:tool_execution_duration:p95:5m'
-            )
-            provider_p95 = self._query_prometheus_value(
-                'victor:provider_latency:p95:5m'
-            )
-            memory = self._query_prometheus_value(
-                'victor_memory_usage_bytes'
-            )
-            cpu = self._query_prometheus_value(
-                'victor:cpu_usage:avg:5m'
-            )
-            rate = self._query_prometheus_value(
-                'job:victor_request_rate:5m'
-            )
+            p50 = self._query_prometheus_value("job:victor_request_duration:p50:5m")
+            p95 = self._query_prometheus_value("job:victor_request_duration:p95:5m")
+            p99 = self._query_prometheus_value("job:victor_request_duration:p99:5m")
+            tool_p95 = self._query_prometheus_value("victor:tool_execution_duration:p95:5m")
+            provider_p95 = self._query_prometheus_value("victor:provider_latency:p95:5m")
+            memory = self._query_prometheus_value("victor_memory_usage_bytes")
+            cpu = self._query_prometheus_value("victor:cpu_usage:avg:5m")
+            rate = self._query_prometheus_value("job:victor_request_rate:5m")
         else:
             # Use defaults
             p50 = p95 = p99 = tool_p95 = provider_p95 = memory = cpu = rate = 0.0
@@ -296,18 +280,10 @@ class MetricsReportGenerator:
             FunctionalMetrics object
         """
         if self.prometheus_url:
-            tool_total = self._query_prometheus_value(
-                'sum(victor_tool_executions_total)'
-            )
-            tool_rate = self._query_prometheus_value(
-                'sum(rate(victor_tool_executions_total[5m]))'
-            )
-            provider_total = self._query_prometheus_value(
-                'sum(victor_provider_requests_total)'
-            )
-            workflow_total = self._query_prometheus_value(
-                'sum(victor_workflow_executions_total)'
-            )
+            tool_total = self._query_prometheus_value("sum(victor_tool_executions_total)")
+            tool_rate = self._query_prometheus_value("sum(rate(victor_tool_executions_total[5m]))")
+            provider_total = self._query_prometheus_value("sum(victor_provider_requests_total)")
+            workflow_total = self._query_prometheus_value("sum(victor_workflow_executions_total)")
         else:
             tool_total = provider_total = workflow_total = 0
             tool_rate = 0.0
@@ -315,9 +291,7 @@ class MetricsReportGenerator:
         # Get vertical usage
         vertical_usage = {}
         if self.prometheus_url:
-            results = self.collect_from_prometheus(
-                'sum(victor_vertical_usage_total) by (vertical)'
-            )
+            results = self.collect_from_prometheus("sum(victor_vertical_usage_total) by (vertical)")
             for result in results:
                 vertical = result.get("metric", {}).get("vertical", "unknown")
                 value = float(result.get("value", [0, "0"])[1])
@@ -339,18 +313,10 @@ class MetricsReportGenerator:
             BusinessMetrics object
         """
         if self.prometheus_url:
-            total_requests = self._query_prometheus_value(
-                'victor_total_requests'
-            )
-            active_users = self._query_prometheus_value(
-                'sum(victor_active_users)'
-            )
-            avg_session = self._query_prometheus_value(
-                'victor:session_duration:avg:5m'
-            )
-            requests_per_user = self._query_prometheus_value(
-                'victor:requests_per_user:5m'
-            )
+            total_requests = self._query_prometheus_value("victor_total_requests")
+            active_users = self._query_prometheus_value("sum(victor_active_users)")
+            avg_session = self._query_prometheus_value("victor:session_duration:avg:5m")
+            requests_per_user = self._query_prometheus_value("victor:requests_per_user:5m")
         else:
             total_requests = active_users = 0
             avg_session = requests_per_user = 0.0
@@ -370,46 +336,28 @@ class MetricsReportGenerator:
         """
         if self.prometheus_url:
             # Coding
-            coding_files = self._query_prometheus_value(
-                'victor_coding_files_analyzed_total'
-            )
-            coding_loc = self._query_prometheus_value(
-                'victor_coding_loc_reviewed_total'
-            )
-            coding_issues = self._query_prometheus_value(
-                'victor_coding_issues_found_total'
-            )
+            coding_files = self._query_prometheus_value("victor_coding_files_analyzed_total")
+            coding_loc = self._query_prometheus_value("victor_coding_loc_reviewed_total")
+            coding_issues = self._query_prometheus_value("victor_coding_issues_found_total")
 
             # RAG
-            rag_docs = self._query_prometheus_value(
-                'victor_rag_documents_ingested_total'
-            )
-            rag_accuracy = self._query_prometheus_value(
-                'victor:rag:search_accuracy:5m'
-            )
+            rag_docs = self._query_prometheus_value("victor_rag_documents_ingested_total")
+            rag_accuracy = self._query_prometheus_value("victor:rag:search_accuracy:5m")
 
             # DevOps
-            devops_deployments = self._query_prometheus_value(
-                'victor_devops_deployments_total'
-            )
+            devops_deployments = self._query_prometheus_value("victor_devops_deployments_total")
             devops_containers = self._query_prometheus_value(
-                'sum(victor_devops_containers_managed)'
+                "sum(victor_devops_containers_managed)"
             )
 
             # DataAnalysis
-            da_queries = self._query_prometheus_value(
-                'victor_dataanalysis_queries_total'
-            )
-            da_viz = self._query_prometheus_value(
-                'victor_dataanalysis_visualizations_total'
-            )
+            da_queries = self._query_prometheus_value("victor_dataanalysis_queries_total")
+            da_viz = self._query_prometheus_value("victor_dataanalysis_visualizations_total")
 
             # Research
-            research_searches = self._query_prometheus_value(
-                'victor_research_searches_total'
-            )
+            research_searches = self._query_prometheus_value("victor_research_searches_total")
             research_citations = self._query_prometheus_value(
-                'victor_research_citations_generated_total'
+                "victor_research_citations_generated_total"
             )
         else:
             coding_files = coding_loc = coding_issues = 0
@@ -453,18 +401,10 @@ class MetricsReportGenerator:
             SecurityMetrics object
         """
         if self.prometheus_url:
-            auth_rate = self._query_prometheus_value(
-                'victor:authorization_success_rate:5m'
-            )
-            failed_auth = self._query_prometheus_value(
-                'victor:failed_authorization_rate:5m'
-            )
-            test_pass = self._query_prometheus_value(
-                'victor_security_test_pass_rate'
-            )
-            vulns = self._query_prometheus_value(
-                'sum(victor_security_vulnerabilities_found_total)'
-            )
+            auth_rate = self._query_prometheus_value("victor:authorization_success_rate:5m")
+            failed_auth = self._query_prometheus_value("victor:failed_authorization_rate:5m")
+            test_pass = self._query_prometheus_value("victor_security_test_pass_rate")
+            vulns = self._query_prometheus_value("sum(victor_security_vulnerabilities_found_total)")
         else:
             auth_rate = 1.0
             failed_auth = 0
@@ -584,11 +524,13 @@ class MetricsReportGenerator:
         for key, value in asdict(report.performance).items():
             lines.append(f"- **{key}:** {value}")
 
-        lines.extend([
-            "",
-            "## Functional Metrics",
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Functional Metrics",
+                "",
+            ]
+        )
 
         # Functional
         for key, value in asdict(report.functional).items():
@@ -599,21 +541,25 @@ class MetricsReportGenerator:
             else:
                 lines.append(f"- **{key}:** {value}")
 
-        lines.extend([
-            "",
-            "## Business Metrics",
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Business Metrics",
+                "",
+            ]
+        )
 
         # Business
         for key, value in asdict(report.business).items():
             lines.append(f"- **{key}:** {value}")
 
-        lines.extend([
-            "",
-            "## Vertical Metrics",
-            "",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Vertical Metrics",
+                "",
+            ]
+        )
 
         # Verticals
         for vertical, metrics in asdict(report.verticals).items():
@@ -622,10 +568,12 @@ class MetricsReportGenerator:
                 lines.append(f"- **{metric}:** {value}")
             lines.append("")
 
-        lines.extend([
-            "## Security Metrics",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Security Metrics",
+                "",
+            ]
+        )
 
         # Security
         for key, value in asdict(report.security).items():
@@ -639,9 +587,7 @@ class MetricsReportGenerator:
 
 def main() -> None:
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Generate Victor AI production metrics report"
-    )
+    parser = argparse.ArgumentParser(description="Generate Victor AI production metrics report")
     parser.add_argument(
         "--format",
         choices=["json", "csv", "markdown", "all"],

@@ -165,7 +165,9 @@ class TestDefaultOrchestrator:
 class TestProfileBasedOrchestrator:
     """Test profile-based orchestrator creation."""
 
-    def test_get_orchestrator_for_profile(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
+    def test_get_orchestrator_for_profile(
+        self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any
+    ) -> None:
         """Test getting orchestrator for a specific profile."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -202,7 +204,9 @@ class TestProfileBasedOrchestrator:
 class TestOrchestratorCaching:
     """Test orchestrator caching and reuse."""
 
-    def test_orchestrator_reuse_from_cache(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
+    def test_orchestrator_reuse_from_cache(
+        self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any
+    ) -> None:
         """Test that cached orchestrator is reused on subsequent calls."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -226,7 +230,9 @@ class TestOrchestratorCaching:
                 # Factory should only be called once (cached)
                 assert mock_factory.create_orchestrator.call_count == 1
 
-    def test_provider_reuse_from_cache(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
+    def test_provider_reuse_from_cache(
+        self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any
+    ) -> None:
         """Test that cached provider is reused."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -284,7 +290,9 @@ class TestOrchestratorCaching:
                 cached = pool.get_cached_profiles()
                 assert set(cached) == {"default", "anthropic", "openai"}
 
-    def test_clear_cache_single_profile(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
+    def test_clear_cache_single_profile(
+        self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any
+    ) -> None:
         """Test clearing cache for a single profile."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -310,7 +318,9 @@ class TestOrchestratorCaching:
                 pool.get_orchestrator("default")
                 assert mock_factory.create_orchestrator.call_count == 2
 
-    def test_clear_cache_all_profiles(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
+    def test_clear_cache_all_profiles(
+        self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any
+    ) -> None:
         """Test clearing cache for all profiles."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -337,7 +347,9 @@ class TestOrchestratorCaching:
                 # Verify all cleared
                 assert pool.get_cached_profiles() == []
 
-    def test_get_cached_profiles(self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any) -> None:
+    def test_get_cached_profiles(
+        self, mock_settings: Any, mock_orchestrator: Any, mock_provider: Any
+    ) -> None:
         """Test getting list of cached profiles."""
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(
@@ -449,7 +461,9 @@ class TestLifecycle:
                 # Verify caches cleared
                 assert pool.get_cached_profiles() == []
 
-    def test_shutdown_handles_close_errors(self, mock_settings: Any, mock_provider: Any, caplog: Any) -> None:
+    def test_shutdown_handles_close_errors(
+        self, mock_settings: Any, mock_provider: Any, caplog: Any
+    ) -> None:
         """Test that shutdown handles errors gracefully."""
         import logging
 

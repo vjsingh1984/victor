@@ -291,9 +291,7 @@ patterns:
       - coding
       - devops
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_path = Path(f.name)
 
@@ -313,14 +311,10 @@ patterns:
         registry = SafetyPatternRegistry.get_instance()
 
         registry.register_pattern(
-            SafetyPattern(
-                name="p1", pattern=r"p1", severity=Severity.LOW, message="P1"
-            )
+            SafetyPattern(name="p1", pattern=r"p1", severity=Severity.LOW, message="P1")
         )
         registry.register_pattern(
-            SafetyPattern(
-                name="p2", pattern=r"p2", severity=Severity.HIGH, message="P2"
-            )
+            SafetyPattern(name="p2", pattern=r"p2", severity=Severity.HIGH, message="P2")
         )
 
         patterns = registry.list_patterns()

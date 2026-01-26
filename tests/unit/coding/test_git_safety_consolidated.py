@@ -22,7 +22,9 @@ Tests that coding GitSafetyMiddleware:
 import pytest
 
 from victor.coding.middleware import GitSafetyMiddleware as CodingGitSafetyMiddleware
-from victor.framework.middleware.framework import GitSafetyMiddleware as FrameworkGitSafetyMiddleware
+from victor.framework.middleware.framework import (
+    GitSafetyMiddleware as FrameworkGitSafetyMiddleware,
+)
 
 
 class TestGitSafetyConsolidation:
@@ -59,9 +61,7 @@ class TestGitSafetyConsolidation:
         assert result.proceed is False
 
         # Test warning for risky operation
-        result = await middleware.before_tool_call(
-            "git", {"command": "git reset --hard"}
-        )
+        result = await middleware.before_tool_call("git", {"command": "git reset --hard"})
         # Should proceed but with warning
         assert result.proceed is True
 
@@ -70,9 +70,7 @@ class TestGitSafetyConsolidation:
         """Non-git tools should pass through unchanged."""
         middleware = CodingGitSafetyMiddleware(block_dangerous=True)
 
-        result = await middleware.before_tool_call(
-            "read_file", {"path": "/tmp/test.txt"}
-        )
+        result = await middleware.before_tool_call("read_file", {"path": "/tmp/test.txt"})
         assert result.proceed is True
 
     def test_priority_is_critical(self):

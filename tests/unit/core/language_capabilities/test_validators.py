@@ -183,6 +183,7 @@ class TestTreeSitterValidator:
     @pytest.fixture
     def validator(self):
         from victor.core.language_capabilities.validators import TreeSitterValidator
+
         return TreeSitterValidator()
 
     def test_is_available(self, validator):
@@ -193,8 +194,7 @@ class TestTreeSitterValidator:
         assert isinstance(is_available, bool)
 
     @pytest.mark.skipif(
-        not TreeSitterValidator().is_available(),
-        reason="tree-sitter not available"
+        not TreeSitterValidator().is_available(), reason="tree-sitter not available"
     )
     def test_validate_python_with_tree_sitter(self, validator):
         """Should validate Python with tree-sitter."""
@@ -205,8 +205,7 @@ class TestTreeSitterValidator:
         assert "tree_sitter" in result.validators_used
 
     @pytest.mark.skipif(
-        not TreeSitterValidator().is_available(),
-        reason="tree-sitter not available"
+        not TreeSitterValidator().is_available(), reason="tree-sitter not available"
     )
     def test_validate_python_error_with_tree_sitter(self, validator):
         """Should detect errors with tree-sitter."""

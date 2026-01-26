@@ -192,7 +192,9 @@ async def run_benchmark(
         if i % 20 == 0:
             collector.record_analytics_event("state_transition")
 
-    print(f"✓ Benchmarks completed: {iterations} iterations across {len(coordinators)} coordinators")
+    print(
+        f"✓ Benchmarks completed: {iterations} iterations across {len(coordinators)} coordinators"
+    )
 
 
 async def generate_sample_data(collector: CoordinatorMetricsCollector) -> None:
@@ -313,9 +315,7 @@ async def main():
         help="Generate sample historical data",
     )
 
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Show detailed output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed output")
 
     args = parser.parse_args()
 

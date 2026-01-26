@@ -412,7 +412,9 @@ class AutonomousPlanner:
         """Execute plan steps in parallel using sub-agents."""
         from victor.agent.subagents import SubAgentRole
 
-        SubAgentTask = getattr(__import__("victor.agent.subagents", fromlist=["SubAgentTask"]), "SubAgentTask", None)
+        SubAgentTask = getattr(
+            __import__("victor.agent.subagents", fromlist=["SubAgentTask"]), "SubAgentTask", None
+        )
 
         while not plan.is_complete() and not plan.is_failed():
             ready_steps = plan.get_ready_steps()

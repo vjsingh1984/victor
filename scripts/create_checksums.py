@@ -59,10 +59,7 @@ def generate_checksums(dist_dir: Path = Path("dist")) -> Dict[str, str]:
     return checksums
 
 
-def write_checksums_file(
-    checksums: Dict[str, str],
-    output_file: Path = Path("SHA256SUMS")
-) -> None:
+def write_checksums_file(checksums: Dict[str, str], output_file: Path = Path("SHA256SUMS")) -> None:
     """
     Write checksums to SHA256SUMS file.
 
@@ -163,19 +160,19 @@ def main() -> None:
     parser.add_argument(
         "--verify",
         action="store_true",
-        help="Verify existing checksums instead of generating new ones"
+        help="Verify existing checksums instead of generating new ones",
     )
     parser.add_argument(
         "--dist-dir",
         type=Path,
         default=Path("dist"),
-        help="Path to distribution directory (default: dist)"
+        help="Path to distribution directory (default: dist)",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=Path("SHA256SUMS"),
-        help="Path to output checksums file (default: SHA256SUMS)"
+        help="Path to output checksums file (default: SHA256SUMS)",
     )
 
     args = parser.parse_args()

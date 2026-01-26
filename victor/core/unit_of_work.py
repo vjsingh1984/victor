@@ -577,7 +577,9 @@ def create_unit_of_work(backend: str = "memory", **kwargs: Any) -> UnitOfWork:
 
 
 @asynccontextmanager
-async def transactional(*repositories: tuple[Repository[Entity], Type[Entity]]) -> AsyncIterator[UnitOfWork]:
+async def transactional(
+    *repositories: tuple[Repository[Entity], Type[Entity]]
+) -> AsyncIterator[UnitOfWork]:
     """Context manager for transactional operations.
 
     Example:

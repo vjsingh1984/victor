@@ -513,12 +513,7 @@ class TeamOptimizer:
             metrics["success_probability"] = float(success_result.predicted_value)
             metrics["quality_score"] = float(quality_result.predicted_value)
             metrics["confidence"] = float(
-                (
-                    time_result.confidence
-                    + success_result.confidence
-                    + quality_result.confidence
-                )
-                / 3
+                (time_result.confidence + success_result.confidence + quality_result.confidence) / 3
             )
 
         # Calculate score based on objective

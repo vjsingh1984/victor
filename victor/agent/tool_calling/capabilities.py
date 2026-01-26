@@ -289,7 +289,9 @@ class ModelCapabilityLoader:
         if "thinking_disable_prefix" in training:
             resolved["thinking_disable_prefix"] = training["thinking_disable_prefix"]
 
-    def _find_matching_model(self, models: Dict[str, Any], model_lower: str) -> List[Tuple[int, str, Dict[str, Any]]]:
+    def _find_matching_model(
+        self, models: Dict[str, Any], model_lower: str
+    ) -> List[Tuple[int, str, Dict[str, Any]]]:
         """Find matching model patterns, sorted by specificity."""
         matching = []
 

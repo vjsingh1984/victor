@@ -370,13 +370,16 @@ class ComputeNodeRunner(BaseNodeRunner):
                     raise ValueError("ToolRegistry is required but not set")
                 # Create mock objects for compatibility with handler signature
                 from dataclasses import dataclass
+
                 @dataclass
                 class MockComputeNode:
                     id: str
                     description: str
+
                 @dataclass
                 class MockWorkflowContext:
                     data: Dict[str, Any]
+
                 mock_node = MockComputeNode(id="_compute_", description="Compute handler")
                 mock_context = MockWorkflowContext(data=context)
                 result = await handler(

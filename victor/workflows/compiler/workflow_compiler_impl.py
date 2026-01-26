@@ -139,6 +139,7 @@ class WorkflowCompilerImpl:
         result = legacy_compiler.compile(yaml_def)
         # Cast to protocol for type safety
         from typing import cast
+
         return cast("CompiledGraphProtocol", result)
 
 

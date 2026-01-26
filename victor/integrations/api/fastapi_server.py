@@ -767,9 +767,24 @@ class VictorFastAPIServer:
                             configured = True
                             try:
                                 provider_instance = provider_class()
-                                supports_tools = provider_instance.supports_tools() if hasattr(provider_instance, "supports_tools") and callable(provider_instance.supports_tools) else False
-                                supports_streaming = provider_instance.supports_streaming() if hasattr(provider_instance, "supports_streaming") and callable(provider_instance.supports_streaming) else True
-                                configured = provider_instance.is_configured() if hasattr(provider_instance, "is_configured") and callable(provider_instance.is_configured) else True
+                                supports_tools = (
+                                    provider_instance.supports_tools()
+                                    if hasattr(provider_instance, "supports_tools")
+                                    and callable(provider_instance.supports_tools)
+                                    else False
+                                )
+                                supports_streaming = (
+                                    provider_instance.supports_streaming()
+                                    if hasattr(provider_instance, "supports_streaming")
+                                    and callable(provider_instance.supports_streaming)
+                                    else True
+                                )
+                                configured = (
+                                    provider_instance.is_configured()
+                                    if hasattr(provider_instance, "is_configured")
+                                    and callable(provider_instance.is_configured)
+                                    else True
+                                )
                             except Exception:
                                 pass
 
@@ -1917,6 +1932,7 @@ Respond with just the command to run."""
                     if provider != recommendation.value:
                         q_val = learner_ms._get_q_value(provider, task_type)
                         alternatives.append({"provider": provider, "q_value": round(q_val, 3)})
+
                 # Sort by q_value, handling None values as 0
                 def sort_key(item: dict[str, object]) -> float:
                     val = item.get("q_value")
@@ -1926,13 +1942,16 @@ Respond with just the command to run."""
                     if isinstance(val, (int, float)):
                         return float(val)
                     return 0.0
+
                 alternatives.sort(key=sort_key, reverse=True)
 
                 return JSONResponse(
                     {
                         "provider": recommendation.value,
                         "model": None,
-                        "q_value": round(learner_ms._get_q_value(recommendation.value, task_type), 3),
+                        "q_value": round(
+                            learner_ms._get_q_value(recommendation.value, task_type), 3
+                        ),
                         "confidence": round(recommendation.confidence, 3),
                         "reason": recommendation.reason,
                         "task_type": task_type,

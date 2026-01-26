@@ -79,6 +79,7 @@ class TreeSitterValidator:
         """Check if tree-sitter is available."""
         try:
             import tree_sitter
+
             return True
         except ImportError:
             logger.warning("tree-sitter not available for validation")
@@ -174,9 +175,7 @@ class TreeSitterValidator:
 
             if errors:
                 result.is_valid = False
-                logger.debug(
-                    f"Tree-sitter found {len(errors)} errors in {file_path}"
-                )
+                logger.debug(f"Tree-sitter found {len(errors)} errors in {file_path}")
             else:
                 logger.debug(f"Tree-sitter validation passed for {file_path}")
 
@@ -290,22 +289,26 @@ class TreeSitterValidator:
             if len(error_text) > 50:
                 error_text = error_text[:47] + "..."
 
-            errors.append({
-                "line": node.start_point[0] + 1,
-                "column": node.start_point[1],
-                "end_line": node.end_point[0] + 1,
-                "end_column": node.end_point[1],
-                "message": f"Syntax error: {error_text}" if error_text else "Syntax error",
-                "code": "TS0001",
-            })
+            errors.append(
+                {
+                    "line": node.start_point[0] + 1,
+                    "column": node.start_point[1],
+                    "end_line": node.end_point[0] + 1,
+                    "end_column": node.end_point[1],
+                    "message": f"Syntax error: {error_text}" if error_text else "Syntax error",
+                    "code": "TS0001",
+                }
+            )
 
         elif node.is_missing:
-            errors.append({
-                "line": node.start_point[0] + 1,
-                "column": node.start_point[1],
-                "message": f"Missing: {node.type}",
-                "code": "TS0002",
-            })
+            errors.append(
+                {
+                    "line": node.start_point[0] + 1,
+                    "column": node.start_point[1],
+                    "message": f"Missing: {node.type}",
+                    "code": "TS0002",
+                }
+            )
 
         # Visit children
         for child in node.children:

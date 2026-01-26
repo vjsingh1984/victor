@@ -22,7 +22,9 @@ from .types import (
 logger = logging.getLogger(__name__)
 
 # Default config file location
-DEFAULT_CONFIG_PATH = Path(__file__).parent.parent.parent / "config" / "languages" / "capabilities.yaml"
+DEFAULT_CONFIG_PATH = (
+    Path(__file__).parent.parent.parent / "config" / "languages" / "capabilities.yaml"
+)
 
 
 def _parse_ast_access_method(value: str) -> ASTAccessMethod:

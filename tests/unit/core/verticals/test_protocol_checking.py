@@ -30,19 +30,16 @@ import pytest
 class TestProtocol(Protocol):
     """A test protocol for checking."""
 
-    def get_name(self) -> str:
-        ...
+    def get_name(self) -> str: ...
 
-    def get_value(self) -> int:
-        ...
+    def get_value(self) -> int: ...
 
 
 @runtime_checkable
 class AnotherProtocol(Protocol):
     """Another test protocol."""
 
-    def do_something(self) -> None:
-        ...
+    def do_something(self) -> None: ...
 
 
 class ConformingClass:

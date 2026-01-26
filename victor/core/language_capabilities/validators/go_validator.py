@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 # Check if gopygo is available
 try:
     import gopygo
+
     GOPYGO_AVAILABLE = True
 except ImportError:
     GOPYGO_AVAILABLE = False
@@ -123,13 +124,15 @@ class GoValidator:
             line = 1
             column = 0
 
-            issues.append(ValidationIssue(
-                line=line,
-                column=column,
-                message=error_msg,
-                severity=ValidationSeverity.ERROR,
-                source="gopygo",
-            ))
+            issues.append(
+                ValidationIssue(
+                    line=line,
+                    column=column,
+                    message=error_msg,
+                    severity=ValidationSeverity.ERROR,
+                    source="gopygo",
+                )
+            )
 
             return CodeValidationResult(
                 is_valid=False,

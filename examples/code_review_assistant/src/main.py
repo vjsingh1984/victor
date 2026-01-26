@@ -41,13 +41,27 @@ def cli():
 @cli.command()
 @click.argument("path", type=click.Path(exists=True))
 @click.option("--recursive", "-r", is_flag=True, help="Review directories recursively")
-@click.option("--severity", "-s", multiple=True, help="Filter by severity (low, medium, high, critical)")
-@click.option("--checks", "-c", multiple=True, help="Specific checks to run (security, style, complexity, quality)")
+@click.option(
+    "--severity", "-s", multiple=True, help="Filter by severity (low, medium, high, critical)"
+)
+@click.option(
+    "--checks",
+    "-c",
+    multiple=True,
+    help="Specific checks to run (security, style, complexity, quality)",
+)
 @click.option("--max-complexity", type=int, default=10, help="Maximum cyclomatic complexity")
 @click.option("--ignore", "-i", multiple=True, help="Patterns to ignore")
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output")
-def review(path: str, recursive: bool, severity: tuple, checks: tuple,
-           max_complexity: int, ignore: tuple, verbose: bool):
+def review(
+    path: str,
+    recursive: bool,
+    severity: tuple,
+    checks: tuple,
+    max_complexity: int,
+    ignore: tuple,
+    verbose: bool,
+):
     """Review code files or directories.
 
     Examples:
@@ -58,18 +72,27 @@ def review(path: str, recursive: bool, severity: tuple, checks: tuple,
     asyncio.run(_review(path, recursive, severity, checks, max_complexity, ignore, verbose))
 
 
-async def _review(path: str, recursive: bool, severity: tuple, checks: tuple,
-                  max_complexity: int, ignore: tuple, verbose: bool):
+async def _review(
+    path: str,
+    recursive: bool,
+    severity: tuple,
+    checks: tuple,
+    max_complexity: int,
+    ignore: tuple,
+    verbose: bool,
+):
     """Execute code review."""
     from src.review_engine import ReviewEngine
     from src.config import load_config
 
     # Display welcome banner
-    console.print(Panel.fit(
-        "[bold blue]Victor AI Code Review Assistant[/bold blue]\n"
-        "Comprehensive code analysis powered by Victor AI",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Victor AI Code Review Assistant[/bold blue]\n"
+            "Comprehensive code analysis powered by Victor AI",
+            border_style="blue",
+        )
+    )
 
     # Load configuration
     config = load_config()
@@ -142,14 +165,21 @@ def _display_results(results: dict):
                 "low": "blue",
             }.get(issue["severity"], "white")
 
-            console.print(f"[{severity_color}]●[/] [bold]{issue['severity'].upper()}[/] "
-                         f"{issue['message']} ({issue['file']}:{issue['line']})")
+            console.print(
+                f"[{severity_color}]●[/] [bold]{issue['severity'].upper()}[/] "
+                f"{issue['message']} ({issue['file']}:{issue['line']})"
+            )
 
 
 @cli.command()
 @click.argument("path", type=click.Path(exists=True))
-@click.option("--format", "-f", type=click.Choice(["html", "json", "markdown"]), default="html",
-              help="Report format")
+@click.option(
+    "--format",
+    "-f",
+    type=click.Choice(["html", "json", "markdown"]),
+    default="html",
+    help="Report format",
+)
 @click.option("--output", "-o", type=click.Path(), help="Output file path")
 @click.option("--recursive", "-r", is_flag=True, help="Review directories recursively")
 def report(path: str, format: str, output: Optional[str], recursive: bool):
@@ -168,10 +198,9 @@ async def _report(path: str, format: str, output: Optional[str], recursive: bool
     from src.report_generator import ReportGenerator
     from src.config import load_config
 
-    console.print(Panel.fit(
-        "[bold blue]Victor AI Report Generator[/bold blue]",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit("[bold blue]Victor AI Report Generator[/bold blue]", border_style="blue")
+    )
 
     # Load configuration
     config = load_config()
@@ -214,11 +243,13 @@ async def _interactive():
     from src.interactive_session import InteractiveSession
     from src.config import load_config
 
-    console.print(Panel.fit(
-        "[bold blue]Victor AI Interactive Review[/bold blue]\n"
-        "Type your code or file paths for real-time analysis",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Victor AI Interactive Review[/bold blue]\n"
+            "Type your code or file paths for real-time analysis",
+            border_style="blue",
+        )
+    )
 
     # Load configuration
     config = load_config()
@@ -234,8 +265,13 @@ async def _interactive():
 
 @cli.command()
 @click.argument("path", type=click.Path(exists=True))
-@click.option("--formation", "-f", type=click.Choice(["parallel", "sequential", "hierarchical"]),
-              default="parallel", help="Team formation type")
+@click.option(
+    "--formation",
+    "-f",
+    type=click.Choice(["parallel", "sequential", "hierarchical"]),
+    default="parallel",
+    help="Team formation type",
+)
 @click.option("--roles", "-r", multiple=True, help="Specific roles to include")
 def team_review(path: str, formation: str, roles: tuple):
     """Run multi-agent team review.
@@ -254,11 +290,12 @@ async def _team_review(path: str, formation: str, roles: tuple):
     from src.team_reviewer import TeamReviewer
     from src.config import load_config
 
-    console.print(Panel.fit(
-        "[bold blue]Victor AI Multi-Agent Team Review[/bold blue]\n"
-        f"Formation: {formation}",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Victor AI Multi-Agent Team Review[/bold blue]\n" f"Formation: {formation}",
+            border_style="blue",
+        )
+    )
 
     # Load configuration
     config = load_config()
@@ -287,13 +324,15 @@ def _display_team_results(results: dict):
 
     # Agent results
     for agent_name, agent_results in results.get("agents", {}).items():
-        console.print(Panel(
-            f"[bold]{agent_name}[/bold]\n"
-            f"Issues Found: {agent_results.get('issue_count', 0)}\n"
-            f"Confidence: {agent_results.get('confidence', 0):.1%}",
-            title=agent_name,
-            border_style="cyan"
-        ))
+        console.print(
+            Panel(
+                f"[bold]{agent_name}[/bold]\n"
+                f"Issues Found: {agent_results.get('issue_count', 0)}\n"
+                f"Confidence: {agent_results.get('confidence', 0):.1%}",
+                title=agent_name,
+                border_style="cyan",
+            )
+        )
 
     # Aggregated findings
     console.print("\n[bold yellow]Aggregated Findings:[/bold yellow]")

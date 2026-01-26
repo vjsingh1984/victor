@@ -236,6 +236,7 @@ def bootstrap_container(
     # Apply overrides for testing
     if override_services:
         for service_type, instance in override_services.items():
+
             def make_factory(c: ServiceContainer, inst: Any = instance) -> Any:  # noqa: B023
                 return inst
 
@@ -697,7 +698,10 @@ def _ensure_vertical_activated(
             # Update the extensions in container
             extensions = loader.get_extensions()
             if extensions:
-                def make_ext_factory(c: ServiceContainer, ext: Any = extensions) -> Any:  # noqa: B023
+
+                def make_ext_factory(
+                    c: ServiceContainer, ext: Any = extensions
+                ) -> Any:  # noqa: B023
                     return ext
 
                 container.register_or_replace(

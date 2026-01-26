@@ -569,7 +569,7 @@ class StateCoordinator:
         if self._conversation_state:
             conv_summary: Dict[str, Any] = (
                 self._conversation_state.get_state_summary()
-                if callable(getattr(self._conversation_state, 'get_state_summary', None))
+                if callable(getattr(self._conversation_state, "get_state_summary", None))
                 else {}
             )
             summary["conversation"] = conv_summary

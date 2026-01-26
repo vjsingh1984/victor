@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 else:
     try:
         from victor.storage.graph.duckdb_store import DuckDBGraphStore as _DuckDBGraphStore
+
         _duckdb_available: Optional[type[_DuckDBGraphStore]] = _DuckDBGraphStore
     except Exception:
         _duckdb_available: Optional[type[_DuckDBGraphStore]] = None

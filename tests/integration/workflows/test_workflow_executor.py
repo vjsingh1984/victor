@@ -337,7 +337,9 @@ class TestWorkflowExecutorE2E:
 class TestCheckpointFunctionality:
     """Tests for checkpoint save/resume functionality."""
 
-    async def test_checkpoint_saved_after_each_node(self, mock_orchestrator, simple_workflow) -> None:
+    async def test_checkpoint_saved_after_each_node(
+        self, mock_orchestrator, simple_workflow
+    ) -> None:
         """Test that checkpoints are saved after each node execution."""
         # Create a mock checkpointer
         mock_checkpointer = MagicMock()

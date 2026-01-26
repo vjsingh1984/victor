@@ -81,8 +81,7 @@ class PythonASTValidator:
                 issue.end_column = e.end_offset
 
             logger.debug(
-                f"Python syntax validation failed for {file_path}: "
-                f"line {e.lineno}, {e.msg}"
+                f"Python syntax validation failed for {file_path}: " f"line {e.lineno}, {e.msg}"
             )
 
         except Exception as e:
@@ -182,9 +181,11 @@ class PythonASTValidator:
             ast.parse(code)
             return []
         except SyntaxError as e:
-            return [{
-                "line": e.lineno or 1,
-                "column": e.offset or 0,
-                "message": str(e.msg) if e.msg else "Syntax error",
-                "text": e.text,
-            }]
+            return [
+                {
+                    "line": e.lineno or 1,
+                    "column": e.offset or 0,
+                    "message": str(e.msg) if e.msg else "Syntax error",
+                    "text": e.text,
+                }
+            ]

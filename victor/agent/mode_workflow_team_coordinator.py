@@ -311,7 +311,11 @@ class LearningBasedTeamSelector:
 
         try:
             recommendation = self._learner.suggest_team(task_type)
-            if recommendation and hasattr(recommendation, 'is_baseline') and not recommendation.is_baseline:
+            if (
+                recommendation
+                and hasattr(recommendation, "is_baseline")
+                and not recommendation.is_baseline
+            ):
                 # Map formation to team name
                 return self._find_team_for_recommendation(recommendation, available_teams)
         except Exception as e:

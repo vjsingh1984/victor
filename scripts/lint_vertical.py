@@ -285,9 +285,7 @@ class VerticalLinter:
                                 )
                             )
 
-    def _check_documentation(
-        self, file_path: Path, tree: ast.AST, content: str
-    ) -> None:
+    def _check_documentation(self, file_path: Path, tree: ast.AST, content: str) -> None:
         """Check documentation completeness.
 
         Args:
@@ -321,7 +319,7 @@ class VerticalLinter:
                             file_path=str(file_path),
                             line_number=node.lineno,
                             message=f"Class {node.name} missing docstring",
-                            suggestion=f'Add docstring to class {node.name}',
+                            suggestion=f"Add docstring to class {node.name}",
                         )
                     )
 
@@ -340,7 +338,7 @@ class VerticalLinter:
                             file_path=str(file_path),
                             line_number=node.lineno,
                             message=f"Function {node.name} missing docstring",
-                            suggestion=f'Add docstring to function {node.name}',
+                            suggestion=f"Add docstring to function {node.name}",
                         )
                     )
 
@@ -403,8 +401,17 @@ class VerticalLinter:
             if module_name.startswith("victor"):
                 local_imports.append(imp)
             elif module_name.split(".")[0] in [
-                "os", "sys", "pathlib", "typing", "dataclasses", "enum",
-                "logging", "re", "json", "yaml", "asyncio",
+                "os",
+                "sys",
+                "pathlib",
+                "typing",
+                "dataclasses",
+                "enum",
+                "logging",
+                "re",
+                "json",
+                "yaml",
+                "asyncio",
             ]:
                 stdlib_imports.append(imp)
             else:
@@ -665,7 +672,9 @@ def main() -> int:
 
     if args.all_verticals:
         victor_dir = Path("victor")
-        vertical_dirs = [d for d in victor_dir.iterdir() if d.is_dir() and not d.name.startswith("_")]
+        vertical_dirs = [
+            d for d in victor_dir.iterdir() if d.is_dir() and not d.name.startswith("_")
+        ]
 
         for vertical_dir in vertical_dirs:
             if not (vertical_dir / "assistant.py").exists():

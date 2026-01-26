@@ -217,7 +217,9 @@ class CoordinatorProfiler:
 
         # Try direct import
         try:
-            module = importlib.import_module(f"victor.agent.coordinators.{coordinator_name.lower()}")
+            module = importlib.import_module(
+                f"victor.agent.coordinators.{coordinator_name.lower()}"
+            )
             return getattr(module, coordinator_name)
         except (ImportError, AttributeError):
             pass
@@ -279,9 +281,7 @@ class CoordinatorProfiler:
 
             # High time per call
             if nc > 0 and tt / nc > 0.001:
-                suggestions.append(
-                    f"Optimize {func_name} (average {tt/nc*1000:.2f}ms per call)"
-                )
+                suggestions.append(f"Optimize {func_name} (average {tt/nc*1000:.2f}ms per call)")
 
         # Coordinator-specific suggestions
         coordinator_suggestions = {
@@ -406,7 +406,7 @@ class CoordinatorProfiler:
             reverse=True,
         )[:20]
         for func, count in sorted_calls:
-            function_rows += f'<tr><td>{func}</td><td>{count}</td></tr>'
+            function_rows += f"<tr><td>{func}</td><td>{count}</td></tr>"
 
         # Generate bottlenecks section
         bottlenecks = ""

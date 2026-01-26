@@ -384,7 +384,11 @@ class NodeExecutorFactory:
                             tool_budget=node.tool_budget,
                             allowed_tools=node.allowed_tools,
                         )
-                        return result.to_dict() if hasattr(result, "to_dict") else {"output": str(result)}
+                        return (
+                            result.to_dict()
+                            if hasattr(result, "to_dict")
+                            else {"output": str(result)}
+                        )
 
                     # Execute with timeout if configured
                     if timeout_seconds:
@@ -555,6 +559,7 @@ class NodeExecutorFactory:
             async def execute_agent_with_retry(state: Dict[str, Any]) -> Dict[str, Any]:
                 """Wrapper that applies retry policy to agent execution."""
                 from typing import cast
+
                 result = await retry_executor.execute_async(lambda: execute_agent(state))
                 if result.success:
                     return cast(Dict[str, Any], result.result)
@@ -633,7 +638,9 @@ class NodeExecutorFactory:
 
                         context = WorkflowContext(dict(state))
                         if tool_registry is None:
-                            raise ValueError(f"Tool registry is required for compute node '{node.id}'")
+                            raise ValueError(
+                                f"Tool registry is required for compute node '{node.id}'"
+                            )
                         result = await handler(node, context, tool_registry)
 
                         # Transfer context changes back to state
@@ -790,6 +797,7 @@ class NodeExecutorFactory:
             async def execute_compute_with_retry(state: Dict[str, Any]) -> Dict[str, Any]:
                 """Wrapper that applies retry policy to compute execution."""
                 from typing import cast
+
                 result = await retry_executor.execute_async(lambda: execute_compute(state))
                 if result.success:
                     return cast(Dict[str, Any], result.result)
@@ -1127,6 +1135,7 @@ class NodeExecutorFactory:
                     raise ValueError(f"Orchestrator is required for team node '{node.id}'")
 
                 from victor.agent.orchestrator import AgentOrchestrator
+
                 runner = TeamNodeRunner(
                     orchestrator=cast(AgentOrchestrator, orchestrator),
                     tool_registry=tool_registry,

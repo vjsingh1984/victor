@@ -62,7 +62,10 @@ def build_self_cls_usage_counts() -> Counter:
                 for tok in tokenize.tokenize(handle.readline):
                     if tok.type == tokenize.NAME:
                         if prev_prev and prev and prev.type == tokenize.OP and prev.string == ".":
-                            if prev_prev.type == tokenize.NAME and prev_prev.string in {"self", "cls"}:
+                            if prev_prev.type == tokenize.NAME and prev_prev.string in {
+                                "self",
+                                "cls",
+                            }:
                                 counts[tok.string] += 1
                         prev_prev = prev
                         prev = tok
@@ -162,21 +165,29 @@ def main() -> int:
 
         reasons: list[str] = []
         if is_false_positive(entry, reasons, nested_lines):
-            false_positives.append({
-                **entry,
-                "reasons": reasons,
-            })
+            false_positives.append(
+                {
+                    **entry,
+                    "reasons": reasons,
+                }
+            )
             continue
 
-        if entry.get("severity") == "low" and entry.get("is_private") and not entry.get("is_dunder"):
+        if (
+            entry.get("severity") == "low"
+            and entry.get("is_private")
+            and not entry.get("is_dunder")
+        ):
             if not (entry.get("file") or "").endswith(".py"):
                 continue
             confidence = confidence_score(entry, self_cls_counts)
             if confidence >= 0.6:
-                prune_shortlist.append({
-                    **entry,
-                    "confidence": confidence,
-                })
+                prune_shortlist.append(
+                    {
+                        **entry,
+                        "confidence": confidence,
+                    }
+                )
 
     false_positives.sort(key=lambda x: (x.get("module", ""), x.get("name", "")))
     prune_shortlist.sort(key=lambda x: x["confidence"], reverse=True)
@@ -193,9 +204,7 @@ def main() -> int:
         "prune_shortlist_count": len(prune_shortlist),
         "prune_shortlist_top": prune_shortlist[:20],
     }
-    (REPORT_DIR / "07_dead_code_triage_summary.json").write_text(
-        json.dumps(summary, indent=2)
-    )
+    (REPORT_DIR / "07_dead_code_triage_summary.json").write_text(json.dumps(summary, indent=2))
 
     print("Dead code triage written:")
     print(f"- {REPORT_DIR / '06_dead_code_false_positives.json'}")

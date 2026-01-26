@@ -166,7 +166,10 @@ class SqliteLanceDBStore:
             self._vector_store = lancedb.connect(str(embeddings_dir))
 
             # Check if table exists
-            if self._vector_store is not None and "symbols" in self._vector_store.list_tables().tables:
+            if (
+                self._vector_store is not None
+                and "symbols" in self._vector_store.list_tables().tables
+            ):
                 self._vector_table = self._vector_store.open_table("symbols")
         except ImportError:
             logger.warning("LanceDB not available. Semantic search disabled.")

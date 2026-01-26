@@ -26,7 +26,9 @@ def apply_fixes():
                 # Fix indentation
                 j = i + 1
                 while j < len(lines) and not lines[j].strip().startswith(")"):
-                    if lines[j].startswith("            ") and not lines[j].startswith("                "):
+                    if lines[j].startswith("            ") and not lines[j].startswith(
+                        "                "
+                    ):
                         lines[j] = "                " + lines[j].strip() + "\n"
                         j += 1
                         modified = True

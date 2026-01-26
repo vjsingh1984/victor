@@ -203,7 +203,7 @@ class CollaborationMixin:
         # Create protocol
         log_messages = config.get("log_messages", True)
         self._communication_protocol = TeamCommunicationProtocol(
-            members=getattr(self, 'members', []),
+            members=getattr(self, "members", []),
             communication_type=comm_type,
             log_messages=log_messages,
         )
@@ -265,7 +265,7 @@ class CollaborationMixin:
         # Create framework
         max_rounds = config.get("max_rounds", 3)
         self._negotiation_framework = NegotiationFramework(
-            members=getattr(self, 'members', []),
+            members=getattr(self, "members", []),
             voting_strategy=voting,
             negotiation_type=neg_type,
             max_rounds=max_rounds,
@@ -719,10 +719,10 @@ class CollaborationMixin:
         """
         if not self._collaboration_enabled:
             # Fall back to regular execution
-            return cast("Dict[str, Any]", await getattr(self, 'execute_task')(task, context))
+            return cast("Dict[str, Any]", await getattr(self, "execute_task")(task, context))
 
         # Execute task
-        result = cast("Dict[str, Any]", await getattr(self, 'execute_task')(task, context))
+        result = cast("Dict[str, Any]", await getattr(self, "execute_task")(task, context))
 
         # Add collaboration metadata
         if self._communication_protocol:

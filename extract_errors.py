@@ -4,9 +4,9 @@
 import re
 
 errors = []
-with open('/tmp/mypy_errors.log', 'r') as f:
+with open("/tmp/mypy_errors.log", "r") as f:
     for line in f:
-        match = re.match(r'^(\d+)->(.+)', line)
+        match = re.match(r"^(\d+)->(.+)", line)
         if match:
             error_num = int(match.group(1))
             if 601 <= error_num <= 650:
@@ -14,17 +14,18 @@ with open('/tmp/mypy_errors.log', 'r') as f:
 
 # Group by file
 from collections import defaultdict
+
 by_file = defaultdict(list)
 for error_num, error_line in errors:
     # Extract file path
-    file_match = re.match(r'^([^:]+):\d+:', error_line)
+    file_match = re.match(r"^([^:]+):\d+:", error_line)
     if file_match:
         by_file[file_match.group(1)].append((error_num, error_line))
 
 # Print summary
 print(f"Total errors 601-650: {len(errors)}")
 print(f"\nFiles affected: {len(by_file)}")
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 
 for file_path in sorted(by_file.keys()):
     error_list = by_file[file_path]

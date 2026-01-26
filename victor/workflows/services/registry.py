@@ -580,10 +580,14 @@ class RestartPolicyEnforcer:
 
             # Stop if still running
             if entry.handle and entry.handle.state == ServiceState.HEALTHY:
-                await self.registry._stop_service(service_name, grace_period=entry.config.lifecycle.shutdown_grace)
+                await self.registry._stop_service(
+                    service_name, grace_period=entry.config.lifecycle.shutdown_grace
+                )
 
             # Start again
-            await self.registry._start_service(service_name, timeout=entry.config.lifecycle.startup_timeout)
+            await self.registry._start_service(
+                service_name, timeout=entry.config.lifecycle.startup_timeout
+            )
 
             # Record success
             self._restart_history[service_name].append(

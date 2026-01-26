@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 # Check if libclang is available
 try:
     import clang.cindex as cindex
+
     LIBCLANG_AVAILABLE = True
 except ImportError:
     LIBCLANG_AVAILABLE = False
@@ -177,15 +178,13 @@ class CppExtractor(BaseLanguageProcessor):
                 args=args,
                 unsaved_files=[(str(file_path), code)],
                 options=(
-                    cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD |
-                    cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
+                    cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
+                    | cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
                 ),
             )
 
             # Extract symbols from AST
-            self._extract_from_cursor(
-                tu.cursor, file_path, symbols, str(file_path)
-            )
+            self._extract_from_cursor(tu.cursor, file_path, symbols, str(file_path))
 
         except Exception as e:
             logger.debug(f"libclang parsing error: {e}")
@@ -214,14 +213,16 @@ class CppExtractor(BaseLanguageProcessor):
             name = cursor.spelling
 
             if name:  # Skip anonymous types
-                symbols.append(ExtractedSymbol(
-                    name=name,
-                    symbol_type=symbol_type,
-                    file_path=str(file_path),
-                    line_number=cursor.location.line,
-                    end_line=cursor.extent.end.line if cursor.extent else None,
-                    parent_symbol=parent,
-                ))
+                symbols.append(
+                    ExtractedSymbol(
+                        name=name,
+                        symbol_type=symbol_type,
+                        file_path=str(file_path),
+                        line_number=cursor.location.line,
+                        end_line=cursor.extent.end.line if cursor.extent else None,
+                        parent_symbol=parent,
+                    )
+                )
 
                 # Update parent for nested symbols
                 if symbol_type in ("class", "struct", "namespace"):
@@ -229,9 +230,7 @@ class CppExtractor(BaseLanguageProcessor):
 
         # Recurse into children
         for child in cursor.get_children():
-            self._extract_from_cursor(
-                child, file_path, symbols, target_file, parent
-            )
+            self._extract_from_cursor(child, file_path, symbols, target_file, parent)
 
     def has_syntax_errors(self, code: str, language: str = "cpp") -> bool:
         """Check if C/C++ code has syntax errors.
@@ -303,20 +302,24 @@ class CppExtractor(BaseLanguageProcessor):
             }
 
             for diag in tu.diagnostics:
-                diagnostics.append({
-                    "line": diag.location.line,
-                    "column": diag.location.column,
-                    "message": diag.spelling,
-                    "severity": severity_map.get(diag.severity, "unknown"),
-                })
+                diagnostics.append(
+                    {
+                        "line": diag.location.line,
+                        "column": diag.location.column,
+                        "message": diag.spelling,
+                        "severity": severity_map.get(diag.severity, "unknown"),
+                    }
+                )
 
         except Exception as e:
-            diagnostics.append({
-                "line": 1,
-                "column": 0,
-                "message": str(e),
-                "severity": "error",
-            })
+            diagnostics.append(
+                {
+                    "line": 1,
+                    "column": 0,
+                    "message": str(e),
+                    "severity": "error",
+                }
+            )
 
         return diagnostics
 

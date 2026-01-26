@@ -38,6 +38,7 @@ except ImportError:
 
 class ValidationSeverity(Enum):
     """Validation issue severity."""
+
     ERROR = "ERROR"
     WARNING = "WARNING"
 
@@ -54,9 +55,7 @@ class ValidationIssue:
 
     def __str__(self) -> str:
         """Format issue for display."""
-        return (
-            f"[{self.severity.value}] {self.file_path}::{self.field_path} - {self.message}"
-        )
+        return f"[{self.severity.value}] {self.file_path}::{self.field_path} - {self.message}"
 
 
 @dataclass
@@ -137,7 +136,13 @@ class ConfigValidator:
                 "required": ["name", "display_name", "formation", "roles"],
                 "optional": ["description", "communication_style", "max_iterations"],
                 "enums": {
-                    "formation": ["pipeline", "parallel", "sequential", "hierarchical", "consensus"],
+                    "formation": [
+                        "pipeline",
+                        "parallel",
+                        "sequential",
+                        "hierarchical",
+                        "consensus",
+                    ],
                     "communication_style": ["structured", "freeform", "minimal"],
                 },
             },
@@ -608,7 +613,9 @@ class ConfigValidator:
             print("\nInvalid Files:")
             for result in self.results:
                 if not result.is_valid:
-                    print(f"  - {result.file_path} ({result.error_count} errors, {result.warning_count} warnings)")
+                    print(
+                        f"  - {result.file_path} ({result.error_count} errors, {result.warning_count} warnings)"
+                    )
 
 
 def main() -> int:

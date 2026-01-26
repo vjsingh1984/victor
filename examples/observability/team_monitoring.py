@@ -378,9 +378,7 @@ async def export_metrics_to_json() -> None:
     summary = collector.get_summary()
     if summary["total_teams_executed"] > 0:
         # Export a few example teams
-        data["team_details"]["code_review_team"] = collector.get_team_metrics(
-            "code_review_team"
-        )
+        data["team_details"]["code_review_team"] = collector.get_team_metrics("code_review_team")
         data["team_details"]["decision_team"] = collector.get_team_metrics("decision_team")
 
     # Write to file

@@ -379,12 +379,16 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
         for middleware in reversed(self._middleware):
             current_chain = chain
 
-            async def make_next(mw: Middleware[TRequest, TResponse], next_fn: NextHandler) -> TResponse:
+            async def make_next(
+                mw: Middleware[TRequest, TResponse], next_fn: NextHandler
+            ) -> TResponse:
                 result = await mw(context, next_fn)
                 return result
 
             # Capture current middleware and chain in closure
-            updated_chain: Callable[[], Awaitable[TResponse]] = self._make_chain_link(middleware, current_chain, context)
+            updated_chain: Callable[[], Awaitable[TResponse]] = self._make_chain_link(
+                middleware, current_chain, context
+            )
             chain = updated_chain
 
         return chain
@@ -592,6 +596,7 @@ class RetryMiddleware(Middleware[TRequest, TResponse]):
         for attempt in range(self._max_retries + 1):
             try:
                 from typing import cast
+
                 return cast(TResponse, await next_handler())
 
             except self._retry_on as e:
@@ -887,13 +892,7 @@ def create_default_pipeline() -> MiddlewarePipeline[Any, Any]:
     Returns:
         Pipeline with logging, timing, and error handling.
     """
-    return (
-        PipelineBuilder[Any, Any]()
-        .with_error_handling()
-        .with_logging()
-        .with_timing()
-        .build()
-    )
+    return PipelineBuilder[Any, Any]().with_error_handling().with_logging().with_timing().build()
 
 
 def create_resilient_pipeline(

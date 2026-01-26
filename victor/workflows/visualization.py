@@ -814,6 +814,7 @@ class WorkflowVisualizer:
         else:
             # Try in order
             from typing import Callable
+
             svg_methods: list[Callable[[Optional[str]], str]] = [
                 self._to_svg_d2,
                 self._to_svg_kroki,
@@ -1012,6 +1013,7 @@ class WorkflowVisualizer:
         else:
             # Try in order
             from typing import Callable, cast
+
             for method in [self._to_png_d2, self._to_png_kroki, self._to_png_graphviz]:
                 try:
                     cast(Callable[[str], None], method)(output_path)

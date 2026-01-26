@@ -19,6 +19,7 @@ from pathlib import Path
 
 # Ensure we can import victor
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
@@ -148,6 +149,7 @@ async def main():
 
             # Simulate work
             import time
+
             time.sleep(0.1)
 
             # Record metrics
@@ -164,6 +166,7 @@ async def main():
     with perf_logger.track_operation("database_query", metadata={"table": "users"}):
         # Simulate query
         import time
+
         time.sleep(0.05)
         logger.info("Query executed")
 
@@ -250,5 +253,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n\nError: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

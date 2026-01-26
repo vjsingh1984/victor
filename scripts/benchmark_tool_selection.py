@@ -279,7 +279,9 @@ class BenchmarkRunner:
             project_root = script_dir.parent
 
         self.project_root = project_root
-        self.benchmark_file = project_root / "tests" / "benchmarks" / "test_tool_selection_benchmark.py"
+        self.benchmark_file = (
+            project_root / "tests" / "benchmarks" / "test_tool_selection_benchmark.py"
+        )
 
     def run(
         self,
@@ -530,7 +532,9 @@ def compare_runs(file1: Path, file2: Optional[Path] = None) -> str:
                 change_str = f"{change:+.2f} ({pct_change:+.1f}%)"
                 speedup_str = f"{speedup:.2f}x" if speedup > 1 else f"{1/speedup:.2f}x slower"
 
-                lines.append(f"| {name} | {m1['value']:.2f} | {m2['value']:.2f} | {change_str} | {speedup_str} |")
+                lines.append(
+                    f"| {name} | {m1['value']:.2f} | {m2['value']:.2f} | {change_str} | {speedup_str} |"
+                )
 
     return "\n".join(lines)
 
@@ -567,7 +571,18 @@ Examples:
     run_parser = subparsers.add_parser("run", help="Run benchmarks")
     run_parser.add_argument(
         "--group",
-        choices=["cold", "warm", "mixed", "context", "rl", "size", "ttl", "memory", "concurrent", "all"],
+        choices=[
+            "cold",
+            "warm",
+            "mixed",
+            "context",
+            "rl",
+            "size",
+            "ttl",
+            "memory",
+            "concurrent",
+            "all",
+        ],
         default="all",
         help="Benchmark group to run",
     )
@@ -583,7 +598,9 @@ Examples:
         default="markdown",
         help="Output format",
     )
-    report_parser.add_argument("--input", type=Path, help="Input JSON file (uses latest if not specified)")
+    report_parser.add_argument(
+        "--input", type=Path, help="Input JSON file (uses latest if not specified)"
+    )
 
     # Compare command
     compare_parser = subparsers.add_parser("compare", help="Compare benchmark runs")

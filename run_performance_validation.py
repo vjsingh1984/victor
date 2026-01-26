@@ -55,21 +55,15 @@ def run_benchmark_tests() -> Dict[str, Any]:
     # Calculate speedups
     baseline = metrics["cold_cache"]["avg_ms"]
     metrics["warm_cache"]["speedup"] = baseline / metrics["warm_cache"]["avg_ms"]
-    metrics["warm_cache"]["latency_reduction"] = (
-        1 - 1 / metrics["warm_cache"]["speedup"]
-    ) * 100
+    metrics["warm_cache"]["latency_reduction"] = (1 - 1 / metrics["warm_cache"]["speedup"]) * 100
     metrics["mixed_cache"]["speedup"] = baseline / metrics["mixed_cache"]["avg_ms"]
-    metrics["mixed_cache"]["latency_reduction"] = (
-        1 - 1 / metrics["mixed_cache"]["speedup"]
-    ) * 100
+    metrics["mixed_cache"]["latency_reduction"] = (1 - 1 / metrics["mixed_cache"]["speedup"]) * 100
     metrics["context_cache"]["speedup"] = baseline / metrics["context_cache"]["avg_ms"]
     metrics["context_cache"]["latency_reduction"] = (
         1 - 1 / metrics["context_cache"]["speedup"]
     ) * 100
     metrics["rl_cache"]["speedup"] = baseline / metrics["rl_cache"]["avg_ms"]
-    metrics["rl_cache"]["latency_reduction"] = (
-        1 - 1 / metrics["rl_cache"]["speedup"]
-    ) * 100
+    metrics["rl_cache"]["latency_reduction"] = (1 - 1 / metrics["rl_cache"]["speedup"]) * 100
 
     return metrics
 
@@ -99,7 +93,9 @@ def run_startup_benchmarks() -> Dict[str, Any]:
         return {}
 
 
-def calculate_improvements(tool_metrics: Dict[str, Any], startup_metrics: Dict[str, Any]) -> Dict[str, Any]:
+def calculate_improvements(
+    tool_metrics: Dict[str, Any], startup_metrics: Dict[str, Any]
+) -> Dict[str, Any]:
     """Calculate performance improvements."""
     improvements = {
         "tool_selection": {
@@ -162,29 +158,31 @@ def generate_performance_report(
             f"| {cache_type} | {avg:.2f} | {p95:.2f} | {hit_rate:.1f}% | {speedup:.2f}x | {reduction:.1f}% |"
         )
 
-    lines.extend([
-        "",
-        "### Key Findings",
-        "",
-        f"1. **Warm Cache Performance**: {tool_metrics['warm_cache']['speedup']:.2f}x speedup ({tool_metrics['warm_cache']['latency_reduction']:.1f}% latency reduction)",
-        f"2. **Context-Aware Cache**: {tool_metrics['context_cache']['speedup']:.2f}x speedup ({tool_metrics['context_cache']['latency_reduction']:.1f}% latency reduction)",
-        f"3. **RL Ranking Cache**: {tool_metrics['rl_cache']['speedup']:.2f}x speedup ({tool_metrics['rl_cache']['latency_reduction']:.1f}% latency reduction)",
-        "",
-        "### Expected vs Actual",
-        "",
-        "| Metric | Expected | Actual | Status |",
-        "|--------|----------|--------|--------|",
-        f"| Warm cache speedup | 1.24-1.37x | {tool_metrics['warm_cache']['speedup']:.2f}x | {'✓ PASS' if 1.24 <= tool_metrics['warm_cache']['speedup'] <= 1.37 else '✗ FAIL'} |",
-        f"| Context cache speedup | 1.24-1.37x | {tool_metrics['context_cache']['speedup']:.2f}x | {'✓ PASS' if 1.24 <= tool_metrics['context_cache']['speedup'] else '✗ FAIL'} |",
-        f"| RL cache speedup | 1.24-1.59x | {tool_metrics['rl_cache']['speedup']:.2f}x | {'✓ PASS' if 1.24 <= tool_metrics['rl_cache']['speedup'] else '✗ FAIL'} |",
-        "",
-        "## Startup Time Performance",
-        "",
-        "### Vertical Loading Times (10 iterations)",
-        "",
-        "| Vertical | Min (s) | Mean (s) | Max (s) |",
-        "|----------|---------|----------|---------|",
-    ])
+    lines.extend(
+        [
+            "",
+            "### Key Findings",
+            "",
+            f"1. **Warm Cache Performance**: {tool_metrics['warm_cache']['speedup']:.2f}x speedup ({tool_metrics['warm_cache']['latency_reduction']:.1f}% latency reduction)",
+            f"2. **Context-Aware Cache**: {tool_metrics['context_cache']['speedup']:.2f}x speedup ({tool_metrics['context_cache']['latency_reduction']:.1f}% latency reduction)",
+            f"3. **RL Ranking Cache**: {tool_metrics['rl_cache']['speedup']:.2f}x speedup ({tool_metrics['rl_cache']['latency_reduction']:.1f}% latency reduction)",
+            "",
+            "### Expected vs Actual",
+            "",
+            "| Metric | Expected | Actual | Status |",
+            "|--------|----------|--------|--------|",
+            f"| Warm cache speedup | 1.24-1.37x | {tool_metrics['warm_cache']['speedup']:.2f}x | {'✓ PASS' if 1.24 <= tool_metrics['warm_cache']['speedup'] <= 1.37 else '✗ FAIL'} |",
+            f"| Context cache speedup | 1.24-1.37x | {tool_metrics['context_cache']['speedup']:.2f}x | {'✓ PASS' if 1.24 <= tool_metrics['context_cache']['speedup'] else '✗ FAIL'} |",
+            f"| RL cache speedup | 1.24-1.59x | {tool_metrics['rl_cache']['speedup']:.2f}x | {'✓ PASS' if 1.24 <= tool_metrics['rl_cache']['speedup'] else '✗ FAIL'} |",
+            "",
+            "## Startup Time Performance",
+            "",
+            "### Vertical Loading Times (10 iterations)",
+            "",
+            "| Vertical | Min (s) | Mean (s) | Max (s) |",
+            "|----------|---------|----------|---------|",
+        ]
+    )
 
     for vertical, stats in startup_metrics.items():
         if isinstance(stats, dict) and "mean" in stats:
@@ -195,80 +193,82 @@ def generate_performance_report(
     total_mean = sum(
         stats.get("mean", 0) for stats in startup_metrics.values() if isinstance(stats, dict)
     )
-    lines.extend([
-        "",
-        f"**Total mean startup time:** {total_mean:.4f}s",
-        "",
-        "## Cache Effectiveness Analysis",
-        "",
-        "### Hit Rate Distribution",
-        "",
-        "| Cache Type | Hit Rate | Expected | Status |",
-        "|------------|----------|----------|--------|",
-        f"| Warm Cache | {tool_metrics['warm_cache']['hit_rate']:.1f}% | 100% | {'✓ PASS' if tool_metrics['warm_cache']['hit_rate'] == 100 else '✗ FAIL'} |",
-        f"| Mixed Cache | {tool_metrics['mixed_cache']['hit_rate']:.1f}% | 40-60% | {'✓ PASS' if 40 <= tool_metrics['mixed_cache']['hit_rate'] <= 60 else '✗ FAIL'} |",
-        f"| Context Cache | {tool_metrics['context_cache']['hit_rate']:.1f}% | 100% | {'✓ PASS' if tool_metrics['context_cache']['hit_rate'] == 100 else '✗ FAIL'} |",
-        f"| RL Cache | {tool_metrics['rl_cache']['hit_rate']:.1f}% | 100% | {'✓ PASS' if tool_metrics['rl_cache']['hit_rate'] == 100 else '✗ FAIL'} |",
-        "",
-        "### Memory Usage",
-        "",
-        "Based on benchmark results:",
-        "- Per cache entry: ~0.65 KB",
-        "- 1000 entries: ~0.87 MB",
-        "- Recommended cache size: 500-1000 entries",
-        "",
-        "## Performance Recommendations",
-        "",
-        "### Production Configuration",
-        "",
-        "1. **Cache Size**: 500-1000 entries for optimal balance",
-        "2. **TTL Settings**:",
-        "   - Query cache: 1 hour (3600s)",
-        "   - Context cache: 5 minutes (300s)",
-        "   - RL cache: 1 hour (3600s)",
-        "3. **Expected Hit Rates**:",
-        "   - Query cache: 40-60%",
-        "   - Context cache: 50-70%",
-        "   - RL cache: 60-80%",
-        "",
-        "### Performance Targets",
-        "",
-        "| Metric | Target | Achieved | Status |",
-        "|--------|--------|----------|--------|",
-        f"| Tool selection latency reduction | >20% | {tool_metrics['warm_cache']['latency_reduction']:.1f}% | {'✓ PASS' if tool_metrics['warm_cache']['latency_reduction'] > 20 else '✗ FAIL'} |",
-        f"| Cache hit rate | >30% | {tool_metrics['mixed_cache']['hit_rate']:.1f}% | {'✓ PASS' if tool_metrics['mixed_cache']['hit_rate'] > 30 else '✗ FAIL'} |",
-        f"| Warm cache speedup | >1.2x | {tool_metrics['warm_cache']['speedup']:.2f}x | {'✓ PASS' if tool_metrics['warm_cache']['speedup'] > 1.2 else '✗ FAIL'} |",
-        "",
-        "## Statistical Significance",
-        "",
-        "All benchmarks were run with 100 iterations, ensuring statistical significance.",
-        "The results demonstrate consistent performance improvements across multiple",
-        "cache configurations and hit rates.",
-        "",
-        "## Conclusion",
-        "",
-        f"### Track 5: Tool Selection Caching",
-        f"- **Status**: {'✓ SUCCESS' if tool_metrics['warm_cache']['latency_reduction'] > 20 else '✗ NEEDS IMPROVEMENT'}",
-        f"- **Achievement**: {tool_metrics['warm_cache']['latency_reduction']:.1f}% latency reduction with warm cache",
-        f"- **Best case**: {tool_metrics['rl_cache']['latency_reduction']:.1f}% latency reduction with RL cache",
-        "",
-        "### Track 6: Lazy Loading",
-        "- **Status**: ✓ SUCCESS",
-        "- **Achievement**: Verticals load on-demand with minimal overhead",
-        f"- **Average startup time**: {total_mean:.4f}s across all verticals",
-        "",
-        "### Overall Assessment",
-        "",
-        "The performance improvements from Tracks 5 and 6 have been successfully validated.",
-        "The tool selection caching system delivers significant latency reductions (24-58%)",
-        "depending on cache configuration, while lazy loading ensures efficient startup times.",
-        "",
-        "All success criteria have been met:",
-        f"- ✓ Tool selection latency reduced by >20% (achieved {tool_metrics['warm_cache']['latency_reduction']:.1f}%)",
-        f"- ✓ Cache hit rate >30% (achieved {tool_metrics['mixed_cache']['hit_rate']:.1f}%)",
-        f"- ✓ Startup time optimized (lazy loading implemented)",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            f"**Total mean startup time:** {total_mean:.4f}s",
+            "",
+            "## Cache Effectiveness Analysis",
+            "",
+            "### Hit Rate Distribution",
+            "",
+            "| Cache Type | Hit Rate | Expected | Status |",
+            "|------------|----------|----------|--------|",
+            f"| Warm Cache | {tool_metrics['warm_cache']['hit_rate']:.1f}% | 100% | {'✓ PASS' if tool_metrics['warm_cache']['hit_rate'] == 100 else '✗ FAIL'} |",
+            f"| Mixed Cache | {tool_metrics['mixed_cache']['hit_rate']:.1f}% | 40-60% | {'✓ PASS' if 40 <= tool_metrics['mixed_cache']['hit_rate'] <= 60 else '✗ FAIL'} |",
+            f"| Context Cache | {tool_metrics['context_cache']['hit_rate']:.1f}% | 100% | {'✓ PASS' if tool_metrics['context_cache']['hit_rate'] == 100 else '✗ FAIL'} |",
+            f"| RL Cache | {tool_metrics['rl_cache']['hit_rate']:.1f}% | 100% | {'✓ PASS' if tool_metrics['rl_cache']['hit_rate'] == 100 else '✗ FAIL'} |",
+            "",
+            "### Memory Usage",
+            "",
+            "Based on benchmark results:",
+            "- Per cache entry: ~0.65 KB",
+            "- 1000 entries: ~0.87 MB",
+            "- Recommended cache size: 500-1000 entries",
+            "",
+            "## Performance Recommendations",
+            "",
+            "### Production Configuration",
+            "",
+            "1. **Cache Size**: 500-1000 entries for optimal balance",
+            "2. **TTL Settings**:",
+            "   - Query cache: 1 hour (3600s)",
+            "   - Context cache: 5 minutes (300s)",
+            "   - RL cache: 1 hour (3600s)",
+            "3. **Expected Hit Rates**:",
+            "   - Query cache: 40-60%",
+            "   - Context cache: 50-70%",
+            "   - RL cache: 60-80%",
+            "",
+            "### Performance Targets",
+            "",
+            "| Metric | Target | Achieved | Status |",
+            "|--------|--------|----------|--------|",
+            f"| Tool selection latency reduction | >20% | {tool_metrics['warm_cache']['latency_reduction']:.1f}% | {'✓ PASS' if tool_metrics['warm_cache']['latency_reduction'] > 20 else '✗ FAIL'} |",
+            f"| Cache hit rate | >30% | {tool_metrics['mixed_cache']['hit_rate']:.1f}% | {'✓ PASS' if tool_metrics['mixed_cache']['hit_rate'] > 30 else '✗ FAIL'} |",
+            f"| Warm cache speedup | >1.2x | {tool_metrics['warm_cache']['speedup']:.2f}x | {'✓ PASS' if tool_metrics['warm_cache']['speedup'] > 1.2 else '✗ FAIL'} |",
+            "",
+            "## Statistical Significance",
+            "",
+            "All benchmarks were run with 100 iterations, ensuring statistical significance.",
+            "The results demonstrate consistent performance improvements across multiple",
+            "cache configurations and hit rates.",
+            "",
+            "## Conclusion",
+            "",
+            f"### Track 5: Tool Selection Caching",
+            f"- **Status**: {'✓ SUCCESS' if tool_metrics['warm_cache']['latency_reduction'] > 20 else '✗ NEEDS IMPROVEMENT'}",
+            f"- **Achievement**: {tool_metrics['warm_cache']['latency_reduction']:.1f}% latency reduction with warm cache",
+            f"- **Best case**: {tool_metrics['rl_cache']['latency_reduction']:.1f}% latency reduction with RL cache",
+            "",
+            "### Track 6: Lazy Loading",
+            "- **Status**: ✓ SUCCESS",
+            "- **Achievement**: Verticals load on-demand with minimal overhead",
+            f"- **Average startup time**: {total_mean:.4f}s across all verticals",
+            "",
+            "### Overall Assessment",
+            "",
+            "The performance improvements from Tracks 5 and 6 have been successfully validated.",
+            "The tool selection caching system delivers significant latency reductions (24-58%)",
+            "depending on cache configuration, while lazy loading ensures efficient startup times.",
+            "",
+            "All success criteria have been met:",
+            f"- ✓ Tool selection latency reduced by >20% (achieved {tool_metrics['warm_cache']['latency_reduction']:.1f}%)",
+            f"- ✓ Cache hit rate >30% (achieved {tool_metrics['mixed_cache']['hit_rate']:.1f}%)",
+            f"- ✓ Startup time optimized (lazy loading implemented)",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 

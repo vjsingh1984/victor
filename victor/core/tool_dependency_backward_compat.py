@@ -91,7 +91,9 @@ class DeprecatedToolDependencyProvider(YAMLToolDependencyProvider):
         return cls  # pragma: no cover
 
 
-def create_deprecated_provider(vertical: str) -> Union["YAMLToolDependencyProvider", "EmptyToolDependencyProvider"]:
+def create_deprecated_provider(
+    vertical: str,
+) -> Union["YAMLToolDependencyProvider", "EmptyToolDependencyProvider"]:
     """Create a deprecated provider instance for backward compatibility.
 
     This function is used internally to maintain backward compatibility while
@@ -135,7 +137,9 @@ def get_deprecated_class_name(vertical: str) -> str:
         ValueError: If vertical is not recognized
     """
     if vertical not in VERTICAL_DEPRECATED_ALIASES:
-        raise ValueError(f"Unknown vertical: {vertical}. Must be one of {list(VERTICAL_DEPRECATED_ALIASES.keys())}")
+        raise ValueError(
+            f"Unknown vertical: {vertical}. Must be one of {list(VERTICAL_DEPRECATED_ALIASES.keys())}"
+        )
     return VERTICAL_DEPRECATED_ALIASES[vertical]
 
 
@@ -152,6 +156,7 @@ def is_deprecated_provider_vertical(vertical: str) -> bool:
 
 
 # Migration helper functions
+
 
 def suggest_migration_code(vertical: str) -> str:
     """Generate migration code snippet for a vertical.

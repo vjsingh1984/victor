@@ -56,9 +56,11 @@ class MemoryGraphStore(GraphStoreProtocol):
         for node in self._nodes.values():
             if symbol_types and node.type not in symbol_types:
                 continue
-            if (query_lower in node.name.lower() or
-                (node.signature and query_lower in node.signature.lower()) or
-                (node.docstring and query_lower in node.docstring.lower())):
+            if (
+                query_lower in node.name.lower()
+                or (node.signature and query_lower in node.signature.lower())
+                or (node.docstring and query_lower in node.docstring.lower())
+            ):
                 results.append(node)
                 if len(results) >= limit:
                     break
@@ -110,7 +112,7 @@ class MemoryGraphStore(GraphStoreProtocol):
             "nodes": len(self._nodes),
             "edges": len(self._edges),
             "path": ":memory:",
-            "files": len(self._file_mtimes)
+            "files": len(self._file_mtimes),
         }
 
     async def get_all_edges(self) -> List[GraphEdge]:

@@ -107,18 +107,14 @@ class MigrationValidator:
 
             for var in deprecated_vars:
                 if var in content:
-                    self.issues.append(
-                        f"{env_file}: Found deprecated variable '{var.strip('=')}'"
-                    )
+                    self.issues.append(f"{env_file}: Found deprecated variable '{var.strip('=')}'")
                     issues_found = True
 
         # Check for old Config usage
         for py_file in self.directory.rglob("*.py"):
             content = py_file.read_text()
             if "Config()" in content and "from victor.config" in content:
-                self.issues.append(
-                    f"{py_file}: Found old Config() usage, should use Settings()"
-                )
+                self.issues.append(f"{py_file}: Found old Config() usage, should use Settings()")
                 issues_found = True
 
         if issues_found:
@@ -140,7 +136,7 @@ class MigrationValidator:
                 continue
 
             content = py_file.read_text()
-            lines = content.split('\n')
+            lines = content.split("\n")
 
             for i, line in enumerate(lines, 1):
                 # Check for direct orchestrator instantiation
@@ -162,8 +158,7 @@ class MigrationValidator:
                 # Check for singleton access
                 if "SharedToolRegistry.get_instance()" in line:
                     self.issues.append(
-                        f"{py_file}:{i}: Found SharedToolRegistry singleton, "
-                        "use DI container"
+                        f"{py_file}:{i}: Found SharedToolRegistry singleton, " "use DI container"
                     )
                     issues_found = True
 
@@ -176,7 +171,7 @@ class MigrationValidator:
                     issues_found = True
 
                 # Check for sync chat calls
-                if "orchestrator.chat(" in line and "await" not in lines[max(0, i-2):i]:
+                if "orchestrator.chat(" in line and "await" not in lines[max(0, i - 2) : i]:
                     self.warnings.append(
                         f"{py_file}:{i}: Possible sync chat call, should use await"
                     )
@@ -201,11 +196,12 @@ class MigrationValidator:
         """Check Python dependencies."""
         try:
             import victor
+
             version = getattr(victor, "__version__", "unknown")
 
             # Parse version
             try:
-                major, minor, patch = map(int, version.split('.')[:3])
+                major, minor, patch = map(int, version.split(".")[:3])
                 if major >= 1:
                     print(f"✓ Victor version: {version}")
                     return True
@@ -255,35 +251,17 @@ class MigrationValidator:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Validate Victor migration from 0.5.x to 0.5.0"
-    )
+    parser = argparse.ArgumentParser(description="Validate Victor migration from 0.5.x to 0.5.0")
     parser.add_argument(
         "--directory",
         type=Path,
         default=Path.cwd(),
-        help="Directory to validate (default: current directory)"
+        help="Directory to validate (default: current directory)",
     )
-    parser.add_argument(
-        "--check-imports",
-        action="store_true",
-        help="Only check imports"
-    )
-    parser.add_argument(
-        "--check-config",
-        action="store_true",
-        help="Only check configuration"
-    )
-    parser.add_argument(
-        "--check-patterns",
-        action="store_true",
-        help="Only check code patterns"
-    )
-    parser.add_argument(
-        "--report",
-        type=Path,
-        help="Save validation report to file"
-    )
+    parser.add_argument("--check-imports", action="store_true", help="Only check imports")
+    parser.add_argument("--check-config", action="store_true", help="Only check configuration")
+    parser.add_argument("--check-patterns", action="store_true", help="Only check code patterns")
+    parser.add_argument("--report", type=Path, help="Save validation report to file")
 
     args = parser.parse_args()
 

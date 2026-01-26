@@ -213,9 +213,7 @@ class EventBroadcaster:
         """Main broadcast loop."""
         while self._running:
             try:
-                event: BridgeEvent = await asyncio.wait_for(
-                    self._event_queue.get(), timeout=1.0
-                )
+                event: BridgeEvent = await asyncio.wait_for(self._event_queue.get(), timeout=1.0)
                 await self._send_to_clients(event)
             except asyncio.TimeoutError:
                 continue

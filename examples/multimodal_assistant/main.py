@@ -40,7 +40,9 @@ def cli():
 @click.option("--question", "-q", help="Specific question about the image")
 @click.option("--detect-objects", is_flag=True, help="Detect objects in image")
 @click.option("--output", "-o", type=click.Path(), help="Save output to file")
-def analyze_image(image_path: str, question: Optional[str], detect_objects: bool, output: Optional[str]):
+def analyze_image(
+    image_path: str, question: Optional[str], detect_objects: bool, output: Optional[str]
+):
     """Analyze an image with AI.
 
     Examples:
@@ -52,11 +54,12 @@ def analyze_image(image_path: str, question: Optional[str], detect_objects: bool
     settings = Settings()
     orchestrator = create_orchestrator(settings)
 
-    console.print(Panel.fit(
-        "[bold blue]Victor AI Image Analysis[/bold blue]\n"
-        f"Analyzing: {image_path}",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Victor AI Image Analysis[/bold blue]\n" f"Analyzing: {image_path}",
+            border_style="blue",
+        )
+    )
 
     # Process image
     processor = VisionProcessor(orchestrator)
@@ -71,11 +74,7 @@ def analyze_image(image_path: str, question: Optional[str], detect_objects: bool
         table.add_column("Location", style="yellow")
 
         for obj in objects:
-            table.add_row(
-                obj['label'],
-                f"{obj['confidence']:.1%}",
-                f"{obj['bbox']}"
-            )
+            table.add_row(obj["label"], f"{obj['confidence']:.1%}", f"{obj['bbox']}")
 
         console.print(table)
 
@@ -112,11 +111,12 @@ def transcribe(audio_path: str, language: str, timestamps: bool, output: Optiona
     settings = Settings()
     orchestrator = create_orchestrator(settings)
 
-    console.print(Panel.fit(
-        "[bold blue]Victor AI Audio Transcription[/bold blue]\n"
-        f"Processing: {audio_path}",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Victor AI Audio Transcription[/bold blue]\n" f"Processing: {audio_path}",
+            border_style="blue",
+        )
+    )
 
     console.print(f"\n[cyan]Transcribing audio (language: {language})...[/cyan]")
 
@@ -148,11 +148,12 @@ def ocr(image_path: str, language: str, preprocess: bool, output: Optional[str])
     settings = Settings()
     orchestrator = create_orchestrator(settings)
 
-    console.print(Panel.fit(
-        "[bold blue]Victor AI OCR (Text Extraction)[/bold blue]\n"
-        f"Processing: {image_path}",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Victor AI OCR (Text Extraction)[/bold blue]\n" f"Processing: {image_path}",
+            border_style="blue",
+        )
+    )
 
     console.print(f"\n[cyan]Extracting text...[/cyan]")
 
@@ -164,7 +165,7 @@ def ocr(image_path: str, language: str, preprocess: bool, output: Optional[str])
     console.print(text)
 
     # Show statistics
-    lines = text.split('\n')
+    lines = text.split("\n")
     words = text.split()
 
     stats_table = Table(title="Extraction Statistics")
@@ -197,11 +198,12 @@ def analyze_video(video_path: str, frames: int, analyze_frames: bool):
     settings = Settings()
     orchestrator = create_orchestrator(settings)
 
-    console.print(Panel.fit(
-        "[bold blue]Victor AI Video Analysis[/bold blue]\n"
-        f"Processing: {video_path}",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Victor AI Video Analysis[/bold blue]\n" f"Processing: {video_path}",
+            border_style="blue",
+        )
+    )
 
     console.print(f"\n[cyan]Extracting {frames} key frames...[/cyan]")
 
@@ -242,11 +244,12 @@ def query(image: Optional[str], audio: Optional[str], text: Optional[str], quest
     settings = Settings()
     orchestrator = create_orchestrator(settings)
 
-    console.print(Panel.fit(
-        "[bold blue]Victor AI Cross-Modal Query[/bold blue]\n"
-        f"Question: {question}",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Victor AI Cross-Modal Query[/bold blue]\n" f"Question: {question}",
+            border_style="blue",
+        )
+    )
 
     # Build multimodal context
     context = {}
@@ -255,18 +258,18 @@ def query(image: Optional[str], audio: Optional[str], text: Optional[str], quest
     if image:
         console.print(f"\n[cyan]Processing image: {image}[/cyan]")
         processor = VisionProcessor(orchestrator)
-        context['image'] = image
+        context["image"] = image
         modalities.append("image")
 
     if audio:
         console.print(f"\n[cyan]Processing audio: {audio}[/cyan]")
         processor = AudioProcessor(orchestrator)
         transcript = processor.transcribe(audio)
-        context['audio_transcript'] = transcript
+        context["audio_transcript"] = transcript
         modalities.append("audio")
 
     if text:
-        context['text'] = text
+        context["text"] = text
         modalities.append("text")
 
     # Execute cross-modal query
@@ -292,18 +295,19 @@ def batch_process(directory: str, output: Optional[str]):
     settings = Settings()
     orchestrator = create_orchestrator(settings)
 
-    console.print(Panel.fit(
-        "[bold blue]Victor AI Batch Processing[/bold blue]\n"
-        f"Directory: {directory}",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Victor AI Batch Processing[/bold blue]\n" f"Directory: {directory}",
+            border_style="blue",
+        )
+    )
 
     # Find all images
     dir_path = Path(directory)
     image_files = []
-    for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-        image_files.extend(dir_path.glob(f'*{ext}'))
-        image_files.extend(dir_path.glob(f'*{ext.upper()}'))
+    for ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
+        image_files.extend(dir_path.glob(f"*{ext}"))
+        image_files.extend(dir_path.glob(f"*{ext.upper()}"))
 
     console.print(f"\n[cyan]Found {len(image_files)} images[/cyan]")
 
@@ -315,10 +319,7 @@ def batch_process(directory: str, output: Optional[str]):
         for i, image_file in enumerate(image_files, 1):
             console.print(f"[{i}/{len(image_files)}] {image_file.name}")
             description = processor.describe(str(image_file))
-            results.append({
-                'file': str(image_file),
-                'description': description
-            })
+            results.append({"file": str(image_file), "description": description})
 
     # Display summary
     console.print(f"\n[bold green]Processed {len(results)} images[/bold]")
@@ -326,14 +327,15 @@ def batch_process(directory: str, output: Optional[str]):
     # Save report if requested
     if output:
         import json
-        with open(output, 'w') as f:
+
+        with open(output, "w") as f:
             json.dump(results, f, indent=2)
         console.print(f"[green]Report saved to: {output}[/green]")
 
 
 def _save_output(content: str, output_path: str):
     """Save content to file."""
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         f.write(content)
     console.print(f"\n[green]Output saved to: {output_path}[/green]")
 

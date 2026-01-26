@@ -9,37 +9,38 @@ from typing import Dict, List, Set, Tuple
 
 # All type replacements
 TYPE_FIXES = {
-    'Callable': ('Callable[..., Any]', None),
-    'Dict': ('Dict[str, Any]', None),
-    'dict': ('dict[str, Any]', None),
-    'List': ('List[Any]', None),
-    'list': ('list[Any]', None),
-    'Tuple': ('Tuple[Any, ...]', None),
-    'tuple': ('tuple[Any, ...]', None),
-    'Set': ('Set[Any]', None),
-    'set': ('set[Any]', None),
-    'frozenset': ('frozenset[Any]', None),
-    'Type': ('Type[Any]', None),
-    'Pattern': ('Pattern[str]', None),
-    'Counter': ('Counter[str]', None),
-    'deque': ('deque[Any]', None),
-    'OrderedDict': ('OrderedDict[str, Any]', None),
-    'Task': ('Task[Any, Any]', 'from victor.framework import Task'),
-    'SingletonRegistry': ('SingletonRegistry[Any]', None),
-    'UniversalRegistry': ('UniversalRegistry[Any]', None),
-    'ServiceDescriptor': ('ServiceDescriptor[Any]', None),
-    'ItemsView': ('ItemsView[Any, Any]', None),
-    'ObjectPool': ('ObjectPool[Any]', None),
-    'LRUCache': ('LRUCache[Any, Any]', None),
-    'TimedCache': ('TimedCache[Any, Any]', None),
-    'weakref.ref': ('weakref.ref[Any]', None),
-    'CompletedProcess': ('CompletedProcess[Any]', None),
+    "Callable": ("Callable[..., Any]", None),
+    "Dict": ("Dict[str, Any]", None),
+    "dict": ("dict[str, Any]", None),
+    "List": ("List[Any]", None),
+    "list": ("list[Any]", None),
+    "Tuple": ("Tuple[Any, ...]", None),
+    "tuple": ("tuple[Any, ...]", None),
+    "Set": ("Set[Any]", None),
+    "set": ("set[Any]", None),
+    "frozenset": ("frozenset[Any]", None),
+    "Type": ("Type[Any]", None),
+    "Pattern": ("Pattern[str]", None),
+    "Counter": ("Counter[str]", None),
+    "deque": ("deque[Any]", None),
+    "OrderedDict": ("OrderedDict[str, Any]", None),
+    "Task": ("Task[Any, Any]", "from victor.framework import Task"),
+    "SingletonRegistry": ("SingletonRegistry[Any]", None),
+    "UniversalRegistry": ("UniversalRegistry[Any]", None),
+    "ServiceDescriptor": ("ServiceDescriptor[Any]", None),
+    "ItemsView": ("ItemsView[Any, Any]", None),
+    "ObjectPool": ("ObjectPool[Any]", None),
+    "LRUCache": ("LRUCache[Any, Any]", None),
+    "TimedCache": ("TimedCache[Any, Any]", None),
+    "weakref.ref": ("weakref.ref[Any]", None),
+    "CompletedProcess": ("CompletedProcess[Any]", None),
 }
+
 
 def fix_file(file_path: Path) -> Tuple[int, List[str]]:
     """Fix type parameters in a single file."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         original_content = content
@@ -49,8 +50,8 @@ def fix_file(file_path: Path) -> Tuple[int, List[str]]:
         for type_name, (replacement, _) in TYPE_FIXES.items():
             # Pattern to match: variable: Type followed by delimiter
             # But NOT: Type[...]
-            delimiter_class = r'[,\)\]\}:\n]'
-            pattern = rf':\s*{re.escape(type_name)}\s*({delimiter_class})'
+            delimiter_class = r"[,\)\]\}:\n]"
+            pattern = rf":\s*{re.escape(type_name)}\s*({delimiter_class})"
 
             def replacer(match):
                 # Ensure it's not already followed by [
@@ -58,11 +59,11 @@ def fix_file(file_path: Path) -> Tuple[int, List[str]]:
                 # Check what comes after
                 pos = match.end()
                 if pos < len(content):
-                    next_char = content[pos:pos+1].strip()
-                    if next_char == '[':
+                    next_char = content[pos : pos + 1].strip()
+                    if next_char == "[":
                         # Already has type params, skip
                         return match.group(0)
-                return f': {replacement}{delimiter}'
+                return f": {replacement}{delimiter}"
 
             # Find all matches
             matches = list(re.finditer(pattern, content))
@@ -74,7 +75,7 @@ def fix_file(file_path: Path) -> Tuple[int, List[str]]:
                     # Check if next non-space char is [
                     while pos < len(content) and content[pos].isspace():
                         pos += 1
-                    if pos >= len(content) or content[pos] != '[':
+                    if pos >= len(content) or content[pos] != "[":
                         valid_matches.append(m)
 
                 if valid_matches:
@@ -82,13 +83,15 @@ def fix_file(file_path: Path) -> Tuple[int, List[str]]:
                     for m in reversed(valid_matches):
                         delimiter = m.group(1)
                         old_text = m.group(0)
-                        new_text = f': {replacement}{delimiter}'
-                        content = content[:m.start()] + new_text + content[m.end():]
+                        new_text = f": {replacement}{delimiter}"
+                        content = content[: m.start()] + new_text + content[m.end() :]
 
-                    changes_made.append(f"  - {type_name} -> {replacement}: {len(valid_matches)} occurrence(s)")
+                    changes_made.append(
+                        f"  - {type_name} -> {replacement}: {len(valid_matches)} occurrence(s)"
+                    )
 
         if content != original_content:
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(content)
             return len(changes_made), changes_made
 
@@ -97,12 +100,13 @@ def fix_file(file_path: Path) -> Tuple[int, List[str]]:
         print(f"  Error: {e}", file=sys.stderr)
         return 0, []
 
+
 def main():
     """Main function."""
-    victor_dir = Path('/Users/vijaysingh/code/codingagent/victor')
+    victor_dir = Path("/Users/vijaysingh/code/codingagent/victor")
 
     # Find all Python files
-    python_files = list(victor_dir.rglob('*.py'))
+    python_files = list(victor_dir.rglob("*.py"))
 
     print(f"Processing {len(python_files)} Python files...")
     print()
@@ -127,5 +131,6 @@ def main():
 
     return 0
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(main())

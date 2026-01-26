@@ -222,17 +222,17 @@ class TestServerInitialization:
         mock_lsp_client._write_message = MagicMock()
 
         with patch.object(
-            mock_lsp_client, "_send_request", new_callable=AsyncMock, return_value={"capabilities": {}}
+            mock_lsp_client,
+            "_send_request",
+            new_callable=AsyncMock,
+            return_value={"capabilities": {}},
         ):
             await mock_lsp_client._initialize()
 
             # Verify initialized notification was sent
             # _write_message is called with dicts containing "method" key
             calls = mock_lsp_client._write_message.call_args_list
-            initialized_calls = [
-                c for c in calls
-                if c[0][0].get("method") == "initialized"
-            ]
+            initialized_calls = [c for c in calls if c[0][0].get("method") == "initialized"]
             assert len(initialized_calls) >= 1
 
 

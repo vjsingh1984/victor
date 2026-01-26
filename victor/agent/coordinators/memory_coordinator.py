@@ -313,7 +313,7 @@ class MemoryCoordinator:
                 self._session_id or "default", count=1000
             )
             return [
-                msg.model_dump() if hasattr(msg, 'model_dump') else msg  # type: ignore[misc]
+                msg.model_dump() if hasattr(msg, "model_dump") else msg  # type: ignore[misc]
                 for msg in messages_list
             ]
         except Exception as e:

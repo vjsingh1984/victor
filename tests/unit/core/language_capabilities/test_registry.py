@@ -143,9 +143,7 @@ class TestLanguageCapabilityRegistry:
             name="custom_lang",
             tier=LanguageTier.TIER_3,
             extensions=[".custom"],
-            tree_sitter=TreeSitterCapability(
-                grammar_package="tree_sitter_custom"
-            ),
+            tree_sitter=TreeSitterCapability(grammar_package="tree_sitter_custom"),
         )
 
         registry.register(custom)
@@ -244,9 +242,7 @@ class TestUnifiedLanguageCapability:
                 library="test",
                 access_method=ASTAccessMethod.NATIVE,
             ),
-            tree_sitter=TreeSitterCapability(
-                grammar_package="tree_sitter_test"
-            ),
+            tree_sitter=TreeSitterCapability(grammar_package="tree_sitter_test"),
             indexing_strategy=[
                 ASTAccessMethod.NATIVE,
                 ASTAccessMethod.TREE_SITTER,
@@ -263,9 +259,7 @@ class TestUnifiedLanguageCapability:
             tier=LanguageTier.TIER_2,
             extensions=[".test"],
             native_ast=None,  # No native AST
-            tree_sitter=TreeSitterCapability(
-                grammar_package="tree_sitter_test"
-            ),
+            tree_sitter=TreeSitterCapability(grammar_package="tree_sitter_test"),
             indexing_strategy=[
                 ASTAccessMethod.NATIVE,
                 ASTAccessMethod.TREE_SITTER,
@@ -294,9 +288,7 @@ class TestUnifiedLanguageCapability:
             name="test",
             tier=LanguageTier.TIER_3,
             extensions=[".test"],
-            tree_sitter=TreeSitterCapability(
-                grammar_package="tree_sitter_test"
-            ),
+            tree_sitter=TreeSitterCapability(grammar_package="tree_sitter_test"),
         )
         assert cap_with_ts.supports_syntax_validation()
 
@@ -319,9 +311,7 @@ class TestUnifiedLanguageCapability:
                 library="test",
                 access_method=ASTAccessMethod.NATIVE,
             ),
-            tree_sitter=TreeSitterCapability(
-                grammar_package="tree_sitter_test"
-            ),
+            tree_sitter=TreeSitterCapability(grammar_package="tree_sitter_test"),
             lsp=LSPCapability(
                 server_name="test-lsp",
                 language_id="test",

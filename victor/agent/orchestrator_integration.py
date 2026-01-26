@@ -376,9 +376,7 @@ class OrchestratorIntegration:
             return self._pipeline._mode_controller.get_optimal_tool_budget(task_type)
         return self._orchestrator.tool_budget
 
-    def add_quality_observer(
-        self, observer: Callable[[float, "Dict[str, float]"], None]
-    ) -> None:
+    def add_quality_observer(self, observer: Callable[[float, "Dict[str, float]"], None]) -> None:
         """Add observer for quality score events.
 
         Args:
@@ -386,9 +384,7 @@ class OrchestratorIntegration:
         """
         self._quality_observers.append(observer)
 
-    def add_grounding_observer(
-        self, observer: Callable[[bool, "List[str]"], None]
-    ) -> None:
+    def add_grounding_observer(self, observer: Callable[[bool, "List[str]"], None]) -> None:
         """Add observer for grounding verification events.
 
         Args:

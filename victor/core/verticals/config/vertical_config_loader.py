@@ -254,7 +254,9 @@ class VerticalConfigLoader:
         """
         # Get tools list
         if "list" in tools_config:
-            tools_list = list(tools_config["list"]) if isinstance(tools_config["list"], list) else []
+            tools_list = (
+                list(tools_config["list"]) if isinstance(tools_config["list"], list) else []
+            )
         else:
             # Start with empty if using capabilities (future feature)
             tools_list = []

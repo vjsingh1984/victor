@@ -95,6 +95,7 @@ logger = logging.getLogger(__name__)
 # Use the State-bound TypeVar from graph_dsl or define our own
 if TYPE_CHECKING:
     from victor.workflows.graph_dsl import State as GraphState
+
     # State is a Protocol/ABC, not a concrete type, so use State as bound
     S = TypeVar("S", bound="GraphState")
 else:
@@ -341,7 +342,9 @@ class WorkflowGraphCompiler(Generic[S]):
             # Create state-aware router
             state_type = graph.state_type
 
-            def make_router(r: Callable[[S], str], st: Type[Any]) -> Callable[[Dict[str, Any]], str]:
+            def make_router(
+                r: Callable[[S], str], st: Type[Any]
+            ) -> Callable[[Dict[str, Any]], str]:
                 def wrapped_router(state: Dict[str, Any]) -> str:
                     # Convert dict state to typed state for router
                     if hasattr(st, "from_dict"):
@@ -466,14 +469,18 @@ class WorkflowGraphCompiler(Generic[S]):
                 {
                     "role": getattr(graph_node, "agent_role", None) or "executor",
                     "goal": getattr(graph_node, "agent_goal", None) or "",
-                    "tool_budget": getattr(graph_node, "tool_budget", None) or getattr(graph_node, "agent_tool_budget", None) or 10,
+                    "tool_budget": getattr(graph_node, "tool_budget", None)
+                    or getattr(graph_node, "agent_tool_budget", None)
+                    or 10,
                 }
             )
         elif graph_node.node_type == GraphNodeType.COMPUTE:
             config.update(
                 {
                     "handler": getattr(graph_node, "compute_handler", None),
-                    "tools": getattr(graph_node, "compute_tools", None) or getattr(graph_node, "tools", None) or [],
+                    "tools": getattr(graph_node, "compute_tools", None)
+                    or getattr(graph_node, "tools", None)
+                    or [],
                 }
             )
         elif graph_node.node_type == GraphNodeType.TRANSFORM:

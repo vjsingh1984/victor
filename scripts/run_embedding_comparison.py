@@ -34,45 +34,34 @@ def main():
     parser = argparse.ArgumentParser(
         description="Run embedding operation benchmarks and comparisons"
     )
+    parser.add_argument("--baseline", default="baseline", help="Name for baseline results")
+    parser.add_argument("--compare", help="Compare against existing results")
     parser.add_argument(
-        '--baseline',
-        default='baseline',
-        help="Name for baseline results"
+        "--category",
+        choices=["all", "similarity", "topk", "cache", "matrix", "pipeline"],
+        default="all",
+        help="Benchmark category to run",
     )
-    parser.add_argument(
-        '--compare',
-        help="Compare against existing results"
-    )
-    parser.add_argument(
-        '--category',
-        choices=['all', 'similarity', 'topk', 'cache', 'matrix', 'pipeline'],
-        default='all',
-        help="Benchmark category to run"
-    )
-    parser.add_argument(
-        '--quick',
-        action='store_true',
-        help="Run quick version (fewer rounds)"
-    )
+    parser.add_argument("--quick", action="store_true", help="Run quick version (fewer rounds)")
 
     args = parser.parse_args()
 
     # Build pytest command
     pytest_cmd = [
-        'pytest',
-        'tests/benchmarks/test_embedding_operations_baseline.py',
-        '-v',
-        '--benchmark-only',
-        '--benchmark-sort=name',
+        "pytest",
+        "tests/benchmarks/test_embedding_operations_baseline.py",
+        "-v",
+        "--benchmark-only",
+        "--benchmark-sort=name",
     ]
 
     # Add category filter
-    if args.category != 'all':
-        pytest_cmd.append(f'-k {args.category}')
+    if args.category != "all":
+        pytest_cmd.append(f"-k {args.category}")
 
     # Add quick mode
     if args.quick:
-        pytest_cmd.extend(['--benchmark-min-rounds', '5'])
+        pytest_cmd.extend(["--benchmark-min-rounds", "5"])
 
     # Step 1: Run benchmarks
     print("\n" + "=" * 60)
@@ -81,17 +70,15 @@ def main():
 
     if args.compare:
         # Comparison mode
-        pytest_cmd.extend([
-            f'--benchmark-compare={args.compare}',
-            f'--benchmark-save={args.baseline}'
-        ])
+        pytest_cmd.extend(
+            [f"--benchmark-compare={args.compare}", f"--benchmark-save={args.baseline}"]
+        )
     else:
         # Baseline mode
-        pytest_cmd.append(f'--benchmark-save={args.baseline}')
+        pytest_cmd.append(f"--benchmark-save={args.baseline}")
 
     success = run_command(
-        pytest_cmd,
-        f"Running {args.category} benchmarks ({'quick' if args.quick else 'full'})"
+        pytest_cmd, f"Running {args.category} benchmarks ({'quick' if args.quick else 'full'})"
     )
 
     if not success:
@@ -107,17 +94,16 @@ def main():
     report_file = f"benchmark_report_{args.baseline}.md"
 
     analyze_cmd = [
-        'python',
-        'scripts/analyze_embedding_benchmarks.py',
-        'report',
-        '--results', results_file,
-        '--output', report_file
+        "python",
+        "scripts/analyze_embedding_benchmarks.py",
+        "report",
+        "--results",
+        results_file,
+        "--output",
+        report_file,
     ]
 
-    success = run_command(
-        analyze_cmd,
-        "Generating performance analysis report"
-    )
+    success = run_command(analyze_cmd, "Generating performance analysis report")
 
     if not success:
         print("\n⚠️  Report generation failed (but benchmarks succeeded)")
@@ -142,5 +128,5 @@ def main():
     print("\n" + "=" * 60)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

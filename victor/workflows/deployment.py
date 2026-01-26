@@ -956,6 +956,7 @@ class DockerDeploymentHandler(DeploymentHandler):
         # Parse output if JSON
         try:
             from typing import cast
+
             parsed_result = json.loads(output.decode())
             if isinstance(parsed_result, dict) and "state" in parsed_result:
                 return cast(Dict[str, Any], parsed_result["state"])
@@ -1142,6 +1143,7 @@ class KubernetesDeploymentHandler(DeploymentHandler):
         # Parse output if JSON
         try:
             from typing import cast
+
             parsed_result = json.loads(resp)
             if isinstance(parsed_result, dict) and "state" in parsed_result:
                 return cast(Dict[str, Any], parsed_result["state"])

@@ -106,7 +106,9 @@ class CoverageReporter:
 
         # Run pytest with coverage
         cmd = [
-            "python", "-m", "pytest",
+            "python",
+            "-m",
+            "pytest",
             "--cov=" + target,
             "--cov-report=json",
             "--cov-report=term-missing",
@@ -189,9 +191,7 @@ class CoverageReporter:
         report.covered_statements = covered_statements
         report.missing_statements = total_statements - covered_statements
         report.coverage_percent = (
-            covered_statements / total_statements * 100
-            if total_statements > 0
-            else 0.0
+            covered_statements / total_statements * 100 if total_statements > 0 else 0.0
         )
 
         return report
@@ -213,9 +213,7 @@ class CoverageReporter:
                 filtered.total_statements += metrics.total_statements
                 filtered.covered_statements += metrics.covered_statements
 
-        filtered.missing_statements = (
-            filtered.total_statements - filtered.covered_statements
-        )
+        filtered.missing_statements = filtered.total_statements - filtered.covered_statements
         filtered.coverage_percent = (
             filtered.covered_statements / filtered.total_statements * 100
             if filtered.total_statements > 0
@@ -244,9 +242,7 @@ class CoverageReporter:
                 filtered.total_statements += metrics.total_statements
                 filtered.covered_statements += metrics.covered_statements
 
-        filtered.missing_statements = (
-            filtered.total_statements - filtered.covered_statements
-        )
+        filtered.missing_statements = filtered.total_statements - filtered.covered_statements
         filtered.coverage_percent = (
             filtered.covered_statements / filtered.total_statements * 100
             if filtered.total_statements > 0
@@ -377,12 +373,14 @@ class CoverageReporter:
         if self.report.target_name not in trends_data:
             trends_data[self.report.target_name] = []
 
-        trends_data[self.report.target_name].append({
-            "timestamp": timestamp,
-            "coverage_percent": self.report.coverage_percent,
-            "total_statements": self.report.total_statements,
-            "covered_statements": self.report.covered_statements,
-        })
+        trends_data[self.report.target_name].append(
+            {
+                "timestamp": timestamp,
+                "coverage_percent": self.report.coverage_percent,
+                "total_statements": self.report.total_statements,
+                "covered_statements": self.report.covered_statements,
+            }
+        )
 
         # Keep only last 30 entries
         trends_data[self.report.target_name] = trends_data[self.report.target_name][-30:]

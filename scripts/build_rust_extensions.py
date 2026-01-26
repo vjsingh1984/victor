@@ -23,20 +23,14 @@ def check_maturin_installed():
     """Check if maturin is installed, install if not."""
     try:
         result = subprocess.run(
-            ["maturin", "--version"],
-            check=True,
-            capture_output=True,
-            text=True
+            ["maturin", "--version"], check=True, capture_output=True, text=True
         )
         print(f"✅ Found maturin: {result.stdout.strip()}")
         return True
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print("⚠️  Maturin not found. Installing...")
         try:
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install", "maturin>=1.4"],
-                check=True
-            )
+            subprocess.run([sys.executable, "-m", "pip", "install", "maturin>=1.4"], check=True)
             print("✅ Maturin installed successfully")
             return True
         except subprocess.CalledProcessError:
@@ -48,12 +42,7 @@ def check_maturin_installed():
 def check_rust_toolchain():
     """Check if Rust toolchain is installed."""
     try:
-        result = subprocess.run(
-            ["rustc", "--version"],
-            check=True,
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(["rustc", "--version"], check=True, capture_output=True, text=True)
         print(f"✅ Found Rust: {result.stdout.strip()}")
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -91,13 +80,7 @@ def build_rust_extensions(profile="release"):
 
     try:
         # Run maturin build
-        result = subprocess.run(
-            cmd,
-            cwd=rust_dir,
-            check=True,
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(cmd, cwd=rust_dir, check=True, capture_output=True, text=True)
 
         print("✅ Build output:")
         print(result.stdout)
@@ -131,7 +114,7 @@ def verify_build():
             check=True,
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
 
         version = result.stdout.strip()
@@ -157,11 +140,7 @@ def run_tests():
 
     try:
         result = subprocess.run(
-            ["cargo", "test", "--lib"],
-            cwd=rust_dir,
-            check=True,
-            capture_output=True,
-            text=True
+            ["cargo", "test", "--lib"], cwd=rust_dir, check=True, capture_output=True, text=True
         )
 
         print("✅ All Rust tests passed")
@@ -176,25 +155,15 @@ def run_tests():
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Build victor_native Rust extensions"
-    )
+    parser = argparse.ArgumentParser(description="Build victor_native Rust extensions")
     parser.add_argument(
         "--release",
         action="store_true",
         default=True,
-        help="Build with release optimizations (default)"
+        help="Build with release optimizations (default)",
     )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Build with debug symbols"
-    )
-    parser.add_argument(
-        "--test",
-        action="store_true",
-        help="Run Rust unit tests after building"
-    )
+    parser.add_argument("--debug", action="store_true", help="Build with debug symbols")
+    parser.add_argument("--test", action="store_true", help="Run Rust unit tests after building")
 
     args = parser.parse_args()
 

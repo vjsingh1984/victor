@@ -229,6 +229,7 @@ class RecursionContext:
             New RecursionContext with copied state and fresh lock
         """
         from typing import cast
+
         # Avoid infinite recursion
         if id(self) in memo:
             return cast(RecursionContext, memo[id(self)])

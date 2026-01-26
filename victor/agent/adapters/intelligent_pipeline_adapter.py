@@ -188,13 +188,11 @@ class IntelligentPipelineAdapter:
 
         try:
             # Delegate to validation coordinator
-            validation_result = (
-                await self._validation_coordinator.validate_intelligent_response(
-                    response=response,
-                    query=query,
-                    tool_calls=tool_calls,
-                    task_type=task_type,
-                )
+            validation_result = await self._validation_coordinator.validate_intelligent_response(
+                response=response,
+                query=query,
+                tool_calls=tool_calls,
+                task_type=task_type,
             )
 
             # Return None if validation was skipped (backward compatibility)

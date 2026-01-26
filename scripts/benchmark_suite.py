@@ -121,9 +121,7 @@ class BenchmarkRunner:
         logger.setLevel(logging.DEBUG if self.config.verbose else logging.INFO)
 
         handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
@@ -382,8 +380,7 @@ class BenchmarkRunner:
             "category": self.results.category.value,
             "duration_seconds": self.results.duration_seconds,
             "results": {
-                k: v if k != "error" else {"error": v}
-                for k, v in self.results.results.items()
+                k: v if k != "error" else {"error": v} for k, v in self.results.results.items()
             },
             "stats": self.results.stats,
             "metadata": self.results.metadata,
@@ -423,9 +420,7 @@ class BenchmarkRunner:
         except Exception as e:
             self.logger.error(f"Error generating comparison report: {e}")
 
-    def _compare_results(
-        self, baseline: Dict[str, Any], current: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _compare_results(self, baseline: Dict[str, Any], current: Dict[str, Any]) -> Dict[str, Any]:
         """Compare two benchmark results."""
         return {
             "baseline_timestamp": baseline.get("timestamp"),
@@ -590,9 +585,7 @@ Examples:
         help="Benchmark category to run (default: all)",
     )
 
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
 
     parser.add_argument(
         "--export",

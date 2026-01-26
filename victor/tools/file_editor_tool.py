@@ -688,21 +688,25 @@ async def edit(
 
                 if not result.is_valid:
                     for issue in result.errors:
-                        validation_errors.append({
-                            "path": path,
-                            "line": issue.line,
-                            "column": issue.column,
-                            "message": issue.message,
-                            "severity": "error",
-                        })
+                        validation_errors.append(
+                            {
+                                "path": path,
+                                "line": issue.line,
+                                "column": issue.column,
+                                "message": issue.message,
+                                "severity": "error",
+                            }
+                        )
 
                 for issue in result.warnings:
-                    validation_warnings.append({
-                        "path": path,
-                        "line": issue.line,
-                        "message": issue.message,
-                        "severity": "warning",
-                    })
+                    validation_warnings.append(
+                        {
+                            "path": path,
+                            "line": issue.line,
+                            "message": issue.message,
+                            "severity": "warning",
+                        }
+                    )
 
         except ImportError:
             # Language capabilities not available
@@ -710,6 +714,7 @@ async def edit(
         except Exception as e:
             # Don't fail the edit due to validation errors
             import logging
+
             logger = logging.getLogger(__name__)
             logger.debug(f"Code validation skipped due to error: {e}")
 
@@ -728,10 +733,9 @@ async def edit(
     # (validation is advisory, not blocking, unless strict mode is used)
     if validation_errors:
         import logging
+
         logger = logging.getLogger(__name__)
-        logger.warning(
-            f"Code validation found {len(validation_errors)} errors in pending edits"
-        )
+        logger.warning(f"Code validation found {len(validation_errors)} errors in pending edits")
 
     # Handle preview mode
     if preview:

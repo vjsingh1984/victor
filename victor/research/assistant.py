@@ -225,13 +225,12 @@ class ResearchAssistant(VerticalBase):
             from victor.core.verticals.protocols import ToolDependencyProviderProtocol
 
             return cast(
-                ToolDependencyProviderProtocol,
-                create_vertical_tool_dependency_provider("research")
+                ToolDependencyProviderProtocol, create_vertical_tool_dependency_provider("research")
             )
 
         return cast(
             Optional[ToolDependencyProviderProtocol],
-            cls._get_cached_extension("tool_dependency_provider", _create)
+            cls._get_cached_extension("tool_dependency_provider", _create),
         )
 
     @classmethod

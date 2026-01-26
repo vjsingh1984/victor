@@ -17,6 +17,7 @@ from typing import Dict, Optional
 @dataclass
 class LanguageFeatureFlags:
     """Per-language feature flag overrides."""
+
     indexing_enabled: bool = True
     validation_enabled: bool = True
     native_ast_enabled: bool = True
@@ -41,6 +42,7 @@ class GlobalFeatureFlags:
         parallel_processing: Enable parallel processing
         language_overrides: Per-language flag overrides
     """
+
     # Master switches
     indexing_enabled: bool = True
     validation_enabled: bool = True
@@ -93,30 +95,14 @@ class FeatureFlagManager:
 
     def _load_from_env(self) -> None:
         """Load flags from environment variables."""
-        self._global.indexing_enabled = self._env_bool(
-            "VICTOR_INDEXING_ENABLED", True
-        )
-        self._global.validation_enabled = self._env_bool(
-            "VICTOR_VALIDATION_ENABLED", True
-        )
-        self._global.strict_mode = self._env_bool(
-            "VICTOR_STRICT_VALIDATION", False
-        )
-        self._global.native_ast_enabled = self._env_bool(
-            "VICTOR_NATIVE_AST_ENABLED", True
-        )
-        self._global.tree_sitter_enabled = self._env_bool(
-            "VICTOR_TREE_SITTER_ENABLED", True
-        )
-        self._global.lsp_enabled = self._env_bool(
-            "VICTOR_LSP_ENABLED", True
-        )
-        self._global.cache_enabled = self._env_bool(
-            "VICTOR_LANG_CACHE_ENABLED", True
-        )
-        self._global.parallel_processing = self._env_bool(
-            "VICTOR_PARALLEL_PROCESSING", True
-        )
+        self._global.indexing_enabled = self._env_bool("VICTOR_INDEXING_ENABLED", True)
+        self._global.validation_enabled = self._env_bool("VICTOR_VALIDATION_ENABLED", True)
+        self._global.strict_mode = self._env_bool("VICTOR_STRICT_VALIDATION", False)
+        self._global.native_ast_enabled = self._env_bool("VICTOR_NATIVE_AST_ENABLED", True)
+        self._global.tree_sitter_enabled = self._env_bool("VICTOR_TREE_SITTER_ENABLED", True)
+        self._global.lsp_enabled = self._env_bool("VICTOR_LSP_ENABLED", True)
+        self._global.cache_enabled = self._env_bool("VICTOR_LANG_CACHE_ENABLED", True)
+        self._global.parallel_processing = self._env_bool("VICTOR_PARALLEL_PROCESSING", True)
 
         # Load cache TTL
         ttl_str = os.getenv("VICTOR_LANG_CACHE_TTL")
@@ -229,7 +215,7 @@ class FeatureFlagManager:
                 native_ast_enabled=False,
                 tree_sitter_enabled=False,
                 lsp_enabled=False,
-            )
+            ),
         )
 
     def enable_language(self, language: str) -> None:
@@ -259,5 +245,5 @@ class FeatureFlagManager:
                     "lsp_enabled": flags.lsp_enabled,
                 }
                 for lang, flags in self._global.language_overrides.items()
-            }
+            },
         }

@@ -70,7 +70,7 @@ class ComputeNodeExecutor:
 
         # Step 1: Build params from node.inputs with $ctx. and $state. prefixes
         params = {}
-        if hasattr(node, 'inputs') and node.inputs:
+        if hasattr(node, "inputs") and node.inputs:
             for param_name, source in node.inputs.items():
                 # Handle $ctx. prefix (from state)
                 if isinstance(source, str) and source.startswith("$ctx."):
@@ -187,15 +187,15 @@ class ComputeNodeExecutor:
         node_results = state_dict["_node_results"]
         if isinstance(node_results, dict):
             node_results[node.id] = {
-            "node_id": node.id,
-            "status": "completed",
-            "result": output,
-            "metadata": {
-                "handler": node.handler,
-                "tools": node.tools if hasattr(node, "tools") else [],
-                "tool_calls_used": tool_calls_used,
-            },
-        }
+                "node_id": node.id,
+                "status": "completed",
+                "result": output,
+                "metadata": {
+                    "handler": node.handler,
+                    "tools": node.tools if hasattr(node, "tools") else [],
+                    "tool_calls_used": tool_calls_used,
+                },
+            }
 
         # Return the modified dict directly instead of mutating TypedDict
         logger.info(f"Compute node {node.id} completed successfully")

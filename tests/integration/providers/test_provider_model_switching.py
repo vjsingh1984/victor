@@ -38,9 +38,7 @@ def get_ollama_models() -> list[str]:
     try:
         import subprocess
 
-        result = subprocess.run(
-            ["ollama", "list"], capture_output=True, text=True, timeout=5
-        )
+        result = subprocess.run(["ollama", "list"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             models = []
             for line in result.stdout.strip().split("\n"):
@@ -136,7 +134,9 @@ def second_provider_name(available_providers, provider_name):
             return providers_list[0]
     else:
         # Only one provider available
-        pytest.skip("Provider switching tests require at least 2 different providers (Ollama and LMStudio)")
+        pytest.skip(
+            "Provider switching tests require at least 2 different providers (Ollama and LMStudio)"
+        )
 
 
 @pytest.fixture
@@ -309,7 +309,10 @@ class TestProviderModelCombinedSwitching:
         if success:
             assert orchestrator.model == "llama3.2"
             assert orchestrator.provider_name == second_provider_name
-            assert orchestrator.model != initial_model or orchestrator.provider_name != initial_provider
+            assert (
+                orchestrator.model != initial_model
+                or orchestrator.provider_name != initial_provider
+            )
 
     def test_switch_to_profile(self, orchestrator, second_provider_name):
         """Test switching to a pre-configured profile."""

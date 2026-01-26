@@ -166,12 +166,14 @@ class ContextCoordinator:
         # This would integrate with persistence layer in a full implementation
         # For now, return empty context
         logger.info(f"Rebuilding context for session {session_id} using {strategy} strategy")
-        return CompactionContext({
-            "messages": [],
-            "token_count": 0,
-            "rebuilt": True,
-            "rebuild_strategy": strategy,
-        })
+        return CompactionContext(
+            {
+                "messages": [],
+                "token_count": 0,
+                "rebuilt": True,
+                "rebuild_strategy": strategy,
+            }
+        )
 
     def estimate_token_count(
         self,
@@ -417,11 +419,13 @@ class TruncationCompactionStrategy(BaseCompactionStrategy):
         else:
             new_tokens = 0
 
-        compacted_context: CompactionContext = CompactionContext({
-            **context,
-            "messages": compacted_messages,
-            "token_count": new_tokens,
-        })
+        compacted_context: CompactionContext = CompactionContext(
+            {
+                **context,
+                "messages": compacted_messages,
+                "token_count": new_tokens,
+            }
+        )
 
         return CompactionResult(
             compacted_context=compacted_context,
@@ -539,11 +543,13 @@ class SummarizationCompactionStrategy(BaseCompactionStrategy):
         compacted_messages = [summary_message] + recent_messages
         new_tokens = original_tokens - tokens_saved
 
-        compacted_context: CompactionContext = CompactionContext({
-            **context,
-            "messages": compacted_messages,
-            "token_count": new_tokens,
-        })
+        compacted_context: CompactionContext = CompactionContext(
+            {
+                **context,
+                "messages": compacted_messages,
+                "token_count": new_tokens,
+            }
+        )
 
         return CompactionResult(
             compacted_context=compacted_context,
@@ -668,11 +674,13 @@ class SemanticCompactionStrategy(BaseCompactionStrategy):
 
         tokens_saved = original_tokens - new_tokens
 
-        compacted_context: CompactionContext = CompactionContext({
-            **context,
-            "messages": compacted_messages,
-            "token_count": new_tokens,
-        })
+        compacted_context: CompactionContext = CompactionContext(
+            {
+                **context,
+                "messages": compacted_messages,
+                "token_count": new_tokens,
+            }
+        )
 
         return CompactionResult(
             compacted_context=compacted_context,
@@ -771,7 +779,11 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         context_after_semantic = context
         result = await self._semantic_strategy.compact(context, budget)
 
-        compacted_dict = result.compacted_context if hasattr(result.compacted_context, 'get') else {"token_count": 0}
+        compacted_dict = (
+            result.compacted_context
+            if hasattr(result.compacted_context, "get")
+            else {"token_count": 0}
+        )
         if compacted_dict.get("token_count", 0) <= max_tokens:
             result.strategy_used = f"{self._name}_semantic"
             return result
@@ -781,7 +793,11 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         # Step 2: Try summarization
         result = await self._summarization_strategy.compact(context_after_semantic, budget)
 
-        compacted_dict = result.compacted_context if hasattr(result.compacted_context, 'get') else {"token_count": 0}
+        compacted_dict = (
+            result.compacted_context
+            if hasattr(result.compacted_context, "get")
+            else {"token_count": 0}
+        )
         if compacted_dict.get("token_count", 0) <= max_tokens:
             result.strategy_used = f"{self._name}_summarization"
             return result
@@ -794,7 +810,11 @@ class HybridCompactionStrategy(BaseCompactionStrategy):
         result.strategy_used = f"{self._name}_truncation"
 
         # Calculate total tokens saved
-        final_tokens = result.compacted_context if hasattr(result.compacted_context, 'get') else {"token_count": 0}
+        final_tokens = (
+            result.compacted_context
+            if hasattr(result.compacted_context, "get")
+            else {"token_count": 0}
+        )
         final_token_count = final_tokens.get("token_count", 0)
         total_tokens_saved = original_tokens - final_token_count
 

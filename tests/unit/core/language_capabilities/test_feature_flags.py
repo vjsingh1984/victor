@@ -62,10 +62,7 @@ class TestFeatureFlagManager:
         manager = FeatureFlagManager.instance()
 
         # Disable validation for rust only
-        manager.set_language_flags(
-            "rust",
-            LanguageFeatureFlags(validation_enabled=False)
-        )
+        manager.set_language_flags("rust", LanguageFeatureFlags(validation_enabled=False))
 
         assert not manager.is_validation_enabled("rust")
         assert manager.is_validation_enabled("python")  # Others unaffected
@@ -119,10 +116,7 @@ class TestFeatureFlagManager:
         assert flags is None
 
         # After setting override
-        manager.set_language_flags(
-            "python",
-            LanguageFeatureFlags(validation_enabled=False)
-        )
+        manager.set_language_flags("python", LanguageFeatureFlags(validation_enabled=False))
 
         flags = manager.get_language_flags("python")
         assert flags is not None

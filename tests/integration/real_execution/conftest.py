@@ -158,10 +158,7 @@ def ollama_available() -> bool:
 @pytest.fixture(scope="session")
 def ollama_model_available() -> bool:
     """Check if Ollama model is available for testing."""
-    return any(
-        is_ollama_model_available(model)
-        for model in PROVIDER_MODELS["ollama"]
-    )
+    return any(is_ollama_model_available(model) for model in PROVIDER_MODELS["ollama"])
 
 
 @pytest.fixture(scope="session")
@@ -219,10 +216,7 @@ async def ollama_provider() -> AsyncGenerator[OllamaProvider, None]:
             break
 
     if not model:
-        pytest.skip(
-            "No suitable Ollama model found. "
-            "Run: ollama pull qwen2.5-coder:14b"
-        )
+        pytest.skip("No suitable Ollama model found. " "Run: ollama pull qwen2.5-coder:14b")
 
     provider = OllamaProvider(
         base_url="http://localhost:11434",
@@ -472,21 +466,11 @@ TIMEOUT_XLONG = 180  # Complex workflows, file operations
 
 def pytest_configure(config):
     """Configure pytest markers."""
+    config.addinivalue_line("markers", "real_execution: Mark test as real execution (no mocks)")
+    config.addinivalue_line("markers", "cloud_provider: Mark test as cloud provider test")
+    config.addinivalue_line("markers", "benchmark: Mark test as performance benchmark")
     config.addinivalue_line(
-        "markers",
-        "real_execution: Mark test as real execution (no mocks)"
-    )
-    config.addinivalue_line(
-        "markers",
-        "cloud_provider: Mark test as cloud provider test"
-    )
-    config.addinivalue_line(
-        "markers",
-        "benchmark: Mark test as performance benchmark"
-    )
-    config.addinivalue_line(
-        "markers",
-        "requires_provider(provider): Mark test as requiring specific provider"
+        "markers", "requires_provider(provider): Mark test as requiring specific provider"
     )
 
 

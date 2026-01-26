@@ -193,7 +193,9 @@ class AgentSwarm:
             ConsensusResult with final decision
         """
         if not self.coordinator:
-            return ConsensusResult(achieved=False, decision=None, conflicts=["No coordinator configured"])
+            return ConsensusResult(
+                achieved=False, decision=None, conflicts=["No coordinator configured"]
+            )
 
         # Stage 1: Generate proposals
         proposals = await self._generate_proposals(task, context)

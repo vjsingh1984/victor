@@ -433,7 +433,7 @@ class WorkflowGenerationPipeline:
         validator = WorkflowValidator()
         result = validator.validate(schema)
         # Handle both sync and async validators
-        if isinstance(result, asyncio.Future) or hasattr(result, '__await__'):
+        if isinstance(result, asyncio.Future) or hasattr(result, "__await__"):
             return cast(WorkflowGenerationValidationResult, await result)
         return result
 
@@ -460,7 +460,7 @@ class WorkflowGenerationPipeline:
 
         result = self._refiner.refine(schema, validation)
         # Handle both sync and async refiners
-        if isinstance(result, asyncio.Future) or hasattr(result, '__await__'):
+        if isinstance(result, asyncio.Future) or hasattr(result, "__await__"):
             refined_result = await result
             return cast(Tuple[Dict[str, Any], RefinementResult], refined_result)
         # If result is a tuple, return it directly

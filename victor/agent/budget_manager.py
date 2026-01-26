@@ -481,6 +481,7 @@ class ExtendedBudgetManager(BudgetManager):
         if self._mode_checker is None:
             # Create concrete implementation instead of abstract class
             from victor.agent.budget.mode_completion_checker import ModeCompletionChecker
+
             self._mode_checker = ModeCompletionChecker()
 
     def set_mode(self, mode: str) -> None:

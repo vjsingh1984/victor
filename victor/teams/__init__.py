@@ -129,6 +129,7 @@ def __getattr__(name: str) -> Any:
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
+
 # Coordinator
 from victor.teams.unified_coordinator import UnifiedTeamCoordinator
 

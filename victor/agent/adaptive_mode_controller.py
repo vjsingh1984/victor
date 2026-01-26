@@ -1179,8 +1179,14 @@ class AdaptiveModeController:
                 learner_samples_result = learner_stats.get("sample_count", 0)
 
                 # Ensure types
-                learner_budget: int = int(learner_budget_result) if learner_budget_result is not None else local_budget
-                learner_samples: int = int(learner_samples_result) if learner_samples_result is not None else 0
+                learner_budget: int = (
+                    int(learner_budget_result)
+                    if learner_budget_result is not None
+                    else local_budget
+                )
+                learner_samples: int = (
+                    int(learner_samples_result) if learner_samples_result is not None else 0
+                )
 
                 # Prefer source with more samples
                 if learner_samples > local_samples:
@@ -1193,7 +1199,11 @@ class AdaptiveModeController:
             except Exception as e:
                 logger.debug(f"RL: Could not get budget from learner: {e}")
 
-        return int(local_budget) if local_budget is not None else self.DEFAULT_TOOL_BUDGETS.get(task_type, 10)
+        return (
+            int(local_budget)
+            if local_budget is not None
+            else self.DEFAULT_TOOL_BUDGETS.get(task_type, 10)
+        )
 
     def should_continue(
         self,

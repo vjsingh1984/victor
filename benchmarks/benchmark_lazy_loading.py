@@ -29,6 +29,7 @@ def benchmark_eager_loading():
     print("=" * 70)
 
     import os
+
     os.environ["VICTOR_LAZY_LOADING"] = "false"
 
     clear_imports()
@@ -43,6 +44,7 @@ def benchmark_eager_loading():
     # Simulate accessing a vertical
     start_access = time.perf_counter()
     from victor.core.verticals import VerticalRegistry
+
     coding = VerticalRegistry.get("coding")
     access_time = time.perf_counter() - start_access
 
@@ -68,6 +70,7 @@ def benchmark_lazy_loading():
     print("=" * 70)
 
     import os
+
     os.environ["VICTOR_LAZY_LOADING"] = "true"
 
     clear_imports()
@@ -82,6 +85,7 @@ def benchmark_lazy_loading():
     # Simulate accessing a vertical (triggers lazy import)
     start_access = time.perf_counter()
     from victor.core.verticals import VerticalRegistry
+
     coding = VerticalRegistry.get("coding")
     access_time = time.perf_counter() - start_access
 
@@ -108,15 +112,18 @@ def benchmark_scenario_use_only_one_vertical():
 
     # Lazy loading
     import os
+
     os.environ["VICTOR_LAZY_LOADING"] = "true"
     clear_imports()
 
     start = time.perf_counter()
     import victor.core.verticals
+
     import_time = time.perf_counter() - start
 
     start = time.perf_counter()
     from victor.core.verticals import VerticalRegistry
+
     coding = VerticalRegistry.get("coding")
     config = coding.get_config()
     access_time = time.perf_counter() - start
@@ -134,10 +141,12 @@ def benchmark_scenario_use_only_one_vertical():
 
     start = time.perf_counter()
     import victor.core.verticals
+
     import_time = time.perf_counter() - start
 
     start = time.perf_counter()
     from victor.core.verticals import VerticalRegistry
+
     coding = VerticalRegistry.get("coding")  # Already loaded
     config = coding.get_config()
     access_time = time.perf_counter() - start
@@ -167,12 +176,14 @@ def benchmark_scenario_list_verticals():
 
     # Lazy loading
     import os
+
     os.environ["VICTOR_LAZY_LOADING"] = "true"
     clear_imports()
 
     start = time.perf_counter()
     import victor.core.verticals
     from victor.core.verticals import VerticalRegistry
+
     names = VerticalRegistry.list_names()
     lazy_time = time.perf_counter() - start
 
@@ -186,6 +197,7 @@ def benchmark_scenario_list_verticals():
     start = time.perf_counter()
     import victor.core.verticals
     from victor.core.verticals import VerticalRegistry
+
     names = VerticalRegistry.list_names()
     eager_time = time.perf_counter() - start
 

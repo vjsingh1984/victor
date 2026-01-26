@@ -247,6 +247,7 @@ class PluginDiscovery:
             # Python 3.10+: entry_points(group=...) returns iterable directly
             # Python <3.10: _entry_points().group(...) returns iterable
             from importlib.metadata import entry_points as _entry_points_internal
+
             eps_result = _entry_points_internal(group=self.ENTRY_POINT_GROUP)
 
             # Check if eps_result has .select() method (new API)
@@ -420,9 +421,7 @@ class PluginDiscovery:
             # Discover from all sources
             builtin_result = self.discover_builtin_verticals()
             entry_point_result = (
-                self.discover_from_entry_points()
-                if self.enable_entry_points
-                else DiscoveryResult()
+                self.discover_from_entry_points() if self.enable_entry_points else DiscoveryResult()
             )
             yaml_result = (
                 self.discover_from_yaml() if self.enable_yaml_fallback else DiscoveryResult()

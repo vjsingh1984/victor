@@ -128,9 +128,7 @@ class CapabilityHandler:
             errors = self._definition.get_validation_errors(config)
             if errors:
                 error_msg = "; ".join(errors)
-                raise ValueError(
-                    f"Invalid configuration for '{self._name}': {error_msg}"
-                )
+                raise ValueError(f"Invalid configuration for '{self._name}': {error_msg}")
 
         # Merge with defaults to ensure complete config
         merged_config = self._definition.merge_config({}, config)

@@ -570,6 +570,7 @@ def create_source_credibility_safety_rules(
             # Type the lambda explicitly to avoid inference issues
             def check_fn(op: str, d: str = domain) -> bool:
                 return d in op.lower()
+
             enforcer.add_rule(
                 SafetyRule(
                     name=f"source_block_{domain.replace('.', '_')}",

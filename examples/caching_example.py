@@ -16,8 +16,7 @@ from typing import Any
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -106,9 +105,7 @@ async def example_semantic_cache():
     )
 
     # Store a response
-    messages1 = [
-        Message(role="user", content="How do I parse JSON in Python?")
-    ]
+    messages1 = [Message(role="user", content="How do I parse JSON in Python?")]
     response1 = CompletionResponse(
         content="Use json.loads() to parse JSON in Python.",
         role="assistant",
@@ -118,9 +115,7 @@ async def example_semantic_cache():
     logger.info("Stored response for 'How do I parse JSON in Python?'")
 
     # Similar query (different wording)
-    messages2 = [
-        Message(role="user", content="Python JSON parsing example")
-    ]
+    messages2 = [Message(role="user", content="Python JSON parsing example")]
 
     # Will find semantically similar cached response
     result = await cache.get_similar(messages2)

@@ -51,7 +51,9 @@ class ConfigMigrator:
                 config["tool_budget"] = self._extract_value(content, "tool_budget")
             if "use_semantic_tool_selection" in content:
                 config["tool_selection_strategy"] = "hybrid"
-                self.changes_made.append("Migrated use_semantic_tool_selection to tool_selection_strategy=hybrid")
+                self.changes_made.append(
+                    "Migrated use_semantic_tool_selection to tool_selection_strategy=hybrid"
+                )
 
         return config
 
@@ -65,11 +67,11 @@ class ConfigMigrator:
         with open(env_file) as f:
             for line in f:
                 line = line.strip()
-                if not line or line.startswith('#'):
+                if not line or line.startswith("#"):
                     continue
 
-                if '=' in line:
-                    key, value = line.split('=', 1)
+                if "=" in line:
+                    key, value = line.split("=", 1)
                     key = key.strip()
                     value = value.strip()
 
@@ -97,7 +99,7 @@ class ConfigMigrator:
 
         # Create settings.yaml
         settings_file = dest_dir / "settings.yaml"
-        with open(settings_file, 'w') as f:
+        with open(settings_file, "w") as f:
             f.write("# Victor 0.5.0 Configuration\n")
             f.write("# Migrated from 0.5.x\n\n")
 
@@ -122,7 +124,7 @@ class ConfigMigrator:
 
     def update_env_file(self, env_vars: Dict[str, str], env_file: Path) -> None:
         """Update .env file with new variable names."""
-        with open(env_file, 'w') as f:
+        with open(env_file, "w") as f:
             f.write("# Victor 0.5.0 Environment Variables\n")
             f.write("# Migrated from 0.5.x\n\n")
 
@@ -136,8 +138,8 @@ class ConfigMigrator:
         import re
 
         patterns = [
-            rf'{key}\s*=\s*(.+)',
-            rf'{key}\s*=\s*(.+)\n',
+            rf"{key}\s*=\s*(.+)",
+            rf"{key}\s*=\s*(.+)\n",
         ]
 
         for pattern in patterns:
@@ -175,6 +177,7 @@ class ConfigMigrator:
         else:
             try:
                 import yaml
+
                 with open(settings_file) as f:
                     yaml.safe_load(f)
                 print(f"✓ {settings_file} is valid YAML")
@@ -212,29 +215,29 @@ class ConfigMigrator:
 
         # Determine source type
         if self.source.is_file():
-            if self.source.suffix == '.py':
+            if self.source.suffix == ".py":
                 config = self.migrate_python_config(self.source)
                 if self.dest:
                     self.create_yaml_config(config, self.dest)
-            elif self.source.name == '.env':
+            elif self.source.name == ".env":
                 env_vars = self.migrate_env_file(self.source)
                 if self.dest:
-                    self.update_env_file(env_vars, self.dest / '.env')
+                    self.update_env_file(env_vars, self.dest / ".env")
             else:
                 print(f"Unsupported source file type: {self.source.suffix}")
                 return False
 
         elif self.source.is_dir():
             # Migrate all config files in directory
-            env_file = self.source / '.env'
+            env_file = self.source / ".env"
             if env_file.exists():
                 env_vars = self.migrate_env_file(env_file)
                 if self.dest:
-                    self.update_env_file(env_vars, self.dest / '.env')
+                    self.update_env_file(env_vars, self.dest / ".env")
 
             # Look for Python config files
-            for py_file in self.source.glob('*.py'):
-                if 'config' in py_file.name.lower():
+            for py_file in self.source.glob("*.py"):
+                if "config" in py_file.name.lower():
                     config = self.migrate_python_config(py_file)
                     if self.dest:
                         self.create_yaml_config(config, self.dest)
@@ -252,25 +255,14 @@ class ConfigMigrator:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Migrate Victor configuration from 0.5.x to 0.5.0"
+    parser = argparse.ArgumentParser(description="Migrate Victor configuration from 0.5.x to 0.5.0")
+    parser.add_argument(
+        "--source", type=Path, required=True, help="Source configuration file or directory"
     )
     parser.add_argument(
-        "--source",
-        type=Path,
-        required=True,
-        help="Source configuration file or directory"
+        "--dest", type=Path, help="Destination directory for migrated configuration"
     )
-    parser.add_argument(
-        "--dest",
-        type=Path,
-        help="Destination directory for migrated configuration"
-    )
-    parser.add_argument(
-        "--validate",
-        type=Path,
-        help="Validate migrated configuration"
-    )
+    parser.add_argument("--validate", type=Path, help="Validate migrated configuration")
 
     args = parser.parse_args()
 

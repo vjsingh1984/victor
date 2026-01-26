@@ -49,7 +49,9 @@ class DataAnalysisAssistant(VerticalBase):
     """
 
     name: ClassVar[str] = "data_analysis"
-    description: ClassVar[str] = "Data exploration, statistical analysis, visualization, and ML insights"
+    description: ClassVar[str] = (
+        "Data exploration, statistical analysis, visualization, and ML insights"
+    )
     version: ClassVar[str] = "0.5.0"
 
     @classmethod
@@ -206,13 +208,12 @@ class DataAnalysisAssistant(VerticalBase):
             from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 
             return cast(
-                ToolDependencyProviderProtocol,
-                create_vertical_tool_dependency_provider(cls.name)
+                ToolDependencyProviderProtocol, create_vertical_tool_dependency_provider(cls.name)
             )
 
         return cast(
             Optional[ToolDependencyProviderProtocol],
-            cls._get_cached_extension("tool_dependency_provider", _create)
+            cls._get_cached_extension("tool_dependency_provider", _create),
         )
 
     @classmethod

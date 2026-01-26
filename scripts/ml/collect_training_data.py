@@ -307,9 +307,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Collect training data from workflow execution logs"
     )
-    parser.add_argument(
-        "--input-dir", required=True, help="Directory containing log files"
-    )
+    parser.add_argument("--input-dir", required=True, help="Directory containing log files")
     parser.add_argument(
         "--output-data",
         default="data/historical_executions.json",
@@ -326,9 +324,7 @@ def main():
         action="store_true",
         help="Only include successful executions",
     )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose logging"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
 

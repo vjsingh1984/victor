@@ -908,7 +908,11 @@ class TeamMemberAdapter:
             else:
                 handler_result = result
             # The handler is typed to return Optional[AgentMessage], so this should be safe
-            return handler_result if isinstance(handler_result, AgentMessage) or handler_result is None else None
+            return (
+                handler_result
+                if isinstance(handler_result, AgentMessage) or handler_result is None
+                else None
+            )
         return None
 
 

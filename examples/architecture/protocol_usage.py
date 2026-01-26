@@ -106,8 +106,7 @@ class SemanticToolSelector:
         # Simulate semantic matching
         task_lower = task.lower()
         scores = {
-            name: self._compute_similarity(task_lower, desc)
-            for name, desc in self._tools.items()
+            name: self._compute_similarity(task_lower, desc) for name, desc in self._tools.items()
         }
 
         # Sort by score and return top N
@@ -162,9 +161,7 @@ class KeywordToolSelector:
         """Get keyword match score."""
         if tool_name not in self._tool_keywords:
             return 0.0
-        return self._keyword_score(
-            task.lower(), self._tool_keywords[tool_name]
-        )
+        return self._keyword_score(task.lower(), self._tool_keywords[tool_name])
 
     def _keyword_score(self, task: str, keywords: List[str]) -> float:
         """Compute keyword match score."""
@@ -207,23 +204,17 @@ class HybridToolSelector:
             semantic_score = self.semantic.get_tool_score(tool, task)
             keyword_score = self.keyword.get_tool_score(tool, task)
             combined_scores[tool] = (
-                self.semantic_weight * semantic_score
-                + (1 - self.semantic_weight) * keyword_score
+                self.semantic_weight * semantic_score + (1 - self.semantic_weight) * keyword_score
             )
 
-        sorted_tools = sorted(
-            combined_scores.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_tools = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)
         return [name for name, _ in sorted_tools[:limit]]
 
     def get_tool_score(self, tool_name: str, task: str) -> float:
         """Get combined relevance score."""
         semantic_score = self.semantic.get_tool_score(tool_name, task)
         keyword_score = self.keyword.get_tool_score(tool_name, task)
-        return (
-            self.semantic_weight * semantic_score
-            + (1 - self.semantic_weight) * keyword_score
-        )
+        return self.semantic_weight * semantic_score + (1 - self.semantic_weight) * keyword_score
 
     @property
     def strategy_name(self) -> str:
@@ -261,10 +252,7 @@ class ToolCoordinator:
         selected_tools = self.selector.select_tools(task, limit=self.max_tools)
 
         # Get scores for selected tools
-        tool_scores = {
-            tool: self.selector.get_tool_score(tool, task)
-            for tool in selected_tools
-        }
+        tool_scores = {tool: self.selector.get_tool_score(tool, task) for tool in selected_tools}
 
         return {
             "task": task,
@@ -307,9 +295,7 @@ def test_coordinator_with_mock():
     logger.info("Testing ToolCoordinator with mock selector...")
 
     # Create mock selector
-    mock_selector = MockToolSelector(
-        fixed_tools=["code_search", "file_edit", "test_gen"]
-    )
+    mock_selector = MockToolSelector(fixed_tools=["code_search", "file_edit", "test_gen"])
 
     # Create coordinator with mock
     coordinator = ToolCoordinator(selector=mock_selector, max_tools=5)
@@ -392,9 +378,7 @@ def main():
     # Use in coordinator
     coordinator = ToolCoordinator(selector=hybrid, max_tools=5)
 
-    result = coordinator.select_and_execute(
-        "I need to debug and refactor the authentication code"
-    )
+    result = coordinator.select_and_execute("I need to debug and refactor the authentication code")
 
     logger.info(f"\nFinal Result:")
     logger.info(f"  Task: {result['task']}")

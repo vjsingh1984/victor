@@ -1978,9 +1978,7 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
                     warnings=all_warnings if all_warnings else [],
                 )
 
-        return ToolCallParseResult(
-            remaining_content=content, warnings=warnings if warnings else []
-        )
+        return ToolCallParseResult(remaining_content=content, warnings=warnings if warnings else [])
 
     def get_system_prompt_hints(self) -> str:
         """Get system prompt hints for Azure OpenAI models."""

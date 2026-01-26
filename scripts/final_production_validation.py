@@ -127,13 +127,13 @@ class ValidationReport:
             "total_tests": self.total_tests,
             "passed": self.passed_tests,
             "failed": self.failed_tests,
-            "success_rate": (self.passed_tests / self.total_tests * 100) if self.total_tests > 0 else 0,
+            "success_rate": (
+                (self.passed_tests / self.total_tests * 100) if self.total_tests > 0 else 0
+            ),
             "critical_failures": len(self.critical_failures),
             "warnings": len(self.warnings),
             "total_duration_seconds": (
-                (self.end_time - self.start_time).total_seconds()
-                if self.end_time
-                else 0
+                (self.end_time - self.start_time).total_seconds() if self.end_time else 0
             ),
         }
 
@@ -212,24 +212,28 @@ class ValidationReport:
         # Generate tables for each category
         for category, results in categories.items():
             html += f'<div class="category-header">{category}</div>'
-            html += '<table>'
-            html += '<thead><tr><th>Test Name</th><th>Status</th><th>Duration (ms)</th><th>Details</th></tr></thead>'
-            html += '<tbody>'
+            html += "<table>"
+            html += "<thead><tr><th>Test Name</th><th>Status</th><th>Duration (ms)</th><th>Details</th></tr></thead>"
+            html += "<tbody>"
 
             for result in results:
-                status = '<span class="status-pass">PASS</span>' if result.passed else '<span class="status-fail">FAIL</span>'
+                status = (
+                    '<span class="status-pass">PASS</span>'
+                    if result.passed
+                    else '<span class="status-fail">FAIL</span>'
+                )
                 details = result.details or result.error or "N/A"
-                html += f'<tr><td>{result.name}</td><td>{status}</td><td>{result.duration_ms:.2f}</td><td>{details}</td></tr>'
+                html += f"<tr><td>{result.name}</td><td>{status}</td><td>{result.duration_ms:.2f}</td><td>{details}</td></tr>"
 
-            html += '</tbody></table>'
+            html += "</tbody></table>"
 
         # Critical failures
         if self.critical_failures:
             html += '<h2 style="color: #f44336;">Critical Failures</h2>'
-            html += '<ul>'
+            html += "<ul>"
             for failure in self.critical_failures:
-                html += f'<li>{failure}</li>'
-            html += '</ul>'
+                html += f"<li>{failure}</li>"
+            html += "</ul>"
 
         html += """
     </div>
@@ -936,7 +940,9 @@ class ProductionValidator:
                     },
                 )
             )
-            console.print(f"[green]✓[/green] Concurrent operations validated ({len(coordinators)} coordinators)")
+            console.print(
+                f"[green]✓[/green] Concurrent operations validated ({len(coordinators)} coordinators)"
+            )
         except Exception as e:
             duration = (time.time() - start) * 1000
             self.report.add_result(
@@ -989,9 +995,13 @@ class ProductionValidator:
             )
 
             if passed:
-                console.print(f"[green]✓[/green] Memory usage validated ({avg_mem_per_coordinator:.3f}MB/coordinator)")
+                console.print(
+                    f"[green]✓[/green] Memory usage validated ({avg_mem_per_coordinator:.3f}MB/coordinator)"
+                )
             else:
-                console.print(f"[yellow]⚠[/yellow] Memory usage high ({avg_mem_per_coordinator:.3f}MB/coordinator)")
+                console.print(
+                    f"[yellow]⚠[/yellow] Memory usage high ({avg_mem_per_coordinator:.3f}MB/coordinator)"
+                )
                 self.report.warnings.append("High memory usage per coordinator")
 
         except Exception as e:
@@ -1076,7 +1086,9 @@ class ProductionValidator:
 
         table.add_row("Total Tests", str(summary["total_tests"]))
         table.add_row("Passed", f"[green]{summary['passed']}[/green]")
-        table.add_row("Failed", f"[{'red' if summary['failed'] > 0 else 'green'}]{summary['failed']}[/]")
+        table.add_row(
+            "Failed", f"[{'red' if summary['failed'] > 0 else 'green'}]{summary['failed']}[/]"
+        )
         table.add_row("Success Rate", f"{summary['success_rate']:.1f}%")
         table.add_row("Critical Failures", str(summary["critical_failures"]))
         table.add_row("Warnings", str(summary["warnings"]))
@@ -1098,11 +1110,17 @@ class ProductionValidator:
 
         # Overall verdict
         if summary["critical_failures"] > 0:
-            console.print("\n[bold red]VERDICT: CANNOT ROLL OUT - Critical failures detected[/bold red]")
+            console.print(
+                "\n[bold red]VERDICT: CANNOT ROLL OUT - Critical failures detected[/bold red]"
+            )
         elif summary["failed"] > 0:
-            console.print("\n[bold yellow]VERDICT: PROCEED WITH CAUTION - Some failures detected[/bold yellow]")
+            console.print(
+                "\n[bold yellow]VERDICT: PROCEED WITH CAUTION - Some failures detected[/bold yellow]"
+            )
         else:
-            console.print("\n[bold green]VERDICT: READY FOR ROLLOUT - All validations passed[/bold green]")
+            console.print(
+                "\n[bold green]VERDICT: READY FOR ROLLOUT - All validations passed[/bold green]"
+            )
 
 
 async def main():
@@ -1110,7 +1128,12 @@ async def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Final production validation")
-    parser.add_argument("--output", type=str, default="/tmp/production_validation_report.html", help="Output report path")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="/tmp/production_validation_report.html",
+        help="Output report path",
+    )
     parser.add_argument("--json", type=str, help="Output JSON report path")
     args = parser.parse_args()
 

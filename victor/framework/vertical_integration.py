@@ -785,8 +785,12 @@ class VerticalIntegrationPipeline:
             parallel_enabled: If True, enable parallel execution (Phase 2.2, default: False)
         """
         self._strict_mode: bool = strict_mode
-        self._pre_hooks: List[Callable[[Any, type[Any]], None]] = list(pre_hooks) if pre_hooks else []
-        self._post_hooks: List[Callable[[Any, IntegrationResult], None]] = list(post_hooks) if post_hooks else []
+        self._pre_hooks: List[Callable[[Any, type[Any]], None]] = (
+            list(pre_hooks) if pre_hooks else []
+        )
+        self._post_hooks: List[Callable[[Any, IntegrationResult], None]] = (
+            list(post_hooks) if post_hooks else []
+        )
         self._use_step_handlers: bool = use_step_handlers
         self._enable_cache = enable_cache
         self._cache_ttl = cache_ttl

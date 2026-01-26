@@ -124,7 +124,9 @@ async def list_recordings(args) -> None:
         size = format_bytes(r.get("file_size_bytes"))
         date = datetime.fromtimestamp(r.get("started_at", 0)).strftime("%Y-%m-%d %H:%M")
 
-        print(f"{r['recording_id'][:8]:<8} {r['workflow_name'][:20]:<20} {status:<8} {duration:<10} {size:<10} {date}")
+        print(
+            f"{r['recording_id'][:8]:<8} {r['workflow_name'][:20]:<20} {status:<8} {duration:<10} {size:<10} {date}"
+        )
 
     print()
 
@@ -152,7 +154,9 @@ async def inspect_recording(args) -> None:
 
     print(f"\nTiming:")
     print(f"  Started: {datetime.fromtimestamp(metadata.get('started_at', 0))}")
-    print(f"  Completed: {datetime.fromtimestamp(metadata.get('completed_at', 0)) if metadata.get('completed_at') else 'N/A'}")
+    print(
+        f"  Completed: {datetime.fromtimestamp(metadata.get('completed_at', 0)) if metadata.get('completed_at') else 'N/A'}"
+    )
     print(f"  Duration: {format_duration(metadata.get('duration_seconds'))}")
 
     print(f"\nExecution:")
@@ -166,7 +170,7 @@ async def inspect_recording(args) -> None:
     print(f"  Checksum: {metadata.get('checksum', 'N/A')}")
 
     print(f"\nTags:")
-    tags = metadata.get('tags', [])
+    tags = metadata.get("tags", [])
     if tags:
         for tag in tags:
             print(f"  - {tag}")
@@ -261,7 +265,9 @@ async def compare_recordings(args) -> None:
 
     # Compare metadata
     print("Metadata differences:")
-    print(f"  Duration: {format_duration(replayer1.metadata.duration_seconds)} vs {format_duration(replayer2.metadata.duration_seconds)}")
+    print(
+        f"  Duration: {format_duration(replayer1.metadata.duration_seconds)} vs {format_duration(replayer2.metadata.duration_seconds)}"
+    )
     print(f"  Nodes: {replayer1.metadata.node_count} vs {replayer2.metadata.node_count}")
     print(f"  Teams: {replayer1.metadata.team_count} vs {replayer2.metadata.team_count}")
     print(f"  Events: {replayer1.metadata.event_count} vs {replayer2.metadata.event_count}")
@@ -374,11 +380,11 @@ async def cleanup_recordings(args) -> None:
     print(f"To delete: {result['to_delete']}")
     print(f"Total size: {format_bytes(result['total_size_bytes'])}")
 
-    if args.dry_run and result['deleted_ids']:
+    if args.dry_run and result["deleted_ids"]:
         print("\nRecordings that would be deleted:")
-        for recording_id in result['deleted_ids'][:10]:
+        for recording_id in result["deleted_ids"][:10]:
             print(f"  - {recording_id}")
-        if len(result['deleted_ids']) > 10:
+        if len(result["deleted_ids"]) > 10:
             print(f"  ... and {len(result['deleted_ids']) - 10} more")
 
     print()
@@ -407,13 +413,13 @@ async def storage_stats(args) -> None:
     print(f"  Total duration: {format_duration(stats['total_duration_seconds'])}")
 
     print(f"\nTime range:")
-    if stats['oldest_recording']:
+    if stats["oldest_recording"]:
         print(f"  Oldest: {datetime.fromtimestamp(stats['oldest_recording'])}")
-    if stats['newest_recording']:
+    if stats["newest_recording"]:
         print(f"  Newest: {datetime.fromtimestamp(stats['newest_recording'])}")
 
     print(f"\nWorkflows:")
-    for workflow, count in sorted(stats['workflow_counts'].items(), key=lambda x: -x[1]):
+    for workflow, count in sorted(stats["workflow_counts"].items(), key=lambda x: -x[1]):
         print(f"  {workflow}: {count}")
 
     print()
@@ -439,12 +445,16 @@ async def main() -> None:
     list_parser.add_argument("--workflow", help="Filter by workflow name")
     list_parser.add_argument("--start", help="Start date (ISO format)")
     list_parser.add_argument("--end", help="End date (ISO format)")
-    list_parser.add_argument("--success", choices=["true", "false"], help="Filter by success status")
+    list_parser.add_argument(
+        "--success", choices=["true", "false"], help="Filter by success status"
+    )
     list_parser.add_argument("--tags", help="Filter by tags (comma-separated)")
     list_parser.add_argument("--limit", type=int, help="Limit number of results")
     list_parser.add_argument("--offset", type=int, default=0, help="Offset for pagination")
     list_parser.add_argument("--sort-by", default="started_at", help="Field to sort by")
-    list_parser.add_argument("--sort-order", choices=["asc", "desc"], default="desc", help="Sort order")
+    list_parser.add_argument(
+        "--sort-order", choices=["asc", "desc"], default="desc", help="Sort order"
+    )
 
     # Inspect command
     inspect_parser = subparsers.add_parser("inspect", help="Inspect recording metadata")
@@ -465,15 +475,23 @@ async def main() -> None:
     # Export command
     export_parser = subparsers.add_parser("export", help="Export a recording")
     export_parser.add_argument("recording_id", help="Recording ID")
-    export_parser.add_argument("--format", choices=["dot", "json", "summary"], default="summary", help="Export format")
+    export_parser.add_argument(
+        "--format", choices=["dot", "json", "summary"], default="summary", help="Export format"
+    )
     export_parser.add_argument("--output", required=True, help="Output file path")
 
     # Cleanup command
     cleanup_parser = subparsers.add_parser("cleanup", help="Cleanup old recordings")
     cleanup_parser.add_argument("--max-age-days", type=int, help="Maximum age in days")
-    cleanup_parser.add_argument("--max-count", type=int, help="Maximum number of recordings to keep")
-    cleanup_parser.add_argument("--delete-failed", action="store_true", help="Delete failed recordings")
-    cleanup_parser.add_argument("--dry-run", action="store_true", help="Show what would be deleted without deleting")
+    cleanup_parser.add_argument(
+        "--max-count", type=int, help="Maximum number of recordings to keep"
+    )
+    cleanup_parser.add_argument(
+        "--delete-failed", action="store_true", help="Delete failed recordings"
+    )
+    cleanup_parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be deleted without deleting"
+    )
 
     # Stats command
     stats_parser = subparsers.add_parser("stats", help="Show storage statistics")

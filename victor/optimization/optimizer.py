@@ -143,8 +143,10 @@ class WorkflowOptimizer:
 
         # Initialize search algorithm
         if self.config.search_algorithm == "hill_climbing":
-            self.search_optimizer: Union[HillClimbingOptimizer, SimulatedAnnealingOptimizer] = HillClimbingOptimizer(
-                variant_generator=self.variant_generator,
+            self.search_optimizer: Union[HillClimbingOptimizer, SimulatedAnnealingOptimizer] = (
+                HillClimbingOptimizer(
+                    variant_generator=self.variant_generator,
+                )
             )
         elif self.config.search_algorithm == "simulated_annealing":
             search_optimizer = SimulatedAnnealingOptimizer(

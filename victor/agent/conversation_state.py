@@ -905,7 +905,9 @@ class ConversationStateMachine:
         """
         # Use StageTransitionEngine's detailed priorities if available
         if self._transition_engine:
-            multiplier = cast(float, self._transition_engine.get_tool_priority_multiplier(tool_name))
+            multiplier = cast(
+                float, self._transition_engine.get_tool_priority_multiplier(tool_name)
+            )
             # If engine has a specific multiplier (not default 1.0), use it
             if multiplier != 1.0:
                 # Convert multiplier (1.0-2.0) to boost (0.0-0.2)

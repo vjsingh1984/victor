@@ -1119,7 +1119,8 @@ class AgentOrchestrator(
                 orchestrator=self,
                 state_coordinator=self._state_coordinator,
                 provider_coordinator=self._provider_coordinator,
-                tools=getattr(self, "_tool_pipeline", None) or getattr(self, "tool_registrar", None),
+                tools=getattr(self, "_tool_pipeline", None)
+                or getattr(self, "tool_registrar", None),
                 conversation=self.conversation,
                 mode_controller=getattr(self, "mode_controller", None),
                 unified_tracker=getattr(self, "unified_tracker", None),
@@ -1855,16 +1856,17 @@ class AgentOrchestrator(
         if not hasattr(self.tool_selector, "initialize_tool_embeddings"):
             return
         # ToolSelector owns the initialization state
-        if (
-            hasattr(self.tool_selector, "_embeddings_initialized")
-            and getattr(self.tool_selector, "_embeddings_initialized", False)
+        if hasattr(self.tool_selector, "_embeddings_initialized") and getattr(
+            self.tool_selector, "_embeddings_initialized", False
         ):
             return
 
         try:
             logger.info("Starting background embedding preload...")
             # Initialize the actual tool_selector (not the deprecated semantic_selector)
-            if self.tool_selector is not None and hasattr(self.tool_selector, "initialize_tool_embeddings"):
+            if self.tool_selector is not None and hasattr(
+                self.tool_selector, "initialize_tool_embeddings"
+            ):
                 await self.tool_selector.initialize_tool_embeddings(self.tools)
             logger.info(
                 f"{self._presentation.icon('success')} Tool embeddings preloaded successfully in background"
@@ -1959,16 +1961,20 @@ class AgentOrchestrator(
                 "recommended_tool": "code_search",
                 "confidence": 0.5,
                 "reason": "Search coordinator not available",
-                "search_type": "keyword"
+                "search_type": "keyword",
             }
         result = self._search_coordinator.route_search_query(query)
         # Ensure the result has the expected structure
-        return result if isinstance(result, dict) else {
-            "recommended_tool": "code_search",
-            "confidence": 0.5,
-            "reason": "Unexpected result type from search coordinator",
-            "search_type": "keyword"
-        }
+        return (
+            result
+            if isinstance(result, dict)
+            else {
+                "recommended_tool": "code_search",
+                "confidence": 0.5,
+                "reason": "Unexpected result type from search coordinator",
+                "search_type": "keyword",
+            }
+        )
 
     def get_recommended_search_tool(self, query: str) -> str:
         """Get the recommended search tool name for a query.
@@ -2076,10 +2082,14 @@ class AgentOrchestrator(
                 "selection_stats": {},
                 "tool_stats": {},
                 "cost_by_tier": {},
-                "total_cost": 0.0
+                "total_cost": 0.0,
             }
-        conv_summary = self.conversation_state.get_state_summary() if self.conversation_state else {}
-        result = self._metrics_coordinator.get_tool_usage_stats(conversation_state_summary=conv_summary)
+        conv_summary = (
+            self.conversation_state.get_state_summary() if self.conversation_state else {}
+        )
+        result = self._metrics_coordinator.get_tool_usage_stats(
+            conversation_state_summary=conv_summary
+        )
         return cast(Dict[str, Any], result)
 
     def get_token_usage(self) -> "TokenUsage":
@@ -2094,18 +2104,21 @@ class AgentOrchestrator(
         if self._metrics_coordinator is None:
             # Return empty TokenUsage if coordinator not available
             from victor.evaluation.protocol import TokenUsage
+
             return TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0)
         result = self._metrics_coordinator.get_token_usage()
         # Ensure result is a dict with expected keys
         if isinstance(result, dict):
             from victor.evaluation.protocol import TokenUsage
+
             return TokenUsage(
                 input_tokens=result.get("input_tokens", 0),
                 output_tokens=result.get("output_tokens", 0),
-                total_tokens=result.get("total_tokens", 0)
+                total_tokens=result.get("total_tokens", 0),
             )
         # Return empty TokenUsage if result is not as expected
         from victor.evaluation.protocol import TokenUsage
+
         return TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0)
 
     def reset_token_usage(self) -> None:

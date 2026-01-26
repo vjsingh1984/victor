@@ -55,7 +55,11 @@ def benchmark_task_to_framework_task(
     # Build context dictionary
     context: Dict[str, Any] = {
         "task_id": benchmark_task.task_id,
-        "benchmark": benchmark_task.benchmark.value if hasattr(benchmark_task.benchmark, 'value') else str(benchmark_task.benchmark),
+        "benchmark": (
+            benchmark_task.benchmark.value
+            if hasattr(benchmark_task.benchmark, "value")
+            else str(benchmark_task.benchmark)
+        ),
     }
 
     if include_context:

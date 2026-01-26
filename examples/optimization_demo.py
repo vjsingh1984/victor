@@ -134,10 +134,7 @@ async def demo_concurrency_optimization():
         await asyncio.sleep(delay)
         return task_id
 
-    tasks = [
-        lambda i=i: mock_task(i, 0.1)
-        for i in range(10)
-    ]
+    tasks = [lambda i=i: mock_task(i, 0.1) for i in range(10)]
 
     print("\nExecuting 10 tasks with concurrency limit of 3...")
 

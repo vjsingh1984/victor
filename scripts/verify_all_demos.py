@@ -24,7 +24,7 @@ RESET = "\033[0m"
 def check_syntax(file_path: Path) -> Tuple[bool, str]:
     """Check if Python file has valid syntax."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             source = f.read()
         ast.parse(source)
         return True, "OK"
@@ -38,7 +38,7 @@ def check_imports(file_path: Path) -> Tuple[bool, str]:
     """Check if file can be imported without errors."""
     try:
         # Don't actually import, just check the AST for imports
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             source = f.read()
         tree = ast.parse(source)
 

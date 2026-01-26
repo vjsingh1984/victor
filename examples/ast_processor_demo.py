@@ -105,8 +105,7 @@ class Calculator:
     ]
 
     results = processor.extract_symbols_parallel(
-        files,
-        symbol_types=["function_definition", "class_definition"]
+        files, symbol_types=["function_definition", "class_definition"]
     )
 
     for idx, symbols in results.items():

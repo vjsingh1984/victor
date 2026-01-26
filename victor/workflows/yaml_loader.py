@@ -1047,7 +1047,9 @@ def _create_transform(expr: str) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
         if value_str.startswith("ctx."):
             ref_key = value_str[4:]
 
-            def ref_transform(ctx: Dict[str, Any], k: str = key, rk: str = ref_key) -> Dict[str, Any]:
+            def ref_transform(
+                ctx: Dict[str, Any], k: str = key, rk: str = ref_key
+            ) -> Dict[str, Any]:
                 result = ctx.copy()
                 result[k] = ctx.get(rk)
                 return result
@@ -2070,6 +2072,7 @@ class WorkflowArgument:
 
         # Type conversion
         from typing import Callable
+
         type_map: Dict[str, Callable[[Any], Any]] = {
             "str": str,
             "int": int,

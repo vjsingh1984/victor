@@ -245,47 +245,31 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
     # Collect command
-    collect_parser = subparsers.add_parser(
-        "collect",
-        help="Collect and print metrics"
-    )
+    collect_parser = subparsers.add_parser("collect", help="Collect and print metrics")
 
     # Export command
-    export_parser = subparsers.add_parser(
-        "export",
-        help="Export metrics to file"
-    )
+    export_parser = subparsers.add_parser("export", help="Export metrics to file")
     export_parser.add_argument(
         "--format",
         choices=["json", "prometheus"],
         default="json",
-        help="Export format (default: json)"
+        help="Export format (default: json)",
     )
-    export_parser.add_argument(
-        "--output", "-o",
-        help="Output file path (default: stdout)"
-    )
+    export_parser.add_argument("--output", "-o", help="Output file path (default: stdout)")
 
     # Baseline command
-    baseline_parser = subparsers.add_parser(
-        "baseline",
-        help="Establish baseline metrics"
-    )
+    baseline_parser = subparsers.add_parser("baseline", help="Establish baseline metrics")
     baseline_parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         default="baseline_metrics.json",
-        help="Baseline output file (default: baseline_metrics.json)"
+        help="Baseline output file (default: baseline_metrics.json)",
     )
 
     # Compare command
-    compare_parser = subparsers.add_parser(
-        "compare",
-        help="Compare against baseline"
-    )
+    compare_parser = subparsers.add_parser("compare", help="Compare against baseline")
     compare_parser.add_argument(
-        "--baseline", "-b",
-        required=True,
-        help="Baseline file to compare against"
+        "--baseline", "-b", required=True, help="Baseline file to compare against"
     )
 
     # Parse arguments

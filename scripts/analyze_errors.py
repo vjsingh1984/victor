@@ -4,15 +4,15 @@ import subprocess
 import re
 
 result = subprocess.run(
-    ['mypy', 'victor/', '--config-file', 'pyproject.toml'],
+    ["mypy", "victor/", "--config-file", "pyproject.toml"],
     capture_output=True,
     text=True,
-    cwd='/Users/vijaysingh/code/codingagent'
+    cwd="/Users/vijaysingh/code/codingagent",
 )
 
 type_counts = {}
-for line in result.stdout.split('\n'):
-    if 'type-arg' in line:
+for line in result.stdout.split("\n"):
+    if "type-arg" in line:
         match = re.search(r'Missing type parameters for generic type "([^"]+)"', line)
         if match:
             type_name = match.group(1)

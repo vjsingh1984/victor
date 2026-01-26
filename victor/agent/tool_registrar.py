@@ -211,7 +211,9 @@ class ToolRegistrar:
 
         logger.debug("ToolRegistrar facade initialized")
 
-    def set_background_task_callback(self, callback: Callable[[Any, str], asyncio.Task[Any]]) -> None:
+    def set_background_task_callback(
+        self, callback: Callable[[Any, str], asyncio.Task[Any]]
+    ) -> None:
         """Set callback for creating background tasks.
 
         Args:

@@ -61,9 +61,7 @@ class Calculator:
     def add(self, a: int, b: int) -> int:
         return a + b
 '''
-        should_proceed, result = hook.validate_before_write_sync(
-            content, file_path, strict=False
-        )
+        should_proceed, result = hook.validate_before_write_sync(content, file_path, strict=False)
 
         assert should_proceed is True
         assert result.is_valid is True
@@ -74,27 +72,20 @@ class Calculator:
         file_path = temp_dir / "invalid.py"
         content = "def foo(:"  # Syntax error
 
-        should_proceed, result = hook.validate_before_write_sync(
-            content, file_path, strict=True
-        )
+        should_proceed, result = hook.validate_before_write_sync(content, file_path, strict=True)
 
         assert should_proceed is False
         assert result.is_valid is False
         assert result.language == "python"
         assert len(result.issues) > 0
-        assert any(
-            issue.severity == ValidationSeverity.ERROR
-            for issue in result.issues
-        )
+        assert any(issue.severity == ValidationSeverity.ERROR for issue in result.issues)
 
     def test_invalid_python_warns_in_non_strict_mode(self, hook, temp_dir):
         """Test that invalid Python code generates warnings in non-strict mode."""
         file_path = temp_dir / "invalid.py"
         content = "def foo(:"  # Syntax error
 
-        should_proceed, result = hook.validate_before_write_sync(
-            content, file_path, strict=False
-        )
+        should_proceed, result = hook.validate_before_write_sync(content, file_path, strict=False)
 
         # In non-strict mode, validation still fails but write may proceed
         # depending on fallback_on_error setting
@@ -106,9 +97,7 @@ class Calculator:
         file_path = temp_dir / "unknown.xyz"
         content = "some content that cannot be validated"
 
-        should_proceed, result = hook.validate_before_write_sync(
-            content, file_path, strict=False
-        )
+        should_proceed, result = hook.validate_before_write_sync(content, file_path, strict=False)
 
         assert should_proceed is True
         assert result.language == "unknown"
@@ -117,7 +106,7 @@ class Calculator:
     def test_typescript_validation(self, hook, temp_dir):
         """Test TypeScript validation (tree-sitter based)."""
         file_path = temp_dir / "test.ts"
-        content = '''
+        content = """
 interface User {
     name: string;
     age: number;
@@ -126,10 +115,8 @@ interface User {
 function greet(user: User): string {
     return `Hello, ${user.name}!`;
 }
-'''
-        should_proceed, result = hook.validate_before_write_sync(
-            content, file_path, strict=False
-        )
+"""
+        should_proceed, result = hook.validate_before_write_sync(content, file_path, strict=False)
 
         assert should_proceed is True
         assert result.language == "typescript"
@@ -137,7 +124,7 @@ function greet(user: User): string {
     def test_javascript_validation(self, hook, temp_dir):
         """Test JavaScript validation (tree-sitter based)."""
         file_path = temp_dir / "test.js"
-        content = '''
+        content = """
 function greet(name) {
     return `Hello, ${name}!`;
 }
@@ -146,10 +133,8 @@ const calculator = {
     add: (a, b) => a + b,
     subtract: (a, b) => a - b,
 };
-'''
-        should_proceed, result = hook.validate_before_write_sync(
-            content, file_path, strict=False
-        )
+"""
+        should_proceed, result = hook.validate_before_write_sync(content, file_path, strict=False)
 
         assert should_proceed is True
         assert result.language == "javascript"
@@ -157,7 +142,7 @@ const calculator = {
     def test_go_validation(self, hook, temp_dir):
         """Test Go validation (tree-sitter based)."""
         file_path = temp_dir / "main.go"
-        content = '''
+        content = """
 package main
 
 import "fmt"
@@ -173,10 +158,8 @@ type Calculator struct {
 func (c *Calculator) Add(n int) int {
     return c.value + n
 }
-'''
-        should_proceed, result = hook.validate_before_write_sync(
-            content, file_path, strict=False
-        )
+"""
+        should_proceed, result = hook.validate_before_write_sync(content, file_path, strict=False)
 
         assert should_proceed is True
         assert result.language == "go"
@@ -184,7 +167,7 @@ func (c *Calculator) Add(n int) int {
     def test_rust_validation(self, hook, temp_dir):
         """Test Rust validation (tree-sitter based)."""
         file_path = temp_dir / "main.rs"
-        content = '''
+        content = """
 fn main() {
     println!("Hello, World!");
 }
@@ -202,10 +185,8 @@ impl Calculator {
         self.value + n
     }
 }
-'''
-        should_proceed, result = hook.validate_before_write_sync(
-            content, file_path, strict=False
-        )
+"""
+        should_proceed, result = hook.validate_before_write_sync(content, file_path, strict=False)
 
         assert should_proceed is True
         assert result.language == "rust"
@@ -213,7 +194,7 @@ impl Calculator {
     def test_java_validation(self, hook, temp_dir):
         """Test Java validation (tree-sitter based)."""
         file_path = temp_dir / "Main.java"
-        content = '''
+        content = """
 public class Main {
     public static void main(String[] args) {
         System.out.println("Hello, World!");
@@ -223,10 +204,8 @@ public class Main {
         return a + b;
     }
 }
-'''
-        should_proceed, result = hook.validate_before_write_sync(
-            content, file_path, strict=False
-        )
+"""
+        should_proceed, result = hook.validate_before_write_sync(content, file_path, strict=False)
 
         assert should_proceed is True
         assert result.language == "java"
@@ -258,9 +237,7 @@ public class Main {
 
         # Validate using the hook
         content = "x = 1"
-        should_proceed, result = hook.validate_before_write_sync(
-            content, file_path, strict=False
-        )
+        should_proceed, result = hook.validate_before_write_sync(content, file_path, strict=False)
         assert result.language == "python"
 
 
@@ -287,6 +264,7 @@ class TestFileEditorValidationIntegration:
 
         # Check the default signature
         import inspect
+
         sig = inspect.signature(FileEditor.commit)
         params = sig.parameters
 
@@ -299,6 +277,7 @@ class TestFileEditorValidationIntegration:
         from victor.coding.editing.editor import FileEditor
 
         import inspect
+
         sig = inspect.signature(FileEditor.commit)
         params = sig.parameters
 
@@ -314,6 +293,7 @@ class TestFileEditorToolValidation:
         from victor.tools.file_editor_tool import edit
 
         import inspect
+
         sig = inspect.signature(edit)
         params = sig.parameters
 
@@ -360,9 +340,7 @@ class TestValidationWithFeatureFlags:
         manager = FeatureFlagManager()
         manager._global = GlobalFeatureFlags(
             validation_enabled=True,
-            language_overrides={
-                "python": LanguageFeatureFlags(validation_enabled=False)
-            }
+            language_overrides={"python": LanguageFeatureFlags(validation_enabled=False)},
         )
 
         # Python should have validation disabled
@@ -385,6 +363,7 @@ class TestValidationPipeline:
     def validator(self):
         """Get the unified validator."""
         from victor.core.language_capabilities import UnifiedLanguageValidator
+
         return UnifiedLanguageValidator()
 
     def test_validation_pipeline(self, validator, temp_dir):
@@ -411,13 +390,13 @@ class TestValidationPipeline:
     def test_multiple_errors(self, validator, temp_dir):
         """Test validation with multiple errors."""
         file_path = temp_dir / "test.py"
-        content = '''
+        content = """
 def foo(:
     pass
 
 def bar(
     pass
-'''
+"""
         result = validator.validate(content, file_path)
 
         assert result.is_valid is False

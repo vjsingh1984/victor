@@ -185,7 +185,11 @@ class ConversationalNode:
         if self.protocol:
             assert self._context is not None
             # Convert types.ConversationParticipant to protocols.ConversationParticipant
-            from victor.framework.conversations.protocols import ConversationParticipant as ProtocolParticipant, ConversationContext as ProtocolContext
+            from victor.framework.conversations.protocols import (
+                ConversationParticipant as ProtocolParticipant,
+                ConversationContext as ProtocolContext,
+            )
+
             protocol_participants = [
                 ProtocolParticipant(
                     agent_id=p.id,
@@ -196,7 +200,10 @@ class ConversationalNode:
                 for p in self.participants
             ]
             # Convert context - use protocol's ConversationContext
-            from victor.framework.conversations.protocols import ConversationContext as ProtocolContext
+            from victor.framework.conversations.protocols import (
+                ConversationContext as ProtocolContext,
+            )
+
             ctx = self._ctx
             protocol_context = ProtocolContext(
                 conversation_id=ctx.conversation_id,
@@ -322,7 +329,10 @@ class ConversationalNode:
             Next speaker ID or None if no more speakers
         """
         if self.protocol:
-            from victor.framework.conversations.protocols import ConversationContext as ProtocolContext
+            from victor.framework.conversations.protocols import (
+                ConversationContext as ProtocolContext,
+            )
+
             ctx = self._ctx
             protocol_ctx = ProtocolContext(
                 conversation_id=ctx.conversation_id,
@@ -422,7 +432,10 @@ class ConversationalNode:
             Tuple of (should_continue, reason)
         """
         if self.protocol:
-            from victor.framework.conversations.protocols import ConversationContext as ProtocolContext
+            from victor.framework.conversations.protocols import (
+                ConversationContext as ProtocolContext,
+            )
+
             ctx = self._ctx
             protocol_ctx = ProtocolContext(
                 conversation_id=ctx.conversation_id,

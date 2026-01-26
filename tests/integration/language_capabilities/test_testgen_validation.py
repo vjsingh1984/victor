@@ -94,9 +94,9 @@ def test_example():
         test_file = temp_dir / "test_invalid.py"
         generated = GeneratedTest(
             file_path=test_file,
-            content='''def test_broken(:  # Syntax error
+            content="""def test_broken(:  # Syntax error
     assert True
-''',
+""",
             suites=[],
         )
 
@@ -115,9 +115,9 @@ def test_example():
         test_file = temp_dir / "test_invalid.py"
         generated = GeneratedTest(
             file_path=test_file,
-            content='''def test_broken(:  # Syntax error
+            content="""def test_broken(:  # Syntax error
     assert True
-''',
+""",
             suites=[],
         )
 
@@ -139,9 +139,9 @@ def test_example():
         test_file = temp_dir / "test_invalid.py"
         generated = GeneratedTest(
             file_path=test_file,
-            content='''def test_broken(:  # Syntax error
+            content="""def test_broken(:  # Syntax error
     assert True
-''',
+""",
             suites=[],
         )
 
@@ -154,13 +154,15 @@ def test_example():
         """Test that generate_for_file passes validation parameters."""
         # Create a source file to generate tests for
         source_file = temp_dir / "simple_module.py"
-        source_file.write_text('''"""Simple module."""
+        source_file.write_text(
+            '''"""Simple module."""
 
 
 def add(a: int, b: int) -> int:
     """Add two numbers."""
     return a + b
-''')
+'''
+        )
 
         # Generate tests (validation enabled by default)
         result = manager.generate_for_file(
@@ -177,13 +179,15 @@ def add(a: int, b: int) -> int:
         """Test generate_for_file with strict validation."""
         # Create a source file to generate tests for
         source_file = temp_dir / "simple_module.py"
-        source_file.write_text('''"""Simple module."""
+        source_file.write_text(
+            '''"""Simple module."""
 
 
 def multiply(x: int, y: int) -> int:
     """Multiply two numbers."""
     return x * y
-''')
+'''
+        )
 
         # Generate tests with strict validation
         result = manager.generate_for_file(
@@ -200,13 +204,15 @@ def multiply(x: int, y: int) -> int:
         """Test that generate_for_directory passes validation parameters."""
         # Create a source file
         source_file = temp_dir / "module.py"
-        source_file.write_text('''"""A module."""
+        source_file.write_text(
+            '''"""A module."""
 
 
 def greet(name: str) -> str:
     """Greet someone."""
     return f"Hello, {name}"
-''')
+'''
+        )
 
         # Generate tests for directory
         result = manager.generate_for_directory(
@@ -228,13 +234,15 @@ def greet(name: str) -> str:
         init_file.write_text('"""My package."""\n')
 
         source_file = module_dir / "utils.py"
-        source_file.write_text('''"""Utilities."""
+        source_file.write_text(
+            '''"""Utilities."""
 
 
 def helper() -> None:
     """Helper function."""
     pass
-''')
+'''
+        )
 
         # Generate tests for module
         result = manager.generate_for_module(
@@ -265,9 +273,7 @@ def test_hooked():
             suites=[],
         )
 
-        with patch(
-            "victor.coding.testgen.manager.validate_code_before_write"
-        ) as mock_validate:
+        with patch("victor.coding.testgen.manager.validate_code_before_write") as mock_validate:
             mock_validate.return_value = (
                 True,
                 CodeValidationResult(is_valid=True, language="python"),
@@ -290,9 +296,7 @@ def test_hooked():
             suites=[],
         )
 
-        with patch(
-            "victor.coding.testgen.manager.validate_code_before_write"
-        ) as mock_validate:
+        with patch("victor.coding.testgen.manager.validate_code_before_write") as mock_validate:
             manager._write_test_file(generated, validate=False)
 
             # Validation should not be called
@@ -307,9 +311,7 @@ def test_hooked():
             suites=[],
         )
 
-        with patch(
-            "victor.coding.testgen.manager.validate_code_before_write"
-        ) as mock_validate:
+        with patch("victor.coding.testgen.manager.validate_code_before_write") as mock_validate:
             mock_validate.return_value = (
                 True,
                 CodeValidationResult(is_valid=True, language="python"),

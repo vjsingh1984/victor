@@ -296,11 +296,7 @@ class SandboxedExecutor:
             return SandboxExecutionResult(
                 success=process.returncode == 0,
                 output=stdout if stdout else "",
-                error=(
-                    stderr
-                    if stderr and process.returncode != 0
-                    else ""
-                ),
+                error=(stderr if stderr and process.returncode != 0 else ""),
                 exit_code=process.returncode or 0,
                 sandbox_type="process",
             )

@@ -37,9 +37,7 @@ class TestCodeGroundingHook:
     def test_validate_valid_python(self, hook):
         """Should pass valid Python code."""
         code = "def hello(): return 'world'"
-        should_proceed, result = hook.validate_before_write_sync(
-            code, Path("test.py")
-        )
+        should_proceed, result = hook.validate_before_write_sync(code, Path("test.py"))
 
         assert should_proceed
         assert result.is_valid
@@ -47,9 +45,7 @@ class TestCodeGroundingHook:
     def test_validate_invalid_python(self, hook):
         """Should fail invalid Python code."""
         code = "def foo(:"
-        should_proceed, result = hook.validate_before_write_sync(
-            code, Path("test.py")
-        )
+        should_proceed, result = hook.validate_before_write_sync(code, Path("test.py"))
 
         # Default is not strict, so should proceed with warnings
         assert should_proceed
@@ -59,9 +55,7 @@ class TestCodeGroundingHook:
     def test_validate_invalid_python_strict(self, hook):
         """Should block invalid Python code in strict mode."""
         code = "def foo(:"
-        should_proceed, result = hook.validate_before_write_sync(
-            code, Path("test.py"), strict=True
-        )
+        should_proceed, result = hook.validate_before_write_sync(code, Path("test.py"), strict=True)
 
         assert not should_proceed
         assert not result.is_valid
@@ -69,9 +63,7 @@ class TestCodeGroundingHook:
     def test_validate_unknown_file_type(self, hook):
         """Should allow unknown file types with warning."""
         code = "some content"
-        should_proceed, result = hook.validate_before_write_sync(
-            code, Path("unknown.xyz")
-        )
+        should_proceed, result = hook.validate_before_write_sync(code, Path("unknown.xyz"))
 
         assert should_proceed
         assert result.is_valid
@@ -93,9 +85,7 @@ class TestCodeGroundingHook:
     def test_string_path_conversion(self, hook):
         """Should handle string paths."""
         code = "def hello(): return 'world'"
-        should_proceed, result = hook.validate_before_write_sync(
-            code, Path("test.py")
-        )
+        should_proceed, result = hook.validate_before_write_sync(code, Path("test.py"))
 
         assert should_proceed
         assert result.is_valid
@@ -137,9 +127,7 @@ class TestAsyncValidation:
     async def test_async_validate_valid_python(self, hook):
         """Should validate async."""
         code = "async def hello(): return 'world'"
-        should_proceed, result = await hook.validate_before_write(
-            code, Path("test.py")
-        )
+        should_proceed, result = await hook.validate_before_write(code, Path("test.py"))
 
         assert should_proceed
         assert result.is_valid

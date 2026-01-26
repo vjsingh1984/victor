@@ -1027,7 +1027,9 @@ class CapabilityHelper:
         # Use capability registry if available (preferred)
         if isinstance(obj, CapabilityRegistryProtocol):
             try:
-                return obj.invoke_capability(capability_name, *args, min_version=min_version, **kwargs)
+                return obj.invoke_capability(
+                    capability_name, *args, min_version=min_version, **kwargs
+                )
             except (KeyError, TypeError) as e:
                 logger.debug(f"Registry invoke failed for {capability_name}: {e}")
                 # Fall through to public method fallback
@@ -1073,4 +1075,9 @@ class CapabilityHelper:
         )
 
 
-__all__ = ["CapabilityRegistryMixin", "CapabilityHelper", "get_capability_registry", "get_method_for_capability"]
+__all__ = [
+    "CapabilityRegistryMixin",
+    "CapabilityHelper",
+    "get_capability_registry",
+    "get_method_for_capability",
+]

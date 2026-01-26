@@ -68,10 +68,10 @@ class Greeter:
 
     def test_extract_async_function(self, extractor):
         """Should detect async functions."""
-        code = '''
+        code = """
 async def fetch_data(url: str) -> dict:
     return {}
-'''
+"""
         symbols = extractor.extract(code, Path("test.py"))
 
         assert len(symbols) == 1
@@ -80,12 +80,12 @@ async def fetch_data(url: str) -> dict:
 
     def test_extract_decorated_function(self, extractor):
         """Should extract decorators."""
-        code = '''
+        code = """
 @staticmethod
 @cache
 def compute(x: int) -> int:
     return x * 2
-'''
+"""
         symbols = extractor.extract(code, Path("test.py"))
 
         assert len(symbols) == 1
@@ -94,10 +94,10 @@ def compute(x: int) -> int:
 
     def test_extract_class_inheritance(self, extractor):
         """Should extract class inheritance."""
-        code = '''
+        code = """
 class MyClass(BaseClass, Mixin):
     pass
-'''
+"""
         symbols = extractor.extract(code, Path("test.py"))
 
         assert len(symbols) == 1
@@ -106,11 +106,11 @@ class MyClass(BaseClass, Mixin):
 
     def test_extract_visibility(self, extractor):
         """Should detect visibility."""
-        code = '''
+        code = """
 def public_func(): pass
 def _protected_func(): pass
 def __private_func(): pass
-'''
+"""
         symbols = extractor.extract(code, Path("test.py"))
 
         public = next(s for s in symbols if s.name == "public_func")
@@ -124,11 +124,11 @@ def __private_func(): pass
 
     def test_extract_nested_class(self, extractor):
         """Should extract nested classes."""
-        code = '''
+        code = """
 class Outer:
     class Inner:
         def method(self): pass
-'''
+"""
         symbols = extractor.extract(code, Path("test.py"))
 
         assert len(symbols) == 3
@@ -166,19 +166,18 @@ class TestTreeSitterExtractor:
         assert isinstance(is_available, bool)
 
     @pytest.mark.skipif(
-        not TreeSitterExtractor().is_available(),
-        reason="tree-sitter not available"
+        not TreeSitterExtractor().is_available(), reason="tree-sitter not available"
     )
     def test_extract_python(self, extractor):
         """Should extract Python symbols."""
-        code = '''
+        code = """
 def hello():
     pass
 
 class Greeter:
     def greet(self):
         pass
-'''
+"""
         symbols = extractor.extract(code, Path("test.py"), "python")
 
         names = [s.name for s in symbols]
@@ -187,8 +186,7 @@ class Greeter:
         # greet might or might not be extracted depending on query
 
     @pytest.mark.skipif(
-        not TreeSitterExtractor().is_available(),
-        reason="tree-sitter not available"
+        not TreeSitterExtractor().is_available(), reason="tree-sitter not available"
     )
     def test_has_syntax_errors(self, extractor):
         """Should detect syntax errors."""
@@ -196,8 +194,7 @@ class Greeter:
         assert not extractor.has_syntax_errors("def foo(): pass", "python")
 
     @pytest.mark.skipif(
-        not TreeSitterExtractor().is_available(),
-        reason="tree-sitter not available"
+        not TreeSitterExtractor().is_available(), reason="tree-sitter not available"
     )
     def test_get_error_locations(self, extractor):
         """Should get error locations."""
@@ -225,10 +222,10 @@ class TestUnifiedLanguageExtractor:
 
     def test_extract_python(self, extractor):
         """Should extract Python symbols."""
-        code = '''
+        code = """
 def hello(name: str) -> str:
     return f"Hello, {name}!"
-'''
+"""
         symbols = extractor.extract_symbols(code, Path("test.py"))
 
         assert len(symbols) == 1
@@ -238,9 +235,7 @@ def hello(name: str) -> str:
     def test_extract_with_language_override(self, extractor):
         """Should respect language override."""
         code = "def hello(): pass"
-        symbols = extractor.extract_symbols(
-            code, Path("unknown.xyz"), language="python"
-        )
+        symbols = extractor.extract_symbols(code, Path("unknown.xyz"), language="python")
 
         assert len(symbols) == 1
         assert symbols[0].name == "hello"

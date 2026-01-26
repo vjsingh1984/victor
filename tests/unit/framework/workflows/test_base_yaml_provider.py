@@ -157,7 +157,9 @@ class TestCompileWorkflow:
                 compiled = test_provider.provider.compile_workflow("test_workflow")
                 assert isinstance(compiled, CachedCompiledGraph)
 
-    def test_compile_workflow_has_workflow_name(self, test_provider: Any, yaml_workflow_file: Any) -> None:
+    def test_compile_workflow_has_workflow_name(
+        self, test_provider: Any, yaml_workflow_file: Any
+    ) -> None:
         """Test that compiled workflow has correct workflow_name."""
         with patch.object(
             test_provider.provider, "_get_workflow_path", return_value=yaml_workflow_file
@@ -168,7 +170,9 @@ class TestCompileWorkflow:
                 compiled = test_provider.provider.compile_workflow("test_workflow")
                 assert compiled.workflow_name == "test_workflow"
 
-    def test_compile_workflow_raises_for_unknown_workflow(self, test_provider: Any, tmp_path: Any) -> None:
+    def test_compile_workflow_raises_for_unknown_workflow(
+        self, test_provider: Any, tmp_path: Any
+    ) -> None:
         """Test that compile_workflow raises ValueError for unknown workflow."""
         with pytest.raises(ValueError, match="Workflow not found"):
             test_provider.provider.compile_workflow("nonexistent_workflow")

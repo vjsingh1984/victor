@@ -265,12 +265,15 @@ class TestResearchVerticalCapabilities:
         orchestrator = MockOrchestrator()
 
         # Set some config via vertical_context (the proper way)
-        orchestrator.vertical_context.set_capability_config("source_verification", {
-            "min_credibility": 0.9,
-            "min_source_count": 5,
-            "require_diverse_sources": True,
-            "validate_urls": False,
-        })
+        orchestrator.vertical_context.set_capability_config(
+            "source_verification",
+            {
+                "min_credibility": 0.9,
+                "min_source_count": 5,
+                "require_diverse_sources": True,
+                "validate_urls": False,
+            },
+        )
 
         # Get it back
         config = get_source_verification(orchestrator)
@@ -279,10 +282,13 @@ class TestResearchVerticalCapabilities:
         assert config["min_source_count"] == 5
 
         # Test getter with config set via vertical_context
-        orchestrator.vertical_context.set_capability_config("citation_management", {
-            "default_style": "chicago",
-            "require_urls": False,
-        })
+        orchestrator.vertical_context.set_capability_config(
+            "citation_management",
+            {
+                "default_style": "chicago",
+                "require_urls": False,
+            },
+        )
         citation_cfg = get_citation_config(orchestrator)
         assert citation_cfg["default_style"] == "chicago"
         assert citation_cfg["require_urls"] is False
@@ -379,12 +385,15 @@ class TestDevOpsVerticalCapabilities:
 
         orchestrator = MockOrchestrator()
         # Set config via vertical_context (the proper way)
-        orchestrator.vertical_context.set_capability_config("container_settings", {
-            "runtime": "docker",
-            "default_registry": "ghcr.io",
-            "security_scan_enabled": False,
-            "max_image_size_mb": 5000,
-        })
+        orchestrator.vertical_context.set_capability_config(
+            "container_settings",
+            {
+                "runtime": "docker",
+                "default_registry": "ghcr.io",
+                "security_scan_enabled": False,
+                "max_image_size_mb": 5000,
+            },
+        )
 
         config = get_container_settings(orchestrator)
 

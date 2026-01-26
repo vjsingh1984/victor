@@ -35,7 +35,10 @@ if TYPE_CHECKING:
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
 
-from victor.core.verticals.base import VerticalBase, VerticalConfig  # StageDefinition is not exported
+from victor.core.verticals.base import (
+    VerticalBase,
+    VerticalConfig,
+)  # StageDefinition is not exported
 from victor.core.verticals.defaults.tool_defaults import (
     COMMON_READONLY_TOOLS,
     merge_required_tools,

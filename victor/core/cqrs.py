@@ -226,7 +226,9 @@ def query_handler(
             return await user_repo.get(query.user_id)
     """
 
-    def decorator(func: Callable[[Query[Any]], Awaitable[Any]]) -> Callable[[Query[Any]], Awaitable[Any]]:
+    def decorator(
+        func: Callable[[Query[Any]], Awaitable[Any]],
+    ) -> Callable[[Query[Any]], Awaitable[Any]]:
         _QUERY_HANDLERS[query_type] = func
         logger.debug(f"Registered query handler for {query_type.__name__}")
         return func
@@ -239,7 +241,9 @@ def get_registered_command_handlers() -> Dict[Type[Command], CommandHandlerFunc]
     return _COMMAND_HANDLERS.copy()
 
 
-def get_registered_query_handlers() -> Dict[Type[Query[Any]], Callable[[Query[Any]], Awaitable[Any]]]:
+def get_registered_query_handlers() -> (
+    Dict[Type[Query[Any]], Callable[[Query[Any]], Awaitable[Any]]]
+):
     """Get all registered query handlers."""
     return _QUERY_HANDLERS.copy()
 
@@ -525,7 +529,9 @@ class CommandBus:
         chain: Callable[[Command], Coroutine[Any, Any, Any]] = final_handler
         for middleware in reversed(self._middleware):
 
-            def create_next(mw: CommandMiddleware, next_fn: Callable[[Command], Coroutine[Any, Any, Any]]) -> Callable[[Command], Coroutine[Any, Any, Any]]:
+            def create_next(
+                mw: CommandMiddleware, next_fn: Callable[[Command], Coroutine[Any, Any, Any]]
+            ) -> Callable[[Command], Coroutine[Any, Any, Any]]:
                 async def wrapped(cmd: Command) -> Any:
                     return await mw.execute(cmd, next_fn)
 

@@ -83,7 +83,9 @@ def run_benchmark() -> Dict[str, float]:
             print(f"    ✗ Failed in {t*1000:.2f}ms")
         results[f"import_{vertical.split('.')[-1]}"] = t
 
-    results["avg_vertical_import"] = sum(vertical_times) / len(vertical_times) if vertical_times else 0
+    results["avg_vertical_import"] = (
+        sum(vertical_times) / len(vertical_times) if vertical_times else 0
+    )
     results["total_vertical_import"] = sum(vertical_times)
 
     # Test 3: Access vertical metadata
@@ -195,7 +197,9 @@ def print_summary(results: Dict[str, float]) -> None:
     for category, ops in categories.items():
         category_time = sum(results.get(op, 0) for op in ops)
         if category_time > 0:
-            print(f"  {category:30s}: {category_time*1000:8.2f}ms ({category_time/total_time*100:5.1f}%)")
+            print(
+                f"  {category:30s}: {category_time*1000:8.2f}ms ({category_time/total_time*100:5.1f}%)"
+            )
 
 
 if __name__ == "__main__":

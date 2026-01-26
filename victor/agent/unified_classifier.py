@@ -65,6 +65,7 @@ _native_module: Any = None
 
 try:
     import victor_native
+
     _native_module = victor_native
     _NATIVE_AVAILABLE = True
     logger.debug(f"Native classifier loaded (v{_native_module.__version__})")
@@ -890,6 +891,7 @@ class UnifiedTaskClassifier:
                 # This is a known limitation - semantic classification in sync mode
                 # will use cached results or fallback gracefully
                 import asyncio
+
                 try:
                     loop = asyncio.get_event_loop()
                     if loop.is_running():
@@ -897,7 +899,9 @@ class UnifiedTaskClassifier:
                         logger.debug("Skipping semantic classification in async context")
                     else:
                         # We can run the coroutine
-                        sem_result = loop.run_until_complete(self.semantic_classifier.classify(message))
+                        sem_result = loop.run_until_complete(
+                            self.semantic_classifier.classify(message)
+                        )
                         semantic_type = self._map_semantic_to_unified(sem_result.task_type)
                         semantic_confidence = sem_result.confidence
                 except RuntimeError:

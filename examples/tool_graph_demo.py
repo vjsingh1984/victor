@@ -99,6 +99,7 @@ def main():
 
     # 6. Demonstrate compilation
     print("6. Compiling from tool calls...")
+
     # Note: Using mock registry for demo purposes
     class MockTool:
         def __init__(self, name):

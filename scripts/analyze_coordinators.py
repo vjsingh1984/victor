@@ -35,6 +35,7 @@ EXISTING_COORDINATORS = [
     "ToolSelectionCoordinator",
 ]
 
+
 def analyze_coordinator_file(filename):
     """Analyze a coordinator file to extract its purpose and methods."""
     filepath = COORDINATORS_DIR / filename
@@ -42,7 +43,7 @@ def analyze_coordinator_file(filename):
     if not filepath.exists():
         return None
 
-    with open(filepath, 'r') as f:
+    with open(filepath, "r") as f:
         content = f.read()
 
     # Parse docstring for purpose
@@ -75,6 +76,7 @@ def analyze_coordinator_file(filename):
             "docstring": None,
         }
 
+
 def main():
     """Main analysis."""
     print("=" * 80)
@@ -98,7 +100,7 @@ def main():
     for filename in all_files:
         result = analyze_coordinator_file(filename)
         if result:
-            analysis[filename.replace('.py', '')] = result
+            analysis[filename.replace(".py", "")] = result
 
     print("\n## PHASE 1 COORDINATORS (Created but NOT Integrated)\n")
     for coord in PHASE_1_COORDINATORS:
@@ -109,8 +111,8 @@ def main():
             print(f"  File: {info['file']}")
             print(f"  Classes: {', '.join(info['classes'])}")
             print(f"  Methods: {len(info['methods'])}")
-            if info['docstring']:
-                lines = info['docstring'].split('\n')[:5]
+            if info["docstring"]:
+                lines = info["docstring"].split("\n")[:5]
                 print(f"  Purpose: {lines[0] if lines else 'N/A'}")
 
     print("\n\n## EXISTING COORDINATORS (Being Used)\n")
@@ -128,13 +130,14 @@ def main():
             print(f"\n{coord}:")
             print(f"  Classes: {', '.join(info['classes'])}")
             print(f"  Methods: {len(info['methods'])}")
-            if info['docstring']:
-                lines = info['docstring'].split('\n')[:5]
+            if info["docstring"]:
+                lines = info["docstring"].split("\n")[:5]
                 print(f"  Purpose: {lines[0] if lines else 'N/A'}")
 
     print("\n\n## CONSOLIDATION RECOMMENDATIONS\n")
 
-    print("""
+    print(
+        """
 ### 1. AnalyticsCoordinator vs EvaluationCoordinator/MetricsCoordinator
 
 **Analysis:**
@@ -188,17 +191,21 @@ def main():
 | ConfigCoordinator | INTEGRATE | Fills gap, no duplicate |
 | PromptCoordinator | INTEGRATE | Fills gap, no duplicate |
 | ContextCoordinator | INTEGRATE | Wraps ContextCompactor, no duplicate |
-""")
+"""
+    )
 
     print("\n## NEXT STEPS\n")
-    print("""
+    print(
+        """
 1. AnalyticsCoordinator: Add to orchestrator for external analytics export
 2. ConfigCoordinator: Integrate for configuration loading (Days 8-12)
 3. PromptCoordinator: Integrate for prompt building (Days 20-22)
 4. ContextCoordinator: Integrate as wrapper for ContextCompactor (Days 13-19)
 
 All avoid duplication - they fill gaps or orchestrate existing components.
-""")
+"""
+    )
+
 
 if __name__ == "__main__":
     main()

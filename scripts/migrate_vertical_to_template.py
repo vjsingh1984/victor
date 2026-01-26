@@ -315,7 +315,9 @@ class VerticalExtractor:
                                 display_name=getattr(team, "display_name", name),
                                 description=getattr(team, "description", ""),
                                 formation=getattr(team, "formation", "parallel"),
-                                communication_style=getattr(team, "communication_style", "structured"),
+                                communication_style=getattr(
+                                    team, "communication_style", "structured"
+                                ),
                                 max_iterations=getattr(team, "max_iterations", 5),
                                 roles=roles,
                             )
@@ -387,9 +389,7 @@ def import_vertical_class(import_path: str) -> type[VerticalBase]:
 
 def main():
     """CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description="Extract templates from existing verticals"
-    )
+    parser = argparse.ArgumentParser(description="Extract templates from existing verticals")
 
     parser.add_argument(
         "--vertical",

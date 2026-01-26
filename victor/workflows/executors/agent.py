@@ -225,6 +225,7 @@ class AgentNodeExecutor:
 
         def replace_var(match: Any) -> str:
             from typing import cast
+
             var_name = match.group(1)
             if var_name in context:
                 value = context[var_name]
@@ -233,7 +234,7 @@ class AgentNodeExecutor:
                     import json
 
                     return json.dumps(value)
-                # Handle primitive values
+                    # Handle primitive values
                     return str(value)
             # Keep original if not found
             return cast(str, match.group(0))

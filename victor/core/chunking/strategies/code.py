@@ -147,7 +147,9 @@ class CodeChunkingStrategy(ChunkingStrategy):
 
             # If section is too large, sub-chunk it
             if len(section) > self.config.max_chunk_size:
-                sub_chunks = self._chunk_large_definition(section, start, def_type, symbol_name or "")
+                sub_chunks = self._chunk_large_definition(
+                    section, start, def_type, symbol_name or ""
+                )
                 chunks.extend(sub_chunks)
             elif len(section) >= self.config.min_chunk_size:
                 chunks.append(

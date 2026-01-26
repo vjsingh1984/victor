@@ -73,6 +73,7 @@ class ParallelNodeExecutor:
         @dataclass
         class GraphNodeResult:
             """Result from a graph node execution."""
+
             node_id: str
             status: str
             result: Optional[Dict[str, Any]] = None
@@ -128,19 +129,21 @@ class ParallelNodeExecutor:
             if "_node_results" not in state_dict:
                 state_dict["_node_results"] = {}
 
-            state_dict["_node_results"][node.id] = dataclasses.asdict(GraphNodeResult(
-                node_id=node.id,
-                status="completed" if "_error" not in state_dict else "failed",
-                result={
-                    "parallel_nodes": getattr(node, "parallel_nodes", []),
-                    "join_strategy": join_strategy,
-                    "results_count": len(parallel_results),
-                },
-                metadata={
-                    "duration_seconds": time.time() - start_time,
-                    "join_strategy": join_strategy,
-                },
-            ))
+            state_dict["_node_results"][node.id] = dataclasses.asdict(
+                GraphNodeResult(
+                    node_id=node.id,
+                    status="completed" if "_error" not in state_dict else "failed",
+                    result={
+                        "parallel_nodes": getattr(node, "parallel_nodes", []),
+                        "join_strategy": join_strategy,
+                        "results_count": len(parallel_results),
+                    },
+                    metadata={
+                        "duration_seconds": time.time() - start_time,
+                        "join_strategy": join_strategy,
+                    },
+                )
+            )
 
             logger.info(f"Parallel node {node.id} completed with strategy: {join_strategy}")
             return state_dict  # type: ignore[return-value]
@@ -152,14 +155,16 @@ class ParallelNodeExecutor:
             if "_node_results" not in state_dict:
                 state_dict["_node_results"] = {}
 
-            state_dict["_node_results"][node.id] = dataclasses.asdict(GraphNodeResult(
-                node_id=node.id,
-                status="failed",
-                error=str(e),
-                metadata={
-                    "duration_seconds": time.time() - start_time,
-                },
-            ))
+            state_dict["_node_results"][node.id] = dataclasses.asdict(
+                GraphNodeResult(
+                    node_id=node.id,
+                    status="failed",
+                    error=str(e),
+                    metadata={
+                        "duration_seconds": time.time() - start_time,
+                    },
+                )
+            )
 
             raise
 

@@ -560,9 +560,7 @@ class KubernetesServiceProvider(BaseServiceProvider):
                     from kubernetes.client import V1Service
 
                     def delete_service(s: V1Service = svc) -> None:
-                        self.core_v1.delete_namespaced_service(
-                            name=s.metadata.name, namespace=ns
-                        )
+                        self.core_v1.delete_namespaced_service(name=s.metadata.name, namespace=ns)
 
                     await loop.run_in_executor(
                         None,

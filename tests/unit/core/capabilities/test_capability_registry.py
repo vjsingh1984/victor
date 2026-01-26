@@ -263,9 +263,7 @@ class TestCapabilityRegistry:
         mock_entry_point.name = "external_cap"
         mock_entry_point.load.return_value = mock_definition
 
-        with patch(
-            "victor.core.capabilities.registry.entry_points"
-        ) as mock_entry_points:
+        with patch("victor.core.capabilities.registry.entry_points") as mock_entry_points:
             mock_entry_points.return_value.select.return_value = [mock_entry_point]
 
             count = registry.discover_from_entry_points("victor.capabilities")
@@ -291,9 +289,7 @@ capabilities:
       - safety
       - validation
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_path = Path(f.name)
 
@@ -534,9 +530,7 @@ class TestEntryPointDiscovery:
         mock_entry_point.name = "external_class_cap"
         mock_entry_point.load.return_value = ExternalCapability
 
-        with patch(
-            "victor.core.capabilities.registry.entry_points"
-        ) as mock_entry_points:
+        with patch("victor.core.capabilities.registry.entry_points") as mock_entry_points:
             mock_entry_points.return_value.select.return_value = [mock_entry_point]
 
             count = registry.discover_from_entry_points("victor.capabilities")
@@ -552,9 +546,7 @@ class TestEntryPointDiscovery:
         mock_entry_point.name = "broken_cap"
         mock_entry_point.load.side_effect = ImportError("Module not found")
 
-        with patch(
-            "victor.core.capabilities.registry.entry_points"
-        ) as mock_entry_points:
+        with patch("victor.core.capabilities.registry.entry_points") as mock_entry_points:
             mock_entry_points.return_value.select.return_value = [mock_entry_point]
 
             # Should not raise, should log warning

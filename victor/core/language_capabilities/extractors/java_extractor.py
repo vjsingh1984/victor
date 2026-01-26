@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 # Check if javalang is available
 try:
     import javalang
+
     JAVALANG_AVAILABLE = True
 except ImportError:
     JAVALANG_AVAILABLE = False
@@ -120,21 +121,27 @@ class JavaExtractor(BaseLanguageProcessor):
 
             # Extract package declaration
             if tree.package:
-                symbols.append(ExtractedSymbol(
-                    name=tree.package.name,
-                    symbol_type="package",
-                    file_path=str(file_path),
-                    line_number=1,
-                ))
+                symbols.append(
+                    ExtractedSymbol(
+                        name=tree.package.name,
+                        symbol_type="package",
+                        file_path=str(file_path),
+                        line_number=1,
+                    )
+                )
 
             # Extract imports
             for imp in tree.imports:
-                symbols.append(ExtractedSymbol(
-                    name=imp.path,
-                    symbol_type="import",
-                    file_path=str(file_path),
-                    line_number=getattr(imp, 'position', (1, 1))[0] if hasattr(imp, 'position') else 1,
-                ))
+                symbols.append(
+                    ExtractedSymbol(
+                        name=imp.path,
+                        symbol_type="import",
+                        file_path=str(file_path),
+                        line_number=(
+                            getattr(imp, "position", (1, 1))[0] if hasattr(imp, "position") else 1
+                        ),
+                    )
+                )
 
             # Extract types (classes, interfaces, enums)
             for path, node in tree.filter(javalang.tree.TypeDeclaration):
@@ -160,49 +167,51 @@ class JavaExtractor(BaseLanguageProcessor):
         node_type = type(node).__name__
 
         # Determine symbol type
-        if node_type == 'ClassDeclaration':
+        if node_type == "ClassDeclaration":
             symbol_type = "class"
-        elif node_type == 'InterfaceDeclaration':
+        elif node_type == "InterfaceDeclaration":
             symbol_type = "interface"
-        elif node_type == 'EnumDeclaration':
+        elif node_type == "EnumDeclaration":
             symbol_type = "enum"
-        elif node_type == 'AnnotationDeclaration':
+        elif node_type == "AnnotationDeclaration":
             symbol_type = "annotation"
         else:
             symbol_type = "type"
 
         # Get position
         line = 1
-        if hasattr(node, 'position') and node.position:
+        if hasattr(node, "position") and node.position:
             line = node.position[0]
 
         # Extract visibility
         visibility = None
-        if hasattr(node, 'modifiers') and node.modifiers:
-            if 'public' in node.modifiers:
+        if hasattr(node, "modifiers") and node.modifiers:
+            if "public" in node.modifiers:
                 visibility = "public"
-            elif 'protected' in node.modifiers:
+            elif "protected" in node.modifiers:
                 visibility = "protected"
-            elif 'private' in node.modifiers:
+            elif "private" in node.modifiers:
                 visibility = "private"
             else:
                 visibility = "package"
 
-        symbols.append(ExtractedSymbol(
-            name=node.name,
-            symbol_type=symbol_type,
-            file_path=str(file_path),
-            line_number=line,
-            parent_symbol=parent,
-        ))
+        symbols.append(
+            ExtractedSymbol(
+                name=node.name,
+                symbol_type=symbol_type,
+                file_path=str(file_path),
+                line_number=line,
+                parent_symbol=parent,
+            )
+        )
 
         # Extract members (fields, methods, constructors)
-        if hasattr(node, 'body') and node.body:
+        if hasattr(node, "body") and node.body:
             for member in node.body:
                 self._extract_member(member, file_path, symbols, node.name)
 
         # Extract nested types
-        if hasattr(node, 'body') and node.body:
+        if hasattr(node, "body") and node.body:
             for member in node.body:
                 if isinstance(member, javalang.tree.TypeDeclaration):
                     self._extract_type(member, file_path, symbols, node.name)
@@ -217,59 +226,67 @@ class JavaExtractor(BaseLanguageProcessor):
         """Extract a class/interface member."""
         member_type = type(member).__name__
 
-        if member_type == 'MethodDeclaration':
+        if member_type == "MethodDeclaration":
             line = 1
-            if hasattr(member, 'position') and member.position:
+            if hasattr(member, "position") and member.position:
                 line = member.position[0]
 
-            symbols.append(ExtractedSymbol(
-                name=member.name,
-                symbol_type="method",
-                file_path=str(file_path),
-                line_number=line,
-                parent_symbol=parent,
-            ))
+            symbols.append(
+                ExtractedSymbol(
+                    name=member.name,
+                    symbol_type="method",
+                    file_path=str(file_path),
+                    line_number=line,
+                    parent_symbol=parent,
+                )
+            )
 
-        elif member_type == 'ConstructorDeclaration':
+        elif member_type == "ConstructorDeclaration":
             line = 1
-            if hasattr(member, 'position') and member.position:
+            if hasattr(member, "position") and member.position:
                 line = member.position[0]
 
-            symbols.append(ExtractedSymbol(
-                name=member.name,
-                symbol_type="constructor",
-                file_path=str(file_path),
-                line_number=line,
-                parent_symbol=parent,
-            ))
+            symbols.append(
+                ExtractedSymbol(
+                    name=member.name,
+                    symbol_type="constructor",
+                    file_path=str(file_path),
+                    line_number=line,
+                    parent_symbol=parent,
+                )
+            )
 
-        elif member_type == 'FieldDeclaration':
+        elif member_type == "FieldDeclaration":
             line = 1
-            if hasattr(member, 'position') and member.position:
+            if hasattr(member, "position") and member.position:
                 line = member.position[0]
 
             # Extract all declared fields
             for declarator in member.declarators:
-                symbols.append(ExtractedSymbol(
-                    name=declarator.name,
-                    symbol_type="field",
+                symbols.append(
+                    ExtractedSymbol(
+                        name=declarator.name,
+                        symbol_type="field",
+                        file_path=str(file_path),
+                        line_number=line,
+                        parent_symbol=parent,
+                    )
+                )
+
+        elif member_type == "EnumConstantDeclaration":
+            line = 1
+            if hasattr(member, "position") and member.position:
+                line = member.position[0]
+
+            symbols.append(
+                ExtractedSymbol(
+                    name=member.name,
+                    symbol_type="enum_constant",
                     file_path=str(file_path),
                     line_number=line,
                     parent_symbol=parent,
-                ))
-
-        elif member_type == 'EnumConstantDeclaration':
-            line = 1
-            if hasattr(member, 'position') and member.position:
-                line = member.position[0]
-
-            symbols.append(ExtractedSymbol(
-                name=member.name,
-                symbol_type="enum_constant",
-                file_path=str(file_path),
-                line_number=line,
-                parent_symbol=parent,
-            ))
+                )
+            )
 
     def has_syntax_errors(self, code: str) -> bool:
         """Check if Java code has syntax errors.

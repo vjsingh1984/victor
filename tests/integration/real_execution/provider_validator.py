@@ -34,7 +34,9 @@ class ProviderValidationResult:
     provider: str
     available: bool
     reason: str
-    error_type: Optional[str] = None  # 'missing_key', 'auth_error', 'billing_error', 'rate_limit', 'network_error'
+    error_type: Optional[str] = (
+        None  # 'missing_key', 'auth_error', 'billing_error', 'rate_limit', 'network_error'
+    )
 
     def __str__(self) -> str:
         status = "✓" if self.available else "✗"
@@ -161,7 +163,7 @@ class ProviderValidator:
                 provider=provider_name,
                 available=False,
                 reason=f"{self._get_env_var(provider_name)} not set",
-                error_type="missing_key"
+                error_type="missing_key",
             )
             self._cache[provider_name] = result
             return result
@@ -175,23 +177,19 @@ class ProviderValidator:
 
             # Make minimal test call
             response = await provider.chat(
-                messages=[Message(role="user", content="Hi")],
-                model=model,
-                max_tokens=5
+                messages=[Message(role="user", content="Hi")], model=model, max_tokens=5
             )
 
             if response and response.content:
                 result = ProviderValidationResult(
-                    provider=provider_name,
-                    available=True,
-                    reason=f"API key valid (model: {model})"
+                    provider=provider_name, available=True, reason=f"API key valid (model: {model})"
                 )
             else:
                 result = ProviderValidationResult(
                     provider=provider_name,
                     available=False,
                     reason="No response content",
-                    error_type="auth_error"
+                    error_type="auth_error",
                 )
 
             # Cleanup
@@ -217,10 +215,7 @@ class ProviderValidator:
                 reason = f"Error: {str(e)[:100]}"
 
             result = ProviderValidationResult(
-                provider=provider_name,
-                available=False,
-                reason=reason,
-                error_type=error_type
+                provider=provider_name, available=False, reason=reason, error_type=error_type
             )
 
         self._cache[provider_name] = result
@@ -244,15 +239,11 @@ class ProviderValidator:
         elif provider_name in ["llamacpp", "llama.cpp"]:
             # llama.cpp runs on dynamic ports, just check if binary exists
             return ProviderValidationResult(
-                provider=provider_name,
-                available=True,
-                reason="Local provider (check if running)"
+                provider=provider_name, available=True, reason="Local provider (check if running)"
             )
         else:
             return ProviderValidationResult(
-                provider=provider_name,
-                available=False,
-                reason="Unknown local provider"
+                provider=provider_name, available=False, reason="Unknown local provider"
             )
 
         # Try to connect
@@ -264,23 +255,21 @@ class ProviderValidator:
 
             if result == 0:
                 return ProviderValidationResult(
-                    provider=provider_name,
-                    available=True,
-                    reason=f"Running at {host}:{port}"
+                    provider=provider_name, available=True, reason=f"Running at {host}:{port}"
                 )
             else:
                 return ProviderValidationResult(
                     provider=provider_name,
                     available=False,
                     reason=f"Not running at {host}:{port}",
-                    error_type="network_error"
+                    error_type="network_error",
                 )
         except Exception as e:
             return ProviderValidationResult(
                 provider=provider_name,
                 available=False,
                 reason=f"Connection failed: {str(e)[:50]}",
-                error_type="network_error"
+                error_type="network_error",
             )
 
     def _get_env_var(self, provider_name: str) -> str:
@@ -324,8 +313,7 @@ class ProviderValidator:
         return env_vars.get(provider_name.lower(), "")
 
     async def validate_all_providers(
-        self,
-        providers_config: Dict[str, Dict]
+        self, providers_config: Dict[str, Dict]
     ) -> Dict[str, ProviderValidationResult]:
         """Validate all providers concurrently.
 
@@ -369,7 +357,7 @@ class ProviderValidator:
                     provider=provider_name,
                     available=False,
                     reason=f"Validation error: {str(result)[:100]}",
-                    error_type="unknown"
+                    error_type="unknown",
                 )
             else:
                 results[provider_name] = result

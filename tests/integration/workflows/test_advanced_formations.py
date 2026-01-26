@@ -137,7 +137,9 @@ class TestDynamicFormation:
         assert formation.enable_auto_detection is False
 
     @pytest.mark.asyncio
-    async def test_dynamic_formation_execution(self, mock_agents, team_context, sample_task) -> None:
+    async def test_dynamic_formation_execution(
+        self, mock_agents, team_context, sample_task
+    ) -> None:
         """Test basic execution with dynamic formation."""
         formation = DynamicFormation(initial_formation="parallel", enable_auto_detection=False)
 
@@ -197,7 +199,9 @@ class TestDynamicFormation:
         assert metadata["switches_made"] <= formation.max_switches
 
     @pytest.mark.asyncio
-    async def test_dynamic_formation_error_recovery(self, mock_agents, team_context, sample_task) -> None:
+    async def test_dynamic_formation_error_recovery(
+        self, mock_agents, team_context, sample_task
+    ) -> None:
         """Test error recovery by switching formations."""
         # Create agent that fails initially
         call_count = {"count": 0}
@@ -280,7 +284,9 @@ class TestAdaptiveFormation:
         assert formation.use_ml is True
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_task_analysis(self, mock_agents, team_context, sample_task) -> None:
+    async def test_adaptive_formation_task_analysis(
+        self, mock_agents, team_context, sample_task
+    ) -> None:
         """Test task characteristic analysis."""
         formation = AdaptiveFormation()
 
@@ -337,7 +343,9 @@ class TestAdaptiveFormation:
         assert scores["sequential"] > 0.5 or scores["pipeline"] > 0.5
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_execution(self, mock_agents, team_context, sample_task) -> None:
+    async def test_adaptive_formation_execution(
+        self, mock_agents, team_context, sample_task
+    ) -> None:
         """Test adaptive formation execution."""
         formation = AdaptiveFormation(
             criteria=["complexity", "deadline"],
@@ -432,7 +440,9 @@ class TestHybridFormation:
         assert "phase_results" in metadata
 
     @pytest.mark.asyncio
-    async def test_hybrid_formation_phase_results(self, mock_agents, team_context, sample_task) -> None:
+    async def test_hybrid_formation_phase_results(
+        self, mock_agents, team_context, sample_task
+    ) -> None:
         """Test that each phase produces its own results."""
         phases = [
             HybridPhase(formation="parallel", goal="Phase 1"),
@@ -458,7 +468,9 @@ class TestHybridFormation:
             assert "results" in phase_result
 
     @pytest.mark.asyncio
-    async def test_hybrid_formation_stop_on_failure(self, mock_agents, team_context, sample_task) -> None:
+    async def test_hybrid_formation_stop_on_failure(
+        self, mock_agents, team_context, sample_task
+    ) -> None:
         """Test stop_on_first_failure behavior."""
 
         # Create an agent that fails
@@ -488,7 +500,9 @@ class TestHybridFormation:
         assert metadata["phases_completed"] < 3
 
     @pytest.mark.asyncio
-    async def test_hybrid_formation_duration_budget(self, mock_agents, team_context, sample_task) -> None:
+    async def test_hybrid_formation_duration_budget(
+        self, mock_agents, team_context, sample_task
+    ) -> None:
         """Test phase duration budget enforcement."""
 
         async def slow_execute(task: str, context: Dict[str, Any] = None) -> str:
@@ -687,7 +701,9 @@ class TestAdvancedFormationBenchmarks:
 
     @pytest.mark.asyncio
     @pytest.mark.slow
-    async def test_benchmark_dynamic_vs_static(self, mock_agents, team_context, sample_task) -> None:
+    async def test_benchmark_dynamic_vs_static(
+        self, mock_agents, team_context, sample_task
+    ) -> None:
         """Benchmark DynamicFormation vs static formations."""
         # This is a simplified benchmark - real benchmarks would use more complex tasks
 

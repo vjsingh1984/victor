@@ -76,6 +76,7 @@ class SQLiteStorage:
             self._local.conn.row_factory = sqlite3.Row
         # Cast to Connection since mypy doesn't understand Row factory
         import sqlite3
+
         conn: sqlite3.Connection = self._local.conn
         return conn
 

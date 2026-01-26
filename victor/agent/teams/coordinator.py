@@ -268,7 +268,9 @@ class TeamCoordinator(ITeamCoordinator):
             "formation": result.formation.value,
         }
 
-    async def broadcast(self, message: CanonicalAgentMessage) -> List[Optional[CanonicalAgentMessage]]:
+    async def broadcast(
+        self, message: CanonicalAgentMessage
+    ) -> List[Optional[CanonicalAgentMessage]]:
         """Broadcast a message to all team members.
 
         Args:

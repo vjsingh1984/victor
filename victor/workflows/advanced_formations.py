@@ -1257,7 +1257,10 @@ class HybridFormation(BaseFormationStrategy):
 
             # Return final results with metadata
             from typing import cast
-            final_results: List[MemberResult] = cast(List[MemberResult], phase_results[-1]["results"]) if phase_results else []
+
+            final_results: List[MemberResult] = (
+                cast(List[MemberResult], phase_results[-1]["results"]) if phase_results else []
+            )
             return self._enhance_results(
                 final_results,
                 phases_completed,

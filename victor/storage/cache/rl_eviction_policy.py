@@ -468,7 +468,9 @@ class RLEvictionPolicy:
 
         logger.debug(f"Q-update: {feature_key}:{action.value} {current_q:.3f} -> {new_q:.3f}")
 
-    def _track_decision(self, state: CacheEntryState, action: EvictionAction, q_value: float) -> None:
+    def _track_decision(
+        self, state: CacheEntryState, action: EvictionAction, q_value: float
+    ) -> None:
         """Track decision for later feedback.
 
         Args:

@@ -177,7 +177,7 @@ class Episode:
         age_hours = (current_time - self.timestamp).total_seconds() / 3600
 
         # Decay factor reduces by 1% per hour (configurable)
-        decayed_importance = self.importance * (self.decay_factor ** age_hours)
+        decayed_importance = self.importance * (self.decay_factor**age_hours)
 
         # Boost based on rewards (positive rewards increase importance)
         reward_boost = min(abs(self.rewards) / 100.0, 0.3)  # Max 30% boost

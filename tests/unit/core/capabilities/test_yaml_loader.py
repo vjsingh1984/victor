@@ -130,9 +130,7 @@ capabilities:
     default_config:
       enabled: true
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_path = Path(f.name)
 
@@ -149,9 +147,7 @@ capabilities:
 
     def test_register_with_invalid_yaml_returns_zero(self, fresh_registry):
         """Test registering from invalid YAML returns 0."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("invalid: yaml: content: [")
             temp_path = Path(f.name)
 

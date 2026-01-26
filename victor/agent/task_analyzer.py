@@ -131,7 +131,9 @@ class TaskAnalyzer:
         self._task_classifier: Optional[TaskClassifierProtocol] = None
         self._intent_classifier: Optional[IntentClassifierProtocol] = None
         self._coordinator = coordinator
-        self._last_complexity: Optional[TaskComplexity] = None  # Track last analyzed complexity for continuation strategy
+        self._last_complexity: Optional[TaskComplexity] = (
+            None  # Track last analyzed complexity for continuation strategy
+        )
 
     def set_coordinator(self, coordinator: "ModeWorkflowTeamCoordinator") -> None:
         """Set the coordinator for team/workflow suggestions.
@@ -319,12 +321,14 @@ class TaskAnalyzer:
                 if loop.is_running():
                     # Emit the event directly as MessagingEvent
                     msg_event = event.to_messaging_event()
-                    asyncio.create_task(bus.emit(
-                        msg_event.topic,
-                        msg_event.data,
-                        source=msg_event.source,
-                        correlation_id=msg_event.correlation_id
-                    ))
+                    asyncio.create_task(
+                        bus.emit(
+                            msg_event.topic,
+                            msg_event.data,
+                            source=msg_event.source,
+                            correlation_id=msg_event.correlation_id,
+                        )
+                    )
                 else:
                     # Sync context, emit synchronously
                     pass  # Event bus requires async context

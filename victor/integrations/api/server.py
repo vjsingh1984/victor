@@ -196,7 +196,7 @@ class VictorAPIServer:
                     "Access-Control-Allow-Origin": "*",
                     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
                     "Access-Control-Allow-Headers": "Content-Type",
-                }
+                },
             )
 
         response = await handler(request)
@@ -1782,17 +1782,22 @@ class VictorAPIServer:
                 server_entry = registry._servers.get(name)
                 if server_entry:
                     # Check if client is connected
-                    status_val = server_entry.status.value if hasattr(server_entry.status, 'value') else str(server_entry.status)
-                    is_connected = (
-                        server_entry.client is not None
-                        and status_val == "connected"
+                    status_val = (
+                        server_entry.status.value
+                        if hasattr(server_entry.status, "value")
+                        else str(server_entry.status)
                     )
+                    is_connected = server_entry.client is not None and status_val == "connected"
                     servers.append(
                         {
                             "name": name,
                             "connected": is_connected,
                             "tools": [tool.name for tool in server_entry.tools_cache],
-                            "endpoint": server_entry.config.endpoint if hasattr(server_entry.config, "endpoint") else None,
+                            "endpoint": (
+                                server_entry.config.endpoint
+                                if hasattr(server_entry.config, "endpoint")
+                                else None
+                            ),
                         }
                     )
 

@@ -165,6 +165,7 @@ class EntityExtractor:
         # Extract file references
         if self._config.extract_file_references:
             from victor.storage.memory.entity_types import Entity
+
             files = self._file_pattern.findall(content)
             for file_path in set(files):
                 if entities_found >= self._config.max_entities_per_message:
@@ -182,6 +183,7 @@ class EntityExtractor:
         # Extract function references
         if self._config.extract_function_references:
             from victor.storage.memory.entity_types import Entity
+
             # Find function calls and definitions
             functions = self._function_pattern.findall(content)
             for func_name in set(functions):
@@ -203,6 +205,7 @@ class EntityExtractor:
         # Extract class references
         if self._config.extract_class_references:
             from victor.storage.memory.entity_types import Entity
+
             # Find class names (PascalCase)
             classes = self._class_pattern.findall(content)
             for class_name in set(classes):
@@ -268,6 +271,7 @@ class EntityExtractor:
 
             # Store as CONCEPT entity (could be refined with LLM)
             from victor.storage.memory.entity_types import Entity
+
             entity = Entity.create(
                 name=quote,
                 entity_type=EntityType.CONCEPT,
@@ -302,12 +306,12 @@ class EntityExtractor:
             target_entities = self._memory.search(target_entity_name, limit=1)
 
             # Ensure we have lists
-            if hasattr(source_entities, '__await__'):
+            if hasattr(source_entities, "__await__"):
                 source_list = await source_entities
             else:
                 source_list = source_entities  # type: ignore[assignment]
 
-            if hasattr(target_entities, '__await__'):
+            if hasattr(target_entities, "__await__"):
                 target_list = await target_entities
             else:
                 target_list = target_entities  # type: ignore[assignment]
@@ -346,7 +350,7 @@ class EntityExtractor:
         """
         search_result = self._memory.search(query, limit=limit)
         # Ensure we have a list
-        if hasattr(search_result, '__await__'):
+        if hasattr(search_result, "__await__"):
             entities = await search_result
         else:
             entities = search_result  # type: ignore[assignment]
@@ -365,7 +369,7 @@ class EntityExtractor:
         # Get most mentioned entities
         all_entities = self._memory.search("", limit=limit)
         # Ensure we have a list
-        if hasattr(all_entities, '__await__'):
+        if hasattr(all_entities, "__await__"):
             entities_list = await all_entities
         else:
             entities_list = all_entities  # type: ignore[assignment]

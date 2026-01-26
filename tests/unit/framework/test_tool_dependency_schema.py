@@ -154,9 +154,7 @@ class TestToolDependencyValidator:
             "default_sequence": ["read", "edit"],
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(yaml_content, f)
             temp_path = Path(f.name)
 
@@ -177,9 +175,7 @@ class TestToolDependencyValidator:
             "transitions": {},
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(yaml_content, f)
             temp_path = Path(f.name)
 
@@ -201,9 +197,7 @@ class TestToolDependencyValidator:
             "transitions": {},
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(yaml_content, f)
             temp_path = Path(f.name)
 
@@ -226,9 +220,7 @@ class TestToolDependencyValidator:
             },
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(yaml_content, f)
             temp_path = Path(f.name)
 
@@ -252,9 +244,7 @@ class TestToolDependencyValidator:
             ],
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(yaml_content, f)
             temp_path = Path(f.name)
 
@@ -320,9 +310,7 @@ class TestValidateAllVerticals:
 
         if path.exists():
             result = validator.validate(path)
-            assert (
-                result.is_valid is True
-            ), f"DataAnalysis validation failed: {result.errors}"
+            assert result.is_valid is True, f"DataAnalysis validation failed: {result.errors}"
 
     def test_validate_all_verticals(self):
         """Integration test: validate all vertical configs."""

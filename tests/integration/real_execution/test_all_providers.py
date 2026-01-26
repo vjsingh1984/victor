@@ -77,12 +77,11 @@ async def skip_on_timeout(timeout_seconds: float, provider_name: str = "unknown"
 ALL_PROVIDERS: List[str] = [
     # Local providers (free)
     "ollama",
-
     # Premium cloud providers (cheapest models)
-    "deepseek",      # ~$0.14/$0.28 per 1M tokens
-    "google",        # ~$0.075/$0.30 per 1M tokens
-    "openai",        # gpt-4o-mini ~$0.15/$0.60 per 1M tokens
-    "anthropic",     # claude-haiku ~$0.25/$1.25 per 1M tokens
+    "deepseek",  # ~$0.14/$0.28 per 1M tokens
+    "google",  # ~$0.075/$0.30 per 1M tokens
+    "openai",  # gpt-4o-mini ~$0.15/$0.60 per 1M tokens
+    "anthropic",  # claude-haiku ~$0.25/$1.25 per 1M tokens
 ]
 
 
@@ -142,10 +141,7 @@ async def provider(request):
                     break
 
             if not model:
-                pytest.skip(
-                    f"No Ollama model found. "
-                    f"Run: ollama pull {config['models'][0]}"
-                )
+                pytest.skip(f"No Ollama model found. " f"Run: ollama pull {config['models'][0]}")
 
             from victor.providers.ollama_provider import OllamaProvider
 
@@ -220,7 +216,7 @@ async def provider(request):
                 test_response = await provider_instance.chat(
                     messages=[Message(role="user", content="Hi")],
                     model=config["model"],
-                    max_tokens=5
+                    max_tokens=5,
                 )
 
                 if not test_response or not test_response.content:
@@ -231,31 +227,39 @@ async def provider(request):
                 error_str = str(e).lower()
 
                 # Check for specific error patterns
-                if any(pattern in error_str for pattern in [
-                    "invalid", "unauthorized", "401", "403",
-                    "authentication", "forbidden"
-                ]):
-                    pytest.skip(
-                        f"{provider_name}: Invalid API key ({str(e)[:80]})"
-                    )
-                elif any(pattern in error_str for pattern in [
-                    "billing", "payment", "credit", "quota", "limit",
-                    "insufficient", "balance", "suspended"
-                ]):
-                    pytest.skip(
-                        f"{provider_name}: Billing/credit issue ({str(e)[:80]})"
-                    )
-                elif any(pattern in error_str for pattern in [
-                    "rate limit", "429", "too many requests"
-                ]):
-                    pytest.skip(
-                        f"{provider_name}: Rate limit ({str(e)[:80]})"
-                    )
+                if any(
+                    pattern in error_str
+                    for pattern in [
+                        "invalid",
+                        "unauthorized",
+                        "401",
+                        "403",
+                        "authentication",
+                        "forbidden",
+                    ]
+                ):
+                    pytest.skip(f"{provider_name}: Invalid API key ({str(e)[:80]})")
+                elif any(
+                    pattern in error_str
+                    for pattern in [
+                        "billing",
+                        "payment",
+                        "credit",
+                        "quota",
+                        "limit",
+                        "insufficient",
+                        "balance",
+                        "suspended",
+                    ]
+                ):
+                    pytest.skip(f"{provider_name}: Billing/credit issue ({str(e)[:80]})")
+                elif any(
+                    pattern in error_str for pattern in ["rate limit", "429", "too many requests"]
+                ):
+                    pytest.skip(f"{provider_name}: Rate limit ({str(e)[:80]})")
                 else:
                     # Network or other error - skip to avoid test failures
-                    pytest.skip(
-                        f"{provider_name}: Error ({str(e)[:80]})"
-                    )
+                    pytest.skip(f"{provider_name}: Error ({str(e)[:80]})")
 
             yield provider_instance
 
@@ -272,9 +276,7 @@ async def provider(request):
                     pass
 
         except Exception as e:
-            pytest.skip(
-                f"{provider_name}: Failed to create provider ({str(e)[:80]})"
-            )
+            pytest.skip(f"{provider_name}: Failed to create provider ({str(e)[:80]})")
 
 
 # =============================================================================
@@ -338,9 +340,13 @@ def is_provider_available(provider: str) -> bool:
     # Local providers
     if provider == "ollama":
         from tests.integration.real_execution.conftest_all_providers import is_ollama_running
+
         return is_ollama_running()
     elif provider == "llamacpp":
-        from tests.integration.real_execution.conftest_all_providers import is_local_provider_running
+        from tests.integration.real_execution.conftest_all_providers import (
+            is_local_provider_running,
+        )
+
         return is_local_provider_running("llamacpp")
 
     # Cloud providers
@@ -370,7 +376,7 @@ async def test_provider_read_tool(
     settings.provider = provider._provider_name
     settings.model = provider._selected_model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (provider._provider_name in ["ollama", "llamacpp"])
+    settings.airgapped_mode = provider._provider_name in ["ollama", "llamacpp"]
 
     orchestrator = AgentOrchestrator(
         settings=settings,
@@ -417,7 +423,7 @@ async def test_provider_shell_tool(
     settings.provider = provider._provider_name
     settings.model = provider._selected_model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (provider._provider_name in ["ollama", "llamacpp"])
+    settings.airgapped_mode = provider._provider_name in ["ollama", "llamacpp"]
 
     orchestrator = AgentOrchestrator(
         settings=settings,
@@ -443,8 +449,19 @@ async def test_provider_shell_tool(
     # Check for command-related keywords
     command_keywords = any(
         word in response_lower
-        for word in ["file", "ls", "list", "sample.py", "readme", ".py", ".md",
-                     "directory", "folder", "content", "output"]
+        for word in [
+            "file",
+            "ls",
+            "list",
+            "sample.py",
+            "readme",
+            ".py",
+            ".md",
+            "directory",
+            "folder",
+            "content",
+            "output",
+        ]
     )
 
     # Check for JSON output (model returned structured directory info)
@@ -452,8 +469,7 @@ async def test_provider_shell_tool(
 
     # Check for directory names that might appear in a listing
     has_dir_names = any(
-        word in response_lower
-        for word in ["victor", "tests", "docs", "src", "examples", "scripts"]
+        word in response_lower for word in ["victor", "tests", "docs", "src", "examples", "scripts"]
     )
 
     # At least one indicator should be true
@@ -487,7 +503,7 @@ async def test_provider_multi_tool(
     settings.provider = provider._provider_name
     settings.model = provider._selected_model
     settings.working_dir = temp_workspace
-    settings.airgapped_mode = (provider._provider_name in ["ollama", "llamacpp"])
+    settings.airgapped_mode = provider._provider_name in ["ollama", "llamacpp"]
 
     orchestrator = AgentOrchestrator(
         settings=settings,
@@ -511,9 +527,7 @@ async def test_provider_multi_tool(
 
     # Turn 2: Add docstring (check for success indicators)
     async with skip_on_timeout(turn_timeout, provider_name):
-        response2 = await orchestrator.chat(
-            user_message="Add a docstring to the greet function."
-        )
+        response2 = await orchestrator.chat(user_message="Add a docstring to the greet function.")
     assert response2.content is not None
     print(f"✓ [{provider_name}] Turn 2 (Edit): {len(response2.content)} chars")
 
@@ -524,8 +538,7 @@ async def test_provider_multi_tool(
     response_lower = response2.content.lower()
 
     edit_keywords = any(
-        word in response_lower
-        for word in ["edit", "modify", "update", "change", "docstring"]
+        word in response_lower for word in ["edit", "modify", "update", "change", "docstring"]
     )
     has_tool_call = '{"name"' in response2.content or "'name'" in response2.content
     substantial_response = len(response2.content) > 50
@@ -547,9 +560,7 @@ async def test_provider_multi_tool(
 
     # Turn 3: Verify changes
     async with skip_on_timeout(turn_timeout, provider_name):
-        response3 = await orchestrator.chat(
-            user_message="Read the file again to verify."
-        )
+        response3 = await orchestrator.chat(user_message="Read the file again to verify.")
     assert response3.content is not None
 
     elapsed = time.time() - start_time
@@ -572,7 +583,7 @@ async def test_provider_simple_query(provider):
         response = await provider.chat(
             messages=[Message(role="user", content="What is 2+2? Just say the number.")],
             model=provider._selected_model,
-            max_tokens=10
+            max_tokens=10,
         )
     elapsed = time.time() - start_time
 
@@ -582,14 +593,11 @@ async def test_provider_simple_query(provider):
 
     # Look for number in response (be flexible with formatting)
     content = response.content.lower()
-    has_number = any(
-        num in content
-        for num in ["4", "four", "2+2=4"]
-    )
+    has_number = any(num in content for num in ["4", "four", "2+2=4"])
 
-    assert has_number or len(response.content) > 0, (
-        f"[{provider._provider_name}] Response should mention answer. Got: {response.content[:100]}"
-    )
+    assert (
+        has_number or len(response.content) > 0
+    ), f"[{provider._provider_name}] Response should mention answer. Got: {response.content[:100]}"
 
     print(f"✓ [{provider._provider_name}] Simple query test passed in {elapsed:.2f}s")
 
@@ -607,9 +615,9 @@ def test_provider_summary():
     """
     from tests.integration.real_execution.conftest_all_providers import PROVIDER_CONFIG
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("PROVIDER AVAILABILITY SUMMARY")
-    print("="*70)
+    print("=" * 70)
     print()
 
     # Local providers
@@ -631,7 +639,7 @@ def test_provider_summary():
         print(f"  {provider.capitalize():15} {status:20} ({cost_tier})")
 
     print()
-    print("="*70)
+    print("=" * 70)
     print("\nTo add API keys, set environment variables:")
     for provider in ALL_PROVIDERS:
         env_vars = get_provider_env_vars(provider)
@@ -639,4 +647,4 @@ def test_provider_summary():
             for env_var in env_vars:
                 print(f"  export {env_var}=<your-api-key>")
     print()
-    print("="*70)
+    print("=" * 70)

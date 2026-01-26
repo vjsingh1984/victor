@@ -3,7 +3,7 @@
 
 file_path = "/Users/vijaysingh/code/codingagent/victor/agent/coordinators/chat_coordinator.py"
 
-with open(file_path, 'r') as f:
+with open(file_path, "r") as f:
     lines = f.readlines()
 
 # Fix lines 2036-2062 (0-indexed: 2035-2061)
@@ -25,7 +25,7 @@ if 2063 < len(lines):
         if 2064 >= len(lines) or "return None" not in lines[2064]:
             lines.insert(2064, "        return None\n")
 
-with open(file_path, 'w') as f:
+with open(file_path, "w") as f:
     f.writelines(lines)
 
 print("Fixed indentation in chat_coordinator.py")

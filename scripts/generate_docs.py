@@ -167,7 +167,9 @@ class DocumentationGenerator:
                 param_info = {
                     "name": param_name,
                     "type": str(hints.get(param_name, "Any")),
-                    "default": str(param.default) if param.default != inspect.Parameter.empty else None,
+                    "default": (
+                        str(param.default) if param.default != inspect.Parameter.empty else None
+                    ),
                 }
                 parameters.append(param_info)
 
@@ -215,7 +217,9 @@ class DocumentationGenerator:
                 param_info = {
                     "name": param_name,
                     "type": "Any",
-                    "default": str(param.default) if param.default != inspect.Parameter.empty else None,
+                    "default": (
+                        str(param.default) if param.default != inspect.Parameter.empty else None
+                    ),
                 }
                 parameters.append(param_info)
         except ValueError:
@@ -299,7 +303,7 @@ class DocumentationGenerator:
         if doc.parameters:
             f.write("**Parameters:**\n\n")
             for param in doc.parameters:
-                default_str = f" = {param['default']}" if param['default'] else ""
+                default_str = f" = {param['default']}" if param["default"] else ""
                 f.write(f"- `{param['name']}` ({param['type']}){default_str}\n")
             f.write("\n")
 
@@ -346,7 +350,9 @@ class DocumentationGenerator:
 
                 # Try to import and document
                 try:
-                    module = importlib.import_module(f"victor.agent.coordinators.{coordinator_name.lower()}")
+                    module = importlib.import_module(
+                        f"victor.agent.coordinators.{coordinator_name.lower()}"
+                    )
                     coordinator_class = getattr(module, coordinator_name)
 
                     # Get docstring
@@ -408,8 +414,13 @@ class DocumentationGenerator:
 
                     # Get assistant class
                     from victor.core.verticals.base import VerticalBase
+
                     for name, obj in inspect.getmembers(module):
-                        if inspect.isclass(obj) and issubclass(obj, VerticalBase) and obj != VerticalBase:
+                        if (
+                            inspect.isclass(obj)
+                            and issubclass(obj, VerticalBase)
+                            and obj != VerticalBase
+                        ):
                             # Get docstring
                             docstring = inspect.getdoc(obj)
                             if docstring:

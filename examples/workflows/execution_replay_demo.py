@@ -92,6 +92,7 @@ def simulate_workflow_execution(
 
     if scenario == "slow":
         import time
+
         time.sleep(0.5)  # Simulate slow execution
 
     recorder.record_node_complete(
@@ -189,9 +190,9 @@ def simulate_workflow_execution(
 
 async def demo_1_basic_recording():
     """Demo 1: Basic workflow recording."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DEMO 1: Basic Workflow Recording")
-    print("="*60)
+    print("=" * 60)
 
     # Record a workflow execution
     recorder = simulate_workflow_execution("demo_workflow", scenario="success")
@@ -217,9 +218,9 @@ async def demo_1_basic_recording():
 
 async def demo_2_replay_stepping(filepath: Path):
     """Demo 2: Replay with step-through debugging."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DEMO 2: Replay with Step-Through Debugging")
-    print("="*60)
+    print("=" * 60)
 
     # Load recording
     replayer = ExecutionReplayer.load(filepath)
@@ -259,9 +260,9 @@ async def demo_2_replay_stepping(filepath: Path):
 
 async def demo_3_storage_backend():
     """Demo 3: Using storage backend."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DEMO 3: Storage Backend")
-    print("="*60)
+    print("=" * 60)
 
     # Use temporary directory for demo
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -285,7 +286,9 @@ async def demo_3_storage_backend():
         recordings = await storage.list()
         for r in recordings:
             status = "✓" if r["success"] else "✗"
-            print(f"  {status} {r['recording_id'][:8]}... {r['workflow_name']} ({r['duration_seconds']:.1f}s)")
+            print(
+                f"  {status} {r['recording_id'][:8]}... {r['workflow_name']} ({r['duration_seconds']:.1f}s)"
+            )
 
         # Filter by success status
         print(f"\n✅ Successful recordings only:")
@@ -312,9 +315,9 @@ async def demo_3_storage_backend():
 
 async def demo_4_comparison():
     """Demo 4: Comparing two executions."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DEMO 4: Comparing Two Executions")
-    print("="*60)
+    print("=" * 60)
 
     # Record two different executions
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -359,9 +362,9 @@ async def demo_4_comparison():
 
 async def demo_5_visualization():
     """Demo 5: Export visualization."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DEMO 5: Export Visualization")
-    print("="*60)
+    print("=" * 60)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create recording
@@ -393,9 +396,9 @@ async def demo_5_visualization():
 
 async def demo_6_context_manager():
     """Demo 6: Using context manager for recording."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DEMO 6: Context Manager Recording")
-    print("="*60)
+    print("=" * 60)
 
     # Use context manager for automatic cleanup
     with record_workflow("context_demo_workflow", tags=["demo", "context_manager"]) as recorder:
@@ -418,9 +421,9 @@ async def demo_6_context_manager():
 
 async def demo_7_retention_policy():
     """Demo 7: Retention policy management."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DEMO 7: Retention Policy")
-    print("="*60)
+    print("=" * 60)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         storage = FileRecordingStorage(base_path=Path(tmpdir))
@@ -449,9 +452,9 @@ async def demo_7_retention_policy():
 
 async def main():
     """Run all demos."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Workflow Execution Replay System - Demo")
-    print("="*60)
+    print("=" * 60)
 
     try:
         # Demo 1: Basic recording
@@ -475,13 +478,14 @@ async def main():
         # Demo 7: Retention policy
         # await demo_7_retention_policy()
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("✅ All demos completed!")
-        print("="*60)
+        print("=" * 60)
 
     except Exception as e:
         print(f"\n❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
 
 

@@ -209,7 +209,7 @@ class CacheBackendFactory:
             MemoryCacheBackend(
                 default_ttl_seconds=default_ttl,
                 enable_stats=enable_stats,
-            )
+            ),
         )
 
     @staticmethod

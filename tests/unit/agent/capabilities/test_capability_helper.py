@@ -106,9 +106,7 @@ class TestCapabilityHelper:
         from victor.agent.capability_registry import CapabilityHelper
 
         obj = MockOrchestrator()
-        result = CapabilityHelper.invoke_capability(
-            obj, "enabled_tools", {"read"}, extra="value"
-        )
+        result = CapabilityHelper.invoke_capability(obj, "enabled_tools", {"read"}, extra="value")
         assert result is True
         assert obj._invoked["enabled_tools"][1] == {"extra": "value"}
 
@@ -136,9 +134,7 @@ class TestCapabilityHelper:
             CapabilityHelper.check_capability(obj, "enabled_tools")
 
             # Check if deprecation warning was issued
-            deprecation_warnings = [
-                x for x in w if issubclass(x.category, DeprecationWarning)
-            ]
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
             assert len(deprecation_warnings) > 0
 
     def test_strict_mode_raises_for_non_protocol(self):
@@ -172,9 +168,7 @@ class TestCapabilityHelperEdgeCases:
 
         # Should raise TypeError in strict mode for non-protocol objects
         with pytest.raises(TypeError):
-            CapabilityHelper.invoke_capability(
-                obj, "nonexistent_capability", "value", strict=True
-            )
+            CapabilityHelper.invoke_capability(obj, "nonexistent_capability", "value", strict=True)
 
     def test_helper_methods_are_static(self):
         """Helper methods should be static (no instance required)."""
@@ -185,9 +179,5 @@ class TestCapabilityHelperEdgeCases:
         assert callable(CapabilityHelper.invoke_capability)
 
         # Should work with staticmethod
-        assert isinstance(
-            CapabilityHelper.__dict__["check_capability"], staticmethod
-        )
-        assert isinstance(
-            CapabilityHelper.__dict__["invoke_capability"], staticmethod
-        )
+        assert isinstance(CapabilityHelper.__dict__["check_capability"], staticmethod)
+        assert isinstance(CapabilityHelper.__dict__["invoke_capability"], staticmethod)

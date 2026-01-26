@@ -238,6 +238,7 @@ class WorkflowCompiler:
 
         # Cast to protocol for type safety - CompiledGraph implements CompiledGraphProtocol
         from typing import cast
+
         return cast("CompiledGraphProtocol", compiled)
 
 

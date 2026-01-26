@@ -29,11 +29,12 @@ st.set_page_config(
     page_title="Victor AI Data Dashboard",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # Custom CSS
-st.markdown("""
+st.markdown(
+    """
 <style>
     .main-header {
         font-size: 3rem;
@@ -50,28 +51,30 @@ st.markdown("""
         margin: 0.5rem 0;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
 def initialize_session_state():
     """Initialize session state variables."""
-    if 'orchestrator' not in st.session_state:
+    if "orchestrator" not in st.session_state:
         settings = Settings()
         st.session_state.orchestrator = create_orchestrator(settings)
 
-    if 'analyzer' not in st.session_state:
+    if "analyzer" not in st.session_state:
         st.session_state.analyzer = DataAnalyzer(st.session_state.orchestrator)
 
-    if 'visualizer' not in st.session_state:
+    if "visualizer" not in st.session_state:
         st.session_state.visualizer = DataVisualizer()
 
-    if 'insight_generator' not in st.session_state:
+    if "insight_generator" not in st.session_state:
         st.session_state.insight_generator = InsightGenerator(st.session_state.orchestrator)
 
-    if 'data' not in st.session_state:
+    if "data" not in st.session_state:
         st.session_state.data = None
 
-    if 'analysis_complete' not in st.session_state:
+    if "analysis_complete" not in st.session_state:
         st.session_state.analysis_complete = False
 
 
@@ -81,13 +84,13 @@ def load_data(file):
         # Determine file type
         file_extension = Path(file.name).suffix.lower()
 
-        if file_extension == '.csv':
+        if file_extension == ".csv":
             df = pd.read_csv(file)
-        elif file_extension in ['.xlsx', '.xls']:
+        elif file_extension in [".xlsx", ".xls"]:
             df = pd.read_excel(file)
-        elif file_extension == '.json':
+        elif file_extension == ".json":
             df = pd.read_json(file)
-        elif file_extension == '.parquet':
+        elif file_extension == ".parquet":
             df = pd.read_parquet(file)
         else:
             st.error(f"Unsupported file format: {file_extension}")
@@ -120,12 +123,14 @@ def display_data_overview(df):
 
     # Display data types
     st.subheader("Column Types")
-    col_types = pd.DataFrame({
-        'Column': df.columns,
-        'Type': df.dtypes.values,
-        'Non-Null': df.notnull().sum().values,
-        'Null': df.isnull().sum().values,
-    })
+    col_types = pd.DataFrame(
+        {
+            "Column": df.columns,
+            "Type": df.dtypes.values,
+            "Non-Null": df.notnull().sum().values,
+            "Null": df.isnull().sum().values,
+        }
+    )
     st.dataframe(col_types, use_container_width=True)
 
     # Display first rows
@@ -138,7 +143,7 @@ def display_statistical_analysis(df):
     st.subheader("📊 Statistical Analysis")
 
     # Numerical columns
-    numerical_cols = df.select_dtypes(include=['number']).columns.tolist()
+    numerical_cols = df.select_dtypes(include=["number"]).columns.tolist()
 
     if numerical_cols:
         with st.expander("Descriptive Statistics", expanded=True):
@@ -150,15 +155,12 @@ def display_statistical_analysis(df):
             with st.expander("Correlation Matrix"):
                 corr_matrix = df[numerical_cols].corr()
                 fig = px.imshow(
-                    corr_matrix,
-                    text_auto=True,
-                    aspect="auto",
-                    color_continuous_scale='RdBu_r'
+                    corr_matrix, text_auto=True, aspect="auto", color_continuous_scale="RdBu_r"
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
     # Categorical columns
-    categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+    categorical_cols = df.select_dtypes(include=["object"]).columns.tolist()
 
     if categorical_cols:
         with st.expander("Categorical Columns"):
@@ -172,13 +174,13 @@ def display_visualizations(df):
     """Display interactive visualizations."""
     st.subheader("📈 Visualizations")
 
-    numerical_cols = df.select_dtypes(include=['number']).columns.tolist()
-    categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+    numerical_cols = df.select_dtypes(include=["number"]).columns.tolist()
+    categorical_cols = df.select_dtypes(include=["object"]).columns.tolist()
 
     # Let user select visualization type
     viz_type = st.selectbox(
         "Select Visualization Type",
-        ["Histogram", "Box Plot", "Scatter Plot", "Bar Chart", "Line Chart", "Heatmap"]
+        ["Histogram", "Box Plot", "Scatter Plot", "Bar Chart", "Line Chart", "Heatmap"],
     )
 
     if viz_type == "Histogram" and numerical_cols:
@@ -204,7 +206,7 @@ def display_visualizations(df):
             x=value_counts.index,
             y=value_counts.values,
             title=f"Count by {col}",
-            labels={'x': col, 'y': 'Count'}
+            labels={"x": col, "y": "Count"},
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -215,12 +217,7 @@ def display_visualizations(df):
 
     elif viz_type == "Heatmap" and len(numerical_cols) > 1:
         corr_matrix = df[numerical_cols].corr()
-        fig = px.imshow(
-            corr_matrix,
-            text_auto=True,
-            aspect="auto",
-            title="Correlation Heatmap"
-        )
+        fig = px.imshow(corr_matrix, text_auto=True, aspect="auto", title="Correlation Heatmap")
         st.plotly_chart(fig, use_container_width=True)
 
 
@@ -237,13 +234,16 @@ def display_insights(df):
         insights = st.session_state.insights
 
     # Display insights
-    for insight in insights.get('key_insights', []):
-        st.markdown(f"""
+    for insight in insights.get("key_insights", []):
+        st.markdown(
+            f"""
         <div class="insight-card">
             <h4>{insight['title']}</h4>
             <p>{insight['description']}</p>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
 
 
 def natural_language_query(df):
@@ -253,7 +253,7 @@ def natural_language_query(df):
     query = st.text_input(
         "Ask a question (e.g., 'What is the average price?')",
         placeholder="Type your question here...",
-        key="nl_query"
+        key="nl_query",
     )
 
     if st.button("Analyze", key="analyze_query"):
@@ -264,14 +264,14 @@ def natural_language_query(df):
                 if result:
                     st.success("Result:")
 
-                    if 'answer' in result:
-                        st.write(result['answer'])
+                    if "answer" in result:
+                        st.write(result["answer"])
 
-                    if 'visualization' in result and result['visualization']:
-                        st.plotly_chart(result['visualization'], use_container_width=True)
+                    if "visualization" in result and result["visualization"]:
+                        st.plotly_chart(result["visualization"], use_container_width=True)
 
-                    if 'data' in result:
-                        st.dataframe(result['data'], use_container_width=True)
+                    if "data" in result:
+                        st.dataframe(result["data"], use_container_width=True)
                 else:
                     st.warning("Could not understand the query. Please try rephrasing.")
 
@@ -286,28 +286,26 @@ def export_results(df):
         if st.button("Export Data (CSV)"):
             csv = df.to_csv(index=False)
             st.download_button(
-                label="Download CSV",
-                data=csv,
-                file_name="analysis_data.csv",
-                mime="text/csv"
+                label="Download CSV", data=csv, file_name="analysis_data.csv", mime="text/csv"
             )
 
     with col2:
         if st.button("Export Summary (JSON)"):
             summary = {
-                'rows': len(df),
-                'columns': len(df.columns),
-                'column_types': df.dtypes.to_dict(),
-                'insights': st.session_state.get('insights', {})
+                "rows": len(df),
+                "columns": len(df.columns),
+                "column_types": df.dtypes.to_dict(),
+                "insights": st.session_state.get("insights", {}),
             }
 
             import json
+
             json_str = json.dumps(summary, indent=2, default=str)
             st.download_button(
                 label="Download JSON",
                 data=json_str,
                 file_name="analysis_summary.json",
-                mime="application/json"
+                mime="application/json",
             )
 
 
@@ -325,8 +323,8 @@ def main():
 
         uploaded_file = st.file_uploader(
             "Upload Data File",
-            type=['csv', 'xlsx', 'xls', 'json', 'parquet'],
-            help="Supported formats: CSV, Excel, JSON, Parquet"
+            type=["csv", "xlsx", "xls", "json", "parquet"],
+            help="Supported formats: CSV, Excel, JSON, Parquet",
         )
 
         if uploaded_file:
@@ -344,9 +342,9 @@ def main():
         df = st.session_state.data
 
         # Tabs
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "📋 Overview", "📊 Statistics", "📈 Visualizations", "🤖 Insights", "💬 Query"
-        ])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(
+            ["📋 Overview", "📊 Statistics", "📈 Visualizations", "🤖 Insights", "💬 Query"]
+        )
 
         with tab1:
             display_data_overview(df)
@@ -369,7 +367,8 @@ def main():
 
     else:
         # Welcome message
-        st.markdown("""
+        st.markdown(
+            """
         ## 👋 Welcome to Victor AI Data Dashboard!
 
         **Features:**
@@ -392,7 +391,8 @@ def main():
         - Parquet (.parquet)
 
         Upload a file to get started!
-        """)
+        """
+        )
 
 
 if __name__ == "__main__":

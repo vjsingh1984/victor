@@ -164,46 +164,56 @@ class PerformanceReportGenerator:
         ]
 
         # Executive summary
-        lines.extend([
-            "## Executive Summary",
-            "",
-            self._generate_executive_summary(data),
-            "",
-        ])
+        lines.extend(
+            [
+                "## Executive Summary",
+                "",
+                self._generate_executive_summary(data),
+                "",
+            ]
+        )
 
         # Benchmark results
         if "benchmarks" in data:
-            lines.extend([
-                "## Benchmark Results",
-                "",
-                self._generate_benchmark_table(data),
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Benchmark Results",
+                    "",
+                    self._generate_benchmark_table(data),
+                    "",
+                ]
+            )
 
         # Performance targets
-        lines.extend([
-            "## Performance Targets",
-            "",
-            self._generate_performance_targets(data),
-            "",
-        ])
+        lines.extend(
+            [
+                "## Performance Targets",
+                "",
+                self._generate_performance_targets(data),
+                "",
+            ]
+        )
 
         # Comparison with baseline
         if self.baseline_data:
-            lines.extend([
-                "## Comparison with Baseline",
-                "",
-                self._generate_baseline_comparison(data),
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Comparison with Baseline",
+                    "",
+                    self._generate_baseline_comparison(data),
+                    "",
+                ]
+            )
 
         # Recommendations
-        lines.extend([
-            "## Recommendations",
-            "",
-            self._generate_recommendations(data),
-            "",
-        ])
+        lines.extend(
+            [
+                "## Recommendations",
+                "",
+                self._generate_recommendations(data),
+                "",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -212,14 +222,10 @@ class PerformanceReportGenerator:
         benchmarks = data.get("benchmarks", {})
         total_benchmarks = len(benchmarks)
         successful_benchmarks = sum(
-            1 for b in benchmarks.values()
-            if b.get("stats", {}).get("iterations", 0) > 0
+            1 for b in benchmarks.values() if b.get("stats", {}).get("iterations", 0) > 0
         )
 
-        total_time = sum(
-            b.get("stats", {}).get("median", 0)
-            for b in benchmarks.values()
-        )
+        total_time = sum(b.get("stats", {}).get("median", 0) for b in benchmarks.values())
 
         summary = f"""
 - **Total Benchmarks:** {total_benchmarks}
@@ -277,7 +283,9 @@ class PerformanceReportGenerator:
 
         benchmarks = data.get("benchmarks", {})
 
-        for target_name, target_value in targets.get(data.get("machine_info", {}).get("suite", ""), {}).items():
+        for target_name, target_value in targets.get(
+            data.get("machine_info", {}).get("suite", ""), {}
+        ).items():
             if target_name in benchmarks:
                 actual_value = benchmarks[target_name].get("stats", {}).get("median", 0)
                 status = "✓ PASS" if actual_value <= target_value else "✗ FAIL"
@@ -326,20 +334,24 @@ class PerformanceReportGenerator:
 
         # Add summary
         if regressions:
-            lines.extend([
-                "",
-                "#### ⚠️ Regressions Detected",
-                "",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "#### ⚠️ Regressions Detected",
+                    "",
+                ]
+            )
             for name, change_pct in regressions:
                 lines.append(f"- **{name}**: {change_pct:.1f}% slower")
 
         if improvements:
-            lines.extend([
-                "",
-                "#### ✨ Improvements",
-                "",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "#### ✨ Improvements",
+                    "",
+                ]
+            )
             for name, change_pct in improvements:
                 lines.append(f"- **{name}**: {abs(change_pct):.1f}% faster")
 
@@ -486,7 +498,7 @@ class PerformanceReportGenerator:
                 row_class = "improvement" if change_pct < -self.regression_threshold else row_class
 
                 html += f'<tr class="{row_class}"><td>{name}</td><td>{baseline_median:.2f}</td>'
-                html += f'<td>{current_median:.2f}</td><td>{change_pct:+.1f}%</td>'
+                html += f"<td>{current_median:.2f}</td><td>{change_pct:+.1f}%</td>"
                 html += f'<td class="{status.lower()}">{status}</td></tr>\n'
 
         html += "</table>\n"

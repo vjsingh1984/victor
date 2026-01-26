@@ -140,9 +140,7 @@ class WorkflowCacheConfig(_LegacyWorkflowCacheConfig):
         self.persist_to_disk = persist_to_disk
         self.disk_cache_path = disk_cache_path
         self.cacheable_node_types = (
-            cacheable_node_types
-            if cacheable_node_types is not None
-            else {"transform", "condition"}
+            cacheable_node_types if cacheable_node_types is not None else {"transform", "condition"}
         )
         self.excluded_context_keys = (
             excluded_context_keys

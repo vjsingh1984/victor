@@ -55,7 +55,9 @@ def benchmark_read_scalability():
         ops_per_sec = total_ops / duration
         results[num_threads] = ops_per_sec
 
-        print(f"  {num_threads:2d} threads: {ops_per_sec:10.0f} ops/sec ({total_ops/duration:10.0f} total ops in {duration:.2f}s)")
+        print(
+            f"  {num_threads:2d} threads: {ops_per_sec:10.0f} ops/sec ({total_ops/duration:10.0f} total ops in {duration:.2f}s)"
+        )
 
     # Calculate speedup
     baseline = results[1]
@@ -98,7 +100,9 @@ def benchmark_write_throughput():
         total_ops = 1000 * num_threads
         ops_per_sec = total_ops / duration
 
-        print(f"  {num_threads:2d} threads: {ops_per_sec:10.0f} writes/sec ({total_ops} ops in {duration:.2f}s)")
+        print(
+            f"  {num_threads:2d} threads: {ops_per_sec:10.0f} writes/sec ({total_ops} ops in {duration:.2f}s)"
+        )
 
     stats = registry.get_stats()
     print(f"\nFinal state: {stats['total_entries']} entries (max 1000)")
@@ -177,6 +181,7 @@ def main():
     except Exception as e:
         print(f"\n✗ Benchmark failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

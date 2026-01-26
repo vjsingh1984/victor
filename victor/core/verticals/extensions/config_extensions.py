@@ -151,6 +151,7 @@ class ConfigExtensions:
         config = self.get_rl_settings()
         result = config.get("active_learners", [])
         from typing import cast
+
         return cast(list[str], result)
 
     def get_quality_thresholds(self) -> Dict[str, float]:
@@ -162,6 +163,7 @@ class ConfigExtensions:
         config = self.get_rl_settings()
         result = config.get("quality_thresholds", {})
         from typing import cast
+
         return cast(dict[str, float], result)
 
     def get_rl_hooks(self) -> Optional[Any]:

@@ -122,6 +122,7 @@ class LifecycleManager:
 
         # Orchestrator-specific callbacks for shutdown
         from typing import Callable
+
         self._flush_analytics_callback: Optional[Callable[[], Any]] = None
         self._stop_health_monitoring_callback: Optional[Callable[[], Any]] = None
 

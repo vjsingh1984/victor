@@ -290,9 +290,7 @@ class CapabilityRegistry:
         """
         with self._op_lock:
             return [
-                name
-                for name, definition in self._definitions.items()
-                if tag in definition.tags
+                name for name, definition in self._definitions.items() if tag in definition.tags
             ]
 
     def discover_from_entry_points(self, group: str = "victor.capabilities") -> int:
@@ -328,9 +326,7 @@ class CapabilityRegistry:
                     if definition:
                         self.register(definition, replace=True)
                         count += 1
-                        logger.info(
-                            f"Discovered capability '{definition.name}' from entry point"
-                        )
+                        logger.info(f"Discovered capability '{definition.name}' from entry point")
                 except Exception as e:
                     logger.warning(
                         f"Failed to load entry point '{ep.name}': {e}",
@@ -342,9 +338,7 @@ class CapabilityRegistry:
 
         return count
 
-    def _resolve_definition(
-        self, loaded: Any, name: str
-    ) -> Optional[CapabilityDefinition]:
+    def _resolve_definition(self, loaded: Any, name: str) -> Optional[CapabilityDefinition]:
         """Resolve loaded entry point to CapabilityDefinition.
 
         Args:

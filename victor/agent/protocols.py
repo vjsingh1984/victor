@@ -3990,7 +3990,9 @@ class IEmbeddingManager(Protocol):
         """Initialize embedding store."""
         ...
 
-    async def semantic_search(self, query: str, k: int = 5, filters: Optional[Dict[str, Any]] = None) -> List[Any]:
+    async def semantic_search(
+        self, query: str, k: int = 5, filters: Optional[Dict[str, Any]] = None
+    ) -> List[Any]:
         """Perform semantic search.
 
         Args:

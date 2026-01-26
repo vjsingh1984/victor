@@ -268,7 +268,9 @@ class TestFeatureExtractor:
         assert extractor.use_embeddings is False
         assert extractor.embedding_model is None
 
-    def test_extract_features_basic(self, sample_task: Any, team_context: Any, mock_agents: Any) -> None:
+    def test_extract_features_basic(
+        self, sample_task: Any, team_context: Any, mock_agents: Any
+    ) -> None:
         """Test basic feature extraction."""
         extractor = FeatureExtractor()
         features = extractor.extract_features(sample_task, team_context, mock_agents)
@@ -346,7 +348,9 @@ class TestFeatureExtractor:
         features = extractor.extract_dependencies(indep_task.content, MagicMock())
         assert features < 0.5
 
-    def test_feature_vector_conversion(self, sample_task: Any, team_context: Any, mock_agents: Any) -> None:
+    def test_feature_vector_conversion(
+        self, sample_task: Any, team_context: Any, mock_agents: Any
+    ) -> None:
         """Test conversion to feature vector."""
         extractor = FeatureExtractor()
         features = extractor.extract_features(sample_task, team_context, mock_agents)
@@ -491,7 +495,9 @@ class TestAdaptiveFormationML:
         assert selector.scaler is not None
 
     @pytest.mark.asyncio
-    async def test_predict_formation_without_model(self, sample_task, team_context, mock_agents) -> None:
+    async def test_predict_formation_without_model(
+        self, sample_task, team_context, mock_agents
+    ) -> None:
         """Test prediction without trained model (heuristic fallback)."""
         selector = AdaptiveFormationML(model_path=None)
 
@@ -499,7 +505,9 @@ class TestAdaptiveFormationML:
         assert formation in ["sequential", "parallel", "hierarchical", "pipeline", "consensus"]
 
     @pytest.mark.asyncio
-    async def test_predict_formation_with_scores(self, sample_task, team_context, mock_agents) -> None:
+    async def test_predict_formation_with_scores(
+        self, sample_task, team_context, mock_agents
+    ) -> None:
         """Test prediction with formation scores."""
         selector = AdaptiveFormationML(model_path=None)
 

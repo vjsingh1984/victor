@@ -322,7 +322,9 @@ class MarkdownFormatter(ReportFormatter):
                 baseline_avg = self._get_metric(baseline, "avg_latency")
                 scaling_factor = avg.value / baseline_avg.value if baseline_avg else 1.0
 
-                lines.append(f"| {size} | {avg.value:.2f} | {overhead:.2f} | {scaling_factor:.2f}x |")
+                lines.append(
+                    f"| {size} | {avg.value:.2f} | {overhead:.2f} | {scaling_factor:.2f}x |"
+                )
 
         return lines
 
@@ -489,7 +491,9 @@ class BenchmarkRunner:
             project_root = script_dir.parent
 
         self.project_root = project_root
-        self.benchmark_file = project_root / "tests" / "performance" / "test_team_node_performance.py"
+        self.benchmark_file = (
+            project_root / "tests" / "performance" / "test_team_node_performance.py"
+        )
 
     def run(
         self,
@@ -585,13 +589,19 @@ class BenchmarkRunner:
 
         # Pattern: "test_name: 12.34ms"
         patterns = [
-            (r"test_formation_performance.*?\[([^\]]+)\].*?:\s*([\d.]+)ms", "Formation Performance"),
+            (
+                r"test_formation_performance.*?\[([^\]]+)\].*?:\s*([\d.]+)ms",
+                "Formation Performance",
+            ),
             (r"test_team_size_scaling.*?\[(\d+)\].*?:\s*([\d.]+)ms", "Team Size Scaling"),
             (r"test_tool_budget_impact.*?\[(\d+)\].*?:\s*([\d.]+)ms", "Tool Budget Impact"),
             (r"test_recursion_depth_overhead.*?\[(\d+)\].*?:\s*([\d.]+)ms", "Recursion Depth"),
             (r"test_timeout_performance.*?\[(\d+)\].*?:\s*([\d.]+)ms", "Timeout Handling"),
             (r"test_memory_per_member.*?\[(\d+)\].*?:\s*([\d.]+)ms", "Memory Per Member"),
-            (r"test_consensus_formation_performance.*?\[(\d+),\s*(\d+)\].*?:\s*([\d.]+)ms", "Consensus Formation"),
+            (
+                r"test_consensus_formation_performance.*?\[(\d+),\s*(\d+)\].*?:\s*([\d.]+)ms",
+                "Consensus Formation",
+            ),
             (r"test_simple_task_scenario.*?:\s*([\d.]+)ms", "Simple Task Scenario"),
             (r"test_complex_task_scenario.*?:\s*([\d.]+)ms", "Complex Task Scenario"),
             (r"test_large_context_scenario.*?:\s*([\d.]+)ms", "Large Context Scenario"),
@@ -709,14 +719,18 @@ def compare_runs(file1: Path, file2: Optional[Path] = None) -> str:
 
     # Find files
     if file1.is_dir():
-        files = sorted(results_dir.glob("team_nodes_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        files = sorted(
+            results_dir.glob("team_nodes_*.json"), key=lambda p: p.stat().st_mtime, reverse=True
+        )
         if len(files) < 2:
             return "Need at least 2 benchmark runs to compare"
         file1 = files[1]  # Second most recent
         file2 = files[0]  # Most recent
     elif file2 is None:
         # Use the most recent file as comparison
-        files = sorted(results_dir.glob("team_nodes_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        files = sorted(
+            results_dir.glob("team_nodes_*.json"), key=lambda p: p.stat().st_mtime, reverse=True
+        )
         if files and files[0] != file1:
             file2 = files[0]
 
@@ -757,7 +771,9 @@ def compare_runs(file1: Path, file2: Optional[Path] = None) -> str:
                 change_str = f"{change:+.2f} ({pct_change:+.1f}%)"
                 speedup_str = f"{speedup:.2f}x" if speedup > 1 else f"{1/speedup:.2f}x slower"
 
-                lines.append(f"| {name} | {m1['value']:.2f} | {m2['value']:.2f} | {change_str} | {speedup_str} |")
+                lines.append(
+                    f"| {name} | {m1['value']:.2f} | {m2['value']:.2f} | {change_str} | {speedup_str} |"
+                )
 
     return "\n".join(lines)
 
@@ -820,7 +836,9 @@ Examples:
         default="markdown",
         help="Output format",
     )
-    report_parser.add_argument("--input", type=Path, help="Input JSON file (uses latest if not specified)")
+    report_parser.add_argument(
+        "--input", type=Path, help="Input JSON file (uses latest if not specified)"
+    )
 
     # Compare command
     compare_parser = subparsers.add_parser("compare", help="Compare benchmark runs")

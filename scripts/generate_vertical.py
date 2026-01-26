@@ -699,7 +699,7 @@ from victor.{vertical_name}.assistant import {vertical_class_name}
 __all__ = ["{vertical_class_name}"
 '''
 
-VERTICAL_YAML_TEMPLATE = '''# Vertical Configuration for {vertical_name}
+VERTICAL_YAML_TEMPLATE = """# Vertical Configuration for {vertical_name}
 # Generated from template by scripts/generate_vertical.py
 
 metadata:
@@ -719,7 +719,7 @@ core:
       {system_prompt_indented}
 
   stages: {stages_yaml}
-'''
+"""
 
 
 # =============================================================================
@@ -837,8 +837,12 @@ class VerticalGenerator:
         prompt_hints = self._format_prompt_hints()
 
         # Format grounding rules and system prompt section
-        grounding_rules = self.template.custom_config.get("grounding_rules", "Base all responses on tool output.")
-        system_prompt_section = self.template.custom_config.get("system_prompt_section", "Follow best practices.")
+        grounding_rules = self.template.custom_config.get(
+            "grounding_rules", "Base all responses on tool output."
+        )
+        system_prompt_section = self.template.custom_config.get(
+            "system_prompt_section", "Follow best practices."
+        )
 
         content = PROMPTS_PY_TEMPLATE.format(
             vertical_name=vertical_name,
@@ -996,9 +1000,9 @@ class VerticalGenerator:
             lines.append(f'        "{stage_name}": StageDefinition(')
             lines.append(f'            name="{stage.name}",')
             lines.append(f'            description="{stage.description}",')
-            lines.append(f'            tools={tools_str},')
-            lines.append(f'            keywords={keywords_str},')
-            lines.append(f'            next_stages={next_stages_str},')
+            lines.append(f"            tools={tools_str},")
+            lines.append(f"            keywords={keywords_str},")
+            lines.append(f"            next_stages={next_stages_str},")
             lines.append("        ),")
 
         lines.append("    }")
@@ -1023,7 +1027,11 @@ class VerticalGenerator:
 
         for mw in self.template.extensions.middleware:
             args = ", ".join(f"{k}={v}" for k, v in mw.config.items())
-            lines.append(f"                {mw.class_name}({args})," if args else f"                {mw.class_name}(),")
+            lines.append(
+                f"                {mw.class_name}({args}),"
+                if args
+                else f"                {mw.class_name}(),"
+            )
 
         lines.append("            ]")
 
@@ -1055,9 +1063,9 @@ class VerticalGenerator:
             tools_str = json.dumps(hint.priority_tools)
             lines.append(f'    "{hint.task_type}": TaskTypeHint(')
             lines.append(f'        task_type="{hint.task_type}",')
-            lines.append(f'        hint={json.dumps(hint.hint)},')
-            lines.append(f'        tool_budget={hint.tool_budget},')
-            lines.append(f'        priority_tools={tools_str},')
+            lines.append(f"        hint={json.dumps(hint.hint)},")
+            lines.append(f"        tool_budget={hint.tool_budget},")
+            lines.append(f"        priority_tools={tools_str},")
             lines.append("    ),")
 
         return "\n".join(lines)
@@ -1105,9 +1113,7 @@ def to_class_name(vertical_name: str) -> str:
 
 def main():
     """CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description="Generate vertical implementations from templates"
-    )
+    parser = argparse.ArgumentParser(description="Generate vertical implementations from templates")
 
     parser.add_argument(
         "--template",

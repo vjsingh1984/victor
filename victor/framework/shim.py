@@ -273,12 +273,13 @@ class FrameworkShim:
         )
         if self._orchestrator is not None:
             from typing import cast
+
             # wire_orchestrator expects AgentOrchestrator but we have OrchestratorProtocol
             # Use cast since the actual instance should be AgentOrchestrator
             self._observability.wire_orchestrator(cast(Any, self._orchestrator))
 
             # Store reference on orchestrator for access
-            if hasattr(self._orchestrator, 'observability'):
+            if hasattr(self._orchestrator, "observability"):
                 self._orchestrator.observability = self._observability
 
         logger.debug(
@@ -298,6 +299,7 @@ class FrameworkShim:
             Orchestrator instance, or None if not yet created.
         """
         from typing import cast
+
         return cast("OrchestratorProtocol", self._orchestrator)
 
     @property

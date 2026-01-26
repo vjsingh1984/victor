@@ -280,9 +280,9 @@ class ProviderPoolBenchmark:
 
     async def run_all_benchmarks(self) -> None:
         """Run comprehensive benchmark suite."""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("PROVIDER池 BENCHMARK SUITE")
-        print("="*60)
+        print("=" * 60)
 
         # Benchmark 1: Baseline - Single provider
         await self.run_benchmark(
@@ -356,11 +356,14 @@ class ProviderPoolBenchmark:
 
         # Benchmark 6: Variable latency
         providers_config = [
-            ("variable_latency", [
-                ("fast", 50),
-                ("medium", 150),
-                ("slow", 300),
-            ]),
+            (
+                "variable_latency",
+                [
+                    ("fast", 50),
+                    ("medium", 150),
+                    ("slow", 300),
+                ],
+            ),
         ]
 
         # Generate comparison report
@@ -378,10 +381,12 @@ class ProviderPoolBenchmark:
         ]
 
         # Table header
-        report_lines.extend([
-            "| Benchmark | Throughput (req/s) | Avg Latency (ms) | P95 Latency (ms) | Success Rate |",
-            "|-----------|-------------------|------------------|------------------|--------------|",
-        ])
+        report_lines.extend(
+            [
+                "| Benchmark | Throughput (req/s) | Avg Latency (ms) | P95 Latency (ms) | Success Rate |",
+                "|-----------|-------------------|------------------|------------------|--------------|",
+            ]
+        )
 
         for result in self.results:
             success_rate = (
@@ -399,76 +404,79 @@ class ProviderPoolBenchmark:
         report_lines.append("\n## Detailed Results\n")
 
         for result in self.results:
-            report_lines.extend([
-                f"### {result.name}",
-                f"\n**Configuration:**",
-                f"- Requests: {result.config.num_requests}",
-                f"- Providers: {result.config.num_providers}",
-                f"- Concurrency: {result.config.concurrency}",
-                f"- Latency: {result.config.latency_ms}ms",
-                f"- Load Balancer: {result.config.load_balancer.value}",
-                f"\n**Results:**",
-                f"- Total Requests: {result.total_requests}",
-                f"- Successful: {result.successful_requests}",
-                f"- Failed: {result.failed_requests}",
-                f"- Duration: {result.total_duration_sec:.2f}s",
-                f"- Throughput: {result.throughput_rps:.2f} req/s",
-                f"- Avg Latency: {result.avg_latency_ms:.2f}ms",
-                f"- P50 Latency: {result.p50_latency_ms:.2f}ms",
-                f"- P95 Latency: {result.p95_latency_ms:.2f}ms",
-                f"- P99 Latency: {result.p99_latency_ms:.2f}ms",
-                "\n",
-            ])
+            report_lines.extend(
+                [
+                    f"### {result.name}",
+                    f"\n**Configuration:**",
+                    f"- Requests: {result.config.num_requests}",
+                    f"- Providers: {result.config.num_providers}",
+                    f"- Concurrency: {result.config.concurrency}",
+                    f"- Latency: {result.config.latency_ms}ms",
+                    f"- Load Balancer: {result.config.load_balancer.value}",
+                    f"\n**Results:**",
+                    f"- Total Requests: {result.total_requests}",
+                    f"- Successful: {result.successful_requests}",
+                    f"- Failed: {result.failed_requests}",
+                    f"- Duration: {result.total_duration_sec:.2f}s",
+                    f"- Throughput: {result.throughput_rps:.2f} req/s",
+                    f"- Avg Latency: {result.avg_latency_ms:.2f}ms",
+                    f"- P50 Latency: {result.p50_latency_ms:.2f}ms",
+                    f"- P95 Latency: {result.p95_latency_ms:.2f}ms",
+                    f"- P99 Latency: {result.p99_latency_ms:.2f}ms",
+                    "\n",
+                ]
+            )
 
         # Performance improvements
-        report_lines.extend([
-            "## Performance Analysis",
-            "\n### Key Findings",
-        ])
+        report_lines.extend(
+            [
+                "## Performance Analysis",
+                "\n### Key Findings",
+            ]
+        )
 
         if len(self.results) >= 2:
             baseline = self.results[0]
             pool_3 = self.results[1]
 
             throughput_improvement = (
-                (pool_3.throughput_rps - baseline.throughput_rps)
-                / baseline.throughput_rps * 100
+                (pool_3.throughput_rps - baseline.throughput_rps) / baseline.throughput_rps * 100
                 if baseline.throughput_rps > 0
                 else 0
             )
 
             latency_reduction = (
-                (baseline.avg_latency_ms - pool_3.avg_latency_ms)
-                / baseline.avg_latency_ms * 100
+                (baseline.avg_latency_ms - pool_3.avg_latency_ms) / baseline.avg_latency_ms * 100
                 if baseline.avg_latency_ms > 0
                 else 0
             )
 
-            report_lines.extend([
-                f"- **Throughput Improvement:** {throughput_improvement:.1f}% "
-                f"({baseline.throughput_rps:.2f} → {pool_3.throughput_rps:.2f} req/s)",
-                f"- **Latency Reduction:** {latency_reduction:.1f}% "
-                f"({baseline.avg_latency_ms:.2f}ms → {pool_3.avg_latency_ms:.2f}ms)",
-            ])
+            report_lines.extend(
+                [
+                    f"- **Throughput Improvement:** {throughput_improvement:.1f}% "
+                    f"({baseline.throughput_rps:.2f} → {pool_3.throughput_rps:.2f} req/s)",
+                    f"- **Latency Reduction:** {latency_reduction:.1f}% "
+                    f"({baseline.avg_latency_ms:.2f}ms → {pool_3.avg_latency_ms:.2f}ms)",
+                ]
+            )
 
         report_lines.append("\n### Load Balancer Comparison")
 
         # Extract load balancer comparison results
-        lb_results = [
-            r for r in self.results
-            if r.name.startswith("lb_comparison_")
-        ]
+        lb_results = [r for r in self.results if r.name.startswith("lb_comparison_")]
 
         if lb_results:
             best_throughput = max(lb_results, key=lambda r: r.throughput_rps)
             lowest_latency = min(lb_results, key=lambda r: r.avg_latency_ms)
 
-            report_lines.extend([
-                f"- **Best Throughput:** {best_throughput.config.load_balancer.value} "
-                f"({best_throughput.throughput_rps:.2f} req/s)",
-                f"- **Lowest Latency:** {lowest_latency.config.load_balancer.value} "
-                f"({lowest_latency.avg_latency_ms:.2f}ms)",
-            ])
+            report_lines.extend(
+                [
+                    f"- **Best Throughput:** {best_throughput.config.load_balancer.value} "
+                    f"({best_throughput.throughput_rps:.2f} req/s)",
+                    f"- **Lowest Latency:** {lowest_latency.config.load_balancer.value} "
+                    f"({lowest_latency.avg_latency_ms:.2f}ms)",
+                ]
+            )
 
         # Save report
         report_path = self.output_dir / "provider_pool_benchmark_report.md"

@@ -244,16 +244,18 @@ class ChatCoordinator:
 
             event_bus = get_observability_bus()
             # Fire and forget - don't await event emission
-            asyncio.create_task(event_bus.emit(
-                topic="state.task.requirements_extracted",
-                data={
-                    "required_files": orch._required_files,
-                    "required_outputs": orch._required_outputs,
-                    "file_count": len(orch._required_files),
-                    "output_count": len(orch._required_outputs),
-                    "category": "state",
-                },
-            ))
+            asyncio.create_task(
+                event_bus.emit(
+                    topic="state.task.requirements_extracted",
+                    data={
+                        "required_files": orch._required_files,
+                        "required_outputs": orch._required_outputs,
+                        "file_count": len(orch._required_files),
+                        "output_count": len(orch._required_outputs),
+                        "category": "state",
+                    },
+                )
+            )
 
         # Iteration limits - kept as read-only local references for readability
         max_total_iterations = stream_ctx.max_total_iterations
@@ -309,7 +311,9 @@ class ChatCoordinator:
                     "Only explore if absolutely necessary to complete the task.",
                 )
 
-        goals = orch._tool_planner.infer_goals_from_message(user_message) if orch._tool_planner else []
+        goals = (
+            orch._tool_planner.infer_goals_from_message(user_message) if orch._tool_planner else []
+        )
 
         # Log all limits for debugging
         logger.info(
@@ -505,7 +509,9 @@ class ChatCoordinator:
                         completed=False,
                     )
                     if orch._chunk_generator:
-                        yield orch._chunk_generator.generate_content_chunk(fallback_msg, is_final=True)
+                        yield orch._chunk_generator.generate_content_chunk(
+                            fallback_msg, is_final=True
+                        )
                     return
 
             # Record tool calls in progress tracker for loop detection
@@ -577,7 +583,9 @@ class ChatCoordinator:
                 # Check UnifiedTaskTracker for stop decision via recovery coordinator
                 recovery_ctx = self._create_recovery_context(stream_ctx)
                 if orch._recovery_coordinator is not None:
-                    was_triggered, hint = orch._recovery_coordinator.check_force_action(recovery_ctx)
+                    was_triggered, hint = orch._recovery_coordinator.check_force_action(
+                        recovery_ctx
+                    )
                     if was_triggered:
                         logger.info(
                             f"UnifiedTaskTracker forcing action: {hint}, "
@@ -768,7 +776,9 @@ class ChatCoordinator:
             orch._sequence_tracker.clear_history()
 
         # PERF: Start background compaction for async context management
-        if orch._context_manager is not None and hasattr(orch._context_manager, "start_background_compaction"):
+        if orch._context_manager is not None and hasattr(
+            orch._context_manager, "start_background_compaction"
+        ):
             await orch._context_manager.start_background_compaction(interval_seconds=15.0)
 
         # Local aliases for frequently-used values
@@ -968,10 +978,7 @@ class ChatCoordinator:
         orch = self._orch()
 
         # Wire reminder_manager dependency if not already set
-        if (
-            orch.task_coordinator is not None
-            and orch.task_coordinator._reminder_manager is None
-        ):
+        if orch.task_coordinator is not None and orch.task_coordinator._reminder_manager is None:
             orch.task_coordinator.set_reminder_manager(orch.reminder_manager)
 
         # Delegate to TaskCoordinator
@@ -1343,9 +1350,7 @@ class ChatCoordinator:
         """
         orch = self._orch()
         unique_resources = (
-            orch.unified_tracker.unique_resources
-            if orch.unified_tracker is not None
-            else set()
+            orch.unified_tracker.unique_resources if orch.unified_tracker is not None else set()
         )
         logger.debug(
             f"Iteration {stream_ctx.total_iterations}/{max_total_iterations}: "
@@ -2149,19 +2154,19 @@ class ChatCoordinator:
                 current_temperature=getattr(orch, "temperature", 0.7),
                 quality_score=stream_ctx.last_quality_score,
                 task_type=(
-                getattr(orch._task_tracker, "current_task_type", "general")
-                if hasattr(orch, "_task_tracker")
-                else "general"
+                    getattr(orch._task_tracker, "current_task_type", "general")
+                    if hasattr(orch, "_task_tracker")
+                    else "general"
                 ),
                 is_analysis_task=(
-                getattr(orch._task_tracker, "is_analysis_task", False)
-                if hasattr(orch, "_task_tracker")
-                else False
+                    getattr(orch._task_tracker, "is_analysis_task", False)
+                    if hasattr(orch, "_task_tracker")
+                    else False
                 ),
                 is_action_task=(
-                getattr(orch._task_tracker, "is_action_task", False)
-                if hasattr(orch, "_task_tracker")
-                else False
+                    getattr(orch._task_tracker, "is_action_task", False)
+                    if hasattr(orch, "_task_tracker")
+                    else False
                 ),
                 context_utilization=None,
             )

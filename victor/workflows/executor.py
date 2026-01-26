@@ -964,9 +964,7 @@ class WorkflowExecutor:
                 node_id=node.id,
                 status=ExecutorNodeStatus.FAILED,
                 error=(
-                    str(retry_result.exception)
-                    if retry_result.exception
-                    else "Retry exhausted"
+                    str(retry_result.exception) if retry_result.exception else "Retry exhausted"
                 ),
                 duration_seconds=time.time() - start_time,
             )
@@ -1354,7 +1352,9 @@ class WorkflowExecutor:
 
             if node.parallel and len(allowed_tools) > 1:
                 # Execute tools in parallel
-                async def execute_tool(tool_name: str, exec_context: dict[str, Any]) -> tuple[Any, Any]:
+                async def execute_tool(
+                    tool_name: str, exec_context: dict[str, Any]
+                ) -> tuple[Any, Any]:
                     try:
                         result = await asyncio.wait_for(
                             self.tool_registry.execute(

@@ -50,8 +50,7 @@ import requests
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -59,6 +58,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass
 class Config:
@@ -80,8 +80,7 @@ class Config:
             grafana_api_key=os.getenv("GRAFANA_API_KEY"),
             prometheus_url=os.getenv("PROMETHEUS_URL", "http://localhost:9090"),
             prometheus_config_path=os.getenv(
-                "PROMETHEUS_CONFIG_PATH",
-                "/etc/prometheus/prometheus.yml"
+                "PROMETHEUS_CONFIG_PATH", "/etc/prometheus/prometheus.yml"
             ),
             dashboard_dir=Path(__file__).parent.parent.parent / "observability" / "dashboards",
             alerts_dir=Path(__file__).parent.parent.parent / "observability" / "alerts",
@@ -92,6 +91,7 @@ class Config:
 # =============================================================================
 # Dashboard Provisioning
 # =============================================================================
+
 
 class GrafanaClient:
     """Client for interacting with Grafana API."""
@@ -107,14 +107,15 @@ class GrafanaClient:
         self.base_url = f"{config.grafana_url}/api"
 
         if config.grafana_api_key:
-            self.session.headers.update({
-                "Authorization": f"Bearer {config.grafana_api_key}",
-                "Content-Type": "application/json"
-            })
+            self.session.headers.update(
+                {
+                    "Authorization": f"Bearer {config.grafana_api_key}",
+                    "Content-Type": "application/json",
+                }
+            )
         else:
             logger.warning(
-                "No GRAFANA_API_KEY provided. "
-                "Authentication will fail if Grafana requires it."
+                "No GRAFANA_API_KEY provided. " "Authentication will fail if Grafana requires it."
             )
 
     def health_check(self) -> bool:
@@ -163,15 +164,10 @@ class GrafanaClient:
                 "access": "proxy",
                 "url": self.config.prometheus_url,
                 "isDefault": True,
-                "jsonData": {
-                    "httpMethod": "POST"
-                }
+                "jsonData": {"httpMethod": "POST"},
             }
 
-            response = self.session.post(
-                f"{self.base_url}/datasources",
-                json=datasource_payload
-            )
+            response = self.session.post(f"{self.base_url}/datasources", json=datasource_payload)
 
             if response.status_code in (200, 201):
                 logger.info("Prometheus datasource created successfully")
@@ -212,29 +208,18 @@ class GrafanaClient:
                 )
                 return True
 
-            response = self.session.get(
-                f"{self.base_url}/dashboards/uid/{dashboard_uid}"
-            )
+            response = self.session.get(f"{self.base_url}/dashboards/uid/{dashboard_uid}")
 
-            payload = {
-                "overwrite": True,
-                "dashboard": dashboard_data
-            }
+            payload = {"overwrite": True, "dashboard": dashboard_data}
 
             if response.status_code == 200:
                 # Update existing dashboard
                 logger.info(f"Updating dashboard: {dashboard_title}")
-                response = self.session.post(
-                    f"{self.base_url}/dashboards/db",
-                    json=payload
-                )
+                response = self.session.post(f"{self.base_url}/dashboards/db", json=payload)
             else:
                 # Create new dashboard
                 logger.info(f"Creating dashboard: {dashboard_title}")
-                response = self.session.post(
-                    f"{self.base_url}/dashboards/db",
-                    json=payload
-                )
+                response = self.session.post(f"{self.base_url}/dashboards/db", json=payload)
 
             if response.status_code in (200, 201):
                 logger.info(f"Dashboard provisioned successfully: {dashboard_title}")
@@ -272,6 +257,7 @@ class GrafanaClient:
 # Prometheus Rules
 # =============================================================================
 
+
 class PrometheusManager:
     """Manager for Prometheus alerting rules."""
 
@@ -301,9 +287,7 @@ class PrometheusManager:
                 return True
 
             result = subprocess.run(
-                ["promtool", "check", "rules", str(rules_file)],
-                capture_output=True,
-                text=True
+                ["promtool", "check", "rules", str(rules_file)], capture_output=True, text=True
             )
 
             if result.returncode == 0:
@@ -357,7 +341,7 @@ class PrometheusManager:
                 return True
 
             # Add rules file to config
-            rule_files_section = "\nrule_files:\n  - \"" + rules_file_str + "\"\n"
+            rule_files_section = '\nrule_files:\n  - "' + rules_file_str + '"\n'
 
             # Insert rule_files section if it doesn't exist
             if "rule_files:" not in config_content:
@@ -366,18 +350,15 @@ class PrometheusManager:
                     # Find end of global section
                     global_end = config_content.find("\n\n", config_content.find("global:"))
                     config_content = (
-                        config_content[:global_end] +
-                        rule_files_section +
-                        config_content[global_end:]
+                        config_content[:global_end]
+                        + rule_files_section
+                        + config_content[global_end:]
                     )
                 else:
                     config_content = rule_files_section + config_content
             else:
                 # Append to existing rule_files section
-                config_content = config_content.replace(
-                    "rule_files:",
-                    rule_files_section.strip()
-                )
+                config_content = config_content.replace("rule_files:", rule_files_section.strip())
 
             # Backup existing config
             backup_path = config_path.with_suffix(".yml.bak")
@@ -392,10 +373,8 @@ class PrometheusManager:
 
             # Reload Prometheus
             import subprocess
-            subprocess.run(
-                ["killall", "-HUP", "prometheus"],
-                check=False
-            )
+
+            subprocess.run(["killall", "-HUP", "prometheus"], check=False)
             logger.info("Sent HUP signal to Prometheus for reload")
 
             return True
@@ -408,6 +387,7 @@ class PrometheusManager:
 # =============================================================================
 # Dashboard Validation
 # =============================================================================
+
 
 class DashboardValidator:
     """Validator for Grafana dashboards."""
@@ -464,10 +444,8 @@ class DashboardValidator:
 # Main Setup
 # =============================================================================
 
-def setup_dashboards(
-    config: Config,
-    dashboard_filter: Optional[str] = None
-) -> int:
+
+def setup_dashboards(config: Config, dashboard_filter: Optional[str] = None) -> int:
     """Setup Grafana dashboards and Prometheus rules.
 
     Args:
@@ -503,10 +481,7 @@ def setup_dashboards(
     dashboard_files = list(config.dashboard_dir.glob("*.json"))
 
     if dashboard_filter:
-        dashboard_files = [
-            f for f in dashboard_files
-            if dashboard_filter in f.name
-        ]
+        dashboard_files = [f for f in dashboard_files if dashboard_filter in f.name]
 
     for dashboard_file in dashboard_files:
         errors = validator.validate_dashboard(dashboard_file)
@@ -560,37 +535,31 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Victor Observability Dashboard Setup",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
 
     parser.add_argument(
-        "--dashboard",
-        type=str,
-        help="Specific dashboard to provision (e.g., team_overview)"
+        "--dashboard", type=str, help="Specific dashboard to provision (e.g., team_overview)"
     )
 
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print what would be done without making changes"
+        "--dry-run", action="store_true", help="Print what would be done without making changes"
     )
 
     parser.add_argument(
         "--grafana-url",
         type=str,
-        help="Grafana server URL (default: GRAFANA_URL env var or http://localhost:3000)"
+        help="Grafana server URL (default: GRAFANA_URL env var or http://localhost:3000)",
     )
 
     parser.add_argument(
-        "--grafana-api-key",
-        type=str,
-        help="Grafana API key (default: GRAFANA_API_KEY env var)"
+        "--grafana-api-key", type=str, help="Grafana API key (default: GRAFANA_API_KEY env var)"
     )
 
     parser.add_argument(
         "--prometheus-url",
         type=str,
-        help="Prometheus server URL (default: PROMETHEUS_URL env var or http://localhost:9090)"
+        help="Prometheus server URL (default: PROMETHEUS_URL env var or http://localhost:9090)",
     )
 
     args = parser.parse_args()

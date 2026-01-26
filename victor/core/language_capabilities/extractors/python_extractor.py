@@ -353,9 +353,11 @@ class PythonASTExtractor:
             ast.parse(code)
             return []
         except SyntaxError as e:
-            return [{
-                "line": e.lineno or 1,
-                "column": e.offset or 0,
-                "message": str(e.msg),
-                "text": e.text,
-            }]
+            return [
+                {
+                    "line": e.lineno or 1,
+                    "column": e.offset or 0,
+                    "message": str(e.msg),
+                    "text": e.text,
+                }
+            ]

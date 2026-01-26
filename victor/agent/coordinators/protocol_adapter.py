@@ -65,6 +65,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_selector import ToolSelector
     from victor.agent.protocols import ToolAccessContext
     from victor.agent.prompts.system import SystemPromptBuilder
+
     # Conversation is not in the conversation module, use Any as fallback
     Conversation: Any = Any
 

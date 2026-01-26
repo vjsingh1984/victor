@@ -112,7 +112,6 @@ PROVIDER_CONFIG: Dict[str, Dict[str, Any]] = {
         "cost_tier": "free",
         "description": "Local GGUF inference",
     },
-
     # === Premium Cloud Providers ===
     "anthropic": {
         "class": AnthropicProvider,
@@ -201,7 +200,6 @@ PROVIDER_CONFIG: Dict[str, Dict[str, Any]] = {
         "cost_tier": "premium",
         "description": "DeepSeek models",
     },
-
     # === Free-Tier Cloud Providers ===
     "groqcloud": {
         "class": GroqProvider,
@@ -276,7 +274,6 @@ PROVIDER_CONFIG: Dict[str, Dict[str, Any]] = {
         "cost_tier": "free",
         "description": "Cerebras (free tier)",
     },
-
     # === Additional Providers ===
     "huggingface": {
         "class": HuggingFaceProvider,
@@ -443,8 +440,7 @@ def _create_provider_fixture(provider_name: str):
 
                 if not model:
                     pytest.skip(
-                        f"No Ollama model found. "
-                        f"Run: ollama pull {config['models'][0]}"
+                        f"No Ollama model found. " f"Run: ollama pull {config['models'][0]}"
                     )
 
                 provider = OllamaProvider(
@@ -490,7 +486,7 @@ def _create_provider_fixture(provider_name: str):
                     test_response = await provider.chat(
                         messages=[Message(role="user", content="Hi")],
                         model=config["model"],
-                        max_tokens=5
+                        max_tokens=5,
                     )
 
                     if not test_response or not test_response.content:
@@ -501,35 +497,42 @@ def _create_provider_fixture(provider_name: str):
                     error_str = str(e).lower()
 
                     # Check for specific error patterns
-                    if any(pattern in error_str for pattern in [
-                        "invalid", "unauthorized", "401", "403",
-                        "authentication", "forbidden"
-                    ]):
-                        pytest.skip(
-                            f"{provider_name}: Invalid API key ({str(e)[:80]})"
-                        )
-                    elif any(pattern in error_str for pattern in [
-                        "billing", "payment", "credit", "quota", "limit",
-                        "insufficient", "balance", "suspended"
-                    ]):
-                        pytest.skip(
-                            f"{provider_name}: Billing/credit issue ({str(e)[:80]})"
-                        )
-                    elif any(pattern in error_str for pattern in [
-                        "rate limit", "429", "too many requests"
-                    ]):
-                        pytest.skip(
-                            f"{provider_name}: Rate limit ({str(e)[:80]})"
-                        )
+                    if any(
+                        pattern in error_str
+                        for pattern in [
+                            "invalid",
+                            "unauthorized",
+                            "401",
+                            "403",
+                            "authentication",
+                            "forbidden",
+                        ]
+                    ):
+                        pytest.skip(f"{provider_name}: Invalid API key ({str(e)[:80]})")
+                    elif any(
+                        pattern in error_str
+                        for pattern in [
+                            "billing",
+                            "payment",
+                            "credit",
+                            "quota",
+                            "limit",
+                            "insufficient",
+                            "balance",
+                            "suspended",
+                        ]
+                    ):
+                        pytest.skip(f"{provider_name}: Billing/credit issue ({str(e)[:80]})")
+                    elif any(
+                        pattern in error_str
+                        for pattern in ["rate limit", "429", "too many requests"]
+                    ):
+                        pytest.skip(f"{provider_name}: Rate limit ({str(e)[:80]})")
                     else:
-                        pytest.skip(
-                            f"{provider_name}: API key error ({str(e)[:80]})"
-                        )
+                        pytest.skip(f"{provider_name}: API key error ({str(e)[:80]})")
 
             except Exception as e:
-                pytest.skip(
-                    f"{provider_name}: Failed to create provider ({str(e)[:80]})"
-                )
+                pytest.skip(f"{provider_name}: Failed to create provider ({str(e)[:80]})")
 
         yield provider
 
@@ -669,25 +672,14 @@ TIMEOUT_XLONG = 180  # Complex workflows, file operations
 
 def pytest_configure(config):
     """Configure pytest markers."""
+    config.addinivalue_line("markers", "real_execution: Mark test as real execution (no mocks)")
+    config.addinivalue_line("markers", "cloud_provider: Mark test as cloud provider test")
+    config.addinivalue_line("markers", "benchmark: Mark test as performance benchmark")
     config.addinivalue_line(
-        "markers",
-        "real_execution: Mark test as real execution (no mocks)"
+        "markers", "requires_provider(provider): Mark test as requiring specific provider"
     )
     config.addinivalue_line(
-        "markers",
-        "cloud_provider: Mark test as cloud provider test"
-    )
-    config.addinivalue_line(
-        "markers",
-        "benchmark: Mark test as performance benchmark"
-    )
-    config.addinivalue_line(
-        "markers",
-        "requires_provider(provider): Mark test as requiring specific provider"
-    )
-    config.addinivalue_line(
-        "markers",
-        "integration: Integration test (may require external services)"
+        "markers", "integration: Integration test (may require external services)"
     )
 
 
@@ -703,8 +695,7 @@ def pytest_collection_modifyitems(items, config):
         # Skip real_execution tests if no provider is available
         if item.get_closest_marker("real_execution"):
             has_any_provider = is_ollama_running() or any(
-                has_provider_api_key(p)
-                for p in PROVIDER_CONFIG.keys()
+                has_provider_api_key(p) for p in PROVIDER_CONFIG.keys()
             )
 
             if not has_any_provider:
@@ -747,15 +738,15 @@ def pytest_runtest_makereport(item, call):
                     provider_name = provider_param._provider_name
 
             # Store timeout info for reporting
-            item.user_properties.append((
-                "timeout_info",
-                f"Test timed out for provider: {provider_name}"
-            ))
+            item.user_properties.append(
+                ("timeout_info", f"Test timed out for provider: {provider_name}")
+            )
 
 
 # =============================================================================
 # Explicit Provider Fixtures (pytest-asyncio compatible)
 # =============================================================================
+
 
 @pytest_asyncio.fixture
 async def ollama_provider():

@@ -256,9 +256,7 @@ def validate_tool_dependency_yaml(data: Dict[str, Any]) -> List[str]:
                     if "weight" not in target:
                         errors.append(f"transitions.{source}[{i}]: missing 'weight'")
                     elif not isinstance(target["weight"], (int, float)):
-                        errors.append(
-                            f"transitions.{source}[{i}]: 'weight' must be a number"
-                        )
+                        errors.append(f"transitions.{source}[{i}]: 'weight' must be a number")
                     elif target["weight"] < 0 or target["weight"] > 1:
                         errors.append(
                             f"transitions.{source}[{i}]: 'weight' must be between 0 and 1"
@@ -305,9 +303,7 @@ def validate_tool_dependency_yaml(data: Dict[str, Any]) -> List[str]:
                     if not isinstance(weight, (int, float)):
                         errors.append(f"dependencies[{i}]: 'weight' must be a number")
                     elif weight < 0 or weight > 1:
-                        errors.append(
-                            f"dependencies[{i}]: 'weight' must be between 0 and 1"
-                        )
+                        errors.append(f"dependencies[{i}]: 'weight' must be between 0 and 1")
 
     return errors
 
@@ -347,9 +343,7 @@ def _detect_circular_dependencies(data: Dict[str, Any]) -> List[str]:
                 if has_cycle(neighbor, visited, path):
                     return True
             elif neighbor in path:
-                warnings.append(
-                    f"Circular dependency detected involving: {node} -> {neighbor}"
-                )
+                warnings.append(f"Circular dependency detected involving: {node} -> {neighbor}")
                 return True
 
         path.remove(node)
@@ -459,7 +453,9 @@ class ToolDependencyValidator:
             file_path=path,
         )
 
-    def validate_all_verticals(self, base_path: Optional[Path] = None) -> Dict[str, ValidationResult]:
+    def validate_all_verticals(
+        self, base_path: Optional[Path] = None
+    ) -> Dict[str, ValidationResult]:
         """Validate tool_dependencies.yaml across all verticals.
 
         Args:

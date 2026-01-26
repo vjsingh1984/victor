@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
     from victor.native.rust import file_ops
+
     RUST_AVAILABLE = file_ops.RUST_AVAILABLE
 except ImportError:
     RUST_AVAILABLE = False
@@ -45,10 +46,7 @@ def demo_basic_walk():
     # Walk current directory
     print("\nWalking 'victor' directory...")
     files = file_ops.walk_directory(
-        "victor",
-        patterns=["*.py"],
-        max_depth=2,
-        ignore_patterns=["__pycache__", "*.pyc"]
+        "victor", patterns=["*.py"], max_depth=2, ignore_patterns=["__pycache__", "*.pyc"]
     )
 
     print(f"Found {len(files)} Python files:")
@@ -75,10 +73,7 @@ def demo_pattern_matching():
 
     for name, pattern in patterns.items():
         files = file_ops.walk_directory(
-            ".",
-            patterns=pattern,
-            max_depth=1,
-            ignore_patterns=["__pycache__", ".git"]
+            ".", patterns=pattern, max_depth=1, ignore_patterns=["__pycache__", ".git"]
         )
         print(f"\n{name}: {len(files)} files")
         if files:
@@ -99,7 +94,7 @@ def demo_parallel_traversal():
             "victor",
             patterns=["*"],
             max_depth=max_depth,
-            ignore_patterns=["__pycache__", "*.pyc", ".git"]
+            ignore_patterns=["__pycache__", "*.pyc", ".git"],
         )
         elapsed = time.time() - start
 
@@ -114,10 +109,7 @@ def demo_filtering():
 
     # Get all files
     all_files = file_ops.walk_directory(
-        ".",
-        patterns=["*"],
-        max_depth=1,
-        ignore_patterns=["__pycache__", ".git", "*.so"]
+        ".", patterns=["*"], max_depth=1, ignore_patterns=["__pycache__", ".git", "*.so"]
     )
 
     print(f"\nTotal files found: {len(all_files)}")
@@ -128,11 +120,7 @@ def demo_filtering():
 
     # Filter by size
     small_files = file_ops.filter_files_by_size(all_files, max_size=1024)
-    medium_files = file_ops.filter_files_by_size(
-        all_files,
-        min_size=1024,
-        max_size=10 * 1024
-    )
+    medium_files = file_ops.filter_files_by_size(all_files, min_size=1024, max_size=10 * 1024)
     large_files = file_ops.filter_files_by_size(all_files, min_size=10 * 1024)
 
     print(f"Small files (< 1KB): {len(small_files)}")
@@ -148,10 +136,7 @@ def demo_metadata_collection():
 
     # Get some Python files
     py_files = file_ops.walk_directory(
-        "victor",
-        patterns=["*.py"],
-        max_depth=2,
-        ignore_patterns=["__pycache__"]
+        "victor", patterns=["*.py"], max_depth=2, ignore_patterns=["__pycache__"]
     )
 
     if py_files:
@@ -169,8 +154,10 @@ def demo_metadata_collection():
             print(f"  - {Path(m.path).name}")
             print(f"    Size: {m.size} bytes")
             print(f"    Modified: {m.modified}")
-            print(f"    Permissions: file={m.is_file}, dir={m.is_dir}, "
-                  f"symlink={m.is_symlink}, readonly={m.is_readonly}")
+            print(
+                f"    Permissions: file={m.is_file}, dir={m.is_dir}, "
+                f"symlink={m.is_symlink}, readonly={m.is_readonly}"
+            )
 
 
 def demo_directory_stats():
@@ -181,18 +168,17 @@ def demo_directory_stats():
 
     # Get stats for victor directory
     print("\nAnalyzing 'victor' directory...")
-    stats = file_ops.get_directory_statistics(
-        "victor",
-        max_depth=3
-    )
+    stats = file_ops.get_directory_statistics("victor", max_depth=3)
 
-    print(f"\nTotal size: {stats['total_size']:,} bytes "
-          f"({stats['total_size'] / 1024 / 1024:.2f} MB)")
+    print(
+        f"\nTotal size: {stats['total_size']:,} bytes "
+        f"({stats['total_size'] / 1024 / 1024:.2f} MB)"
+    )
     print(f"File count: {stats['file_count']:,}")
     print(f"Directory count: {stats['dir_count']:,}")
 
     print("\nLargest files:")
-    for path, size in stats['largest_files'][:5]:
+    for path, size in stats["largest_files"][:5]:
         print(f"  - {Path(path).name}: {size:,} bytes")
 
 
@@ -204,10 +190,7 @@ def demo_grouping():
 
     # Get Python files
     py_files = file_ops.walk_directory(
-        "victor",
-        patterns=["*.py"],
-        max_depth=2,
-        ignore_patterns=["__pycache__"]
+        "victor", patterns=["*.py"], max_depth=2, ignore_patterns=["__pycache__"]
     )
 
     # Group by directory
@@ -216,11 +199,7 @@ def demo_grouping():
     print(f"\nFound {len(grouped)} directories with Python files")
 
     # Show top 5 directories
-    sorted_dirs = sorted(
-        grouped.items(),
-        key=lambda x: len(x[1]),
-        reverse=True
-    )[:5]
+    sorted_dirs = sorted(grouped.items(), key=lambda x: len(x[1]), reverse=True)[:5]
 
     for dir_path, files in sorted_dirs:
         print(f"\n{dir_path}:")
@@ -242,23 +221,14 @@ def demo_time_filtering():
     one_week_ago = int(time_module.time()) - 604800
 
     all_files = file_ops.walk_directory(
-        ".",
-        patterns=["*.py", "*.md", "*.txt"],
-        max_depth=1,
-        ignore_patterns=["__pycache__"]
+        ".", patterns=["*.py", "*.md", "*.txt"], max_depth=1, ignore_patterns=["__pycache__"]
     )
 
-    recent_files = file_ops.filter_files_by_modified_time(
-        all_files,
-        since=one_week_ago
-    )
+    recent_files = file_ops.filter_files_by_modified_time(all_files, since=one_week_ago)
 
     print(f"\nFiles modified in last week: {len(recent_files)}")
 
-    very_recent = file_ops.filter_files_by_modified_time(
-        all_files,
-        since=one_day_ago
-    )
+    very_recent = file_ops.filter_files_by_modified_time(all_files, since=one_day_ago)
 
     print(f"Files modified in last 24 hours: {len(very_recent)}")
 
@@ -267,6 +237,7 @@ def demo_time_filtering():
         for f in very_recent[:5]:
             if f.modified:
                 import datetime
+
                 mod_time = datetime.datetime.fromtimestamp(f.modified)
                 print(f"  - {Path(f.path).name}: {mod_time.strftime('%Y-%m-%d %H:%M')}")
 
@@ -279,10 +250,7 @@ def demo_code_discovery():
 
     # Find all code files
     print("\nFinding code files in 'victor' directory...")
-    code_files = file_ops.find_code_files(
-        "victor",
-        max_depth=2
-    )
+    code_files = file_ops.find_code_files("victor", max_depth=2)
 
     # Group by extension
     ext_counts = {}
@@ -308,10 +276,7 @@ def demo_performance_comparison():
     print("\nRust implementation:")
     start = time.time()
     rust_files = file_ops.walk_directory(
-        "victor",
-        patterns=["*.py"],
-        max_depth=3,
-        ignore_patterns=["__pycache__", "*.pyc"]
+        "victor", patterns=["*.py"], max_depth=3, ignore_patterns=["__pycache__", "*.pyc"]
     )
     rust_time = time.time() - start
     print(f"  Found {len(rust_files)} files in {rust_time:.3f}s")
@@ -367,6 +332,7 @@ def main():
     except Exception as e:
         print(f"\nERROR: {e}")
         import traceback
+
         traceback.print_exc()
 
 

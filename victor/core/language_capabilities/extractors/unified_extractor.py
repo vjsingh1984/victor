@@ -111,8 +111,7 @@ class UnifiedLanguageExtractor(BaseLanguageProcessor):
             symbols = self._try_extraction(method, code, file_path, cap.name)
             if symbols:
                 logger.debug(
-                    f"Extracted {len(symbols)} symbols from {file_path} "
-                    f"using {method.value}"
+                    f"Extracted {len(symbols)} symbols from {file_path} " f"using {method.value}"
                 )
                 return symbols
 
@@ -151,9 +150,7 @@ class UnifiedLanguageExtractor(BaseLanguageProcessor):
                 return []
 
         except Exception as e:
-            logger.warning(
-                f"Extraction failed with {method.value} for {language}: {e}"
-            )
+            logger.warning(f"Extraction failed with {method.value} for {language}: {e}")
             return []
 
     def _extract_native(

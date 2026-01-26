@@ -1114,7 +1114,9 @@ def create_hitl_router(
         return {"requests": [r.to_dict() for r in pending], "count": len(pending)}
 
     @router.get("/requests/{request_id}")
-    async def get_request(request_id: str, authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    async def get_request(
+        request_id: str, authorization: Optional[str] = Header(None)
+    ) -> Dict[str, Any]:
         """Get a specific HITL request."""
         await verify_auth(authorization)
         stored = await hitl_store.get_request(request_id)

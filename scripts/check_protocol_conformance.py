@@ -35,6 +35,7 @@ sys.path.insert(0, str(project_root))
 
 class Severity(Enum):
     """Violation severity levels."""
+
     ERROR = "ERROR"
     WARNING = "WARNING"
     INFO = "INFO"
@@ -408,6 +409,7 @@ class ProtocolConformanceChecker:
             # Try from victor.protocols
             try:
                 from victor import protocols
+
                 return getattr(protocols, protocol_name)
             except AttributeError:
                 raise ImportError(f"Cannot import protocol: {protocol_name}")
@@ -492,14 +494,14 @@ class ProtocolConformanceChecker:
             print("\nNon-Compliant Components:")
             for report in self.reports:
                 if not report.is_compliant:
-                    print(f"  - {report.component_name} ({report.error_count} errors, {report.warning_count} warnings)")
+                    print(
+                        f"  - {report.component_name} ({report.error_count} errors, {report.warning_count} warnings)"
+                    )
 
 
 def main() -> int:
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Check protocol conformance for Victor components"
-    )
+    parser = argparse.ArgumentParser(description="Check protocol conformance for Victor components")
     parser.add_argument(
         "--vertical",
         type=Path,
@@ -516,7 +518,8 @@ def main() -> int:
         help="Check all verticals in victor/",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable verbose output",
     )
@@ -534,7 +537,9 @@ def main() -> int:
     if args.all_verticals:
         # Check all verticals
         victor_dir = Path("victor")
-        vertical_dirs = [d for d in victor_dir.iterdir() if d.is_dir() and not d.name.startswith("_")]
+        vertical_dirs = [
+            d for d in victor_dir.iterdir() if d.is_dir() and not d.name.startswith("_")
+        ]
 
         for vertical_dir in vertical_dirs:
             # Skip non-vertical directories

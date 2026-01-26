@@ -457,7 +457,9 @@ class DIContainer:
 
             # Skip 'self' parameter for methods
             if list(parameters.keys()) and list(parameters.keys())[0] == "self":
-                parameters = dict[str, Parameter]({k: v for k, v in parameters.items() if k != "self"})
+                parameters = dict[str, Parameter](
+                    {k: v for k, v in parameters.items() if k != "self"}
+                )
 
             # Build kwargs with resolved dependencies
             kwargs = {}

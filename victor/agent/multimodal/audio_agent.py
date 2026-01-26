@@ -1107,7 +1107,9 @@ Summary:"""
         for audio_path in audio_paths:
             try:
                 if operation == "transcribe":
-                    result: TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None = await self.transcribe_audio(audio_path, **kwargs)
+                    result: (
+                        TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None
+                    ) = await self.transcribe_audio(audio_path, **kwargs)
                 elif operation == "analyze":
                     result = await self.analyze_audio(audio_path)
                 elif operation == "detect_language":

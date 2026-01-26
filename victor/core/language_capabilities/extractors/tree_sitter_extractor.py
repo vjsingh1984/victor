@@ -149,6 +149,7 @@ class TreeSitterExtractor:
         """Check if tree-sitter is available."""
         try:
             import tree_sitter
+
             return True
         except ImportError:
             logger.warning("tree-sitter not available, falling back to no-op extraction")
@@ -259,14 +260,10 @@ class TreeSitterExtractor:
         # Get language-specific query
         query_src = SYMBOL_QUERIES.get(language)
         if query_src:
-            symbols.extend(
-                self._extract_with_query(tree, file_path, language, query_src)
-            )
+            symbols.extend(self._extract_with_query(tree, file_path, language, query_src))
         else:
             # Fall back to generic extraction
-            symbols.extend(
-                self._extract_generic(tree.root_node, file_path)
-            )
+            symbols.extend(self._extract_generic(tree.root_node, file_path))
 
         return symbols
 
@@ -421,12 +418,14 @@ class TreeSitterExtractor:
             self._collect_errors(tree.root_node, errors)
             return errors
         except Exception as e:
-            return [{
-                "line": 1,
-                "column": 0,
-                "message": str(e),
-                "type": "parse_error",
-            }]
+            return [
+                {
+                    "line": 1,
+                    "column": 0,
+                    "message": str(e),
+                    "type": "parse_error",
+                }
+            ]
 
     def _collect_errors(
         self,
@@ -435,21 +434,25 @@ class TreeSitterExtractor:
     ) -> None:
         """Collect error nodes from tree."""
         if node.type == "ERROR":
-            errors.append({
-                "line": node.start_point[0] + 1,
-                "column": node.start_point[1],
-                "end_line": node.end_point[0] + 1,
-                "end_column": node.end_point[1],
-                "message": "Syntax error",
-                "type": "error",
-            })
+            errors.append(
+                {
+                    "line": node.start_point[0] + 1,
+                    "column": node.start_point[1],
+                    "end_line": node.end_point[0] + 1,
+                    "end_column": node.end_point[1],
+                    "message": "Syntax error",
+                    "type": "error",
+                }
+            )
         elif node.is_missing:
-            errors.append({
-                "line": node.start_point[0] + 1,
-                "column": node.start_point[1],
-                "message": f"Missing: {node.type}",
-                "type": "missing",
-            })
+            errors.append(
+                {
+                    "line": node.start_point[0] + 1,
+                    "column": node.start_point[1],
+                    "message": f"Missing: {node.type}",
+                    "type": "missing",
+                }
+            )
 
         for child in node.children:
             self._collect_errors(child, errors)

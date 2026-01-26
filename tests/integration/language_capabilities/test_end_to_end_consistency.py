@@ -56,8 +56,7 @@ class TestIndexingValidationConsistency:
             # If indexing is supported, validation should be too
             if index_method is not None:
                 assert validate_method is not None, (
-                    f"Language {lang} supports indexing ({index_method}) "
-                    f"but not validation"
+                    f"Language {lang} supports indexing ({index_method}) " f"but not validation"
                 )
 
     def test_same_capability_used_for_both_operations(self, registry):
@@ -73,11 +72,13 @@ class TestIndexingValidationConsistency:
             if cap.native_ast is not None:
                 # Check it's in at least one strategy
                 has_native_in_strategy = (
-                    ASTAccessMethod.NATIVE in cap.indexing_strategy or
-                    ASTAccessMethod.NATIVE in cap.validation_strategy
+                    ASTAccessMethod.NATIVE in cap.indexing_strategy
+                    or ASTAccessMethod.NATIVE in cap.validation_strategy
                 )
                 # Native AST should be used somewhere
-                assert has_native_in_strategy or cap.native_ast.access_method != ASTAccessMethod.NATIVE
+                assert (
+                    has_native_in_strategy or cap.native_ast.access_method != ASTAccessMethod.NATIVE
+                )
 
     def test_tier_classification_matches_capabilities(self, registry):
         """Tier classification should match available capabilities."""
@@ -93,14 +94,14 @@ class TestIndexingValidationConsistency:
                 )
             elif cap.tier == LanguageTier.TIER_2:
                 # Tier 2 should have at least tree-sitter or native
-                assert cap.tree_sitter is not None or cap.native_ast is not None, (
-                    f"Tier 2 language {lang} should have tree-sitter or native AST"
-                )
+                assert (
+                    cap.tree_sitter is not None or cap.native_ast is not None
+                ), f"Tier 2 language {lang} should have tree-sitter or native AST"
             elif cap.tier == LanguageTier.TIER_3:
                 # Tier 3 should at least have tree-sitter
-                assert cap.tree_sitter is not None, (
-                    f"Tier 3 language {lang} should have tree-sitter"
-                )
+                assert (
+                    cap.tree_sitter is not None
+                ), f"Tier 3 language {lang} should have tree-sitter"
 
     def test_validation_works_for_all_languages(self, registry, validator):
         """Validation should work for all registered languages."""
@@ -131,14 +132,10 @@ class TestIndexingValidationConsistency:
             result = validator.validate(code, file_path, language=lang)
 
             # Result should have the correct language
-            assert result.language == lang, (
-                f"Validation result language mismatch for {lang}"
-            )
+            assert result.language == lang, f"Validation result language mismatch for {lang}"
 
             # Valid code should pass validation
-            assert result.is_valid, (
-                f"Valid {lang} code failed validation: {result.errors}"
-            )
+            assert result.is_valid, f"Valid {lang} code failed validation: {result.errors}"
 
     def test_invalid_code_detected_by_validation(self, registry, validator):
         """Invalid code should be detected by validation."""
@@ -161,12 +158,8 @@ class TestIndexingValidationConsistency:
             result = validator.validate(code, file_path, language=lang)
 
             # Invalid code should fail validation
-            assert not result.is_valid, (
-                f"Invalid {lang} code passed validation when it should fail"
-            )
-            assert len(result.errors) > 0, (
-                f"Invalid {lang} code should have errors"
-            )
+            assert not result.is_valid, f"Invalid {lang} code passed validation when it should fail"
+            assert len(result.errors) > 0, f"Invalid {lang} code should have errors"
 
 
 class TestConfigLanguageValidation:
@@ -301,9 +294,9 @@ class TestRegistrySingleSourceOfTruth:
                     assert cap.name == expected_lang
             else:
                 assert cap is not None, f"No capability for {file_path}"
-                assert cap.name == expected_lang, (
-                    f"Expected {expected_lang}, got {cap.name} for {file_path}"
-                )
+                assert (
+                    cap.name == expected_lang
+                ), f"Expected {expected_lang}, got {cap.name} for {file_path}"
 
     def test_extension_mapping_unique(self, registry):
         """Each extension should map to exactly one language."""

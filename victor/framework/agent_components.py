@@ -480,6 +480,7 @@ class AgentBuilder:
 
             # Use the factory function directly instead of getting from container
             from victor.framework.service_provider import _create_tool_configurator
+
             service_impl = _create_tool_configurator(self._container)
             return cast(ToolConfiguratorService, service_impl)
         except Exception as e:
@@ -500,6 +501,7 @@ class AgentBuilder:
 
             # Use the factory function directly instead of getting from container
             from victor.framework.service_provider import _create_event_registry
+
             service_impl = _create_event_registry(self._container)
             return cast(EventRegistryService, service_impl)
         except Exception as e:

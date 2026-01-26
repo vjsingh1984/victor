@@ -1389,6 +1389,7 @@ class ToolPipeline:
 
         # Execute graph
         from typing import cast
+
         result = cast(PipelineExecutionResult, await self._graph_engine.execute(graph, context))
 
         # Record execution time

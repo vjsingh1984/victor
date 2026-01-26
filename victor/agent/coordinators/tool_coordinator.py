@@ -642,7 +642,7 @@ class ToolCoordinator:
                 return cached, True, None
 
         retry_enabled = self._config.retry_enabled
-        max_retry_attempts = getattr(self._config, 'max_retry_attempts', 3)
+        max_retry_attempts = getattr(self._config, "max_retry_attempts", 3)
         max_attempts = max_retry_attempts if retry_enabled else 1
         base_delay = self._config.retry_base_delay
         max_delay = self._config.retry_max_delay
@@ -651,9 +651,9 @@ class ToolCoordinator:
         for attempt in range(max_attempts):
             try:
                 # Use the correct method name from ToolPipeline
-                execute_method = getattr(self._pipeline, '_execute_single_call', None)
+                execute_method = getattr(self._pipeline, "_execute_single_call", None)
                 if execute_method is None:
-                    execute_method = getattr(self._pipeline, '_execute_single_tool', None)
+                    execute_method = getattr(self._pipeline, "_execute_single_tool", None)
                 if execute_method is None:
                     raise AttributeError("ToolPipeline missing execute method")
                 result = await execute_method(tool_name, tool_args, context)

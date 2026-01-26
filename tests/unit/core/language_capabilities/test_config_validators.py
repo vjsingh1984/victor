@@ -214,19 +214,19 @@ class TestXmlValidator:
 
     def test_invalid_xml_unclosed_tag(self, validator, temp_dir):
         """Test validation fails for unclosed XML tag."""
-        code = '<root><item>test</root>'  # Missing </item>
+        code = "<root><item>test</root>"  # Missing </item>
         result = validator.validate(code, temp_dir / "test.xml")
         assert result.is_valid is False
 
     def test_invalid_xml_mismatched_tags(self, validator, temp_dir):
         """Test validation fails for mismatched tags."""
-        code = '<root><item>test</other></root>'
+        code = "<root><item>test</other></root>"
         result = validator.validate(code, temp_dir / "test.xml")
         assert result.is_valid is False
 
     def test_error_has_position(self, validator, temp_dir):
         """Test that errors include position information."""
-        code = '<root>\n<item>test</root>'
+        code = "<root>\n<item>test</root>"
         result = validator.validate(code, temp_dir / "test.xml")
         assert result.is_valid is False
         assert result.errors[0].line >= 1
@@ -380,7 +380,7 @@ class TestUnifiedValidatorConfigIntegration:
         file_path = temp_dir / "test.yaml"
 
         # Valid YAML
-        result = validator.validate('key: value\nlist:\n  - item1\n  - item2', file_path)
+        result = validator.validate("key: value\nlist:\n  - item1\n  - item2", file_path)
         assert result.is_valid is True
 
     def test_xml_validation_direct(self, temp_dir):
@@ -389,11 +389,11 @@ class TestUnifiedValidatorConfigIntegration:
         file_path = temp_dir / "test.xml"
 
         # Valid XML
-        result = validator.validate('<root><item>test</item></root>', file_path)
+        result = validator.validate("<root><item>test</item></root>", file_path)
         assert result.is_valid is True
 
         # Invalid XML
-        result = validator.validate('<root><item>test</root>', file_path)
+        result = validator.validate("<root><item>test</root>", file_path)
         assert result.is_valid is False
         assert len(result.errors) > 0
 
@@ -403,5 +403,5 @@ class TestUnifiedValidatorConfigIntegration:
             validator = get_config_validator(lang)
             assert validator is not None, f"No validator for {lang}"
             # All should have is_available method
-            assert hasattr(validator, 'is_available')
-            assert hasattr(validator, 'validate')
+            assert hasattr(validator, "is_available")
+            assert hasattr(validator, "validate")

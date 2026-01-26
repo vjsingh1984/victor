@@ -83,13 +83,17 @@ class CompiledWorkflowExecutor:
             )
         else:
             from typing import cast
-            return cast("ExecutionResultProtocol", ExecutionResult(
-                final_state=initial_state,
-                metrics={
-                    "duration_seconds": 0.0,
-                    "nodes_executed": 0,
-                },
-            ))
+
+            return cast(
+                "ExecutionResultProtocol",
+                ExecutionResult(
+                    final_state=initial_state,
+                    metrics={
+                        "duration_seconds": 0.0,
+                        "nodes_executed": 0,
+                    },
+                ),
+            )
 
     async def stream(
         self,

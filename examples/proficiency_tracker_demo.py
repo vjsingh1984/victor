@@ -77,10 +77,7 @@ def main():
     logger.info(f"  Found {len(trajectory)} trajectory points for code_review")
     if trajectory:
         latest = trajectory[-1]
-        logger.info(
-            f"    Latest: {latest.success_rate:.1%} success, "
-            f"{latest.trend} trend"
-        )
+        logger.info(f"    Latest: {latest.success_rate:.1%} success, " f"{latest.trend} trend")
 
     # 5. Get top proficiencies
     logger.info("\n5. Top 5 proficiencies...")
@@ -94,9 +91,7 @@ def main():
     for tool in weaknesses:
         score = tracker.get_proficiency(tool)
         if score:
-            logger.info(
-                f"  {tool}: {score.success_rate:.1%} success rate (needs improvement)"
-            )
+            logger.info(f"  {tool}: {score.success_rate:.1%} success rate (needs improvement)")
 
     # 7. Manual proficiency update
     logger.info("\n7. Manually updating proficiency...")

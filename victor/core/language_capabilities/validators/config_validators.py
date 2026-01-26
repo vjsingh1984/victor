@@ -98,6 +98,7 @@ class YamlValidator:
         self._yaml_available = False
         try:
             import yaml
+
             self._yaml = yaml
             self._yaml_available = True
         except ImportError:
@@ -131,10 +132,10 @@ class YamlValidator:
             message = str(e)
 
             # Extract position information if available
-            if hasattr(e, 'problem_mark') and e.problem_mark:
+            if hasattr(e, "problem_mark") and e.problem_mark:
                 line = e.problem_mark.line + 1
                 column = e.problem_mark.column
-                message = e.problem if hasattr(e, 'problem') else str(e)
+                message = e.problem if hasattr(e, "problem") else str(e)
 
             result = CodeValidationResult(
                 is_valid=False,
@@ -169,12 +170,14 @@ class TomlValidator:
         # Try tomllib (Python 3.11+) first
         try:
             import tomllib
+
             self._toml_module = tomllib
             self._toml_available = True
         except ImportError:
             # Fall back to tomli
             try:
                 import tomli
+
                 self._toml_module = tomli
                 self._toml_available = True
             except ImportError:
@@ -207,9 +210,9 @@ class TomlValidator:
             message = str(e)
 
             # Extract line number from error message if available
-            if hasattr(e, 'lineno'):
+            if hasattr(e, "lineno"):
                 line = e.lineno
-            if hasattr(e, 'colno'):
+            if hasattr(e, "colno"):
                 column = e.colno
 
             result = CodeValidationResult(
@@ -243,6 +246,7 @@ class HoconValidator:
 
         try:
             from pyhocon import ConfigFactory
+
             self._config_factory = ConfigFactory
             self._hocon_available = True
         except ImportError:
@@ -276,7 +280,8 @@ class HoconValidator:
 
             # Try to extract line number from error message
             import re
-            line_match = re.search(r'line\s+(\d+)', message, re.IGNORECASE)
+
+            line_match = re.search(r"line\s+(\d+)", message, re.IGNORECASE)
             if line_match:
                 line = int(line_match.group(1))
 
@@ -365,12 +370,14 @@ class MarkdownValidator:
 
         try:
             from markdown_it import MarkdownIt
+
             self._md = MarkdownIt()
             self._md_available = True
         except ImportError:
             # Try mistune as fallback
             try:
                 import mistune
+
                 self._mistune = mistune
                 self._md_available = True
             except ImportError:
@@ -392,10 +399,10 @@ class MarkdownValidator:
             return self._ts_validator.validate(code, file_path, "markdown", config)
 
         try:
-            if hasattr(self, '_md'):
+            if hasattr(self, "_md"):
                 # markdown-it-py
                 self._md.parse(code)
-            elif hasattr(self, '_mistune'):
+            elif hasattr(self, "_mistune"):
                 # mistune
                 self._mistune.html(code)
 

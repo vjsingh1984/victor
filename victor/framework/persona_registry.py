@@ -639,10 +639,12 @@ def persona(
             result = func(*args, **kwargs)
             # Cast to PersonaSpec since we're decorating functions that return it
             from typing import cast
+
             return cast(PersonaSpec, result)
 
         # Cast wrapper back to F to maintain type compatibility
         from typing import cast
+
         return cast(F, wrapper)
 
     return decorator

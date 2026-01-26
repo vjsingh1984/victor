@@ -96,7 +96,7 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
             category="custom",
         )
         # Add to scanner's patterns by extending it
-        if not hasattr(self, '_custom_patterns'):
+        if not hasattr(self, "_custom_patterns"):
             self._custom_patterns: List[SafetyPattern] = []
         self._custom_patterns.append(custom_pattern)
 
@@ -107,7 +107,7 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
             List of safety patterns for dangerous bash commands
         """
         base_patterns = self._scanner.all_patterns
-        if hasattr(self, '_custom_patterns'):
+        if hasattr(self, "_custom_patterns"):
             return base_patterns + self._custom_patterns
         return base_patterns
 

@@ -223,7 +223,9 @@ class TestCanonicalWorkflowAPI:
                 await provider.run_compiled_workflow("nonexistent", {})
 
     @pytest.mark.asyncio
-    async def test_stream_compiled_workflow_raises_for_unknown_workflow(self, all_providers) -> None:
+    async def test_stream_compiled_workflow_raises_for_unknown_workflow(
+        self, all_providers
+    ) -> None:
         """Test stream_compiled_workflow raises ValueError for unknown workflow."""
         for name, provider in all_providers:
             try:

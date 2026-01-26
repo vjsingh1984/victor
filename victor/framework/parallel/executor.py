@@ -771,6 +771,7 @@ class ParallelExecutorHandler:
         # If node has handler tasks, use those
         elif hasattr(node, "tasks") and node.tasks:
             from typing import cast
+
             tasks = cast(List[TaskInput[Any]], node.tasks)
 
         return tasks

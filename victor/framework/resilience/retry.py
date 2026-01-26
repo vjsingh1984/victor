@@ -218,7 +218,8 @@ class RetryHandler:
                 if retry_cfg.non_retryable_exceptions:
                     # Filter to only Exception types (not BaseException)
                     non_retryable = set(
-                        exc for exc in retry_cfg.non_retryable_exceptions
+                        exc
+                        for exc in retry_cfg.non_retryable_exceptions
                         if issubclass(exc, Exception)
                     )
 

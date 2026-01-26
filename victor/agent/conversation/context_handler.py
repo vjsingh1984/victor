@@ -100,7 +100,7 @@ class ContextOverflowHandler(IContextOverflowHandler):
             )
 
             # Delegate to controller for compaction
-            if hasattr(self._controller, 'compact_context'):
+            if hasattr(self._controller, "compact_context"):
                 metrics = self._controller.compact_context(
                     strategy=strategy,
                     target_ratio=target_ratio,

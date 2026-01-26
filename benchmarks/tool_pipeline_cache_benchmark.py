@@ -30,11 +30,9 @@ class BenchmarkToolExecutor(ToolExecutor):
         await asyncio.sleep(self.latency_ms / 1000.0)
         self.call_count += 1
         # Return a proper result object with all required attributes
-        return type('Result', (), {
-            'success': True,
-            'result': f"Executed {tool_name}",
-            'error': None
-        })
+        return type(
+            "Result", (), {"success": True, "result": f"Executed {tool_name}", "error": None}
+        )
 
 
 async def benchmark_with_cache(
@@ -159,8 +157,7 @@ async def run_benchmark():
     print("-" * 70)
 
     tool_calls_unique = [
-        {"name": f"tool{i}", "arguments": {"path": f"/test/file{i}.txt"}}
-        for i in range(100)
+        {"name": f"tool{i}", "arguments": {"path": f"/test/file{i}.txt"}} for i in range(100)
     ]
 
     cached_time = await benchmark_with_cache(tool_calls_unique, iterations=1)
@@ -180,8 +177,7 @@ async def run_benchmark():
     print("-" * 70)
 
     tool_calls_mixed = [
-        {"name": "read", "arguments": {"path": f"/test/file{i % 50}.txt"}}
-        for i in range(100)
+        {"name": "read", "arguments": {"path": f"/test/file{i % 50}.txt"}} for i in range(100)
     ]
 
     cached_time = await benchmark_with_cache(tool_calls_mixed, iterations=5)

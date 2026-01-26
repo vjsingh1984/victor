@@ -43,7 +43,7 @@ class JsonCompilerPlugin(WorkflowCompilerPlugin):
         result = await compiled.invoke({'input': 'data'})
     """
 
-    supported_schemes = ['json', 'json+file']
+    supported_schemes = ["json", "json+file"]
 
     def compile(
         self,
@@ -107,7 +107,7 @@ class JsonCompilerPlugin(WorkflowCompilerPlugin):
         """
         # Check if source is a file path
         if Path(source).exists():
-            with open(source, 'r') as f:
+            with open(source, "r") as f:
                 return json.load(f)
         else:
             # Parse as JSON string
@@ -122,25 +122,25 @@ class JsonCompilerPlugin(WorkflowCompilerPlugin):
         Raises:
             ValueError: If JSON structure is invalid
         """
-        required_keys = ['workflows']
+        required_keys = ["workflows"]
 
         for key in required_keys:
             if key not in data:
                 raise ValueError(f"Missing required key: {key}")
 
         # Validate workflows section
-        if not isinstance(data['workflows'], dict):
+        if not isinstance(data["workflows"], dict):
             raise ValueError("'workflows' must be a dictionary")
 
         # Validate each workflow
-        for workflow_name, workflow_def in data['workflows'].items():
+        for workflow_name, workflow_def in data["workflows"].items():
             if not isinstance(workflow_def, dict):
                 raise ValueError(f"Workflow '{workflow_name}' must be a dictionary")
 
-            if 'nodes' not in workflow_def:
+            if "nodes" not in workflow_def:
                 raise ValueError(f"Workflow '{workflow_name}' missing 'nodes' key")
 
-            if not isinstance(workflow_def['nodes'], list):
+            if not isinstance(workflow_def["nodes"], list):
                 raise ValueError(f"Workflow '{workflow_name}' 'nodes' must be a list")
 
     def _convert_to_workflow_def(self, data: Dict) -> Dict:
@@ -156,12 +156,12 @@ class JsonCompilerPlugin(WorkflowCompilerPlugin):
         # In a real plugin, you might need to transform the structure
 
         # Ensure workflow has metadata
-        for workflow_name, workflow_def in data['workflows'].items():
-            if 'metadata' not in workflow_def:
-                workflow_def['metadata'] = {}
+        for workflow_name, workflow_def in data["workflows"].items():
+            if "metadata" not in workflow_def:
+                workflow_def["metadata"] = {}
 
-            if 'version' not in workflow_def['metadata']:
-                workflow_def['metadata']['version'] = '0.5.0'
+            if "version" not in workflow_def["metadata"]:
+                workflow_def["metadata"]["version"] = "0.5.0"
 
         return data
 

@@ -251,10 +251,7 @@ class VerticalExtensionLoader(ABC):
         evicted = 0
 
         # First, remove any expired entries
-        expired_keys = [
-            key for key, entry in cls._extensions_cache.items()
-            if entry.is_expired()
-        ]
+        expired_keys = [key for key, entry in cls._extensions_cache.items() if entry.is_expired()]
         for key in expired_keys:
             del cls._extensions_cache[key]
             evicted += 1
@@ -313,7 +310,9 @@ class VerticalExtensionLoader(ABC):
                         class_name = f"{vertical_class_name}{cls_suffix}"
 
                         # Use _get_extension_factory to load the extension
-                        return cast(type[VerticalExtensionLoader], subcls)._get_extension_factory(ext_type, import_path, class_name)
+                        return cast(type[VerticalExtensionLoader], subcls)._get_extension_factory(
+                            ext_type, import_path, class_name
+                        )
 
                     return classmethod(_getter)
 
@@ -366,7 +365,9 @@ class VerticalExtensionLoader(ABC):
                                     # Return empty list on any error
                                     return []
 
-                            return cast(type[VerticalExtensionLoader], subcls)._get_cached_extension(ext_type, _create_middleware)
+                            return cast(
+                                type[VerticalExtensionLoader], subcls
+                            )._get_cached_extension(ext_type, _create_middleware)
 
                         # Special handling for composed_chains and personas
                         if ext_type in ("composed_chains", "personas"):
@@ -386,7 +387,9 @@ class VerticalExtensionLoader(ABC):
                                 except Exception:
                                     return {}
 
-                            return cast(type[VerticalExtensionLoader], subcls)._get_cached_extension(ext_type, _create_extension)
+                            return cast(
+                                type[VerticalExtensionLoader], subcls
+                            )._get_cached_extension(ext_type, _create_extension)
 
                         # Default: return None
                         return None
@@ -401,7 +404,9 @@ class VerticalExtensionLoader(ABC):
     # =========================================================================
 
     @classmethod
-    def _get_cached_extension(cls, key: str, factory: Callable[[], Any], ttl: Optional[int] = None) -> Any:
+    def _get_cached_extension(
+        cls, key: str, factory: Callable[[], Any], ttl: Optional[int] = None
+    ) -> Any:
         """Get extension from cache or create and cache it with TTL support.
 
         This helper enables fine-grained caching of individual extension
@@ -1004,10 +1009,31 @@ class VerticalExtensionLoader(ABC):
                 return [] if is_list else None
 
         # Load each extension with error handling
-        middleware = _load_extension("middleware", cls.get_middleware if hasattr(cls, "get_middleware") else (lambda: []), is_list=True)
-        safety = _load_extension("safety", cls.get_safety_extension if hasattr(cls, "get_safety_extension") else (lambda: None))
-        prompt = _load_extension("prompt", cls.get_prompt_contributor if hasattr(cls, "get_prompt_contributor") else (lambda: None))
-        mode_config = _load_extension("mode_config", cls.get_mode_config_provider if hasattr(cls, "get_mode_config_provider") else (lambda: None))
+        middleware = _load_extension(
+            "middleware",
+            cls.get_middleware if hasattr(cls, "get_middleware") else (lambda: []),
+            is_list=True,
+        )
+        safety = _load_extension(
+            "safety",
+            cls.get_safety_extension if hasattr(cls, "get_safety_extension") else (lambda: None),
+        )
+        prompt = _load_extension(
+            "prompt",
+            (
+                cls.get_prompt_contributor
+                if hasattr(cls, "get_prompt_contributor")
+                else (lambda: None)
+            ),
+        )
+        mode_config = _load_extension(
+            "mode_config",
+            (
+                cls.get_mode_config_provider
+                if hasattr(cls, "get_mode_config_provider")
+                else (lambda: None)
+            ),
+        )
         tool_deps = _load_extension("tool_deps", cls.get_tool_dependency_provider)
         workflow = _load_extension("workflow", cls.get_workflow_provider)
         service = _load_extension("service", cls.get_service_provider)
@@ -1037,7 +1063,9 @@ class VerticalExtensionLoader(ABC):
                 )
         except Exception as e:
             # Dynamic extensions are optional - don't fail if registry not available
-            logger.debug(f"Could not load dynamic extensions for vertical '{cls.name if hasattr(cls, 'name') else cls.__name__}': {e}")
+            logger.debug(
+                f"Could not load dynamic extensions for vertical '{cls.name if hasattr(cls, 'name') else cls.__name__}': {e}"
+            )
 
         # Check for critical failures (strict mode or required extensions)
         critical_errors = [e for e in errors if is_strict or e.is_required]
@@ -1206,7 +1234,9 @@ class VerticalExtensionLoader(ABC):
         cache_prefix = f"{cls.__name__}:"
 
         with cls._cache_lock:
-            entries = [(k, v) for k, v in cls._extensions_cache.items() if k.startswith(cache_prefix)]
+            entries = [
+                (k, v) for k, v in cls._extensions_cache.items() if k.startswith(cache_prefix)
+            ]
 
             if not entries:
                 return {

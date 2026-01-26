@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # Check if libclang is available
 try:
     import clang.cindex as cindex
+
     LIBCLANG_AVAILABLE = True
 except ImportError:
     LIBCLANG_AVAILABLE = False
@@ -209,13 +210,15 @@ class CppValidator:
         except Exception as e:
             logger.debug(f"{language.upper()} parsing error for {file_path}: {e}")
 
-            issues.append(ValidationIssue(
-                line=1,
-                column=0,
-                message=str(e),
-                severity=ValidationSeverity.ERROR,
-                source="libclang",
-            ))
+            issues.append(
+                ValidationIssue(
+                    line=1,
+                    column=0,
+                    message=str(e),
+                    severity=ValidationSeverity.ERROR,
+                    source="libclang",
+                )
+            )
 
             return CodeValidationResult(
                 is_valid=False,

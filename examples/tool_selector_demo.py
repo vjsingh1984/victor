@@ -45,10 +45,7 @@ def main():
 
     # Category mapping
     categories = ["file_ops", "search", "execution", "git", "analysis"]
-    tool_category_map = {
-        name: categories[i % len(categories)]
-        for i, name in enumerate(tool_names)
-    }
+    tool_category_map = {name: categories[i % len(categories)] for i, name in enumerate(tool_names)}
 
     print(f"Query embedding: {len(query)} dimensions")
     print(f"Tools: {num_tools}")
@@ -96,9 +93,7 @@ def main():
 
     allowed_categories = {"file_ops", "git"}
     start = time.perf_counter()
-    filtered = accelerator.filter_by_category(
-        tool_names, allowed_categories, tool_category_map
-    )
+    filtered = accelerator.filter_by_category(tool_names, allowed_categories, tool_category_map)
     duration = (time.perf_counter() - start) * 1000
 
     print(f"Filtered to {len(filtered)} tools in {duration:.3f}ms")

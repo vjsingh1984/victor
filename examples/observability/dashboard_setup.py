@@ -32,8 +32,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -41,6 +40,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 class DashboardConfig:
     """Configuration for dashboard setup."""
@@ -73,7 +73,7 @@ class DashboardConfig:
                 "1. Open Grafana: %s\n"
                 "2. Go to Configuration → API Keys\n"
                 "3. Create new key with Admin role",
-                self.grafana_url
+                self.grafana_url,
             )
 
         if not self.dashboards_dir.exists():
@@ -90,6 +90,7 @@ class DashboardConfig:
 # =============================================================================
 # Health Checks
 # =============================================================================
+
 
 class HealthChecker:
     """Health checker for monitoring stack."""
@@ -109,10 +110,7 @@ class HealthChecker:
             True if Prometheus is healthy
         """
         try:
-            response = requests.get(
-                f"{self.config.prometheus_url}/-/healthy",
-                timeout=5
-            )
+            response = requests.get(f"{self.config.prometheus_url}/-/healthy", timeout=5)
             if response.status_code == 200:
                 logger.info("✓ Prometheus is healthy")
                 return True
@@ -131,10 +129,7 @@ class HealthChecker:
             True if Grafana is healthy
         """
         try:
-            response = requests.get(
-                f"{self.config.grafana_url}/api/health",
-                timeout=5
-            )
+            response = requests.get(f"{self.config.grafana_url}/api/health", timeout=5)
             if response.status_code == 200:
                 logger.info("✓ Grafana is healthy")
                 return True
@@ -153,10 +148,7 @@ class HealthChecker:
             True if metrics are available
         """
         try:
-            response = requests.get(
-                f"{self.config.victor_metrics_url}/metrics",
-                timeout=5
-            )
+            response = requests.get(f"{self.config.victor_metrics_url}/metrics", timeout=5)
             if response.status_code == 200:
                 # Check for team metrics
                 if "victor_teams_executed_total" in response.text:
@@ -183,17 +175,16 @@ class HealthChecker:
             True if scrape target exists
         """
         try:
-            response = requests.get(
-                f"{self.config.prometheus_url}/api/v1/targets",
-                timeout=5
-            )
+            response = requests.get(f"{self.config.prometheus_url}/api/v1/targets", timeout=5)
             if response.status_code == 200:
                 targets = response.json().get("data", {}).get("activeTargets", [])
                 for target in targets:
                     if self.config.victor_metrics_url in target.get("scrapeUrl", ""):
                         health = target.get("health", "unknown")
                         if health == "up":
-                            logger.info(f"✓ Prometheus is scraping Victor metrics (health: {health})")
+                            logger.info(
+                                f"✓ Prometheus is scraping Victor metrics (health: {health})"
+                            )
                             return True
                         else:
                             logger.warning(
@@ -248,6 +239,7 @@ class HealthChecker:
 # Dashboard Provisioning
 # =============================================================================
 
+
 class DashboardProvisioner:
     """Provision Grafana dashboards."""
 
@@ -260,10 +252,12 @@ class DashboardProvisioner:
         self.config = config
         self.session = requests.Session()
         if config.grafana_api_key:
-            self.session.headers.update({
-                "Authorization": f"Bearer {config.grafana_api_key}",
-                "Content-Type": "application/json"
-            })
+            self.session.headers.update(
+                {
+                    "Authorization": f"Bearer {config.grafana_api_key}",
+                    "Content-Type": "application/json",
+                }
+            )
 
     def ensure_datasource(self) -> bool:
         """Ensure Prometheus datasource exists in Grafana.
@@ -293,15 +287,10 @@ class DashboardProvisioner:
                 "access": "proxy",
                 "url": self.config.prometheus_url,
                 "isDefault": True,
-                "jsonData": {
-                    "httpMethod": "POST"
-                }
+                "jsonData": {"httpMethod": "POST"},
             }
 
-            response = self.session.post(
-                f"{self.config.grafana_url}/api/datasources",
-                json=payload
-            )
+            response = self.session.post(f"{self.config.grafana_url}/api/datasources", json=payload)
             response.raise_for_status()
 
             logger.info("✓ Prometheus datasource created")
@@ -333,14 +322,10 @@ class DashboardProvisioner:
 
             logger.info(f"Provisioning dashboard: {dashboard_title} (uid: {dashboard_uid})")
 
-            payload = {
-                "overwrite": True,
-                "dashboard": dashboard_data
-            }
+            payload = {"overwrite": True, "dashboard": dashboard_data}
 
             response = self.session.post(
-                f"{self.config.grafana_url}/api/dashboards/db",
-                json=payload
+                f"{self.config.grafana_url}/api/dashboards/db", json=payload
             )
             response.raise_for_status()
 
@@ -395,6 +380,7 @@ class DashboardProvisioner:
 # =============================================================================
 # Main Setup
 # =============================================================================
+
 
 def main():
     """Main entry point."""

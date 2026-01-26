@@ -884,7 +884,9 @@ class EnhancedRLCoordinator(Generic[S, A]):
         self.policy_grad_returns: List[float] = []  # For Monte Carlo returns
 
         # Experience replay buffer
-        self.replay_buffer: ExperienceReplayBuffer[S, A] = ExperienceReplayBuffer(capacity=replay_buffer_size)
+        self.replay_buffer: ExperienceReplayBuffer[S, A] = ExperienceReplayBuffer(
+            capacity=replay_buffer_size
+        )
 
         # Target network for stable learning
         self.target_network = TargetNetwork(update_frequency=target_network_update_freq)

@@ -46,8 +46,10 @@ class TestBatchedObservabilityIntegration:
     @pytest.fixture
     def mock_emitter(self, emitted_batches):
         """Create a mock emitter that tracks batches."""
+
         async def emitter(events: List[Dict[str, Any]]) -> None:
             emitted_batches.append(events)
+
         return emitter
 
     @pytest.mark.asyncio
@@ -226,8 +228,10 @@ class TestImmediateStrategy:
     @pytest.fixture
     def mock_emitter(self, emitted_batches):
         """Create a mock emitter that tracks batches."""
+
         async def emitter(events: List[Dict[str, Any]]) -> None:
             emitted_batches.append(events)
+
         return emitter
 
     @pytest.mark.asyncio

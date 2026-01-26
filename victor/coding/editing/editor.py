@@ -403,9 +403,7 @@ class FileEditor:
             if not hook.can_validate(path):
                 continue
 
-            should_proceed, result = hook.validate_before_write_sync(
-                content, path, strict=strict
-            )
+            should_proceed, result = hook.validate_before_write_sync(content, path, strict=strict)
 
             if not should_proceed:
                 has_errors = True
@@ -415,20 +413,14 @@ class FileEditor:
                         f"  [red]Line {issue.line}:{issue.column}[/] {issue.message}"
                     )
                 if strict:
-                    self.console.print(
-                        "[yellow]Strict validation mode - blocking commit[/]"
-                    )
+                    self.console.print("[yellow]Strict validation mode - blocking commit[/]")
                     return False
             elif result.warnings:
                 for issue in result.warnings:
-                    self.console.print(
-                        f"  [yellow]⚠ {op.path}:{issue.line}[/] {issue.message}"
-                    )
+                    self.console.print(f"  [yellow]⚠ {op.path}:{issue.line}[/] {issue.message}")
 
         if has_errors and not strict:
-            self.console.print(
-                "\n[yellow]⚠ Validation warnings found, proceeding anyway[/]"
-            )
+            self.console.print("\n[yellow]⚠ Validation warnings found, proceeding anyway[/]")
 
         return True
 

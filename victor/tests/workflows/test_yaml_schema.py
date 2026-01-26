@@ -339,7 +339,9 @@ workflows:
         # $ctx. prefix is stripped during parsing
         # Check if node has input_mapping attribute
         if hasattr(node1, "input_mapping") and node1.input_mapping is not None:
-            assert "target_symbol" in str(node1.input_mapping) or "symbol" in str(node1.input_mapping)
+            assert "target_symbol" in str(node1.input_mapping) or "symbol" in str(
+                node1.input_mapping
+            )
         else:
             # If no input_mapping, the test still passes if node exists
             assert node1 is not None

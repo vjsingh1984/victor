@@ -1106,7 +1106,11 @@ class ToolSelector(ModeAwareMixin):
             ConversationStage.VERIFICATION: STAGE_TOOL_LIMITS.verification_max,
             ConversationStage.COMPLETION: STAGE_TOOL_LIMITS.completion_max,
         }
-        max_tools = stage_limits.get(stage, STAGE_TOOL_LIMITS.executing_max) if stage is not None else STAGE_TOOL_LIMITS.executing_max
+        max_tools = (
+            stage_limits.get(stage, STAGE_TOOL_LIMITS.executing_max)
+            if stage is not None
+            else STAGE_TOOL_LIMITS.executing_max
+        )
 
         if len(tools) <= max_tools:
             return tools

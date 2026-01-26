@@ -158,7 +158,9 @@ def long_running_workflow() -> Any:
 class TestStreamingWorkflowE2E:
     """End-to-end streaming workflow tests."""
 
-    async def test_stream_simple_transform_workflow(self, mock_orchestrator, three_node_workflow) -> None:
+    async def test_stream_simple_transform_workflow(
+        self, mock_orchestrator, three_node_workflow
+    ) -> None:
         """Test streaming a simple transform workflow.
 
         Verifies event sequence: START -> NODE_START -> NODE_COMPLETE (x3) -> COMPLETE
@@ -283,7 +285,9 @@ class TestStreamingWorkflowE2E:
         else:
             assert final_event.event_type == WorkflowEventType.WORKFLOW_ERROR
 
-    async def test_subscription_receives_events(self, mock_orchestrator, three_node_workflow) -> None:
+    async def test_subscription_receives_events(
+        self, mock_orchestrator, three_node_workflow
+    ) -> None:
         """Test subscription callback receives matching events.
 
         Subscribes to NODE_COMPLETE events and verifies callback invocation.
@@ -317,7 +321,9 @@ class TestStreamingWorkflowE2E:
         node_ids = {e.node_id for e in subscribed_events}
         assert node_ids == {"step_a", "step_b", "step_c"}
 
-    async def test_subscription_unsubscribe_works(self, mock_orchestrator, three_node_workflow) -> None:
+    async def test_subscription_unsubscribe_works(
+        self, mock_orchestrator, three_node_workflow
+    ) -> None:
         """Test that unsubscribe stops callback invocation."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
@@ -339,7 +345,9 @@ class TestStreamingWorkflowE2E:
         # Should not have received any events via callback
         assert call_count["value"] == 0
 
-    async def test_cancellation_stops_workflow(self, mock_orchestrator, long_running_workflow) -> None:
+    async def test_cancellation_stops_workflow(
+        self, mock_orchestrator, long_running_workflow
+    ) -> None:
         """Test cancellation properly stops streaming.
 
         Starts a long workflow and cancels mid-execution.
@@ -382,7 +390,9 @@ class TestStreamingWorkflowE2E:
         result = executor.cancel_workflow("nonexistent_workflow_id")
         assert result is False
 
-    async def test_backward_compatibility_execute(self, mock_orchestrator, three_node_workflow) -> None:
+    async def test_backward_compatibility_execute(
+        self, mock_orchestrator, three_node_workflow
+    ) -> None:
         """Test execute() still works on StreamingWorkflowExecutor.
 
         Verifies that the base class execute() method returns
@@ -455,7 +465,9 @@ class TestStreamingWorkflowE2E:
         # After completion, should return None
         assert executor.get_workflow_progress(workflow_id) is None
 
-    async def test_workflow_metadata_in_chunks(self, mock_orchestrator, three_node_workflow) -> None:
+    async def test_workflow_metadata_in_chunks(
+        self, mock_orchestrator, three_node_workflow
+    ) -> None:
         """Test that workflow metadata is included in chunks."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 

@@ -251,16 +251,8 @@ class MLOpsHandler(BaseHandler):
         model_path = node.input_mapping.get("model_path", "")
         metrics_input: Any = node.input_mapping.get("metrics", {})
         params_input: Any = node.input_mapping.get("params", {})
-        metrics: Dict[str, Any] = (
-            metrics_input
-            if isinstance(metrics_input, dict)
-            else {}
-        )
-        params: Dict[str, Any] = (
-            params_input
-            if isinstance(params_input, dict)
-            else {}
-        )
+        metrics: Dict[str, Any] = metrics_input if isinstance(metrics_input, dict) else {}
+        params: Dict[str, Any] = params_input if isinstance(params_input, dict) else {}
         experiment_name = node.input_mapping.get("experiment_name", "default")
         stage = node.input_mapping.get("stage", "Staging")
         version = node.input_mapping.get("version", "")
@@ -472,7 +464,9 @@ class MLOpsHandler(BaseHandler):
                 "error": f"Model comparison failed: {e}",
             }
 
-    def _promote_model(self, client: Any, model_name: str, version: str, stage: str) -> Dict[str, Any]:
+    def _promote_model(
+        self, client: Any, model_name: str, version: str, stage: str
+    ) -> Dict[str, Any]:
         """Promote a model version to a stage."""
         client.transition_model_version_stage(
             name=model_name,

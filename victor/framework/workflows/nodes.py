@@ -394,11 +394,11 @@ class TeamNode:
 
         # Execute via unified coordinator
         result_dict: Dict[str, Any] = await coordinator.execute_task(
-            task=team_config.goal,
-            context=team_config.shared_context or {}
+            task=team_config.goal, context=team_config.shared_context or {}
         )
         # Convert dict result to TeamResult
         from victor.teams import TeamResult
+
         return TeamResult(**result_dict)
 
     def _merge_team_result(

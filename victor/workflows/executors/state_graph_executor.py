@@ -242,6 +242,7 @@ class StateGraphExecutor(Generic[StateType]):
         @dataclass
         class _ExecutionContextImpl:
             """Concrete implementation of ExecutionContextProtocol."""
+
             _thread_id: str
             _graph_id: str
             _start_time: float
@@ -272,7 +273,7 @@ class StateGraphExecutor(Generic[StateType]):
 
         return _ExecutionContextImpl(
             _thread_id=thread_id,
-            _graph_id=getattr(self._graph, 'graph_id', None) or "unknown",
+            _graph_id=getattr(self._graph, "graph_id", None) or "unknown",
             _start_time=time.time(),
         )
 

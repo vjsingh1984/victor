@@ -29,12 +29,17 @@ def test_yaml_parsing():
 
         # Check that metadata is merged
         expected_metadata_keys = [
-            'name', 'version', 'description',
-            'vector_store', 'supported_formats',
-            'embedding_model', 'chunk_size', 'chunk_overlap'
+            "name",
+            "version",
+            "description",
+            "vector_store",
+            "supported_formats",
+            "embedding_model",
+            "chunk_size",
+            "chunk_overlap",
         ]
 
-        missing_keys = set(expected_metadata_keys) - set(data['metadata'].keys())
+        missing_keys = set(expected_metadata_keys) - set(data["metadata"].keys())
         if missing_keys:
             print(f"✗ Missing metadata keys: {missing_keys}")
             return False
@@ -91,6 +96,7 @@ def test_initialization_performance():
     except Exception as e:
         print(f"✗ Initialization test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -115,7 +121,7 @@ def test_configuration_loading():
         print(f"\n✓ Tools loaded: {len(tools)} tools")
 
         # Tools might be strings or tool objects
-        if tools and hasattr(tools[0], 'name'):
+        if tools and hasattr(tools[0], "name"):
             tool_names = [tool.name for tool in tools]
         else:
             tool_names = list(tools) if tools else []
@@ -126,7 +132,7 @@ def test_configuration_loading():
         print(f"\n✓ System prompt loaded: {len(prompt)} characters")
 
         # Verify key RAG tools are present
-        expected_tools = ['rag_search', 'rag_query', 'rag_ingest']
+        expected_tools = ["rag_search", "rag_query", "rag_ingest"]
         missing_tools = set(expected_tools) - set(tool_names)
         if missing_tools:
             print(f"\n✗ Missing expected tools: {missing_tools}")
@@ -138,6 +144,7 @@ def test_configuration_loading():
     except Exception as e:
         print(f"✗ Configuration loading test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

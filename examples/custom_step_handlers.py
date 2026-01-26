@@ -134,6 +134,7 @@ class OrderedMiddlewareHandler(BaseStepHandler):
 
     def _order_middleware(self, middleware_list: List[Any]) -> List[Any]:
         """Order middleware by priority attribute."""
+
         def get_priority(mw):
             return getattr(mw, "priority", 50)
 

@@ -21,13 +21,11 @@ class BaseLanguageProcessor(ABC):
     Uses the unified capability registry.
     """
 
-    def __init__(
-        self,
-        registry: Optional["LanguageCapabilityRegistry"] = None
-    ) -> None:
+    def __init__(self, registry: Optional["LanguageCapabilityRegistry"] = None) -> None:
         # Lazy import to avoid circular dependency
         if registry is None:
             from ..registry import LanguageCapabilityRegistry
+
             registry = LanguageCapabilityRegistry.instance()
         self._registry = registry
 
@@ -52,9 +50,7 @@ class BaseLanguageProcessor(ABC):
         pass
 
     def _get_capability(
-        self,
-        file_path: Path,
-        language: Optional[str] = None
+        self, file_path: Path, language: Optional[str] = None
     ) -> Optional["UnifiedLanguageCapability"]:
         """Get capability for file/language."""
         if language:

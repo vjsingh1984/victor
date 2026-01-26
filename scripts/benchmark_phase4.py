@@ -37,6 +37,7 @@ from victor.security.authorization_enhanced import EnhancedAuthorizer, Permissio
 
 class ExpensiveComponent:
     """Simulates expensive component initialization."""
+
     def __init__(self, load_time_ms: float = 20.0):
         time.sleep(load_time_ms / 1000.0)
         self.data = list(range(1000))
@@ -44,6 +45,7 @@ class ExpensiveComponent:
 
 class SimpleComponent:
     """Simulates simple component."""
+
     def __init__(self):
         self.data = "simple"
 
@@ -57,6 +59,7 @@ async def async_task(duration_ms: float, result: Any = None) -> Any:
 @dataclass
 class BenchmarkResult:
     """Benchmark result."""
+
     category: str
     name: str
     metric: str
@@ -70,6 +73,7 @@ class BenchmarkResult:
 @dataclass
 class BenchmarkReport:
     """Complete benchmark report."""
+
     results: List[BenchmarkResult] = field(default_factory=list)
     start_time: float = field(default_factory=time.time)
     end_time: float = 0.0
@@ -83,12 +87,12 @@ class BenchmarkReport:
         self.end_time = time.time()
         duration = self.end_time - self.start_time
 
-        print("\n" + "="*100)
+        print("\n" + "=" * 100)
         print("PHASE 4 PERFORMANCE BENCHMARK REPORT")
-        print("="*100)
+        print("=" * 100)
         print(f"Total Duration: {duration:.2f} seconds")
         print(f"Date: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print("="*100)
+        print("=" * 100)
 
         # Group results by category
         categories: Dict[str, List[BenchmarkResult]] = {}
@@ -101,18 +105,20 @@ class BenchmarkReport:
         for category, cat_results in categories.items():
             print(f"\n{'='*100}")
             print(f"{category}")
-            print('='*100)
+            print("=" * 100)
 
             # Table header
             print(f"{'Benchmark':<40} {'Metric':<20} {'Value':<15} {'Target':<10} {'Status':<10}")
-            print('-'*100)
+            print("-" * 100)
 
             for result in cat_results:
                 status = "✓ PASS" if result.passed else "✗ FAIL"
                 value_str = f"{result.value:.2f} {result.unit}"
                 target_str = f"{result.target:.2f} {result.unit}" if result.target > 0 else "N/A"
 
-                print(f"{result.name:<40} {result.metric:<20} {value_str:<15} {target_str:<10} {status:<10}")
+                print(
+                    f"{result.name:<40} {result.metric:<20} {value_str:<15} {target_str:<10} {status:<10}"
+                )
 
                 if result.details:
                     print(f"  └─ {result.details}")
@@ -124,12 +130,12 @@ class BenchmarkReport:
 
         print(f"\n{'='*100}")
         print(f"SUMMARY")
-        print('='*100)
+        print("=" * 100)
         print(f"Total Tests: {total_tests}")
         print(f"Passed: {passed_tests}")
         print(f"Failed: {total_tests - passed_tests}")
         print(f"Pass Rate: {pass_rate:.1f}%")
-        print('='*100 + "\n")
+        print("=" * 100 + "\n")
 
 
 # =============================================================================
@@ -171,16 +177,18 @@ def benchmark_lazy_loading(report: BenchmarkReport) -> None:
     avg_eager = sum(eager_times) / len(eager_times)
     improvement = ((avg_eager - avg_lazy) / avg_eager) * 100
 
-    report.add_result(BenchmarkResult(
-        category="1. Lazy Loading Performance",
-        name="Initialization Time",
-        metric="Avg Initialization",
-        value=avg_lazy,
-        unit="ms",
-        target=avg_eager * 0.8,  # Target: 20% faster
-        passed=avg_lazy < avg_eager,
-        details=f"Eager: {avg_eager:.2f}ms, Improvement: {improvement:.1f}%"
-    ))
+    report.add_result(
+        BenchmarkResult(
+            category="1. Lazy Loading Performance",
+            name="Initialization Time",
+            metric="Avg Initialization",
+            value=avg_lazy,
+            unit="ms",
+            target=avg_eager * 0.8,  # Target: 20% faster
+            passed=avg_lazy < avg_eager,
+            details=f"Eager: {avg_eager:.2f}ms, Improvement: {improvement:.1f}%",
+        )
+    )
 
     # 2. First access overhead
     print("  Testing first access overhead...")
@@ -198,16 +206,18 @@ def benchmark_lazy_loading(report: BenchmarkReport) -> None:
 
     avg_first_access = sum(first_access_times) / len(first_access_times)
 
-    report.add_result(BenchmarkResult(
-        category="1. Lazy Loading Performance",
-        name="First Access Overhead",
-        metric="Avg First Access",
-        value=avg_first_access,
-        unit="ms",
-        target=30.0,  # Target: <30ms
-        passed=avg_first_access < 30.0,
-        details="Includes component initialization time"
-    ))
+    report.add_result(
+        BenchmarkResult(
+            category="1. Lazy Loading Performance",
+            name="First Access Overhead",
+            metric="Avg First Access",
+            value=avg_first_access,
+            unit="ms",
+            target=30.0,  # Target: <30ms
+            passed=avg_first_access < 30.0,
+            details="Includes component initialization time",
+        )
+    )
 
     # 3. Cached access performance
     print("  Testing cached access performance...")
@@ -224,16 +234,18 @@ def benchmark_lazy_loading(report: BenchmarkReport) -> None:
 
     avg_cached = sum(cached_times) / len(cached_times)
 
-    report.add_result(BenchmarkResult(
-        category="1. Lazy Loading Performance",
-        name="Cached Access",
-        metric="Avg Cached Access",
-        value=avg_cached,
-        unit="ms",
-        target=1.0,  # Target: <1ms
-        passed=avg_cached < 1.0,
-        details=f"Speedup vs first access: {avg_first_access / avg_cached:.0f}x"
-    ))
+    report.add_result(
+        BenchmarkResult(
+            category="1. Lazy Loading Performance",
+            name="Cached Access",
+            metric="Avg Cached Access",
+            value=avg_cached,
+            unit="ms",
+            target=1.0,  # Target: <1ms
+            passed=avg_cached < 1.0,
+            details=f"Speedup vs first access: {avg_first_access / avg_cached:.0f}x",
+        )
+    )
 
 
 def benchmark_parallel_execution(report: BenchmarkReport) -> None:
@@ -264,16 +276,18 @@ def benchmark_parallel_execution(report: BenchmarkReport) -> None:
         speedup = sequential_time / parallel_time
         improvement = ((sequential_time - parallel_time) / sequential_time) * 100
 
-        report.add_result(BenchmarkResult(
-            category="2. Parallel Execution Performance",
-            name="Parallel Speedup",
-            metric="Speedup Factor",
-            value=speedup,
-            unit="x",
-            target=1.15,  # Target: 15% speedup
-            passed=speedup >= 1.15,
-            details=f"Sequential: {sequential_time:.0f}ms, Parallel: {parallel_time:.0f}ms, Improvement: {improvement:.1f}%"
-        ))
+        report.add_result(
+            BenchmarkResult(
+                category="2. Parallel Execution Performance",
+                name="Parallel Speedup",
+                metric="Speedup Factor",
+                value=speedup,
+                unit="x",
+                target=1.15,  # Target: 15% speedup
+                passed=speedup >= 1.15,
+                details=f"Sequential: {sequential_time:.0f}ms, Parallel: {parallel_time:.0f}ms, Improvement: {improvement:.1f}%",
+            )
+        )
 
         # 2. Adaptive strategy
         print("  Testing adaptive strategy...")
@@ -297,16 +311,18 @@ def benchmark_parallel_execution(report: BenchmarkReport) -> None:
 
         metrics = executor.get_metrics()
 
-        report.add_result(BenchmarkResult(
-            category="2. Parallel Execution Performance",
-            name="Adaptive Strategy",
-            metric="Large Task Execution",
-            value=large_time,
-            unit="ms",
-            target=1000.0,  # Reasonable target
-            passed=large_time < 1000.0,
-            details=f"Small tasks: {small_time:.0f}ms, Workers: {metrics.worker_count}, Speedup: {metrics.speedup_factor:.2f}x"
-        ))
+        report.add_result(
+            BenchmarkResult(
+                category="2. Parallel Execution Performance",
+                name="Adaptive Strategy",
+                metric="Large Task Execution",
+                value=large_time,
+                unit="ms",
+                target=1000.0,  # Reasonable target
+                passed=large_time < 1000.0,
+                details=f"Small tasks: {small_time:.0f}ms, Workers: {metrics.worker_count}, Speedup: {metrics.speedup_factor:.2f}x",
+            )
+        )
 
         # 3. Overhead measurement
         print("  Testing parallelization overhead...")
@@ -333,16 +349,18 @@ def benchmark_parallel_execution(report: BenchmarkReport) -> None:
         overhead_ms = metrics.overhead_ms
         overhead_ratio = overhead_ms / (par_time * 1000)
 
-        report.add_result(BenchmarkResult(
-            category="2. Parallel Execution Performance",
-            name="Parallelization Overhead",
-            metric="Overhead Ratio",
-            value=overhead_ratio * 100,
-            unit="%",
-            target=50.0,  # Target: <50% for micro tasks
-            passed=overhead_ratio < 0.5,
-            details=f"Overhead: {overhead_ms:.2f}ms"
-        ))
+        report.add_result(
+            BenchmarkResult(
+                category="2. Parallel Execution Performance",
+                name="Parallelization Overhead",
+                metric="Overhead Ratio",
+                value=overhead_ratio * 100,
+                unit="%",
+                target=50.0,  # Target: <50% for micro tasks
+                passed=overhead_ratio < 0.5,
+                details=f"Overhead: {overhead_ms:.2f}ms",
+            )
+        )
 
     asyncio.run(run_benchmarks())
 
@@ -378,16 +396,18 @@ def benchmark_memory_efficiency(report: BenchmarkReport) -> None:
 
     memory_saving = ((eager_current - lazy_current) / eager_current) * 100
 
-    report.add_result(BenchmarkResult(
-        category="3. Memory Efficiency",
-        name="Lazy Loading Memory Savings",
-        metric="Memory Reduction",
-        value=memory_saving,
-        unit="%",
-        target=15.0,  # Target: 15% reduction
-        passed=memory_saving >= 15.0,
-        details=f"Eager: {eager_current/1024:.1f}KB, Lazy: {lazy_current/1024:.1f}KB"
-    ))
+    report.add_result(
+        BenchmarkResult(
+            category="3. Memory Efficiency",
+            name="Lazy Loading Memory Savings",
+            metric="Memory Reduction",
+            value=memory_saving,
+            unit="%",
+            target=15.0,  # Target: 15% reduction
+            passed=memory_saving >= 15.0,
+            details=f"Eager: {eager_current/1024:.1f}KB, Lazy: {lazy_current/1024:.1f}KB",
+        )
+    )
 
     # 2. Cache management
     print("  Testing LRU cache management...")
@@ -404,16 +424,18 @@ def benchmark_memory_efficiency(report: BenchmarkReport) -> None:
 
     loaded_count = len(loader.get_loaded_components())
 
-    report.add_result(BenchmarkResult(
-        category="3. Memory Efficiency",
-        name="LRU Cache Management",
-        metric="Loaded Components",
-        value=loaded_count,
-        unit="count",
-        target=3.0,  # Should not exceed max_cache_size
-        passed=loaded_count <= 3,
-        details=f"Max cache size: 3, Registered: 10"
-    ))
+    report.add_result(
+        BenchmarkResult(
+            category="3. Memory Efficiency",
+            name="LRU Cache Management",
+            metric="Loaded Components",
+            value=loaded_count,
+            unit="count",
+            target=3.0,  # Should not exceed max_cache_size
+            passed=loaded_count <= 3,
+            details=f"Max cache size: 3, Registered: 10",
+        )
+    )
 
 
 def benchmark_persona_manager(report: BenchmarkReport) -> None:
@@ -446,16 +468,18 @@ def benchmark_persona_manager(report: BenchmarkReport) -> None:
 
     avg_load = sum(load_times) / len(load_times)
 
-    report.add_result(BenchmarkResult(
-        category="4. Persona Manager Performance",
-        name="Persona Loading",
-        metric="Avg Load Time",
-        value=avg_load,
-        unit="ms",
-        target=10.0,  # Target: <10ms
-        passed=avg_load < 10.0,
-        details="From repository"
-    ))
+    report.add_result(
+        BenchmarkResult(
+            category="4. Persona Manager Performance",
+            name="Persona Loading",
+            metric="Avg Load Time",
+            value=avg_load,
+            unit="ms",
+            target=10.0,  # Target: <10ms
+            passed=avg_load < 10.0,
+            details="From repository",
+        )
+    )
 
     # 2. Persona adaptation (with caching)
     print("  Testing persona adaptation...")
@@ -476,16 +500,18 @@ def benchmark_persona_manager(report: BenchmarkReport) -> None:
 
     avg_adapt = sum(adapt_times) / len(adapt_times)
 
-    report.add_result(BenchmarkResult(
-        category="4. Persona Manager Performance",
-        name="Persona Adaptation (Cached)",
-        metric="Avg Adapt Time",
-        value=avg_adapt,
-        unit="ms",
-        target=20.0,  # Target: <20ms
-        passed=avg_adapt < 20.0,
-        details="With caching enabled"
-    ))
+    report.add_result(
+        BenchmarkResult(
+            category="4. Persona Manager Performance",
+            name="Persona Adaptation (Cached)",
+            metric="Avg Adapt Time",
+            value=avg_adapt,
+            unit="ms",
+            target=20.0,  # Target: <20ms
+            passed=avg_adapt < 20.0,
+            details="With caching enabled",
+        )
+    )
 
     # 3. Persona merging
     print("  Testing persona merging...")
@@ -513,16 +539,18 @@ def benchmark_persona_manager(report: BenchmarkReport) -> None:
     manager.merge_personas(personas, "Merged Persona")
     merge_time = (time.perf_counter() - start) * 1000
 
-    report.add_result(BenchmarkResult(
-        category="4. Persona Manager Performance",
-        name="Persona Merging",
-        metric="Merge Time",
-        value=merge_time,
-        unit="ms",
-        target=50.0,  # Target: <50ms
-        passed=merge_time < 50.0,
-        details="Merging 3 personas"
-    ))
+    report.add_result(
+        BenchmarkResult(
+            category="4. Persona Manager Performance",
+            name="Persona Merging",
+            metric="Merge Time",
+            value=merge_time,
+            unit="ms",
+            target=50.0,  # Target: <50ms
+            passed=merge_time < 50.0,
+            details="Merging 3 personas",
+        )
+    )
 
 
 def benchmark_security_overhead(report: BenchmarkReport) -> None:
@@ -538,7 +566,7 @@ def benchmark_security_overhead(report: BenchmarkReport) -> None:
             Permission("tools", "read"),
             Permission("tools", "execute"),
             Permission("code", "write"),
-        }
+        },
     )
     user = authorizer.create_user("user1", "user1", roles=["developer"])
 
@@ -554,16 +582,18 @@ def benchmark_security_overhead(report: BenchmarkReport) -> None:
 
     avg_check = sum(check_times) / len(check_times)
 
-    report.add_result(BenchmarkResult(
-        category="5. Security Authorization Overhead",
-        name="Authorization Check",
-        metric="Avg Check Time",
-        value=avg_check,
-        unit="ms",
-        target=5.0,  # Target: <5ms
-        passed=avg_check < 5.0,
-        details="Single permission check"
-    ))
+    report.add_result(
+        BenchmarkResult(
+            category="5. Security Authorization Overhead",
+            name="Authorization Check",
+            metric="Avg Check Time",
+            value=avg_check,
+            unit="ms",
+            target=5.0,  # Target: <5ms
+            passed=avg_check < 5.0,
+            details="Single permission check",
+        )
+    )
 
     # 2. Bulk authorization checks
     print("  Testing bulk authorization checks...")
@@ -577,7 +607,7 @@ def benchmark_security_overhead(report: BenchmarkReport) -> None:
             Permission("code", "read"),
             Permission("code", "write"),
             Permission("code", "delete"),
-        }
+        },
     )
     admin_user = authorizer.create_user("admin_user", "admin_user", roles=["admin"])
 
@@ -603,16 +633,18 @@ def benchmark_security_overhead(report: BenchmarkReport) -> None:
     avg_bulk = bulk_time / len(resource_actions)
     scaling = avg_bulk / single_time
 
-    report.add_result(BenchmarkResult(
-        category="5. Security Authorization Overhead",
-        name="Bulk Authorization",
-        metric="Scaling Factor",
-        value=scaling,
-        unit="x",
-        target=2.0,  # Target: <2x scaling
-        passed=scaling < 2.0,
-        details=f"Single: {single_time:.2f}ms, Avg bulk: {avg_bulk:.2f}ms"
-    ))
+    report.add_result(
+        BenchmarkResult(
+            category="5. Security Authorization Overhead",
+            name="Bulk Authorization",
+            metric="Scaling Factor",
+            value=scaling,
+            unit="x",
+            target=2.0,  # Target: <2x scaling
+            passed=scaling < 2.0,
+            details=f"Single: {single_time:.2f}ms, Avg bulk: {avg_bulk:.2f}ms",
+        )
+    )
 
 
 # =============================================================================
@@ -622,9 +654,9 @@ def benchmark_security_overhead(report: BenchmarkReport) -> None:
 
 def main() -> int:
     """Run all benchmarks and generate report."""
-    print("="*100)
+    print("=" * 100)
     print("PHASE 4 PERFORMANCE BENCHMARK SUITE")
-    print("="*100)
+    print("=" * 100)
     print("Running comprehensive performance benchmarks on Phase 4 optimizations...")
     print("This may take several minutes...\n")
 
@@ -656,6 +688,7 @@ def main() -> int:
     except Exception as e:
         print(f"\n✗ Error running benchmarks: {e}")
         import traceback
+
         traceback.print_exc()
         return 2
 

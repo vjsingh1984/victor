@@ -567,6 +567,7 @@ async def query_filings(
         metadata_filter["symbol"] = filter_symbol.upper()
 
     from victor.agent.tool_calling.execution_context import ExecutionContext
+
     exec_ctx = ExecutionContext()
 
     result = await tool.execute(

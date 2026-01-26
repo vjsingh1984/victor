@@ -40,11 +40,8 @@ class WorkflowMigrator:
         if "StateGraph" in content or "graph = " in content:
             workflow_name = source_file.stem
             workflow["workflows"][workflow_name] = {
-                "metadata": {
-                    "version": "0.5.0",
-                    "migrated_from": "python"
-                },
-                "nodes": []
+                "metadata": {"version": "0.5.0", "migrated_from": "python"},
+                "nodes": [],
             }
 
             self.changes_made.append(f"Migrated Python workflow from {source_file}")
@@ -65,11 +62,8 @@ class WorkflowMigrator:
         # Migrate to new format
         workflow_name = old_workflow.get("name", source_file.stem)
         new_workflow["workflows"][workflow_name] = {
-            "metadata": {
-                "version": "0.5.0",
-                "migrated_from": "yaml_0.5.x"
-            },
-            "nodes": []
+            "metadata": {"version": "0.5.0", "migrated_from": "yaml_0.5.x"},
+            "nodes": [],
         }
 
         # Migrate nodes
@@ -119,7 +113,7 @@ class WorkflowMigrator:
         """Save migrated workflow to YAML file."""
         dest_file.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(dest_file, 'w') as f:
+        with open(dest_file, "w") as f:
             yaml.dump(workflow, f, default_flow_style=False, sort_keys=False)
 
         self.changes_made.append(f"Created {dest_file}")
@@ -167,9 +161,9 @@ class WorkflowMigrator:
 
     def migrate_file(self, source_file: Path) -> Dict[str, Any]:
         """Migrate a single workflow file."""
-        if source_file.suffix == '.yaml':
+        if source_file.suffix == ".yaml":
             return self.migrate_yaml_workflow(source_file)
-        elif source_file.suffix == '.py':
+        elif source_file.suffix == ".py":
             return self.migrate_python_workflow(source_file)
         else:
             print(f"Skipping unsupported file: {source_file}")
@@ -247,25 +241,12 @@ class WorkflowMigrator:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Migrate Victor workflows from 0.5.x to 0.5.0"
-    )
+    parser = argparse.ArgumentParser(description="Migrate Victor workflows from 0.5.x to 0.5.0")
     parser.add_argument(
-        "--source",
-        type=Path,
-        required=True,
-        help="Source workflow file or directory"
+        "--source", type=Path, required=True, help="Source workflow file or directory"
     )
-    parser.add_argument(
-        "--dest",
-        type=Path,
-        help="Destination directory for migrated workflows"
-    )
-    parser.add_argument(
-        "--validate",
-        type=Path,
-        help="Validate migrated workflows"
-    )
+    parser.add_argument("--dest", type=Path, help="Destination directory for migrated workflows")
+    parser.add_argument("--validate", type=Path, help="Validate migrated workflows")
 
     args = parser.parse_args()
 

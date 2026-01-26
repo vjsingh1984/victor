@@ -43,6 +43,7 @@ if TYPE_CHECKING:
 # Import StateScope at runtime for use in adapter
 try:
     from victor.agent.coordinators.state_coordinator import StateScope as ImportedStateScope
+
     StateScope = ImportedStateScope
 except ImportError:
     # Fallback for testing - create a simple type
@@ -52,6 +53,7 @@ except ImportError:
         CHECKPOINT = "checkpoint"
         ROLLBACK = "rollback"
         SNAPSHOT = "snapshot"
+
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +130,7 @@ class CoordinatorAdapter:
             # Note: This must be awaited, but this is a sync method
             # The caller should use an async context or the coordinator should handle this
             import asyncio
+
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 # We're in an async context, schedule the coroutine
@@ -155,7 +158,9 @@ class CoordinatorAdapter:
         try:
             # Get base state from StateCoordinator
             scope_value = StateScope.CHECKPOINT if isinstance(StateScope, type) else "CHECKPOINT"
-            base_state = self._state_coordinator.get_state(scope=scope_value, include_metadata=False)
+            base_state = self._state_coordinator.get_state(
+                scope=scope_value, include_metadata=False
+            )
 
             # Merge with orchestrator-specific state
             checkpoint_state = {
@@ -165,7 +170,8 @@ class CoordinatorAdapter:
                 ),
                 "message_count": len(
                     self._conversation_controller.conversation.messages
-                    if self._conversation_controller and hasattr(self._conversation_controller, 'conversation')
+                    if self._conversation_controller
+                    and hasattr(self._conversation_controller, "conversation")
                     else []
                 ),
             }

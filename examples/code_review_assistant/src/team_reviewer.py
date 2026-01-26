@@ -49,12 +49,11 @@ class TeamReviewer:
             team_roles = default_roles
 
         # Create team coordinator
-        console.print(f"[cyan]Creating {self.formation.value} team with {len(team_roles)} agents...[/cyan]\n")
-
-        coordinator = create_coordinator(
-            formation=self.formation,
-            roles=team_roles
+        console.print(
+            f"[cyan]Creating {self.formation.value} team with {len(team_roles)} agents...[/cyan]\n"
         )
+
+        coordinator = create_coordinator(formation=self.formation, roles=team_roles)
 
         # Prepare context for team
         context = {
@@ -62,15 +61,14 @@ class TeamReviewer:
             "review_config": {
                 "max_complexity": self.config.max_complexity,
                 "severity_levels": self.config.severity_levels,
-            }
+            },
         }
 
         # Execute team review
         console.print("[cyan]Agents analyzing code...[/cyan]\n")
 
         team_result = await coordinator.execute_task(
-            task="Review the code for issues and improvements",
-            context=context
+            task="Review the code for issues and improvements", context=context
         )
 
         # Aggregate results
@@ -84,8 +82,8 @@ class TeamReviewer:
                 "display_name": "Security Reviewer",
                 "description": "Focuses on security vulnerabilities and threats",
                 "persona": "You are a security expert specializing in identifying vulnerabilities, "
-                          "security flaws, and potential attack vectors in code. You check for SQL injection, "
-                          "XSS, hardcoded secrets, insecure dependencies, and authentication issues.",
+                "security flaws, and potential attack vectors in code. You check for SQL injection, "
+                "XSS, hardcoded secrets, insecure dependencies, and authentication issues.",
                 "tool_categories": ["security", "analysis"],
                 "capabilities": ["security_scan", "vulnerability_detection"],
             },
@@ -94,8 +92,8 @@ class TeamReviewer:
                 "display_name": "Quality Reviewer",
                 "description": "Focuses on code quality and maintainability",
                 "persona": "You are a code quality expert focusing on maintainability, readability, "
-                          "and best practices. You check code complexity, duplication, naming conventions, "
-                          "documentation, and adherence to SOLID principles.",
+                "and best practices. You check code complexity, duplication, naming conventions, "
+                "documentation, and adherence to SOLID principles.",
                 "tool_categories": ["analysis", "metrics"],
                 "capabilities": ["complexity_analysis", "style_check", "duplication_detection"],
             },
@@ -104,8 +102,8 @@ class TeamReviewer:
                 "display_name": "Performance Reviewer",
                 "description": "Focuses on performance optimization",
                 "persona": "You are a performance optimization expert. You identify performance bottlenecks, "
-                          "inefficient algorithms, memory leaks, database query issues, and opportunities for "
-                          "caching and optimization.",
+                "inefficient algorithms, memory leaks, database query issues, and opportunities for "
+                "caching and optimization.",
                 "tool_categories": ["analysis", "profiling"],
                 "capabilities": ["profiling", "performance_analysis", "benchmarking"],
             },

@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 try:
     import javalang
     import javalang.parser
+
     JAVALANG_AVAILABLE = True
 except ImportError:
     JAVALANG_AVAILABLE = False
@@ -127,18 +128,20 @@ class JavaValidator:
             # Try to extract position from error
             line = 1
             column = 0
-            if hasattr(e, 'at') and e.at:
-                if hasattr(e.at, 'position') and e.at.position:
+            if hasattr(e, "at") and e.at:
+                if hasattr(e.at, "position") and e.at.position:
                     line = e.at.position[0]
                     column = e.at.position[1]
 
-            issues.append(ValidationIssue(
-                line=line,
-                column=column,
-                message=error_msg,
-                severity=ValidationSeverity.ERROR,
-                source="javalang",
-            ))
+            issues.append(
+                ValidationIssue(
+                    line=line,
+                    column=column,
+                    message=error_msg,
+                    severity=ValidationSeverity.ERROR,
+                    source="javalang",
+                )
+            )
 
             return CodeValidationResult(
                 is_valid=False,
@@ -151,13 +154,15 @@ class JavaValidator:
             error_msg = str(e)
             logger.debug(f"Java parsing error for {file_path}: {error_msg}")
 
-            issues.append(ValidationIssue(
-                line=1,
-                column=0,
-                message=error_msg,
-                severity=ValidationSeverity.ERROR,
-                source="javalang",
-            ))
+            issues.append(
+                ValidationIssue(
+                    line=1,
+                    column=0,
+                    message=error_msg,
+                    severity=ValidationSeverity.ERROR,
+                    source="javalang",
+                )
+            )
 
             return CodeValidationResult(
                 is_valid=False,

@@ -550,7 +550,8 @@ class CodeAnalyzer:
                             module_doc.all_exports = [
                                 str(elt.value)
                                 for elt in node.value.elts
-                                if isinstance(elt, ast.Constant) and isinstance(elt.value, (str, bytes, int, float, bool))
+                                if isinstance(elt, ast.Constant)
+                                and isinstance(elt.value, (str, bytes, int, float, bool))
                             ]
 
         # Extract functions and classes

@@ -193,9 +193,7 @@ def get_profile(profile_name: str) -> Dict[str, Any]:
     """
     if profile_name not in LOAD_TEST_PROFILES:
         available = ", ".join(LOAD_TEST_PROFILES.keys())
-        raise ValueError(
-            f"Unknown profile '{profile_name}'. Available profiles: {available}"
-        )
+        raise ValueError(f"Unknown profile '{profile_name}'. Available profiles: {available}")
     return LOAD_TEST_PROFILES[profile_name]
 
 
@@ -261,10 +259,14 @@ def get_locust_cmd_args(profile: str = "normal") -> List[str]:
     config = get_profile(profile)
 
     args = [
-        "--host", config["host"],
-        "--users", str(config["users"]),
-        "--spawn-rate", str(config["spawn_rate"]),
-        "--run-time", config["run_time"],
+        "--host",
+        config["host"],
+        "--users",
+        str(config["users"]),
+        "--spawn-rate",
+        str(config["spawn_rate"]),
+        "--run-time",
+        config["run_time"],
     ]
 
     return args
@@ -291,8 +293,7 @@ def validate_config() -> bool:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    f"{DEFAULT_HOST}/health",
-                    timeout=aiohttp.ClientTimeout(total=5)
+                    f"{DEFAULT_HOST}/health", timeout=aiohttp.ClientTimeout(total=5)
                 ) as response:
                     return response.status < 500
         except Exception:

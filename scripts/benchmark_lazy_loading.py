@@ -119,7 +119,9 @@ for vertical in ['{verticals}']:
         sys.exit(1)
 
 print("SUCCESS")
-""".format(verticals="', '".join(self.verticals))
+""".format(
+            verticals="', '".join(self.verticals)
+        )
 
         # Measure startup time
         process = psutil.Process()
@@ -264,8 +266,10 @@ print(f"FIRST_ACCESS:{{(end - start) * 1000:.2f}}")
         # Benchmark 1: Eager startup time
         print("Benchmark 1: Measuring eager startup time...")
         eager_result = self.measure_startup_time("eager")
-        print(f"  Result: {eager_result.duration_ms:.2f}ms " +
-              (f"✓" if eager_result.success else f"✗ ({eager_result.error})"))
+        print(
+            f"  Result: {eager_result.duration_ms:.2f}ms "
+            + (f"✓" if eager_result.success else f"✗ ({eager_result.error})")
+        )
 
         # Force garbage collection between runs
         gc.collect()
@@ -273,8 +277,10 @@ print(f"FIRST_ACCESS:{{(end - start) * 1000:.2f}}")
         # Benchmark 2: Lazy startup time
         print("\nBenchmark 2: Measuring lazy startup time...")
         lazy_result = self.measure_startup_time("lazy")
-        print(f"  Result: {lazy_result.duration_ms:.2f}ms " +
-              (f"✓" if lazy_result.success else f"✗ ({lazy_result.error})"))
+        print(
+            f"  Result: {lazy_result.duration_ms:.2f}ms "
+            + (f"✓" if lazy_result.success else f"✗ ({lazy_result.error})")
+        )
 
         # Force garbage collection between runs
         gc.collect()
@@ -292,8 +298,11 @@ print(f"FIRST_ACCESS:{{(end - start) * 1000:.2f}}")
 
         # Calculate improvements
         if eager_result.success and lazy_result.success:
-            startup_improvement_pct = ((eager_result.duration_ms - lazy_result.duration_ms) /
-                                      eager_result.duration_ms * 100)
+            startup_improvement_pct = (
+                (eager_result.duration_ms - lazy_result.duration_ms)
+                / eager_result.duration_ms
+                * 100
+            )
             print(f"\n{'='*60}")
             print(f"Startup Time Improvement: {startup_improvement_pct:.1f}%")
             print(f"  Eager: {eager_result.duration_ms:.2f}ms")
@@ -301,7 +310,9 @@ print(f"FIRST_ACCESS:{{(end - start) * 1000:.2f}}")
             print(f"  Saved: {eager_result.duration_ms - lazy_result.duration_ms:.2f}ms")
 
             if first_access_results:
-                avg_first_access = sum(r.duration_ms for r in first_access_results if r.success) / len([r for r in first_access_results if r.success])
+                avg_first_access = sum(
+                    r.duration_ms for r in first_access_results if r.success
+                ) / len([r for r in first_access_results if r.success])
                 print(f"\nAverage First-Access Overhead: {avg_first_access:.2f}ms")
 
             print(f"{'='*60}\n")
@@ -332,23 +343,32 @@ def print_report_markdown(report: BenchmarkReport) -> None:
     print(f"|------|---------------|-------------|--------|")
 
     if report.eager_startup.success:
-        print(f"| Eager | {report.eager_startup.duration_ms:.2f} | "
-              f"{report.eager_startup.memory_mb:.2f} | ✓ |")
+        print(
+            f"| Eager | {report.eager_startup.duration_ms:.2f} | "
+            f"{report.eager_startup.memory_mb:.2f} | ✓ |"
+        )
     else:
         print(f"| Eager | - | - | ✗ |")
 
     if report.lazy_startup.success:
-        print(f"| Lazy  | {report.lazy_startup.duration_ms:.2f} | "
-              f"{report.lazy_startup.memory_mb:.2f} | ✓ |")
+        print(
+            f"| Lazy  | {report.lazy_startup.duration_ms:.2f} | "
+            f"{report.lazy_startup.memory_mb:.2f} | ✓ |"
+        )
     else:
         print(f"| Lazy  | - | - | ✗ |")
 
     # Calculate improvement
     if report.eager_startup.success and report.lazy_startup.success:
-        improvement = ((report.eager_startup.duration_ms - report.lazy_startup.duration_ms) /
-                      report.eager_startup.duration_ms * 100)
-        print(f"\n**Improvement:** {improvement:.1f}% faster startup "
-              f"({report.eager_startup.duration_ms - report.lazy_startup.duration_ms:.2f}ms saved)")
+        improvement = (
+            (report.eager_startup.duration_ms - report.lazy_startup.duration_ms)
+            / report.eager_startup.duration_ms
+            * 100
+        )
+        print(
+            f"\n**Improvement:** {improvement:.1f}% faster startup "
+            f"({report.eager_startup.duration_ms - report.lazy_startup.duration_ms:.2f}ms saved)"
+        )
 
     print(f"\n## First-Access Overhead\n")
     print(f"| Vertical | Duration (ms) | Status |")
@@ -416,9 +436,7 @@ def main() -> int:
     Returns:
         Exit code (0 for success, 1 for error)
     """
-    parser = argparse.ArgumentParser(
-        description="Benchmark lazy loading performance improvements"
-    )
+    parser = argparse.ArgumentParser(description="Benchmark lazy loading performance improvements")
     parser.add_argument(
         "--verticals",
         type=str,
