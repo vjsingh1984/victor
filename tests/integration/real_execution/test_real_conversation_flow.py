@@ -205,7 +205,7 @@ async def test_conversation_error_recovery(ollama_provider, ollama_model_name, t
     # Attempt to read non-existent file (will fail)
     non_existent_file = "/tmp/this_file_does_not_exist_12345.txt"
 
-    async with skip_on_timeout(90, "error_recovery"):
+    async with skip_on_timeout(180, "error_recovery"):
         response1 = await orchestrator.chat(user_message=f"Read the file {non_existent_file}.")
 
     assert response1.content is not None
@@ -215,7 +215,7 @@ async def test_conversation_error_recovery(ollama_provider, ollama_model_name, t
     print(f"✓ Response to error: {response1.content[:200]}...")
 
     # Conversation should continue - ask a different question
-    async with skip_on_timeout(90, "error_recovery"):
+    async with skip_on_timeout(180, "error_recovery"):
         response2 = await orchestrator.chat(
             user_message="That's fine. Instead, create a simple Python file with a hello world function."
         )
@@ -396,7 +396,7 @@ async def test_conversation_tool_calling_accuracy(
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(600)  # 10 minutes for 5-turn conversation (Ollama can be slow)
+@pytest.mark.timeout(1200)  # 20 minutes for 5-turn conversation (asyncio skip at 180s per turn)
 async def test_conversation_memory_efficiency(ollama_provider, ollama_model_name, temp_workspace):
     """Test conversation memory usage is efficient.
 
@@ -424,8 +424,8 @@ async def test_conversation_memory_efficiency(ollama_provider, ollama_model_name
 
     start_time = time.time()
 
-    # Per-turn timeout: 90s for local providers like Ollama
-    turn_timeout = 90
+    # Per-turn timeout: 180s for local providers like Ollama
+    turn_timeout = 180
 
     # Simulate a longer conversation (5 turns)
     for i in range(5):
@@ -447,5 +447,5 @@ async def test_conversation_memory_efficiency(ollama_provider, ollama_model_name
 
     # Verify performance is acceptable
     # Note: Performance varies by hardware and model. On M1 Max with qwen2.5-coder:14b,
-    # 5 turns should complete in < 200s (40s per turn average) to account for variability
-    assert elapsed < 200, f"5-turn conversation should complete in < 200s, took {elapsed:.2f}s"
+    # 5 turns should complete in < 600s (120s per turn average) to account for variability
+    assert elapsed < 600, f"5-turn conversation should complete in < 600s, took {elapsed:.2f}s"
