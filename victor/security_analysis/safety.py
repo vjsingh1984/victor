@@ -21,7 +21,7 @@ security scanning operations.
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from victor.security_analysis.patterns.types import SafetyPattern
 from victor.security_analysis.patterns.secrets import SecretScanner
@@ -35,7 +35,7 @@ class SecurityAnalysisSafetyExtension(SafetyExtensionProtocol):
     secret handling, credential scanning, and security tool operations.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the safety extension."""
         self._secret_scanner = SecretScanner()
         self._custom_patterns: List[SafetyPattern] = []
@@ -159,7 +159,7 @@ class SecurityAnalysisSafetyExtension(SafetyExtensionProtocol):
         """
         return "security_analysis"
 
-    def scan_for_secrets(self, content: str) -> List[Dict]:
+    def scan_for_secrets(self, content: str) -> List[Dict[str, Any]]:
         """Scan content for potential secrets.
 
         Args:
@@ -168,7 +168,18 @@ class SecurityAnalysisSafetyExtension(SafetyExtensionProtocol):
         Returns:
             List of detected secrets with metadata
         """
-        return self._secret_scanner.scan(content)
+        secrets = self._secret_scanner.scan(content)
+        # Convert SecretMatch objects to dicts for compatibility
+        return [  # type: ignore[return-value]
+            {
+                "pattern": secret.pattern,
+                "match": secret.match,
+                "severity": secret.severity.value,
+                "start_index": secret.start_index,
+                "end_index": secret.end_index,
+            }
+            for secret in secrets
+        ]
 
 
 __all__ = ["SecurityAnalysisSafetyExtension"]

@@ -32,11 +32,11 @@ class VulnerabilityScanHandler:
     Coordinates dependency parsing, CVE lookup, and result aggregation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the handler."""
         self._scanner = None  # Lazy load
 
-    def _get_scanner(self):
+    def _get_scanner(self) -> Any:
         """Get or create security scanner."""
         if self._scanner is None:
             from victor.security_analysis.tools import get_scanner
@@ -83,11 +83,11 @@ class VulnerabilityScanHandler:
 class SecretScanHandler:
     """Handler for secret detection workflows."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the handler."""
         self._scanner = None  # Lazy load
 
-    def _get_scanner(self):
+    def _get_scanner(self) -> Any:
         """Get or create secret scanner."""
         if self._scanner is None:
             from victor.security_analysis.patterns import SecretScanner
@@ -147,7 +147,7 @@ class SecretScanHandler:
 class ComplianceCheckHandler:
     """Handler for compliance checking workflows."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the handler."""
         pass
 
@@ -171,7 +171,7 @@ class ComplianceCheckHandler:
         )
 
         frameworks = frameworks or ["soc2"]
-        results = {}
+        results: Dict[str, Any] = {}
 
         try:
             # Initialize audit manager (validates project path)

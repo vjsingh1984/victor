@@ -573,6 +573,7 @@ class EnhancedRLCoordinator:
             # No policy, return random action
             if available_actions:
                 import random
+
                 return random.choice(available_actions)
             return None
 
@@ -581,6 +582,7 @@ class EnhancedRLCoordinator:
             # Explore: random action
             if available_actions:
                 import random
+
                 return random.choice(available_actions)
             return None
 
@@ -589,6 +591,7 @@ class EnhancedRLCoordinator:
         if not action_values:
             if available_actions:
                 import random
+
                 return random.choice(available_actions)
             return None
 
@@ -611,6 +614,7 @@ class EnhancedRLCoordinator:
         # Fallback to random
         if available_actions:
             import random
+
             return random.choice(available_actions)
         return None
 

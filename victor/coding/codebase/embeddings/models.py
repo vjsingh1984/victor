@@ -323,7 +323,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
             raise RuntimeError("Cohere client not initialized")
 
         response = await self.client.embed(texts=[text], model=self.config.embedding_model)
-        return response.embeddings[0]
+        return list(response.embeddings[0])  # type: ignore[no-any-return]
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts."""
@@ -334,7 +334,8 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
             raise RuntimeError("Cohere client not initialized")
 
         response = await self.client.embed(texts=texts, model=self.config.embedding_model)
-        return response.embeddings
+        # Type assertion: Cohere returns list of embeddings
+        return [list(emb) for emb in response.embeddings]  # type: ignore[no-any-return]
 
     def get_dimension(self) -> int:
         """Get embedding dimension."""

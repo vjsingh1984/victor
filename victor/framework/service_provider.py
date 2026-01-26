@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol, Type, runtime_checkable
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Protocol, Type, runtime_checkable
 
 from victor.core.container import (
     ServiceContainer,

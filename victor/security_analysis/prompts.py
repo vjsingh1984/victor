@@ -20,7 +20,7 @@ security analysis tasks.
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from victor.core.verticals.protocols import PromptContributorProtocol
 
@@ -71,7 +71,7 @@ class SecurityAnalysisPromptContributor(PromptContributorProtocol):
 5. Provide proof-of-concept where safe to do so""",
         }
 
-    def get_context_hints(self, context: Dict) -> List[str]:
+    def get_context_hints(self, context: Dict[str, Any]) -> List[str]:
         """Get context-aware hints based on current state.
 
         Args:
