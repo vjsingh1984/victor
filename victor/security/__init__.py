@@ -261,6 +261,7 @@ def __getattr__(name: str) -> Any:
                 stacklevel=2,
             )
         import importlib
+
         _submodule_cache["auth"] = importlib.import_module("victor.security.auth")
         return _submodule_cache["auth"]
     elif name == "safety":
@@ -272,6 +273,7 @@ def __getattr__(name: str) -> Any:
                 stacklevel=2,
             )
         import importlib
+
         _submodule_cache["safety"] = importlib.import_module("victor.security.safety")
         return _submodule_cache["safety"]
     elif name == "audit":
@@ -283,6 +285,7 @@ def __getattr__(name: str) -> Any:
                 stacklevel=2,
             )
         import importlib
+
         _submodule_cache["audit"] = importlib.import_module("victor.security.audit")
         return _submodule_cache["audit"]
     elif name == "penetration_testing":
@@ -294,6 +297,7 @@ def __getattr__(name: str) -> Any:
                 stacklevel=2,
             )
         import importlib
+
         _submodule_cache["penetration_testing"] = importlib.import_module(
             "victor.security.penetration_testing"
         )
@@ -307,6 +311,7 @@ def __getattr__(name: str) -> Any:
                 stacklevel=2,
             )
         import importlib
+
         _submodule_cache["authorization_enhanced"] = importlib.import_module(
             "victor.security.authorization_enhanced"
         )

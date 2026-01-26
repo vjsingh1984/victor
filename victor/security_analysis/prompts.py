@@ -47,26 +47,22 @@ class SecurityAnalysisPromptContributor(PromptContributorProtocol):
 2. Query CVE databases for known vulnerabilities
 3. Prioritize by CVSS score (critical > high > medium > low)
 4. Include remediation steps with specific version upgrades""",
-
             "secret_detection": """When detecting secrets:
 1. Scan all source files, configs, and environment files
 2. Check for API keys, passwords, tokens, and credentials
 3. Look for hardcoded values that should be environment variables
 4. Report file paths and line numbers for each finding""",
-
             "compliance_check": """When checking compliance:
 1. Identify applicable frameworks (SOC2, GDPR, HIPAA, PCI-DSS)
 2. Check data handling practices
 3. Verify encryption and access controls
 4. Document any gaps or violations""",
-
             "security_review": """When reviewing code for security:
 1. Check input validation and sanitization
 2. Look for injection vulnerabilities (SQL, XSS, command injection)
 3. Verify authentication and authorization
 4. Review error handling (no sensitive data in errors)
 5. Check for secure communications (HTTPS, TLS)""",
-
             "penetration_test": """When conducting penetration testing:
 1. Document scope and authorization
 2. Start with reconnaissance (non-intrusive)

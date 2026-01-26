@@ -95,7 +95,8 @@ class TestMemoryCoordinator:
         mock_store = MagicMock()
         mock_msg = MagicMock()
         mock_msg.model_dump.return_value = {"role": "user", "content": "Test"}
-        mock_store.messages = [mock_msg]
+        # Mock get_recent_messages to return the mock message
+        mock_store.get_recent_messages.return_value = [mock_msg]
 
         coordinator = MemoryCoordinator(
             conversation_store=mock_store,
@@ -113,7 +114,8 @@ class TestMemoryCoordinator:
         # Setup
         mock_memory_manager.get_context.side_effect = Exception("Memory error")
         mock_store = MagicMock()
-        mock_store.messages = []
+        # Mock get_recent_messages to return empty list (no messages)
+        mock_store.get_recent_messages.return_value = []
 
         coordinator = MemoryCoordinator(
             memory_manager=mock_memory_manager,
@@ -357,7 +359,8 @@ class TestMemoryCoordinator:
         # Setup
         mock_msg = MagicMock()
         mock_msg.model_dump.return_value = {"role": "user", "content": "Test"}
-        mock_conversation_store.messages = [mock_msg]
+        # Mock get_recent_messages to return the mock message
+        mock_conversation_store.get_recent_messages.return_value = [mock_msg]
 
         coordinator = MemoryCoordinator(
             conversation_store=mock_conversation_store,

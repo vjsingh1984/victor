@@ -442,9 +442,7 @@ CONFIG_VALIDATORS = {
 
 def get_config_validator(
     language: str, ts_validator: Optional[TreeSitterValidator] = None
-) -> Optional[
-    Union[JsonValidator, YamlValidator, TomlValidator, XmlValidator, MarkdownValidator]
-]:
+) -> Optional[Union[JsonValidator, YamlValidator, TomlValidator, XmlValidator, MarkdownValidator]]:
     """
     Get the appropriate validator for a configuration file format.
 

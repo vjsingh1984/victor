@@ -85,31 +85,37 @@ class SecurityAnalysisServiceProvider(ServiceProviderProtocol):
     def _create_security_scanner(self) -> Any:
         """Create security scanner instance."""
         from victor.security_analysis.tools import get_scanner
+
         return get_scanner()
 
     def _create_secret_scanner(self) -> Any:
         """Create secret scanner instance."""
         from victor.security_analysis.patterns import SecretScanner
+
         return SecretScanner()
 
     def _create_security_manager(self) -> Any:
         """Create security manager instance."""
         from victor.security_analysis.tools import get_security_manager
+
         return get_security_manager()
 
     def _create_vulnerability_handler(self) -> Any:
         """Create vulnerability scan handler."""
         from victor.security_analysis.handlers import VulnerabilityScanHandler
+
         return VulnerabilityScanHandler()
 
     def _create_secret_handler(self) -> Any:
         """Create secret scan handler."""
         from victor.security_analysis.handlers import SecretScanHandler
+
         return SecretScanHandler()
 
     def _create_compliance_handler(self) -> Any:
         """Create compliance check handler."""
         from victor.security_analysis.handlers import ComplianceCheckHandler
+
         return ComplianceCheckHandler()
 
     def get_service_names(self) -> List[str]:

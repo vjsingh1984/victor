@@ -40,6 +40,7 @@ class VulnerabilityScanHandler:
         """Get or create security scanner."""
         if self._scanner is None:
             from victor.security_analysis.tools import get_scanner
+
             self._scanner = get_scanner()
         return self._scanner
 
@@ -90,6 +91,7 @@ class SecretScanHandler:
         """Get or create secret scanner."""
         if self._scanner is None:
             from victor.security_analysis.patterns import SecretScanner
+
             self._scanner = SecretScanner()
         return self._scanner
 

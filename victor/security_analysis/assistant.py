@@ -156,6 +156,7 @@ Security Best Practices:
             Security analysis safety extension.
         """
         from victor.security_analysis.safety import SecurityAnalysisSafetyExtension
+
         return SecurityAnalysisSafetyExtension()
 
     @classmethod
@@ -166,6 +167,7 @@ Security Best Practices:
             Security analysis middleware.
         """
         from victor.security_analysis.middleware import SecurityAnalysisMiddleware
+
         return SecurityAnalysisMiddleware()
 
     @classmethod
@@ -176,6 +178,7 @@ Security Best Practices:
             Security analysis prompt contributor.
         """
         from victor.security_analysis.prompts import SecurityAnalysisPromptContributor
+
         return SecurityAnalysisPromptContributor()
 
     @classmethod
@@ -186,6 +189,7 @@ Security Best Practices:
             Security analysis service provider for DI registration.
         """
         from victor.security_analysis.service_provider import SecurityAnalysisServiceProvider
+
         return SecurityAnalysisServiceProvider()
 
     @classmethod
