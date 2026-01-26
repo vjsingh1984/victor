@@ -35,6 +35,7 @@ from victor.coding.testgen.protocol import (
     TestGenConfig,
     TestGenResult,
 )
+from victor.core.language_capabilities.hooks import validate_code_before_write
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,8 @@ class TestGenManager:
         file_path: Path,
         config: Optional[TestGenConfig] = None,
         write_file: bool = True,
+        validate: bool = True,
+        strict_validation: bool = False,
     ) -> TestGenResult:
         """Generate tests for a single file.
 
@@ -91,6 +94,8 @@ class TestGenManager:
             file_path: Path to the source file
             config: Generation configuration (uses default if None)
             write_file: Whether to write the test file
+            validate: Whether to validate generated code before writing
+            strict_validation: Block write on any validation failure
 
         Returns:
             TestGenResult with generated tests
@@ -110,7 +115,16 @@ class TestGenManager:
 
             # Write file if requested
             if write_file:
-                self._write_test_file(generated)
+                write_success = self._write_test_file(
+                    generated,
+                    validate=validate,
+                    strict_validation=strict_validation,
+                )
+                if not write_success:
+                    result.errors.append(
+                        f"Validation failed for generated test: {generated.file_path}"
+                    )
+                    return result
 
             result.generated_files.append(generated)
             result.total_test_cases = sum(len(suite.test_cases) for suite in generated.suites)
@@ -130,6 +144,8 @@ class TestGenManager:
         write_files: bool = True,
         recursive: bool = True,
         exclude_patterns: Optional[list[str]] = None,
+        validate: bool = True,
+        strict_validation: bool = False,
     ) -> TestGenResult:
         """Generate tests for all Python files in a directory.
 
@@ -139,6 +155,8 @@ class TestGenManager:
             write_files: Whether to write test files
             recursive: Whether to recurse into subdirectories
             exclude_patterns: Glob patterns to exclude
+            validate: Whether to validate generated code before writing
+            strict_validation: Block write on any validation failure
 
         Returns:
             TestGenResult with all generated tests
@@ -170,6 +188,8 @@ class TestGenManager:
                 file_path,
                 config=config,
                 write_file=write_files,
+                validate=validate,
+                strict_validation=strict_validation,
             )
 
             # Merge results
@@ -189,6 +209,8 @@ class TestGenManager:
         module_path: Path,
         config: Optional[TestGenConfig] = None,
         write_files: bool = True,
+        validate: bool = True,
+        strict_validation: bool = False,
     ) -> TestGenResult:
         """Generate tests for a Python module (package).
 
@@ -196,6 +218,8 @@ class TestGenManager:
             module_path: Path to the module directory
             config: Generation configuration
             write_files: Whether to write test files
+            validate: Whether to validate generated code before writing
+            strict_validation: Block write on any validation failure
 
         Returns:
             TestGenResult
@@ -216,6 +240,8 @@ class TestGenManager:
             config=config,
             write_files=write_files,
             recursive=True,
+            validate=validate,
+            strict_validation=strict_validation,
         )
 
     def analyze_coverage_gaps(
@@ -343,18 +369,49 @@ class TestGenManager:
             return generated.content
         return None
 
-    def _write_test_file(self, generated: GeneratedTest) -> None:
-        """Write a generated test file.
+    def _write_test_file(
+        self,
+        generated: GeneratedTest,
+        validate: bool = True,
+        strict_validation: bool = False,
+    ) -> bool:
+        """Write a generated test file with optional validation.
 
         Args:
             generated: GeneratedTest to write
+            validate: Whether to run code validation before writing
+            strict_validation: Block write on any validation failure
+
+        Returns:
+            True if file was written successfully, False if validation blocked it
         """
+        # Validate generated code before writing
+        if validate:
+            should_proceed, result = validate_code_before_write(
+                generated.content,
+                generated.file_path,
+                strict=strict_validation,
+            )
+
+            if not should_proceed:
+                logger.error(
+                    f"Validation failed for generated test file {generated.file_path}"
+                )
+                for issue in result.errors:
+                    logger.error(f"  {issue}")
+                return False
+
+            if result.warnings:
+                for issue in result.warnings:
+                    logger.warning(f"Validation warning for {generated.file_path}: {issue}")
+
         # Create directory if needed
         generated.file_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write file
         generated.file_path.write_text(generated.content)
         logger.info(f"Wrote test file: {generated.file_path}")
+        return True
 
     def _should_exclude(
         self,

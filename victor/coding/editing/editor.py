@@ -311,11 +311,18 @@ class FileEditor:
             )
         )
 
-    def commit(self, dry_run: bool = False) -> bool:
+    def commit(
+        self,
+        dry_run: bool = False,
+        validate: bool = True,
+        strict_validation: bool = False,
+    ) -> bool:
         """Commit the transaction (apply all changes).
 
         Args:
             dry_run: If True, don't actually apply changes
+            validate: Run code grounding validation before write
+            strict_validation: Block on any validation failure
 
         Returns:
             True if successful, False otherwise
@@ -329,6 +336,12 @@ class FileEditor:
         self.console.print(
             f"\n[bold cyan]{'🔍 Dry Run' if dry_run else '💾 Committing'}:[/] {len(self.current_transaction.operations)} operations"
         )
+
+        # Validate operations before applying (if not dry run)
+        if validate and not dry_run:
+            validation_passed = self._validate_operations(strict_validation)
+            if not validation_passed:
+                return False
 
         if dry_run:
             self.console.print("[dim]Dry run mode - no changes will be applied[/]")
@@ -355,6 +368,69 @@ class FileEditor:
 
         finally:
             self.current_transaction = None
+
+    def _validate_operations(self, strict: bool = False) -> bool:
+        """Validate all CREATE and MODIFY operations before applying.
+
+        Args:
+            strict: Block on any validation failure
+
+        Returns:
+            True if all validations passed, False otherwise
+        """
+        if not self.current_transaction:
+            return True
+
+        try:
+            from victor.core.language_capabilities.hooks import CodeGroundingHook
+
+            hook = CodeGroundingHook.instance()
+        except ImportError:
+            # Language capabilities module not available
+            self.console.print("[dim]Code validation not available[/]")
+            return True
+
+        has_errors = False
+
+        for op in self.current_transaction.operations:
+            if op.type not in (OperationType.CREATE, OperationType.MODIFY):
+                continue
+
+            content = op.new_content or ""
+            path = Path(op.path)
+
+            # Skip validation for non-code files
+            if not hook.can_validate(path):
+                continue
+
+            should_proceed, result = hook.validate_before_write_sync(
+                content, path, strict=strict
+            )
+
+            if not should_proceed:
+                has_errors = True
+                self.console.print(f"\n[bold red]✗ Validation failed:[/] {op.path}")
+                for issue in result.errors:
+                    self.console.print(
+                        f"  [red]Line {issue.line}:{issue.column}[/] {issue.message}"
+                    )
+                if strict:
+                    self.console.print(
+                        "[yellow]Strict validation mode - blocking commit[/]"
+                    )
+                    return False
+            elif result.warnings:
+                for issue in result.warnings:
+                    self.console.print(
+                        f"  [yellow]⚠ {op.path}:{issue.line}[/] {issue.message}"
+                    )
+
+        if has_errors and not strict:
+            self.console.print(
+                "\n[yellow]⚠ Validation warnings found, proceeding anyway[/]"
+            )
+
+        return True
 
     def _apply_operation(self, op: EditOperation) -> None:
         """Apply a single operation.

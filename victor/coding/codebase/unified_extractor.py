@@ -43,6 +43,12 @@ SOLID Principles Applied:
     - LSP: All extractors produce compatible EnrichedSymbol
     - ISP: LSPServiceProtocol is minimal interface
     - DIP: Depends on protocols, not concrete implementations
+
+Integration with LanguageCapabilityRegistry:
+    This module now uses the unified LanguageCapabilityRegistry from
+    victor.core.language_capabilities for language detection and tier
+    configuration. This provides a single source of truth for both
+    indexing and validation across the codebase.
 """
 
 from __future__ import annotations
@@ -51,12 +57,19 @@ import ast
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 from victor.core.errors import FileError, ValidationError
 
 logger = logging.getLogger(__name__)
 
+# Import from unified language capabilities registry (new system)
+from victor.core.language_capabilities import (
+    LanguageCapabilityRegistry,
+    LanguageTier as UnifiedLanguageTier,
+)
+
+# Also import legacy tier system for backward compatibility
 from victor.coding.languages.tiers import LanguageTier, get_tier
 
 if TYPE_CHECKING:
@@ -114,6 +127,7 @@ class UnifiedSymbolExtractor:
         tree_sitter: TreeSitterExtractor for syntax analysis
         lsp_service: Optional LSP service for type enrichment
         enable_lsp_enrichment: Whether to use LSP (can be disabled)
+        use_unified_registry: Whether to use the new LanguageCapabilityRegistry
     """
 
     def __init__(
@@ -121,6 +135,7 @@ class UnifiedSymbolExtractor:
         tree_sitter: Optional["TreeSitterExtractor"] = None,
         lsp_service: Optional["LSPServiceProtocol"] = None,
         enable_lsp_enrichment: bool = True,
+        use_unified_registry: bool = True,
     ):
         """Initialize the unified extractor.
 
@@ -128,10 +143,14 @@ class UnifiedSymbolExtractor:
             tree_sitter: Tree-sitter extractor instance
             lsp_service: LSP service for type enrichment (optional)
             enable_lsp_enrichment: Whether to use LSP for enrichment
+            use_unified_registry: Whether to use the new LanguageCapabilityRegistry
+                                  (default: True for forward compatibility)
         """
         self._ts = tree_sitter
         self._lsp = lsp_service if enable_lsp_enrichment else None
         self._enable_lsp = enable_lsp_enrichment
+        self._use_unified_registry = use_unified_registry
+        self._registry = LanguageCapabilityRegistry.instance() if use_unified_registry else None
 
     def set_tree_sitter(self, tree_sitter: "TreeSitterExtractor") -> None:
         """Set or update the tree-sitter extractor.
@@ -140,6 +159,40 @@ class UnifiedSymbolExtractor:
             tree_sitter: TreeSitterExtractor instance
         """
         self._ts = tree_sitter
+
+    def _convert_unified_to_legacy(self, unified_cap: Any) -> Any:
+        """Convert unified capability to legacy tier config interface.
+
+        This provides backward compatibility by creating an object that
+        matches the legacy get_tier() interface while using the new
+        unified capability system.
+
+        Args:
+            unified_cap: UnifiedLanguageCapability from the new registry
+
+        Returns:
+            Object with tier, has_native_ast, and has_lsp attributes
+        """
+        # Map unified tier to legacy tier
+        tier_mapping = {
+            UnifiedLanguageTier.TIER_1: LanguageTier.TIER_1,
+            UnifiedLanguageTier.TIER_2: LanguageTier.TIER_2,
+            UnifiedLanguageTier.TIER_3: LanguageTier.TIER_3,
+            UnifiedLanguageTier.UNSUPPORTED: LanguageTier.TIER_3,  # Fallback
+        }
+
+        class LegacyTierConfig:
+            """Adapter for legacy tier config interface."""
+
+            def __init__(self, cap):
+                self.tier = tier_mapping.get(cap.tier, LanguageTier.TIER_3)
+                self.has_native_ast = cap.native_ast is not None
+                self.has_lsp = cap.lsp is not None
+                self.has_tree_sitter = cap.tree_sitter is not None
+                self.name = cap.name
+                self.extensions = cap.extensions
+
+        return LegacyTierConfig(unified_cap)
 
     def set_lsp_service(self, lsp_service: Optional["LSPServiceProtocol"]) -> None:
         """Set or update the LSP service.
@@ -160,7 +213,7 @@ class UnifiedSymbolExtractor:
 
         This is the main entry point. It:
         1. Detects language if not provided
-        2. Gets tier configuration
+        2. Gets tier configuration (from unified registry or legacy system)
         3. Extracts symbols via tree-sitter (all tiers)
         4. Enriches with native AST for Tier 1 Python
         5. Enriches with LSP for Tier 1/2 if available
@@ -183,11 +236,29 @@ class UnifiedSymbolExtractor:
             logger.debug(f"Could not detect language for {file_path}")
             return []
 
-        tier_config = get_tier(lang)
-        logger.debug(
-            f"Extracting symbols from {file_path.name} "
-            f"(language={lang}, tier={tier_config.tier.name})"
-        )
+        # Get tier configuration from unified registry or legacy system
+        tier_config = None
+        unified_cap = None
+        if self._use_unified_registry and self._registry:
+            unified_cap = self._registry.get(lang)
+            if not unified_cap:
+                # Fallback: try to get by file path
+                unified_cap = self._registry.get_for_file(file_path)
+
+        if unified_cap:
+            # Use unified registry - convert to legacy tier_config interface
+            tier_config = self._convert_unified_to_legacy(unified_cap)
+            logger.debug(
+                f"Extracting symbols from {file_path.name} "
+                f"(language={lang}, tier={unified_cap.tier.name}, source=unified_registry)"
+            )
+        else:
+            # Fallback to legacy tier system
+            tier_config = get_tier(lang)
+            logger.debug(
+                f"Extracting symbols from {file_path.name} "
+                f"(language={lang}, tier={tier_config.tier.name}, source=legacy)"
+            )
 
         # Read content if not provided
         if content is None:
@@ -257,7 +328,18 @@ class UnifiedSymbolExtractor:
         if not lang:
             return []
 
-        tier_config = get_tier(lang)
+        # Get tier configuration from unified registry or legacy system
+        tier_config = None
+        unified_cap = None
+        if self._use_unified_registry and self._registry:
+            unified_cap = self._registry.get(lang)
+            if not unified_cap:
+                unified_cap = self._registry.get_for_file(file_path)
+
+        if unified_cap:
+            tier_config = self._convert_unified_to_legacy(unified_cap)
+        else:
+            tier_config = get_tier(lang)
 
         if content is None:
             try:
