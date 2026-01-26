@@ -101,6 +101,7 @@ dependencies = [
     "diskcache>=5.6",
     "docker>=7.0",
     "docstring-parser>=0.15",
+    "watchdog>=4.0",  # File system watching for cache invalidation
 
     # Semantic Tool Selection (Default: local embeddings)
     "sentence-transformers>=2.2.0",
