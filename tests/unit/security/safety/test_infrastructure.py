@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.security_analysis.patterns.infrastructure import (
+from victor.core.security.patterns.infrastructure import (
     InfraPatternCategory,
     InfrastructureScanner,
     InfraScanResult,

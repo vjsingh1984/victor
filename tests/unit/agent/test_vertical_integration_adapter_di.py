@@ -24,7 +24,7 @@ from unittest.mock import MagicMock, Mock, patch
 from victor.core.errors import CapabilityRegistryRequiredError
 from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
 from victor.core.verticals.protocols.middleware import MiddlewareProtocol
-from victor.security_analysis.patterns.types import SafetyPattern
+from victor.core.security.patterns.types import SafetyPattern
 
 
 class MockMiddleware(MiddlewareProtocol):

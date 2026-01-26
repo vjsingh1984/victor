@@ -34,7 +34,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from victor.security_analysis.patterns import (
+from victor.core.security.patterns import (
     SecretScanner,
     SecretSeverity,
     detect_secrets,

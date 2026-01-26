@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.security_analysis.patterns.registry import (
+from victor.core.security.patterns.registry import (
     ISafetyScanner,
     SafetyRegistry,
 )
