@@ -83,7 +83,7 @@ async def test_conversation_context_preservation(
     )
 
     # Turn 1: Provide information
-    async with skip_on_timeout(60, "context_preservation"):
+    async with skip_on_timeout(90, "context_preservation"):
         response1 = await orchestrator.chat(
             user_message="I'm working on a Python project with a Calculator class. Remember this."
         )
@@ -92,7 +92,7 @@ async def test_conversation_context_preservation(
     print(f"✓ Turn 1 response: {response1.content[:100]}...")
 
     # Turn 2: Reference previous information
-    async with skip_on_timeout(60, "context_preservation"):
+    async with skip_on_timeout(90, "context_preservation"):
         response2 = await orchestrator.chat(user_message="What project did I mention I'm working on?")
 
     assert response2.content is not None
@@ -138,7 +138,7 @@ async def test_conversation_stage_transitions(
     print(f"✓ Initial stage: {initial_stage}")
 
     # Start a task that will trigger stage transitions
-    async with skip_on_timeout(120, "stage_transitions"):
+    async with skip_on_timeout(180, "stage_transitions"):
         response = await orchestrator.chat(
             user_message=f"I need to analyze the code in {sample_code_file}. Read it first, then add error handling to the add function."
         )
@@ -201,7 +201,7 @@ async def test_conversation_error_recovery(ollama_provider, ollama_model_name, t
     # Attempt to read non-existent file (will fail)
     non_existent_file = "/tmp/this_file_does_not_exist_12345.txt"
 
-    async with skip_on_timeout(60, "error_recovery"):
+    async with skip_on_timeout(90, "error_recovery"):
         response1 = await orchestrator.chat(user_message=f"Read the file {non_existent_file}.")
 
     assert response1.content is not None
@@ -211,7 +211,7 @@ async def test_conversation_error_recovery(ollama_provider, ollama_model_name, t
     print(f"✓ Response to error: {response1.content[:200]}...")
 
     # Conversation should continue - ask a different question
-    async with skip_on_timeout(60, "error_recovery"):
+    async with skip_on_timeout(90, "error_recovery"):
         response2 = await orchestrator.chat(
             user_message="That's fine. Instead, create a simple Python file with a hello world function."
         )
@@ -225,7 +225,7 @@ async def test_conversation_error_recovery(ollama_provider, ollama_model_name, t
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(300)  # 5 minutes for 3-turn multi-tool test
+@pytest.mark.timeout(600)  # 10 minutes for 3-turn multi-tool test (Ollama can be slow)
 async def test_conversation_multi_turn_task_completion(
     ollama_provider, ollama_model_name, temp_workspace
 ):
@@ -235,6 +235,8 @@ async def test_conversation_multi_turn_task_completion(
     - Multiple conversation turns complete successfully
     - Each turn builds on previous context
     - Task is completed through collaboration
+
+    Timeout extended to 600s for slow local providers like Ollama.
     """
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
@@ -259,8 +261,11 @@ async def test_conversation_multi_turn_task_completion(
 
     start_time = time.time()
 
+    # Per-turn timeout: 180s for local providers like Ollama
+    turn_timeout = 180
+
     # Turn 1: Analyze the file
-    async with skip_on_timeout(90, "multi_turn_task"):
+    async with skip_on_timeout(turn_timeout, "multi_turn_task"):
         response1 = await orchestrator.chat(
             user_message=f"Analyze the file {test_file}. What does it do?"
         )
@@ -269,7 +274,7 @@ async def test_conversation_multi_turn_task_completion(
     print(f"✓ Turn 1 (Analyze): {len(response1.content)} chars")
 
     # Turn 2: Ask for improvement
-    async with skip_on_timeout(90, "multi_turn_task"):
+    async with skip_on_timeout(turn_timeout, "multi_turn_task"):
         response2 = await orchestrator.chat(
             user_message="Add a docstring and implement the function to return 'Task completed'."
         )
@@ -317,7 +322,7 @@ async def test_conversation_multi_turn_task_completion(
     print(f"✓ Turn 2 (Improve): {len(response2.content)} chars")
 
     # Turn 3: Verify the changes
-    async with skip_on_timeout(90, "multi_turn_task"):
+    async with skip_on_timeout(turn_timeout, "multi_turn_task"):
         response3 = await orchestrator.chat(user_message="Read the file again to verify the changes.")
 
     assert response3.content is not None
@@ -361,8 +366,8 @@ async def test_conversation_tool_calling_accuracy(
         model=settings.model,
     )
 
-    # Start a conversation that will require tool usage
-    async with skip_on_timeout(120, "tool_calling_accuracy"):
+    # Start a conversation that will require tool usage (180s for Ollama)
+    async with skip_on_timeout(180, "tool_calling_accuracy"):
         response = await orchestrator.chat(
             user_message=f"I have a file at {sample_code_file}. First read it, then tell me how many functions it defines."
         )
@@ -385,7 +390,7 @@ async def test_conversation_tool_calling_accuracy(
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(300)  # 5 minutes for 5-turn conversation
+@pytest.mark.timeout(600)  # 10 minutes for 5-turn conversation (Ollama can be slow)
 async def test_conversation_memory_efficiency(ollama_provider, ollama_model_name, temp_workspace):
     """Test conversation memory usage is efficient.
 
@@ -393,6 +398,8 @@ async def test_conversation_memory_efficiency(ollama_provider, ollama_model_name
     - Long conversations don't cause memory issues
     - Context is properly summarized if needed
     - Performance remains acceptable
+
+    Timeout extended to 600s for slow local providers like Ollama.
     """
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
@@ -411,9 +418,12 @@ async def test_conversation_memory_efficiency(ollama_provider, ollama_model_name
 
     start_time = time.time()
 
+    # Per-turn timeout: 90s for local providers like Ollama
+    turn_timeout = 90
+
     # Simulate a longer conversation (5 turns)
     for i in range(5):
-        async with skip_on_timeout(45, f"memory_efficiency_turn_{i}"):
+        async with skip_on_timeout(turn_timeout, f"memory_efficiency_turn_{i}"):
             if i == 0:
                 response = await orchestrator.chat(
                     user_message="Let's work on a Python project step by step."
