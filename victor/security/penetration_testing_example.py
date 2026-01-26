@@ -6,14 +6,14 @@ comprehensive security audits on Victor AI agents.
 """
 
 from pathlib import Path
-from victor.security_analysis.tools import (
+from victor.security import (
     SecurityTestSuite,
-    SecurityAuditReport,
-    SecurityVulnerability,
-    ExploitPattern,
+    ComprehensiveSecurityReport as SecurityAuditReport,
+    Vulnerability as SecurityVulnerability,
     SeverityLevel,
     AttackType,
 )
+from victor.security.penetration_testing import ExploitPattern
 
 
 async def example_basic_usage() -> None:

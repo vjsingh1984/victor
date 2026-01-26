@@ -47,6 +47,7 @@ from victor.core.security.patterns.secrets import (
     SecretScanner,
     SecretSeverity,
     detect_secrets,
+    mask_secrets,
 )
 from victor.core.security.patterns.pii import (
     ANONYMIZATION_SUGGESTIONS,
@@ -133,6 +134,7 @@ __all__ = [
     "SecretScanner",
     "SecretSeverity",
     "detect_secrets",
+    "mask_secrets",
     # PII
     "ANONYMIZATION_SUGGESTIONS",
     "PII_COLUMN_PATTERNS",
