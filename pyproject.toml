@@ -632,6 +632,8 @@ exclude = [
     "^scripts/",
 ]
 files = ["victor"]
+# Pydantic v2 MyPy plugin for proper BaseModel type checking
+plugins = ["pydantic.mypy"]
 
 # Strictly typed modules (these should pass strict checks)
 [[tool.mypy.overrides]]
@@ -722,19 +724,10 @@ module = [
     "victor.observability.*",
     "victor.telemetry.*",
     "victor.context.*",
-    # Modules with Pydantic BaseModel type Any issues (Pydantic v2 type stubs)
-    "victor.core.validation",
-    "victor.core.tool_dependency_schema",
-    "victor.core.tool_dependency_loader",
-    "victor.config.settings",
     # Modules with watchdog FileSystemEventHandler type Any issues
-    "victor.framework.module_loader",
     "victor.core.events.*",
     "victor.agent.cache.file_watcher",
     # Other modules with type errors
-    "victor.agent.conversation_memory",
-    "victor.agent.tool_result_cache",
-    "victor.framework.service_provider",
     "victor.agent.orchestrator_factory",
     "victor.agent.orchestrator",
     "victor.security_analysis.*",
@@ -764,6 +757,15 @@ check_untyped_defs = true
 disallow_untyped_defs = false  # Allow gradual improvement
 warn_return_any = true
 warn_unused_ignores = true
+
+# Pydantic MyPy plugin configuration
+# Enables proper type checking for Pydantic BaseModel fields
+# See: https://docs.pydantic.dev/latest/integrations/mypy/
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+warn_untyped_fields = true
 
 [tool.black]
 line-length = 100

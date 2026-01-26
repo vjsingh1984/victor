@@ -126,7 +126,7 @@ class TestHillClimbingOptimizer:
             new=AsyncMock(),
         ) as mock_generate:
             # Mock variant generation
-            from victor.optimization.generator import WorkflowVariant
+            from victor.optimization.workflow.generator import WorkflowVariant
 
             mock_variant = WorkflowVariant(
                 variant_id="test_variant",
@@ -221,7 +221,7 @@ class TestSimulatedAnnealingOptimizer:
             new=AsyncMock(),
         ) as mock_generate:
             # Mock variant generation
-            from victor.optimization.generator import WorkflowVariant
+            from victor.optimization.workflow.generator import WorkflowVariant
 
             mock_variant = WorkflowVariant(
                 variant_id="test_variant",
@@ -265,7 +265,7 @@ class TestSimulatedAnnealingOptimizer:
 
 def test_optimization_result_to_dict():
     """Test OptimizationResult serialization."""
-    from victor.optimization.generator import WorkflowVariant
+    from victor.optimization.workflow.generator import WorkflowVariant
 
     variant = WorkflowVariant(
         variant_id="test_variant",
