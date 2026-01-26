@@ -27,11 +27,11 @@ from enum import Enum
 
 import numpy as np
 
-from victor.optimization.models import (
+from victor.optimization.workflow.models import (
     NodeStatistics,
     WorkflowProfile,
 )
-from victor.optimization.generator import (
+from victor.optimization.workflow.generator import (
     WorkflowVariant,
     WorkflowVariantGenerator,
 )

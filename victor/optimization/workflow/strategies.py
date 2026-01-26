@@ -25,7 +25,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass
 
-from victor.optimization.models import (
+from victor.optimization.workflow.models import (
     Bottleneck,
     BottleneckSeverity,
     BottleneckType,

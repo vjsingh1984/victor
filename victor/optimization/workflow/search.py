@@ -27,12 +27,12 @@ from dataclasses import dataclass
 from copy import deepcopy
 import math
 
-from victor.optimization.models import (
+from victor.optimization.workflow.models import (
     OptimizationOpportunity,
     OptimizationStrategyType,
     WorkflowProfile,
 )
-from victor.optimization.generator import (
+from victor.optimization.workflow.generator import (
     WorkflowVariant,
     WorkflowVariantGenerator,
 )

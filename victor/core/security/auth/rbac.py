@@ -62,6 +62,10 @@ from victor.security.auth.rbac import (
     User,
     RBACManager,
     get_permission_for_access_mode,
+    # Utility functions
+    require_permission,
+    get_rbac_manager,
+    set_rbac_manager,
 )
 
 __all__ = [
@@ -70,4 +74,8 @@ __all__ = [
     "User",
     "RBACManager",
     "get_permission_for_access_mode",
+    # Utility functions
+    "require_permission",
+    "get_rbac_manager",
+    "set_rbac_manager",
 ]

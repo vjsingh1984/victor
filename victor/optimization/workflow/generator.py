@@ -25,12 +25,12 @@ from typing import Any, Dict, List, Optional, Set
 from dataclasses import dataclass, field
 from copy import deepcopy
 
-from victor.optimization.models import (
+from victor.optimization.workflow.models import (
     OptimizationOpportunity,
     OptimizationStrategyType,
     WorkflowProfile,
 )
-from victor.optimization.strategies import (
+from victor.optimization.workflow.strategies import (
     WorkflowChange,
     create_strategy,
 )

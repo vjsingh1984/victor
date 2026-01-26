@@ -1779,12 +1779,10 @@ class ContextStepHandler(BaseStepHandler):
         if _check_capability(orchestrator, "vertical_context"):
             _invoke_capability(orchestrator, "vertical_context", context)
             logger.debug("Attached context via capability")
-        elif hasattr(orchestrator, "set_vertical_context"):
-            orchestrator.set_vertical_context(context)
-            logger.debug("Attached context via set_vertical_context")
         else:
             result.add_warning(
-                "Orchestrator lacks set_vertical_context method; " "context not attached"
+                "Orchestrator lacks vertical_context capability; "
+                "context not attached. Ensure CapabilityRegistry is available."
             )
 
 

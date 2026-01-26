@@ -329,7 +329,7 @@ class ToolExecutor:
             return True, None
         else:
             # Build informative denial message
-            from victor.security.auth.rbac import Permission
+            from victor.core.security.auth import Permission
 
             required_permission = Permission.from_access_mode(access_mode)
             return (

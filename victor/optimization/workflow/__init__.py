@@ -29,9 +29,8 @@ Usage:
     suggestions = await optimizer.suggest_optimizations(workflow_id)
 """
 
-# Import from the original optimization module files
-# Note: These imports use relative imports from the parent optimization package
-from victor.optimization.models import (
+# Import from local workflow module files
+from victor.optimization.workflow.models import (
     Bottleneck,
     BottleneckSeverity,
     BottleneckType,
@@ -41,17 +40,17 @@ from victor.optimization.models import (
     OptimizationStrategyType,
     WorkflowProfile,
 )
-from victor.optimization.profiler import WorkflowProfiler
-from victor.optimization.strategies import (
+from victor.optimization.workflow.profiler import WorkflowProfiler
+from victor.optimization.workflow.strategies import (
     ParallelizationStrategy,
     PruningStrategy,
     ToolSelectionStrategy,
 )
-from victor.optimization.generator import WorkflowVariantGenerator
-from victor.optimization.search import HillClimbingOptimizer
-from victor.optimization.evaluator import VariantEvaluator
-from victor.optimization.optimizer import WorkflowOptimizer
-from victor.optimization.validator import (
+from victor.optimization.workflow.generator import WorkflowVariantGenerator
+from victor.optimization.workflow.search import HillClimbingOptimizer
+from victor.optimization.workflow.evaluator import VariantEvaluator
+from victor.optimization.workflow.optimizer import WorkflowOptimizer
+from victor.optimization.workflow.validator import (
     ConstraintViolation,
     OptimizationValidationResult,
     OptimizationValidator,

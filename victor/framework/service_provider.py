@@ -157,7 +157,9 @@ class WorkflowRegistryService(Protocol):
 class TeamRegistryService(Protocol):
     """Protocol for team registry services."""
 
-    def register_from_vertical(self, vertical: str, specs: dict[str, Any], replace: bool = False) -> None:
+    def register_from_vertical(
+        self, vertical: str, specs: dict[str, Any], replace: bool = False
+    ) -> None:
         """Register team specs from a vertical."""
         ...
 

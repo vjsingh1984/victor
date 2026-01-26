@@ -24,23 +24,23 @@ import logging
 from typing import Any, Dict, List, Optional, Callable, Union
 from dataclasses import dataclass
 
-from victor.optimization.models import (
+from victor.optimization.workflow.models import (
     Bottleneck,
     OptimizationOpportunity,
     WorkflowProfile,
 )
-from victor.optimization.profiler import WorkflowProfiler
-from victor.optimization.strategies import create_strategy
-from victor.optimization.generator import (
+from victor.optimization.workflow.profiler import WorkflowProfiler
+from victor.optimization.workflow.strategies import create_strategy
+from victor.optimization.workflow.generator import (
     WorkflowVariant,
     WorkflowVariantGenerator,
 )
-from victor.optimization.search import (
+from victor.optimization.workflow.search import (
     HillClimbingOptimizer,
     SimulatedAnnealingOptimizer,
     OptimizationResult,
 )
-from victor.optimization.evaluator import (
+from victor.optimization.workflow.evaluator import (
     VariantEvaluator,
     EvaluationMode,
     EvaluationResult,

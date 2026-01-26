@@ -27,7 +27,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from victor.optimization.models import (
+from victor.optimization.workflow.models import (
     Bottleneck,
     BottleneckSeverity,
     BottleneckType,
