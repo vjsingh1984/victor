@@ -1144,7 +1144,7 @@ TEXT_EXTENSIONS = {
     ],
 )
 async def read(
-    path: str,
+    path: str = "",
     offset: int = 0,
     limit: int = 0,
     search: str = "",
@@ -1153,6 +1153,8 @@ async def read(
     # Parameter aliases for models that use different names (e.g., gpt-oss)
     line_start: int = None,
     line_end: int = None,
+    # Capture malformed calls with incorrect parameter names
+    **kwargs,
 ) -> str:
     """Read text/code file. Binary files rejected.
 
@@ -1176,11 +1178,59 @@ async def read(
         regex: Pattern is regex
         line_start: Alias for offset (some models use this name)
         line_end: Alias for limit (some models use this name)
+        **kwargs: Captures malformed calls with incorrect parameter names
+                  (e.g., pattern instead of search, file instead of path)
 
     Returns:
         File content with line numbers. If truncated, includes continuation hint
         with exact offset to use for next read.
     """
+    # ==========================================================================
+    # MALFORMED CALL RECOVERY
+    # ==========================================================================
+    # Some models (especially Ollama/local models) use incorrect parameter names.
+    # We detect and recover from common mistakes:
+    #   - pattern -> search (grep pattern)
+    #   - file/file_path/filepath -> path
+    #   - query/grep -> search
+    #   - start/begin -> offset
+    #   - end/max/count -> limit
+    # ==========================================================================
+    if kwargs:
+        # Path aliases
+        for key in ["file", "file_path", "filepath", "filename"]:
+            if key in kwargs and not path:
+                path = kwargs.pop(key)
+                break
+
+        # Search/pattern aliases
+        for key in ["pattern", "query", "grep", "find", "match"]:
+            if key in kwargs and not search:
+                search = kwargs.pop(key)
+                break
+
+        # Offset aliases
+        for key in ["start", "begin", "from_line", "start_line"]:
+            if key in kwargs and offset == 0:
+                offset = kwargs.pop(key)
+                break
+
+        # Limit aliases
+        for key in ["end", "max", "count", "max_lines", "num_lines"]:
+            if key in kwargs and limit == 0:
+                limit = kwargs.pop(key)
+                break
+
+        # Context aliases
+        for key in ["context", "context_lines"]:
+            if key in kwargs:
+                ctx = kwargs.pop(key)
+                break
+
+        # Log remaining unexpected kwargs for debugging
+        if kwargs:
+            logger.debug(f"read() received unexpected kwargs (ignored): {list(kwargs.keys())}")
+
     # Handle parameter aliases from models that use different names
     if line_start is not None and offset == 0:
         offset = line_start
