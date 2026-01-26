@@ -273,14 +273,14 @@ async def compile_workflow(request: CompileRequest) -> CompileResponse:
 
 
 @app.post("/api/workflows/export/yaml")
-async def export_to_yaml(graph: WorkflowGraph) -> dict[str, str] | dict[str, bool]:
+async def export_to_yaml(graph: WorkflowGraph) -> dict[str, Any]:
     """Export workflow graph to YAML format.
 
     Args:
         graph: Workflow graph to export
 
     Returns:
-        YAML content as string
+        Dictionary with yaml_content and success flag
     """
     try:
         # Convert graph to workflow definition
@@ -292,13 +292,15 @@ async def export_to_yaml(graph: WorkflowGraph) -> dict[str, str] | dict[str, boo
         yaml_content = yaml.dump(
             {
                 "name": workflow_def.name,
-                "nodes": {node_id: node.__dict__ for node_id, node in workflow_def.nodes.items()},
+                "nodes": {
+                    node_id: node.model_dump() for node_id, node in workflow_def.nodes.items()
+                },
                 "start_node": workflow_def.start_node,
             },
             default_flow_style=False,
         )
 
-        return {"yaml_content": yaml_content, "success": True}  # type: ignore[return-value]
+        return {"yaml_content": yaml_content, "success": True}
 
     except Exception as e:
         logger.error(f"Export failed: {e}", exc_info=True)
