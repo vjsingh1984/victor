@@ -748,6 +748,9 @@ module = [
     "victor.config.settings",
     "victor.agent.tool_result_cache",
     "victor.agent.cache.*",
+    # Security module re-exports (MyPy can't follow the import chain)
+    "victor.security.authorization_enhanced",
+    "victor.security.__init__",
 ]
 ignore_errors = true
 

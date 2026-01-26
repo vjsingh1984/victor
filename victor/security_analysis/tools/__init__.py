@@ -56,27 +56,20 @@ from victor.security_analysis.tools.cve_database import (
     get_cve_database,
 )
 
-# Manager and penetration_testing still in victor.security (not migrated yet)
-import warnings
-
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
-    from victor.security.manager import (
-        SecurityManager,
-        get_security_manager,
-        reset_security_manager,
-    )
-
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
-    from victor.security.penetration_testing import (
-        SecurityTestSuite,
-        SeverityLevel,
-        AttackType,
-        SecurityReport,
-        ComprehensiveSecurityReport,
-        run_security_tests,
-    )
+# Import manager and penetration_testing from local modules (canonical location)
+from victor.security_analysis.tools.manager import (
+    SecurityManager,
+    get_security_manager,
+    reset_security_manager,
+)
+from victor.security_analysis.tools.penetration_testing import (
+    SecurityTestSuite,
+    SeverityLevel,
+    AttackType,
+    SecurityReport,
+    ComprehensiveSecurityReport,
+    run_security_tests,
+)
 
 __all__ = [
     # Scanner

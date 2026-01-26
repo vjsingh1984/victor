@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from victor.security_analysis.tools.cve_database_impl import BaseCVEDatabase
 
-from victor.security.protocol import (
+from victor.core.security.protocol import (
     Dependency,
     SecurityScanResult,
     Vulnerability,

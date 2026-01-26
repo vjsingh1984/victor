@@ -53,6 +53,8 @@ from victor.core.security.authorization import (
     Policy,
     AuthorizationDecision,
     EnhancedAuthorizer,
+    get_enhanced_authorizer,
+    set_enhanced_authorizer,
 )
 
 __all__ = [
@@ -65,4 +67,6 @@ __all__ = [
     "Policy",
     "AuthorizationDecision",
     "EnhancedAuthorizer",
+    "get_enhanced_authorizer",
+    "set_enhanced_authorizer",
 ]

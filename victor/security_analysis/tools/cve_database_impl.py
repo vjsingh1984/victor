@@ -29,7 +29,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional, Protocol, runtime_checkable
 
-from victor.security.protocol import (
+from victor.core.security.protocol import (
     CVE,
     CVSSMetrics,
     Severity,

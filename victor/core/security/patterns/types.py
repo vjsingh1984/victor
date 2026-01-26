@@ -12,13 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Safety pattern type definitions.
+"""Core safety types used across safety modules.
 
-This is the canonical location for SafetyPattern type.
-The old location (victor.security.safety.types) is deprecated.
+This module defines the fundamental types used by safety modules,
+placed here to avoid circular imports between safety and verticals.
 """
 
-# Import from local implementation (canonical location)
-from victor.core.security.patterns.types_impl import SafetyPattern
+from __future__ import annotations
 
-__all__ = ["SafetyPattern"]
+from dataclasses import dataclass
+
+
+@dataclass
+class SafetyPattern:
+    """A safety pattern for detecting dangerous operations.
+
+    Attributes:
+        pattern: Regex pattern to match
+        description: Human-readable description
+        risk_level: Risk level (use string for flexibility)
+        category: Category of the pattern (e.g., "git", "filesystem")
+    """
+
+    pattern: str
+    description: str
+    risk_level: str = "HIGH"  # "CRITICAL", "HIGH", "MEDIUM", "LOW"
+    category: str = "general"
+
+
+__all__ = [
+    "SafetyPattern",
+]
