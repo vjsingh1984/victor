@@ -157,7 +157,7 @@ class WorkflowRegistryService(Protocol):
 class TeamRegistryService(Protocol):
     """Protocol for team registry services."""
 
-    def register_from_vertical(self, vertical: str, specs: dict, replace: bool = False) -> None:
+    def register_from_vertical(self, vertical: str, specs: dict[str, Any], replace: bool = False) -> None:
         """Register team specs from a vertical."""
         ...
 
@@ -281,7 +281,7 @@ def _create_handler_registry(container: ServiceContainer) -> Any:
     return get_handler_registry()
 
 
-def _create_agent_bridge(container: ServiceContainer) -> "AgentBridge":
+def _create_agent_bridge(container: ServiceContainer) -> Optional["AgentBridge"]:
     """Factory for creating AgentBridge.
 
     Creates a bridge configured with container services.
@@ -337,7 +337,7 @@ def _create_agent_bridge(container: ServiceContainer) -> "AgentBridge":
     # Note: AgentBridge requires an Agent instance, not just orchestrator
     # For now, return None and let caller handle the bridge creation
     # when they have an actual Agent instance
-    return None  # type: ignore[return-value]
+    return None
 
 
 # =============================================================================
@@ -587,20 +587,16 @@ class FrameworkScope:
 
         Returns the singleton instance from the parent container.
         """
-        from typing import cast
-
         # Get singleton from parent container (not scope - singletons are shared)
-        return cast(ToolConfiguratorService, self._container.get(ToolConfiguratorService))
+        return self._container.get(ToolConfiguratorService)
 
     def get_registry(self) -> Any:
         """Get event registry service.
 
         Returns the singleton instance from the parent container.
         """
-        from typing import cast
-
         # Get singleton from parent container (not scope - singletons are shared)
-        return cast(EventRegistryService, self._container.get(EventRegistryService))
+        return self._container.get(EventRegistryService)
 
     def get_builder(self) -> Any:
         """Get agent builder service.

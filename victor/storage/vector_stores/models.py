@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     try:
         from openai import AsyncOpenAI
     except ImportError:
-        AsyncOpenAI = None  # type: ignore
+        AsyncOpenAI = None
 
     try:
         import cohere
@@ -205,7 +205,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         if self._embedding_service is None:
             raise RuntimeError("EmbeddingService not initialized")
         embedding = await self._embedding_service.embed_text(text)
-        return embedding.tolist()  # type: ignore[no-any-return]
+        return embedding.tolist()
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts (batch optimized)."""
@@ -387,7 +387,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         # Type assertion for Cohere's dynamic response
         for emb in embeddings:
             assert isinstance(emb, list)
-        return embeddings  # type: ignore[no-any-return]
+        return embeddings
 
     def get_dimension(self) -> int:
         """Get embedding dimension."""

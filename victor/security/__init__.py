@@ -241,9 +241,9 @@ __all__ = [
 
 
 # Track which submodules have already warned to avoid duplicate warnings
-_warned_submodules: set = set()
+_warned_submodules: set[str] = set()
 # Cache for loaded submodules to avoid re-importing
-_submodule_cache: dict = {}
+_submodule_cache: dict[str, Any] = {}
 
 
 def __getattr__(name: str) -> Any:

@@ -2798,7 +2798,7 @@ class CodebaseIndex:
             # Create embedding provider
             created_provider = EmbeddingRegistry.create(embedding_config)
             # Store as compatible type (they have the same interface)
-            self.embedding_provider = created_provider  # type: ignore[assignment]
+            self.embedding_provider = created_provider
             print(
                 f"✓ Embeddings enabled: {embedding_config.embedding_model} + "
                 f"{embedding_config.vector_store}"

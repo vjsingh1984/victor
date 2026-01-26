@@ -252,7 +252,7 @@ class AICompletionProvider(StreamingCompletionProvider):
             logger.warning(f"AI inline completion failed: {e}")
             return InlineCompletionList(items=[])
 
-    async def stream_inline_completion(self, params: InlineCompletionParams) -> AsyncIterator[str]:  # type: ignore[override]
+    async def stream_inline_completion(self, params: InlineCompletionParams) -> AsyncIterator[str]:
         """Stream inline completion tokens.
 
         Args:

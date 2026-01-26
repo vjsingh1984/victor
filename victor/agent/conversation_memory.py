@@ -2234,8 +2234,8 @@ class ConversationStore:
                 summary_embedding = await self._embedding_service.embed_text(summary[:2000])
                 # Convert numpy arrays to lists for cosine_similarity
                 similarity = self._cosine_similarity(
-                    list(query_embedding) if hasattr(query_embedding, "tolist") else query_embedding,  # type: ignore[arg-type]
-                    list(summary_embedding) if hasattr(summary_embedding, "tolist") else summary_embedding,  # type: ignore[arg-type]
+                    list(query_embedding) if hasattr(query_embedding, "tolist") else query_embedding,
+                    list(summary_embedding) if hasattr(summary_embedding, "tolist") else summary_embedding,
                 )
 
                 if similarity >= min_similarity:

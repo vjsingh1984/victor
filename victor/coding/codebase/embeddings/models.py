@@ -165,7 +165,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
 
         # Use async method from EmbeddingService
         embedding = await self._embedding_service.embed_text(text)
-        return embedding.tolist()  # type: ignore[no-any-return]
+        return embedding.tolist()
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts (batch optimized)."""
@@ -245,7 +245,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             raise RuntimeError("OpenAI client not initialized")
 
         response = await self.client.embeddings.create(model=self.config.embedding_model, input=text)
-        return response.data[0].embedding  # type: ignore[no-any-return]
+        return response.data[0].embedding
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts."""
@@ -323,7 +323,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
             raise RuntimeError("Cohere client not initialized")
 
         response = await self.client.embed(texts=[text], model=self.config.embedding_model)
-        return response.embeddings[0]  # type: ignore[no-any-return]
+        return response.embeddings[0]
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts."""
@@ -334,7 +334,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
             raise RuntimeError("Cohere client not initialized")
 
         response = await self.client.embed(texts=texts, model=self.config.embedding_model)
-        return response.embeddings  # type: ignore[no-any-return]
+        return response.embeddings
 
     def get_dimension(self) -> int:
         """Get embedding dimension."""

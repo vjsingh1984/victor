@@ -1022,14 +1022,14 @@ def capability(
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         # Use setattr to avoid attr-defined error on Callable
-        func._capability_meta = {
+        setattr(func, "_capability_meta", {
             "name": name,
             "capability_type": capability_type,
             "version": version,
             "description": description or func.__doc__ or "",
             "setter": setter or name,
             "getter": getter,
-        }
+        })
         return func
 
     return decorator

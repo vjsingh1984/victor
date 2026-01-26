@@ -650,7 +650,7 @@ def __getattr__(name: str) -> Any:
         import sys
 
         this_module = sys.modules[__name__]
-        this_module.discover = discover
+        setattr(this_module, "discover", discover)
 
         return discover
 
