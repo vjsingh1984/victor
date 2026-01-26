@@ -2235,12 +2235,12 @@ class ConversationStore:
                 # Convert numpy arrays to lists for cosine_similarity
                 similarity = self._cosine_similarity(
                     (
-                        list(query_embedding)
+                        list(query_embedding)  # type: ignore[arg-type]
                         if hasattr(query_embedding, "tolist")
                         else query_embedding
                     ),
                     (
-                        list(summary_embedding)
+                        list(summary_embedding)  # type: ignore[arg-type]
                         if hasattr(summary_embedding, "tolist")
                         else summary_embedding
                     ),

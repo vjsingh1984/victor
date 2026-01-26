@@ -722,13 +722,7 @@ module = [
     "victor.observability.*",
     "victor.telemetry.*",
     "victor.context.*",
-    # Core modules with Pydantic BaseModel issues (imported by strict-typed modules)
-    "victor.core.validation",
-    "victor.core.tool_dependency_schema",
-    "victor.integrations.mcp.protocol",
-    "victor.integrations.mcp.*",
-    # Other modules imported by strict-typed modules with type errors
-    "victor.agent.conversation_memory",
+    # Modules imported by strict-typed modules with remaining type errors
     "victor.framework.service_provider",
     "victor.agent.orchestrator_factory",
     "victor.agent.orchestrator",
@@ -741,16 +735,12 @@ module = [
     "victor.agent.streaming.*",
     "victor.storage.cache.*",
     "victor.framework.__init__",
-    # Additional modules with type errors (watchdog, pydantic-settings, etc.)
-    "victor.core.tool_dependency_loader",
-    "victor.framework.module_loader",
+    # Modules with watchdog FileSystemEventHandler type Any issues
     "victor.core.events.*",
-    "victor.config.settings",
-    "victor.agent.tool_result_cache",
     "victor.agent.cache.*",
-    # Security module re-exports (MyPy can't follow the import chain)
-    "victor.security.authorization_enhanced",
-    "victor.security.__init__",
+    # MCP protocol modules (Pydantic BaseModel issues)
+    "victor.integrations.mcp.protocol",
+    "victor.integrations.mcp.*",
 ]
 ignore_errors = true
 
