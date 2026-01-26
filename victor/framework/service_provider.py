@@ -590,7 +590,7 @@ class FrameworkScope:
         Returns the singleton instance from the parent container.
         """
         # Get singleton from parent container (not scope - singletons are shared)
-        return self._container.get(ToolConfiguratorService)
+        return self._container.get(ToolConfiguratorService)  # type: ignore[type-abstract]
 
     def get_registry(self) -> Any:
         """Get event registry service.
@@ -598,7 +598,7 @@ class FrameworkScope:
         Returns the singleton instance from the parent container.
         """
         # Get singleton from parent container (not scope - singletons are shared)
-        return self._container.get(EventRegistryService)
+        return self._container.get(EventRegistryService)  # type: ignore[type-abstract]
 
     def get_builder(self) -> Any:
         """Get agent builder service.

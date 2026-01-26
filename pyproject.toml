@@ -728,8 +728,6 @@ module = [
     "victor.core.events.*",
     "victor.agent.cache.file_watcher",
     # Other modules with type errors
-    "victor.agent.orchestrator_factory",
-    "victor.agent.orchestrator",
     "victor.security_analysis.*",
     "victor.processing.*",
     "victor.coding.codebase.*",
