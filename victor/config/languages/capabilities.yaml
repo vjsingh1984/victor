@@ -1,0 +1,755 @@
+# Unified Language Capabilities Configuration
+# Version: 1.0
+#
+# This file defines capabilities for all supported languages.
+# Used by both indexing and validation systems.
+#
+# Language Tiers:
+# - Tier 1: Full support - Native AST + Tree-sitter + LSP
+# - Tier 2: Good support - Native AST or Tree-sitter + LSP
+# - Tier 3: Basic support - Tree-sitter only
+
+version: "1.0"
+
+# =============================================================================
+# Tier 1 Languages (Full Support)
+# =============================================================================
+
+languages:
+  python:
+    tier: 1
+    extensions: [".py", ".pyw", ".pyi"]
+    filenames: ["Pipfile", "pyproject.toml", "setup.py"]
+
+    native_ast:
+      library: "ast"
+      access_method: "native"
+      has_type_info: true
+      has_error_recovery: false
+      has_semantic_analysis: false
+
+    tree_sitter:
+      grammar_package: "tree_sitter_python"
+      has_highlights: true
+
+    lsp:
+      server_name: "pylsp"
+      language_id: "python"
+      install_command: "pip install python-lsp-server"
+      has_type_info: true
+
+    indexing_strategy: ["native", "tree_sitter", "lsp"]
+    validation_strategy: ["native", "tree_sitter", "lsp"]
+
+  typescript:
+    tier: 1
+    extensions: [".ts"]
+    filenames: ["tsconfig.json"]
+
+    native_ast:
+      library: "typescript"
+      access_method: "subprocess"
+      requires_runtime: "node"
+      subprocess_command: ["npx", "ts-node", "--eval"]
+      output_format: "json"
+      has_type_info: true
+      has_error_recovery: true
+      has_semantic_analysis: true
+
+    tree_sitter:
+      grammar_package: "tree_sitter_typescript"
+      language_function: "language_typescript"
+
+    lsp:
+      server_name: "typescript-language-server"
+      language_id: "typescript"
+      install_command: "npm install -g typescript-language-server typescript"
+      has_type_info: true
+
+    indexing_strategy: ["tree_sitter", "subprocess", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp", "subprocess"]
+
+  tsx:
+    tier: 1
+    extensions: [".tsx"]
+
+    native_ast:
+      library: "typescript"
+      access_method: "subprocess"
+      requires_runtime: "node"
+      has_type_info: true
+      has_error_recovery: true
+
+    tree_sitter:
+      grammar_package: "tree_sitter_typescript"
+      language_function: "language_tsx"
+
+    lsp:
+      server_name: "typescript-language-server"
+      language_id: "typescriptreact"
+      has_type_info: true
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  javascript:
+    tier: 1
+    extensions: [".js", ".mjs", ".cjs"]
+    filenames: ["package.json"]
+
+    native_ast:
+      library: "typescript"
+      access_method: "subprocess"
+      requires_runtime: "node"
+      has_type_info: false  # JS has no static types
+      has_error_recovery: true
+
+    tree_sitter:
+      grammar_package: "tree_sitter_javascript"
+
+    lsp:
+      server_name: "typescript-language-server"
+      language_id: "javascript"
+      has_type_info: false
+
+    indexing_strategy: ["tree_sitter", "subprocess", "lsp"]
+    validation_strategy: ["tree_sitter", "subprocess", "lsp"]
+
+  jsx:
+    tier: 1
+    extensions: [".jsx"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_javascript"
+
+    lsp:
+      server_name: "typescript-language-server"
+      language_id: "javascriptreact"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+# =============================================================================
+# Tier 2 Languages (Good Support)
+# =============================================================================
+
+  go:
+    tier: 2
+    extensions: [".go"]
+    filenames: ["go.mod", "go.sum"]
+
+    native_ast:
+      library: "gopygo"
+      access_method: "python_lib"
+      python_package: "gopygo"
+      has_type_info: false
+      has_error_recovery: false
+
+    tree_sitter:
+      grammar_package: "tree_sitter_go"
+
+    lsp:
+      server_name: "gopls"
+      language_id: "go"
+      install_command: "go install golang.org/x/tools/gopls@latest"
+      has_type_info: true
+
+    indexing_strategy: ["tree_sitter", "python_lib", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp", "python_lib"]
+
+  rust:
+    tier: 2
+    extensions: [".rs"]
+    filenames: ["Cargo.toml", "Cargo.lock"]
+
+    # No good native AST for Rust in Python
+    native_ast: null
+
+    tree_sitter:
+      grammar_package: "tree_sitter_rust"
+
+    lsp:
+      server_name: "rust-analyzer"
+      language_id: "rust"
+      install_command: "rustup component add rust-analyzer"
+      has_type_info: true
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  java:
+    tier: 2
+    extensions: [".java"]
+    filenames: ["pom.xml", "build.gradle", "build.gradle.kts"]
+
+    native_ast:
+      library: "javalang"
+      access_method: "python_lib"
+      python_package: "javalang"
+      has_type_info: false
+      has_error_recovery: true
+
+    tree_sitter:
+      grammar_package: "tree_sitter_java"
+
+    lsp:
+      server_name: "jdtls"
+      language_id: "java"
+      has_type_info: true
+
+    indexing_strategy: ["tree_sitter", "python_lib", "lsp"]
+    validation_strategy: ["tree_sitter", "python_lib", "lsp"]
+
+  c:
+    tier: 2
+    extensions: [".c", ".h"]
+
+    native_ast:
+      library: "libclang"
+      access_method: "ffi"
+      python_package: "libclang"
+      has_type_info: true
+      has_error_recovery: true
+      has_semantic_analysis: true
+
+    tree_sitter:
+      grammar_package: "tree_sitter_c"
+
+    lsp:
+      server_name: "clangd"
+      language_id: "c"
+      has_type_info: true
+
+    indexing_strategy: ["tree_sitter", "ffi", "lsp"]
+    validation_strategy: ["tree_sitter", "ffi", "lsp"]
+
+  cpp:
+    tier: 2
+    extensions: [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".h++"]
+
+    native_ast:
+      library: "libclang"
+      access_method: "ffi"
+      python_package: "libclang"
+      has_type_info: true
+      has_error_recovery: true
+      has_semantic_analysis: true
+
+    tree_sitter:
+      grammar_package: "tree_sitter_cpp"
+
+    lsp:
+      server_name: "clangd"
+      language_id: "cpp"
+      has_type_info: true
+
+    indexing_strategy: ["tree_sitter", "ffi", "lsp"]
+    validation_strategy: ["tree_sitter", "ffi", "lsp"]
+
+# =============================================================================
+# Tier 3 Languages (Tree-sitter only)
+# =============================================================================
+
+  ruby:
+    tier: 3
+    extensions: [".rb", ".rake"]
+    filenames: ["Gemfile", "Rakefile"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_ruby"
+
+    lsp:
+      server_name: "solargraph"
+      language_id: "ruby"
+      install_command: "gem install solargraph"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  php:
+    tier: 3
+    extensions: [".php", ".phtml"]
+    filenames: ["composer.json"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_php"
+
+    lsp:
+      server_name: "phpactor"
+      language_id: "php"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  csharp:
+    tier: 3
+    extensions: [".cs"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_c_sharp"
+
+    lsp:
+      server_name: "omnisharp"
+      language_id: "csharp"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  scala:
+    tier: 3
+    extensions: [".scala", ".sc"]
+    filenames: ["build.sbt"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_scala"
+
+    lsp:
+      server_name: "metals"
+      language_id: "scala"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  kotlin:
+    tier: 3
+    extensions: [".kt", ".kts"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_kotlin"
+
+    lsp:
+      server_name: "kotlin-language-server"
+      language_id: "kotlin"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  swift:
+    tier: 3
+    extensions: [".swift"]
+    filenames: ["Package.swift"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_swift"
+
+    lsp:
+      server_name: "sourcekit-lsp"
+      language_id: "swift"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  lua:
+    tier: 3
+    extensions: [".lua"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_lua"
+
+    lsp:
+      server_name: "lua-language-server"
+      language_id: "lua"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  elixir:
+    tier: 3
+    extensions: [".ex", ".exs"]
+    filenames: ["mix.exs"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_elixir"
+
+    lsp:
+      server_name: "elixir-ls"
+      language_id: "elixir"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  haskell:
+    tier: 3
+    extensions: [".hs", ".lhs"]
+    filenames: ["*.cabal"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_haskell"
+
+    lsp:
+      server_name: "haskell-language-server"
+      language_id: "haskell"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  r:
+    tier: 3
+    extensions: [".r", ".R"]
+    filenames: [".Rprofile"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_r"
+
+    lsp:
+      server_name: "languageserver"
+      language_id: "r"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  julia:
+    tier: 3
+    extensions: [".jl"]
+    filenames: ["Project.toml"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_julia"
+
+    lsp:
+      server_name: "LanguageServer.jl"
+      language_id: "julia"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  perl:
+    tier: 3
+    extensions: [".pl", ".pm"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_perl"
+
+    lsp:
+      server_name: "Perl-LanguageServer"
+      language_id: "perl"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  bash:
+    tier: 3
+    extensions: [".sh", ".bash"]
+    filenames: [".bashrc", ".bash_profile", ".zshrc"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_bash"
+
+    lsp:
+      server_name: "bash-language-server"
+      language_id: "shellscript"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  sql:
+    tier: 3
+    extensions: [".sql"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_sql"
+
+    indexing_strategy: ["tree_sitter"]
+    validation_strategy: ["tree_sitter"]
+
+  yaml:
+    tier: 3
+    extensions: [".yaml", ".yml"]
+
+    native_ast:
+      library: "pyyaml"
+      access_method: "native"
+      has_type_info: false
+      has_error_recovery: false
+
+    tree_sitter:
+      grammar_package: "tree_sitter_yaml"
+
+    lsp:
+      server_name: "yaml-language-server"
+      language_id: "yaml"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["native", "tree_sitter", "lsp"]
+
+  json:
+    tier: 3
+    extensions: [".json"]
+
+    native_ast:
+      library: "json"
+      access_method: "native"
+      has_type_info: false
+      has_error_recovery: false
+
+    tree_sitter:
+      grammar_package: "tree_sitter_json"
+
+    indexing_strategy: ["tree_sitter"]
+    validation_strategy: ["native", "tree_sitter"]
+
+  toml:
+    tier: 3
+    extensions: [".toml"]
+
+    native_ast:
+      library: "tomllib"
+      access_method: "native"
+      has_type_info: false
+      has_error_recovery: false
+
+    tree_sitter:
+      grammar_package: "tree_sitter_toml"
+
+    indexing_strategy: ["tree_sitter"]
+    validation_strategy: ["native", "tree_sitter"]
+
+  html:
+    tier: 3
+    extensions: [".html", ".htm"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_html"
+
+    lsp:
+      server_name: "html-languageserver"
+      language_id: "html"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  css:
+    tier: 3
+    extensions: [".css"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_css"
+
+    lsp:
+      server_name: "css-languageserver"
+      language_id: "css"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  markdown:
+    tier: 3
+    extensions: [".md", ".markdown"]
+
+    native_ast:
+      library: "markdown-it-py"
+      access_method: "native"
+      has_type_info: false
+      has_error_recovery: true
+
+    tree_sitter:
+      grammar_package: "tree_sitter_markdown"
+
+    indexing_strategy: ["tree_sitter"]
+    validation_strategy: ["native", "tree_sitter"]
+
+  xml:
+    tier: 3
+    extensions: [".xml", ".xsd", ".xsl", ".xslt", ".pom"]
+
+    native_ast:
+      library: "xml.etree"
+      access_method: "native"
+      has_type_info: false
+      has_error_recovery: false
+
+    tree_sitter:
+      grammar_package: "tree_sitter_xml"
+
+    lsp:
+      server_name: "lemminx"
+      language_id: "xml"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["native", "tree_sitter", "lsp"]
+
+  hocon:
+    tier: 3
+    extensions: [".conf", ".hocon"]
+    filenames: ["application.conf", "reference.conf"]
+
+    native_ast:
+      library: "pyhocon"
+      access_method: "native"
+      has_type_info: false
+      has_error_recovery: false
+
+    tree_sitter:
+      grammar_package: "tree_sitter_hocon"
+
+    indexing_strategy: ["tree_sitter"]
+    validation_strategy: ["native", "tree_sitter"]
+
+  vue:
+    tier: 3
+    extensions: [".vue"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_vue"
+
+    lsp:
+      server_name: "volar"
+      language_id: "vue"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  svelte:
+    tier: 3
+    extensions: [".svelte"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_svelte"
+
+    lsp:
+      server_name: "svelte-language-server"
+      language_id: "svelte"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  zig:
+    tier: 3
+    extensions: [".zig"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_zig"
+
+    lsp:
+      server_name: "zls"
+      language_id: "zig"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  nim:
+    tier: 3
+    extensions: [".nim"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_nim"
+
+    lsp:
+      server_name: "nimlsp"
+      language_id: "nim"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  dart:
+    tier: 3
+    extensions: [".dart"]
+    filenames: ["pubspec.yaml"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_dart"
+
+    lsp:
+      server_name: "dart"
+      language_id: "dart"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  clojure:
+    tier: 3
+    extensions: [".clj", ".cljs", ".cljc"]
+    filenames: ["deps.edn"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_clojure"
+
+    lsp:
+      server_name: "clojure-lsp"
+      language_id: "clojure"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  erlang:
+    tier: 3
+    extensions: [".erl", ".hrl"]
+    filenames: ["rebar.config"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_erlang"
+
+    lsp:
+      server_name: "erlang_ls"
+      language_id: "erlang"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  terraform:
+    tier: 3
+    extensions: [".tf", ".tfvars"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_hcl"
+
+    lsp:
+      server_name: "terraform-ls"
+      language_id: "terraform"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  dockerfile:
+    tier: 3
+    extensions: []
+    filenames: ["Dockerfile"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_dockerfile"
+
+    lsp:
+      server_name: "dockerfile-language-server-nodejs"
+      language_id: "dockerfile"
+
+    indexing_strategy: ["tree_sitter", "lsp"]
+    validation_strategy: ["tree_sitter", "lsp"]
+
+  make:
+    tier: 3
+    extensions: []
+    filenames: ["Makefile", "GNUmakefile"]
+
+    tree_sitter:
+      grammar_package: "tree_sitter_make"
+
+    indexing_strategy: ["tree_sitter"]
+    validation_strategy: ["tree_sitter"]
+
+# =============================================================================
+# Feature Flags (Global)
+# =============================================================================
+
+feature_flags:
+  # Master switches
+  indexing_enabled: true
+  validation_enabled: true
+
+  # Per-mechanism toggles
+  native_ast_enabled: true
+  tree_sitter_enabled: true
+  lsp_enabled: true
+
+  # Fallback behavior
+  fallback_on_unavailable: "allow"  # allow, warn, block
+  fallback_on_error: "warn"  # allow, warn, block
+
+  # Performance
+  cache_enabled: true
+  cache_ttl_seconds: 300
+  parallel_processing: true
+
+  # Per-language overrides (optional)
+  # language_overrides:
+  #   rust:
+  #     validation_enabled: false
