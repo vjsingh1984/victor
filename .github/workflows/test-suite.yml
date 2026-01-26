@@ -250,108 +250,13 @@ jobs:
           victor --help
           victor version || echo "Version command not available"
 
-  # =============================================================================
-  # Job 4: Framework Tests - Test framework capabilities
-  # =============================================================================
-  framework-tests:
-    name: Framework Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install "pip>=25.2"
-          pip install torch --index-url https://download.pytorch.org/whl/cpu || pip install torch
-          pip install -e ".[dev]"
-
-      - name: Run framework tests
-        run: |
-          pytest tests/unit/framework -v \
-            --cov=victor.framework \
-            --cov-report=xml \
-            --cov-report=term-missing:skip-covered \
-            --tb=short \
-            --maxfail=5 \
-            -m "not slow" \
-            --color=yes
-
-      - name: Generate framework coverage summary
-        run: |
-          echo "# Framework Coverage Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          coverage report --include='victor/framework/*' >> $GITHUB_STEP_SUMMARY || true
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
-          flags: framework-tests
-          name: codecov-framework-tests
-          token: ${{ secrets.CODECOV_TOKEN }}
+  # NOTE: Framework Tests and Coordinator Tests were removed as they're redundant
+  # - Framework tests (tests/unit/framework) are already covered by unit-tests
+  # - Coordinator tests (tests/unit/agent/test_coordinators.py) are already covered by unit-tests
+  # This reduces CI time and avoids duplicate test runs.
 
   # =============================================================================
-  # Job 5: Coordinator Tests - Test all coordinators
-  # =============================================================================
-  coordinator-tests:
-    name: Coordinator Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install "pip>=25.2"
-          pip install torch --index-url https://download.pytorch.org/whl/cpu || pip install torch
-          pip install -e ".[dev]"
-
-      - name: Run coordinator tests
-        run: |
-          pytest tests/unit/agent/test_coordinators.py tests/integration/agent/test_coordinator_integration.py -v \
-            --cov=victor.agent.coordinators \
-            --cov-report=xml \
-            --cov-report=term-missing:skip-covered \
-            --cov-fail-under=70 \
-            --tb=short \
-            --maxfail=5 \
-            --color=yes
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
-          flags: coordinator-tests
-          name: codecov-coordinator-tests
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-  # =============================================================================
-  # Job 6: Performance Tests - Benchmark performance
+  # Job 4: Performance Tests - Benchmark performance
   # =============================================================================
   performance-tests:
     name: Performance Tests
@@ -421,7 +326,7 @@ jobs:
     name: Test Summary Report
     runs-on: ubuntu-latest
     if: always()
-    needs: [unit-tests, integration-tests, smoke-tests, framework-tests, coordinator-tests, performance-tests]
+    needs: [unit-tests, integration-tests, smoke-tests, performance-tests]
 
     steps:
       - name: Download all artifacts
@@ -447,8 +352,6 @@ jobs:
           | Unit Tests | ${{ needs.unit-tests.result }} | Python 3.10, 3.11, 3.12 on Ubuntu, macOS, Windows |
           | Integration Tests | ${{ needs.integration-tests.result }} | Full integration test suite |
           | Smoke Tests | ${{ needs.smoke-tests.result }} | Quick sanity checks |
-          | Framework Tests | ${{ needs.framework-tests.result }} | Framework components |
-          | Coordinator Tests | ${{ needs.coordinator-tests.result }} | All coordinators |
           | Performance Tests | ${{ needs.performance-tests.result }} | Performance benchmarks |
 
           ## Overall Status
@@ -458,9 +361,7 @@ jobs:
           # Add overall status
           if [ "${{ needs.unit-tests.result }}" == "success" ] && \
              [ "${{ needs.integration-tests.result }}" == "success" ] && \
-             [ "${{ needs.smoke-tests.result }}" == "success" ] && \
-             [ "${{ needs.framework-tests.result }}" == "success" ] && \
-             [ "${{ needs.coordinator-tests.result }}" == "success" ]; then
+             [ "${{ needs.smoke-tests.result }}" == "success" ]; then
             echo "✅ **All test suites passed!**" >> test-summary.md
           else
             echo "❌ **Some test suites failed. Please review the logs above.**" >> test-summary.md
@@ -473,8 +374,6 @@ jobs:
           Coverage reports have been uploaded to Codecov for each test suite.
           - Unit Tests: `unit-tests` flag
           - Integration Tests: `integration-tests` flag
-          - Framework Tests: `framework-tests` flag
-          - Coordinator Tests: `coordinator-tests` flag
 
           ## Artifacts
 
@@ -509,9 +408,7 @@ jobs:
         run: |
           if [ "${{ needs.unit-tests.result }}" != "success" ] || \
              [ "${{ needs.integration-tests.result }}" != "success" ] || \
-             [ "${{ needs.smoke-tests.result }}" != "success" ] || \
-             [ "${{ needs.framework-tests.result }}" != "success" ] || \
-             [ "${{ needs.coordinator-tests.result }}" != "success" ]; then
+             [ "${{ needs.smoke-tests.result }}" != "success" ]; then
             echo "::error::One or more test suites failed. Please review the logs."
             exit 1
           fi
