@@ -170,6 +170,44 @@ await lsp.start_server("python")
 definitions = await lsp.get_definitions(file_path, position)
 ```
 
+### Code Validation (Pre-Write Enforcement)
+
+The Coding vertical integrates with the **Unified Language Capability System** to validate code before writing to disk. This prevents syntax errors from being committed:
+
+```python
+from victor.core.language_capabilities.hooks import validate_code_before_write
+
+# Validate before writing
+should_proceed, result = validate_code_before_write(
+    content="def foo():\n    pass",
+    file_path=Path("main.py"),
+    strict=False
+)
+
+if not should_proceed:
+    print(f"Validation failed: {result.errors}")
+```
+
+**Supported Languages** (40+):
+- **Tier 1** (Full Support): Python, JavaScript, TypeScript - Native AST + Tree-sitter + LSP
+- **Tier 2** (Good Support): Go, Java, Rust, C, C++ - Native/Tree-sitter + LSP
+- **Tier 3** (Basic Support): Ruby, PHP, Scala, Kotlin, Swift, etc. - Tree-sitter + optional LSP
+- **Config Files**: JSON, YAML, TOML, XML, HOCON, Markdown - Native Python validators
+
+**CLI Usage**:
+```bash
+victor validate files main.py config.json    # Validate files
+victor validate files src/*.py --strict      # Exit 1 on any error
+victor validate languages                    # List supported languages
+victor validate check app.ts                 # Check validation support
+```
+
+**Environment Variables**:
+```bash
+VICTOR_VALIDATION_ENABLED=false    # Disable validation globally
+VICTOR_STRICT_VALIDATION=true      # Block writes on any error
+```
+
 ### Semantic Code Search
 
 Beyond keyword search, the Coding vertical supports semantic code search using embeddings:

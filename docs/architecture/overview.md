@@ -225,6 +225,46 @@ roles:
     persona: "You are a code quality expert..."
 ```
 
+## Language Capabilities
+
+Unified registry for **40+ languages** supporting both indexing and validation:
+
+| Tier | Languages | Capabilities |
+|------|-----------|--------------|
+| **Tier 1** | Python, JavaScript, TypeScript | Native AST + Tree-sitter + LSP |
+| **Tier 2** | Go, Java, Rust, C, C++ | Native/Tree-sitter + LSP |
+| **Tier 3** | Ruby, PHP, Scala, Kotlin, etc. | Tree-sitter + optional LSP |
+| **Config** | JSON, YAML, TOML, XML, HOCON | Native Python validators |
+
+### Code Validation
+
+Pre-write validation ensures code quality:
+
+```python
+from victor.core.language_capabilities.hooks import validate_code_before_write
+
+should_proceed, result = validate_code_before_write(
+    content="def foo():\n    pass",
+    file_path=Path("main.py"),
+    strict=False  # True = block on any error
+)
+```
+
+### CLI Validation
+
+```bash
+victor validate files main.py config.json  # Validate files
+victor validate languages --tier 1         # List supported languages
+victor validate check app.ts               # Check validation support
+```
+
+### Feature Flags
+
+```bash
+VICTOR_VALIDATION_ENABLED=false  # Disable validation globally
+VICTOR_STRICT_VALIDATION=true    # Block writes on any error
+```
+
 ## Key Design Patterns
 
 | Pattern | Implementation |
