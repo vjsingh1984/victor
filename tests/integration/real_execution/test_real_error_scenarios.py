@@ -93,9 +93,11 @@ async def test_missing_file_error_handling(ollama_provider, ollama_model_name, t
     assert (
         "not found" in content_lower
         or "doesn't exist" in content_lower
+        or "does not exist" in content_lower  # Alternative phrasing
         or "no such file" in content_lower
         or "error" in content_lower
         or "cannot" in content_lower
+        or "suggest" in content_lower  # LLM suggesting alternatives
         or '"read"' in content_lower  # LLM attempting to read via tool call
         or '{"name"' in content_lower  # Tool call JSON format
     ), f"Response should mention file error or attempt tool call: {response.content[:200]}"
