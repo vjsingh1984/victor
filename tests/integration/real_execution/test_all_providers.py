@@ -469,7 +469,7 @@ async def test_provider_shell_tool(
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(300)  # 5 minutes for 3-turn multi-tool test (Ollama can be slow)
+@pytest.mark.timeout(600)  # 10 minutes for 3-turn multi-tool test (Ollama can be slow)
 async def test_provider_multi_tool(
     provider,
     sample_code_file: str,
@@ -478,7 +478,7 @@ async def test_provider_multi_tool(
     """Test multi-turn conversation with multiple tools.
 
     This test involves 3 LLM turns (Read → Edit → Read), which takes longer.
-    Timeout extended to 300s to accommodate slow local providers like Ollama.
+    Timeout extended to 600s to accommodate slow local providers like Ollama.
     """
     from pathlib import Path
 
@@ -499,8 +499,9 @@ async def test_provider_multi_tool(
     start_time = time.time()
     provider_name = provider._provider_name
 
-    # Per-turn timeout (90s each, 270s total vs 300s pytest-timeout)
-    turn_timeout = 90
+    # Per-turn timeout: 120s for local providers, 90s for cloud
+    is_local_provider = provider._provider_name in ["ollama", "lmstudio", "vllm", "llamacpp"]
+    turn_timeout = 180 if is_local_provider else 90
 
     # Turn 1: Read file
     async with skip_on_timeout(turn_timeout, provider_name):

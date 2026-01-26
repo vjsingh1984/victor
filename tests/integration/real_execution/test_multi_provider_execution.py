@@ -68,6 +68,9 @@ def pytest_generate_tests(metafunc):
     This hook checks which providers are available and only parametrizes tests
     with those providers. This avoids the complex async fixture chain that was
     causing event loop issues.
+
+    For tests marked with @pytest.mark.cloud_provider, Ollama is excluded from
+    parametrization since it's a local provider.
     """
     from tests.integration.real_execution.conftest import (
         has_provider_api_key,
@@ -80,18 +83,22 @@ def pytest_generate_tests(metafunc):
     if {"provider", "provider_name", "model"}.isdisjoint(metafunc.fixturenames):
         return
 
+    # Check if this is a cloud-only test
+    is_cloud_only_test = metafunc.definition.get_closest_marker("cloud_provider") is not None
+
     # Determine which providers are available
     provider_configs = []
 
-    # Check Ollama
-    if is_ollama_running() and any(
-        is_ollama_model_available(model)
-        for model in PROVIDER_MODELS["ollama"]
-    ):
-        provider_configs.append({
-            "provider_name": "ollama",
-            "model": PROVIDER_MODELS["ollama"][0],
-        })
+    # Check Ollama (skip for cloud-only tests)
+    if not is_cloud_only_test:
+        if is_ollama_running() and any(
+            is_ollama_model_available(model)
+            for model in PROVIDER_MODELS["ollama"]
+        ):
+            provider_configs.append({
+                "provider_name": "ollama",
+                "model": PROVIDER_MODELS["ollama"][0],
+            })
 
     # Check cloud providers
     for provider in ["deepseek", "xai", "mistral", "openai", "zai"]:
@@ -414,17 +421,14 @@ async def test_cloud_provider_grep_tool(
     """Test Grep tool execution specifically with cloud providers.
 
     This test only runs with cloud providers (DeepSeek, xAI, Mistral, OpenAI, ZAI)
-    to verify cloud API integration works correctly.
+    to verify cloud API integration works correctly. Ollama is automatically
+    excluded via the @pytest.mark.cloud_provider marker.
 
     Verifies:
     - Grep tool is called correctly
     - Search results are returned
     - API integration works
     """
-    # Skip if this is Ollama (local provider)
-    if provider_name == "ollama":
-        pytest.skip("This test is for cloud providers only")
-
     settings = Settings()
     settings.provider = provider_name
     settings.model = model
@@ -465,7 +469,7 @@ async def test_cloud_provider_grep_tool(
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(300)
+@pytest.mark.timeout(600)  # 10 minutes for 3-turn multi-tool test
 async def test_multi_provider_multi_tool(
     provider: BaseProvider,
     model: str,
@@ -481,8 +485,8 @@ async def test_multi_provider_multi_tool(
     - All operations complete
 
     Note: This test involves 3 LLM turns (Read → Edit → Read), which takes longer.
-    The 300s timeout accounts for:
-    - 3 LLM generation/response cycles
+    The 600s timeout accounts for:
+    - 3 LLM generation/response cycles (slow for local providers)
     - 3 tool execution cycles
     - Conversation context preservation overhead
     """
@@ -503,8 +507,9 @@ async def test_multi_provider_multi_tool(
     original_content = Path(sample_code_file).read_text()
     start_time = time.time()
 
-    # Per-turn timeout (90s each, 270s total vs 300s pytest-timeout)
-    turn_timeout = 90
+    # Per-turn timeout: 180s for local providers, 90s for cloud
+    is_local_provider = provider_name in ["ollama", "lmstudio", "vllm", "llamacpp"]
+    turn_timeout = 180 if is_local_provider else 90
 
     # Turn 1: Read file
     async with skip_on_timeout(turn_timeout, provider_name):
