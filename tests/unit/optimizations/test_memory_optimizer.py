@@ -18,7 +18,7 @@ import asyncio
 import gc
 import pytest
 
-from victor.optimizations.memory import (
+from victor.optimization.runtime.memory import (
     MemoryOptimizer,
     ObjectPool,
     MemoryProfiler,

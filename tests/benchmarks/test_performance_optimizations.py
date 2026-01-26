@@ -31,7 +31,7 @@ import pytest
 
 from victor.core.cache import ResponseCache
 from victor.core.batching import RequestBatcher, BatchPriority
-from victor.core.optimizations import json_dumps, json_loads
+from victor.optimization.core import json_dumps, json_loads
 from victor.providers.base import Message, CompletionResponse
 
 

@@ -747,6 +747,9 @@ class TestResponseCoordinatorWithResolution:
 
     def test_is_tool_enabled_internal_with_registry(self, mock_sanitizer, mock_tool_registry):
         """Test tool enabled check with registry."""
+        # Mock list_tools to return available tools
+        mock_tool_registry.list_tools.return_value = ["read_file", "write_file", "bash"]
+
         coordinator = ResponseCoordinator(
             sanitizer=mock_sanitizer,
             tool_registry=mock_tool_registry,
@@ -756,12 +759,12 @@ class TestResponseCoordinatorWithResolution:
 
         # Registry should be consulted
         assert result is True
-        mock_tool_registry.get_tool.assert_called_once_with("read_file")
+        mock_tool_registry.list_tools.assert_called_once_with(only_enabled=False)
 
     def test_is_tool_enabled_internal_registry_error(self, mock_sanitizer):
         """Test tool enabled check with registry error."""
         registry = MagicMock()
-        registry.get_tool.side_effect = Exception("Tool not found")
+        registry.list_tools.side_effect = Exception("Tool not found")
 
         coordinator = ResponseCoordinator(
             sanitizer=mock_sanitizer,

@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.security.safety.code_patterns import (
+from victor.security_analysis.patterns.code_patterns import (
     CodePatternCategory,
     CodePatternScanner,
     GIT_PATTERNS,
@@ -209,7 +209,7 @@ class TestCodePatternScanner:
 
     def test_scanner_with_custom_patterns(self):
         """Scanner should include custom patterns."""
-        from victor.security.safety.types import SafetyPattern
+        from victor.security_analysis.patterns.types import SafetyPattern
 
         custom = SafetyPattern(
             pattern=r"dangerous_custom_command",

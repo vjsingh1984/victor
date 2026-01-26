@@ -24,7 +24,7 @@ import pytest
 import time
 import asyncio
 
-from victor.optimizations import (
+from victor.optimization.runtime import (
     AdaptiveParallelExecutor,
     OptimizationStrategy,
     create_adaptive_executor,

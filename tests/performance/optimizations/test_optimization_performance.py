@@ -37,11 +37,11 @@ from typing import Any, Dict, List
 
 import pytest
 
-from victor.optimizations.lazy_loader import (
+from victor.optimization.runtime.lazy_loader import (
     LazyComponentLoader,
     LoadingStats,
 )
-from victor.optimizations.parallel_executor import (
+from victor.optimization.runtime.parallel_executor import (
     AdaptiveParallelExecutor,
     OptimizationStrategy,
     PerformanceMetrics,

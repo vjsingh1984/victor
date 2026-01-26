@@ -388,9 +388,11 @@ class TestTeamCoordinator:
         self, coordinator: TeamCoordinator, mock_orchestrator: Mock
     ):
         """Test get_team_specs when no specs have been set."""
-        # Setup - ensure _team_specs doesn't exist
-        if hasattr(mock_orchestrator, "_team_specs"):
-            delattr(mock_orchestrator, "_team_specs")
+        # Setup - set _team_specs to empty dict and remove vertical_context
+        mock_orchestrator._team_specs = {}
+        # Remove vertical_context to prevent fallback from auto-creating Mock attributes
+        if hasattr(mock_orchestrator, "vertical_context"):
+            delattr(mock_orchestrator, "vertical_context")
 
         # Execute
         result = coordinator.get_team_specs()

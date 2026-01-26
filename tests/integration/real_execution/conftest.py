@@ -513,8 +513,8 @@ def pytest_collection_modifyitems(items, config):
                     if not is_ollama_running():
                         item.add_marker(
                             pytest.mark.skip(
-                                reason=f"Ollama not available. "
-                                f"Install: brew install ollama && ollama serve"
+                                reason="Ollama not available. "
+                                "Install: brew install ollama && ollama serve"
                             )
                         )
                 elif provider_lower in ["deepseek", "xai", "mistral", "openai", "zai"]:

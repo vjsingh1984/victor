@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.optimizations.parallel_executor import (
+from victor.optimization.runtime.parallel_executor import (
     AdaptiveParallelExecutor,
     OptimizationStrategy,
     PerformanceMetrics,

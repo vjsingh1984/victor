@@ -27,19 +27,19 @@ import yaml
 
 import pytest
 
-from victor.security.penetration_testing import (
+from victor.security_analysis.tools import (
     SecurityTestSuite,
     SeverityLevel,
     AttackType,
 )
-from victor.security.authorization_enhanced import (
+from victor.core.security.authorization import (
     EnhancedAuthorizer,
     Permission,
     Policy,
     PolicyEffect,
     User,
 )
-from victor.security.auth import RBACManager, Permission as RBACPermission
+from victor.core.security.auth import RBACManager, Permission as RBACPermission
 
 
 # =============================================================================

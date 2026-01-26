@@ -211,7 +211,7 @@ class TestExtensionMethodConsistency:
                 # Log but don't fail - some extensions may have optional dependencies
                 import warnings
 
-                warnings.warn(f"{vertical_name}.{method_name}() raised: {e}")
+                warnings.warn(f"{vertical_name}.{method_name}() raised: {e}", stacklevel=2)
 
 
 class TestYAMLOnlyVerticalPattern:

@@ -24,7 +24,7 @@ import pytest
 import time
 import tracemalloc
 
-from victor.optimizations import LazyComponentLoader
+from victor.optimization.runtime import LazyComponentLoader
 
 
 @pytest.mark.performance
@@ -373,7 +373,7 @@ class TestLazyLoadingPerformance:
 
     def test_cache_management_with_different_strategies(self):
         """Test that cache management works with all loading strategies."""
-        from victor.optimizations.lazy_loader import LoadingStrategy
+        from victor.optimization.runtime.lazy_loader import LoadingStrategy
 
         for strategy in [LoadingStrategy.LAZY, LoadingStrategy.EAGER, LoadingStrategy.ADAPTIVE]:
             loader = LazyComponentLoader(max_cache_size=3, strategy=strategy)
@@ -400,7 +400,7 @@ class TestLazyLoadingPerformance:
 
     def test_adaptive_strategy_performance(self):
         """Test performance of adaptive loading strategy with access pattern learning."""
-        from victor.optimizations.lazy_loader import LoadingStrategy
+        from victor.optimization.runtime.lazy_loader import LoadingStrategy
 
         # Create loader with adaptive strategy
         loader = LazyComponentLoader(

@@ -17,7 +17,7 @@
 import asyncio
 import pytest
 
-from victor.optimizations.database import (
+from victor.optimization.runtime.database import (
     DatabaseOptimizer,
     QueryCache,
     QueryMetrics,

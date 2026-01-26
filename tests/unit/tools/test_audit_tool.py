@@ -23,7 +23,7 @@ import victor.tools.audit_tool as audit_tool_module
 from victor.tools.audit_tool import AuditTool
 from victor.agent.presentation import NullPresentationAdapter
 from victor.tools.base import CostTier
-from victor.security.audit import (
+from victor.core.security.audit import (
     AuditEvent,
     AuditEventType,
     AuditReport,

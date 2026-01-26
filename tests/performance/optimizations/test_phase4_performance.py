@@ -45,19 +45,19 @@ except ImportError:
     HAS_BENCHMARK = False
 
 # Import optimization modules
-from victor.optimizations.lazy_loader import (
+from victor.optimization.runtime.lazy_loader import (
     LazyComponentLoader,
     LoadingStrategy,
     LoadingStats,
 )
-from victor.optimizations.parallel_executor import (
+from victor.optimization.runtime.parallel_executor import (
     AdaptiveParallelExecutor,
     OptimizationStrategy,
     PerformanceMetrics,
 )
 from victor.agent.personas.persona_manager import PersonaManager
 from victor.agent.personas.types import Persona, PersonalityType, CommunicationStyle
-from victor.security.authorization_enhanced import EnhancedAuthorizer, Permission
+from victor.core.security.authorization import EnhancedAuthorizer, Permission
 
 
 # =============================================================================

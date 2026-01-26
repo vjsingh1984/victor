@@ -18,7 +18,7 @@ import pytest
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from victor.optimizations.lazy_loader import (
+from victor.optimization.runtime.lazy_loader import (
     ComponentDescriptor,
     LazyComponentLoader,
     LoadingStats,

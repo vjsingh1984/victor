@@ -29,7 +29,7 @@ from datetime import datetime
 
 import pytest
 
-from victor.security.penetration_testing import (
+from victor.security_analysis.tools import (
     SecurityTestSuite,
     SeverityLevel,
     AttackType,

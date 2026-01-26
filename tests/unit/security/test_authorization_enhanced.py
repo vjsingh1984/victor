@@ -11,7 +11,7 @@ Tests cover:
 
 import pytest
 from pathlib import Path
-from victor.security.authorization_enhanced import (
+from victor.core.security.authorization import (
     EnhancedAuthorizer,
     User,
     Role,

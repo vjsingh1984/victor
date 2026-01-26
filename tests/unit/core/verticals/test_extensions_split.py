@@ -32,7 +32,7 @@ from victor.core.verticals.extensions import (
     ConfigExtensions,
 )
 from victor.core.tool_types import ToolDependency
-from victor.security.safety.types import SafetyPattern
+from victor.security_analysis.patterns.types import SafetyPattern
 
 
 class TestToolExtensions:

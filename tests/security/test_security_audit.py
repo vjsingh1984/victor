@@ -34,7 +34,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from victor.security.safety import (
+from victor.security_analysis.patterns import (
     SecretScanner,
     SecretSeverity,
     detect_secrets,
@@ -42,7 +42,7 @@ from victor.security.safety import (
     detect_pii_in_content,
     CodePatternScanner,
 )
-from victor.security.auth import RBACManager, Permission, Role
+from victor.core.security.auth import RBACManager, Permission, Role
 
 
 # =============================================================================
