@@ -336,6 +336,55 @@ lang-all = [
     "tree-sitter-xml>=0.6",
 ]
 
+# Native AST library support for enhanced language analysis
+# These provide better type info and semantic analysis than tree-sitter
+# Usage: pip install victor-ai[lang-native-go]
+
+# Go native AST support (Pure Python Go parser)
+lang-native-go = [
+    "gopygo>=0.1.0",
+]
+
+# Java native AST support (Java 8 only - Java 9+ uses tree-sitter)
+lang-native-java = [
+    "javalang>=0.13.0",
+]
+
+# C/C++ native AST support (libclang bindings)
+# Provides excellent type info, error recovery, and semantic analysis
+lang-native-cpp = [
+    "libclang>=16.0.0",
+]
+
+# JavaScript/TypeScript native AST support (ECMAScript 5.1 + partial ES6)
+# For full ES6+/TypeScript support, Node.js subprocess is used instead
+lang-native-js = [
+    "esprima>=4.0.1",
+]
+
+# All native AST libraries combined
+# Usage: pip install victor-ai[lang-native-all]
+lang-native-all = [
+    "gopygo>=0.1.0",
+    "javalang>=0.13.0",
+    "libclang>=16.0.0",
+    "esprima>=4.0.1",
+]
+
+# Native config file validators
+# These provide better error messages than tree-sitter for config files
+# Usage: pip install victor-ai[config-native]
+config-native = [
+    # YAML validation with detailed error messages
+    "pyyaml>=6.0",  # Already in core deps, included for explicitness
+    # TOML validation (Python 3.11+ has tomllib built-in)
+    "tomli>=2.0.0;python_version<'3.11'",
+    # HOCON validation (Akka, Play Framework, Lightbend config)
+    "pyhocon>=0.3.59",
+    # Markdown parsing (for structural validation)
+    "markdown-it-py>=3.0.0",
+]
+
 # Native Rust extensions for performance (optional)
 # Build with: cd rust && maturin develop --release
 native = [
