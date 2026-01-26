@@ -19,6 +19,7 @@ across the Victor framework. It separates security infrastructure
 (RBAC, audit, authorization) from security analysis tools.
 
 Structure:
+- victor.core.security.pickle: Safe pickle utilities for cache security
 - victor.core.security.auth: Role-Based Access Control (RBAC)
 - victor.core.security.audit: Audit logging and compliance
 - victor.core.security.authorization: Enhanced authorization (RBAC + ABAC)
@@ -28,6 +29,7 @@ Note: For security analysis tools (scanners, CVE databases, penetration testing)
 use victor.security_analysis instead.
 
 Usage:
+    from victor.core.security import safe_pickle_dumps, safe_pickle_loads
     from victor.core.security import RBACManager, Permission
     from victor.core.security.audit import AuditManager
     from victor.core.security.authorization import EnhancedAuthorizer
@@ -36,6 +38,14 @@ Usage:
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+
+# Import safe pickle utilities for cache security
+from victor.core.security.pickle import (
+    CACHE_SIGNING_KEY_ENV,
+    is_signed_pickle_data,
+    safe_pickle_dumps,
+    safe_pickle_loads,
+)
 
 # Import auth module for RBAC
 from victor.core.security.auth import (
@@ -101,6 +111,11 @@ from victor.core.security.authorization import (
 )
 
 __all__ = [
+    # Pickle utilities
+    "safe_pickle_dumps",
+    "safe_pickle_loads",
+    "is_signed_pickle_data",
+    "CACHE_SIGNING_KEY_ENV",
     # Auth (RBAC)
     "Permission",
     "Role",

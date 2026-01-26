@@ -14,30 +14,39 @@
 
 """Hot path optimizations for frequently called code.
 
-.. deprecated:: 0.6.0
-    This module is deprecated. Please migrate to ``victor.optimization.core``.
-    This module will be removed in v1.0.0.
+This is the canonical location for hot path optimization utilities including:
+- Lazy imports for heavy dependencies
+- Optimized JSON serialization (using orjson when available)
+- Thread-safe memoization
+- Performance monitoring utilities
+- Retry decorators
 
-Migration Guide:
-    Old (deprecated):
-        from victor.core.optimizations import json_dumps, json_loads, LazyImport
+Usage:
+    from victor.optimization.core import (
+        json_dumps,
+        json_loads,
+        LazyImport,
+        timed,
+        retry,
+    )
 
-    New (recommended):
-        from victor.optimization.core import json_dumps, json_loads, LazyImport
-        # Or use the unified import:
-        from victor.optimization import json_dumps, json_loads, LazyImport
+    # Fast JSON
+    data = json_dumps({"key": "value"})
+
+    # Lazy imports
+    numpy = LazyImport("numpy")
+
+    # Performance timing
+    @timed
+    def my_function():
+        pass
+
+Performance Impact:
+    - JSON: 3-5x faster with orjson
+    - Lazy imports: 20-30% faster startup
 """
 
-import warnings
-
-# Emit deprecation warning on import
-warnings.warn(
-    "victor.core.optimizations is deprecated and will be removed in v1.0.0. "
-    "Use victor.optimization.core instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
+# Import from victor.core.optimizations (the original location)
 from victor.core.optimizations.hot_path_optimizations import (
     LazyImport,
     lazy_import,

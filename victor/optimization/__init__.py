@@ -12,23 +12,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Workflow optimization algorithms for Victor.
+"""Unified Optimization Module for Victor.
 
-This package provides automated workflow optimization capabilities including:
-- Performance profiling and bottleneck detection
-- Optimization strategies (pruning, parallelization, tool selection)
-- Search algorithms (hill climbing, simulated annealing)
-- Variant generation and evaluation
-- Safety validation and rollback
+This module provides comprehensive optimization capabilities organized into
+three submodules:
+
+- **victor.optimization.workflow**: Workflow profiling and optimization
+  Analyzes workflow execution, detects bottlenecks, generates optimized variants.
+
+- **victor.optimization.runtime**: Lazy loading and parallel execution
+  Provides lazy component loading, adaptive parallel execution, work stealing.
+
+- **victor.optimization.core**: Hot path utilities
+  Fast JSON serialization, lazy imports, memoization, performance monitoring.
 
 Usage:
-    from victor.optimization import WorkflowOptimizer
-
+    # Workflow optimization
+    from victor.optimization import WorkflowOptimizer, WorkflowProfiler
     optimizer = WorkflowOptimizer()
     profile = await optimizer.analyze_workflow(workflow_id)
-    suggestions = await optimizer.suggest_optimizations(workflow_id)
+
+    # Runtime optimization
+    from victor.optimization import LazyComponentLoader, AdaptiveParallelExecutor
+    loader = LazyComponentLoader()
+    executor = AdaptiveParallelExecutor()
+
+    # Hot path utilities
+    from victor.optimization import json_dumps, json_loads, LazyImport
+    data = json_dumps({"key": "value"})
+
+    # Or import from specific submodules
+    from victor.optimization.workflow import WorkflowOptimizer
+    from victor.optimization.runtime import LazyComponentLoader
+    from victor.optimization.core import json_dumps
 """
 
+# =============================================================================
+# Workflow Optimization (from victor.optimization.workflow)
+# =============================================================================
 from victor.optimization.models import (
     Bottleneck,
     BottleneckSeverity,
@@ -56,7 +77,48 @@ from victor.optimization.validator import (
     ValidationRecommendation,
 )
 
+# =============================================================================
+# Runtime Optimization (from victor.optimization.runtime)
+# =============================================================================
+from victor.optimization.runtime import (
+    # Lazy loading
+    LazyComponentLoader,
+    LoadingStats,
+    ComponentDescriptor,
+    lazy_load,
+    set_global_loader,
+    get_global_loader,
+    # Parallel execution
+    AdaptiveParallelExecutor,
+    OptimizationStrategy as RuntimeOptimizationStrategy,  # Avoid conflict
+    PerformanceMetrics,
+    TaskWithPriority,
+    create_adaptive_executor,
+    execute_parallel_optimized,
+)
+
+# =============================================================================
+# Hot Path Optimization (from victor.optimization.core)
+# =============================================================================
+from victor.optimization.core import (
+    LazyImport,
+    lazy_import,
+    json_dumps,
+    json_loads,
+    json_dump,
+    json_load,
+    ThreadSafeMemoized,
+    cached_property,
+    timed,
+    retry,
+    async_retry,
+    PerformanceMonitor,
+)
+
 __all__ = [
+    # ==========================================================================
+    # Workflow Optimization
+    # ==========================================================================
     # Models
     "WorkflowProfile",
     "NodeStatistics",
@@ -81,4 +143,36 @@ __all__ = [
     "OptimizationValidationResult",
     "ValidationRecommendation",
     "ConstraintViolation",
+    # ==========================================================================
+    # Runtime Optimization
+    # ==========================================================================
+    # Lazy loading
+    "LazyComponentLoader",
+    "LoadingStats",
+    "ComponentDescriptor",
+    "lazy_load",
+    "set_global_loader",
+    "get_global_loader",
+    # Parallel execution
+    "AdaptiveParallelExecutor",
+    "RuntimeOptimizationStrategy",
+    "PerformanceMetrics",
+    "TaskWithPriority",
+    "create_adaptive_executor",
+    "execute_parallel_optimized",
+    # ==========================================================================
+    # Hot Path Optimization
+    # ==========================================================================
+    "LazyImport",
+    "lazy_import",
+    "json_dumps",
+    "json_loads",
+    "json_dump",
+    "json_load",
+    "ThreadSafeMemoized",
+    "cached_property",
+    "timed",
+    "retry",
+    "async_retry",
+    "PerformanceMonitor",
 ]

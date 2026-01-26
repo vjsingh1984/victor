@@ -22,7 +22,7 @@ Install gopygo with: pip install gopygo
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from ..types import ExtractedSymbol
 from .base import BaseLanguageProcessor

@@ -25,7 +25,7 @@ Install javalang with: pip install javalang
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from ..types import ExtractedSymbol
 from .base import BaseLanguageProcessor
@@ -158,7 +158,7 @@ class JavaExtractor(BaseLanguageProcessor):
 
     def _extract_type(
         self,
-        node,
+        node: Any,
         file_path: Path,
         symbols: List[ExtractedSymbol],
         parent: Optional[str] = None,
@@ -217,7 +217,7 @@ class JavaExtractor(BaseLanguageProcessor):
 
     def _extract_member(
         self,
-        member,
+        member: Any,
         file_path: Path,
         symbols: List[ExtractedSymbol],
         parent: str,

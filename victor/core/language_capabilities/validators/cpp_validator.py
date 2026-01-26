@@ -110,7 +110,7 @@ class CppValidator:
             ext = file_path.suffix.lower()
             language = "cpp" if ext in [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"] else "c"
 
-        if config and not config.syntax_check_enabled:
+        if config and not config.check_syntax:
             return CodeValidationResult(
                 is_valid=True,
                 language=language,
@@ -146,6 +146,9 @@ class CppValidator:
         """
         issues: List[ValidationIssue] = []
         warnings: List[ValidationIssue] = []
+
+        if self._index is None:
+            raise RuntimeError("libclang index not initialized")
 
         try:
             # Parse options
@@ -227,7 +230,7 @@ class CppValidator:
                 issues=issues,
             )
 
-    def has_syntax_errors(self, code: str, language: str = "cpp") -> bool:
+    def has_errors(self, code: str, language: str = "cpp") -> bool:
         """Check if C/C++ code has syntax errors.
 
         Args:
@@ -238,7 +241,10 @@ class CppValidator:
             True if code has syntax errors
         """
         if not self.is_available():
-            return self._ts_validator.has_syntax_errors(code, language)
+            return self._ts_validator.has_errors(code, language)
+
+        if self._index is None:
+            return False
 
         try:
             args = ["-x", "c++" if language == "cpp" else "c"]

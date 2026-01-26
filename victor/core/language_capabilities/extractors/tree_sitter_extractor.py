@@ -369,10 +369,9 @@ class TreeSitterExtractor:
     def _find_name_in_node(self, node: Any) -> Optional[str]:
         """Find the name identifier in a node."""
         for child in node.children:
-            if child.type in ("identifier", "type_identifier", "property_identifier"):
-                return child.text.decode("utf8")
-            if child.type == "name":
-                return child.text.decode("utf8")
+            if child.type in ("identifier", "type_identifier", "property_identifier", "name"):
+                result: str = child.text.decode("utf8")
+                return result
         return None
 
     def has_syntax_errors(self, code: str, language: str) -> bool:

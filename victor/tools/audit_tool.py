@@ -21,7 +21,7 @@ audit logging, compliance checking, and report generation.
 import logging
 from typing import Any
 
-from victor.security.audit import (
+from victor.core.security.audit import (
     AuditManager,
     AuditReport,
     ComplianceFramework,
@@ -201,7 +201,7 @@ Actions:
 
             elif action == "query":
                 from datetime import datetime, timedelta
-                from victor.security.audit import AuditEventType
+                from victor.core.security.audit import AuditEventType
 
                 days = days or 7
                 end_date = datetime.now()

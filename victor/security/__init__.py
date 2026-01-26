@@ -14,15 +14,44 @@
 
 """Unified Security Module for Victor.
 
+.. deprecated:: 0.6.0
+    This module is being reorganized. Please migrate to:
+
+    - **Security Infrastructure** (RBAC, audit, authorization):
+      Use ``victor.core.security`` instead of ``victor.security.auth``,
+      ``victor.security.audit``, and ``victor.security.authorization_enhanced``.
+
+    - **Security Analysis Tools** (scanners, CVE databases, patterns):
+      Use ``victor.security_analysis`` instead of ``victor.security.scanner``,
+      ``victor.security.cve_database``, and ``victor.security.safety``.
+
+    This module will continue to work but emits deprecation warnings.
+    The deprecated paths will be removed in v1.0.0.
+
+Migration Guide:
+    Old (deprecated):
+        from victor.security.auth import RBACManager, Permission
+        from victor.security.audit import AuditManager
+        from victor.security.safety import detect_secrets
+
+    New (recommended):
+        from victor.core.security.auth import RBACManager, Permission
+        from victor.core.security.audit import AuditManager
+        from victor.security_analysis.patterns import detect_secrets
+
 This module provides comprehensive security capabilities including:
 
 Submodules:
 - victor.security.auth: Authentication and authorization (RBAC)
+  -> Migrate to: victor.core.security.auth
 - victor.security.safety: Safety patterns (secrets, PII, code patterns)
+  -> Migrate to: victor.security_analysis.patterns
 - victor.security.audit: Compliance and audit logging
+  -> Migrate to: victor.core.security.audit
 
 Also includes:
 - Vulnerability scanning and CVE database integration
+  -> Migrate to: victor.security_analysis.tools
 - Security policy enforcement and reporting
 
 Example usage:
@@ -70,7 +99,18 @@ Example usage:
     asyncio.run(scan_project())
 """
 
+import warnings
 from typing import Any
+
+# Deprecation message templates
+_DEPRECATION_MSG_INFRASTRUCTURE = (
+    "victor.security.{name} is deprecated and will be removed in v1.0.0. "
+    "Use victor.core.security.{name} instead for security infrastructure."
+)
+_DEPRECATION_MSG_ANALYSIS = (
+    "victor.security.{name} is deprecated and will be removed in v1.0.0. "
+    "Use victor.security_analysis.{dest} instead for security analysis tools."
+)
 
 # CVE/Vulnerability scanning (existing functionality)
 from victor.security.protocol import (
@@ -200,26 +240,75 @@ __all__ = [
 ]
 
 
+# Track which submodules have already warned to avoid duplicate warnings
+_warned_submodules: set = set()
+# Cache for loaded submodules to avoid re-importing
+_submodule_cache: dict = {}
+
+
 def __getattr__(name: str) -> Any:
-    """Lazy import for submodules to avoid circular imports."""
+    """Lazy import for submodules with deprecation warnings."""
+    # Return from cache if already loaded
+    if name in _submodule_cache:
+        return _submodule_cache[name]
+
     if name == "auth":
-        from victor.security import auth
-
-        return auth
+        if "auth" not in _warned_submodules:
+            _warned_submodules.add("auth")
+            warnings.warn(
+                _DEPRECATION_MSG_INFRASTRUCTURE.format(name="auth"),
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        import importlib
+        _submodule_cache["auth"] = importlib.import_module("victor.security.auth")
+        return _submodule_cache["auth"]
     elif name == "safety":
-        from victor.security import safety
-
-        return safety
+        if "safety" not in _warned_submodules:
+            _warned_submodules.add("safety")
+            warnings.warn(
+                _DEPRECATION_MSG_ANALYSIS.format(name="safety", dest="patterns"),
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        import importlib
+        _submodule_cache["safety"] = importlib.import_module("victor.security.safety")
+        return _submodule_cache["safety"]
     elif name == "audit":
-        from victor.security import audit
-
-        return audit
+        if "audit" not in _warned_submodules:
+            _warned_submodules.add("audit")
+            warnings.warn(
+                _DEPRECATION_MSG_INFRASTRUCTURE.format(name="audit"),
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        import importlib
+        _submodule_cache["audit"] = importlib.import_module("victor.security.audit")
+        return _submodule_cache["audit"]
     elif name == "penetration_testing":
-        from victor.security import penetration_testing
-
-        return penetration_testing
+        if "penetration_testing" not in _warned_submodules:
+            _warned_submodules.add("penetration_testing")
+            warnings.warn(
+                _DEPRECATION_MSG_ANALYSIS.format(name="penetration_testing", dest="tools"),
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        import importlib
+        _submodule_cache["penetration_testing"] = importlib.import_module(
+            "victor.security.penetration_testing"
+        )
+        return _submodule_cache["penetration_testing"]
     elif name == "authorization_enhanced":
-        from victor.security import authorization_enhanced
-
-        return authorization_enhanced
+        if "authorization_enhanced" not in _warned_submodules:
+            _warned_submodules.add("authorization_enhanced")
+            warnings.warn(
+                _DEPRECATION_MSG_INFRASTRUCTURE.format(name="authorization_enhanced"),
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        import importlib
+        _submodule_cache["authorization_enhanced"] = importlib.import_module(
+            "victor.security.authorization_enhanced"
+        )
+        return _submodule_cache["authorization_enhanced"]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

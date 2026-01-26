@@ -434,7 +434,7 @@ class SecretMaskingMiddleware(MiddlewareProtocol):
         Returns:
             Content with secrets replaced
         """
-        from victor.security.safety.secrets import mask_secrets
+        from victor.security_analysis.patterns.secrets import mask_secrets
 
         return mask_secrets(content, replacement=self._replacement)
 

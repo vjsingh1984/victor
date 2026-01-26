@@ -12,29 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Performance optimization framework for Victor.
+"""Runtime performance optimization framework for Victor.
 
-.. deprecated:: 0.6.0
-    This module is deprecated. Please migrate to ``victor.optimization.runtime``.
-    This module will be removed in v1.0.0.
-
-Migration Guide:
-    Old (deprecated):
-        from victor.optimizations import LazyComponentLoader, AdaptiveParallelExecutor
-
-    New (recommended):
-        from victor.optimization.runtime import LazyComponentLoader, AdaptiveParallelExecutor
-        # Or use the unified import:
-        from victor.optimization import LazyComponentLoader, AdaptiveParallelExecutor
-
-This module provides advanced optimization capabilities including:
+This is the canonical location for runtime optimization capabilities including:
 - Lazy component loading with dependency tracking
 - Adaptive parallel execution with load balancing
 - Performance metrics collection
 - Work stealing and priority queues
 
-Quick Start:
-    from victor.optimizations import (
+Usage:
+    from victor.optimization.runtime import (
         LazyComponentLoader,
         AdaptiveParallelExecutor,
         create_adaptive_executor,
@@ -55,16 +42,7 @@ Performance Impact:
     - Overhead: <5% for optimization framework
 """
 
-import warnings
-
-# Emit deprecation warning on import
-warnings.warn(
-    "victor.optimizations is deprecated and will be removed in v1.0.0. "
-    "Use victor.optimization.runtime instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
+# Import from victor.optimizations (the original location)
 from victor.optimizations.lazy_loader import (
     ComponentDescriptor,
     LazyComponentLoader,
@@ -98,5 +76,3 @@ __all__ = [
     "create_adaptive_executor",
     "execute_parallel_optimized",
 ]
-
-__version__ = "0.5.0"

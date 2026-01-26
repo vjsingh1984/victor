@@ -95,7 +95,7 @@ class ValidationMode(Enum):
 
 if TYPE_CHECKING:
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
-    from victor.security.auth.rbac import RBACManager
+    from victor.core.security.auth import RBACManager
 
 logger = logging.getLogger(__name__)
 

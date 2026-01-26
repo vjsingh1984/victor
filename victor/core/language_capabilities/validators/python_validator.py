@@ -7,7 +7,7 @@ Validates Python code syntax using ast.parse().
 import ast
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from ..types import (
     CodeValidationResult,
@@ -167,7 +167,7 @@ class PythonASTValidator:
 
         return result
 
-    def get_syntax_errors(self, code: str) -> list:
+    def get_syntax_errors(self, code: str) -> list[Dict[str, Any]]:
         """
         Get all syntax errors from code (for compatibility).
 

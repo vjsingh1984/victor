@@ -79,7 +79,7 @@ class JavaValidator:
         Returns:
             CodeValidationResult with validation status and issues
         """
-        if config and not config.syntax_check_enabled:
+        if config and not config.check_syntax:
             return CodeValidationResult(
                 is_valid=True,
                 language="java",
@@ -171,7 +171,7 @@ class JavaValidator:
                 issues=issues,
             )
 
-    def has_syntax_errors(self, code: str) -> bool:
+    def has_errors(self, code: str) -> bool:
         """Check if Java code has syntax errors.
 
         Args:
@@ -181,7 +181,7 @@ class JavaValidator:
             True if code has syntax errors
         """
         if not JAVALANG_AVAILABLE:
-            return self._ts_validator.has_syntax_errors(code, "java")
+            return self._ts_validator.has_errors(code, "java")
 
         try:
             javalang.parse.parse(code)

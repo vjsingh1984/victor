@@ -200,7 +200,8 @@ def load_feature_flags_from_yaml(
         with open(config_path, "r") as f:
             data = yaml.safe_load(f)
 
-        return data.get("feature_flags", {})
+        result: Dict[str, Any] = data.get("feature_flags", {}) if isinstance(data, dict) else {}
+        return result
 
     except Exception as e:
         logger.warning(f"Failed to load feature flags: {e}")

@@ -547,6 +547,16 @@ safety_patterns = "victor.agent.capabilities.builtin:SafetyPatternsCapability"
 enrichment_strategy = "victor.agent.capabilities.builtin:EnrichmentStrategyCapability"
 
 
+[project.entry-points."victor.verticals"]
+# Built-in verticals (registered via entry points for OCP compliance)
+coding = "victor.coding:CodingAssistant"
+devops = "victor.devops:DevOpsAssistant"
+rag = "victor.rag:RAGAssistant"
+dataanalysis = "victor.dataanalysis:DataAnalysisAssistant"
+research = "victor.research:ResearchAssistant"
+security_analysis = "victor.security_analysis:SecurityAnalysisAssistant"
+
+
 [tool.setuptools.packages.find]
 include = ["victor*"]
 exclude = ["tests*", "docs*"]

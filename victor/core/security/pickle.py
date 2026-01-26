@@ -12,13 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Security utilities for protecting against deserialization attacks.
+"""Safe pickle serialization with HMAC signing for cache security.
 
-This module provides safe pickle serialization/deserialization with HMAC signing
+This module provides secure pickle serialization/deserialization with HMAC signing
 to prevent cache poisoning attacks via malicious pickle data.
 
 CWE-502: Deserialization of Untrusted Data
+
+Usage:
+    from victor.core.security import safe_pickle_dumps, safe_pickle_loads
+
+    # Serialize with signature
+    data = {"key": "value"}
+    signed = safe_pickle_dumps(data)
+
+    # Deserialize with verification
+    restored = safe_pickle_loads(signed)
 """
+
+from __future__ import annotations
 
 import hashlib
 import hmac
@@ -29,7 +41,6 @@ from typing import Any
 
 # Environment variable for cache signing key
 CACHE_SIGNING_KEY_ENV = "VICTOR_CACHE_SIGNING_KEY"
-
 
 _signing_key_cache: bytes | None = None
 

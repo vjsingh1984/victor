@@ -254,8 +254,9 @@ class PythonASTExtractor:
             param = arg.arg
             if arg.annotation:
                 param += f": {self._annotation_to_string(arg.annotation)}"
-            if args.kw_defaults[i]:
-                param += f" = {self._value_to_string(args.kw_defaults[i])}"
+            default_val = args.kw_defaults[i]
+            if default_val is not None:
+                param += f" = {self._value_to_string(default_val)}"
             parameters.append(param)
 
         # **kwargs
@@ -331,7 +332,7 @@ class PythonASTExtractor:
     def _get_attribute_name(self, node: ast.Attribute) -> str:
         """Get full attribute name (e.g., 'module.Class')."""
         parts = []
-        current = node
+        current: ast.expr = node
         while isinstance(current, ast.Attribute):
             parts.append(current.attr)
             current = current.value

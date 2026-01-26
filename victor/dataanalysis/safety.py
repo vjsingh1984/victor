@@ -2,10 +2,11 @@
 
 from typing import Any, Dict, List, Tuple
 
-from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
+from victor.core.verticals.protocols import SafetyExtensionProtocol
+from victor.security_analysis.patterns.types import SafetyPattern
 
 # Import PII detection from core safety module
-from victor.security.safety.pii import (
+from victor.security_analysis.patterns.pii import (
     PIIScanner,
     PIIType,
     detect_pii_columns as core_detect_pii_columns,
@@ -81,12 +82,12 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
     def get_pii_patterns(self) -> Dict[str, str]:
         """Return patterns for detecting PII columns.
 
-        Uses patterns from victor.security.safety.pii for comprehensive detection.
+        Uses patterns from victor.security_analysis.patterns.pii for comprehensive detection.
 
         Returns:
             Dict of pii_type -> regex_pattern for column names.
         """
-        from victor.security.safety.pii import PII_COLUMN_PATTERNS as CORE_PII_PATTERNS
+        from victor.security_analysis.patterns.pii import PII_COLUMN_PATTERNS as CORE_PII_PATTERNS
 
         # Return simplified dict format for backward compatibility
         return {pii_type.value: pattern for pii_type, pattern in CORE_PII_PATTERNS.items()}

@@ -40,6 +40,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Dict, List, Protocol, runtime_checkable
 
+# Import SafetyPattern at runtime for use in type hints and return values
 from victor.security.safety.types import SafetyPattern
 
 

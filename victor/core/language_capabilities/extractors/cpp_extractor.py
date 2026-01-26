@@ -28,7 +28,7 @@ Install libclang with: pip install libclang
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..types import ExtractedSymbol
 from .base import BaseLanguageProcessor
@@ -168,6 +168,9 @@ class CppExtractor(BaseLanguageProcessor):
 
         symbols: List[ExtractedSymbol] = []
 
+        if self._index is None:
+            return symbols
+
         try:
             # Parse options
             args = ["-x", "c++" if language == "cpp" else "c"]
@@ -193,7 +196,7 @@ class CppExtractor(BaseLanguageProcessor):
 
     def _extract_from_cursor(
         self,
-        cursor,
+        cursor: Any,
         file_path: Path,
         symbols: List[ExtractedSymbol],
         target_file: str,
@@ -245,6 +248,9 @@ class CppExtractor(BaseLanguageProcessor):
         if not self.is_available():
             return self._ts_extractor.has_syntax_errors(code, language)
 
+        if self._index is None:
+            return False
+
         try:
             args = ["-x", "c++" if language == "cpp" else "c"]
 
@@ -268,7 +274,7 @@ class CppExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: str = "cpp",
-    ) -> List[dict]:
+    ) -> List[Dict[str, Any]]:
         """Get diagnostics (errors/warnings) from C/C++ code.
 
         Args:
@@ -281,6 +287,9 @@ class CppExtractor(BaseLanguageProcessor):
         """
         if not self.is_available():
             return self._ts_extractor.get_error_locations(code, language)
+
+        if self._index is None:
+            return []
 
         diagnostics = []
 

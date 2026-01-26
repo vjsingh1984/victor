@@ -26,7 +26,7 @@ All validators fall back to tree-sitter if native libraries aren't available.
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional, Union
 
 from ..types import (
     CodeValidationResult,
@@ -194,7 +194,7 @@ class TomlValidator:
         config: Optional[ValidationConfig] = None,
     ) -> CodeValidationResult:
         """Validate TOML code using tomllib/tomli."""
-        if not self._toml_available:
+        if not self._toml_available or self._toml_module is None:
             return self._ts_validator.validate(code, file_path, "toml", config)
 
         try:
@@ -440,7 +440,11 @@ CONFIG_VALIDATORS = {
 }
 
 
-def get_config_validator(language: str, ts_validator: Optional[TreeSitterValidator] = None):
+def get_config_validator(
+    language: str, ts_validator: Optional[TreeSitterValidator] = None
+) -> Optional[
+    Union[JsonValidator, YamlValidator, TomlValidator, XmlValidator, MarkdownValidator]
+]:
     """
     Get the appropriate validator for a configuration file format.
 
@@ -453,5 +457,6 @@ def get_config_validator(language: str, ts_validator: Optional[TreeSitterValidat
     """
     validator_class = CONFIG_VALIDATORS.get(language.lower())
     if validator_class:
-        return validator_class(ts_validator)
+        result = validator_class(ts_validator)
+        return result  # type: ignore[return-value]
     return None

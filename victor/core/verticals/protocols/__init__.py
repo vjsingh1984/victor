@@ -44,6 +44,10 @@ Usage:
     )
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 # Tool Provider
 from victor.core.verticals.protocols.tool_provider import (
     ToolSelectionContext,
@@ -57,8 +61,11 @@ from victor.core.verticals.protocols.tool_provider import (
 # Safety Provider
 from victor.core.verticals.protocols.safety_provider import (
     SafetyExtensionProtocol,
-    SafetyPattern,
 )
+
+# Import SafetyPattern at runtime for re-export
+# (defined in victor.security.safety.types, re-exported from victor.security_analysis)
+from victor.security.safety.types import SafetyPattern
 
 # Team Provider
 from victor.core.verticals.protocols.team_provider import (

@@ -66,7 +66,7 @@ def _log_security_event(event_type: str, details: dict[str, Any]) -> None:
 
     # Try to log to audit system if available
     try:
-        from victor.security.audit import AuditManager, AuditEventType
+        from victor.core.security.audit import AuditManager, AuditEventType
 
         audit = AuditManager.get_instance()
         audit.log_event(
