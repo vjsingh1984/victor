@@ -194,6 +194,9 @@ async def edit(
     commit: bool = True,
     desc: str = "",
     ctx: int = 3,
+    validate: bool = True,
+    strict_validation: bool = False,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """Edit files atomically with undo. REQUIRED: 'ops' parameter with operation list.
 
@@ -218,6 +221,10 @@ async def edit(
         commit: Auto-apply changes (default: True)
         desc: Change description for tracking
         ctx: Diff context lines (default: 3)
+        validate: Run syntax validation on code files (default: True)
+        strict_validation: Block writes if validation fails (default: False)
+        **kwargs: Captures malformed calls where models pass edit parameters directly
+                  (e.g., file="x.py", old_str="a", new_str="b") instead of using ops.
 
     When to use:
         - Config files (JSON, YAML, TOML, etc.)
@@ -228,6 +235,89 @@ async def edit(
         In EXPLORE/PLAN modes, edits are restricted to .victor/sandbox/.
         Use /mode build to enable unrestricted file edits.
     """
+    # =============================================================================
+    # MALFORMED CALL RECOVERY
+    # =============================================================================
+    # Some models (especially Ollama/local models) call edit() with parameters
+    # directly instead of wrapping them in ops=[{...}]. For example:
+    #   edit(file="x.py", old_str="a", new_str="b")  # WRONG
+    # Instead of:
+    #   edit(ops=[{"path": "x.py", "old_str": "a", "new_str": "b"}])  # CORRECT
+    #
+    # We detect this pattern and auto-convert to the correct format.
+    # =============================================================================
+    if ops is None and kwargs:
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Check if kwargs contains edit operation parameters
+        path_keys = {"file", "file_path", "filepath", "filename", "path"}
+        content_keys = {"content", "new_content", "text", "data"}
+        replace_keys = {"old_str", "new_str", "old", "new", "old_string", "new_string"}
+
+        has_path = any(k in kwargs for k in path_keys)
+        has_content = any(k in kwargs for k in content_keys)
+        has_replace = any(k in kwargs for k in replace_keys)
+
+        if has_path or has_content or has_replace:
+            logger.info(
+                f"Auto-converting malformed edit() call to ops format. "
+                f"Received kwargs: {list(kwargs.keys())}"
+            )
+
+            # Build operation from kwargs
+            op: Dict[str, Any] = {}
+
+            # Extract path
+            for key in path_keys:
+                if key in kwargs:
+                    op["path"] = kwargs.pop(key)
+                    break
+
+            # Determine operation type and extract relevant fields
+            if any(k in kwargs for k in {"old_str", "old", "old_string", "find", "search"}):
+                op["type"] = "replace"
+                # Extract old_str
+                for key in ["old_str", "old", "old_string", "find", "search"]:
+                    if key in kwargs:
+                        op["old_str"] = kwargs.pop(key)
+                        break
+                # Extract new_str
+                for key in ["new_str", "new", "new_string", "replace", "replacement"]:
+                    if key in kwargs:
+                        op["new_str"] = kwargs.pop(key)
+                        break
+            elif any(k in kwargs for k in content_keys):
+                # Check if file exists to determine create vs modify
+                path = op.get("path", "")
+                if path and Path(path).expanduser().resolve().exists():
+                    op["type"] = "modify"
+                else:
+                    op["type"] = "create"
+                # Extract content
+                for key in content_keys:
+                    if key in kwargs:
+                        op["content"] = kwargs.pop(key)
+                        break
+            elif "new_path" in kwargs or "new_name" in kwargs or "destination" in kwargs:
+                op["type"] = "rename"
+                for key in ["new_path", "new_name", "destination", "dest", "to"]:
+                    if key in kwargs:
+                        op["new_path"] = kwargs.pop(key)
+                        break
+            elif "path" in op and not has_content and not has_replace:
+                # Just a path with no content/replace = delete
+                op["type"] = kwargs.pop("type", "delete")
+            else:
+                # Default to modify if we have content
+                op["type"] = kwargs.pop("type", "modify")
+
+            # Set ops to our constructed operation
+            if "path" in op:
+                ops = [op]
+                logger.info(f"Converted to ops: {ops}")
+
     # Validate required 'ops' parameter with helpful error message
     if ops is None:
         return {
@@ -552,6 +642,97 @@ async def edit(
 
     operations_queued = len(ops)
 
+    # =============================================================================
+    # CODE VALIDATION
+    # =============================================================================
+    # Validate code before committing to prevent writing syntactically invalid code.
+    # This catches errors early before they're written to disk.
+    # =============================================================================
+    validation_errors = []
+    validation_warnings = []
+
+    if validate:
+        try:
+            from victor.core.language_capabilities.hooks import CodeGroundingHook
+
+            hook = CodeGroundingHook.instance()
+
+            for op in ops:
+                op_type = op["type"]
+                path = op["path"]
+                file_path = Path(path).expanduser().resolve()
+
+                # Only validate operations that write code
+                if op_type in ("create", "modify"):
+                    content = op.get("new_content") or op.get("content") or ""
+                elif op_type == "replace":
+                    # For replace, we need to compute the final content
+                    old_str = op.get("old_str", "")
+                    new_str = op.get("new_str", "")
+                    if file_path.exists():
+                        original = file_path.read_text(encoding="utf-8")
+                        content = original.replace(old_str, new_str, 1)
+                    else:
+                        continue  # Skip if file doesn't exist (will fail later anyway)
+                else:
+                    continue  # Skip non-write operations
+
+                # Check if we can validate this file type
+                if not hook.can_validate(file_path):
+                    continue
+
+                # Validate the content
+                should_proceed, result = hook.validate_before_write_sync(
+                    content, file_path, strict=strict_validation
+                )
+
+                if not result.is_valid:
+                    for issue in result.errors:
+                        validation_errors.append({
+                            "path": path,
+                            "line": issue.line,
+                            "column": issue.column,
+                            "message": issue.message,
+                            "severity": "error",
+                        })
+
+                for issue in result.warnings:
+                    validation_warnings.append({
+                        "path": path,
+                        "line": issue.line,
+                        "message": issue.message,
+                        "severity": "warning",
+                    })
+
+        except ImportError:
+            # Language capabilities not available
+            pass
+        except Exception as e:
+            # Don't fail the edit due to validation errors
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Code validation skipped due to error: {e}")
+
+    # Block operation if strict validation is enabled and there are errors
+    if strict_validation and validation_errors:
+        editor.abort()
+        tracker._current_group = None
+        return {
+            "success": False,
+            "error": f"Validation failed: {len(validation_errors)} syntax errors detected",
+            "validation_errors": validation_errors,
+            "hint": "Fix the syntax errors or use strict_validation=False to proceed anyway",
+        }
+
+    # If there are validation errors, report them but still allow the operation
+    # (validation is advisory, not blocking, unless strict mode is used)
+    if validation_errors:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            f"Code validation found {len(validation_errors)} errors in pending edits"
+        )
+
     # Handle preview mode
     if preview:
         import io
@@ -601,7 +782,7 @@ async def edit(
         if success:
             # Commit the change group for undo/redo
             tracker.commit_change_group()
-            return {
+            result = {
                 "success": True,
                 "operations_queued": operations_queued,
                 "operations_applied": operations_queued,
@@ -609,6 +790,13 @@ async def edit(
                 "message": f"Successfully applied {operations_queued} operations. Use /undo to revert.",
                 "transaction_id": transaction_id,
             }
+            # Include validation info if there were warnings/errors
+            if validation_errors:
+                result["validation_errors"] = validation_errors
+                result["message"] += f" Note: {len(validation_errors)} syntax issues detected."
+            if validation_warnings:
+                result["validation_warnings"] = validation_warnings
+            return result
         else:
             # Clear change group on failure
             tracker._current_group = None
