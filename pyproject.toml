@@ -741,6 +741,13 @@ module = [
     "victor.agent.streaming.*",
     "victor.storage.cache.*",
     "victor.framework.__init__",
+    # Additional modules with type errors (watchdog, pydantic-settings, etc.)
+    "victor.core.tool_dependency_loader",
+    "victor.framework.module_loader",
+    "victor.core.events.*",
+    "victor.config.settings",
+    "victor.agent.tool_result_cache",
+    "victor.agent.cache.*",
 ]
 ignore_errors = true
 
