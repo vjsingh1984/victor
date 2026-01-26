@@ -88,7 +88,7 @@ class LazyVerticalProxy:
     loader: Callable[[], type[Any]]
     _loaded: bool = False
     _instance: Optional[type[Any]] = None
-    _load_lock: threading.Lock = field(default_factory=threading.Lock)
+    _load_lock: threading.RLock = field(default_factory=threading.RLock)
     _loading: bool = False
 
     def load(self) -> type[Any]:

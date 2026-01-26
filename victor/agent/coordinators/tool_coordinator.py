@@ -404,7 +404,6 @@ class ToolCoordinator:
             logger.warning("No tool selector configured, returning empty list")
             return []
 
-
         try:
             # Build context dict for selector
 
