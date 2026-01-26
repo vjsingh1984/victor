@@ -119,6 +119,93 @@ async def get_available_models() -> List[str]:
         return []
 
 
+# Module-level flag to track if warmup has been done
+_ollama_warmup_completed = False
+
+
+def _prewarm_ollama_model_sync() -> bool:
+    """Send a lightweight request to warm up the first available Ollama model.
+
+    This ensures at least one model is loaded and ready before tests run.
+    The first request after model load can be slow, so we do this once
+    at the start of the test session.
+
+    Returns:
+        True if warmup succeeded, False otherwise.
+    """
+    global _ollama_warmup_completed
+    if _ollama_warmup_completed:
+        return True
+
+    if not is_ollama_available():
+        return False
+
+    import httpx
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            # Get available models
+            response = client.get("http://localhost:11434/api/tags")
+            if response.status_code != 200:
+                return False
+
+            models = response.json().get("models", [])
+            if not models:
+                return False
+
+            # Use the smallest model for warmup (prefer 7b/8b variants)
+            model_name = None
+            for m in models:
+                name = m["name"]
+                if "7b" in name or "8b" in name or "1.5b" in name:
+                    model_name = name
+                    break
+            if not model_name:
+                model_name = models[0]["name"]
+
+            # Send a minimal warmup request
+            warmup_payload = {
+                "model": model_name,
+                "prompt": "Hi",
+                "stream": False,
+            }
+
+            response = client.post(
+                "http://localhost:11434/api/generate",
+                json=warmup_payload,
+                timeout=120.0,  # Allow time for model to load
+            )
+
+            if response.status_code == 200:
+                _ollama_warmup_completed = True
+                return True
+
+    except Exception as e:
+        print(f"Ollama warmup failed: {e}")
+
+    return False
+
+
+@pytest.fixture(scope="module", autouse=True)
+def ollama_warmup():
+    """Module-scoped fixture to warm up Ollama model once per test module.
+
+    This ensures at least one model is loaded and ready before tests run,
+    preventing timeout failures on the first request.
+
+    Uses autouse=True to run automatically for all tests in this module.
+    """
+    if not is_ollama_available():
+        pytest.skip("Ollama server not available")
+        return
+
+    success = _prewarm_ollama_model_sync()
+    if not success:
+        # Don't skip - warmup is best-effort for Ollama since models may already be loaded
+        print("Warning: Ollama warmup did not complete, tests may be slower")
+    yield
+
+
 async def filter_available_pairs(
     pairs: List[Tuple[str, str, str, str]],
 ) -> List[Tuple[str, str, str, str]]:

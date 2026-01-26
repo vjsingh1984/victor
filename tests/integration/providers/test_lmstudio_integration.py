@@ -75,6 +75,78 @@ from victor.providers.base import Message, ToolDefinition  # noqa: E402
 from victor.providers.openai_provider import OpenAIProvider  # noqa: E402
 
 
+# Module-level flag to track if warmup has been done
+_warmup_completed = False
+
+
+def _prewarm_lmstudio_model_sync() -> bool:
+    """Send a lightweight request to warm up the LM Studio model (sync version).
+
+    This ensures the model is fully loaded and ready before tests run.
+    The first request after model load can be slow, so we do this once
+    at the start of the test session.
+
+    Returns:
+        True if warmup succeeded, False otherwise.
+    """
+    global _warmup_completed
+    if _warmup_completed:
+        return True
+
+    import httpx as httpx_sync
+
+    try:
+        with httpx_sync.Client(timeout=60.0) as client:
+            # Get the first available model
+            response = client.get("http://localhost:1234/v1/models")
+            if response.status_code != 200:
+                return False
+
+            models = response.json().get("data", [])
+            if not models:
+                return False
+
+            model_name = models[0]["id"]
+
+            # Send a minimal warmup request
+            warmup_payload = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": "Hi"}],
+                "max_tokens": 5,
+                "temperature": 0,
+            }
+
+            response = client.post(
+                "http://localhost:1234/v1/chat/completions",
+                json=warmup_payload,
+                timeout=120.0,  # Allow time for model to load
+            )
+
+            if response.status_code == 200:
+                _warmup_completed = True
+                return True
+
+    except Exception as e:
+        print(f"LMStudio warmup failed: {e}")
+
+    return False
+
+
+@pytest.fixture(scope="module", autouse=True)
+def lmstudio_warmup():
+    """Module-scoped fixture to warm up LM Studio model once per test module.
+
+    This ensures the model is loaded and ready before any tests run,
+    preventing timeout failures on the first request.
+
+    Uses autouse=True to run automatically for all tests in this module.
+    """
+    success = _prewarm_lmstudio_model_sync()
+    if not success:
+        pytest.skip("Failed to warm up LMStudio model")
+    yield
+
+
 @pytest.fixture
 async def lmstudio_provider():
     """Create LMStudio provider and check if available."""
