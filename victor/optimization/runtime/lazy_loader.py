@@ -27,7 +27,7 @@ Performance Impact:
     First access overhead: ~5-10ms (one-time cost)
 
 Example:
-    from victor.optimizations import LazyComponentLoader
+    from victor.optimization.runtime import LazyComponentLoader
 
     loader = LazyComponentLoader()
 

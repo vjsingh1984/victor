@@ -810,7 +810,7 @@ def _parse_file_worker(args: Tuple[str, str]) -> Optional[Dict[str, Any]]:
         return None
 
 
-class CodebaseFileHandler(FileSystemEventHandler):
+class CodebaseFileHandler(FileSystemEventHandler):  # type: ignore[misc]
     """File system event handler for tracking codebase changes.
 
     Tracks file modifications, creations, and deletions to mark

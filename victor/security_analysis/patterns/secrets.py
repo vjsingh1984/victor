@@ -15,17 +15,17 @@
 """Secret detection patterns.
 
 This is the canonical location for secret detection utilities.
+The old location (victor.security.safety.secrets) is deprecated.
 """
 
-from victor.security.safety.secrets import (
+# Import from local implementation (canonical location)
+from victor.security_analysis.patterns.secrets_impl import (
     CREDENTIAL_PATTERNS,
     SecretMatch,
     SecretScanner,
     SecretSeverity,
     detect_secrets,
-    get_secret_types,
     has_secrets,
-    mask_secrets,
 )
 
 __all__ = [
@@ -34,7 +34,5 @@ __all__ = [
     "SecretScanner",
     "SecretSeverity",
     "detect_secrets",
-    "get_secret_types",
     "has_secrets",
-    "mask_secrets",
 ]

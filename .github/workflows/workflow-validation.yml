@@ -22,7 +22,7 @@ jobs:
   validate-workflows:
     name: Validate Workflows (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -41,7 +41,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install Victor
+      - name: Install Victor (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           python -m pip install --upgrade pip
@@ -50,11 +51,46 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu || pip install torch
           pip install -e ".[dev]"
 
+      - name: Install Victor (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pip>=25.2"
+          # Skip torch on Windows to speed up installation
+          pip install -e ".[dev]" --no-deps
+          pip install -e .
+          # Install only essential dev dependencies on Windows
+          pip install pytest pytest-asyncio pytest-cov ruff mypy black
+
       - name: Run workflow validation (CI mode)
         shell: bash
         run: |
           # Run validation in CI mode for JSON output
-          bash scripts/hooks/validate_workflows.sh --ci victor/*/workflows/*.yaml victor/workflows/*.yaml
+          # Use Python to find files cross-platform
+          python - <<'EOF'
+          import glob
+          import subprocess
+          import sys
+          import os
+
+          # Find all workflow files
+          workflow_files = []
+          workflow_files.extend(glob.glob("victor/*/workflows/*.yaml"))
+          workflow_files.extend(glob.glob("victor/*/workflows/*.yml"))
+          workflow_files.extend(glob.glob("victor/workflows/*.yaml"))
+          workflow_files.extend(glob.glob("victor/workflows/*.yml"))
+
+          if not workflow_files:
+              print("No workflow files found")
+              sys.exit(1)
+
+          # Run validation script with found files
+          cmd = ["bash", "scripts/hooks/validate_workflows.sh", "--ci"] + workflow_files
+          print(f"Running: {' '.join(cmd)}")
+          result = subprocess.run(cmd, env={**os.environ, "VICTOR_VERBOSE_VALIDATION": "1"})
+          sys.exit(result.returncode)
+          EOF
         env:
           VICTOR_VERBOSE_VALIDATION: 1
 

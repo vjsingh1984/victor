@@ -15,36 +15,44 @@
 """Infrastructure safety patterns.
 
 This is the canonical location for infrastructure safety pattern utilities.
+The old location (victor.security.safety.infrastructure) is deprecated.
 """
 
-from victor.security.safety.infrastructure import (
-    CLOUD_PATTERNS,
-    DESTRUCTIVE_PATTERNS,
-    DOCKER_PATTERNS,
+# Import from local implementation (canonical location)
+from victor.security_analysis.patterns.infrastructure_impl import (
     InfraPatternCategory,
+    RiskLevel,
+    DESTRUCTIVE_PATTERNS,
+    KUBERNETES_PATTERNS,
+    DOCKER_PATTERNS,
+    TERRAFORM_PATTERNS,
+    CLOUD_PATTERNS,
     InfraScanResult,
     InfrastructureScanner,
-    KUBERNETES_PATTERNS,
-    TERRAFORM_PATTERNS,
-    get_all_infrastructure_patterns,
-    get_safety_reminders,
     scan_infrastructure_command,
     validate_dockerfile,
     validate_kubernetes_manifest,
+    get_all_infrastructure_patterns,
+    get_safety_reminders,
 )
 
 __all__ = [
-    "CLOUD_PATTERNS",
-    "DESTRUCTIVE_PATTERNS",
-    "DOCKER_PATTERNS",
+    # Enums
     "InfraPatternCategory",
+    "RiskLevel",
+    # Pattern lists
+    "DESTRUCTIVE_PATTERNS",
+    "KUBERNETES_PATTERNS",
+    "DOCKER_PATTERNS",
+    "TERRAFORM_PATTERNS",
+    "CLOUD_PATTERNS",
+    # Classes
     "InfraScanResult",
     "InfrastructureScanner",
-    "KUBERNETES_PATTERNS",
-    "TERRAFORM_PATTERNS",
-    "get_all_infrastructure_patterns",
-    "get_safety_reminders",
+    # Functions
     "scan_infrastructure_command",
     "validate_dockerfile",
     "validate_kubernetes_manifest",
+    "get_all_infrastructure_patterns",
+    "get_safety_reminders",
 ]

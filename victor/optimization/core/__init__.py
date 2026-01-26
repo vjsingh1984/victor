@@ -46,8 +46,8 @@ Performance Impact:
     - Lazy imports: 20-30% faster startup
 """
 
-# Import from victor.core.optimizations (the original location)
-from victor.core.optimizations.hot_path_optimizations import (
+# Import from local module (canonical location)
+from victor.optimization.core.hot_path import (
     LazyImport,
     lazy_import,
     json_dumps,
@@ -63,7 +63,7 @@ from victor.core.optimizations.hot_path_optimizations import (
 )
 
 # Common lazy imports
-from victor.core.optimizations.hot_path_optimizations import (
+from victor.optimization.core.hot_path import (
     numpy,
     pandas,
     httpx,

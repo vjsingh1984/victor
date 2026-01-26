@@ -67,6 +67,7 @@ logger = logging.getLogger(__name__)
 from victor.core.language_capabilities import (
     LanguageCapabilityRegistry,
     LanguageTier as UnifiedLanguageTier,
+    UnifiedLanguageCapability,
 )
 
 # Also import legacy tier system for backward compatibility
@@ -184,7 +185,7 @@ class UnifiedSymbolExtractor:
         class LegacyTierConfig:
             """Adapter for legacy tier config interface."""
 
-            def __init__(self, cap):
+            def __init__(self, cap: UnifiedLanguageCapability) -> None:
                 self.tier = tier_mapping.get(cap.tier, LanguageTier.TIER_3)
                 self.has_native_ast = cap.native_ast is not None
                 self.has_lsp = cap.lsp is not None

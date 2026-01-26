@@ -283,7 +283,7 @@ class EmbeddingService:
         Returns:
             Estimated memory usage in bytes
         """
-        return embedding.size * self._bytes_per_float
+        return int(embedding.size * self._bytes_per_float)
 
     def _evict_cache_for_memory(self, needed_bytes: int) -> int:
         """Evict oldest cache entries to free memory.

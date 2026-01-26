@@ -474,7 +474,7 @@ def create_intent_classification_handler(
         raise ValueError("orchestrator must have a chunk_generator")
     return IntentClassificationHandler(
         intent_classifier=orchestrator.intent_classifier,
-        unified_tracker=orchestrator.unified_tracker,  # type: ignore[arg-type]
+        unified_tracker=orchestrator.unified_tracker,
         sanitizer=orchestrator.sanitizer,
         chunk_generator=chunk_gen,
         settings=orchestrator.settings,

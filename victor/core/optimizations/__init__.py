@@ -38,7 +38,8 @@ warnings.warn(
     stacklevel=2,
 )
 
-from victor.core.optimizations.hot_path_optimizations import (
+# Re-export from canonical location
+from victor.optimization.core.hot_path import (
     LazyImport,
     lazy_import,
     json_dumps,
@@ -54,7 +55,7 @@ from victor.core.optimizations.hot_path_optimizations import (
 )
 
 # Common lazy imports
-from victor.core.optimizations.hot_path_optimizations import (
+from victor.optimization.core.hot_path import (
     numpy,
     pandas,
     httpx,

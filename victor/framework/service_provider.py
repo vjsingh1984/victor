@@ -158,7 +158,7 @@ class TeamRegistryService(Protocol):
     """Protocol for team registry services."""
 
     def register_from_vertical(
-        self, vertical: str, specs: dict[str, Any], replace: bool = False
+        self, vertical: str, specs: Dict[str, Any], replace: bool = False
     ) -> None:
         """Register team specs from a vertical."""
         ...
@@ -605,11 +605,9 @@ class FrameworkScope:
 
         Returns a new builder instance (transient).
         """
-        from typing import cast
-
         # Use factory function to get service
         service_impl = _create_agent_builder(self._scope._parent)
-        return cast(AgentBuilderService, service_impl)
+        return service_impl
 
     async def __aenter__(self) -> "FrameworkScope":
         """Enter async context."""

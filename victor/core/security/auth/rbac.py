@@ -12,57 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Role-Based Access Control (RBAC) for Victor tool execution.
+"""Role-Based Access Control (RBAC) for Victor AI.
 
-This module is the canonical location for RBAC implementation.
-It provides enterprise-grade RBAC that integrates with Victor's
-existing AccessMode system for tool security.
+This is the canonical location for RBAC functionality.
+The old location (victor.security.auth) is deprecated.
 
-Design Principles:
-- Permission model aligned with AccessMode enum (READONLY, WRITE, EXECUTE, NETWORK, MIXED)
-- Category-based permission derivation (not string matching on tool names)
-- YAML-configurable roles and users
-- Decorator support for permission checks
-- Thread-safe for concurrent access
+Example usage:
+    from victor.core.security.auth import RBACManager, Permission, Role, User
 
-Example Configuration (in profiles.yaml or rbac.yaml):
-    rbac:
-      enabled: true
-      default_role: viewer
-      roles:
-        admin:
-          permissions: [READ, WRITE, EXECUTE, NETWORK, ADMIN]
-        developer:
-          permissions: [READ, WRITE, EXECUTE]
-          tool_categories: [filesystem, git, testing]
-        viewer:
-          permissions: [READ]
-      users:
-        alice:
-          roles: [admin]
-        bob:
-          roles: [developer]
-
-Usage:
-    from victor.core.security.auth import RBACManager, Permission, Role
-
+    # Create RBAC manager
     rbac = RBACManager()
-    rbac.add_role(Role("admin", {Permission.ADMIN}))
-    rbac.add_user(User("alice", roles={rbac.get_role("admin")}))
 
+    # Define roles with permissions
+    rbac.add_role(Role("admin", {Permission.ADMIN, Permission.WRITE}))
+    rbac.add_role(Role("user", {Permission.READ}))
+
+    # Create users and assign roles
+    rbac.add_user(User("alice", roles={rbac.get_role("admin")}))
+    rbac.add_user(User("bob", roles={rbac.get_role("user")}))
+
+    # Check permissions
     if rbac.check_tool_access("alice", "shell", "execute", AccessMode.EXECUTE):
         # Allow execution
 """
 
-# Re-export everything from the original location
-# This allows for a gradual migration while maintaining the canonical location
-from victor.security.auth.rbac import (
+# Import from local implementation file
+from victor.core.security.auth.rbac_impl import (
     Permission,
     Role,
     User,
     RBACManager,
     get_permission_for_access_mode,
-    # Utility functions
     require_permission,
     get_rbac_manager,
     set_rbac_manager,
@@ -74,7 +54,6 @@ __all__ = [
     "User",
     "RBACManager",
     "get_permission_for_access_mode",
-    # Utility functions
     "require_permission",
     "get_rbac_manager",
     "set_rbac_manager",

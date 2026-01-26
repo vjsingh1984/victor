@@ -470,11 +470,11 @@ def create_tool_execution_handler(
     if chunk_gen is None:
         raise ValueError("orchestrator must have a chunk_generator")
     return ToolExecutionHandler(
-        recovery_coordinator=orchestrator._recovery_coordinator,  # type: ignore[arg-type]
+        recovery_coordinator=orchestrator._recovery_coordinator,
         chunk_generator=chunk_gen,
         message_adder=orchestrator,
         reminder_manager=orchestrator.reminder_manager,
-        unified_tracker=orchestrator.unified_tracker,  # type: ignore[arg-type]
+        unified_tracker=orchestrator.unified_tracker,
         settings=orchestrator.settings,
         create_recovery_context=orchestrator._create_recovery_context,
         check_progress_with_handler=orchestrator._check_progress_with_handler,

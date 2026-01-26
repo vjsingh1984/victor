@@ -2,7 +2,7 @@
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# You may obtain a copy of the the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -12,11 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Safety scanner registry.
+"""Safety pattern registry.
 
-This is the canonical location for SafetyRegistry.
+This is the canonical location for the safety registry.
+The old location (victor.security.safety.registry) is deprecated.
 """
 
-from victor.security.safety.registry import ISafetyScanner, SafetyRegistry
+# Import from local implementation (canonical location)
+from victor.security_analysis.patterns.registry_impl import (
+    ISafetyScanner,
+    SafetyRegistry,
+)
 
-__all__ = ["ISafetyScanner", "SafetyRegistry"]
+__all__ = [
+    "ISafetyScanner",
+    "SafetyRegistry",
+]

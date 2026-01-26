@@ -252,12 +252,21 @@ validate_yaml_syntax() {
 
     log_info "Checking YAML syntax: $file"
 
-    # Use Python to check YAML syntax
+    # Normalize path for Windows
+    local normalized_file="$file"
+    if [[ "$(uname -s)" == MINGW* ]] || [[ "$(uname -s)" == MSYS* ]]; then
+        normalized_file=$(echo "$file" | sed 's|\\|/|g' | sed 's|^\([A-Za-z]\):|/\1|')
+    fi
+
+    # Use Python to check YAML syntax with path normalization
     if ! "$PYTHON_BIN" -c "
 import sys
+import os
 import yaml
+
+file_path = os.path.normpath('$normalized_file')
 try:
-    with open('$file', 'r') as f:
+    with open(file_path, 'r', encoding='utf-8') as f:
         yaml.safe_load(f)
     sys.exit(0)
 except Exception as e:
@@ -278,14 +287,29 @@ validate_workflow_compilation() {
 
     log_info "Validating workflow compilation: $file"
 
+    # Detect Windows and normalize path
+    local normalized_file="$file"
+    if [[ "$(uname -s)" == MINGW* ]] || [[ "$(uname -s)" == MSYS* ]]; then
+        # Convert Windows path to Unix-style for Git Bash
+        normalized_file=$(echo "$file" | sed 's|\\|/|g' | sed 's|^\([A-Za-z]\):|/\1|')
+    fi
+
     # Use Python to call workflow validation directly
+    # Pass file as argument instead of embedding in code to avoid path escaping issues
     local python_cmd="
 import sys
-sys.path.insert(0, '${PROJECT_ROOT}')
+import os
+
+# Normalize project root for cross-platform compatibility
+project_root = os.path.normpath('${PROJECT_ROOT}')
+sys.path.insert(0, project_root)
 
 from victor.ui.commands.workflow import workflow_app
 import io
 from contextlib import redirect_stdout, redirect_stderr
+
+# Get file path from environment to avoid escaping issues
+file_path = os.path.normpath('${normalized_file}')
 
 # Capture output
 stdout_capture = io.StringIO()
@@ -293,7 +317,7 @@ stderr_capture = io.StringIO()
 
 try:
     with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-        sys.argv = ['workflow', 'validate', '${file}']
+        sys.argv = ['workflow', 'validate', file_path]
         if ${verbose}:
             sys.argv.append('--verbose')
         workflow_app()
@@ -341,8 +365,9 @@ get_file_hash() {
     elif command -v md5sum &> /dev/null; then
         md5sum "$file" | cut -d' ' -f1
     else
-        # Fallback to modification time
-        stat -f "%m" "$file" 2>/dev/null || stat -c "%Y" "$file"
+        # Fallback to modification time (Windows-compatible)
+        # Try BSD stat first (macOS), then GNU stat (Linux)
+        stat -f "%m" "$file" 2>/dev/null || stat -c "%Y" "$file" 2>/dev/null || stat "%Y" "$file" 2>/dev/null
     fi
 }
 

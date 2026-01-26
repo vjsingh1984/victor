@@ -15,32 +15,40 @@
 """Code safety patterns.
 
 This is the canonical location for code safety pattern utilities.
+The old location (victor.security.safety.code_patterns) is deprecated.
 """
 
-from victor.security.safety.code_patterns import (
-    BUILD_DEPLOY_PATTERNS,
+# Import from local implementation (canonical location)
+from victor.security_analysis.patterns.code_patterns_impl import (
     CodePatternCategory,
     CodePatternScanner,
+    RiskLevel,
     GIT_PATTERNS,
-    PACKAGE_MANAGER_PATTERNS,
     REFACTORING_PATTERNS,
+    PACKAGE_MANAGER_PATTERNS,
+    BUILD_DEPLOY_PATTERNS,
     SENSITIVE_FILE_PATTERNS,
     ScanResult,
-    get_all_patterns,
-    is_sensitive_file,
     scan_command,
+    is_sensitive_file,
+    get_all_patterns,
 )
 
 __all__ = [
-    "BUILD_DEPLOY_PATTERNS",
+    # Enums
     "CodePatternCategory",
-    "CodePatternScanner",
+    "RiskLevel",
+    # Pattern lists
     "GIT_PATTERNS",
-    "PACKAGE_MANAGER_PATTERNS",
     "REFACTORING_PATTERNS",
+    "PACKAGE_MANAGER_PATTERNS",
+    "BUILD_DEPLOY_PATTERNS",
     "SENSITIVE_FILE_PATTERNS",
+    # Classes
     "ScanResult",
-    "get_all_patterns",
-    "is_sensitive_file",
+    "CodePatternScanner",
+    # Functions
     "scan_command",
+    "is_sensitive_file",
+    "get_all_patterns",
 ]

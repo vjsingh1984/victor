@@ -91,7 +91,6 @@ from victor.agent.orchestrator_imports import (
     CapabilityRegistryMixin,
     ComponentAccessorMixin,
     StateDelegationMixin,
-    LegacyAPIMixin,
     # DI container
     ensure_bootstrapped,
     get_service_optional,
@@ -458,7 +457,6 @@ class AgentOrchestrator(
     StateDelegationMixin,
     ModeAwareMixin,
     CapabilityRegistryMixin,
-    LegacyAPIMixin,  # Phase 4: Backward compatibility mixin
 ):
     """Facade orchestrator for agent interactions, tool execution, and provider communication.
 
@@ -467,7 +465,6 @@ class AgentOrchestrator(
     - State properties via StateDelegationMixin (e.g., `self.messages`, `self.stage`, `self.current_mode`)
     - Mode control via ModeAwareMixin (e.g., `self.is_build_mode`, `self.exploration_multiplier`)
     - Capability discovery via CapabilityRegistryMixin (type-safe protocol conformance)
-    - Legacy API support via LegacyAPIMixin (deprecated methods with warnings)
 
     **Key Public APIs:**
     - `chat()`, `stream_chat()`: Main entry points for conversations
@@ -475,10 +472,11 @@ class AgentOrchestrator(
     - `reset_session()`: Clear conversation state
     - Component properties (e.g., `tool_selector`, `conversation_controller`): Access extracted components
 
-    **Deprecated APIs:**
-    - Methods from LegacyAPIMixin issue deprecation warnings
-    - Will be removed in v0.7.0
-    - See migration guide in docs/migration/legacy_api_migration.md
+    **Evaluation Support:**
+    - `get_token_usage()`: Token usage tracking for benchmarks
+    - `set_workspace()`: Set project root for tools
+    - `reset_token_usage()`: Reset token tracking between tasks
+    - `append_to_system_prompt()`: Add custom content to system prompt
     """
 
     # State delegations for StateDelegationMixin

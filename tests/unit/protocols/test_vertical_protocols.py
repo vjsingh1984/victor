@@ -12,7 +12,6 @@ from victor.core.verticals.protocols import (
     # Data types
     MiddlewarePriority,
     MiddlewareResult,
-    SafetyPattern,
     TaskTypeHint,
     ModeConfig,
     ToolDependency,
@@ -25,6 +24,9 @@ from victor.core.verticals.protocols import (
     # Composite
     VerticalExtensions,
 )
+
+# Import SafetyPattern from its canonical location
+from victor.security.safety.types import SafetyPattern
 
 
 class TestMiddlewarePriority:

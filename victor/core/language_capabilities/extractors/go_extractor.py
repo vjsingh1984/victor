@@ -149,7 +149,7 @@ class GoExtractor(BaseLanguageProcessor):
 
     def _extract_decl(
         self,
-        decl,
+        decl: Any,
         file_path: Path,
         symbols: List[ExtractedSymbol],
     ) -> None:

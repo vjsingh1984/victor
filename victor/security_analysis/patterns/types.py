@@ -15,8 +15,10 @@
 """Safety pattern type definitions.
 
 This is the canonical location for SafetyPattern type.
+The old location (victor.security.safety.types) is deprecated.
 """
 
-from victor.security.safety.types import SafetyPattern
+# Import from local implementation (canonical location)
+from victor.security_analysis.patterns.types_impl import SafetyPattern
 
 __all__ = ["SafetyPattern"]

@@ -18,8 +18,8 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from datetime import datetime
 
-from victor.optimization.profiler import WorkflowProfiler
-from victor.optimization.models import (
+from victor.optimization.workflow.profiler import WorkflowProfiler
+from victor.optimization.workflow.models import (
     BottleneckType,
     BottleneckSeverity,
     NodeStatistics,

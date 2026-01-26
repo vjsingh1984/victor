@@ -20,7 +20,7 @@ multi-line suggestions (Copilot-style).
 
 import logging
 import time
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncGenerator, AsyncIterator, Optional
 
 from victor.processing.completion.protocol import (
     CompletionCapabilities,
@@ -252,7 +252,7 @@ class AICompletionProvider(StreamingCompletionProvider):
             logger.warning(f"AI inline completion failed: {e}")
             return InlineCompletionList(items=[])
 
-    async def stream_inline_completion(self, params: InlineCompletionParams) -> AsyncIterator[str]:
+    async def stream_inline_completion(self, params: InlineCompletionParams) -> AsyncGenerator[str, None]:
         """Stream inline completion tokens.
 
         Args:

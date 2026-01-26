@@ -6,7 +6,7 @@ comprehensive security audits on Victor AI agents.
 """
 
 from pathlib import Path
-from victor.security.penetration_testing import (
+from victor.security_analysis.tools import (
     SecurityTestSuite,
     SecurityAuditReport,
     SecurityVulnerability,

@@ -14,9 +14,6 @@
 
 """Audit Protocol - Unified interface for compliance and audit logging.
 
-This module defines the abstract interface and data structures for
-enterprise compliance tracking, audit logging, and governance reporting.
-
 This is the canonical location for audit protocol definitions.
 
 Supports compliance frameworks:
@@ -28,8 +25,8 @@ Supports compliance frameworks:
 - SOX
 """
 
-# Re-export everything from the original location
-from victor.security.audit.protocol import (
+# Import from local implementation (canonical location)
+from victor.core.security.audit.protocol_impl import (
     AuditEventType,
     AuditSeverity,
     Severity,

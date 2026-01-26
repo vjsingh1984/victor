@@ -14,13 +14,10 @@
 
 """Audit Logger - File-based audit event storage.
 
-This module provides a file-based implementation of the audit logger
-protocol with support for rotation and export.
-
 This is the canonical location for FileAuditLogger.
 """
 
-# Re-export from the original location
-from victor.security.audit.logger import FileAuditLogger, create_event
+# Import from local implementation (canonical location)
+from victor.core.security.audit.logger_impl import FileAuditLogger, create_event
 
 __all__ = ["FileAuditLogger", "create_event"]

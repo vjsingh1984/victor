@@ -12,25 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Enhanced Authorization System with RBAC and ABAC.
+"""Enhanced Authorization with ABAC (Attribute-Based Access Control).
 
-This module provides advanced authorization capabilities combining:
-- Role-Based Access Control (RBAC): Permissions based on user roles
-- Attribute-Based Access Control (ABAC): Permissions based on user/resource attributes
-- Policy-based authorization: Fine-grained policy evaluation
-- Integration with existing ActionAuthorizer and RBACManager
+This is the canonical location for authorization functionality.
+The old location (victor.security.authorization_enhanced) is deprecated.
 
-This is the canonical location for EnhancedAuthorizer.
-
-Design Principles:
-- Defense in depth: Multiple layers of authorization checks
-- Least privilege: Default deny, explicit allow
-- Separation of concerns: RBAC for coarse-grained, ABAC for fine-grained
-- Integration with existing security infrastructure
-- Configurable policies via YAML
-- Thread-safe for concurrent access
-
-Example:
+Example usage:
     from victor.core.security.authorization import EnhancedAuthorizer
 
     authorizer = EnhancedAuthorizer()
@@ -41,8 +28,8 @@ Example:
         # Allow tool execution
 """
 
-# Re-export from the original location
-from victor.security.authorization_enhanced import (
+# Import from local implementation (canonical location)
+from victor.core.security.authorization_impl import (
     ResourceType,
     ActionType,
     PolicyEffect,

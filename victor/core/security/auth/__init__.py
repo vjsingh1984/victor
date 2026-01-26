@@ -14,6 +14,16 @@
 
 """Authentication and Authorization Module.
 
+This is the canonical location for RBAC functionality.
+The old location (victor.security.auth) is deprecated.
+
+Migration Guide:
+    Old (deprecated):
+        from victor.security.auth import Permission, RBACManager
+
+    New (recommended):
+        from victor.core.security.auth import Permission, RBACManager
+
 This module provides Role-Based Access Control (RBAC) for Victor tool execution.
 
 Usage:
@@ -26,6 +36,7 @@ Usage:
         # Allow execution
 """
 
+# Import from local implementation (canonical location)
 from victor.core.security.auth.rbac import (
     Permission,
     Role,

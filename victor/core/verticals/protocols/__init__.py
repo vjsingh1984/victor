@@ -64,8 +64,9 @@ from victor.core.verticals.protocols.safety_provider import (
 )
 
 # Import SafetyPattern at runtime for re-export
-# (defined in victor.security.safety.types, re-exported from victor.security_analysis)
-from victor.security.safety.types import SafetyPattern
+# Note: Must use TYPE_CHECKING to avoid circular import with security_analysis assistant
+if TYPE_CHECKING:
+    from victor.security_analysis.patterns.types import SafetyPattern
 
 # Team Provider
 from victor.core.verticals.protocols.team_provider import (
@@ -221,13 +222,16 @@ class VerticalExtensions:
             merged.update(contributor.get_task_type_hints())
         return merged
 
-    def get_all_safety_patterns(self) -> List[SafetyPattern]:
+    def get_all_safety_patterns(self) -> List["SafetyPattern"]:
         """Collect safety patterns from all extensions.
 
         Returns:
             Combined list of safety patterns
         """
-        patterns = []
+        # Import locally to avoid circular import at module level
+        from victor.security_analysis.patterns.types import SafetyPattern
+
+        patterns: List[SafetyPattern] = []
         for ext in self.safety_extensions:
             patterns.extend(ext.get_bash_patterns())
             patterns.extend(ext.get_file_patterns())

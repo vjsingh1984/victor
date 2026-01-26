@@ -33,9 +33,9 @@ if TYPE_CHECKING:
     from victor.storage.embeddings.service import EmbeddingService
 
     try:
-        from openai import AsyncOpenAI
+        from openai import AsyncOpenAI as AsyncOpenAIType  # noqa: F401
     except ImportError:
-        AsyncOpenAI = None
+        AsyncOpenAIType = None  # type: ignore[assignment]
 
     try:
         import cohere
@@ -205,7 +205,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         if self._embedding_service is None:
             raise RuntimeError("EmbeddingService not initialized")
         embedding = await self._embedding_service.embed_text(text)
-        return embedding.tolist()
+        return list(embedding.tolist())  # type: ignore[no-any-return]
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts (batch optimized)."""
@@ -216,7 +216,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         if self._embedding_service is None:
             raise RuntimeError("EmbeddingService not initialized")
         embeddings = await self._embedding_service.embed_batch(texts)
-        return [emb.tolist() for emb in embeddings]
+        return [list(emb.tolist()) for emb in embeddings]  # type: ignore[no-any-return]
 
     def get_dimension(self) -> int:
         """Get embedding dimension."""
@@ -255,7 +255,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
     def __init__(self, config: EmbeddingModelConfig):
         """Initialize OpenAI embedding model."""
         super().__init__(config)
-        self.client: Optional["AsyncOpenAI"] = None
+        self.client: Optional["AsyncOpenAIType"] = None
 
     async def initialize(self) -> None:
         """Initialize OpenAI client."""
@@ -263,14 +263,14 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             return
 
         try:
-            from openai import AsyncOpenAI
+            from openai import AsyncOpenAI as AsyncOpenAIImpl
         except ImportError:
             raise ImportError("openai not installed. Install with: pip install openai")
 
         if not self.config.api_key:
             raise ValueError("OpenAI API key required")
 
-        self.client = AsyncOpenAI(api_key=self.config.api_key)
+        self.client = AsyncOpenAIImpl(api_key=self.config.api_key)  # type: ignore[assignment]
         self._initialized = True
 
         print(f"✅ OpenAI embedding model initialized: {self.config.embedding_model}")

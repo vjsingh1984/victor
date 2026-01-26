@@ -27,7 +27,7 @@ Performance Impact:
     Overhead: <5% for optimization framework
 
 Example:
-    from victor.optimizations import (
+    from victor.optimization.runtime import (
         AdaptiveParallelExecutor,
         OptimizationStrategy,
     )
@@ -632,7 +632,12 @@ class AdaptiveParallelExecutor(ParallelExecutor):
                     heappush(priority_queue, TaskWithPriority(priority, task_id, task_input))
                 else:
                     # Priority queue with task function (not dict format)
-                    heappush(priority_queue, TaskWithPriority(priority if isinstance(priority, int) else 0, task_id, task_input))
+                    heappush(
+                        priority_queue,
+                        TaskWithPriority(
+                            priority if isinstance(priority, int) else 0, task_id, task_input
+                        ),
+                    )
             else:
                 # Default priority
                 heappush(priority_queue, TaskWithPriority(0, task_id, task))

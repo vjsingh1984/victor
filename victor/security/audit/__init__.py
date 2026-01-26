@@ -14,6 +14,17 @@
 
 """Compliance & Audit Module - Enterprise governance for Victor.
 
+.. deprecated:: 0.6.0
+    This module is deprecated. Please migrate to ``victor.core.security.audit``.
+    This module will be removed in v1.0.0.
+
+Migration Guide:
+    Old (deprecated):
+        from victor.security.audit import AuditManager
+
+    New (recommended):
+        from victor.core.security.audit import AuditManager
+
 This module provides comprehensive audit logging and compliance
 checking for enterprise environments.
 
@@ -47,15 +58,28 @@ Usage:
     print(f"Total events: {report.total_events}")
 """
 
-from .checker import DefaultComplianceChecker, get_compliance_summary
-from .logger import FileAuditLogger, create_event
-from .manager import AuditManager
-from .protocol import (
+import warnings
+
+warnings.warn(
+    "victor.security.audit is deprecated and will be removed in v1.0.0. "
+    "Use victor.core.security.audit instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+# Re-export from canonical location
+from victor.core.security.audit import (
+    AuditManager,
+    DefaultComplianceChecker,
+    FileAuditLogger,
+    create_event,
+    get_compliance_summary,
     AuditConfig,
     AuditEvent,
     AuditEventType,
     AuditLoggerProtocol,
     AuditReport,
+    AuditSeverity,
     ComplianceCheckerProtocol,
     ComplianceFramework,
     ComplianceRule,
@@ -73,6 +97,7 @@ __all__ = [
     "ComplianceCheckerProtocol",
     # Data classes
     "AuditEventType",
+    "AuditSeverity",
     "Severity",
     "ComplianceFramework",
     "AuditEvent",

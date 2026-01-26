@@ -14,6 +14,16 @@
 
 """Compliance & Audit Module - Enterprise governance for Victor.
 
+This is the canonical location for audit functionality.
+The old location (victor.security.audit) is deprecated.
+
+Migration Guide:
+    Old (deprecated):
+        from victor.security.audit import AuditManager
+
+    New (recommended):
+        from victor.core.security.audit import AuditManager
+
 This module provides comprehensive audit logging and compliance
 checking for enterprise environments.
 
@@ -47,9 +57,7 @@ Usage:
     print(f"Total events: {report.total_events}")
 """
 
-from victor.core.security.audit.checker import DefaultComplianceChecker, get_compliance_summary
-from victor.core.security.audit.logger import FileAuditLogger, create_event
-from victor.core.security.audit.manager import AuditManager
+# Import from local implementations (canonical location)
 from victor.core.security.audit.protocol import (
     AuditConfig,
     AuditEvent,
@@ -65,6 +73,9 @@ from victor.core.security.audit.protocol import (
     RetentionPolicy,
     Severity,
 )
+from victor.core.security.audit.checker import DefaultComplianceChecker, get_compliance_summary
+from victor.core.security.audit.logger import FileAuditLogger, create_event
+from victor.core.security.audit.manager import AuditManager
 
 __all__ = [
     # Manager

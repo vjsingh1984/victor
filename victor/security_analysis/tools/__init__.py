@@ -26,41 +26,52 @@ The tools in victor.security are deprecated in favor of these.
 
 # Re-export from victor.security for now
 # These will be migrated to this location in the future
-from victor.security.scanner import (
-    BaseDependencyParser,
-    DependencyParser,
-    GoDependencyParser,
-    NodeDependencyParser,
-    PythonDependencyParser,
-    RustDependencyParser,
-    SecurityScanner,
-    get_scanner,
-)
+# Suppress deprecation warning for this internal re-export
+import warnings
 
-from victor.security.manager import (
-    SecurityManager,
-    get_security_manager,
-    reset_security_manager,
-)
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    from victor.security.scanner import (
+        BaseDependencyParser,
+        DependencyParser,
+        GoDependencyParser,
+        NodeDependencyParser,
+        PythonDependencyParser,
+        RustDependencyParser,
+        SecurityScanner,
+        get_scanner,
+    )
 
-from victor.security.cve_database import (
-    BaseCVEDatabase,
-    CachingCVEDatabase,
-    CVEDatabase,
-    LocalCVECache,
-    OfflineCVEDatabase,
-    OSVDatabase,
-    get_cve_database,
-)
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    from victor.security.manager import (
+        SecurityManager,
+        get_security_manager,
+        reset_security_manager,
+    )
 
-from victor.security.penetration_testing import (
-    SecurityTestSuite,
-    SeverityLevel,
-    AttackType,
-    SecurityReport,
-    ComprehensiveSecurityReport,
-    run_security_tests,
-)
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    from victor.security.cve_database import (
+        BaseCVEDatabase,
+        CachingCVEDatabase,
+        CVEDatabase,
+        LocalCVECache,
+        OfflineCVEDatabase,
+        OSVDatabase,
+        get_cve_database,
+    )
+
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    from victor.security.penetration_testing import (
+        SecurityTestSuite,
+        SeverityLevel,
+        AttackType,
+        SecurityReport,
+        ComprehensiveSecurityReport,
+        run_security_tests,
+    )
 
 __all__ = [
     # Scanner

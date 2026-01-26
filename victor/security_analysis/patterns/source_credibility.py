@@ -15,30 +15,30 @@
 """Source credibility patterns.
 
 This is the canonical location for source credibility utilities.
+The old location (victor.security.safety.source_credibility) is deprecated.
 """
 
-from victor.security.safety.source_credibility import (
-    DOMAIN_TYPES,
-    SOURCE_CREDIBILITY_PATTERNS,
+# Import from local implementation (canonical location)
+from victor.security_analysis.patterns.source_credibility_impl import (
     CredibilityLevel,
     CredibilityMatch,
+    SOURCE_CREDIBILITY_PATTERNS,
     SourceCredibilityScanner,
+    validate_source_credibility,
     get_credibility_level,
-    get_source_safety_reminders,
     is_high_credibility,
     is_low_credibility,
-    validate_source_credibility,
+    get_source_safety_reminders,
 )
 
 __all__ = [
-    "DOMAIN_TYPES",
-    "SOURCE_CREDIBILITY_PATTERNS",
     "CredibilityLevel",
     "CredibilityMatch",
+    "SOURCE_CREDIBILITY_PATTERNS",
     "SourceCredibilityScanner",
+    "validate_source_credibility",
     "get_credibility_level",
-    "get_source_safety_reminders",
     "is_high_credibility",
     "is_low_credibility",
-    "validate_source_credibility",
+    "get_source_safety_reminders",
 ]

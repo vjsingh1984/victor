@@ -91,9 +91,6 @@ from victor.agent.coordinators.team_coordinator import (
     TeamCoordinator,
 )
 
-# Legacy API mixin for backward compatibility
-from victor.agent.mixins.legacy_api import LegacyAPIMixin
-
 # Export all public symbols
 __all__ = [
     # Third-party
@@ -111,8 +108,6 @@ __all__ = [
     "ConversationCoordinator",
     "SearchCoordinator",
     "TeamCoordinator",
-    # Legacy API
-    "LegacyAPIMixin",
     # Agent components
     "ArgumentNormalizer",
     "NormalizationStrategy",

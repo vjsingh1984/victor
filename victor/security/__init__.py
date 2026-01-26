@@ -262,7 +262,7 @@ def __getattr__(name: str) -> Any:
             )
         import importlib
 
-        _submodule_cache["auth"] = importlib.import_module("victor.security.auth")
+        _submodule_cache["auth"] = importlib.import_module("victor.core.security.auth")
         return _submodule_cache["auth"]
     elif name == "safety":
         if "safety" not in _warned_submodules:
@@ -274,7 +274,7 @@ def __getattr__(name: str) -> Any:
             )
         import importlib
 
-        _submodule_cache["safety"] = importlib.import_module("victor.security.safety")
+        _submodule_cache["safety"] = importlib.import_module("victor.security_analysis.patterns")
         return _submodule_cache["safety"]
     elif name == "audit":
         if "audit" not in _warned_submodules:
@@ -286,7 +286,7 @@ def __getattr__(name: str) -> Any:
             )
         import importlib
 
-        _submodule_cache["audit"] = importlib.import_module("victor.security.audit")
+        _submodule_cache["audit"] = importlib.import_module("victor.core.security.audit")
         return _submodule_cache["audit"]
     elif name == "penetration_testing":
         if "penetration_testing" not in _warned_submodules:
@@ -299,7 +299,7 @@ def __getattr__(name: str) -> Any:
         import importlib
 
         _submodule_cache["penetration_testing"] = importlib.import_module(
-            "victor.security.penetration_testing"
+            "victor.security_analysis.tools"
         )
         return _submodule_cache["penetration_testing"]
     elif name == "authorization_enhanced":
@@ -313,7 +313,7 @@ def __getattr__(name: str) -> Any:
         import importlib
 
         _submodule_cache["authorization_enhanced"] = importlib.import_module(
-            "victor.security.authorization_enhanced"
+            "victor.core.security.authorization"
         )
         return _submodule_cache["authorization_enhanced"]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

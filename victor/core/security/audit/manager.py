@@ -14,13 +14,10 @@
 
 """Audit Manager - Orchestrates audit logging and compliance checking.
 
-This module provides the AuditManager class that coordinates audit
-logging, compliance checking, and report generation.
-
 This is the canonical location for AuditManager.
 """
 
-# Re-export from the original location
-from victor.security.audit.manager import AuditManager
+# Import from local implementation (canonical location)
+from victor.core.security.audit.manager_impl import AuditManager
 
 __all__ = ["AuditManager"]

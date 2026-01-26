@@ -15,9 +15,11 @@
 """PII detection patterns.
 
 This is the canonical location for PII detection utilities.
+The old location (victor.security.safety.pii) is deprecated.
 """
 
-from victor.security.safety.pii import (
+# Import from local implementation (canonical location)
+from victor.security_analysis.patterns.pii_impl import (
     ANONYMIZATION_SUGGESTIONS,
     PII_COLUMN_PATTERNS,
     PII_CONTENT_PATTERNS,

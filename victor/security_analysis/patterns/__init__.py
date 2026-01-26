@@ -12,58 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Security analysis patterns.
+"""Safety patterns and utilities for Victor.
 
-This module provides safety pattern scanners for:
+This is the canonical location for safety pattern utilities.
+The old location (victor.security.safety) is deprecated.
+
+Migration Guide:
+    Old (deprecated):
+        from victor.security.safety import detect_secrets, SafetyPattern
+
+    New (recommended):
+        from victor.security_analysis.patterns import detect_secrets, SafetyPattern
+
+This module provides consolidated safety utilities for:
 - Secret detection (API keys, credentials, tokens)
 - PII detection (email, SSN, credit cards, etc.)
 - Code safety patterns (git, refactoring, package management)
 - Infrastructure safety patterns (Kubernetes, Docker, Terraform)
-- Source credibility patterns
-- Content warning patterns
-
-These are the canonical locations for safety pattern modules.
-The patterns in victor.security.safety are deprecated in favor of these.
-
-Example usage:
-    from victor.security_analysis.patterns import (
-        detect_secrets,
-        detect_pii_columns,
-        CodePatternScanner,
-        InfrastructureScanner,
-        SafetyRegistry,
-    )
-
-    # Detect secrets in code
-    secrets = detect_secrets(code_content)
-
-    # Detect PII columns
-    pii_cols = detect_pii_columns(["email", "name", "score"])
-
-    # Scan git commands
-    scanner = CodePatternScanner()
-    patterns = scanner.scan_command("git push --force")
+- Unified safety registry for pluggable scanners
 """
 
-# Types
+# Import from local submodules (canonical location)
 from victor.security_analysis.patterns.types import SafetyPattern
-
-# Registry
-from victor.security_analysis.patterns.registry import ISafetyScanner, SafetyRegistry
-
-# Secrets
+from victor.security_analysis.patterns.registry import (
+    ISafetyScanner,
+    SafetyRegistry,
+)
 from victor.security_analysis.patterns.secrets import (
     CREDENTIAL_PATTERNS,
     SecretMatch,
     SecretScanner,
     SecretSeverity,
     detect_secrets,
-    get_secret_types,
-    has_secrets,
-    mask_secrets,
 )
-
-# PII
 from victor.security_analysis.patterns.pii import (
     ANONYMIZATION_SUGGESTIONS,
     PII_COLUMN_PATTERNS,
@@ -78,67 +59,63 @@ from victor.security_analysis.patterns.pii import (
     get_anonymization_suggestion,
     get_pii_severity,
     get_pii_types,
+    get_safety_reminders,
     has_pii,
 )
-
-# Code patterns
 from victor.security_analysis.patterns.code_patterns import (
-    BUILD_DEPLOY_PATTERNS,
     CodePatternCategory,
     CodePatternScanner,
+    RiskLevel,
     GIT_PATTERNS,
-    PACKAGE_MANAGER_PATTERNS,
     REFACTORING_PATTERNS,
+    PACKAGE_MANAGER_PATTERNS,
+    BUILD_DEPLOY_PATTERNS,
     SENSITIVE_FILE_PATTERNS,
     ScanResult,
-    is_sensitive_file,
     scan_command,
+    is_sensitive_file,
+    get_all_patterns,
 )
-
-# Infrastructure patterns
 from victor.security_analysis.patterns.infrastructure import (
-    CLOUD_PATTERNS,
-    DESTRUCTIVE_PATTERNS,
-    DOCKER_PATTERNS,
     InfraPatternCategory,
+    RiskLevel as InfraRiskLevel,
+    DESTRUCTIVE_PATTERNS,
+    KUBERNETES_PATTERNS,
+    DOCKER_PATTERNS,
+    TERRAFORM_PATTERNS,
+    CLOUD_PATTERNS,
     InfraScanResult,
     InfrastructureScanner,
-    KUBERNETES_PATTERNS,
-    TERRAFORM_PATTERNS,
-    get_all_infrastructure_patterns,
     scan_infrastructure_command,
     validate_dockerfile,
     validate_kubernetes_manifest,
+    get_all_infrastructure_patterns,
+    get_safety_reminders as get_infrastructure_safety_reminders,
 )
-
-# Source credibility patterns
 from victor.security_analysis.patterns.source_credibility import (
-    DOMAIN_TYPES,
-    SOURCE_CREDIBILITY_PATTERNS,
     CredibilityLevel,
     CredibilityMatch,
+    SOURCE_CREDIBILITY_PATTERNS,
     SourceCredibilityScanner,
+    validate_source_credibility,
     get_credibility_level,
-    get_source_safety_reminders,
     is_high_credibility,
     is_low_credibility,
-    validate_source_credibility,
+    get_source_safety_reminders,
 )
-
-# Content warning patterns
 from victor.security_analysis.patterns.content_patterns import (
-    ADVICE_RISK_PATTERNS,
-    CONTENT_WARNING_PATTERNS,
-    MISINFORMATION_RISK_PATTERNS,
-    ContentPatternScanner,
     ContentWarningLevel,
     ContentWarningMatch,
-    detect_advice_risk,
-    detect_misinformation_risk,
-    get_content_safety_reminders,
-    get_high_severity_warnings,
-    has_content_warnings,
+    CONTENT_WARNING_PATTERNS,
+    MISINFORMATION_RISK_PATTERNS,
+    ADVICE_RISK_PATTERNS,
     scan_content_warnings,
+    has_content_warnings,
+    get_high_severity_warnings,
+    detect_misinformation_risk,
+    detect_advice_risk,
+    get_content_safety_reminders,
+    ContentPatternScanner,
 )
 
 __all__ = [
@@ -153,9 +130,6 @@ __all__ = [
     "SecretScanner",
     "SecretSeverity",
     "detect_secrets",
-    "get_secret_types",
-    "has_secrets",
-    "mask_secrets",
     # PII
     "ANONYMIZATION_SUGGESTIONS",
     "PII_COLUMN_PATTERNS",
@@ -170,53 +144,57 @@ __all__ = [
     "get_anonymization_suggestion",
     "get_pii_severity",
     "get_pii_types",
+    "get_safety_reminders",
     "has_pii",
     # Code patterns
-    "BUILD_DEPLOY_PATTERNS",
     "CodePatternCategory",
     "CodePatternScanner",
+    "RiskLevel",
     "GIT_PATTERNS",
-    "PACKAGE_MANAGER_PATTERNS",
     "REFACTORING_PATTERNS",
+    "PACKAGE_MANAGER_PATTERNS",
+    "BUILD_DEPLOY_PATTERNS",
     "SENSITIVE_FILE_PATTERNS",
     "ScanResult",
-    "is_sensitive_file",
     "scan_command",
+    "is_sensitive_file",
+    "get_all_patterns",
     # Infrastructure patterns
-    "CLOUD_PATTERNS",
-    "DESTRUCTIVE_PATTERNS",
-    "DOCKER_PATTERNS",
     "InfraPatternCategory",
+    "InfraRiskLevel",
+    "DESTRUCTIVE_PATTERNS",
+    "KUBERNETES_PATTERNS",
+    "DOCKER_PATTERNS",
+    "TERRAFORM_PATTERNS",
+    "CLOUD_PATTERNS",
     "InfraScanResult",
     "InfrastructureScanner",
-    "KUBERNETES_PATTERNS",
-    "TERRAFORM_PATTERNS",
-    "get_all_infrastructure_patterns",
     "scan_infrastructure_command",
     "validate_dockerfile",
     "validate_kubernetes_manifest",
-    # Source credibility patterns
-    "DOMAIN_TYPES",
-    "SOURCE_CREDIBILITY_PATTERNS",
+    "get_all_infrastructure_patterns",
+    "get_infrastructure_safety_reminders",
+    # Source credibility
     "CredibilityLevel",
     "CredibilityMatch",
+    "SOURCE_CREDIBILITY_PATTERNS",
     "SourceCredibilityScanner",
+    "validate_source_credibility",
     "get_credibility_level",
-    "get_source_safety_reminders",
     "is_high_credibility",
     "is_low_credibility",
-    "validate_source_credibility",
-    # Content warning patterns
-    "ADVICE_RISK_PATTERNS",
-    "CONTENT_WARNING_PATTERNS",
-    "MISINFORMATION_RISK_PATTERNS",
-    "ContentPatternScanner",
+    "get_source_safety_reminders",
+    # Content patterns
     "ContentWarningLevel",
     "ContentWarningMatch",
-    "detect_advice_risk",
-    "detect_misinformation_risk",
-    "get_content_safety_reminders",
-    "get_high_severity_warnings",
-    "has_content_warnings",
+    "CONTENT_WARNING_PATTERNS",
+    "MISINFORMATION_RISK_PATTERNS",
+    "ADVICE_RISK_PATTERNS",
     "scan_content_warnings",
+    "has_content_warnings",
+    "get_high_severity_warnings",
+    "detect_misinformation_risk",
+    "detect_advice_risk",
+    "get_content_safety_reminders",
+    "ContentPatternScanner",
 ]

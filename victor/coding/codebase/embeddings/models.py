@@ -165,7 +165,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
 
         # Use async method from EmbeddingService
         embedding = await self._embedding_service.embed_text(text)
-        return embedding.tolist()
+        return list(embedding.tolist())  # type: ignore[no-any-return]
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts (batch optimized)."""
@@ -177,7 +177,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
 
         # Use async batch method from EmbeddingService
         embeddings = await self._embedding_service.embed_batch(texts)
-        return [emb.tolist() for emb in embeddings]
+        return [list(emb.tolist()) for emb in embeddings]  # type: ignore[no-any-return]
 
     def get_dimension(self) -> int:
         """Get embedding dimension."""
@@ -245,7 +245,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             raise RuntimeError("OpenAI client not initialized")
 
         response = await self.client.embeddings.create(model=self.config.embedding_model, input=text)
-        return response.data[0].embedding
+        return list(response.data[0].embedding)  # type: ignore[no-any-return]
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts."""

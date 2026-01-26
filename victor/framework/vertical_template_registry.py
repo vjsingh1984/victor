@@ -76,6 +76,7 @@ class VerticalTemplateRegistry:
     def __init__(self) -> None:
         """Initialize the registry."""
         self._templates: Dict[str, VerticalTemplate] = {}
+        self._lock: threading.RLock = threading.RLock()
         self._instance_lock: threading.RLock = threading.RLock()
 
     @classmethod

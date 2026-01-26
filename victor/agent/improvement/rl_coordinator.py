@@ -572,21 +572,24 @@ class EnhancedRLCoordinator:
         if not policy:
             # No policy, return random action
             if available_actions:
-                return available_actions[np.random.randint(len(available_actions))]
+                import random
+                return random.choice(available_actions)
             return None
 
         # Epsilon-greedy selection
         if np.random.random() < self._hyperparameters.exploration_rate:
             # Explore: random action
             if available_actions:
-                return available_actions[np.random.randint(len(available_actions))]
+                import random
+                return random.choice(available_actions)
             return None
 
         # Exploit: best action from policy
         action_values = policy.get_action_values(state)
         if not action_values:
             if available_actions:
-                return available_actions[np.random.randint(len(available_actions))]
+                import random
+                return random.choice(available_actions)
             return None
 
         # Filter available actions
@@ -607,7 +610,8 @@ class EnhancedRLCoordinator:
 
         # Fallback to random
         if available_actions:
-            return available_actions[np.random.randint(len(available_actions))]
+            import random
+            return random.choice(available_actions)
         return None
 
     # =========================================================================

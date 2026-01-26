@@ -65,7 +65,8 @@ warnings.warn(
     stacklevel=2,
 )
 
-from victor.optimizations.lazy_loader import (
+# Re-export from canonical location
+from victor.optimization.runtime.lazy_loader import (
     ComponentDescriptor,
     LazyComponentLoader,
     LoadingStats,
@@ -73,7 +74,7 @@ from victor.optimizations.lazy_loader import (
     lazy_load,
     set_global_loader,
 )
-from victor.optimizations.parallel_executor import (
+from victor.optimization.runtime.parallel_executor import (
     AdaptiveParallelExecutor,
     OptimizationStrategy,
     PerformanceMetrics,

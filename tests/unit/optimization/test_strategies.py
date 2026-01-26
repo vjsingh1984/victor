@@ -17,14 +17,14 @@
 import pytest
 from unittest.mock import Mock
 
-from victor.optimization.strategies import (
+from victor.optimization.workflow.strategies import (
     PruningStrategy,
     ParallelizationStrategy,
     ToolSelectionStrategy,
     create_strategy,
     ParallelGroup,
 )
-from victor.optimization.models import (
+from victor.optimization.workflow.models import (
     Bottleneck,
     BottleneckType,
     BottleneckSeverity,

@@ -78,8 +78,8 @@ from victor.security_analysis.patterns import (
     CodePatternScanner,
     # Infrastructure patterns
     InfrastructureScanner,
-    # Source credibility
-    SourceCredibilityScanner,
+    # Source credibility (use correct name from impl file)
+    SourceCredibilityScanner as SourceCredibilityScanner,
     # Content patterns
     ContentPatternScanner,
 )

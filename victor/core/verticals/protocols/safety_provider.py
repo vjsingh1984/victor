@@ -38,10 +38,12 @@ Usage:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Dict, List, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Dict, List, Protocol, runtime_checkable
 
-# Import SafetyPattern at runtime for use in type hints and return values
-from victor.security.safety.types import SafetyPattern
+# Import SafetyPattern for use in type hints
+# Note: Using TYPE_CHECKING to avoid circular import with security_analysis assistant
+if TYPE_CHECKING:
+    from victor.security_analysis.patterns.types import SafetyPattern
 
 
 # =============================================================================

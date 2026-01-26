@@ -17,12 +17,12 @@
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
 
-from victor.optimization.search import (
+from victor.optimization.workflow.search import (
     HillClimbingOptimizer,
     SimulatedAnnealingOptimizer,
     OptimizationResult,
 )
-from victor.optimization.models import (
+from victor.optimization.workflow.models import (
     OptimizationOpportunity,
     OptimizationStrategyType,
     BottleneckSeverity,

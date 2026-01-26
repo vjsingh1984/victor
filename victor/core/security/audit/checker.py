@@ -14,14 +14,11 @@
 
 """Compliance Checker - Rule-based compliance validation.
 
-This module provides compliance checking against various frameworks
-and generates audit reports.
-
 This is the canonical location for DefaultComplianceChecker.
 """
 
-# Re-export from the original location
-from victor.security.audit.checker import (
+# Import from local implementation (canonical location)
+from victor.core.security.audit.checker_impl import (
     DefaultComplianceChecker,
     get_compliance_summary,
     PII_PATTERNS,

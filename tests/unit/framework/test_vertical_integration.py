@@ -41,7 +41,8 @@ from victor.framework.vertical_integration import (
     create_integration_pipeline,
     apply_vertical,
 )
-from victor.core.verticals.protocols import TaskTypeHint, SafetyPattern, ModeConfig
+from victor.core.verticals.protocols import TaskTypeHint, ModeConfig
+from victor.security.safety.types import SafetyPattern
 
 
 # =============================================================================

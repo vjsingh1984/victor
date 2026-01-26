@@ -12,18 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Content warning patterns.
+"""Content safety patterns.
 
-This is the canonical location for content warning utilities.
+This is the canonical location for content safety pattern utilities.
+The old location (victor.security.safety.content_patterns) is deprecated.
 """
 
-from victor.security.safety.content_patterns import (
-    ADVICE_RISK_PATTERNS,
-    CONTENT_WARNING_PATTERNS,
-    MISINFORMATION_RISK_PATTERNS,
-    ContentPatternScanner,
+# Import from local implementation (canonical location)
+from victor.security_analysis.patterns.content_patterns_impl import (
     ContentWarningLevel,
     ContentWarningMatch,
+    ContentPatternScanner,
+    CONTENT_WARNING_PATTERNS,
+    ADVICE_RISK_PATTERNS,
+    MISINFORMATION_RISK_PATTERNS,
     detect_advice_risk,
     detect_misinformation_risk,
     get_content_safety_reminders,
@@ -33,16 +35,16 @@ from victor.security.safety.content_patterns import (
 )
 
 __all__ = [
-    "ADVICE_RISK_PATTERNS",
-    "CONTENT_WARNING_PATTERNS",
-    "MISINFORMATION_RISK_PATTERNS",
-    "ContentPatternScanner",
     "ContentWarningLevel",
     "ContentWarningMatch",
-    "detect_advice_risk",
-    "detect_misinformation_risk",
-    "get_content_safety_reminders",
-    "get_high_severity_warnings",
-    "has_content_warnings",
+    "CONTENT_WARNING_PATTERNS",
+    "MISINFORMATION_RISK_PATTERNS",
+    "ADVICE_RISK_PATTERNS",
     "scan_content_warnings",
+    "has_content_warnings",
+    "get_high_severity_warnings",
+    "detect_misinformation_risk",
+    "detect_advice_risk",
+    "get_content_safety_reminders",
+    "ContentPatternScanner",
 ]
