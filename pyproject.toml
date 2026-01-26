@@ -139,7 +139,7 @@ dev = [
     # Security Scanning
     "bandit[toml]>=1.7",
     "safety>=3.0",
-    "semgrep>=1.0",
+    "semgrep>=1.0; sys_platform != 'win32'",  # semgrep doesn't support Windows
     "pip-audit>=2.0",
 
     # Monitoring and Metrics
