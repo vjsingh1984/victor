@@ -123,6 +123,7 @@ from victor.security.protocol import (
     Vulnerability,
     VulnerabilityStatus,
 )
+
 # Import from canonical location (no shims)
 from victor.security_analysis.tools.cve_database import (
     BaseCVEDatabase,

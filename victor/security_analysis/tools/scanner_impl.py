@@ -572,6 +572,7 @@ class SecurityScanner:
         if cve_db is None:
             # Lazy import to avoid circular dependency
             from victor.security_analysis.tools.cve_database_impl import get_cve_database
+
             cve_db = get_cve_database(offline=offline)
         self._cve_db = cve_db
         self._parsers = parsers or [cls() for cls in DEPENDENCY_PARSERS]

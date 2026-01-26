@@ -58,6 +58,7 @@ from victor.security_analysis.tools.cve_database import (
 
 # Manager and penetration_testing still in victor.security (not migrated yet)
 import warnings
+
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     from victor.security.manager import (
