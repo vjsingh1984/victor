@@ -52,7 +52,7 @@ async def skip_on_timeout(timeout_seconds: float, test_name: str = "unknown"):
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(180)  # 3 minutes for error handling test
+@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 180s)
 async def test_missing_file_error_handling(ollama_provider, ollama_model_name, temp_workspace):
     """Test handling of missing file errors.
 
@@ -107,7 +107,7 @@ async def test_missing_file_error_handling(ollama_provider, ollama_model_name, t
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(180)  # 3 minutes for syntax error test
+@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 180s)
 async def test_invalid_syntax_error_recovery(ollama_provider, ollama_model_name, temp_workspace):
     """Test recovery from invalid Python syntax.
 
@@ -158,7 +158,7 @@ async def test_invalid_syntax_error_recovery(ollama_provider, ollama_model_name,
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(180)  # 3 minutes for permission error test
+@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 180s)
 async def test_permission_denied_error_handling(ollama_provider, ollama_model_name, temp_workspace):
     """Test handling of permission denied errors.
 
@@ -199,7 +199,7 @@ async def test_permission_denied_error_handling(ollama_provider, ollama_model_na
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(180)  # 3 minutes for long operation test
+@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 180s)
 async def test_timeout_on_long_operation(ollama_provider, ollama_model_name, temp_workspace):
     """Test timeout handling on potentially long operations.
 
@@ -255,7 +255,7 @@ async def test_timeout_on_long_operation(ollama_provider, ollama_model_name, tem
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(180)  # 3 minutes for empty file test
+@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 180s)
 async def test_empty_file_handling(ollama_provider, ollama_model_name, temp_workspace):
     """Test handling of empty files.
 
@@ -305,7 +305,7 @@ async def test_empty_file_handling(ollama_provider, ollama_model_name, temp_work
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(180)  # 3 minutes for special characters test
+@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 180s)
 async def test_special_characters_in_content(ollama_provider, ollama_model_name, temp_workspace):
     """Test handling of files with special characters.
 
@@ -353,7 +353,7 @@ Math: x² + y² = z²
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(180)  # 3 minutes for long response test
+@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 180s)
 async def test_very_long_response_handling(ollama_provider, ollama_model_name, temp_workspace):
     """Test handling of very long LLM responses.
 

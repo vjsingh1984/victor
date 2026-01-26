@@ -56,7 +56,7 @@ async def skip_on_timeout(timeout_seconds: float, test_name: str = "unknown"):
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(180)  # 3 minutes for 2-turn conversation
+@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 90s per turn)
 async def test_conversation_context_preservation(
     ollama_provider, ollama_model_name, temp_workspace
 ):
@@ -110,7 +110,7 @@ async def test_conversation_context_preservation(
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(180)  # 3 minutes for stage transitions
+@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 180s)
 async def test_conversation_stage_transitions(
     ollama_provider, ollama_model_name, sample_code_file, temp_workspace
 ):
@@ -120,6 +120,8 @@ async def test_conversation_stage_transitions(
     - Stages transition correctly (INITIAL → PLANNING → READING → EXECUTING)
     - Each transition is validated
     - Stage history is recorded
+
+    Timeout extended to 300s with 180s asyncio skip for slow providers.
     """
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.config.settings import Settings
@@ -176,7 +178,7 @@ async def test_conversation_stage_transitions(
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(180)  # 3 minutes for error recovery test
+@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 90s per turn)
 async def test_conversation_error_recovery(ollama_provider, ollama_model_name, temp_workspace):
     """Test conversation continues after tool failure.
 
@@ -344,7 +346,7 @@ async def test_conversation_multi_turn_task_completion(
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(180)  # 3 minutes for tool calling test
+@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 180s)
 async def test_conversation_tool_calling_accuracy(
     ollama_provider, ollama_model_name, sample_code_file, temp_workspace
 ):
