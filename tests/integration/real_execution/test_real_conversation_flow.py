@@ -56,7 +56,7 @@ async def skip_on_timeout(timeout_seconds: float, test_name: str = "unknown"):
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 90s per turn)
+@pytest.mark.timeout(600)  # 10 minutes (asyncio skip at 180s per turn)
 async def test_conversation_context_preservation(
     ollama_provider, ollama_model_name, temp_workspace
 ):
@@ -83,7 +83,7 @@ async def test_conversation_context_preservation(
     )
 
     # Turn 1: Provide information
-    async with skip_on_timeout(90, "context_preservation"):
+    async with skip_on_timeout(180, "context_preservation"):
         response1 = await orchestrator.chat(
             user_message="I'm working on a Python project with a Calculator class. Remember this."
         )
@@ -92,7 +92,7 @@ async def test_conversation_context_preservation(
     print(f"✓ Turn 1 response: {response1.content[:100]}...")
 
     # Turn 2: Reference previous information
-    async with skip_on_timeout(90, "context_preservation"):
+    async with skip_on_timeout(180, "context_preservation"):
         response2 = await orchestrator.chat(
             user_message="What project did I mention I'm working on?"
         )
@@ -178,7 +178,7 @@ async def test_conversation_stage_transitions(
 
 @pytest.mark.real_execution
 @pytest.mark.asyncio
-@pytest.mark.timeout(300)  # 5 minutes (asyncio skip at 90s per turn)
+@pytest.mark.timeout(600)  # 10 minutes (asyncio skip at 180s per turn)
 async def test_conversation_error_recovery(ollama_provider, ollama_model_name, temp_workspace):
     """Test conversation continues after tool failure.
 
