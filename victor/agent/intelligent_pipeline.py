@@ -346,16 +346,19 @@ class IntelligentAgentPipeline:
         is_grounded: bool,
         grounding_score: float,
         task_type: str,
+        grounding_result: Optional["GroundingVerificationResult"] = None,
     ) -> None:
-        """Emit RL event for grounding verification.
+        """Emit RL event for grounding verification with full context.
 
         This activates the grounding_threshold learner to learn optimal
-        thresholds based on verification outcomes.
+        thresholds based on verification outcomes, and provides detailed
+        context for observability and debugging.
 
         Args:
             is_grounded: Whether the response passed grounding verification
             grounding_score: Confidence score from grounding verifier
             task_type: Type of task being verified
+            grounding_result: Full verification result with issues (for context)
         """
         try:
             from victor.framework.rl.hooks import get_rl_hooks, RLEvent, RLEventType
@@ -363,6 +366,38 @@ class IntelligentAgentPipeline:
             hooks = get_rl_hooks()
             if hooks is None:
                 return  # type: ignore[unreachable]
+
+            # Build rich metadata with context about what failed
+            metadata = {
+                "is_grounded": is_grounded,
+                "grounding_score": grounding_score,
+            }
+
+            # Add detailed issue information if available
+            if grounding_result is not None and not is_grounded:
+                metadata["issues"] = [
+                    {
+                        "issue_type": issue.issue_type.value,
+                        "severity": issue.severity.value,
+                        "description": issue.description,
+                        "reference": issue.reference,
+                        "suggestion": issue.suggestion,
+                    }
+                    for issue in grounding_result.issues
+                ]
+                # Add summary for quick filtering
+                metadata["issue_summary"] = {
+                    "total_issues": len(grounding_result.issues),
+                    "issue_types": [issue.issue_type.value for issue in grounding_result.issues],
+                    "has_path_issues": any(
+                        issue.issue_type.value in ["path_invalid", "file_not_found", "ambiguous"]
+                        for issue in grounding_result.issues
+                    ),
+                    "has_verification_issues": any(
+                        issue.issue_type.value in ["unverifiable", "syntax_error"]
+                        for issue in grounding_result.issues
+                    ),
+                }
 
             event = RLEvent(
                 type=RLEventType.GROUNDING_CHECK,
@@ -372,12 +407,18 @@ class IntelligentAgentPipeline:
                 model=self.model,
                 task_type=task_type,
                 threshold_value=grounding_score,
-                metadata={
-                    "is_grounded": is_grounded,
-                },
+                metadata=metadata,
             )
 
             hooks.emit(event)
+
+            # Log summary for debugging
+            if not is_grounded and grounding_result is not None:
+                logger.debug(
+                    f"[IntelligentPipeline] Emitted grounding failure event: "
+                    f"{len(grounding_result.issues)} issues, "
+                    f"types: {[issue.issue_type.value for issue in grounding_result.issues]}"
+                )
 
         except Exception as e:
             logger.debug(f"[IntelligentPipeline] Grounding event emission failed: {e}")
@@ -644,11 +685,12 @@ class IntelligentAgentPipeline:
                 for issue in grounding_result.issues
             ]
 
-            # Emit RL event for grounding verification
+            # Emit RL event for grounding verification with full context
             self._emit_grounding_event(
                 is_grounded=is_grounded,
                 grounding_score=grounding_score,
                 task_type=task_type,
+                grounding_result=grounding_result,  # Pass full result for context
             )
 
         # Track grounding failures for best-effort finalize logic
