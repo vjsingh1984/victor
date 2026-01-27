@@ -71,6 +71,9 @@ def pytest_generate_tests(metafunc):
 
     For tests marked with @pytest.mark.cloud_provider, Ollama is excluded from
     parametrization since it's a local provider.
+
+    Ultra-fast models (0.5B-3B) are skipped for Ollama as they may hallucinate
+    tools or have insufficient capability for reliable tool use.
     """
     from tests.integration.real_execution.conftest import (
         has_provider_api_key,
@@ -90,16 +93,43 @@ def pytest_generate_tests(metafunc):
     provider_configs = []
 
     # Check Ollama (skip for cloud-only tests)
+    # Skip ultra-fast models (0.5B-3B) for multi-provider tests - use 7B+ models
     if not is_cloud_only_test:
-        if is_ollama_running() and any(
-            is_ollama_model_available(model) for model in PROVIDER_MODELS["ollama"]
-        ):
-            provider_configs.append(
-                {
-                    "provider_name": "ollama",
-                    "model": PROVIDER_MODELS["ollama"][0],
-                }
-            )
+        if is_ollama_running():
+            # Find first suitable model (7B or larger, skip ultra-fast 0.5B-3B models)
+            ollama_models = PROVIDER_MODELS["ollama"]
+            # Ultra-fast models to skip: qwen2.5-coder:1.5b, llama3.2:latest (2B), mistral:latest (4.1B-ish)
+            # Use qwen2.5-coder:7b or better
+            suitable_model = None
+            for model in ollama_models:
+                # Skip ultra-fast models (based on model name patterns)
+                if any(
+                    skip in model.lower()
+                    for skip in [
+                        ":0.5b",
+                        ":1b",
+                        ":1.5b",
+                        ":2b",
+                        ":3b",
+                        ":3.8b",
+                        "llama3.2:latest",
+                        "mistral:latest",
+                        ":mini",
+                        "phi3:mini",
+                    ]
+                ):
+                    continue
+                # Use first suitable model (7B or larger)
+                suitable_model = model
+                break
+
+            if suitable_model and is_ollama_model_available(suitable_model):
+                provider_configs.append(
+                    {
+                        "provider_name": "ollama",
+                        "model": suitable_model,
+                    }
+                )
 
     # Check cloud providers
     for provider in ["deepseek", "xai", "mistral", "openai", "zai"]:
