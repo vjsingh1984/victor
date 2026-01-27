@@ -212,7 +212,7 @@ class BrowserTool:
             self._context = await self._browser.new_context(**context_options)  # type: ignore[attr-defined]
 
             # Block popups if configured
-            if self.config.block_popups and self._context:
+            if self.config.block_popups:
                 self._context.on("page", lambda p: asyncio.create_task(p.close()))  # type: ignore[attr-defined]
 
             # Create initial page
@@ -364,7 +364,8 @@ class BrowserTool:
             )
 
         try:
-            response = await self._page.goto(url, wait_until=wait_for)
+            if self._page:
+                response: Any = await self._page.goto(url, wait_until=wait_for)  # type: ignore[assignment]
 
             self._state.url = self._page.url  # type: ignore[attr-defined]
             self._state.title = await self._page.title()  # type: ignore[attr-defined]
@@ -403,14 +404,12 @@ class BrowserTool:
         """
         start = datetime.now()
 
-        if not self._initialized or not self._page:
+        if not self._initialized:
             return ActionResult(
                 success=False,
                 action=BrowserAction.CLICK,
                 error="Browser not initialized",
             )
-        # MyPy doesn't understand the null checks above, so add explicit type check
-        assert self._initialized and self._page is not None, "Browser should be initialized"
 
         if not self._check_rate_limit():
             return ActionResult(
@@ -452,7 +451,7 @@ class BrowserTool:
         """
         start = datetime.now()
 
-        if not self._initialized or not self._page:
+        if not self._initialized:
             return ActionResult(
                 success=False,
                 action=BrowserAction.TYPE,
@@ -468,9 +467,9 @@ class BrowserTool:
 
         try:
             if clear_first:
-                await self._page.fill(selector, text, timeout=self.config.element_timeout)
+                await self._page.fill(selector, text, timeout=self.config.element_timeout)  # type: ignore[attr-defined]
             else:
-                await self._page.type(selector, text, timeout=self.config.element_timeout)
+                await self._page.type(selector, text, timeout=self.config.element_timeout)  # type: ignore[attr-defined]
 
             self._state.action_count += 1
 
@@ -503,7 +502,7 @@ class BrowserTool:
         """
         start = datetime.now()
 
-        if not self._initialized or not self._page:
+        if not self._initialized:
             return ActionResult(
                 success=False,
                 action=BrowserAction.SCROLL,
@@ -563,7 +562,7 @@ class BrowserTool:
         """
         start = datetime.now()
 
-        if not self._initialized or not self._page:
+        if not self._initialized:
             return ActionResult(
                 success=False,
                 action=BrowserAction.SCREENSHOT,
@@ -629,7 +628,7 @@ class BrowserTool:
         """
         start = datetime.now()
 
-        if not self._initialized or not self._page:
+        if not self._initialized:
             return ActionResult(
                 success=False,
                 action=BrowserAction.EXTRACT,
@@ -685,7 +684,7 @@ class BrowserTool:
         """
         start = datetime.now()
 
-        if not self._initialized or not self._page:
+        if not self._initialized:
             return ActionResult(
                 success=False,
                 action=BrowserAction.WAIT,
@@ -729,7 +728,7 @@ class BrowserTool:
         """
         start = datetime.now()
 
-        if not self._initialized or not self._page:
+        if not self._initialized:
             return ActionResult(
                 success=False,
                 action=BrowserAction.EVALUATE,

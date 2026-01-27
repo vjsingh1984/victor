@@ -513,7 +513,8 @@ class BaselineValidator:
 
         try:
             # Get appropriate test runner
-            runner = self.test_registry.get_runner(language)
+            lang_enum = self.lang_map.get(language, Language.UNKNOWN)
+            runner = self.test_registry.get_runner(lang_enum)
             if not runner:
                 baseline.status = BaselineStatus.ERROR
                 baseline.error_message = f"No test runner for language: {language}"
@@ -642,7 +643,6 @@ class BaselineValidator:
             instance_id=baseline.instance_id,
             baseline=baseline,
             post_change_results=TestRunResults(
-                language=language,
                 total=0,
                 passed=0,
                 failed=0,
@@ -651,7 +651,8 @@ class BaselineValidator:
             ),
         )
 
-        runner = self.test_registry.get_runner(language)
+        lang_enum = self.lang_map.get(language, Language.UNKNOWN)
+        runner = self.test_registry.get_runner(lang_enum)
         if not runner:
             logger.error(f"No test runner for language: {language}")
             return result
@@ -666,7 +667,6 @@ class BaselineValidator:
         post_results = await runner.run_tests(
             workspace_dir,
             all_tests,
-            timeout=self.timeout_per_test * len(all_tests),
         )
         result.post_change_results = post_results
 

@@ -204,12 +204,12 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
                 message=f"Mistral request timed out after {self.timeout}s",
-                provider=self.name,  # type: ignore[attr-defined]
+                provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            raise self._handle_http_error(e, self.name)  # type: ignore[attr-defined]
+            raise self._handle_http_error(e, self.name)
         except Exception as e:
-            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -278,12 +278,12 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
                 message=f"Mistral stream timed out after {self.timeout}s",
-                provider=self.name,  # type: ignore[attr-defined]
+                provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            raise self._handle_http_error(e, self.name)  # type: ignore[attr-defined]
+            raise self._handle_http_error(e, self.name)
         except Exception as e:
-            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
+            raise self._handle_error(e, self.name)
 
     def _build_request_payload(
         self,
@@ -367,7 +367,10 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
                 content="",
                 role="assistant",
                 model=model,
+                stop_reason="stop",
+                usage=None,
                 raw_response=result,
+                metadata=None,
             )
 
         choice = choices[0]
@@ -403,6 +406,7 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
             usage=usage,
             model=model,
             raw_response=result,
+            metadata=None,
         )
 
     def _normalize_tool_calls(

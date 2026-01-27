@@ -425,7 +425,7 @@ class TeamLearningSystem:
         if len(rewards) >= 20:
             first_half = rewards[: len(rewards) // 2]
             second_half = rewards[len(rewards) // 2 :]
-            learning_rate = (np.mean(second_half) - np.mean(first_half)) / len(rewards)
+            learning_rate = float((np.mean(second_half) - np.mean(first_half)) / len(rewards))
         else:
             learning_rate = 0.0
 
@@ -514,7 +514,7 @@ class TeamLearningSystem:
         return AdaptationRecommendation(
             recommendation_type="formation_change",
             description=f"Switch from {current_formation} to {best_formation}",
-            expected_improvement=min(1.0, abs(improvement)),
+            expected_improvement=min(1.0, float(abs(improvement))),
             confidence=min(1.0, len(formation_rewards[current_formation]) / 20),
             changes={"formation": best_formation},
             rationale=f"{best_formation} has {avg_rewards[best_formation]:.3f} avg reward vs "
@@ -556,7 +556,7 @@ class TeamLearningSystem:
         return AdaptationRecommendation(
             recommendation_type="member_replacement",
             description=f"Consider replacing or retraining {worst_member}",
-            expected_improvement=min(1.0, abs(worst_reward)),
+            expected_improvement=min(1.0, float(abs(worst_reward))),
             confidence=min(1.0, len(member_rewards[worst_member]) / 10),
             changes={"member_to_replace": worst_member},
             rationale=f"{worst_member} has average reward of {worst_reward:.3f}, below threshold",

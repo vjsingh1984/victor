@@ -470,7 +470,7 @@ class TimeOrderedTableView(DataTable):
             )
 
         # Prevent duplicates if enabled
-        if self._enable_dedup and event.id:
+        if self._enable_dedup and event.id and self._seen_event_ids:
             if event.id in self._seen_event_ids:
                 logger.debug(f"[{self.__class__.__name__}] Skipping duplicate event {event.id}")
                 return  # Skip duplicate
@@ -484,7 +484,7 @@ class TimeOrderedTableView(DataTable):
             # Remove oldest from end
             removed = self._events.pop()
             # Clean up event ID from seen set if deduplication enabled
-            if self._enable_dedup and removed.id:
+            if self._enable_dedup and removed.id and self._seen_event_ids:
                 self._seen_event_ids.discard(removed.id)
 
         # Rebuild table
@@ -527,7 +527,7 @@ class TimeOrderedTableView(DataTable):
     def clear_events(self) -> None:
         """Clear all stored events and reset the table."""
         self._events.clear()
-        if self._enable_dedup:
+        if self._enable_dedup and self._seen_event_ids:
             self._seen_event_ids.clear()
         self.clear()
 
@@ -657,6 +657,11 @@ class ToolExecutionView(DataTable):
 class VerticalTraceView(ScrollableContainer):
     """View showing vertical integration traces."""
 
+    def clear(self) -> None:
+        """Clear all traces."""
+        content = self.query_one("#trace-content", Static)
+        content.update("[dim]Vertical integration traces will appear here...[/]")
+
     def compose(self) -> ComposeResult:
         yield Static("[dim]Vertical integration traces will appear here...[/]", id="trace-content")
 
@@ -765,6 +770,12 @@ class ExecutionTraceView(TimeOrderedTableView):
 
     def __init__(self, *args, max_rows: int = 300, **kwargs):
         super().__init__(*args, max_rows=max_rows, **kwargs)
+        self._spans: list = []  # type: ignore[attr-defined]
+
+    def clear(self) -> None:
+        """Clear all spans."""
+        self._spans.clear()
+        self.update_table()
 
     def on_mount(self) -> None:
         """Set up the table columns."""
@@ -825,6 +836,12 @@ class ToolCallHistoryView(TimeOrderedTableView):
 
     def __init__(self, *args, max_rows: int = 200, **kwargs):
         super().__init__(*args, max_rows=max_rows, **kwargs)
+        self._tool_calls: list = []  # type: ignore[attr-defined]
+
+    def clear(self) -> None:
+        """Clear all tool calls."""
+        self._tool_calls.clear()
+        self.update_table()
 
     def on_mount(self) -> None:
         """Set up the table columns."""
@@ -924,6 +941,12 @@ class StateTransitionView(TimeOrderedTableView):
     def __init__(self, *args, max_rows: int = 200, **kwargs):
         # Enable deduplication to prevent duplicate state events
         super().__init__(*args, max_rows=max_rows, enable_dedup=True, **kwargs)
+        self._transitions: list = []  # type: ignore[attr-defined]
+
+    def clear(self) -> None:
+        """Clear all transitions."""
+        self._transitions.clear()
+        self.update_table()
 
     def on_mount(self) -> None:
         """Set up the table columns."""
@@ -980,6 +1003,17 @@ class PerformanceMetricsView(Static):
 
     Aggregates metrics from ExecutionTracer, ToolCallTracer, and StateTracer.
     """
+
+    def clear(self) -> None:
+        """Clear all metrics."""
+        self.total_spans = 0
+        self.active_spans = 0
+        self.total_tool_calls = 0
+        self.failed_tool_calls = 0
+        self.avg_tool_duration = 0.0
+        self.total_state_transitions = 0
+        content = self.query_one("#metrics-content", Static)
+        content.update("No performance data available")
 
     total_spans: reactive[int] = reactive(0)
     active_spans: reactive[int] = reactive(0)

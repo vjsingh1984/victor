@@ -162,6 +162,22 @@ class ToolEventEmitter(IToolEventEmitter):
         except Exception as e:
             logger.debug(f"Failed to emit tool event: {e}")
 
+    def emit_safe(self, event: MessagingEvent) -> bool:
+        """Safely emit a tool event, catching any exceptions.
+
+        Args:
+            event: The event to emit
+
+        Returns:
+            True if emission succeeded, False otherwise
+        """
+        try:
+            self.emit(topic=event.topic, data=event.data)
+            return True
+        except Exception as e:
+            logger.debug(f"Failed to emit tool event safely: {e}")
+            return False
+
     async def tool_start_async(
         self,
         tool_name: str,

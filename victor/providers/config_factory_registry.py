@@ -275,14 +275,14 @@ class OllamaProviderStrategy(ProviderConfigStrategy):
         finally:
             await provider.close()
 
-    def get_config_form(self) -> Optional[Type]:
+    def get_config_form(self) -> Type:
         """Get Ollama config form."""
         try:
             from victor.ui.commands.models import OllamaConfigForm  # type: ignore[attr-defined]
 
             return OllamaConfigForm
         except ImportError:
-            return None
+            return None  # type: ignore[return-value]  # type: ignore[return-value]
 
 
 class LMStudioProviderStrategy(ProviderConfigStrategy):
@@ -309,14 +309,14 @@ class LMStudioProviderStrategy(ProviderConfigStrategy):
         models_list = await provider.list_models()
         return models_list or []
 
-    def get_config_form(self) -> Optional[Type]:
+    def get_config_form(self) -> Type:
         """Get LMStudio config form."""
         try:
             from victor.ui.commands.models import LMStudioConfigForm  # type: ignore[attr-defined]
 
             return LMStudioConfigForm
         except ImportError:
-            return None
+            return None  # type: ignore[return-value]
 
 
 class AnthropicProviderStrategy(ProviderConfigStrategy):
@@ -339,14 +339,14 @@ class AnthropicProviderStrategy(ProviderConfigStrategy):
             {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus"},
         ]
 
-    def get_config_form(self) -> Optional[Type]:
+    def get_config_form(self) -> Type:
         """Get Anthropic config form."""
         try:
             from victor.ui.commands.models import AnthropicConfigForm  # type: ignore[attr-defined]
 
             return AnthropicConfigForm
         except ImportError:
-            return None
+            return None  # type: ignore[return-value]
 
 
 class OpenAIProviderStrategy(ProviderConfigStrategy):
@@ -369,14 +369,14 @@ class OpenAIProviderStrategy(ProviderConfigStrategy):
             {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo"},
         ]
 
-    def get_config_form(self) -> Optional[Type]:
+    def get_config_form(self) -> Type:
         """Get OpenAI config form."""
         try:
             from victor.ui.commands.models import OpenAIConfigForm  # type: ignore[attr-defined]
 
             return OpenAIConfigForm
         except ImportError:
-            return None
+            return None  # type: ignore[return-value]
 
 
 class GoogleProviderStrategy(ProviderConfigStrategy):
@@ -398,14 +398,14 @@ class GoogleProviderStrategy(ProviderConfigStrategy):
             {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro"},
         ]
 
-    def get_config_form(self) -> Optional[Type]:
+    def get_config_form(self) -> Type:
         """Get Google config form."""
         try:
             from victor.ui.commands.models import GoogleConfigForm  # type: ignore[attr-defined]
 
             return GoogleConfigForm
         except ImportError:
-            return None
+            return None  # type: ignore[return-value]
 
 
 class GroqProviderStrategy(ProviderConfigStrategy):
@@ -426,14 +426,14 @@ class GroqProviderStrategy(ProviderConfigStrategy):
             {"id": "llama-3.1-70b-versatile", "name": "Llama 3.1 70B Versatile"},
         ]
 
-    def get_config_form(self) -> Optional[Type]:
+    def get_config_form(self) -> Type:
         """Get Groq config form."""
         try:
             from victor.ui.commands.models import GroqConfigForm  # type: ignore[attr-defined]
 
             return GroqConfigForm
         except ImportError:
-            return None
+            return None  # type: ignore[return-value]
 
 
 class CerebrasProviderStrategy(ProviderConfigStrategy):
@@ -453,14 +453,14 @@ class CerebrasProviderStrategy(ProviderConfigStrategy):
             {"id": "llama3.1-70b", "name": "Llama 3.1 70B"},
         ]
 
-    def get_config_form(self) -> Optional[Type]:
+    def get_config_form(self) -> Type:
         """Get Cerebras config form."""
         try:
             from victor.ui.commands.models import CerebrasConfigForm  # type: ignore[attr-defined]
 
             return CerebrasConfigForm
         except ImportError:
-            return None
+            return None  # type: ignore[return-value]
 
 
 class LlamaCppProviderStrategy(ProviderConfigStrategy):
@@ -478,14 +478,14 @@ class LlamaCppProviderStrategy(ProviderConfigStrategy):
         """List llama.cpp models (static - needs local file)."""
         return []  # llama.cpp needs a model file path
 
-    def get_config_form(self) -> Optional[Type]:
+    def get_config_form(self) -> Type:
         """Get llama.cpp config form."""
         try:
             from victor.ui.commands.models import LlamaCppConfigForm  # type: ignore[attr-defined]
 
             return LlamaCppConfigForm
         except ImportError:
-            return None
+            return None  # type: ignore[return-value]
 
 
 class VLLMProviderStrategy(ProviderConfigStrategy):
@@ -512,14 +512,14 @@ class VLLMProviderStrategy(ProviderConfigStrategy):
         models_list = await provider.list_models()
         return models_list or []
 
-    def get_config_form(self) -> Optional[Type]:
+    def get_config_form(self) -> Type:
         """Get vLLM config form."""
         try:
             from victor.ui.commands.models import VLLMConfigForm  # type: ignore[attr-defined]
 
             return VLLMConfigForm
         except ImportError:
-            return None
+            return None  # type: ignore[return-value]
 
 
 # Register built-in providers

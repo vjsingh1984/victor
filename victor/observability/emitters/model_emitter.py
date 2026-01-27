@@ -159,6 +159,22 @@ class ModelEventEmitter(IModelEventEmitter):
         except Exception as e:
             logger.debug(f"Failed to emit model event: {e}")
 
+    def emit_safe(self, event: MessagingEvent) -> bool:
+        """Safely emit a model event, catching any exceptions.
+
+        Args:
+            event: The event to emit
+
+        Returns:
+            True if emission succeeded, False otherwise
+        """
+        try:
+            self.emit(topic=event.topic, data=event.data)
+            return True
+        except Exception as e:
+            logger.debug(f"Failed to emit model event safely: {e}")
+            return False
+
     async def model_request_async(
         self,
         provider: str,

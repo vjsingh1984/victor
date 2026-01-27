@@ -169,12 +169,12 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         """
         # Try exact match first
         if model in ZAI_MODELS:
-            return ZAI_MODELS[model]["context_window"]
+            return int(ZAI_MODELS[model]["context_window"])
 
         # Try prefix match (e.g., "glm-4.7-custom" matches "glm-4.7")
         for model_prefix, info in ZAI_MODELS.items():
             if model.startswith(model_prefix):
-                return info["context_window"]
+                return int(info["context_window"])
 
         # Default to 128K for unknown GLM models
         return 128000
@@ -236,14 +236,14 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
                 message=f"z.ai request timed out after {self.timeout}s",
-                provider=self.name,  # type: ignore[attr-defined]
+                provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            raise self._handle_http_error(e, self.name)  # type: ignore[attr-defined]
+            raise self._handle_http_error(e, self.name)
         except Exception as e:
             raise ProviderError(
                 message=f"z.ai API error: {str(e)}",
-                provider=self.name,  # type: ignore[attr-defined]
+                provider=self.name,
                 raw_error=e,
             )
 
@@ -255,7 +255,6 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         temperature: float = 0.7,
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
-        thinking: bool = False,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from z.ai with tool call accumulation.
@@ -276,6 +275,9 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             ProviderError: If request fails
         """
         try:
+            # Extract thinking from kwargs
+            thinking = kwargs.get("thinking", False)
+
             payload = self._build_request_payload(
                 messages=messages,
                 model=model,
@@ -333,14 +335,14 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
                 message=f"z.ai stream timed out after {self.timeout}s",
-                provider=self.name,  # type: ignore[attr-defined]
+                provider=self.name,
             ) from e
         except httpx.HTTPStatusError as e:
-            raise self._handle_http_error(e, self.name)  # type: ignore[attr-defined]
+            raise self._handle_http_error(e, self.name)
         except Exception as e:
             raise ProviderError(
                 message=f"z.ai streaming error: {str(e)}",
-                provider=self.name,  # type: ignore[attr-defined]
+                provider=self.name,
                 raw_error=e,
             )
 
@@ -477,7 +479,10 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                 content="",
                 role="assistant",
                 model=model,
+                stop_reason="stop",
+                usage=None,
                 raw_response=result,
+                metadata=None,
             )
 
         choice = choices[0]
@@ -614,7 +619,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise ProviderError(
                 message=f"z.ai failed to list models: {str(e)}",
-                provider=self.name,  # type: ignore[attr-defined]
+                provider=self.name,
                 raw_error=e,
             ) from e
 

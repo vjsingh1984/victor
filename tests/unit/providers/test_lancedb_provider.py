@@ -52,6 +52,7 @@ def mock_lancedb():
         mock_db = MagicMock()
         mock_table = MagicMock()
         mock_table.count_rows.return_value = 0
+        mock_table.to_pandas.return_value.__len__ = lambda x: 0  # Empty dataframe
 
         # Mock list_tables() API (new)
         mock_list_response = MagicMock()
@@ -64,7 +65,7 @@ def mock_lancedb():
         mock_db.open_table.return_value = mock_table
         mock_db.create_table.return_value = mock_table
         mock_connect.return_value = mock_db
-        yield mock_connect, mock_db, mock_table
+        yield mock_connect, mock_db, mock_table, mock_list_response
 
 
 class TestLanceDBProvider:

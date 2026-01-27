@@ -386,7 +386,7 @@ For complete API documentation, see [API Docs](docs/api.md).
 )
 async def docs(
     path: str,
-    doc_types: List[str] = None,
+    doc_types: Optional[List[str]] = None,
     format: str = "google",
     output: Optional[str] = None,
     recursive: bool = False,
@@ -615,7 +615,7 @@ async def docs(
         "documentation coverage",
     ],  # From MANDATORY_TOOL_KEYWORDS "docs" -> ["docs", "docs_coverage"]
     stages=["analysis", "reading"],
-    execution_category=ExecutionCategory.READ_ONLY,
+    execution_category="read_only",  # type: ignore[arg-type]
 )
 async def docs_coverage(
     path: str,

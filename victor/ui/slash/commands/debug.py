@@ -48,12 +48,12 @@ logger = logging.getLogger(__name__)
 def _get_breakpoint_manager(ctx: CommandContext):
     """Get breakpoint manager from agent if available."""
     # Try to get from orchestrator or agent
-    if hasattr(ctx.agent, "breakpoint_manager"):
+    if ctx.agent and hasattr(ctx.agent, "breakpoint_manager"):
         return ctx.agent.breakpoint_manager
-    if hasattr(ctx.agent, "_breakpoint_manager"):
+    if ctx.agent and hasattr(ctx.agent, "_breakpoint_manager"):
         return ctx.agent._breakpoint_manager
     # Try through workflow engine
-    if hasattr(ctx.agent, "workflow_engine"):
+    if ctx.agent and hasattr(ctx.agent, "workflow_engine"):
         engine = ctx.agent.workflow_engine
         if hasattr(engine, "breakpoint_manager"):
             return engine.breakpoint_manager
@@ -360,11 +360,11 @@ class DebugCommand(BaseSlashCommand):
         # Try to get workflow state from various sources
         state = None
 
-        if hasattr(ctx.agent, "workflow_state"):
+        if ctx.agent and hasattr(ctx.agent, "workflow_state"):
             state = ctx.agent.workflow_state
-        elif hasattr(ctx.agent, "_current_workflow_state"):
+        elif ctx.agent and hasattr(ctx.agent, "_current_workflow_state"):
             state = ctx.agent._current_workflow_state
-        elif hasattr(ctx.agent, "workflow_engine"):
+        elif ctx.agent and hasattr(ctx.agent, "workflow_engine"):
             engine = ctx.agent.workflow_engine
             if hasattr(engine, "current_state"):
                 state = engine.current_state
@@ -403,7 +403,7 @@ class DebugCommand(BaseSlashCommand):
     def _handle_continue(self, ctx: CommandContext) -> None:
         """Handle continuing from a breakpoint."""
         # Signal continue to workflow engine
-        if hasattr(ctx.agent, "workflow_engine"):
+        if ctx.agent and hasattr(ctx.agent, "workflow_engine"):
             engine = ctx.agent.workflow_engine
             if hasattr(engine, "debug_continue"):
                 try:
@@ -415,7 +415,7 @@ class DebugCommand(BaseSlashCommand):
                     return
 
         # Try alternative signal mechanism
-        if hasattr(ctx.agent, "_debug_signal"):
+        if ctx.agent and hasattr(ctx.agent, "_debug_signal"):
             ctx.agent._debug_signal = "continue"
             ctx.console.print("[green]Continue signal sent[/]")
             return
@@ -425,7 +425,7 @@ class DebugCommand(BaseSlashCommand):
     def _handle_step(self, ctx: CommandContext) -> None:
         """Handle stepping to next node."""
         # Signal step to workflow engine
-        if hasattr(ctx.agent, "workflow_engine"):
+        if ctx.agent and hasattr(ctx.agent, "workflow_engine"):
             engine = ctx.agent.workflow_engine
             if hasattr(engine, "debug_step"):
                 try:
@@ -437,7 +437,7 @@ class DebugCommand(BaseSlashCommand):
                     return
 
         # Try alternative signal mechanism
-        if hasattr(ctx.agent, "_debug_signal"):
+        if ctx.agent and hasattr(ctx.agent, "_debug_signal"):
             ctx.agent._debug_signal = "step"
             ctx.console.print("[green]Step signal sent[/]")
             return

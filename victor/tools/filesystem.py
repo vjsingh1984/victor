@@ -1600,13 +1600,13 @@ async def read(
         effective_max_lines = MAX_LINES
 
     # Apply truncation (always ends on complete lines)
-    truncated_content, info = truncate_by_lines(
+    truncated_content, trunc_info = truncate_by_lines(
         remaining_content,
         max_lines=effective_max_lines,
         max_bytes=MAX_BYTES,
         start_line=0,  # Already applied offset above
     )
-    info: TruncationInfo = info  # type: ignore[assignment]
+    # trunc_info is already a TruncationInfo from the function return
 
     # Format with line numbers (1-indexed, adjusted for offset)
     numbered_content = format_with_line_numbers(truncated_content, start_line=offset + 1)
@@ -1616,23 +1616,23 @@ async def read(
     file_size_kb = file_size_bytes / 1024
 
     # Build informative header with explicit units to prevent LLM misinterpretation
-    actual_end_line = offset + info.lines_returned
+    actual_end_line = offset + trunc_info.lines_returned
     header_parts = [
         f"File: {path}",
         f"Showing lines {offset + 1}-{actual_end_line} of {total_lines} total lines",
         f"This file is {file_size_bytes:,} bytes ({file_size_kb:.1f} KB)",
-        f"Showing {info.bytes_returned:,} bytes of content",
+        f"Showing {trunc_info.bytes_returned:,} bytes of content",
     ]
 
     # Add truncation warning with specific details
-    if info.was_truncated:
+    if trunc_info.was_truncated:
         remaining = total_lines - actual_end_line
-        if info.truncation_reason == "line_limit":
+        if trunc_info.truncation_reason == "line_limit":
             header_parts.append(
                 f"[TRUNCATED: Hit {effective_max_lines} line limit. "
                 f"{remaining} lines remaining. Use offset={actual_end_line} to continue]"
             )
-        elif info.truncation_reason == "byte_limit":
+        elif trunc_info.truncation_reason == "byte_limit":
             header_parts.append(
                 f"[TRUNCATED: Hit {MAX_BYTES // 1024}KB byte limit at line {actual_end_line}. "
                 f"{remaining} lines remaining. Use offset={actual_end_line} to continue]"
