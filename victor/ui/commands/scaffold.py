@@ -207,7 +207,7 @@ def new_vertical(
             "[red]Error: Jinja2 is required for scaffolding. "
             "Install it with: pip install jinja2[/]"
         )
-        raise typer.Exit(1)  # type: ignore[unreachable]
+        raise typer.Exit(1)
 
     # Validate the name
     try:

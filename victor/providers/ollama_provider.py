@@ -714,6 +714,13 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         content = message.get("content", "")
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
 
+        # Log empty responses for debugging
+        if not content and not tool_calls:
+            logger.warning(
+                f"Ollama returned empty response (no content, no tool_calls) for model {model}. "
+                f"Response keys: {list(result.keys())}, Message keys: {list(message.keys())}"
+            )
+
         # Fallback: Check if content contains JSON tool call (for models without native support)
         if not tool_calls and content:
             parsed_tool_calls = self._parse_json_tool_call_from_content(content)
@@ -756,6 +763,14 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         content = message.get("content", "")
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
         is_done = chunk_data.get("done", False)
+
+        # Log empty final chunks for debugging
+        if is_done and not content and not tool_calls:
+            model = chunk_data.get("model", "unknown")
+            logger.warning(
+                f"Ollama stream completed with empty response for model {model}. "
+                f"Chunk keys: {list(chunk_data.keys())}, Message keys: {list(message.keys())}"
+            )
 
         # Fallback: Check if this is a final chunk with JSON tool call in content
         # (for models without native tool calling support)

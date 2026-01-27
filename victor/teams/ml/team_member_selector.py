@@ -329,9 +329,8 @@ class TeamMemberSelector:
                 - task_features: TaskFeatures
                 - success: bool (whether member was successful)
         """
-        # type: ignore[import-untyped]
-        from sklearn.ensemble import RandomForestClassifier
-        from sklearn.preprocessing import StandardScaler
+        from sklearn.ensemble import RandomForestClassifier  # type: ignore[import-untyped]
+        from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
         # Prepare features
         X = []

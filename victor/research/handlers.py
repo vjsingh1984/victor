@@ -88,7 +88,7 @@ class WebScraperHandler(BaseHandler):
             "web_fetch",
             url=url,
             selectors=selectors,
-            _exec_ctx=context.model_dump(),
+            _exec_ctx={},
         )
 
         # Raise exception if tool execution failed

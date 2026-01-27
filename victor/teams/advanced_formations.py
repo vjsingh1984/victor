@@ -59,6 +59,34 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def get_formation(formation_name: str) -> "BaseFormationStrategy":
+    """Get a formation by name.
+
+    Temporary implementation until proper registry is available.
+    """
+    from victor.coordination.formations import (
+        SequentialFormation,
+        ParallelFormation,
+        HierarchicalFormation,
+        PipelineFormation,
+        ConsensusFormation,
+    )
+    from victor.teams.types import TeamFormation
+
+    formation_map = {
+        TeamFormation.SEQUENTIAL.value: SequentialFormation(),
+        TeamFormation.PARALLEL.value: ParallelFormation(),
+        TeamFormation.HIERARCHICAL.value: HierarchicalFormation(),
+        TeamFormation.PIPELINE.value: PipelineFormation(),
+        TeamFormation.CONSSENSUS.value: ConsensusFormation(),
+    }
+
+    if formation_name not in formation_map:
+        raise ValueError(f"Unknown formation: {formation_name}")
+
+    return formation_map[formation_name]
+
+
 # =============================================================================
 # Switching Formation
 # =============================================================================

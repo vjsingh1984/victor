@@ -256,7 +256,7 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Google.
 
         When tools are provided, this method uses non-streaming chat() internally
@@ -541,7 +541,7 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
             usage=usage,
             model=model,
             stop_reason=None,
-            raw_response=result,
+            raw_response=response,
             metadata=None,
         )
 

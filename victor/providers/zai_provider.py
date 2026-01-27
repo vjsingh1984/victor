@@ -51,7 +51,8 @@ logger = logging.getLogger(__name__)
 
 # Available z.ai GLM models
 # Reference: https://docs.z.ai/ and https://z.ai/blog/glm-4.6
-ZAI_MODELS = {
+# Type annotation for ZAI_MODELS to fix MyPy type inference
+ZAI_MODELS: Dict[str, Dict[str, Any]] = {
     "glm-4.7": {
         "description": "GLM-4.7 - Latest flagship model",
         "context_window": 128000,
@@ -256,7 +257,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from z.ai with tool call accumulation.
 
         Args:

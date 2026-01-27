@@ -357,7 +357,13 @@ class AzureOpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         choices = result.get("choices", [])
         if not choices:
             return CompletionResponse(
-                content="", role="assistant", model=model, raw_response=result
+                content="",
+                role="assistant",
+                model=model,
+                raw_response=result,
+                metadata={},
+                stop_reason="",
+                tool_calls=None,
             )
 
         choice = choices[0]
@@ -379,6 +385,7 @@ class AzureOpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             stop_reason=choice.get("finish_reason"),
             usage=usage,
             model=model,
+            metadata={},
             raw_response=result,
         )
 

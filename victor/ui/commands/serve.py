@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 class ServerBackend(str, Enum):
     """Server backend options."""
 
-    AIOHTTP = "aiohttp"
     FASTAPI = "fastapi"
 
 
@@ -53,7 +52,7 @@ def serve(
         ServerBackend.FASTAPI,
         "--backend",
         "-b",
-        help="Server backend: 'fastapi' (default, with OpenAPI docs) or 'aiohttp' (legacy)",
+        help="Server backend: 'fastapi' (with OpenAPI docs)",
     ),
     enable_hitl: bool = typer.Option(
         False,
@@ -73,9 +72,8 @@ def serve(
     and external tool access.
 
     Examples:
-        victor serve                          # Start with FastAPI backend (default)
-        victor serve -p 8000                  # FastAPI on custom port
-        victor serve --backend aiohttp        # Use legacy aiohttp backend
+        victor serve                          # Start FastAPI server on port 8765
+        victor serve -p 9000                  # Custom port
         victor serve --enable-hitl            # Enable HITL endpoints for approvals
     """
     if ctx.invoked_subcommand is None:
@@ -125,44 +123,7 @@ def _serve(
         )
     )
 
-    if backend == ServerBackend.FASTAPI:
-        asyncio.run(_run_fastapi_server(host, port, profile, enable_hitl, hitl_auth_token))
-    else:
-        if enable_hitl:
-            console.print("[yellow]Warning:[/] HITL endpoints only available with FastAPI backend")
-        asyncio.run(_run_aiohttp_server(host, port, profile))
-
-
-async def _run_aiohttp_server(host: str, port: int, profile: str) -> None:
-    """Run the aiohttp API server (legacy backend)."""
-    try:
-        from pathlib import Path
-
-        from victor.integrations.api.server import VictorAPIServer
-
-        server = VictorAPIServer(
-            host=host,
-            port=port,
-            workspace_root=str(Path.cwd()),
-        )
-
-        # Run server asynchronously to avoid nested event loop errors
-        runner = await server.start_async()
-        try:
-            while True:
-                await asyncio.sleep(3600)
-        finally:
-            await runner.cleanup()
-
-    except ImportError as e:
-        console.print(f"[red]Error:[/] Missing dependency for server: {e}")
-        console.print("\nInstall with: [bold]pip install aiohttp[/]")
-        raise typer.Exit(1)
-    except KeyboardInterrupt:
-        console.print("\n[dim]Server stopped[/]")
-    except Exception as e:
-        console.print(f"[red]Error:[/] {e}")
-        raise typer.Exit(1)
+    asyncio.run(_run_fastapi_server(host, port, profile, enable_hitl, hitl_auth_token))
 
 
 async def _run_fastapi_server(

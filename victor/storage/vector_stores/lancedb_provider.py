@@ -282,13 +282,13 @@ class LanceDBProvider(BaseEmbeddingProvider):
         """Ensure database connection is initialized."""
         if self.db is None:
             raise RuntimeError("LanceDB connection not initialized. Call initialize() first.")
-        return self.db
+        return self.db  # type: ignore[unreachable]
 
     def _ensure_table(self) -> Any:
         """Ensure table is initialized."""
         if self.table is None:
             raise RuntimeError("LanceDB table not initialized. Call initialize() first.")
-        return self.table
+        return self.table  # type: ignore[unreachable]
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text.
@@ -353,7 +353,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         table_name = self.config.extra_config.get("table_name", "embeddings")
         db = self._ensure_db()
         if self.table is None:
-            self.table = db.create_table(table_name, data=[document])  # type: ignore
+            self.table = db.create_table(table_name, data=[document])
         else:
             table = self._ensure_table()
             table.add([document])
@@ -389,10 +389,10 @@ class LanceDBProvider(BaseEmbeddingProvider):
         table_name = self.config.extra_config.get("table_name", "embeddings")
         db = self._ensure_db()
         if self.table is None:
-            self.table = db.create_table(table_name, data=lance_docs)  # type: ignore
+            self.table = db.create_table(table_name, data=lance_docs)
         else:
             table = self._ensure_table()
-            table.add(lance_docs)  # type: ignore
+            table.add(lance_docs)
 
     async def search_similar(
         self,
@@ -490,7 +490,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         # Delete documents with matching file_path
         # LanceDB uses SQL-like predicates
         table = self._ensure_table()
-        table.delete(f"file_path = '{file_path}'")  # type: ignore
+        table.delete(f"file_path = '{file_path}'")
 
         # Count documents after deletion
         try:
@@ -526,7 +526,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         count = 0
         if self.table is not None:
             try:
-                count = self.table.count_rows()  # type: ignore
+                count = self.table.count_rows()
             except (AttributeError, RuntimeError, ValueError):
                 count = 0
 

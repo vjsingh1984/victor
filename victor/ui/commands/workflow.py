@@ -1263,7 +1263,7 @@ def list_presets(
             category_presets = []
             for preset_name in preset_names:
                 preset = get_workflow_preset(preset_name)
-                if preset and preset.category == category:
+                if preset and preset.category == category:  # type: ignore[union-attr]
                     category_presets.append(preset)
 
             if not category_presets:
@@ -1278,8 +1278,8 @@ def list_presets(
             for preset in sorted(category_presets, key=lambda x: x.name):
                 console.print(f"  • [cyan]{preset.name}[/]: {preset.description}")
                 console.print(
-                    f"    [dim]Complexity: {preset.complexity}, "
-                    f"~{preset.estimated_duration_minutes}min[/]"
+                    f"    [dim]Complexity: {preset.complexity}, "  # type: ignore[attr-defined]
+                    f"~{preset.estimated_duration_minutes}min[/]"  # type: ignore[attr-defined]
                 )
         else:
             # Show all by category

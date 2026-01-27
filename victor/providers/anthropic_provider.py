@@ -179,7 +179,7 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Anthropic with tool-use support."""
         try:
             # Separate system messages
@@ -265,7 +265,11 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
                             text = getattr(delta, "text", "")
                             yield StreamChunk(content=text or "", is_final=False)
                         elif delta_type in {"input_json_delta", "input_delta"}:
-                            tc_id = block_index_to_id.get(block_index)
+                            tc_id = (
+                                block_index_to_id.get(int(block_index))
+                                if block_index is not None
+                                else None
+                            )
                             if tc_id and block_index is not None:  # Ensure block_index is not None
                                 partial = (
                                     getattr(delta, "partial_json", None)
@@ -286,7 +290,11 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
                         block_index = getattr(
                             event, "index", getattr(event, "content_block_index", None)
                         )
-                        tc_id = block_index_to_id.get(block_index)
+                        tc_id = (
+                            block_index_to_id.get(int(block_index))
+                            if block_index is not None
+                            else None
+                        )
                         if (
                             tc_id
                             and block_index is not None

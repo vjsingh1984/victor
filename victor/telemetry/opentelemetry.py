@@ -14,14 +14,14 @@
 
 """OpenTelemetry setup and configuration."""
 
-from opentelemetry import trace, metrics  # type: ignore[import-not-found]
-from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-not-found]
-from opentelemetry.sdk.trace.export import BatchSpanProcessor  # type: ignore[import-not-found]
-from opentelemetry.sdk.metrics import MeterProvider  # type: ignore[import-not-found]
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader  # type: ignore[import-not-found]
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # type: ignore[import-not-found]
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter  # type: ignore[import-not-found]
-from opentelemetry.sdk.resources import Resource  # type: ignore[import-not-found]
+from opentelemetry import trace, metrics  # type: ignore[import-untyped]
+from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-untyped]
+from opentelemetry.sdk.trace.export import BatchSpanProcessor  # type: ignore[import-untyped]
+from opentelemetry.sdk.metrics import MeterProvider  # type: ignore[import-untyped]
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader  # type: ignore[import-untyped]
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # type: ignore[import-untyped]
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter  # type: ignore[import-untyped]
+from opentelemetry.sdk.resources import Resource  # type: ignore[import-untyped]
 
 
 def setup_opentelemetry(service_name: str, service_version: str):

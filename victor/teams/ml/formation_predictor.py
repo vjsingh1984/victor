@@ -376,9 +376,8 @@ class FormationPredictor:
                 - formation: TeamFormation (label)
                 - success: bool (optional, for weighting)
         """
-        # type: ignore[import-untyped]
-        from sklearn.ensemble import RandomForestClassifier
-        from sklearn.preprocessing import StandardScaler
+        from sklearn.ensemble import RandomForestClassifier  # type: ignore[import-untyped]
+        from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
         # Prepare features
         X = []

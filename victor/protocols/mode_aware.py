@@ -90,8 +90,8 @@ class ModeInfo:
     allow_all_tools: bool = True
     exploration_multiplier: float = 1.0
     sandbox_dir: Optional[str] = None
-    allowed_tools: Set[str] = None  # type: ignore
-    disallowed_tools: Set[str] = None  # type: ignore
+    allowed_tools: Optional[Set[str]] = None
+    disallowed_tools: Optional[Set[str]] = None
 
     def __post_init__(self) -> None:
         if self.allowed_tools is None:

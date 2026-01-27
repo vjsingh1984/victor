@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     try:
         from openai import AsyncOpenAI as AsyncOpenAIType  # noqa: F401
     except ImportError:
-        AsyncOpenAIType = None  # type: ignore[assignment]
+        AsyncOpenAIType = None
 
     try:
         import cohere  # type: ignore[import-not-found]
@@ -43,7 +43,7 @@ if TYPE_CHECKING:
         pass
 
     try:
-        import httpx  # type: ignore[import-not-found]
+        import httpx
     except ImportError:
         pass
 

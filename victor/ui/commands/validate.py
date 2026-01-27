@@ -16,7 +16,7 @@
 
 import typer
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 from rich.table import Table
@@ -108,7 +108,7 @@ def validate_files(
         # Validate the file
         result = validator.validate(content, file_path, language=language)
 
-        file_result = {
+        file_result: Dict[str, Any] = {
             "file": str(file_path),
             "valid": result.is_valid,
             "language": result.language,

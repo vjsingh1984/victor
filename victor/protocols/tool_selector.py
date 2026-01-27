@@ -54,7 +54,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
-    from victor.tools.tool import ToolDefinition
+    from victor.providers.base import ToolDefinition
 
 
 class ToolSelectionStrategy(Enum):

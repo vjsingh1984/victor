@@ -226,7 +226,7 @@ def configure_logging(
     effective_console_level = getattr(logging, log_level.upper(), None)
     if effective_console_level is None:
         effective_console_level = getattr(logging, console_level.upper(), logging.WARNING)
-    console_handler.setLevel(effective_console_level)
+    console_handler.setLevel(effective_console_level or logging.WARNING)
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
 
