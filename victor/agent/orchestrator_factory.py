@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.prompt_builder import SystemPromptBuilder
-    from victor.agent.context_project import ProjectContext  # type: ignore[import]
+    from victor.agent.context_project import ProjectContext  # type: ignore[import-not-found]
     from victor.framework.task import TaskComplexityService as ComplexityClassifier
     from victor.agent.action_authorizer import ActionAuthorizer
     from victor.agent.search_router import SearchRouter
@@ -195,25 +195,25 @@ class OrchestratorComponents:
     """
 
     # Provider
-    provider: ProviderComponents = field(default_factory=lambda: None)
+    provider: Optional[ProviderComponents] = field(default=None)
 
     # Core services
-    services: CoreServices = field(default_factory=lambda: None)
+    services: Optional[CoreServices] = field(default=None)
 
     # Conversation
-    conversation: ConversationComponents = field(default_factory=lambda: None)
+    conversation: Optional[ConversationComponents] = field(default=None)
 
     # Tools
-    tools: ToolComponents = field(default_factory=lambda: None)
+    tools: Optional[ToolComponents] = field(default=None)
 
     # Streaming
-    streaming: StreamingComponents = field(default_factory=lambda: None)
+    streaming: Optional[StreamingComponents] = field(default=None)
 
     # Analytics
-    analytics: AnalyticsComponents = field(default_factory=lambda: None)
+    analytics: Optional[AnalyticsComponents] = field(default=None)
 
     # Recovery
-    recovery: RecoveryComponents = field(default_factory=lambda: None)
+    recovery: Optional[RecoveryComponents] = field(default=None)
 
     # Observability
     observability: Optional["ObservabilityIntegration"] = None

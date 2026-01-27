@@ -1040,7 +1040,7 @@ def test_benchmark_summary():
     print("  • Memory leak:                  FAIL if memory grows")
 
     print("\n" + "=" * 80)
-    print("RUN: pytest tests/benchmarks/test_tool_selection_performance.py -v --benchmark-only")
+    print("RUN: pytest tests/benchmark/benchmarks/test_tool_selection_performance.py -v --benchmark-only")
     print("=" * 80 + "\n")
 
     assert True  # Always passes (just for display)

@@ -17,7 +17,7 @@
 import re
 
 # Read the file
-with open("tests/benchmarks/test_tool_selection_performance.py", "r") as f:
+with open("tests/benchmark/benchmarks/test_tool_selection_performance.py", "r") as f:
     lines = f.readlines()
 
 output = []
@@ -119,7 +119,7 @@ while i < len(lines):
     i += 1
 
 # Write the fixed version
-with open("tests/benchmarks/test_tool_selection_performance.py", "w") as f:
+with open("tests/benchmark/benchmarks/test_tool_selection_performance.py", "w") as f:
     f.writelines(output)
 
 print("Fixed benchmark tests successfully!")

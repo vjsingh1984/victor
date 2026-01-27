@@ -699,16 +699,16 @@ def generate_benchmark_report() -> str:
 
     ```bash
     # Run all benchmarks
-    pytest tests/benchmarks/test_embedding_operations_baseline.py -v
+    pytest tests/benchmark/benchmarks/test_embedding_operations_baseline.py -v
 
     # Run specific category
-    pytest tests/benchmarks/test_embedding_operations_baseline.py::test_cosine_similarity_large_batch -v
+    pytest tests/benchmark/benchmarks/test_embedding_operations_baseline.py::test_cosine_similarity_large_batch -v
 
     # Generate comparison report
-    pytest tests/benchmarks/test_embedding_operations_baseline.py --benchmark-compare
+    pytest tests/benchmark/benchmarks/test_embedding_operations_baseline.py --benchmark-compare
 
     # Save results for later comparison
-    pytest tests/benchmarks/test_embedding_operations_baseline.py --benchmark-save=baseline
+    pytest tests/benchmark/benchmarks/test_embedding_operations_baseline.py --benchmark-save=baseline
     ```
 
     ## Expected Performance Patterns

@@ -322,7 +322,7 @@ if __name__ == "__main__":
    - LRU cache for frequently accessed results
    - Minimal overhead, significant benefit
 
-See tests/benchmarks/test_embedding_operations_baseline.py for
+See tests/benchmark/benchmarks/test_embedding_operations_baseline.py for
 comprehensive benchmarks validating these optimizations.
     """
     )
