@@ -229,7 +229,7 @@ class OpenAIAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.OPENAI
 
-    def adapt_stream(
+    async def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -281,7 +281,7 @@ class AnthropicAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.ANTHROPIC
 
-    def adapt_stream(
+    async def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -325,7 +325,7 @@ class GoogleAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.GOOGLE
 
-    def adapt_stream(
+    async def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -377,7 +377,7 @@ class OllamaAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.OLLAMA
 
-    def adapt_stream(
+    async def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -438,7 +438,7 @@ class LMStudioAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.LMSTUDIO
 
-    def adapt_stream(
+    async def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -470,7 +470,7 @@ class VLLMAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.VLLM
 
-    def adapt_stream(
+    async def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
