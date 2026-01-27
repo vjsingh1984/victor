@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 from pathlib import Path
 
 from tree_sitter import Query, QueryCursor
-from victor.coding.codebase.tree_sitter_manager import get_parser
+from victor.coding.codebase.tree_sitter_manager import get_parser, get_language
 from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
@@ -104,7 +104,7 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
         root_node = tree.root_node
 
         for symbol_type in ["function", "class"]:
-            query = Query(PYTHON_QUERIES[symbol_type], parser.language)
+            query = Query(get_language("python"), PYTHON_QUERIES[symbol_type])
             cursor = QueryCursor(query)
             captures_dict = cursor.captures(root_node)
 
@@ -196,7 +196,7 @@ async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]
     """
     references = []
     parser = get_parser("python")
-    query = Query(PYTHON_QUERIES["identifier"], parser.language)
+    query = Query(get_language("python"), PYTHON_QUERIES["identifier"])
 
     root_path = Path(search_path)
     if not root_path.is_dir():

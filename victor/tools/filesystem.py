@@ -1874,6 +1874,13 @@ async def ls(
                     f"Suggestion: Use read_file(path='{path}') to read this file instead."
                 )
 
+        # Explicit check: path must be a directory
+        if dir_path.exists() and not dir_path.is_dir():
+            raise NotADirectoryError(
+                f"Path is not a directory: {path}\n"
+                f"Suggestion: Use read_file(path='{path}') to read this file instead."
+            )
+
         # Determine max depth for traversal
         max_depth = float("inf") if recursive else depth
 
@@ -1964,7 +1971,21 @@ async def ls(
             if count >= limit:
                 item["truncated"] = True
 
-        return items
+        # Always wrap in metadata dict within a list for consistency
+        result_dict = {
+            "items": items,
+            "count": len(items),
+            "truncated": count >= limit,
+            "cwd": str(dir_path),  # Current working directory for context
+            "target": str(dir_path),  # Target path that was listed
+        }
+
+        # Add filter key to result dict if pattern was used
+        if pattern:
+            result_dict["filter"] = pattern
+
+        # Return as list for consistency with tests
+        return [result_dict]
 
     except Exception as e:
         # Let the decorator handle the exception and format it

@@ -275,6 +275,7 @@ class CodeSandbox:
         self.working_dir: str = "/app"
         self.docker_available: bool = False
         self.docker_client = None
+        self.container: Any | None = None
         self.network_disabled: bool = network_disabled
         self.memory_limit: str | None = memory_limit
         try:
