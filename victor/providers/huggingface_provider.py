@@ -331,7 +331,14 @@ class HuggingFaceProvider(BaseProvider, HTTPErrorHandlerMixin):
         choices = result.get("choices", [])
         if not choices:
             return CompletionResponse(
-                content="", role="assistant", model=model, raw_response=result
+                content="",
+                role="assistant",
+                model=model,
+                raw_response=result,
+                tool_calls=None,
+                stop_reason=None,
+                usage=None,
+                metadata=None
             )
 
         choice = choices[0]
@@ -354,6 +361,7 @@ class HuggingFaceProvider(BaseProvider, HTTPErrorHandlerMixin):
             usage=usage,
             model=model,
             raw_response=result,
+            metadata=None
         )
 
     def _normalize_tool_calls(self, tool_calls) -> Optional[List[Dict[str, Any]]]:

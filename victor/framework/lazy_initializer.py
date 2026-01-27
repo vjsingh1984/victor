@@ -148,11 +148,11 @@ class LazyInitializer:
             Exception: If initialization fails
         """
         if self._initialized:
-            return self._result  # type: ignore[unreachable]
+            return self._result
 
         with self._init_lock:
             if self._initialized:
-                return self._result  # type: ignore[unreachable]
+                return self._result
 
             # Check for recursive initialization
             if self._initializing:
@@ -173,7 +173,7 @@ class LazyInitializer:
                 self._initialized = True
 
                 logger.debug(f"Successfully initialized vertical '{self.vertical_name}'")
-                return self._result  # type: ignore[unreachable]
+                return self._result
             except Exception as e:
                 logger.error(f"Failed to initialize vertical '{self.vertical_name}': {e}")
                 raise

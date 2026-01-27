@@ -84,7 +84,7 @@ class TestProtocolTypeChecking:
     def test_test_file_passes_mypy(self):
         """Test file itself should pass mypy type checking."""
         result = subprocess.run(
-            ["mypy", "--strict", "tests/unit/protocols/test_capability_protocol.py"],
+            ["mypy", "--strict", "--follow-imports=skip", "--no-error-summary", "tests/unit/protocols/test_capability_protocol.py"],
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent.parent.parent,

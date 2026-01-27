@@ -770,12 +770,12 @@ class ExecutionTraceView(TimeOrderedTableView):
 
     def __init__(self, *args, max_rows: int = 300, **kwargs):
         super().__init__(*args, max_rows=max_rows, **kwargs)
-        self._spans: list = []  # type: ignore[attr-defined]
+        self._spans: list = []
 
     def clear(self) -> None:
         """Clear all spans."""
         self._spans.clear()
-        self.update_table()
+        self.update_data([])  # type: ignore[attr-defined]
 
     def on_mount(self) -> None:
         """Set up the table columns."""
@@ -836,12 +836,12 @@ class ToolCallHistoryView(TimeOrderedTableView):
 
     def __init__(self, *args, max_rows: int = 200, **kwargs):
         super().__init__(*args, max_rows=max_rows, **kwargs)
-        self._tool_calls: list = []  # type: ignore[attr-defined]
+        self._tool_calls: list = []
 
     def clear(self) -> None:
         """Clear all tool calls."""
         self._tool_calls.clear()
-        self.update_table()
+        self.update_data([])  # type: ignore[attr-defined]
 
     def on_mount(self) -> None:
         """Set up the table columns."""
@@ -941,12 +941,12 @@ class StateTransitionView(TimeOrderedTableView):
     def __init__(self, *args, max_rows: int = 200, **kwargs):
         # Enable deduplication to prevent duplicate state events
         super().__init__(*args, max_rows=max_rows, enable_dedup=True, **kwargs)
-        self._transitions: list = []  # type: ignore[attr-defined]
+        self._transitions: list = []
 
     def clear(self) -> None:
         """Clear all transitions."""
         self._transitions.clear()
-        self.update_table()
+        self.update_data([])  # type: ignore[attr-defined]
 
     def on_mount(self) -> None:
         """Set up the table columns."""
