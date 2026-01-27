@@ -2822,7 +2822,7 @@ class AgentOrchestrator(
             Tuple of (result, success, error_message or None)
         """
         # Use coordinator if available
-        if self.tool_retry_coordinator is not None:
+        if hasattr(self, 'tool_retry_coordinator') and self.tool_retry_coordinator is not None:
             result = await self.tool_retry_coordinator.execute_tool(
                 tool_name=tool_name,
                 tool_args=tool_args,

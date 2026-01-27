@@ -722,6 +722,8 @@ class ToolRegistrar:
         Returns:
             Number of tools registered in dependency graph
         """
+        from victor.tools.enums import CostTier  # Runtime import for CostTier usage
+
         if not self.tool_graph:
             return 0
 
