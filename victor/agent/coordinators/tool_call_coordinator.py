@@ -62,7 +62,6 @@ class ToolCallCoordinator(IToolCallCoordinator):
         tool_executor: Any,
         tool_registry: Any,
         tool_retry_coordinator: Optional[Any] = None,
-        sanitizer: Optional[Any] = None,
     ):
         """Initialize ToolCallCoordinator.
 
@@ -71,13 +70,11 @@ class ToolCallCoordinator(IToolCallCoordinator):
             tool_executor: Tool executor instance
             tool_registry: Tool registry for validation
             tool_retry_coordinator: Optional retry coordinator
-            sanitizer: Tool name sanitizer for validation
         """
         self._config = config
         self._tool_executor = tool_executor
         self._tool_registry = tool_registry
         self._tool_retry_coordinator = tool_retry_coordinator
-        self._sanitizer = sanitizer
 
     async def handle_tool_calls(
         self,
@@ -150,9 +147,6 @@ class ToolCallCoordinator(IToolCallCoordinator):
             return errors
 
         # Validate tool name format
-        if self._sanitizer and not self._sanitizer.is_valid_tool_name(tool_call.name):
-            errors.append(f"Invalid tool name '{tool_call.name}'")
-
         # Check tool availability
         if not self._is_tool_enabled(tool_call.name):
             errors.append(f"Tool '{tool_call.name}' is not available")
@@ -439,7 +433,6 @@ def create_tool_call_coordinator(
     tool_executor: Any,
     tool_registry: Any,
     tool_retry_coordinator: Optional[Any] = None,
-    sanitizer: Optional[Any] = None,
 ) -> ToolCallCoordinator:
     """Factory function to create ToolCallCoordinator.
 
@@ -448,7 +441,6 @@ def create_tool_call_coordinator(
         tool_executor: Tool executor instance
         tool_registry: Tool registry for validation
         tool_retry_coordinator: Optional retry coordinator
-        sanitizer: Tool name sanitizer
 
     Returns:
         Configured ToolCallCoordinator instance
@@ -458,7 +450,6 @@ def create_tool_call_coordinator(
         tool_executor=tool_executor,
         tool_registry=tool_registry,
         tool_retry_coordinator=tool_retry_coordinator,
-        sanitizer=sanitizer,
     )
 
 

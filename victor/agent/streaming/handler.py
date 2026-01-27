@@ -368,34 +368,62 @@ class StreamingChatHandler:
     def handle_empty_response(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
         """Handle an empty response from the model.
 
-        Tracks consecutive empty responses and forces summary if threshold exceeded.
+        Tracks consecutive empty responses and takes action based on context.
+        - First 2 attempts: Encourage tool use with stronger language
+        - 3rd attempt: Force summary to prevent infinite loops
 
         Args:
             ctx: The streaming context
 
         Returns:
-            IterationResult if threshold exceeded and summary forced, None otherwise
+            IterationResult if action needed, None otherwise
         """
-        threshold_exceeded = ctx.record_empty_response()
-        if threshold_exceeded:
+        consecutive_empty = ctx.record_empty_response()
+
+        # Early attempts (1-2): Strongly encourage tool use
+        if consecutive_empty <= 2:
             logger.warning(
-                f"Model stuck with {ctx.consecutive_empty_responses} consecutive "
-                "empty responses - forcing summary"
+                f"Model returned empty response (attempt {consecutive_empty}/3). "
+                "Encouraging tool use with stronger guidance."
             )
             result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
-            result.add_chunk(
-                StreamChunk(content="\n[recovery] Forcing summary after repeated empty responses\n")
-            )
-            # Add strong instruction to summarize
-            self.message_adder.add_message(
-                "user",
-                "You seem to be stuck. Please provide a summary of what you have found so far. "
-                "DO NOT call any more tools - just summarize the information you have already gathered.",
-            )
-            ctx.reset_empty_responses()
-            ctx.force_completion = True
+
+            # Add increasingly strong encouragement
+            if consecutive_empty == 1:
+                encouragement = (
+                    "IMPORTANT: You must use tools to answer this question. "
+                    "Your previous response was empty. Please call the appropriate tool(s) "
+                    "to gather information, then provide a response based on the actual tool output."
+                )
+            else:  # consecutive_empty == 2
+                encouragement = (
+                    "CRITICAL: You returned an empty response AGAIN. "
+                    "You MUST use tools to complete this task. "
+                    "Do not provide a text response without first calling tools. "
+                    "Select and execute the appropriate tool(s) now."
+                )
+
+            self.message_adder.add_message("user", encouragement)
             return result
-        return None
+
+        # Third attempt: Force summary to prevent infinite loop
+        logger.warning(
+            f"Model stuck with {consecutive_empty} consecutive "
+            "empty responses - forcing summary after tool use encouragement failed"
+        )
+        result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
+        result.add_chunk(
+            StreamChunk(content="\n[recovery] Forcing summary after repeated empty responses\n")
+        )
+        # Add instruction to summarize
+        self.message_adder.add_message(
+            "user",
+            "You seem to be stuck. Please provide a summary of what you have found so far. "
+            "DO NOT call any more tools - just summarize the information you have already gathered.",
+        )
+        ctx.reset_empty_responses()
+        ctx.force_completion = True
+        return result
 
     def handle_blocked_tool_call(
         self,

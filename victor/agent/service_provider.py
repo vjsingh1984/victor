@@ -1992,17 +1992,11 @@ class OrchestratorServiceProvider:
             strict_validation=getattr(self._settings, "strict_tool_validation", True),
         )
 
-        # Get sanitizer if available
-        # TODO: Fix import for ToolNameSanitizer - module doesn't exist
-        # from victor.agent.tool_calling.sanitizer import ToolNameSanitizer
-        # sanitizer = ToolNameSanitizer()
-
         return create_tool_call_coordinator(
             config=config,
             tool_executor=tool_executor,
             tool_registry=tool_registry,
             tool_retry_coordinator=tool_retry_coordinator,
-            sanitizer=sanitizer,
         )
 
     def _create_prompt_builder_coordinator(self) -> Any:

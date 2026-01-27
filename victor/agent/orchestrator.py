@@ -3792,68 +3792,60 @@ class AgentOrchestrator(
             orchestrator.__dict__.update(components.attributes)
         else:
             if components.provider is not None:
-                orchestrator.provider = components.provider.provider  # type: ignore[union-attr]
-                orchestrator.model = components.provider.model  # type: ignore[union-attr]
-                orchestrator.provider_name = components.provider.provider_name  # type: ignore[union-attr]
-                orchestrator.tool_adapter = components.provider.tool_adapter  # type: ignore[union-attr]
-                orchestrator._tool_calling_caps_internal = components.provider.tool_calling_caps  # type: ignore[union-attr]
-
+                orchestrator.provider = components.provider.provider
+                orchestrator.model = components.provider.model
+                orchestrator.provider_name = components.provider.provider_name
+                orchestrator.tool_adapter = components.provider.tool_adapter
+                orchestrator._tool_calling_caps_internal = components.provider.tool_calling_caps
             if components.services is not None:
-                orchestrator.sanitizer = components.services.sanitizer  # type: ignore[union-attr]
-                orchestrator.prompt_builder = components.services.prompt_builder  # type: ignore[union-attr]
-                orchestrator.project_context = components.services.project_context  # type: ignore[union-attr]
-                orchestrator.task_classifier = components.services.complexity_classifier  # type: ignore[union-attr]
-                orchestrator.intent_detector = components.services.action_authorizer  # type: ignore[union-attr]
-                orchestrator.search_router = components.services.search_router  # type: ignore[union-attr]
-
+                orchestrator.sanitizer = components.services.sanitizer
+                orchestrator.prompt_builder = components.services.prompt_builder
+                orchestrator.project_context = components.services.project_context
+                orchestrator.task_classifier = components.services.complexity_classifier
+                orchestrator.intent_detector = components.services.action_authorizer
+                orchestrator.search_router = components.services.search_router
             if components.conversation is not None:
-                orchestrator._conversation_controller = components.conversation.conversation_controller  # type: ignore[union-attr]
-                orchestrator.memory_manager = components.conversation.memory_manager  # type: ignore[union-attr]
-                orchestrator._memory_session_id = components.conversation.memory_session_id or ""  # type: ignore[union-attr]
-                orchestrator.conversation_state = components.conversation.conversation_state  # type: ignore[union-attr]
-
+                orchestrator._conversation_controller = (
+                    components.conversation.conversation_controller
+                )
+                orchestrator.memory_manager = components.conversation.memory_manager
+                orchestrator._memory_session_id = components.conversation.memory_session_id or ""
+                orchestrator.conversation_state = components.conversation.conversation_state
             if components.tools is not None:
-                orchestrator.tools = components.tools.tool_registry  # type: ignore[union-attr]
-                orchestrator.tool_registrar = components.tools.tool_registrar  # type: ignore[union-attr]
-                orchestrator.tool_executor = components.tools.tool_executor  # type: ignore[union-attr]
-                orchestrator.tool_cache = components.tools.tool_cache  # type: ignore[union-attr]
-                orchestrator.tool_graph = components.tools.tool_graph  # type: ignore[union-attr]
-                orchestrator.plugin_manager = components.tools.plugin_manager  # type: ignore[union-attr]
-
+                orchestrator.tools = components.tools.tool_registry
+                orchestrator.tool_registrar = components.tools.tool_registrar
+                orchestrator.tool_executor = components.tools.tool_executor
+                orchestrator.tool_cache = components.tools.tool_cache
+                orchestrator.tool_graph = components.tools.tool_graph
+                orchestrator.plugin_manager = components.tools.plugin_manager
             if components.streaming is not None:
-                orchestrator._streaming_controller = components.streaming.streaming_controller  # type: ignore[union-attr]
-                orchestrator._streaming_handler = components.streaming.streaming_handler  # type: ignore[union-attr]
-                orchestrator._metrics_collector = components.streaming.metrics_collector  # type: ignore[union-attr]
+                orchestrator._streaming_controller = components.streaming.streaming_controller
+                orchestrator._streaming_handler = components.streaming.streaming_handler
+                orchestrator._metrics_collector = components.streaming.metrics_collector
                 orchestrator.streaming_metrics_collector = (
-                    components.streaming.streaming_metrics_collector  # type: ignore[union-attr]
+                    components.streaming.streaming_metrics_collector
                 )
 
             if components.analytics is not None:
-                orchestrator._usage_analytics = components.analytics.usage_analytics  # type: ignore[union-attr]
-                orchestrator._sequence_tracker = components.analytics.sequence_tracker  # type: ignore[union-attr]
-                orchestrator.unified_tracker = components.analytics.unified_tracker  # type: ignore[union-attr]
-
+                orchestrator._usage_analytics = components.analytics.usage_analytics
+                orchestrator._sequence_tracker = components.analytics.sequence_tracker
+                orchestrator.unified_tracker = components.analytics.unified_tracker
             if components.recovery is not None:
-                orchestrator._recovery_handler = components.recovery.recovery_handler  # type: ignore[union-attr]
-                orchestrator._recovery_integration = components.recovery.recovery_integration  # type: ignore[union-attr]
-                orchestrator._context_compactor = components.recovery.context_compactor  # type: ignore[union-attr]
-
+                orchestrator._recovery_handler = components.recovery.recovery_handler
+                orchestrator._recovery_integration = components.recovery.recovery_integration
+                orchestrator._context_compactor = components.recovery.context_compactor
             if components.observability is not None:
-                orchestrator._observability = components.observability  # type: ignore[union-attr]
-
+                orchestrator._observability = components.observability
             if components.tool_output_formatter is not None:
-                orchestrator._tool_output_formatter = components.tool_output_formatter  # type: ignore[union-attr]
-
+                orchestrator._tool_output_formatter = components.tool_output_formatter
             if components.workflow_optimization is not None:
-                orchestrator._workflow_optimization = components.workflow_optimization  # type: ignore[union-attr]
-
+                orchestrator._workflow_optimization = components.workflow_optimization
             if components.coordinators is not None:
-                orchestrator._response_coordinator = components.coordinators.response_coordinator  # type: ignore[union-attr]
+                orchestrator._response_coordinator = components.coordinators.response_coordinator
                 orchestrator._tool_access_config_coordinator = (
-                    components.coordinators.tool_access_config_coordinator  # type: ignore[union-attr]
+                    components.coordinators.tool_access_config_coordinator
                 )
-                orchestrator._state_coordinator = components.coordinators.state_coordinator  # type: ignore[union-attr]
-
+                orchestrator._state_coordinator = components.coordinators.state_coordinator
         if not hasattr(orchestrator, "_capabilities"):
             orchestrator.__init_capability_registry__()
 

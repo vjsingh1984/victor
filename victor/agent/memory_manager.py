@@ -342,8 +342,6 @@ class SessionRecoveryManager:
                     return True
                 else:
                     logger.warning(f"Session {session_id} not found")
-            else:
-                logger.warning("Conversation store not available")  # type: ignore[unreachable]
             return False
         except Exception as e:
             logger.warning(f"Failed to recover session {session_id}: {e}")

@@ -1180,8 +1180,11 @@ class ChatCoordinator:
         if tool_registry is None:
             # Fallback: try to get from components.tool_registry if available
             from victor.agent.mixins.component_accessor import ComponentAccessorMixin
+
             if isinstance(orch, ComponentAccessorMixin):
-                tool_registry = orch.components.tool_registry if hasattr(orch, "components") else None
+                tool_registry = (
+                    orch.components.tool_registry if hasattr(orch, "components") else None
+                )
 
         context = ToolSelectionContext(
             task_description=context_msg,

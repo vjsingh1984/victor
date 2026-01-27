@@ -3090,7 +3090,7 @@ class OrchestratorFactory(ModeAwareMixin):
             # Apply tools if specified
             tools = kwargs.get("tools")
             if tools:
-                from victor.tools.configure_tools import configure_tools
+                from victor.framework.tool_config import configure_tools
 
                 configure_tools(orchestrator, tools, airgapped=kwargs.get("airgapped", False))
 

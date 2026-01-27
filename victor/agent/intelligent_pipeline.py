@@ -75,14 +75,14 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
-    from victor.providers.base import BaseProvider
-    from victor.providers.types import Message
+    from victor.providers.base import BaseProvider, Message
     from victor.agent.intelligent_prompt_builder import IntelligentPromptBuilder
     from victor.agent.adaptive_mode_controller import AdaptiveModeController
     from victor.agent.response_quality import ResponseQualityScorer
     from victor.agent.grounding_verifier import GroundingVerifier
     from victor.agent.resilience import ResilientExecutor
 
+from victor.agent.grounding_verifier import GroundingVerificationResult
 from victor.agent.output_deduplicator import OutputDeduplicator
 from victor.protocols.provider_adapter import get_provider_adapter
 

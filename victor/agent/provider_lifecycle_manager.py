@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any, List
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
-    from victor.framework.prompts.common_prompts import SystemPromptBuilder
+    from victor.agent.prompt_builder import SystemPromptBuilder
 
 logger = logging.getLogger(__name__)
 

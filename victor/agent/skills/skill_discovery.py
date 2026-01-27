@@ -656,9 +656,10 @@ class SkillDiscoveryEngine:
         # Use tool selector if available
         if self._tool_selector:
             try:
+                # Don't pass available_tools in metadata - semantic selector needs ToolRegistry, not list
+                # The semantic selector will use its stored _tools_registry from initialize_tool_embeddings
                 selection_context = ToolSelectionContext(
                     task_description=task,
-                    metadata={"tools": available_tools},
                 )
 
                 result = self._tool_selector.select_tools(
