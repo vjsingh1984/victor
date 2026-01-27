@@ -140,7 +140,9 @@ class CoordinatorAdapter:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 try:
-                    loop.run_until_complete(self._evaluation_coordinator.send_rl_reward_signal(session))
+                    loop.run_until_complete(
+                        self._evaluation_coordinator.send_rl_reward_signal(session)
+                    )
                 finally:
                     loop.close()
             logger.debug("RL reward signal sent successfully")

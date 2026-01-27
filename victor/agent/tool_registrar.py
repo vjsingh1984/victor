@@ -819,7 +819,8 @@ class ToolRegistrar:
             return []
 
         graph_builder = self._get_graph_builder()
-        return graph_builder.plan_for_goals(goals, available_inputs)  
+        return graph_builder.plan_for_goals(goals, available_inputs)
+
     def infer_goals_from_message(self, user_message: str) -> List[str]:
         """Infer planning goals from user request.
 
@@ -832,7 +833,8 @@ class ToolRegistrar:
             List of inferred goal names
         """
         graph_builder = self._get_graph_builder()
-        return graph_builder.infer_goals_from_message(user_message)  
+        return graph_builder.infer_goals_from_message(user_message)
+
     def get_stats(self) -> RegistrationStats:
         """Get registration statistics.
 
@@ -859,7 +861,7 @@ class ToolRegistrar:
             Dictionary with plugin information
         """
         if self._plugin_loader:
-            return self._plugin_loader.get_summary()  
+            return self._plugin_loader.get_summary()
         # Legacy fallback
         if not self.plugin_manager:
             return {"plugins": [], "total": 0}
@@ -885,7 +887,7 @@ class ToolRegistrar:
             Dictionary with MCP server information
         """
         if self._mcp_connector:
-            return self._mcp_connector.get_summary()  
+            return self._mcp_connector.get_summary()
         # Legacy fallback
         if not self.mcp_registry:
             return {"servers": [], "connected": 0, "total": 0}

@@ -39,7 +39,7 @@ from victor.agent.decorators import deprecated
 
 if TYPE_CHECKING:
     from victor.core.state import ConversationStage
-    from victor.core.events.vertical_context import VerticalContext
+    from victor.agent.vertical_context import VerticalContext
     from victor.agent.stream_handler import StreamMetrics
     from victor.evaluation.protocol import TokenUsage
 
@@ -361,7 +361,7 @@ class LegacyAPIMixin:
             _ = self.mode_workflow_team_coordinator
 
         if self._team_coordinator is not None:
-            return self._team_coordinator.get_team_specs()  # type: ignore[no-any-return]
+            return self._team_coordinator.get_team_specs()
         return {}
 
     # =========================================================================
@@ -384,7 +384,7 @@ class LegacyAPIMixin:
             Dictionary with usage analytics
         """
         if self._metrics_coordinator is not None and self.conversation_state is not None:
-            return self._metrics_coordinator.get_tool_usage_stats(  # type: ignore[no-any-return]
+            return self._metrics_coordinator.get_tool_usage_stats(
                 conversation_state_summary=self.conversation_state.get_state_summary()
             )
         return {}
@@ -404,7 +404,7 @@ class LegacyAPIMixin:
             TokenUsage dataclass with input/output/total token counts
         """
         if self._metrics_coordinator is not None:
-            return self._metrics_coordinator.get_token_usage()  # type: ignore[no-any-return]
+            return self._metrics_coordinator.get_token_usage()
         # Return default TokenUsage if coordinator not available
         from victor.evaluation.protocol import TokenUsage
 
@@ -440,7 +440,7 @@ class LegacyAPIMixin:
             StreamMetrics from the last session or None
         """
         if self._metrics_coordinator is not None:
-            return self._metrics_coordinator.get_last_stream_metrics()  # type: ignore[no-any-return]
+            return self._metrics_coordinator.get_last_stream_metrics()
         return None
 
     @deprecated(
@@ -458,7 +458,7 @@ class LegacyAPIMixin:
             Dictionary with aggregated metrics or None
         """
         if self._metrics_coordinator is not None:
-            return self._metrics_coordinator.get_streaming_metrics_summary()  # type: ignore[no-any-return]
+            return self._metrics_coordinator.get_streaming_metrics_summary()
         return None
 
     @deprecated(
@@ -479,7 +479,7 @@ class LegacyAPIMixin:
             List of recent metrics dictionaries
         """
         if self._metrics_coordinator is not None:
-            return self._metrics_coordinator.get_streaming_metrics_history(limit)  # type: ignore[no-any-return]
+            return self._metrics_coordinator.get_streaming_metrics_history(limit)
         return []
 
     @deprecated(
@@ -497,7 +497,7 @@ class LegacyAPIMixin:
             Dictionary with session cost statistics
         """
         if self._metrics_coordinator is not None:
-            return self._metrics_coordinator.get_session_cost_summary()  # type: ignore[no-any-return]
+            return self._metrics_coordinator.get_session_cost_summary()
         return {}
 
     @deprecated(
@@ -515,7 +515,7 @@ class LegacyAPIMixin:
             Cost string like "$0.0123" or "cost n/a"
         """
         if self._metrics_coordinator is not None:
-            return self._metrics_coordinator.get_session_cost_formatted()  # type: ignore[no-any-return]
+            return self._metrics_coordinator.get_session_cost_formatted()
         return "cost n/a"
 
     @deprecated(
@@ -579,7 +579,7 @@ class LegacyAPIMixin:
             Set of tool names recommended for current stage
         """
         if self._state_coordinator is not None:
-            return self._state_coordinator.get_stage_tools()  # type: ignore[no-any-return]
+            return self._state_coordinator.get_stage_tools()
         return set()
 
     @deprecated(
@@ -624,7 +624,7 @@ class LegacyAPIMixin:
             Set of absolute file paths
         """
         if self._state_coordinator is not None:
-            return self._state_coordinator.observed_files  # type: ignore[no-any-return]
+            return self._state_coordinator.observed_files
         return set()
 
     @deprecated(
@@ -665,7 +665,7 @@ class LegacyAPIMixin:
             Non-negative count of tool calls in this session
         """
         if self.unified_tracker:
-            return self.unified_tracker.tool_calls_used  # type: ignore[no-any-return]
+            return self.unified_tracker.tool_calls_used
         return getattr(self, "tool_calls_used", 0)
 
     @deprecated(
@@ -683,7 +683,7 @@ class LegacyAPIMixin:
             Maximum allowed tool calls
         """
         if self.unified_tracker:
-            return self.unified_tracker.tool_budget  # type: ignore[no-any-return]
+            return self.unified_tracker.tool_budget
         return getattr(self, "tool_budget", 50)
 
     @deprecated(
@@ -701,7 +701,7 @@ class LegacyAPIMixin:
             Non-negative iteration count
         """
         if self.unified_tracker:
-            return self.unified_tracker.iteration_count  # type: ignore[no-any-return]
+            return self.unified_tracker.iteration_count
         return 0
 
     @deprecated(
@@ -719,7 +719,7 @@ class LegacyAPIMixin:
             Max iteration limit
         """
         if self.unified_tracker:
-            return self.unified_tracker.max_iterations  # type: ignore[no-any-return]
+            return self.unified_tracker.max_iterations
         return 25
 
     # =========================================================================
@@ -825,7 +825,7 @@ class LegacyAPIMixin:
             True if tool is enabled
         """
         if self._tool_access_coordinator is not None:
-            return self._tool_access_coordinator.is_tool_enabled(tool_name)  # type: ignore[no-any-return]
+            return self._tool_access_coordinator.is_tool_enabled(tool_name)
         return False
 
     # =========================================================================
@@ -848,7 +848,7 @@ class LegacyAPIMixin:
             Complete system prompt string
         """
         if self.prompt_builder:
-            return self.prompt_builder.build()  # type: ignore[no-any-return]
+            return self.prompt_builder.build()
         return ""
 
     @deprecated(
@@ -949,7 +949,7 @@ class LegacyAPIMixin:
             Dictionary with routing recommendation
         """
         if self._search_coordinator is not None:
-            return self._search_coordinator.route_search_query(query)  # type: ignore[no-any-return]
+            return self._search_coordinator.route_search_query(query)
         return {"tool": "unknown", "confidence": 0.0}
 
     @deprecated(
@@ -970,7 +970,7 @@ class LegacyAPIMixin:
             Tool name: "code_search", "semantic_code_search", or "both"
         """
         if self._search_coordinator is not None:
-            return self._search_coordinator.get_recommended_search_tool(query)  # type: ignore[no-any-return]
+            return self._search_coordinator.get_recommended_search_tool(query)
         return "code_search"
 
     # =========================================================================

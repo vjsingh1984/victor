@@ -235,6 +235,8 @@ class OrchestratorComponents:
 class OrchestratorFactory(ModeAwareMixin):
     """Factory for creating AgentOrchestrator components.
 
+    _container: Optional["ServiceContainer"]  # Lazy-initialized container
+
     This factory extracts component initialization logic from the orchestrator's
     __init__ method, providing:
 
@@ -287,8 +289,12 @@ class OrchestratorFactory(ModeAwareMixin):
         self.provider = provider
         self.model = model
         # Use parameter if provided, otherwise fall back to settings
-        self.temperature = temperature if temperature is not None else getattr(settings, 'temperature', 0.7)
-        self.max_tokens = max_tokens if max_tokens is not None else getattr(settings, 'max_tokens', 4096)
+        self.temperature = (
+            temperature if temperature is not None else getattr(settings, "temperature", 0.7)
+        )
+        self.max_tokens = (
+            max_tokens if max_tokens is not None else getattr(settings, "max_tokens", 4096)
+        )
         self.console = console
         self.provider_name = provider_name
         self.profile_name = profile_name
@@ -479,7 +485,7 @@ class OrchestratorFactory(ModeAwareMixin):
             from victor.core.container import ServiceContainer
 
             new_container: ServiceContainer = ensure_bootstrapped(self.settings)
-            self._container = new_container
+            self._container = new_container  # type: ignore[assignment]
 
             # Verify orchestrator services are registered
             # If ResponseSanitizer is not registered, bootstrapping was incomplete
@@ -488,7 +494,7 @@ class OrchestratorFactory(ModeAwareMixin):
                 from victor.core.bootstrap import bootstrap_container
 
                 # Create a new fully-bootstrapped container
-                self._container = bootstrap_container(self.settings)
+                self._container = bootstrap_container(self.settings)  # type: ignore[assignment]
 
         return self._container
 
@@ -2339,7 +2345,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.info(f"Provider pool stats: {stats}")
 
         # Return pool as BaseProvider (ProviderPool is a BaseProvider subclass)
-        return pool, True
+        return pool, True  # type: ignore[return-value]
 
     async def _create_provider_for_url(
         self,
@@ -2989,8 +2995,7 @@ class OrchestratorFactory(ModeAwareMixin):
         valid_modes = {"foreground", "background", "team_member"}
         if mode not in valid_modes:
             raise ValueError(
-                f"Invalid agent mode: {mode!r}. "
-                f"Must be one of {sorted(valid_modes)}"
+                f"Invalid agent mode: {mode!r}. " f"Must be one of {sorted(valid_modes)}"
             )
 
         # Extract parameters from UnifiedAgentConfig if provided
@@ -3080,12 +3085,12 @@ class OrchestratorFactory(ModeAwareMixin):
             from victor.framework.agent import Agent
 
             # Create foreground Agent
-            agent = Agent(orchestrator)
+            agent = Agent(orchestrator)  # type: ignore[arg-type]
 
             # Apply tools if specified
             tools = kwargs.get("tools")
             if tools:
-                from victor.framework.tools import configure_tools
+                from victor.tools.configure_tools import configure_tools
 
                 configure_tools(orchestrator, tools, airgapped=kwargs.get("airgapped", False))
 
@@ -3133,8 +3138,7 @@ class OrchestratorFactory(ModeAwareMixin):
         else:
             # This should never be reached due to early validation above
             raise ValueError(
-                f"Invalid agent mode: {mode!r}. "
-                f"Must be one of {sorted(valid_modes)}"
+                f"Invalid agent mode: {mode!r}. " f"Must be one of {sorted(valid_modes)}"
             )
 
 

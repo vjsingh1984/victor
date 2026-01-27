@@ -36,11 +36,11 @@ if TYPE_CHECKING:
     try:
         from victor.storage.embeddings.task_classifier import TaskType
     except (ImportError, AttributeError):
-        TaskType = None
+        TaskType = None  # type: ignore[misc]
     try:
         from victor.storage.embeddings.intent_classifier import IntentType
     except (ImportError, AttributeError):
-        IntentType = None
+        IntentType = None  # type: ignore[misc]
     from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.protocols.coordination import CoordinationSuggestion
 
@@ -175,7 +175,7 @@ class TaskAnalyzer:
             try:
                 from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
-                self._task_classifier = TaskTypeClassifier.get_instance()
+                self._task_classifier = TaskTypeClassifier.get_instance()  # type: ignore[assignment]
             except ImportError:
                 logger.warning("TaskTypeClassifier not available")
         return self._task_classifier
@@ -186,7 +186,7 @@ class TaskAnalyzer:
             try:
                 from victor.storage.embeddings.intent_classifier import IntentClassifier
 
-                self._intent_classifier = IntentClassifier.get_instance()
+                self._intent_classifier = IntentClassifier.get_instance()  # type: ignore[assignment]
             except ImportError:
                 logger.warning("IntentClassifier not available")
         return self._intent_classifier

@@ -181,7 +181,7 @@ class StreamingCoordinator:
                 if content:
                     contents.append(str(content))
             elif isinstance(chunk, str):
-                contents.append(chunk)
+                contents.append(chunk)  # type: ignore[unreachable]
 
         return "".join(contents)
 

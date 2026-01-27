@@ -794,7 +794,7 @@ class OrchestratorServiceProvider:
     def _register_tool_registry(self, container: ServiceContainer) -> None:
         """Register ToolRegistry as singleton."""
         from victor.agent.protocols import ToolRegistryProtocol, ToolRegistrarProtocol
-        from victor.tools.base import ToolRegistry  # type: ignore[attr-defined]
+        from victor.tools.base import ToolRegistry
 
         container.register(
             ToolRegistryProtocol,  # type: ignore[type-abstract]
@@ -1947,7 +1947,7 @@ class OrchestratorServiceProvider:
         tool_capabilities = getattr(self._settings, "tool_capabilities", None)
         if tool_capabilities is None:
             # Create a default capability checker
-            from victor.agent.tool_calling.capabilities import ToolCallingCapabilities  # type: ignore[attr-defined]
+            from victor.agent.tool_calling.capabilities import ToolCallingCapabilities
 
             tool_capabilities = ToolCallingCapabilities()
 
@@ -1993,9 +1993,9 @@ class OrchestratorServiceProvider:
         )
 
         # Get sanitizer if available
-        from victor.agent.tool_calling.sanitizer import ToolNameSanitizer
-
-        sanitizer = ToolNameSanitizer()
+        # TODO: Fix import for ToolNameSanitizer - module doesn't exist
+        # from victor.agent.tool_calling.sanitizer import ToolNameSanitizer
+        # sanitizer = ToolNameSanitizer()
 
         return create_tool_call_coordinator(
             config=config,

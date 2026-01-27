@@ -782,7 +782,7 @@ class ToolCoordinator:
         for tool_call in tool_calls:
             # Validate structure
             if not isinstance(tool_call, dict):
-                logger.warning(f"Skipping invalid tool call (not a dict): {tool_call}")
+                logger.warning(f"Skipping invalid tool call (not a dict): {tool_call}")  # type: ignore[unreachable]
                 continue
 
             tool_name = tool_call.get("name")
@@ -859,7 +859,9 @@ class ToolCoordinator:
             # Apply adapter-based normalization
             if self._tool_adapter:
                 if hasattr(self._tool_adapter, "normalize_arguments"):
-                    normalized_args = self._tool_adapter.normalize_arguments(normalized_args, tool_name)
+                    normalized_args = self._tool_adapter.normalize_arguments(
+                        normalized_args, tool_name
+                    )
 
             # Check for repeated failures
             try:

@@ -41,7 +41,7 @@ try:
     import importlib.metadata as importlib_metadata_module
 except ImportError:
     # Python < 3.8
-    import importlib_metadata as importlib_metadata_module  # type: ignore[import-not-found]
+    import importlib_metadata as importlib_metadata_module
 
 logger = logging.getLogger(__name__)
 

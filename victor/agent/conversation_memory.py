@@ -1673,9 +1673,9 @@ class ConversationStore:
             return MessagePriority.MEDIUM
 
         if role == MessageRole.TOOL_CALL:
-            return MessagePriority.MEDIUM  # type: ignore[unreachable]
+            return MessagePriority.MEDIUM
 
-        return MessagePriority.MEDIUM
+        return MessagePriority.MEDIUM  # type: ignore[unreachable]
 
     def _estimate_tokens(self, content: str) -> int:
         """Estimate token count from content.

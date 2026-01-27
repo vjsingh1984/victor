@@ -687,7 +687,7 @@ class ValidationCoordinator:
             return result
 
         if not isinstance(query, str):
-            result.add_error(f"Query must be string, got {type(query).__name__}")
+            result.add_error(f"Query must be string, got {type(query).__name__}")  # type: ignore[unreachable]
             return result
 
         # Check for excessively long queries

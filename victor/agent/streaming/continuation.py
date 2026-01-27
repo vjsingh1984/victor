@@ -1027,7 +1027,7 @@ class ContinuationHandler:
                 completed=True,
             )
             if asyncio.iscoroutine(outcome):
-                    await outcome  # type: ignore[unreachable]
+                await outcome  # type: ignore[unreachable]
 
         result.add_chunk(self._chunk_generator.generate_final_marker_chunk())
         return result

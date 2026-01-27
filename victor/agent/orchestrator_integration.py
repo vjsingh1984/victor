@@ -772,7 +772,7 @@ class OrchestratorIntegration:
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return
+                return  # type: ignore[unreachable]
 
             if event_type == "prompt":
                 event = RLEvent(

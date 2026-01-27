@@ -194,7 +194,7 @@ class RedisCacheBackend(ICacheBackend):
             # Create Redis connection with connection pooling
             from redis.asyncio.connection import Connection
 
-            self._redis = await aioredis.from_url(  # type: ignore[no-untyped-call]
+            self._redis = await aioredis.from_url(
                 self._redis_url,
                 max_connections=self._connection_pool_size,
                 decode_responses=False,  # We handle encoding ourselves

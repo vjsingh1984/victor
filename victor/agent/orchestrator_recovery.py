@@ -304,7 +304,7 @@ class OrchestratorRecoveryIntegration:
 
         # Get recovery outcome from handler
         if self._handler is None:
-            return RecoveryAction(
+            return RecoveryAction(  # type: ignore[unreachable]
                 action="abort",
                 failure_type=failure_type,
                 reason="No recovery handler configured",

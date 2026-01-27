@@ -47,7 +47,8 @@ _NATIVE_AVAILABLE = False
 _native: Any = None
 
 try:
-    import victor_native as _native_module  
+    import victor_native as _native_module
+
     _NATIVE_AVAILABLE = True
     if _native_module:
         logger.debug(f"Native streaming filter loaded (v{_native_module.__version__})")

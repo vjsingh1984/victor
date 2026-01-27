@@ -610,7 +610,7 @@ class PromptBuilderCoordinator(IPromptBuilderCoordinator):
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return
+                return  # type: ignore[unreachable]
 
             # Determine prompt style based on provider type  # type: ignore[unreachable]
             # Cloud providers use concise style, local uses detailed

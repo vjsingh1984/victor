@@ -224,7 +224,8 @@ def _create_semantic_selector(
         embedding_provider=embedding_provider,
         cache_embeddings=True,  # Enable caching for performance
     )
-    return selector  
+    return selector
+
 
 def _create_keyword_selector(
     tools: ToolRegistry,
@@ -254,7 +255,8 @@ def _create_keyword_selector(
         provider_name=provider_name,
         enabled_tools=enabled_tools,
     )
-    return selector  
+    return selector
+
 
 def _create_hybrid_selector(
     tools: ToolRegistry,
@@ -330,4 +332,4 @@ def _create_hybrid_selector(
         semantic_selector=semantic_selector,
         keyword_selector=keyword_selector,
         config=config,
-    )  
+    )

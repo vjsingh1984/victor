@@ -990,7 +990,7 @@ class ContextCompactor:
             while self._async_running:
                 await asyncio.sleep(self._check_interval_seconds)
                 if not self._async_running:
-                    break
+                    break  # type: ignore[unreachable]
 
                 try:
                     self._background_checks += 1

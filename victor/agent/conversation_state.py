@@ -614,7 +614,9 @@ class ConversationStateMachine:
 
         return False
 
-    def _transition_to(self, new_stage: ConversationStage, confidence: float = 0.5, force: bool = False) -> None:
+    def _transition_to(
+        self, new_stage: ConversationStage, confidence: float = 0.5, force: bool = False
+    ) -> None:
         """Transition to a new stage.
 
         Args:

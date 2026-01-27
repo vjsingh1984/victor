@@ -362,7 +362,7 @@ class IntelligentAgentPipeline:
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return
+                return  # type: ignore[unreachable]
 
             event = RLEvent(
                 type=RLEventType.GROUNDING_CHECK,
