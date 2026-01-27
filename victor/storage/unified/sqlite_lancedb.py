@@ -159,7 +159,7 @@ class SqliteLanceDBStore:
     async def _init_vector_store(self) -> None:
         """Initialize LanceDB for vector storage."""
         try:
-            import lancedb  # type: ignore[import]
+            import lancedb  # type: ignore[import-untyped]
 
             embeddings_dir = self.persist_directory / "embeddings"
             embeddings_dir.mkdir(parents=True, exist_ok=True)

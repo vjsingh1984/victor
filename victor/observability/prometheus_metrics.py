@@ -307,7 +307,19 @@ class PrometheusRegistry:
         key = f"{name}{{{label_str}}}" if label_str else name
         with self._lock:
             if key not in self._histograms:
-                default_buckets = buckets or [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+                default_buckets = buckets or [
+                    0.005,
+                    0.01,
+                    0.025,
+                    0.05,
+                    0.1,
+                    0.25,
+                    0.5,
+                    1.0,
+                    2.5,
+                    5.0,
+                    10.0,
+                ]
                 self._histograms[key] = Histogram(
                     name=name,
                     help=help,

@@ -598,8 +598,8 @@ class PerformancePredictor:
         Args:
             training_data: List of training examples
         """
-        from sklearn.ensemble import RandomForestRegressor  # type: ignore[import]
-        from sklearn.preprocessing import StandardScaler  # type: ignore[import]
+        from sklearn.ensemble import RandomForestRegressor  # type: ignore[import-untyped]
+        from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
         self._train_model(
             metric_name="execution_time",
@@ -617,8 +617,8 @@ class PerformancePredictor:
         Args:
             training_data: List of training examples
         """
-        from sklearn.ensemble import RandomForestRegressor  # type: ignore[import]
-        from sklearn.preprocessing import StandardScaler  # type: ignore[import]
+        from sklearn.ensemble import RandomForestRegressor  # type: ignore[import-untyped]
+        from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
         self._train_model(
             metric_name="success_rate",
@@ -642,7 +642,7 @@ class PerformancePredictor:
             model_class: Model class to use
             model_params: Parameters for model
         """
-        from sklearn.preprocessing import StandardScaler  # type: ignore[import]
+        from sklearn.preprocessing import StandardScaler
 
         # Prepare features
         X = []

@@ -246,7 +246,7 @@ class ToolHistoryWidget(RichLog):
 
         data = event.data or {}
         tool_name = data.get("tool_name", "unknown")
-        timestamp = event.timestamp.strftime("%H:%M:%S.%f")[:-3]
+        timestamp = datetime.fromtimestamp(event.timestamp).strftime("%H:%M:%S.%f")[:-3]
 
         if event.topic.endswith(".start"):
             # Tool start

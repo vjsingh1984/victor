@@ -259,7 +259,7 @@ class SwitchingFormation:
             List of member results
         """
         # TODO: Implement formation registry/factory
-        from victor.coordination.formations import get_formation  # type: ignore[attr-defined]
+        from victor.coordination.formations import get_formation
 
         results = []
         execution_context = {
@@ -779,10 +779,10 @@ Format your response as a JSON object:
             Member results
         """
         # TODO: Implement formation registry/factory
-        from victor.coordination.formations import get_formation  # type: ignore[attr-defined]
+        from victor.coordination.formations import get_formation
 
         strategy = get_formation(formation)
-        return await strategy.execute(agents, context, task)  # type: ignore[no-any-return]
+        return await strategy.execute(agents, context, task)
 
     def get_negotiation_history(self) -> List[NegotiationResult]:
         """Get history of negotiation rounds.
@@ -1222,10 +1222,10 @@ Rationale: [your reasoning]
         formation = self._map_choice_to_formation(vote_result.winner)
 
         # TODO: Implement formation registry/factory
-        from victor.coordination.formations import get_formation  # type: ignore[attr-defined]
+        from victor.coordination.formations import get_formation
 
         strategy = get_formation(formation)
-        return await strategy.execute(agents, context, task)  # type: ignore[no-any-return]
+        return await strategy.execute(agents, context, task)
 
     def _map_choice_to_formation(self, choice: Optional[str]) -> "TeamFormation":
         """Map voting choice to formation.

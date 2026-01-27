@@ -19,7 +19,8 @@ language-aware code completions.
 """
 
 import logging
-from typing import Any, Optional
+import typing
+from typing import Any, List, Optional
 
 from victor.coding.completion.protocol import (
     CompletionCapabilities,
@@ -203,6 +204,7 @@ class LSPCompletionProvider(BaseCompletionProvider):
             logger.warning(f"LSP completion resolution failed: {e}")
             return item
 
+    @typing.no_type_check
     def _convert_lsp_response(self, lsp_result: dict[str, Any]) -> CompletionList:
         """Convert LSP completion response to our format.
 

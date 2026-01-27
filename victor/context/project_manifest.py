@@ -470,7 +470,7 @@ class ProjectManifest:
     async def _load_pyproject_toml(self, path: Path) -> None:
         """Load metadata from pyproject.toml."""
         try:
-            import tomli
+            import tomli  # type: ignore[import-not-found]
         except ImportError:
             try:
                 import tomllib as tomli  # type: ignore

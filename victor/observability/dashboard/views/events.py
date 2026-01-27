@@ -22,6 +22,7 @@ Provides widgets for viewing and filtering events:
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 
 from textual.app import ComposeResult
@@ -83,7 +84,7 @@ class EventLogWidget(RichLog):
             event: The VictorEvent to display
         """
         self._event_count += 1
-        timestamp = event.timestamp.strftime("%H:%M:%S.%f")[:-3]
+        timestamp = datetime.fromtimestamp(event.timestamp).strftime("%H:%M:%S.%f")[:-3]
         color = CATEGORY_COLORS.get(event.topic.split(".")[0], "white")
         category_name = (
             event.topic.split(".")[0].upper() if event.topic.split(".")[0] else "UNKNOWN"
@@ -185,9 +186,13 @@ class EventTableWidget(DataTable):
 
     def _add_row(self, event: MessagingEvent) -> None:
         """Add a single row for an event."""
-        timestamp = event.timestamp.strftime("%H:%M:%S")
+        timestamp = datetime.fromtimestamp(event.timestamp).strftime("%H:%M:%S")
         category = event.topic.split(".")[0] if event.topic.split(".")[0] else "unknown"
-        session = (event.session_id or "")[:8] if event.session_id else "-"
+        session = (
+            (event.headers.get("session_id", "") or "")[:8]
+            if event.headers.get("session_id")
+            else "-"
+        )
 
         # Build details
         details = self._get_event_details(event)

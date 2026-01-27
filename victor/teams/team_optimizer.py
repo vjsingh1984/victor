@@ -542,6 +542,7 @@ class TeamOptimizer:
                 time_score * 0.25 + success_score * 0.35 + quality_score * 0.25 + cost_score * 0.15
             )
         else:
+            # type: ignore[unreachable]
             score = 0.5
 
         # Apply confidence weighting

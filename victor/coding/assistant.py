@@ -385,7 +385,8 @@ class CodingAssistant(VerticalBase):
             ]
 
         result = cls._get_cached_extension("middleware", _create_middleware)
-        return result  
+        return result
+
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[ToolDependencyProviderProtocol]:
         """Get coding-specific tool dependency provider (cached).
@@ -403,7 +404,8 @@ class CodingAssistant(VerticalBase):
             return create_vertical_tool_dependency_provider("coding")
 
         result = cls._get_cached_extension("tool_dependency_provider", _create)
-        return result  
+        return result
+
     @classmethod
     def get_composed_chains(cls) -> Dict[str, Any]:
         """Get pre-built LCEL-composed tool chains (cached).
@@ -431,7 +433,8 @@ class CodingAssistant(VerticalBase):
             return CODING_CHAINS
 
         result = cls._get_cached_extension("composed_chains", _create)
-        return result  
+        return result
+
     @classmethod
     def get_personas(cls) -> Dict[str, Any]:
         """Get persona definitions for team members (cached).
@@ -465,7 +468,8 @@ class CodingAssistant(VerticalBase):
             return CODING_PERSONAS
 
         result = cls._get_cached_extension("personas", _create)
-        return result  
+        return result
+
     @classmethod
     def get_handlers(cls) -> Dict[str, Any]:
         """Get compute handlers for workflow execution.

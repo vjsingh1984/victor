@@ -744,7 +744,7 @@ class CodebaseAnalyzer:
         self.analysis.loc_stats = {
             "total_lines": total_lines,
             "total_files": total_files,
-            "largest_file": str(largest_file) if largest_file else "",
+            "largest_file": largest_file_lines if largest_file else 0,
             "largest_file_lines": largest_file_lines,
             "top_files_size": sum(size for _, size in top_files),
         }
@@ -1505,7 +1505,9 @@ def gather_project_context(
     for file_path in key_files_to_read:
         try:
             content = (root / file_path).read_text(encoding="utf-8")
-            context["key_files_content"][file_path] = content[:8192]  # Limit content size (fits 10-12 parallel reads)
+            context["key_files_content"][file_path] = content[
+                :8192
+            ]  # Limit content size (fits 10-12 parallel reads)
         except Exception:
             pass
 
@@ -1540,10 +1542,10 @@ Analyze the following project data and generate the {VICTOR_CONTEXT_FILE} file.
 """
 
     # Dynamic part of the prompt (the "20%")
-    languages = context['detected_languages'] or []
-    config_files = context['config_files'] or []
-    directory_structure = context['directory_structure'] or []
-    source_files = context['source_files'] or []
+    languages = context["detected_languages"] or []
+    config_files = context["config_files"] or []
+    directory_structure = context["directory_structure"] or []
+    source_files = context["source_files"] or []
 
     dynamic_context = f"""
 **Project Name**: {context['project_name']}
@@ -2251,7 +2253,7 @@ async def generate_victor_md_from_index(
             )
 
         # Show top 3 largest files
-        top_files = loc.get("top_files", [])[:3]  # type: ignore[index]
+        top_files: list[tuple[str, int]] = loc.get("top_files", [])[:3]
         if top_files:
             sections.append("- Top files by size:")
             for path, lines in top_files:

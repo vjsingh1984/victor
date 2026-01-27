@@ -127,7 +127,7 @@ class EventFileWatcher(Static):
                         )
 
                         # Emit to EventBus
-                        event_bus.emit(event)  # type: ignore[attr-defined]
+                        event_bus.emit(event.topic, event.data)
                         events_loaded += 1
                         logger.debug(
                             f"[EventFileWatcher] Line {idx}: PUBLISHED to EventBus (total: {events_loaded})"
@@ -235,7 +235,7 @@ class EventFileWatcher(Static):
 
                             if event:
                                 # Emit to EventBus
-                                event_bus.emit(event)  # type: ignore[attr-defined]
+                                event_bus.emit(event.topic, event.data)
                                 events_loaded += 1
 
                         except Exception as e:
@@ -303,7 +303,7 @@ class EventFileWatcher(Static):
             # Create MessagingEvent from dict
             event = MessagingEvent(
                 id=data.get("id"),
-                timestamp=timestamp.timestamp() if hasattr(timestamp, 'timestamp') else float(timestamp),
+                timestamp=timestamp.timestamp(),
                 topic=topic,
                 data=data.get("data", {}),
                 source=data.get("source"),

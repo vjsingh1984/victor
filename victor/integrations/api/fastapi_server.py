@@ -35,7 +35,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional, cast
 
-from fastapi import (  # type: ignore[import-not-found]
+from fastapi import (
     Body,
     FastAPI,
     HTTPException,
@@ -44,9 +44,9 @@ from fastapi import (  # type: ignore[import-not-found]
     WebSocket,
     WebSocketDisconnect,
 )
-from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import-not-found]
-from fastapi.responses import JSONResponse, StreamingResponse  # type: ignore[import-not-found]
-from pydantic import BaseModel, Field, field_validator  # type: ignore[import-not-found]
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field, field_validator
 
 from victor.integrations.search_types import CodeSearchResult
 from victor.integrations.api.event_bridge import EventBridge
@@ -944,7 +944,7 @@ class VictorFastAPIServer:
             """Reset conversation history."""
             await self._record_rl_feedback()
             if self._orchestrator is not None:
-                self._orchestrator.reset_conversation()
+                self._orchestrator.reset_conversation()  # type: ignore[unreachable]
             return JSONResponse({"success": True, "message": "Conversation reset"})
 
         @app.get("/conversation/export", tags=["Conversation"])
@@ -953,7 +953,7 @@ class VictorFastAPIServer:
             if self._orchestrator is None:
                 return JSONResponse({"messages": []})
 
-            messages = self._orchestrator.get_messages()
+            messages = self._orchestrator.get_messages()  # type: ignore[unreachable]
 
             if format == "markdown":
                 content = self._format_messages_markdown(messages)

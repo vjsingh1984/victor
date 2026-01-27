@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     try:
         from openai import AsyncOpenAI as AsyncOpenAIType  # noqa: F401
     except ImportError:
-        AsyncOpenAIType = None  # type: ignore[misc]
+        AsyncOpenAIType = None  # type: ignore[assignment]
 
     try:
         import cohere  # type: ignore[import-not-found]
@@ -43,7 +43,7 @@ if TYPE_CHECKING:
         pass
 
     try:
-        import httpx  # type: ignore[import]
+        import httpx  # type: ignore[import-not-found]
     except ImportError:
         pass
 
@@ -205,7 +205,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         if self._embedding_service is None:
             raise RuntimeError("EmbeddingService not initialized")
         embedding = await self._embedding_service.embed_text(text)
-        return list(embedding.tolist())  # type: ignore[no-any-return]
+        return list(embedding.tolist())
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for multiple texts (batch optimized)."""
@@ -216,7 +216,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         if self._embedding_service is None:
             raise RuntimeError("EmbeddingService not initialized")
         embeddings = await self._embedding_service.embed_batch(texts)
-        return [list(emb.tolist()) for emb in embeddings]  # type: ignore[no-any-return]
+        return [list(emb.tolist()) for emb in embeddings]
 
     def get_dimension(self) -> int:
         """Get embedding dimension."""
@@ -270,7 +270,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         if not self.config.api_key:
             raise ValueError("OpenAI API key required")
 
-        self.client = AsyncOpenAIImpl(api_key=self.config.api_key)  # type: ignore[assignment]
+        self.client = AsyncOpenAIImpl(api_key=self.config.api_key)
         self._initialized = True
 
         print(f"✅ OpenAI embedding model initialized: {self.config.embedding_model}")

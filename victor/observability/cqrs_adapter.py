@@ -480,7 +480,7 @@ class CQRSEventAdapter:
             data["_category"] = str(event.category) if hasattr(event.category, "__str__") else ""
 
         # Map to concrete event types based on event name and category
-        event_name = getattr(event, 'name', '')
+        event_name = getattr(event, "name", "")
         if "stage_transition" in event_name or "state" in event_name.lower():
             return StateChangedEvent(
                 task_id=data.get("session_id", ""),

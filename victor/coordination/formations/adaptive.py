@@ -375,10 +375,6 @@ class AdaptiveFormation(BaseFormationStrategy):
             quality_score = results[0].metadata.get("quality_score", 0.5)
             return float(quality_score)
 
-        else:
-            # Default: neutral score
-            return 0.5
-
     def _should_switch_formation(
         self, performance_score: float, results: List[MemberResult]
     ) -> bool:

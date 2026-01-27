@@ -522,7 +522,7 @@ def validate_environment(language: Language) -> dict[str, bool]:
     Returns:
         Dictionary of tool names to availability status
     """
-    checks: dict[Language, dict[str]] = {
+    checks: dict[Language, dict[str, str]] = {
         Language.PYTHON: {
             "python": "python",
             "pip": "pip",

@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-import numpy as np  # type: ignore[import-not-found]
+import numpy as np
 
 if TYPE_CHECKING:
     from victor.teams.team_predictor import TaskFeatures
@@ -329,6 +329,7 @@ class TeamMemberSelector:
                 - task_features: TaskFeatures
                 - success: bool (whether member was successful)
         """
+        # type: ignore[import-untyped]
         from sklearn.ensemble import RandomForestClassifier
         from sklearn.preprocessing import StandardScaler
 

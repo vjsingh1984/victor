@@ -190,10 +190,10 @@ class PythonDependencyParser(BaseDependencyParser):
         """Parse poetry.lock format."""
         deps: list[Dependency] = []
         try:
-            import tomllib
+            import tomllib  # type: ignore[import-untyped]
         except ImportError:
             try:
-                import tomli as tomllib
+                import tomli as tomllib  # type: ignore[import-untyped]
             except ImportError:
                 logger.warning("tomllib/tomli not available for poetry.lock parsing")
                 return deps
@@ -222,10 +222,10 @@ class PythonDependencyParser(BaseDependencyParser):
         """Parse pyproject.toml for dependencies."""
         deps: list[Dependency] = []
         try:
-            import tomllib
+            import tomllib  # type: ignore[import-untyped]
         except ImportError:
             try:
-                import tomli as tomllib
+                import tomli as tomllib  # type: ignore[import-untyped]
             except ImportError:
                 return deps
 
@@ -381,10 +381,10 @@ class RustDependencyParser(BaseDependencyParser):
         """Parse Cargo.toml."""
         deps: list[Dependency] = []
         try:
-            import tomllib
+            import tomllib  # type: ignore[import-untyped]
         except ImportError:
             try:
-                import tomli as tomllib
+                import tomli as tomllib  # type: ignore[import-untyped]
             except ImportError:
                 return deps
 
@@ -421,10 +421,10 @@ class RustDependencyParser(BaseDependencyParser):
         """Parse Cargo.lock."""
         deps: list[Dependency] = []
         try:
-            import tomllib
+            import tomllib  # type: ignore[import-untyped]
         except ImportError:
             try:
-                import tomli as tomllib
+                import tomli as tomllib  # type: ignore[import-untyped]
             except ImportError:
                 return deps
 

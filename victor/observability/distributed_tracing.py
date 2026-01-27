@@ -76,10 +76,10 @@ if TYPE_CHECKING:
         from opentelemetry import trace
         from opentelemetry.trace import Span, Status, StatusCode
     except ImportError:
-        trace = None
-        Span = None
-        Status = None
-        StatusCode = None
+        trace = None  # type: ignore[assignment]
+        Span = None  # type: ignore[assignment]
+        Status = None  # type: ignore[assignment]
+        StatusCode = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -310,7 +310,7 @@ class DistributedTracer:
         parent: Optional["Span"] = None,
         kind: SpanKind = SpanKind.INTERNAL,
         attributes: Optional[Dict[str, Any]] = None,
-    ) -> "Span":
+    ) -> "Span | NoOpSpan":
         """Start a new span.
 
         Args:
@@ -338,7 +338,7 @@ class DistributedTracer:
             ctx = TraceContext()
 
         # Create span
-        span = Span(
+        span: Span | NoOpSpan = Span(
             tracer=self,
             name=name,
             context=ctx,
@@ -587,7 +587,7 @@ class Span:  # type: ignore[no-redef]
         Returns:
             Self
         """
-        return self
+        return self  # type: ignore[return-value]
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit span context.

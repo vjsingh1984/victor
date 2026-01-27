@@ -366,7 +366,7 @@ class SECFilingFetcher:
     def _extract_text_from_html(self, html: str) -> str:
         """Extract readable text from HTML filing."""
         try:
-            from bs4 import BeautifulSoup
+            from bs4 import BeautifulSoup  # type: ignore[import-untyped]
 
             soup = BeautifulSoup(html, "html.parser")
 
@@ -566,7 +566,7 @@ async def query_filings(
     if filter_symbol:
         metadata_filter["symbol"] = filter_symbol.upper()
 
-    from victor.agent.tool_calling.execution_context import ExecutionContext
+    from victor.workflows.execution_context import ExecutionContext
 
     exec_ctx = ExecutionContext()
 

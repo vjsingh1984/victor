@@ -309,7 +309,7 @@ class RAGIngestTool(BaseTool):
     def _extract_text_from_html(self, html: str) -> str:
         """Extract readable text from HTML content."""
         try:
-            from bs4 import BeautifulSoup
+            from bs4 import BeautifulSoup  # type: ignore[import-untyped]
 
             soup = BeautifulSoup(html, "html.parser")
 
@@ -494,7 +494,7 @@ class RAGIngestTool(BaseTool):
     async def _read_pdf(self, path: Path) -> str:
         """Read text from PDF file."""
         try:
-            import pypdf  # type: ignore[import]
+            import pypdf  # type: ignore[import-untyped]
 
             reader = pypdf.PdfReader(str(path))
             text_parts = []

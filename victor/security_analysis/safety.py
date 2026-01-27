@@ -170,7 +170,7 @@ class SecurityAnalysisSafetyExtension(SafetyExtensionProtocol):
         """
         secrets = self._secret_scanner.scan(content)
         # Convert SecretMatch objects to dicts for compatibility
-        return [  # type: ignore[return-value]
+        return [
             {
                 "secret_type": secret.secret_type,
                 "matched_text": secret.matched_text,

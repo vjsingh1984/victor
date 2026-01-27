@@ -731,6 +731,7 @@ class EvaluationOrchestrator:
         else:
             # Fallback to basic report
             from victor.framework.rl.base import CorrelationReport  # type: ignore[attr-defined]
+
             return CorrelationReport(scores=scores, metadata={})
 
     def _notify_progress(self, progress: TaskProgress) -> None:

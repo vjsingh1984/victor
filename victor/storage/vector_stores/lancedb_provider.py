@@ -288,7 +288,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         """Ensure table is initialized."""
         if self.table is None:
             raise RuntimeError("LanceDB table not initialized. Call initialize() first.")
-        return self.table  # type: ignore[unreachable]
+        return self.table
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text.
@@ -353,7 +353,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         table_name = self.config.extra_config.get("table_name", "embeddings")
         db = self._ensure_db()
         if self.table is None:
-            self.table = db.create_table(table_name, data=[document])  # type: ignore[unreachable]
+            self.table = db.create_table(table_name, data=[document])  # type: ignore
         else:
             table = self._ensure_table()
             table.add([document])
@@ -389,10 +389,10 @@ class LanceDBProvider(BaseEmbeddingProvider):
         table_name = self.config.extra_config.get("table_name", "embeddings")
         db = self._ensure_db()
         if self.table is None:
-            self.table = db.create_table(table_name, data=lance_docs)  # type: ignore[unreachable]
+            self.table = db.create_table(table_name, data=lance_docs)  # type: ignore
         else:
             table = self._ensure_table()
-            table.add(lance_docs)  # type: ignore[unreachable]
+            table.add(lance_docs)  # type: ignore
 
     async def search_similar(
         self,
@@ -417,7 +417,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             return []
 
         # Generate query embedding
-        query_embedding = await self.embed_text(query)  # type: ignore[unreachable]
+        query_embedding = await self.embed_text(query)  # type: ignore
 
         # Search in LanceDB
         table = self._ensure_table()
@@ -461,7 +461,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if self.table is None:
             return
 
-        self.table.delete(f"id = '{doc_id}'")  # type: ignore[unreachable]
+        self.table.delete(f"id = '{doc_id}'")  # type: ignore
 
     async def delete_by_file(self, file_path: str) -> int:
         """Delete all documents from a specific file.
@@ -490,7 +490,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         # Delete documents with matching file_path
         # LanceDB uses SQL-like predicates
         table = self._ensure_table()
-        table.delete(f"file_path = '{file_path}'")  # type: ignore[unreachable]
+        table.delete(f"file_path = '{file_path}'")  # type: ignore
 
         # Count documents after deletion
         try:
@@ -526,7 +526,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         count = 0
         if self.table is not None:
             try:
-                count = self.table.count_rows()  # type: ignore[unreachable]
+                count = self.table.count_rows()  # type: ignore
             except (AttributeError, RuntimeError, ValueError):
                 count = 0
 

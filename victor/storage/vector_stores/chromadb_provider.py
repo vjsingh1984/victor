@@ -31,12 +31,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
-    import chromadb  # type: ignore[import-not-found]
-    from chromadb.config import Settings  # type: ignore[import-not-found]
+    import chromadb  # type: ignore[import]
+    from chromadb.config import Settings  # type: ignore[import]
 
 try:
-    import chromadb  # type: ignore[import-not-found]
-    from chromadb.config import Settings  # type: ignore[import-not-found]
+    import chromadb  # type: ignore[import]
+    from chromadb.config import Settings  # type: ignore[import]
 
     CHROMADB_AVAILABLE = True
 except ImportError:

@@ -24,6 +24,7 @@ import logging
 from typing import Any, Dict
 
 from victor.core.verticals.protocols import MiddlewareProtocol
+from victor.core.vertical_types import MiddlewareResult
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,9 @@ class SecurityAnalysisMiddleware(MiddlewareProtocol):
                 return True
         return False
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> "MiddlewareResult":
+    async def before_tool_call(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> "MiddlewareResult":
         """Called before a tool is executed.
 
         Args:
@@ -124,7 +127,7 @@ class SecurityAnalysisMiddleware(MiddlewareProtocol):
                 logger.warning(f"Blocked potentially dangerous tool call: {tool_name}")
                 return MiddlewareResult(
                     proceed=False,
-                    error_message="Potential security risk detected in tool arguments"
+                    error_message="Potential security risk detected in tool arguments",
                 )
 
         return MiddlewareResult()

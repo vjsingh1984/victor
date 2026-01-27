@@ -111,7 +111,11 @@ class ASTProcessorAccelerator:
         Raises:
             ValueError: If language is not supported
         """
-        if self.rust_available and _native_module is not None and hasattr(_native_module, "parse_to_ast"):
+        if (
+            self.rust_available
+            and _native_module is not None
+            and hasattr(_native_module, "parse_to_ast")
+        ):
             try:
                 # Use Rust parser
                 tree = _native_impl.parse_to_ast(source_code, language, file_path or "")
@@ -160,7 +164,11 @@ class ASTProcessorAccelerator:
         Raises:
             ValueError: If query syntax is invalid
         """
-        if self.rust_available and _native_module is not None and hasattr(_native_module, "execute_query"):
+        if (
+            self.rust_available
+            and _native_module is not None
+            and hasattr(_native_module, "execute_query")
+        ):
             try:
                 matches = _native_impl.execute_query(tree, query, language)
                 # Convert to Node objects
@@ -216,7 +224,11 @@ class ASTProcessorAccelerator:
         Returns:
             Dictionary mapping file paths to lists of symbol info
         """
-        if self.rust_available and _native_module is not None and hasattr(_native_module, "extract_symbols_parallel"):
+        if (
+            self.rust_available
+            and _native_module is not None
+            and hasattr(_native_module, "extract_symbols_parallel")
+        ):
             try:
                 results = _native_impl.extract_symbols_parallel(files, symbol_types)
                 return self._format_symbol_results(results, [f[2] for f in files])
@@ -296,7 +308,11 @@ class ASTProcessorAccelerator:
         self._cache_hits = 0
         self._cache_misses = 0
 
-        if self.rust_available and _native_module is not None and hasattr(_native_module, "clear_ast_cache"):
+        if (
+            self.rust_available
+            and _native_module is not None
+            and hasattr(_native_module, "clear_ast_cache")
+        ):
             _native_impl.clear_ast_cache()
 
     @property

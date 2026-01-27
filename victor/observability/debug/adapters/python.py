@@ -71,8 +71,8 @@ logger = logging.getLogger(__name__)
 
 # Check for debugpy availability
 try:
-    import debugpy  # type: ignore[import-not-found]
-    from debugpy.common import messaging  # type: ignore[import-not-found]
+    import debugpy  # type: ignore[import-untyped]
+    from debugpy.common import messaging  # type: ignore[import-untyped]
 
     HAS_DEBUGPY = True
 except ImportError:
@@ -340,7 +340,7 @@ class PythonDebugAdapter(BaseDebugAdapter):
         for loc in breakpoints:
             bp = {"line": loc.line}
             if loc.line in conditions:
-                bp["condition"] = conditions[loc.line]
+                bp["condition"] = conditions[loc.line]  # type: ignore[assignment]
             bp_args.append(bp)
 
         response = await self._send_request(
@@ -649,17 +649,21 @@ class PythonDebugAdapter(BaseDebugAdapter):
             body = message.get("body", {})
 
             # Map DAP events to our events
-            event_type = {
-                "initialized": DebugEventType.INITIALIZED,
-                "stopped": DebugEventType.STOPPED,
-                "continued": DebugEventType.CONTINUED,
-                "exited": DebugEventType.EXITED,
-                "terminated": DebugEventType.TERMINATED,
-                "thread": DebugEventType.THREAD_STARTED,
-                "output": DebugEventType.OUTPUT,
-                "breakpoint": DebugEventType.BREAKPOINT_CHANGED,
-                "module": DebugEventType.MODULE_LOADED,
-            }.get(event_name)
+            event_type = (
+                {
+                    "initialized": DebugEventType.INITIALIZED,
+                    "stopped": DebugEventType.STOPPED,
+                    "continued": DebugEventType.CONTINUED,
+                    "exited": DebugEventType.EXITED,
+                    "terminated": DebugEventType.TERMINATED,
+                    "thread": DebugEventType.THREAD_STARTED,
+                    "output": DebugEventType.OUTPUT,
+                    "breakpoint": DebugEventType.BREAKPOINT_CHANGED,
+                    "module": DebugEventType.MODULE_LOADED,
+                }.get(event_name)
+                if event_name
+                else None
+            )
 
             if event_type:
                 # Find session for this event

@@ -88,7 +88,7 @@ class WebScraperHandler(BaseHandler):
             "web_fetch",
             url=url,
             selectors=selectors,
-            _exec_ctx=context,
+            _exec_ctx=context.model_dump(),
         )
 
         # Raise exception if tool execution failed
@@ -147,7 +147,7 @@ class CitationFormatterHandler(BaseHandler):
     def _format_citation(self, ref: Dict[str, Any], style: str) -> str:
         """Format a single citation."""
         if not isinstance(ref, dict):
-            return str(ref)
+            return str(ref)  # type: ignore[unreachable]
 
         authors = ref.get("authors", ["Unknown"])
         year = ref.get("year", "n.d.")

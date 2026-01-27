@@ -125,7 +125,9 @@ class SecurityAnalysisServiceProvider(ServiceProviderProtocol):
 
         return get_security_manager()
 
-    def _create_vulnerability_handler(self, container: ServiceContainer) -> "VulnerabilityScanHandler":
+    def _create_vulnerability_handler(
+        self, container: ServiceContainer
+    ) -> "VulnerabilityScanHandler":
         """Create vulnerability scan handler."""
         from victor.security_analysis.handlers import VulnerabilityScanHandler
 

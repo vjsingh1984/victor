@@ -270,13 +270,13 @@ else:
     class DocumentListStub:  # Renamed to avoid conflict
         """Stub when Textual is not available."""
 
-        def __init__(self, *args, **kwargs):  # type: ignore
+        def __init__(self, *args, **kwargs):
             raise ImportError("Textual required for RAG UI")
 
     class SearchResultsStub:  # Renamed to avoid conflict
         """Stub when Textual is not available."""
 
-        def __init__(self, *args, **kwargs):  # type: ignore
+        def __init__(self, *args, **kwargs):
             raise ImportError("Textual required for RAG UI")
 
     DocumentList = DocumentListStub  # type: ignore

@@ -129,14 +129,16 @@ class PIIScrubber:
             elif isinstance(value, dict):
                 result[key] = str(self.scrub_dict(value))
             elif isinstance(value, list):
-                result[key] = str([
-                    (
-                        self.scrub_dict(v)
-                        if isinstance(v, dict)
-                        else self.scrub(v) if isinstance(v, str) else str(v)
-                    )
-                    for v in value
-                ])  # type: ignore[list-item]
+                result[key] = str(
+                    [
+                        (
+                            self.scrub_dict(v)
+                            if isinstance(v, dict)
+                            else self.scrub(v) if isinstance(v, str) else str(v)
+                        )
+                        for v in value
+                    ]
+                )  # type: ignore[list-item]
             else:
                 result[key] = value
         return result

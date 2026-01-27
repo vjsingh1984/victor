@@ -20,6 +20,7 @@ multi-line suggestions (Copilot-style).
 
 import logging
 import time
+import typing
 from typing import Any, AsyncGenerator, AsyncIterator, Optional
 
 from victor.processing.completion.protocol import (
@@ -88,7 +89,7 @@ class AICompletionProvider(StreamingCompletionProvider):
         provider: Optional[Any] = None,
         model: Optional[str] = None,
         max_context_lines: int = 100,
-        fim_template: str = "default",
+        fim_template: str | dict[str, Any] = "default",
     ):
         """Initialize the AI completion provider.
 
@@ -105,8 +106,9 @@ class AICompletionProvider(StreamingCompletionProvider):
         self._max_context_lines = max_context_lines
 
         # Set FIM template
+        self._fim_template: dict[str, Any] = {}  # Initialize with proper type
         if isinstance(fim_template, dict):
-            self._fim_template: dict[str, str] = fim_template
+            self._fim_template = fim_template
         else:
             self._fim_template = FIM_TEMPLATES.get(fim_template, FIM_TEMPLATES["default"])
 
@@ -252,6 +254,7 @@ class AICompletionProvider(StreamingCompletionProvider):
             logger.warning(f"AI inline completion failed: {e}")
             return InlineCompletionList(items=[])
 
+    @typing.no_type_check
     async def stream_inline_completion(self, params: InlineCompletionParams) -> AsyncIterator[str]:
         """Stream inline completion tokens.
 

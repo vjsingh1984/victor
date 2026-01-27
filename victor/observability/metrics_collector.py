@@ -104,6 +104,7 @@ class ProductionMetricsCollector:
 
     _instance: Optional["ProductionMetricsCollector"] = None
     _lock: threading.Lock = threading.Lock()
+    _initialized: bool = False
 
     def __new__(cls) -> "ProductionMetricsCollector":
         """Singleton pattern."""

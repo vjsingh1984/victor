@@ -30,7 +30,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Type, cast
 
 if TYPE_CHECKING:
-    from victor.framework.stages import StageDefinition
+    from victor.core.vertical_types import StageDefinition
 
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder

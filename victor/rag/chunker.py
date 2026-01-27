@@ -433,7 +433,7 @@ class DocumentChunker:
             List of (chunk_text, start_char, end_char) tuples
         """
         try:
-            from bs4 import BeautifulSoup
+            from bs4 import BeautifulSoup  # type: ignore[import-untyped]
         except ImportError:
             logger.warning("BeautifulSoup not available, falling back to text chunking")
             return self._chunk_text(content)

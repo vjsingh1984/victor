@@ -270,10 +270,10 @@ class DebugAdapterRegistry:
             try:
                 # Import module
                 module_name = py_file.stem
-                spec = importlib.util.spec_from_file_location(module_name, py_file)  # type: ignore[attr-defined]
+                spec = importlib.util.spec_from_file_location(module_name, py_file)
                 if spec and spec.loader:
-                    module = importlib.util.module_from_spec(spec)  # type: ignore[attr-defined]
-                    spec.loader.exec_module(module)  # type: ignore[attr-defined]
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
 
                     # Find adapter classes
                     for name in dir(module):
@@ -286,7 +286,7 @@ class DebugAdapterRegistry:
                             # Register for each supported language
                             instance = obj()
                             for lang in instance.languages:
-                                self.register(lang, obj)
+                                self.register(lang, obj)  # type: ignore[arg-type]
                                 discovered += 1
 
             except Exception as e:

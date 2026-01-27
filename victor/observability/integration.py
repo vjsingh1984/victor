@@ -246,7 +246,8 @@ class ObservabilityIntegration:
         """
         if self._cqrs_bridge is None:
             self._setup_cqrs_bridge()
-        return self._cqrs_bridge
+        assert self._cqrs_bridge is not None, "CQRS bridge should be set after setup"
+        return self._cqrs_bridge  # type: ignore[return-value]
 
     def disable_cqrs_bridge(self) -> None:
         """Disable CQRS event bridging.

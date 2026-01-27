@@ -189,9 +189,9 @@ class SettingsFlagResolver(FlagResolver):
         Note: Changes to Settings don't persist unless saved to profiles.yaml
         """
         if not hasattr(self._settings, "feature_flags"):
-            self._settings.feature_flags = {}
+            self._settings.feature_flags = {}  # type: ignore[attr-defined]
 
-        feature_flags = self._settings.feature_flags
+        feature_flags = self._settings.feature_flags  # type: ignore[attr-defined]
         if isinstance(feature_flags, dict):
             feature_flags[flag_name] = value
         logger.info(f"Set feature flag {flag_name}={value} in settings")

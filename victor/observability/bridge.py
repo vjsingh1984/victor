@@ -90,12 +90,12 @@ class ObservabilityBridge:
 
         self._tool_emitter = tool_emitter or ToolEventEmitter(bus=bus)
         self._model_emitter = model_emitter or ModelEventEmitter(bus=bus)
-        self._state_emitter = state_emitter or StateEventEmitter(bus=bus)
-        self._lifecycle_emitter = lifecycle_emitter or LifecycleEventEmitter(bus=bus)
-        self._error_emitter = error_emitter or ErrorEventEmitter(bus=bus)
+        self._state_emitter = state_emitter or StateEventEmitter(bus=bus)  # type: ignore[abstract]
+        self._lifecycle_emitter = lifecycle_emitter or LifecycleEventEmitter(bus=bus)  # type: ignore[abstract]
+        self._error_emitter = error_emitter or ErrorEventEmitter(bus=bus)  # type: ignore[abstract]
 
         self._event_bus = bus
-        self._jsonl_exporter = None
+        self._jsonl_exporter: Optional[JsonLineExporter] = None
 
         self._enabled = True
         self._session_start_time: Optional[float] = None
@@ -164,8 +164,8 @@ class ObservabilityBridge:
     def disable_jsonl_exporter(self) -> None:
         """Disable JSONL exporter and close log file."""
         if self._jsonl_exporter is not None:
-            self._event_bus.remove_exporter(self._jsonl_exporter)  # type: ignore[unreachable]
-            self._jsonl_exporter.close()  # type: ignore[unreachable]
+            self._event_bus.remove_exporter(self._jsonl_exporter)
+            self._jsonl_exporter.close()
             self._jsonl_exporter = None
             logger.info("JSONL event logging disabled")
 

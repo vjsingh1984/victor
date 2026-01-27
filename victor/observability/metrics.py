@@ -108,7 +108,7 @@ class Metric(ABC):
         self.name = name
         self.description = description
         self._labels = MetricLabels(labels or {})
-        self._lock = threading.RLock()  # type: ignore[assignment]
+        self._lock = threading.RLock()
         self._created_at = datetime.now(timezone.utc)
 
     @abstractmethod
@@ -472,7 +472,8 @@ class MetricsRegistry:
         with self._lock:
             if key not in self._metrics:
                 self._metrics[key] = Counter(name, description, labels)
-            return self._metrics[key]  
+            return self._metrics[key]  # type: ignore[return-value]
+
     def gauge(
         self,
         name: str,
@@ -493,7 +494,8 @@ class MetricsRegistry:
         with self._lock:
             if key not in self._metrics:
                 self._metrics[key] = Gauge(name, description, labels)
-            return self._metrics[key]  
+            return self._metrics[key]  # type: ignore[return-value]
+
     def histogram(
         self,
         name: str,
@@ -516,7 +518,8 @@ class MetricsRegistry:
         with self._lock:
             if key not in self._metrics:
                 self._metrics[key] = Histogram(name, description, labels, buckets)
-            return self._metrics[key]  
+            return self._metrics[key]  # type: ignore[return-value]
+
     def timer(
         self,
         name: str,
@@ -537,7 +540,8 @@ class MetricsRegistry:
         with self._lock:
             if key not in self._metrics:
                 self._metrics[key] = Timer(name, description, labels)
-            return self._metrics[key]  
+            return self._metrics[key]  # type: ignore[return-value]
+
     def _make_key(self, name: str, labels: Optional[Dict[str, str]]) -> str:
         """Create unique key for metric lookup."""
         if labels:

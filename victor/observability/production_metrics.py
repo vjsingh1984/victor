@@ -51,7 +51,7 @@ from __future__ import annotations
 
 import logging
 import os
-import psutil
+import psutil  # type: ignore[import-untyped]
 import threading
 import time
 from dataclasses import dataclass, field

@@ -272,7 +272,7 @@ class CoordinatorHealthService:
                         last_check=datetime.now(timezone.utc),
                     )
                 else:
-                    report.components[check.name] = result
+                    report.components[check.name] = result  # type: ignore[assignment]
 
         return report
 

@@ -118,7 +118,7 @@ class MCPServer:
                     type=param.get("type", "string"),
                     description=param.get("description", ""),
                     enum=param.get("enum"),
-                    required=name in required_set
+                    required=name in required_set,
                 )
                 for name, param in properties.items()
             ]
@@ -147,7 +147,6 @@ class MCPServer:
                 )
             )
 
-        
         return MCPTool(
             name=tool.name,
             description=tool.description,

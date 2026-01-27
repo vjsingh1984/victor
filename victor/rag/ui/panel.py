@@ -47,13 +47,14 @@ try:
         TabPane,
     )
     from textual.widget import Widget
+
     TEXTUAL_AVAILABLE = True
 except ImportError:
     TEXTUAL_AVAILABLE = False
 
     # Stub classes for when Textual is not available
-    Widget = object  # type: ignore[attr-defined]
-    ComposeResult = object  # type: ignore[attr-defined]
+    Widget = object  # type: ignore[misc, assignment]
+    ComposeResult = object  # type: ignore[misc, assignment]
 
 
 if TEXTUAL_AVAILABLE:
@@ -425,9 +426,9 @@ else:
     class RAGPanelStub:  # Renamed to avoid conflict
         """Stub RAG panel when Textual is not available."""
 
-        def __init__(self, *args, **kwargs):  # type: ignore[attr-defined]
+        def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
             raise ImportError(
                 "Textual is required for RAG UI. " "Install with: pip install textual"
             )
 
-    RAGPanel = RAGPanelStub  # type: ignore[attr-defined]
+    RAGPanel = RAGPanelStub  # type: ignore[misc, assignment]

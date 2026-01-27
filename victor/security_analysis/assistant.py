@@ -27,7 +27,7 @@ The SecurityAnalysisAssistant provides:
 
 from __future__ import annotations
 
-from typing import ClassVar, List, Optional
+from typing import ClassVar, Dict, List, Optional
 
 from victor.core.verticals.base import VerticalBase
 from victor.core.vertical_types import StageDefinition

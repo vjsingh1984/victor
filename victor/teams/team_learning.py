@@ -401,7 +401,7 @@ class TeamLearningSystem:
 
         # Compute metrics
         rewards = [e.reward for e in experiences]
-        avg_reward = np.mean(rewards) if rewards else 0.0
+        avg_reward = float(np.mean(rewards)) if rewards else 0.0
 
         # Compute trend
         if len(rewards) >= 10:

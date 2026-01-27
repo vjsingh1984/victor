@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 # Optional: Import native implementation
 try:
-    from victor_native import (
+    from victor_native import (  # type: ignore[import-not-found]
         parse_json as rust_parse_json,
         serialize_json as rust_serialize_json,
         parse_yaml as rust_parse_yaml,

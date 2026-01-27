@@ -78,7 +78,7 @@ except ImportError:
 # Check for OTLP exporter
 _OTLP_AVAILABLE = False
 try:
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # type: ignore[import-not-found]
 
     _OTLP_AVAILABLE = True
 except ImportError:
@@ -170,7 +170,7 @@ class OpenTelemetryExporter(BaseExporter):
                 headers=self._headers,
             )
             if self._batch_export:
-                processor = BatchSpanProcessor(otlp_exporter)
+                processor = BatchSpanProcessor(otlp_exporter)  # type: ignore[assignment]
             else:
                 processor = SimpleSpanProcessor(otlp_exporter)
         else:
@@ -211,7 +211,7 @@ class OpenTelemetryExporter(BaseExporter):
 
             # Metadata
             span.set_attribute("victor.topic", event.topic)
-            span.set_attribute("victor.session_id", event.session_id or "")
+            span.set_attribute("victor.session_id", event.headers.get("session_id", "") or "")
 
             # Status based on error presence
             if event.data.get("error"):
@@ -277,7 +277,7 @@ class OTELSpanManager:
         Yields:
             Active span.
         """
-        with self._tracer.start_as_current_span(name) as span:
+        with self._tracer.start_as_current_span(name) as span:  # type: ignore[union-attr]
             if attributes:
                 for key, value in attributes.items():
                     if isinstance(value, (str, int, float, bool)):

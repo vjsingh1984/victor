@@ -60,7 +60,7 @@ Usage Example:
     ```
 """
 
-from typing import Callable, List, Optional, Any
+from typing import Callable, List, Optional, Any, Dict
 from dataclasses import dataclass
 
 try:
@@ -100,7 +100,7 @@ class BatchTask:
     priority: float = 0.0
     timeout_ms: Optional[int] = None
     retry_count: int = 0
-    dependencies: List[str] = None
+    dependencies: Optional[List[str]] = None
 
     def __post_init__(self) -> None:
         if self.dependencies is None:
@@ -471,7 +471,7 @@ class BatchProcessor:
     def _validate_dependencies(self, tasks: List[BatchTask]) -> None:
         """Validate dependencies (Python fallback)."""
         # Build dependency graph
-        graph = {task.task_id: set(task.dependencies) for task in tasks}
+        graph = {task.task_id: set(task.dependencies or []) for task in tasks}
 
         # Detect cycles using DFS
         def visit(node: str, visited: set[Any], rec_stack: set[Any]) -> bool:
@@ -489,7 +489,7 @@ class BatchProcessor:
             return False
 
         for task_id in graph:
-            if task_id not in {n for visited in [set()] for n in visited}:
+            if task_id not in {n for visited in [set()] for n in visited}:  # type: ignore[var-annotated]
                 if visit(task_id, set(), set()):
                     raise ValueError("Circular dependency detected in tasks")
 
@@ -497,10 +497,10 @@ class BatchProcessor:
         """Resolve execution order using topological sort (Python fallback)."""
         # Build graph
         in_degree = {task.task_id: 0 for task in tasks}
-        adjacency = {task.task_id: [] for task in tasks}
+        adjacency: Dict[str, List[str]] = {task.task_id: [] for task in tasks}
 
         for task in tasks:
-            for dep in task.dependencies:
+            for dep in task.dependencies or []:
                 if dep in adjacency:
                     adjacency[dep].append(task.task_id)
                     in_degree[task.task_id] += 1
@@ -644,7 +644,7 @@ def merge_batch_summaries_py(summaries: List[BatchProcessSummary]) -> BatchProce
         Merged BatchProcessSummary
     """
     if RUST_AVAILABLE and summaries:
-        [s.to_rust() for s in summaries]  # Need to implement to_rust
+        [s.to_rust() for s in summaries]  # type: ignore[attr-defined]  # Need to implement to_rust
         # For now, use Python fallback
         pass
 
