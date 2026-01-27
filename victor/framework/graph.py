@@ -2346,7 +2346,7 @@ class CompiledGraph(Generic[StateType]):
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return
+                return  # type: ignore[unreachable]
 
             quality = 0.8 if success else 0.2
             if success and iterations < 10:

@@ -315,6 +315,6 @@ def on_test_stop(environment, **kwargs):
         print(f"  95th percentile: {stats.total.get_response_time_percentile(0.95):.0f}ms")
         print(f"  99th percentile: {stats.total.get_response_time_percentile(0.99):.0f}ms")
 
-        print(f"\nThroughput: {stats.total.total_avg_rps:.2f} requests/second")
+        print(f"\nThroughput: {stats.total.total_rps:.2f} requests/second")
 
     print("=" * 80 + "\n")

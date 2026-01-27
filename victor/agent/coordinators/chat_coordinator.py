@@ -1174,6 +1174,15 @@ class ChatCoordinator:
         # Convert ToolDefinition list to list of tool names
         planned_tool_names = [tool.name for tool in planned_tools] if planned_tools else []
 
+        # Get tool_registry from orchestrator for semantic selector
+        # The semantic selector needs tools.get_tool_cost() method which is on ToolRegistry
+        tool_registry = getattr(orch, "tool_registry", None)
+        if tool_registry is None:
+            # Fallback: try to get from components.tool_registry if available
+            from victor.agent.mixins.component_accessor import ComponentAccessorMixin
+            if isinstance(orch, ComponentAccessorMixin):
+                tool_registry = orch.components.tool_registry if hasattr(orch, "components") else None
+
         context = ToolSelectionContext(
             task_description=context_msg,
             conversation_stage=(
@@ -1185,6 +1194,7 @@ class ChatCoordinator:
             ),
             previous_tools=[],
             planned_tools=planned_tool_names,
+            metadata={"tools": tool_registry} if tool_registry else {},
         )
 
         # Graceful fallback: If tool selection fails, log and return None
