@@ -50,7 +50,7 @@ class AsyncLoadTestFramework:
         num_requests: int,
         concurrency: int,
         payload: Dict[str, Any],
-        endpoint: str = "/api/v1/chat",
+        endpoint: str = "/chat",
     ) -> Dict[str, Any]:
         """Execute concurrent requests with specified concurrency level.
 
