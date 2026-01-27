@@ -260,8 +260,8 @@ class PipelineManager:
             "new_uncovered_files": [
                 f for f in current.uncovered_files if f not in baseline.uncovered_files
             ],
-            "improved_files": [],
-            "regressed_files": [],
+            "improved_files": [],  # type: ignore[list-item]
+            "regressed_files": [],  # type: ignore[list-item]
         }
 
         # Find improved/regressed files

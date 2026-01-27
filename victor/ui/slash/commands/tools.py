@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -161,7 +162,7 @@ class LMStudioCommand(BaseSlashCommand):
             lmstudio = LMStudioProvider(**provider_settings)
 
             # Check connectivity
-            if not lmstudio._models_available():
+            if not asyncio.run(lmstudio._models_available()):
                 ctx.console.print(
                     Panel(
                         "[red]LMStudio not detected[/]\n\n"
@@ -177,11 +178,12 @@ class LMStudioCommand(BaseSlashCommand):
                 return
 
             # Get models and system info
-            models = lmstudio.list_models()
-            endpoint = lmstudio._base_url
+            models = await lmstudio.list_models()
+            endpoint = lmstudio._raw_base_urls
 
             content = f"[green]LMStudio Connected[/]\n\n"
-            content += f"[bold]Endpoint:[/] {endpoint}\n"
+            endpoint_str = endpoint[0] if isinstance(endpoint, list) else endpoint
+            content += f"[bold]Endpoint:[/] {endpoint_str}\n"
             content += f"[bold]Loaded Models:[/] {len(models)}\n\n"
 
             if models:

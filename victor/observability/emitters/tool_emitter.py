@@ -150,7 +150,7 @@ class ToolEventEmitter(IToolEventEmitter):
         except Exception as e:
             logger.debug(f"Failed to emit tool event: {e}")
 
-    def emit_safe(self, event: "MessagingEvent") -> bool:  # type: ignore[name-defined]
+    def emit_safe(self, event: "MessagingEvent") -> bool:
         """Safely emit a tool event, catching any exceptions.
 
         Args:
@@ -160,7 +160,7 @@ class ToolEventEmitter(IToolEventEmitter):
             True if emission succeeded, False otherwise
         """
         try:
-            self.emit(MessagingEvent(topic=event.topic, data=event.data))  # type: ignore[arg-type]
+            self.emit(MessagingEvent(topic=event.topic, data=event.data))
             return True
         except Exception as e:
             logger.debug(f"Failed to emit tool event safely: {e}")
@@ -204,14 +204,18 @@ class ToolEventEmitter(IToolEventEmitter):
             arguments: Tool arguments
             **metadata: Additional metadata (agent_id, session_id, etc.)
         """
-        self.emit(
-            topic="tool.start",
-            data={
-                "tool_name": tool_name,
-                "arguments": arguments,
-                **metadata,
-            },
-        )
+        sync_wrapper = self._get_sync_wrapper()
+        if sync_wrapper:
+            sync_wrapper.publish(
+                MessagingEvent(
+                    topic="tool.start",
+                    data={
+                        "tool_name": tool_name,
+                        "arguments": arguments,
+                        **metadata,
+                    },
+                )
+            )
 
     async def tool_end_async(
         self,
