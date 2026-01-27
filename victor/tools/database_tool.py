@@ -71,7 +71,7 @@ def _get_connection_pool(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str,
                 return cache_manager.connection_pool
 
     # Fallback to global cache for backward compatibility
-    return _connections
+    return _connections  # type: ignore[return-value]
 
 
 # Dangerous SQL patterns that should be blocked

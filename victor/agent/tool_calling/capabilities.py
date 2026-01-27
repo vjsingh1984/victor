@@ -323,7 +323,7 @@ class ModelCapabilityLoader:
         """
         # Handle non-string input (e.g., Mock objects in tests)
         if not isinstance(model_name, str):
-            return False
+            return False  # type: ignore[unreachable]
 
         # Try fnmatch first
         if fnmatch.fnmatch(model_name, pattern):
