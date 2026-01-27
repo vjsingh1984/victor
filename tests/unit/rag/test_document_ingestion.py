@@ -916,10 +916,14 @@ class TestDocumentStorage:
         """Test adding a document to the store."""
         from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
+        # Use custom chunking config with smaller min size for testing
+        store = DocumentStore(
+            config=DocumentStoreConfig(path=temp_dir / "test_store"),
+            chunking_config=ChunkingConfig(min_chunk_size=20),
+        )
         await store.initialize()
 
-        doc = Document(id="store1", content="Test content for store", source="test.txt")
+        doc = Document(id="store1", content="Test content for store that is long enough to be chunked", source="test.txt")
         chunks = await store.add_document(doc)
 
         assert len(chunks) > 0
@@ -931,10 +935,14 @@ class TestDocumentStorage:
         """Test retrieving a document from the store."""
         from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
+        # Use custom chunking config with smaller min size for testing
+        store = DocumentStore(
+            config=DocumentStoreConfig(path=temp_dir / "test_store"),
+            chunking_config=ChunkingConfig(min_chunk_size=20),
+        )
         await store.initialize()
 
-        doc = Document(id="get1", content="Content for retrieval", source="test.txt")
+        doc = Document(id="get1", content="Content for retrieval that is long enough to chunk", source="test.txt")
         await store.add_document(doc)
 
         retrieved = await store.get_document("get1")
@@ -948,10 +956,14 @@ class TestDocumentStorage:
         """Test deleting a document from the store."""
         from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
+        # Use custom chunking config with smaller min size for testing
+        store = DocumentStore(
+            config=DocumentStoreConfig(path=temp_dir / "test_store"),
+            chunking_config=ChunkingConfig(min_chunk_size=20),
+        )
         await store.initialize()
 
-        doc = Document(id="del1", content="Content to delete", source="test.txt")
+        doc = Document(id="del1", content="Content to delete that is long enough", source="test.txt")
         await store.add_document(doc)
 
         # Delete the document
@@ -968,12 +980,16 @@ class TestDocumentStorage:
         """Test listing all documents in the store."""
         from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
+        # Use custom chunking config with smaller min size for testing
+        store = DocumentStore(
+            config=DocumentStoreConfig(path=temp_dir / "test_store"),
+            chunking_config=ChunkingConfig(min_chunk_size=20),
+        )
         await store.initialize()
 
         # Add multiple documents
         for i in range(3):
-            doc = Document(id=f"list{i}", content=f"Content {i}", source=f"test{i}.txt")
+            doc = Document(id=f"list{i}", content=f"Content {i} that is long enough", source=f"test{i}.txt")
             await store.add_document(doc)
 
         docs = await store.list_documents()
@@ -986,10 +1002,14 @@ class TestDocumentStorage:
         """Test getting store statistics."""
         from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
+        # Use custom chunking config with smaller min size for testing
+        store = DocumentStore(
+            config=DocumentStoreConfig(path=temp_dir / "test_store"),
+            chunking_config=ChunkingConfig(min_chunk_size=20),
+        )
         await store.initialize()
 
-        doc = Document(id="stats1", content="Content for stats", source="test.txt")
+        doc = Document(id="stats1", content="Content for stats that is long enough", source="test.txt")
         await store.add_document(doc)
 
         stats = await store.get_stats()
@@ -1004,11 +1024,15 @@ class TestDocumentStorage:
         """Test searching documents in the store."""
         from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
+        # Use custom chunking config with smaller min size for testing
+        store = DocumentStore(
+            config=DocumentStoreConfig(path=temp_dir / "test_store"),
+            chunking_config=ChunkingConfig(min_chunk_size=20),
+        )
         await store.initialize()
 
         doc = Document(
-            id="search1", content="Machine learning is a subset of AI", source="test.txt"
+            id="search1", content="Machine learning is a subset of AI and is very important", source="test.txt"
         )
         await store.add_document(doc)
 

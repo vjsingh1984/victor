@@ -58,7 +58,8 @@ class TestIndexingCapability:
 
         configure_indexing(orchestrator)
 
-        config = orchestrator.rag_config.get("indexing", {})
+        # Check vertical_context for config
+        config = orchestrator.vertical_context._configs.get("rag_indexing", {})
         assert config["chunk_size"] == 512
         assert config["chunk_overlap"] == 50
         assert config["embedding_model"] == "text-embedding-3-small"
@@ -78,7 +79,8 @@ class TestIndexingCapability:
             store_backend="chromadb",
         )
 
-        config = orchestrator.rag_config.get("indexing", {})
+        # Check vertical_context for config
+        config = orchestrator.vertical_context._configs.get("rag_indexing", {})
         assert config["chunk_size"] == 1024
         assert config["chunk_overlap"] == 100
         assert config["embedding_model"] == "text-embedding-3-large"
@@ -116,7 +118,8 @@ class TestRetrievalCapability:
 
         configure_retrieval(orchestrator)
 
-        config = orchestrator.rag_config.get("retrieval", {})
+        # Check vertical_context for config
+        config = orchestrator.vertical_context._configs.get("rag_retrieval", {})
         assert config["top_k"] == 5
         assert config["similarity_threshold"] == 0.7
         assert config["search_type"] == "hybrid"
@@ -136,7 +139,8 @@ class TestRetrievalCapability:
             max_context_tokens=8000,
         )
 
-        config = orchestrator.rag_config.get("retrieval", {})
+        # Check vertical_context for config
+        config = orchestrator.vertical_context._configs.get("rag_retrieval", {})
         assert config["top_k"] == 10
         assert config["similarity_threshold"] == 0.8
         assert config["search_type"] == "semantic"
@@ -173,7 +177,8 @@ class TestSynthesisCapability:
 
         configure_synthesis(orchestrator)
 
-        config = orchestrator.rag_config.get("synthesis", {})
+        # Check vertical_context for config
+        config = orchestrator.vertical_context._configs.get("rag_synthesis", {})
         assert config["citation_style"] == "inline"
         assert config["include_sources"] is True
         assert config["max_answer_tokens"] == 2000
@@ -193,7 +198,8 @@ class TestSynthesisCapability:
             require_verification=False,
         )
 
-        config = orchestrator.rag_config.get("synthesis", {})
+        # Check vertical_context for config
+        config = orchestrator.vertical_context._configs.get("rag_synthesis", {})
         assert config["citation_style"] == "footnote"
         assert config["include_sources"] is False
         assert config["max_answer_tokens"] == 4000
@@ -230,7 +236,8 @@ class TestSafetyCapability:
 
         configure_safety(orchestrator)
 
-        config = orchestrator.rag_config.get("safety", {})
+        # Check vertical_context for config
+        config = orchestrator.vertical_context._configs.get("rag_safety", {})
         assert config["filter_sensitive_data"] is True
         assert config["max_document_size_mb"] == 50
         assert config["validate_sources"] is True
@@ -249,7 +256,8 @@ class TestSafetyCapability:
             validate_sources=False,
         )
 
-        config = orchestrator.rag_config.get("safety", {})
+        # Check vertical_context for config
+        config = orchestrator.vertical_context._configs.get("rag_safety", {})
         assert config["filter_sensitive_data"] is False
         assert config["max_document_size_mb"] == 100
         assert config["allowed_file_types"] == ["pdf", "docx"]
@@ -269,7 +277,8 @@ class TestQueryEnhancementCapability:
 
         configure_query_enhancement(orchestrator)
 
-        config = orchestrator.rag_config.get("query_enhancement", {})
+        # Check vertical_context for config
+        config = orchestrator.vertical_context._configs.get("rag_query_enhancement", {})
         assert config["enable_expansion"] is True
         assert config["enable_decomposition"] is True
         assert config["max_query_variants"] == 3
@@ -287,7 +296,8 @@ class TestQueryEnhancementCapability:
             use_synonyms=False,
         )
 
-        config = orchestrator.rag_config.get("query_enhancement", {})
+        # Check vertical_context for config
+        config = orchestrator.vertical_context._configs.get("rag_query_enhancement", {})
         assert config["enable_expansion"] is False
         assert config["enable_decomposition"] is False
         assert config["max_query_variants"] == 5
@@ -349,7 +359,9 @@ class TestRAGCapabilityProvider:
     def test_apply_capability_by_name(self, provider, orchestrator):
         """Test applying capability by name."""
         provider.apply_capability(orchestrator, "indexing", chunk_size=1024)
-        assert orchestrator.rag_config["indexing"]["chunk_size"] == 1024
+        # Check vertical_context for config
+        config = orchestrator.vertical_context._configs.get("rag_indexing", {})
+        assert config["chunk_size"] == 1024
         assert "indexing" in provider.get_applied()
 
     def test_apply_capability_with_invalid_name(self, provider, orchestrator):

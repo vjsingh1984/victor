@@ -121,7 +121,7 @@ class MCPServer:
             ]
         else:
             # ToolParameter list format
-            tool_params = tool.parameters
+            tool_params = tool.parameters  # type: ignore[unreachable]
 
         for param in tool_params:
             type_map = {
@@ -135,7 +135,7 @@ class MCPServer:
 
             mcp_type = type_map.get(param.type.lower(), MCPParameterType.STRING)
 
-                mcp_params.append(
+            mcp_params.append(
                 MCPParameter(
                     name=param.name,
                     type=mcp_type,
