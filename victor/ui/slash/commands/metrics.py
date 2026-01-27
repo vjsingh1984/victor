@@ -67,13 +67,15 @@ class CostCommand(BaseSlashCommand):
 
         if analytics:
             summary = analytics.get_session_summary()
-            content = (
-                f"[bold]Session Statistics[/]\n\n"
-            )
+            content = f"[bold]Session Statistics[/]\n\n"
 
             # Safely get conversation count
             conversation_count = "unknown"
-            if ctx.agent and hasattr(ctx.agent, 'conversation') and hasattr(ctx.agent.conversation, 'message_count'):
+            if (
+                ctx.agent
+                and hasattr(ctx.agent, "conversation")
+                and hasattr(ctx.agent.conversation, "message_count")
+            ):
                 conversation_count = str(ctx.agent.conversation.message_count())
 
             content += f"[bold]Messages:[/] {conversation_count}\n"
@@ -95,21 +97,23 @@ class CostCommand(BaseSlashCommand):
             elif ctx.agent and hasattr(ctx.agent, "tool_call_count"):
                 tool_calls = ctx.agent.tool_call_count
 
-            content = (
-                f"[bold]Session Statistics[/]\n\n"
-            )
+            content = f"[bold]Session Statistics[/]\n\n"
 
             # Safely get conversation count
             conversation_count = "unknown"
-            if ctx.agent and hasattr(ctx.agent, 'conversation') and hasattr(ctx.agent.conversation, 'message_count'):
+            if (
+                ctx.agent
+                and hasattr(ctx.agent, "conversation")
+                and hasattr(ctx.agent.conversation, "message_count")
+            ):
                 conversation_count = str(ctx.agent.conversation.message_count())
 
             content += f"[bold]Messages:[/] {conversation_count}\n"
             content += f"[bold]Tool Calls:[/] {tool_calls}\n"
             # Safely access provider and model
-            if ctx.agent and hasattr(ctx.agent, 'provider_name'):
+            if ctx.agent and hasattr(ctx.agent, "provider_name"):
                 content += f"[bold]Provider:[/] {ctx.agent.provider_name}\n"
-            if ctx.agent and hasattr(ctx.agent, 'model'):
+            if ctx.agent and hasattr(ctx.agent, "model"):
                 content += f"[bold]Model:[/] {ctx.agent.model}\n"
 
         ctx.console.print(Panel(content, title="Usage Statistics", border_style="cyan"))
@@ -522,7 +526,9 @@ class LearningCommand(BaseSlashCommand):
             learner = coordinator.get_learner("model_selector")
 
             if learner:
-                rankings: List[Dict[str, Any]] = getattr(learner, "get_provider_rankings", lambda: [])()
+                rankings: List[Dict[str, Any]] = getattr(
+                    learner, "get_provider_rankings", lambda: []
+                )()
                 if rankings:
                     content += "[bold cyan]Model Selector (Provider Rankings):[/]\n"
                     for rank in rankings[:5]:
@@ -589,7 +595,9 @@ class MLStatsCommand(BaseSlashCommand):
                     ctx.console.print("[yellow]Model selector not available[/]")
                     return
 
-                rankings: List[Dict[str, Any]] = getattr(learner, "get_provider_rankings", lambda: [])()
+                rankings: List[Dict[str, Any]] = getattr(
+                    learner, "get_provider_rankings", lambda: []
+                )()
                 if not rankings:
                     ctx.console.print("[dim]No provider data yet[/]")
                     return

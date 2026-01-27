@@ -35,10 +35,10 @@ from rich.syntax import Syntax
 try:
     from jinja2 import Environment, FileSystemLoader, select_autoescape, TemplateNotFound
 except ImportError:
-    Environment = None  # type: ignore[assignment]
-    FileSystemLoader = None  # type: ignore[assignment]
-    select_autoescape = None  # type: ignore[assignment]
-    TemplateNotFound = Exception  # type: ignore[assignment]
+    Environment = None  # type: ignore[assignment,misc]
+    FileSystemLoader = None  # type: ignore[assignment,misc]
+    select_autoescape = None  # type: ignore[assignment,misc]
+    TemplateNotFound = Exception  # type: ignore[assignment,misc]
 
 scaffold_app = typer.Typer(
     name="vertical",
@@ -207,7 +207,7 @@ def new_vertical(
             "[red]Error: Jinja2 is required for scaffolding. "
             "Install it with: pip install jinja2[/]"
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1)  # type: ignore[unreachable]
 
     # Validate the name
     try:

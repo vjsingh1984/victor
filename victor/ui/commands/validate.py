@@ -118,26 +118,28 @@ def validate_files(
             "warnings": [],
         }
 
-        for issue in result.errors:
-            file_result["errors"].append(
-                {
-                    "line": issue.line,
-                    "column": issue.column,
-                    "message": issue.message,
-                    "source": issue.source,
-                }
-            )
+        for issue in result.issues:
+            if issue.severity == ValidationSeverity.ERROR:
+                file_result["errors"].append(
+                    {
+                        "line": issue.line,
+                        "column": issue.column,
+                        "message": issue.message,
+                        "source": issue.source,
+                    }
+                )
             total_errors += 1
 
-        for warning in result.warnings:
-            file_result["warnings"].append(
-                {
-                    "line": warning.line,
-                    "column": warning.column,
-                    "message": warning.message,
-                    "source": warning.source,
-                }
-            )
+        for issue in result.issues:
+            if issue.severity == ValidationSeverity.WARNING:
+                file_result["warnings"].append(
+                    {
+                        "line": issue.line,
+                        "column": issue.column,
+                        "message": issue.message,
+                        "source": issue.source,
+                    }
+                )
             total_warnings += 1
 
         results.append(file_result)

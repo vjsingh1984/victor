@@ -417,7 +417,7 @@ def list_categories() -> None:
     Examples:
         victor errors categories
     """
-    categories = {}
+    categories: dict[str, list[str]] = {}
     for error_info in ERROR_CATALOG.values():
         cat = error_info["category"]
         if cat not in categories:

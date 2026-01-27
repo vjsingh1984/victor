@@ -401,20 +401,24 @@ def run_benchmark(
                         # On timeout/cancellation, store partial data for harness
                         partial = adapter.get_partial_trace()
                         logger.info(
-                            f"Task cancelled - partial trace: "
+                            "Task cancelled - partial trace: "
                             f"tool_calls={partial['tool_calls']}, turns={partial['turns']}, "
                             f"tokens={partial['tokens_used']}"
                         )
                         # Store partial data in a container the harness can access
                         # We use a mutable dict attached to the function object
-                        agent_callback._partial_data = {
-                            "code": partial.get("code", ""),
-                            "tokens_input": partial.get("tokens_input", 0),
-                            "tokens_output": partial.get("tokens_output", 0),
-                            "tokens_used": partial.get("tokens_used", 0),
-                            "tool_calls": partial.get("tool_calls", 0),
-                            "turns": partial.get("turns", 0),
-                        }
+                        setattr(
+                            agent_callback,
+                            "_partial_data",
+                            {
+                                "code": partial.get("code", ""),
+                                "tokens_input": partial.get("tokens_input", 0),
+                                "tokens_output": partial.get("tokens_output", 0),
+                                "tokens_used": partial.get("tokens_used", 0),
+                                "tool_calls": partial.get("tool_calls", 0),
+                                "turns": partial.get("turns", 0),
+                            },
+                        )
                         # Re-raise so wait_for properly times out
                         raise
                     finally:

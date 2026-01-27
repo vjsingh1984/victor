@@ -342,7 +342,7 @@ async def _run_hitl_server(
             store = SQLiteHITLStore(db_path=db_path)
             logger.info(f"Using SQLite HITL store: {store.db_path}")
         else:
-            store = HITLStore()
+            store = HITLStore()  # type: ignore[assignment]
             logger.info("Using in-memory HITL store")
 
         app = create_hitl_app(

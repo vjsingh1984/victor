@@ -621,12 +621,12 @@ async def run_oneshot(
             else:
                 # Fallback for non-UIAgentProtocol
                 response = await agent.chat(message)
-                content_buffer = response.content if hasattr(response, 'content') else str(response)
+                content_buffer = response.content if hasattr(response, "content") else str(response)
         else:
             response = await agent.chat(message)
-            content_buffer = response.content if hasattr(response, 'content') else str(response)
-            usage_stats = response.usage if hasattr(response, 'usage') else None
-            model_name = response.model if hasattr(response, 'model') else "unknown"
+            content_buffer = response.content if hasattr(response, "content") else str(response)
+            usage_stats = response.usage if hasattr(response, "usage") else None
+            model_name = response.model if hasattr(response, "model") else "unknown"
             formatter.response(
                 content=content_buffer,
                 usage=usage_stats,
@@ -807,7 +807,9 @@ async def run_interactive(
         if not use_tui:
             from victor.ui.commands import SlashCommandHandler
 
-            cmd_handler = SlashCommandHandler(console, settings, agent if isinstance(agent, UIAgentProtocol) else None)
+            cmd_handler = SlashCommandHandler(
+                console, settings, agent if isinstance(agent, UIAgentProtocol) else None
+            )
 
             rl_suggestion = get_rl_profile_suggestion(profile_config.provider, profiles)
             await _run_cli_repl(

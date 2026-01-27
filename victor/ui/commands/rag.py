@@ -158,6 +158,7 @@ async def _ingest_async(
     with console.status(f"[bold blue]Ingesting {source}...[/]"):
         if is_url:
             result = await tool.execute(
+                {},
                 url=source,
                 doc_type=doc_type if doc_type != "auto" else "text",
                 doc_id=doc_id,
@@ -165,6 +166,7 @@ async def _ingest_async(
         else:
             path = Path(source).resolve()
             result = await tool.execute(
+                {},
                 path=str(path),
                 recursive=recursive,
                 pattern=pattern,
@@ -208,7 +210,7 @@ async def _search_async(query: str, top_k: int) -> None:
     tool = RAGSearchTool()
 
     with console.status(f"[bold blue]Searching for: {query}...[/]"):
-        result = await tool.execute(query=query, k=top_k)
+        result = await tool.execute({}, query=query, k=top_k)
 
     if result.success:
         console.print(result.output)
@@ -292,6 +294,7 @@ async def _query_async(
 
     with console.status(f"[bold blue]{status_msg}...[/]"):
         result = await tool.execute(
+            {},
             question=question,
             k=top_k,
             synthesize=synthesize,
@@ -413,7 +416,7 @@ async def _list_async() -> None:
     from victor.rag.tools.management import RAGListTool
 
     tool = RAGListTool()
-    result = await tool.execute()
+    result = await tool.execute({})
 
     if result.success:
         console.print(result.output)
@@ -437,7 +440,7 @@ async def _stats_async() -> None:
     from victor.rag.tools.management import RAGStatsTool
 
     tool = RAGStatsTool()
-    result = await tool.execute()
+    result = await tool.execute({})
 
     if result.success:
         console.print(result.output)
@@ -478,7 +481,7 @@ async def _delete_async(doc_id: str) -> None:
     from victor.rag.tools.management import RAGDeleteTool
 
     tool = RAGDeleteTool()
-    result = await tool.execute(doc_id=doc_id)
+    result = await tool.execute({}, doc_id=doc_id)
 
     if result.success:
         console.print(f"[green]{result.output}[/]")

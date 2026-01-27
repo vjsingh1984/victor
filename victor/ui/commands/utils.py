@@ -303,7 +303,7 @@ async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
             if msg_count > 0:
                 import uuid
 
-                metrics = {}
+                metrics: dict[str, Any] = {}
                 if hasattr(agent, "get_session_metrics"):
                     metrics = agent.get_session_metrics() or {}
 
@@ -334,7 +334,7 @@ async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
                 coordinator.record_outcome("model_selector", outcome, "coding")
 
                 # Get updated Q-value for logging
-                rankings = learner.get_provider_rankings()
+                rankings = learner.get_provider_rankings()  # type: ignore[attr-defined]
                 provider_ranking = next(
                     (r for r in rankings if r["provider"] == agent.provider.name), None
                 )
@@ -389,7 +389,7 @@ async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = Fa
     """Check codebase index status at startup and reindex if needed."""
     try:
         index = CodebaseIndex(root_path=cwd, use_embeddings=False, enable_watcher=False)
-        is_stale, modified, deleted = index.check_staleness_by_mtime()
+        is_stale, modified, deleted = index.check_staleness_by_mtime()  # type: ignore[attr-defined]
         if not is_stale:
             if not silent:
                 logger.debug("Codebase index is up to date")
@@ -404,7 +404,7 @@ async def check_codebase_index(cwd: str, console_obj: Console, silent: bool = Fa
             if not silent:
                 console_obj.print(f"[green]Incrementally reindexed {total_changes} files[/]")
         else:
-            await index.reindex()
+            await index.reindex()  # type: ignore[attr-defined]
             if not silent:
                 console_obj.print(f"[green]Full reindex completed ({len(index.files)} files)[/]")
     except ImportError:

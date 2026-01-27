@@ -174,7 +174,7 @@ class CapabilityDiscovery:
         except Exception:
             # Fallback to shared registry
             try:
-                from victor.tools.shared_registry import SharedToolRegistry
+                from victor.tools.shared_registry import SharedToolRegistry  # type: ignore[import-not-found]
 
                 registry = SharedToolRegistry.get_instance()
                 return list(registry._tools.keys())

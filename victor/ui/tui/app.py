@@ -703,7 +703,9 @@ class VictorTUI(App):
         self._tool_widgets: list[ToolCallWidget] = []
         self._tool_widget_limit = 5
         self._thinking_widget: ThinkingWidget | None = None
-        self._slash_handler: SlashCommandHandler | None = None  # Initialized in on_mount when conversation_log is ready
+        self._slash_handler: SlashCommandHandler | None = (
+            None  # Initialized in on_mount when conversation_log is ready
+        )
         self._console_adapter: TUIConsoleAdapter | None = None
         self._session_messages: list[Message] = []
         self._cancellation_timer: Any = None
@@ -989,7 +991,9 @@ class VictorTUI(App):
     def _update_thinking(self, content: str) -> None:
         """Update thinking content."""
         if self._thinking_widget:
-            self._thinking_widget.update_content(content)  # Widget is None when thinking is disabled
+            self._thinking_widget.update_content(
+                content
+            )  # Widget is None when thinking is disabled
 
     def _hide_thinking(self) -> None:
         """Hide thinking panel."""

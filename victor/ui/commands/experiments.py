@@ -97,7 +97,7 @@ def list_experiments(
     setup_logging(log_level)
 
     storage = get_default_storage()
-    tracker = ExperimentTracker(storage=storage)
+    tracker = ExperimentTracker(storage=storage)  # type: ignore[arg-type]
 
     # Build query
     query = ExperimentQuery(limit=limit)
@@ -159,7 +159,7 @@ def show_experiment(
     setup_logging(log_level)
 
     storage = get_default_storage()
-    tracker = ExperimentTracker(storage=storage)
+    tracker = ExperimentTracker(storage=storage)  # type: ignore[arg-type]
 
     experiment = tracker.get_experiment(experiment_id)
     if not experiment:
@@ -283,7 +283,7 @@ def delete_experiment(
     setup_logging(log_level)
 
     storage = get_default_storage()
-    tracker = ExperimentTracker(storage=storage)
+    tracker = ExperimentTracker(storage=storage)  # type: ignore[arg-type]
 
     # Check if experiment exists
     experiment = tracker.get_experiment(experiment_id)
@@ -328,7 +328,7 @@ def list_runs(
     setup_logging(log_level)
 
     storage = get_default_storage()
-    tracker = ExperimentTracker(storage=storage)
+    tracker = ExperimentTracker(storage=storage)  # type: ignore[arg-type]
 
     # Check if experiment exists
     experiment = tracker.get_experiment(experiment_id)
@@ -391,7 +391,7 @@ def show_run(
     setup_logging(log_level)
 
     storage = get_default_storage()
-    tracker = ExperimentTracker(storage=storage)
+    tracker = ExperimentTracker(storage=storage)  # type: ignore[arg-type]
 
     run = tracker.get_run(run_id)
     if not run:

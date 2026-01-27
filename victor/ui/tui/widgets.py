@@ -186,13 +186,15 @@ class StatusBar(Static):
         self.provider = provider
         self.model = model
         provider_label = self.query_one(".provider-info")
-        provider_label.update(Text.assemble(  # type: ignore[attr-defined]
-            ("Victor ", "bold #7cb7ff"),
-            "| ",
-            (f"{self.provider}", ""),
-            (" / ", ""),
-            (f"{self.model}", "bold"),
-        ))
+        provider_label.update(
+            Text.assemble(  # type: ignore[attr-defined]
+                ("Victor ", "bold #7cb7ff"),
+                "| ",
+                (f"{self.provider}", ""),
+                (" / ", ""),
+                (f"{self.model}", "bold"),
+            )
+        )
         self.refresh()
 
     def update_status(self, status: str, state: str = "idle") -> None:

@@ -158,7 +158,7 @@ class OutputFormatter:
         Returns:
             Formatted args string like "path='/file.py', limit=100"
         """
-        parts = []
+        parts: list[str] = []
         total_len = 0
         for k, v in arguments.items():
             if isinstance(v, str):

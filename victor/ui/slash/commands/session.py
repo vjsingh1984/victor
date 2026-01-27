@@ -76,12 +76,14 @@ class SaveCommand(BaseSlashCommand):
             # Save to SQLite
             session_id = sqlite_persistence.save_session(
                 conversation=ctx.agent.conversation if ctx.agent else None,
-                model=getattr(ctx.agent, 'model', None) if ctx.agent else None,  # type: ignore[attr-defined]
-                provider=getattr(ctx.agent, 'provider_name', None) if ctx.agent else None,  # type: ignore[attr-defined]
+                model=str(getattr(ctx.agent, "model", "")) if ctx.agent else "",
+                provider=str(ctx.agent.provider_name) if ctx.agent else "",
                 profile=getattr(ctx.settings, "current_profile", "default"),
                 session_id=session_id,  # Use existing or None for new
                 title=title,
-                conversation_state=getattr(ctx.agent, "conversation_state", None) if ctx.agent else None,
+                conversation_state=(
+                    getattr(ctx.agent, "conversation_state", None) if ctx.agent else None
+                ),
             )
 
             if session_id and ctx.agent:
@@ -410,7 +412,9 @@ class CompactCommand(BaseSlashCommand):
             original_count = ctx.agent.conversation.message_count()
 
             if original_count < 5:
-                ctx.console.print("[dim]Conversation is already small enough, nothing to compact[/]")
+                ctx.console.print(
+                    "[dim]Conversation is already small enough, nothing to compact[/]"
+                )
                 return
 
             use_smart = self._has_flag(ctx, "--smart", "-s")
@@ -461,9 +465,7 @@ class CompactCommand(BaseSlashCommand):
                     *messages[-keep_recent:],
                 ]
                 # Update messages through proper method
-                ctx.agent.conversation.clear_messages()
-                for msg in new_messages:
-                    ctx.agent.conversation.add_message(msg)  # type: ignore[attr-defined]
+                ctx.agent.conversation.messages = new_messages  # type: ignore[misc]
 
                 ctx.console.print(
                     Panel(
@@ -479,9 +481,7 @@ class CompactCommand(BaseSlashCommand):
             # Simple truncation
             if ctx.agent:
                 # Update messages through proper method
-                ctx.agent.conversation.clear_messages()
-                for msg in messages[-keep_recent:]:
-                    ctx.agent.conversation.add_message(msg)  # type: ignore[attr-defined]
+                ctx.agent.conversation.messages = messages[-keep_recent:]  # type: ignore[misc]
                 new_count = ctx.agent.conversation.message_count()
 
                 ctx.console.print(

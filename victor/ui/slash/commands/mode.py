@@ -49,7 +49,7 @@ class ModeCommand(BaseSlashCommand):
         from victor.agent.adaptive_mode_controller import AgentMode
 
         # Use ModeAwareMixin's public mode_controller property (lazy-loads)
-        mode_controller = ctx.agent.mode_controller
+        mode_controller = getattr(ctx.agent, "mode_controller", None) if ctx.agent else None
 
         if not ctx.args:
             # Show current mode using public interface
@@ -223,12 +223,14 @@ class PlanCommand(BaseSlashCommand):
             )
 
             try:
-                response = await ctx.agent.chat(planning_prompt)
+                response = await ctx.agent.chat(planning_prompt) if ctx.agent else ""
                 from rich.markdown import Markdown
 
+                # Handle response which could be str or object with content attribute
+                response_content = response.content if hasattr(response, "content") else response
                 ctx.console.print(
                     Panel(
-                        Markdown(response.content),
+                        Markdown(response_content),
                         title="Planning Analysis",
                         border_style="blue",
                     )

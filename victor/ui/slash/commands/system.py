@@ -161,7 +161,7 @@ class StatusCommand(BaseSlashCommand):
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
             if learner:
-                if hasattr(learner, 'recommend'):
+                if hasattr(learner, "recommend"):
                     rec = learner.recommend(agent.provider_name, "coding")
                     if rec and rec.confidence > 0:
                         content += f"\n[dim]RL: Using optimal provider (Q={rec.confidence:.2f})[/]"
@@ -195,7 +195,7 @@ class ClearCommand(BaseSlashCommand):
             ctx.console.print("[red]Agent not available[/]")
             return
 
-        if hasattr(agent, 'reset_conversation'):
+        if hasattr(agent, "reset_conversation"):
             agent.reset_conversation()
         else:
             ctx.console.print("[yellow]Reset conversation not supported by agent[/]")
@@ -302,7 +302,9 @@ class ApprovalsCommand(BaseSlashCommand):
 
     def execute(self, ctx: CommandContext) -> None:
         # Use dynamic attribute access with fallback
-        current_mode = getattr(ctx.settings, "approval_mode", getattr(ctx.settings, "approval_mode", "suggest"))
+        current_mode = getattr(
+            ctx.settings, "approval_mode", getattr(ctx.settings, "approval_mode", "suggest")
+        )
 
         if not ctx.args:
             # Show current mode

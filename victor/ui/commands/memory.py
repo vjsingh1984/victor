@@ -133,9 +133,7 @@ async def list_entities(
 
             for entity in entities:
                 last_seen = (
-                    entity.last_seen.strftime("%Y-%m-%d %H:%M")
-                    if entity.last_seen
-                    else "Never"
+                    entity.last_seen.strftime("%Y-%m-%d %H:%M") if entity.last_seen else "Never"
                 )
                 table.add_row(
                     entity.name[:50],
@@ -396,9 +394,7 @@ async def show_graph(
             if most_connected:
                 console.print("\n[bold]Most Connected Entities:[/]")
                 for entity_name, relation_count in most_connected[:5]:
-                    console.print(
-                        f"  • {entity_name}: {relation_count} relations"
-                    )
+                    console.print(f"  • {entity_name}: {relation_count} relations")
 
             console.print(stats_table)
 

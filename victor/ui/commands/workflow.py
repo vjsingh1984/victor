@@ -1244,10 +1244,12 @@ def list_presets(
         # List agent presets
         console.print("\n[bold cyan]Agent Presets:[/]\n")
 
-        presets = list_agent_presets()
-        for preset in sorted(presets, key=lambda x: x.role):
-            console.print(f"  [bold]{preset.role.title()}[/]")
-            console.print(f"    • [cyan]{preset.name}[/]: {preset.description}")
+        preset_names = list_agent_presets()
+        for preset_name in sorted(preset_names):
+            preset = get_agent_preset(preset_name)
+            if preset:
+                console.print(f"  [bold]{preset.role.title()}[/]")
+                console.print(f"    • [cyan]{preset.name}[/]: {preset.description}")
 
             console.print()
 
@@ -1257,12 +1259,18 @@ def list_presets(
 
         if category:
             # Filter by category
-            presets = list_workflow_presets()
-            category_presets = [p for p in presets if p.category == category]
+            preset_names = list_workflow_presets()
+            category_presets = []
+            for preset_name in preset_names:
+                preset = get_workflow_preset(preset_name)
+                if preset and preset.category == category:
+                    category_presets.append(preset)
 
             if not category_presets:
                 console.print(f"[bold red]Error:[/] No presets found for category: {category}")
-                available_categories = set(p.category for p in presets)
+                # Get available categories
+                all_presets = [get_workflow_preset(n) for n in preset_names]
+                available_categories = set(p.category for p in all_presets if p)
                 if available_categories:
                     console.print(f"Available: {', '.join(sorted(available_categories))}")
                 raise typer.Exit(1)
@@ -1275,12 +1283,14 @@ def list_presets(
                 )
         else:
             # Show all by category
-            presets = list_workflow_presets()
+            preset_names = list_workflow_presets()
             by_category: dict[str, list] = {}
-            for preset in presets:
-                if preset.category not in by_category:
-                    by_category[preset.category] = []
-                by_category[preset.category].append(preset)
+            for preset_name in preset_names:
+                preset = get_workflow_preset(preset_name)
+                if preset:
+                    if preset.category not in by_category:
+                        by_category[preset.category] = []
+                    by_category[preset.category].append(preset)
 
             for cat, category_presets in sorted(by_category.items()):
                 console.print(f"  [bold]{cat.title()}[/]")
@@ -1372,8 +1382,8 @@ def show_preset_info(
         )
 
     elif preset_type == "workflow":
-        preset = get_workflow_preset(preset_name)
-        if not preset:
+        workflow_preset = get_workflow_preset(preset_name)
+        if not workflow_preset:
             console.print(f"[bold red]Error:[/] Workflow preset '{preset_name}' not found")
             console.print(
                 f"[dim]Use 'victor workflow presets --type workflows' to list available presets[/]"
@@ -1385,11 +1395,11 @@ def show_preset_info(
         table.add_column("Property", style="cyan")
         table.add_column("Value")
 
-        table.add_row("Name", preset.name)
-        table.add_row("Category", preset.category)
-        table.add_row("Description", preset.description)
-        table.add_row("Complexity", preset.complexity)
-        table.add_row("Estimated Duration", f"{preset.estimated_duration_minutes} minutes")
+        table.add_row("Name", workflow_preset.name)
+        table.add_row("Category", workflow_preset.category)
+        table.add_row("Description", workflow_preset.description)
+        table.add_row("Complexity", workflow_preset.complexity)
+        table.add_row("Estimated Duration", f"{workflow_preset.estimated_duration_minutes} minutes")
 
         console.print(table)
 

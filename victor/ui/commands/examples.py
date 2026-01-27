@@ -120,7 +120,7 @@ def _discover_examples(
     Returns:
         List of tuples: (name, description, category, full_path)
     """
-    examples = []
+    examples: list[tuple[str, str, str, Path]] = []
 
     if not examples_dir.exists():
         return examples

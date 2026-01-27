@@ -51,7 +51,7 @@ class ModelCommand(BaseSlashCommand):
         if ctx.args:
             # Switch model
             model_name = ctx.args[FIRST_ARG_INDEX]
-            if ctx.agent and getattr(ctx.agent, 'switch_model', lambda x: False)(model_name):
+            if ctx.agent and getattr(ctx.agent, "switch_model", lambda x: False)(model_name):
                 info = ctx.agent.get_current_provider_info()  # type: ignore[attr-defined]
                 ctx.console.print(f"[green]Switched to model:[/] [cyan]{model_name}[/]")
                 ctx.console.print(
@@ -84,7 +84,7 @@ class ModelCommand(BaseSlashCommand):
             table.add_column("Size", style="yellow")
             table.add_column("Status", style="green")
 
-            current_model = getattr(ctx.agent, 'model', None) if ctx.agent else None
+            current_model = getattr(ctx.agent, "model", None) if ctx.agent else None
 
             for model in models_list:
                 name = model.get("name", "unknown")
@@ -144,7 +144,7 @@ class ProfileCommand(BaseSlashCommand):
                 f"({profile_config.provider}:{profile_config.model_name})...[/]"
             )
 
-            if ctx.agent and getattr(ctx.agent, 'switch_provider', lambda p, m=None: False)(
+            if ctx.agent and getattr(ctx.agent, "switch_provider", lambda p, m=None: False)(
                 profile_config.provider,
                 profile_config.model_name,
             ):
@@ -164,8 +164,8 @@ class ProfileCommand(BaseSlashCommand):
             return
 
         # Show profiles
-        current_provider = getattr(ctx.agent, 'provider_name', None) if ctx.agent else None
-        current_model = getattr(ctx.agent, 'model', None) if ctx.agent else None
+        current_provider = getattr(ctx.agent, "provider_name", None) if ctx.agent else None
+        current_model = getattr(ctx.agent, "model", None) if ctx.agent else None
 
         # Get RL Q-values for provider ranking
         rl_rankings = {}
@@ -290,7 +290,9 @@ class ProviderCommand(BaseSlashCommand):
 
         ctx.console.print(f"[dim]Switching to {provider_name}...[/]")
 
-        if ctx.agent and getattr(ctx.agent, 'switch_provider', lambda p, m=None: False)(provider_name, model):
+        if ctx.agent and getattr(ctx.agent, "switch_provider", lambda p, m=None: False)(
+            provider_name, model
+        ):
             info = ctx.agent.get_current_provider_info()  # type: ignore[attr-defined]
             ctx.console.print(f"[green]Switched to:[/] {info['provider']}:{info['model']}")
             ctx.console.print(

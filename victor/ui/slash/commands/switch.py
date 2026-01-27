@@ -188,9 +188,7 @@ class SwitchCommand(BaseSlashCommand):
             ctx.console.print(f"[red]Error listing sessions:[/] {e}")
             logger.exception("Error listing sessions")
 
-    def _resume_session(
-        self, ctx: CommandContext, session_id: str = "", index: int = 1
-    ) -> bool:
+    def _resume_session(self, ctx: CommandContext, session_id: str = "", index: int = 1) -> bool:
         """Resume a session.
 
         Args:
@@ -233,11 +231,11 @@ class SwitchCommand(BaseSlashCommand):
             ctx.agent.active_session_id = session_id  # type: ignore[union-attr]
 
             conversation_state_dict = session_data.get("conversation_state")
-            if conversation_state_dict:
+            if conversation_state_dict and ctx.agent:
                 try:
                     ctx.agent.conversation_state = ConversationStateMachine.from_dict(
                         conversation_state_dict
-                    )  # type: ignore[union-attr]
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to restore conversation state: {e}")
 
@@ -260,8 +258,8 @@ class SwitchCommand(BaseSlashCommand):
             model: Model name
         """
         try:
-            if ctx.agent.switch_model(model):  # type: ignore[attr-defined,union-attr]
-                info = ctx.agent.get_current_provider_info()  # type: ignore[union-attr]
+            if ctx.agent and ctx.agent.switch_model(model):
+                info = ctx.agent.get_current_provider_info()
                 ctx.console.print(
                     f"[green]✓[/] Switched to [cyan]{model}[/]\n"
                     f"  [dim]Native tools: {info['native_tool_calls']}, "
