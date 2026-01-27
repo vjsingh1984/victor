@@ -307,11 +307,22 @@ class TestGroundingThresholdLearner:
 
     def test_compute_reward(self, learner: GroundingThresholdLearner) -> None:
         """Test reward computation for different result types."""
-        assert learner._compute_reward("tp") == 0.1
-        assert learner._compute_reward("tn") == 0.1
-        assert learner._compute_reward("fp") == -1.0
-        assert learner._compute_reward("fn") == -2.0  # Worst
-        assert learner._compute_reward("unknown") == 0.0
+        # Create outcome objects with metadata
+        def make_outcome(result_type: str) -> RLOutcome:
+            return RLOutcome(
+                provider="test",
+                model="test",
+                task_type="test",
+                success=result_type in ("tp", "tn"),
+                quality_score=1.0 if result_type in ("tp", "tn") else 0.0,
+                metadata={"result_type": result_type}
+            )
+
+        assert learner._compute_reward(make_outcome("tp")) == 0.1
+        assert learner._compute_reward(make_outcome("tn")) == 0.1
+        assert learner._compute_reward(make_outcome("fp")) == -1.0
+        assert learner._compute_reward(make_outcome("fn")) == -2.0  # Worst
+        assert learner._compute_reward(make_outcome("unknown")) == 0.0
 
     def test_context_key_building(self, learner: GroundingThresholdLearner) -> None:
         """Test context key construction."""

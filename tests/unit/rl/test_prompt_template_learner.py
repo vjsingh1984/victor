@@ -265,7 +265,7 @@ class TestPromptTemplateLearner:
         learner.record_outcome(outcome)
 
         # Check that posteriors were created
-        context_key = ("analysis", "anthropic")
+        context_key = "anthropic:claude-3:analysis"
         assert learner._sample_counts.get(context_key, 0) > 0
 
     def test_record_outcome_with_template(self, learner: PromptTemplateLearner) -> None:
@@ -601,5 +601,5 @@ class TestSelectionTracking:
         learner.record_outcome(outcome)
 
         # Sample count should have increased
-        context_key = ("debugging", "anthropic")
+        context_key = "anthropic:claude-3:debugging"
         assert learner._sample_counts.get(context_key, 0) > 0

@@ -251,7 +251,7 @@ class TestRLEvictionPolicy:
     def test_record_eviction_success(self, policy: RLEvictionPolicy) -> None:
         """Test recording successful eviction."""
         state = CacheEntryState(key="evict_key")
-        policy._recent_decisions["evict_key"] = (state, EvictionAction.EVICT)
+        policy._recent_decisions["evict_key"] = (state, EvictionAction.EVICT, 0.5)
 
         policy.record_eviction_success("evict_key")
 
@@ -260,7 +260,7 @@ class TestRLEvictionPolicy:
     def test_q_value_update_on_hit(self, policy: RLEvictionPolicy) -> None:
         """Test Q-value is updated on hit feedback."""
         state = CacheEntryState(key="update_key", tool_type="test")
-        policy._recent_decisions["update_key"] = (state, EvictionAction.KEEP)
+        policy._recent_decisions["update_key"] = (state, EvictionAction.KEEP, 0.7)
 
         feature_key = state.to_feature_tuple()
         initial_q = policy._get_q_values(state)[EvictionAction.KEEP]
