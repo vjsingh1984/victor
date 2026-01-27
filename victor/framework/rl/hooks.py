@@ -287,9 +287,12 @@ class RLHookRegistry:
         self._custom_handlers[event_type].append(handler)
 
     def emit(self, event: RLEvent) -> None:
-        """Emit an event to all subscribed learners.
+        """Emit an event to all subscribed learners and observability bus.
 
         This is the main entry point for components to trigger RL updates.
+        Events are dispatched to:
+        1. RL learners (for learning)
+        2. Observability bus (for JSONL export and dashboard)
 
         Args:
             event: Event data to dispatch
@@ -344,7 +347,60 @@ class RLHookRegistry:
             except Exception as e:
                 logger.warning(f"RL: Custom handler failed: {e}")
 
+        # Emit to observability bus for JSONL export and dashboard
+        self._emit_to_observability(event)
+
         logger.debug(f"RL: Dispatched {event.type.value} to {len(learners)} learners")
+
+    def _emit_to_observability(self, event: RLEvent) -> None:
+        """Emit RL event to observability bus for JSONL export.
+
+        This bridges the RL system with the observability system, allowing
+        RL events (like grounding failures) to appear in events.jsonl and dashboard.
+
+        Args:
+            event: RL event to emit
+        """
+        try:
+            from victor.core.events.backends import get_observability_bus
+
+            observability_bus = get_observability_bus()
+            if observability_bus is None:
+                return  # type: ignore[unreachable]
+
+            # Convert RLEvent to MessagingEvent format
+            import json
+            from datetime import datetime, timezone
+
+            # Build event data
+            event_data = {
+                "type": f"rl.{event.type.value}",
+                "timestamp": event.timestamp.isoformat(),
+                "provider": event.provider,
+                "model": event.model,
+                "success": event.success,
+                "quality_score": event.quality_score,
+                "task_type": event.task_type,
+                "threshold_value": event.threshold_value,
+                "was_exploration": event.was_exploration,
+                "epsilon_value": event.epsilon_value,
+                "metadata": event.metadata or {},
+            }
+
+            # Emit to observability bus (async emit is handled internally)
+            observability_bus.emit(
+                topic=f"rl.{event.type.value}",
+                data=event_data,
+                metadata={
+                    "source": "rl_hooks",
+                    "event_type": str(event.type),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+
+        except Exception as e:
+            # Don't fail if observability bus is not available
+            logger.debug(f"[RLHookRegistry] Failed to emit to observability bus: {e}")
 
     def _dispatch_to_learner(self, learner_name: str, event: RLEvent) -> None:
         """Dispatch event to a specific learner.
