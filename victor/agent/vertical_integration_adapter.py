@@ -194,7 +194,7 @@ class VerticalIntegrationAdapter:
         # Prefer capability registry protocol
         if hasattr(self._orchestrator, "has_capability"):
             result = self._orchestrator.has_capability(name)
-            return result  # type: ignore[no-any-return]
+            return result
 
         # Fall back to checking if method exists
         method_name = get_method_for_capability(name)

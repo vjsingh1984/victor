@@ -145,7 +145,7 @@ class CapabilityDefinition:
             return True
 
         try:
-            import jsonschema  # type: ignore[import-not-found]
+            import jsonschema
 
             jsonschema.validate(instance=config, schema=self.config_schema)
             return True
@@ -170,7 +170,7 @@ class CapabilityDefinition:
             return []
 
         try:
-            import jsonschema  # type: ignore[import-not-found]
+            import jsonschema
 
             validator = jsonschema.Draft7Validator(self.config_schema)
             return [error.message for error in validator.iter_errors(config)]

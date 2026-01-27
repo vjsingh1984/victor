@@ -219,7 +219,7 @@ class ReplicateProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore
         """Stream chat completion from Replicate."""
         try:
             prompt = self._messages_to_prompt(messages)

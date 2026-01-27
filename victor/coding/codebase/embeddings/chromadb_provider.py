@@ -31,8 +31,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 try:
-    import chromadb  # type: ignore[import]
-    from chromadb.config import Settings  # type: ignore[import]
+    import chromadb
+    from chromadb.config import Settings
 
     CHROMADB_AVAILABLE = True
 except ImportError:
@@ -297,10 +297,16 @@ class ChromaDBProvider(BaseEmbeddingProvider):
                 search_results.append(
                     EmbeddingSearchResult(
                         file_path=str(metadata.get("file_path", "")),
-                        symbol_name=str(metadata.get("symbol_name", "")) if metadata.get("symbol_name") else None,
+                        symbol_name=(
+                            str(metadata.get("symbol_name", ""))
+                            if metadata.get("symbol_name")
+                            else None
+                        ),
                         content=str(content),
                         score=float(score),
-                        line_number=int(metadata["line_number"]) if metadata.get("line_number") else None,
+                        line_number=(
+                            int(metadata["line_number"]) if metadata.get("line_number") else None
+                        ),
                         metadata=dict(metadata) if metadata else {},
                     )
                 )

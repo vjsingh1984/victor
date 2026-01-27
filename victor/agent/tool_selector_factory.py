@@ -224,7 +224,7 @@ def _create_semantic_selector(
         embedding_provider=embedding_provider,
         cache_embeddings=True,  # Enable caching for performance
     )
-    return selector
+    return selector  # type: ignore[return-value]
 
 
 def _create_keyword_selector(
@@ -255,7 +255,7 @@ def _create_keyword_selector(
         provider_name=provider_name,
         enabled_tools=enabled_tools,
     )
-    return selector
+    return selector  # type: ignore[return-value]
 
 
 def _create_hybrid_selector(
@@ -332,4 +332,4 @@ def _create_hybrid_selector(
         semantic_selector=semantic_selector,
         keyword_selector=keyword_selector,
         config=config,
-    )
+    )  # type: ignore[return-value]

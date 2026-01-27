@@ -38,8 +38,13 @@ class EmbeddingModelConfig(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    embedding_type: str = Field(default="sentence-transformers", description="Embedding provider type (sentence-transformers, openai, cohere, ollama, etc.)")
-    embedding_model: str = Field(default="BAAI/bge-small-en-v1.5", description="Specific model name")
+    embedding_type: str = Field(
+        default="sentence-transformers",
+        description="Embedding provider type (sentence-transformers, openai, cohere, ollama, etc.)",
+    )
+    embedding_model: str = Field(
+        default="BAAI/bge-small-en-v1.5", description="Specific model name"
+    )
     dimension: int = Field(
         default=384, description="Embedding dimension (auto-detected if possible)"
     )
@@ -145,7 +150,9 @@ class SentenceTransformerModel(BaseEmbeddingModel):
 
         # Use shared EmbeddingService singleton for memory efficiency
         # This shares the model with IntentClassifier and SemanticToolSelector
-        self._embedding_service = EmbeddingService.get_instance(model_name=self.config.embedding_model)
+        self._embedding_service = EmbeddingService.get_instance(
+            model_name=self.config.embedding_model
+        )
 
         # Ensure model is loaded (lazy loading)
         if self._embedding_service is None:
@@ -244,7 +251,9 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         if self.client is None:
             raise RuntimeError("OpenAI client not initialized")
 
-        response = await self.client.embeddings.create(model=self.config.embedding_model, input=text)
+        response = await self.client.embeddings.create(
+            model=self.config.embedding_model, input=text
+        )
         return list(response.data[0].embedding)
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -256,7 +265,9 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             raise RuntimeError("OpenAI client not initialized")
 
         # OpenAI API handles batching internally (up to 2048 texts per request)
-        response = await self.client.embeddings.create(model=self.config.embedding_model, input=texts)
+        response = await self.client.embeddings.create(
+            model=self.config.embedding_model, input=texts
+        )
         return [item.embedding for item in response.data]
 
     def get_dimension(self) -> int:
@@ -302,7 +313,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
             return
 
         try:
-            import cohere  # type: ignore[import]
+            import cohere
         except ImportError:
             raise ImportError("cohere not installed. Install with: pip install cohere")
 
@@ -559,4 +570,4 @@ def create_embedding_model(config: EmbeddingModelConfig) -> BaseEmbeddingModel:
             f"Unknown embedding model type: {config.embedding_type}. " f"Available: {available}"
         )
 
-    return model_class(config)
+    return model_class(config)  # type: ignore[abstract]

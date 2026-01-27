@@ -661,7 +661,7 @@ class ResilientProvider:
 
         except CircuitOpenError as e:
             logger.warning(f"Primary provider circuit open: {e}")
-            primary_error = e
+            primary_error_var = e
         except Exception as e:
             logger.warning(f"Primary provider failed: {e}")
             primary_error: Exception = e
@@ -701,7 +701,7 @@ class ResilientProvider:
 
         # All providers failed
         self._stats["total_failures"] += 1
-        raise ProviderUnavailableError(primary_error, fallback_errors)
+        raise ProviderUnavailableError(primary_error or primary_error_var, fallback_errors)
 
     async def stream(
         self,

@@ -1572,7 +1572,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         Returns:
             Detected TrackerTaskType
         """
-        from victor.storage.embeddings.task_classifier import (  # type: ignore[attr-defined]
+        from victor.storage.embeddings.task_classifier import (
             TaskType as ClassifierTaskType,
             TaskTypeClassifier,
         )
@@ -1830,10 +1830,10 @@ def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, Track
         Tuple of (tracker, detected_task_type)
     """
     # Import here to avoid circular dependency
-    from victor.storage.embeddings.task_classifier import (  # type: ignore[attr-defined]
+    from victor.storage.embeddings.task_classifier import (
         TaskType as ClassifierTaskType,
     )
-    from victor.storage.embeddings.task_classifier import (  # type: ignore[attr-defined]
+    from victor.storage.embeddings.task_classifier import (
         classify_task_type,
     )
 

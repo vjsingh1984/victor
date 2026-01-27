@@ -161,7 +161,11 @@ class LanceDBProvider(BaseEmbeddingProvider):
                         print(f"📖 Opened existing table: {table_name}")
                     except (RuntimeError, Exception) as e:
                         error_msg = str(e).lower()
-                        if "malformed" in error_msg or "corrupted" in error_msg or "database disk image" in error_msg:
+                        if (
+                            "malformed" in error_msg
+                            or "corrupted" in error_msg
+                            or "database disk image" in error_msg
+                        ):
                             print(f"⚠️  Database corrupted: {e}")
                             if should_rebuild:
                                 print("🔧 Rebuilding corrupted database...")
@@ -180,7 +184,11 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
             except Exception as e:
                 error_msg = str(e).lower()
-                if "malformed" in error_msg or "corrupted" in error_msg or "database disk image" in error_msg:
+                if (
+                    "malformed" in error_msg
+                    or "corrupted" in error_msg
+                    or "database disk image" in error_msg
+                ):
                     if should_rebuild:
                         print(f"⚠️  Database corrupted during connection: {e}")
                         print("🔧 Rebuilding corrupted database...")
@@ -216,10 +224,10 @@ class LanceDBProvider(BaseEmbeddingProvider):
         # Close existing connection
         if self.db:
             try:
-                del self.db  # type: ignore[unreachable]
+                del self.db
             except Exception:
-                pass  # type: ignore[unreachable]
-            self.db = None  # type: ignore[unreachable]
+                pass
+            self.db = None
         self.table = None
 
         # Remove corrupted database files
@@ -461,19 +469,19 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Count documents before deletion
         try:
-            count_before = self.table.count_rows()  # type: ignore[unreachable]
+            count_before = self.table.count_rows()
         except (AttributeError, RuntimeError, ValueError):
-            count_before = 0  # type: ignore[unreachable]
+            count_before = 0
 
         # Delete documents with matching file_path
         # LanceDB uses SQL-like predicates
-        self.table.delete(f"file_path = '{file_path}'")  # type: ignore[unreachable]
+        self.table.delete(f"file_path = '{file_path}'")
 
         # Count documents after deletion
         try:
-            count_after = self.table.count_rows()  # type: ignore[unreachable]
+            count_after = self.table.count_rows()
         except (AttributeError, RuntimeError, ValueError):
-            count_after = 0  # type: ignore[unreachable]
+            count_after = 0
 
         return count_before - count_after
 
@@ -504,9 +512,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
         count = 0
         if self.table is not None:
             try:
-                count = self.table.count_rows()  # type: ignore[unreachable]
+                count = self.table.count_rows()
             except (AttributeError, RuntimeError, ValueError):
-                count = 0  # type: ignore[unreachable]
+                count = 0
 
         return {
             "provider": "lancedb",

@@ -169,7 +169,7 @@ class TomlValidator:
 
         # Try tomllib (Python 3.11+) first
         try:
-            import tomllib  # type: ignore[import-not-found]
+            import tomllib  # type: ignore[import-untyped]
 
             self._toml_module = tomllib
             self._toml_available = True
@@ -245,7 +245,7 @@ class HoconValidator:
         self._hocon_available = False
 
         try:
-            from pyhocon import ConfigFactory  # type: ignore[import-untyped]
+            from pyhocon import ConfigFactory  # type: ignore[import-not-found]
 
             self._config_factory = ConfigFactory
             self._hocon_available = True

@@ -54,7 +54,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
-import numpy as np  # type: ignore[import-untyped]
+import numpy as np
 
 from victor.providers.base import Message, CompletionResponse
 
