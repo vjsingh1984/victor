@@ -34,18 +34,18 @@ def api_server_available():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(0.5)  # 500ms timeout
     try:
-        result = sock.connect_ex(('localhost', 8000))
+        result = sock.connect_ex(('localhost', 8765))
         sock.close()
         if result != 0:
             pytest.skip(
-                "API server not running at localhost:8000. "
+                "API server not running at localhost:8765. "
                 "Start with: victor serve"
             )
         return True
     except Exception:
         sock.close()
         pytest.skip(
-            "API server not running at localhost:8000. "
+            "API server not running at localhost:8765. "
             "Start with: victor serve"
         )
 

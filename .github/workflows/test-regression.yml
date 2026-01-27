@@ -270,11 +270,11 @@ jobs:
 
       - name: Start API server in background
         run: |
-          victor serve --host 0.0.0.0 --port 8000 &
+          victor serve --host 0.0.0.0 --port 8765 &
           echo $! > server.pid
           # Wait for server to be ready
           for i in {1..30}; do
-            if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+            if curl -s http://localhost:8765/health > /dev/null 2>&1; then
               echo "Server is ready"
               break
             fi
@@ -292,7 +292,7 @@ jobs:
                 --users 50 \
                 --spawn-rate 5 \
                 --run-time 60s \
-                --host http://localhost:8000 \
+                --host http://localhost:8765 \
                 --html locust_report.html
             done
           fi

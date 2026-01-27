@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 
 # Test configuration
-DEFAULT_HOST = os.getenv("VICTOR_API_HOST", "http://localhost:8000")
+DEFAULT_HOST = os.getenv("VICTOR_API_HOST", "http://localhost:8765")
 
 
 class AsyncLoadTestFramework:
