@@ -214,7 +214,8 @@ class ModeLayer(AccessLayer, ModeAwareMixin):
             return all_tools & mode_info.allowed_tools
 
         # Remove disallowed tools
-        return all_tools - mode_info.disallowed_tools
+        disallowed_tools = mode_info.disallowed_tools or set()
+        return all_tools - disallowed_tools
 
 
 # =============================================================================

@@ -3092,7 +3092,7 @@ class OrchestratorFactory(ModeAwareMixin):
             if tools:
                 from victor.framework.tool_config import configure_tools
 
-                configure_tools(orchestrator, tools, airgapped=kwargs.get("airgapped", False))
+                configure_tools(orchestrator, tools)
 
             # Apply vertical configuration if specified
             vertical = kwargs.get("vertical")

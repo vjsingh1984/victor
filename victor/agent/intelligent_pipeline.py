@@ -368,7 +368,7 @@ class IntelligentAgentPipeline:
                 return  # type: ignore[unreachable]
 
             # Build rich metadata with context about what failed
-            metadata = {
+            metadata: dict[str, Any] = {
                 "is_grounded": is_grounded,
                 "grounding_score": grounding_score,
             }

@@ -1834,11 +1834,11 @@ def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, Track
         TaskType as ClassifierTaskType,
     )
     from victor.storage.embeddings.task_classifier import (
-        classify_task_type,
+        classify,
     )
 
     # Classify the message
-    classifier_type = classify_task_type(message)
+    classifier_type = classify(message)
 
     # Map classifier types to unified types
     type_map = {

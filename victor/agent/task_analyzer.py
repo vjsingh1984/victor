@@ -38,11 +38,11 @@ if TYPE_CHECKING:
     try:
         from victor.storage.embeddings.task_classifier import TaskType
     except (ImportError, AttributeError):
-        TaskType = Union[None, object]  # type: ignore[misc]
+        TaskType = type(None) | object  # type: ignore[misc]
     try:
         from victor.storage.embeddings.intent_classifier import IntentType
     except (ImportError, AttributeError):
-        IntentType = Union[None, object]  # type: ignore[misc]
+        IntentType = type(None) | object  # type: ignore[misc]
     from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.protocols.coordination import CoordinationSuggestion
 
