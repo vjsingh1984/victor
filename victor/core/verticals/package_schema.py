@@ -212,7 +212,7 @@ class VerticalPackageMetadata(BaseModel):
 
         # Write TOML
         try:
-            import tomli_w
+            import tomli_w  # type: ignore[import]
 
             toml_content = tomli_w.dumps(data)
         except ImportError:

@@ -559,7 +559,7 @@ class SlackTransport(BaseTransport):
 
     async def send(self, request: HITLRequest, workflow_id: str) -> str:
         """Send Slack message with interactive buttons."""
-        import aiohttp  # type: ignore[import-not-found]
+        import aiohttp
 
         urls = self._build_callback_urls(request.request_id)
 
@@ -686,7 +686,7 @@ class SMSTransport(BaseTransport):
 
     async def send(self, request: HITLRequest, workflow_id: str) -> str:
         """Send SMS via Twilio."""
-        from twilio.rest import Client
+        from twilio.rest import Client  # type: ignore[import-not-found]
 
         client = Client(
             self.sms_config.account_sid,
@@ -743,7 +743,7 @@ class GitHubPRTransport(BaseTransport):
 
     async def send(self, request: HITLRequest, workflow_id: str) -> str:
         """Request PR review or add approval-required label."""
-        import aiohttp  # type: ignore[import-not-found]
+        import aiohttp
 
         headers = {
             "Authorization": f"token {self.github_config.token}",
@@ -792,7 +792,7 @@ class GitHubPRTransport(BaseTransport):
         timeout: Optional[float] = None,
     ) -> Optional[HITLResponse]:
         """Poll for PR approval status."""
-        import aiohttp  # type: ignore[import-not-found]
+        import aiohttp
 
         # Parse external_ref: github:pr:123:comment:456
         parts = external_ref.split(":")
@@ -872,7 +872,7 @@ class GitHubCheckTransport(BaseTransport):
 
     async def send(self, request: HITLRequest, workflow_id: str) -> str:
         """Create a pending GitHub Check Run."""
-        import aiohttp  # type: ignore[import-not-found]
+        import aiohttp
 
         headers = {
             "Authorization": f"token {self.github_config.token}",

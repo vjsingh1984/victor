@@ -40,7 +40,7 @@ from victor.integrations.mcp.protocol import (
     MCPTool,
     MCPToolCallResult,
 )
-from victor.tools.base import BaseTool
+from victor.tools.base import BaseTool, ToolParameter
 from victor.tools.registry import ToolRegistry
 
 
@@ -105,58 +105,46 @@ class MCPServer:
         mcp_params = []
 
         # Handle both formats: List[ToolParameter] and Dict (JSON Schema)
-        tool_params = tool.parameters
+        tool_params: List[ToolParameter] = []
 
-        if isinstance(tool_params, list):
-            # New format: List[ToolParameter]
-            for param in tool_params:
-                type_map = {
-                    "string": MCPParameterType.STRING,
-                    "number": MCPParameterType.NUMBER,
-                    "integer": MCPParameterType.NUMBER,
-                    "boolean": MCPParameterType.BOOLEAN,
-                    "object": MCPParameterType.OBJECT,
-                    "array": MCPParameterType.ARRAY,
-                }
+        if isinstance(tool.parameters, dict):
+            # JSON Schema format: convert to list
+            tool_params = [
+                ToolParameter(
+                    name=name,
+                    type=param.get("type", "string"),
+                    description=param.get("description", ""),
+                    enum=param.get("enum"),
+                    required=param.get("required", True)
+                )
+                for name, param in tool.parameters.items()
+            ]
+        else:
+            # ToolParameter list format
+            tool_params = tool.parameters
 
-                mcp_type = type_map.get(param.type.lower(), MCPParameterType.STRING)
+        for param in tool_params:
+            type_map = {
+                "string": MCPParameterType.STRING,
+                "number": MCPParameterType.NUMBER,
+                "integer": MCPParameterType.NUMBER,
+                "boolean": MCPParameterType.BOOLEAN,
+                "object": MCPParameterType.OBJECT,
+                "array": MCPParameterType.ARRAY,
+            }
+
+            mcp_type = type_map.get(param.type.lower(), MCPParameterType.STRING)
 
                 mcp_params.append(
-                    MCPParameter(
-                        name=param.name,
-                        type=mcp_type,
-                        description=param.description,
-                        required=param.required,
-                    )
+                MCPParameter(
+                    name=param.name,
+                    type=mcp_type,
+                    description=param.description,
+                    required=param.required,
                 )
+            )
 
-        elif isinstance(tool_params, dict):
-            # Old format: JSON Schema dict
-            properties = tool_params.get("properties", {})
-            required_list = tool_params.get("required", [])
-
-            for param_name, param_def in properties.items():
-                type_map = {
-                    "string": MCPParameterType.STRING,
-                    "number": MCPParameterType.NUMBER,
-                    "integer": MCPParameterType.NUMBER,
-                    "boolean": MCPParameterType.BOOLEAN,
-                    "object": MCPParameterType.OBJECT,
-                    "array": MCPParameterType.ARRAY,
-                }
-
-                param_type = param_def.get("type", "string")
-                mcp_type = type_map.get(param_type.lower(), MCPParameterType.STRING)
-
-                mcp_params.append(
-                    MCPParameter(
-                        name=param_name,
-                        type=mcp_type,
-                        description=param_def.get("description", ""),
-                        required=param_name in required_list,
-                    )
-                )
-
+        
         return MCPTool(
             name=tool.name,
             description=tool.description,

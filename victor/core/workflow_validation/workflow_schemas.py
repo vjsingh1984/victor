@@ -178,7 +178,7 @@ class WorkflowNodeSchema(BaseModel):
 
             for branch_key, branch_val in v.items():
                 if not isinstance(branch_val, str):
-                    continue
+                    continue  # type: ignore[unreachable]
                 if not re.match(r"^[a-zA-Z0-9_\-]+$", branch_val):
                     # Allow __end__ as a special terminal marker
                     if branch_val != "__end__":
@@ -186,7 +186,7 @@ class WorkflowNodeSchema(BaseModel):
                             f"Branch target '{branch_val}' must be alphanumeric "
                             "(underscores and hyphens allowed, or __end__ for terminal)"
                         )
-        return v  # type: ignore[unreachable]
+        return v
 
 
 class WorkflowEdgeSchema(BaseModel):

@@ -927,7 +927,7 @@ class WorkflowRefiner:
         elif error.category == ErrorCategory.SECURITY:
             refined_schema, fixes = self.security_refiner.refine(schema, [error])
         else:
-            return None
+            return None  # type: ignore[unreachable]
 
         return fixes[0] if fixes else None
 

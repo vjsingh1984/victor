@@ -48,7 +48,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 from victor.protocols import IPromptContributor, PromptContext
 
 if TYPE_CHECKING:
-    from victor.framework.prompt import PromptBuilder
+    from victor.framework.prompt import PromptBuilder  # type: ignore[import-not-found]
 
 logger = logging.getLogger(__name__)
 
@@ -612,7 +612,7 @@ class PromptBuilderCoordinator(IPromptBuilderCoordinator):
             if hooks is None:
                 return
 
-            # Determine prompt style based on provider type
+            # Determine prompt style based on provider type  # type: ignore[unreachable]
             # Cloud providers use concise style, local uses detailed
             is_local = provider_name.lower() in {"ollama", "lmstudio", "vllm"}
             prompt_style = "detailed" if is_local else "structured"
