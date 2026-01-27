@@ -232,7 +232,7 @@ class ToolResultCache:
         """Normalize vector for cosine similarity."""
         norm = np.linalg.norm(vec)
         if norm > 0:
-            return vec / norm  # type: ignore[no-any-return]
+            return vec / norm
         return vec
 
     def _hash_args(self, tool_name: str, arguments: Dict[str, Any]) -> str:
@@ -366,7 +366,7 @@ class ToolResultCache:
 
                 if embedding is None:
                     self.stats.misses += 1
-                    return None
+                    return None  # type: ignore[unreachable]
 
                 query_vec = self._normalize(np.array(embedding, dtype=np.float32))
                 sim_threshold = threshold or SIMILARITY_THRESHOLD.get(tool_name, 0.90)

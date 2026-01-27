@@ -756,7 +756,8 @@ class TestEdgeCases:
     async def test_chunk_with_special_characters(self, mock_embedding_fn):
         """Test chunking text with special characters."""
         content = "Test with émojis 🎉 and spëcial çharacters.\n\nNewlines.\t\tTabs."
-        chunker = DocumentChunker()
+        # Use a smaller min_chunk_size to handle short test content
+        chunker = DocumentChunker(ChunkingConfig(min_chunk_size=20))
         doc = Document(id="special", content=content, source="test.txt", doc_type="text")
 
         chunks = await chunker.chunk_document(doc, mock_embedding_fn)
@@ -850,8 +851,9 @@ class TestEmbeddingGeneration:
         async def failing_embedding_fn(text: str):
             raise RuntimeError("Embedding service unavailable")
 
-        chunker = DocumentChunker()
-        doc = Document(id="error", content="Test content", source="test.txt", doc_type="text")
+        # Use smaller min_chunk_size to ensure content gets chunked
+        chunker = DocumentChunker(ChunkingConfig(min_chunk_size=10))
+        doc = Document(id="error", content="Test content for error handling", source="test.txt", doc_type="text")
 
         # Should propagate the error
         with pytest.raises(RuntimeError, match="Embedding service unavailable"):
