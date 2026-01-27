@@ -60,7 +60,7 @@ from .async_framework import AsyncLoadTestFramework
 @pytest.fixture
 async def load_test_framework():
     """Provide load test framework instance."""
-    return AsyncLoadTestFramework(base_url="http://localhost:8000")
+    return AsyncLoadTestFramework(base_url="http://localhost:8765")
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ async def mock_orchestrator():
 class TestConcurrentRequests:
     """Test system behavior under concurrent load.
 
-    Requires API server running at localhost:8000.
+    Requires API server running at localhost:8765.
     """
 
     @pytest.mark.asyncio
@@ -187,7 +187,7 @@ class TestConcurrentRequests:
 class TestLargeContext:
     """Test system behavior with large conversation contexts.
 
-    Requires API server running at localhost:8000.
+    Requires API server running at localhost:8765.
     """
 
     @pytest.mark.asyncio
@@ -305,7 +305,7 @@ class TestLargeContext:
 class TestMemoryLeaks:
     """Test for memory leaks in long-running sessions.
 
-    Requires API server running at localhost:8000.
+    Requires API server running at localhost:8765.
     """
 
     @pytest.mark.asyncio
@@ -389,7 +389,7 @@ class TestMemoryLeaks:
 class TestStressTesting:
     """Find system breaking points and test graceful degradation.
 
-    Requires API server running at localhost:8000.
+    Requires API server running at localhost:8765.
     """
 
     @pytest.mark.asyncio
@@ -474,7 +474,7 @@ class TestEndurance:
 
     Long-running tests to detect memory leaks and performance degradation.
 
-    Requires API server running at localhost:8000.
+    Requires API server running at localhost:8765.
     """
 
     @pytest.mark.asyncio

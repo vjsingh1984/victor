@@ -39,7 +39,7 @@ from locust import HttpUser, task, between, events, run_single_user
 from locust.runners import MasterRunner
 
 # Test configuration
-DEFAULT_HOST = os.getenv("VICTOR_API_HOST", "http://localhost:8000")
+DEFAULT_HOST = os.getenv("VICTOR_API_HOST", "http://localhost:8765")
 DEFAULT_PROVIDER = os.getenv("VICTOR_PROVIDER", "anthropic")
 DEFAULT_MODEL = os.getenv("VICTOR_MODEL", "claude-sonnet-4-5")
 

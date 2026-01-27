@@ -30,7 +30,7 @@ from pytest import mark
 
 
 # Test configuration
-API_HOST = "http://localhost:8000"
+API_HOST = "http://localhost:8765"
 DEFAULT_TIMEOUT = 60.0  # Longer timeout for workflows
 
 
@@ -41,7 +41,7 @@ class TestWorkflowLoad:
     """Workflow execution load tests.
 
     Measures workflow compilation, execution, and state management under load.
-    Requires API server running at localhost:8000.
+    Requires API server running at localhost:8765.
     """
 
     async def test_simple_workflow_baseline(self):

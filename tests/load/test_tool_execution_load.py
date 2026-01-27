@@ -30,7 +30,7 @@ from pytest import mark
 
 
 # Test configuration
-API_HOST = "http://localhost:8000"
+API_HOST = "http://localhost:8765"
 DEFAULT_TIMEOUT = 30.0
 
 
@@ -41,7 +41,7 @@ class TestToolExecutionLoad:
     """Tool execution load tests.
 
     Measures tool selection, execution, and error handling under load.
-    Requires API server running at localhost:8000.
+    Requires API server running at localhost:8765.
     """
 
     async def test_single_tool_baseline(self):

@@ -31,7 +31,7 @@ from pytest import mark
 
 
 # Test configuration
-API_HOST = "http://localhost:8000"
+API_HOST = "http://localhost:8765"
 DEFAULT_TIMEOUT = 30.0
 ENDPOINTS = {
     "chat": "/api/v1/chat",
