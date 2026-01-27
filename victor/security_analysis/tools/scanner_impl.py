@@ -193,7 +193,9 @@ class PythonDependencyParser(BaseDependencyParser):
             import tomllib  # type: ignore[import-not-found]
         except ImportError:
             try:
-                import tomli as tomllib  # type: ignore[import-not-found]
+                import tomli as tomli_module  # type: ignore[import-not-found]
+
+                tomllib = tomli_module
             except ImportError:
                 logger.warning("tomllib/tomli not available for poetry.lock parsing")
                 return deps
