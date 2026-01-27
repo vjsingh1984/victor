@@ -416,7 +416,7 @@ def detect_secrets(content: str, include_low_severity: bool = False) -> List[Sec
     """Quick function to detect secrets in content.
 
     Uses Rust-accelerated scanning when available (5-10x faster),
-    falls back to Python regex otherwise.
+    and combines with Python scanner for comprehensive coverage.
 
     Args:
         content: Text content to scan
@@ -425,7 +425,12 @@ def detect_secrets(content: str, include_low_severity: bool = False) -> List[Sec
     Returns:
         List of SecretMatch objects
     """
-    # Try Rust-accelerated scanning first (faster for large content)
+    # Always use Python scanner for comprehensive pattern coverage
+    # Python scanner has all the patterns defined in CREDENTIAL_PATTERNS
+    python_scanner = SecretScanner(include_low_severity=include_low_severity)
+    python_matches = python_scanner.scan(content)
+
+    # If Rust is available, combine results (de-duplicating by position)
     if _RUST_SECRETS_AVAILABLE and not include_low_severity:
         try:
             rust_matches = rust_scan_secrets(content)
@@ -437,7 +442,9 @@ def detect_secrets(content: str, include_low_severity: bool = False) -> List[Sec
                 offset += len(line) + 1
                 line_offsets.append(offset)
 
-            result = []
+            rust_results = []
+            seen_positions = set()
+
             for rm in rust_matches:
                 # Find line number
                 line_num = 1
@@ -446,24 +453,34 @@ def detect_secrets(content: str, include_low_severity: bool = False) -> List[Sec
                         line_num = i
                         break
 
-                result.append(
-                    SecretMatch(
-                        secret_type=rm.secret_type,
-                        matched_text=rm.matched_text,
-                        start=rm.start,
-                        end=rm.end,
-                        line_number=line_num,
-                        severity=SecretSeverity.HIGH,  # Rust patterns are high-value
-                        suggestion="Remove or rotate this credential",
+                # Track position to avoid duplicates
+                if (rm.start, rm.end) not in seen_positions:
+                    rust_results.append(
+                        SecretMatch(
+                            secret_type=rm.secret_type,
+                            matched_text=rm.matched_text,
+                            start=rm.start,
+                            end=rm.end,
+                            line_number=line_num,
+                            severity=SecretSeverity.HIGH,  # Rust patterns are high-value
+                            suggestion="Remove or rotate this credential",
+                        )
                     )
-                )
-            return result
-        except Exception:
-            pass  # Fall through to Python implementation
+                    seen_positions.add((rm.start, rm.end))
 
-    # Fallback to Python regex scanning
-    scanner = SecretScanner(include_low_severity=include_low_severity)
-    return scanner.scan(content)
+            # Combine results, preferring Python matches for same position
+            combined = []
+            python_positions = {(m.start, m.end) for m in python_matches}
+
+            for rust_match in rust_results:
+                if (rust_match.start, rust_match.end) not in python_positions:
+                    combined.append(rust_match)
+
+            return python_matches + combined
+        except Exception:
+            pass  # Fall through to Python-only results
+
+    return python_matches
 
 
 def has_secrets(content: str) -> bool:
@@ -499,7 +516,8 @@ def get_secret_types() -> List[str]:
 def mask_secrets(content: str, replacement: str = "[REDACTED]") -> str:
     """Mask all detected secrets in content.
 
-    Uses Rust-accelerated masking when available.
+    Uses combined Rust+Python detection for comprehensive coverage,
+    with Python-based masking for flexibility.
 
     Args:
         content: Text content with potential secrets
@@ -508,14 +526,8 @@ def mask_secrets(content: str, replacement: str = "[REDACTED]") -> str:
     Returns:
         Content with secrets masked
     """
-    # Try Rust-accelerated masking first
-    if _RUST_SECRETS_AVAILABLE and replacement == "[REDACTED]":
-        try:
-            return rust_mask_secrets(content)
-        except Exception:
-            pass
-
-    # Fallback to Python implementation
+    # Always use detect_secrets which now combines Rust+Python patterns
+    # This ensures all patterns are detected before masking
     matches = detect_secrets(content, include_low_severity=True)
 
     # Sort by position descending to replace from end first

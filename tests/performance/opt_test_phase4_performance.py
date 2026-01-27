@@ -674,9 +674,10 @@ class TestSecurityAuthorizationOverhead:
 
         # Setup: Create user and assign role
         authorizer.create_user(user_id="user1", username="user1", roles=["developer"])
+        user = authorizer.get_user("user1")
 
         def auth_check():
-            return authorizer.check_permission("user1", "tools", "execute")
+            return authorizer.check_permission(user, "tools", "execute")
 
         result = benchmark.pedantic(auth_check, rounds=1000, iterations=1)
 
@@ -703,10 +704,11 @@ class TestSecurityAuthorizationOverhead:
             },
         )
         authorizer.create_user(user_id="admin_user", username="admin_user", roles=["admin"])
+        admin_user_obj = authorizer.get_user("admin_user")
 
         # Single check baseline
         start = time.perf_counter()
-        authorizer.check_permission("admin_user", "tools", "execute")
+        authorizer.check_permission(admin_user_obj, "tools", "execute")
         single_check_time = (time.perf_counter() - start) * 1000
 
         # Bulk checks
@@ -719,7 +721,7 @@ class TestSecurityAuthorizationOverhead:
         ]
 
         start = time.perf_counter()
-        results = [authorizer.check_permission("admin_user", resource, action) for resource, action in checks]
+        results = [authorizer.check_permission(admin_user_obj, resource, action) for resource, action in checks]
         bulk_check_time = (time.perf_counter() - start) * 1000
 
         avg_bulk_time = bulk_check_time / len(checks)

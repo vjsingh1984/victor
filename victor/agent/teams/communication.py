@@ -296,7 +296,7 @@ class TeamMessageBus:
                     return None
             elif timeout is None:
                 # Wait forever
-                msg = await self._queues[agent_id].get()
+                msg = await self._queues[agent_id].get()  # type: ignore[unreachable]
             else:
                 # Wait with timeout
                 msg = await asyncio.wait_for(

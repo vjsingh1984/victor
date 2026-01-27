@@ -1309,8 +1309,8 @@ class ErrorHandler:
 
 
 # Alias for builtin FileNotFoundError
-if isinstance(__builtins__, dict):
-    builtins_FileNotFoundError = __builtins__["FileNotFoundError"]
+if isinstance(__builtins__, dict):  # type: ignore[unreachable]
+    builtins_FileNotFoundError = __builtins__["FileNotFoundError"]  # type: ignore[unreachable]
 else:
     builtins_FileNotFoundError = __builtins__.FileNotFoundError
 

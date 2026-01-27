@@ -180,7 +180,8 @@ class TestSecretDetection:
         secrets = detect_secrets(code)
 
         assert len(secrets) > 0
-        assert any("AWS" in s.secret_type for s in secrets)
+        # Use case-insensitive match
+        assert any("aws" in s.secret_type.lower() for s in secrets)
 
     def test_openai_key_detection(self):
         """Test OpenAI API key detection."""

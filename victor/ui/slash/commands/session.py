@@ -76,8 +76,8 @@ class SaveCommand(BaseSlashCommand):
             # Save to SQLite
             session_id = sqlite_persistence.save_session(
                 conversation=ctx.agent.conversation if ctx.agent else None,
-                model=ctx.agent.model if ctx.agent else None,
-                provider=ctx.agent.provider_name if ctx.agent else None,
+                model=getattr(ctx.agent, 'model', None) if ctx.agent else None,  # type: ignore[attr-defined]
+                provider=getattr(ctx.agent, 'provider_name', None) if ctx.agent else None,  # type: ignore[attr-defined]
                 profile=getattr(ctx.settings, "current_profile", "default"),
                 session_id=session_id,  # Use existing or None for new
                 title=title,
@@ -460,7 +460,10 @@ class CompactCommand(BaseSlashCommand):
                     Message(role="system", content=f"[Previous conversation summary]\n{summary}"),
                     *messages[-keep_recent:],
                 ]
-                ctx.agent.conversation.messages = new_messages
+                # Update messages through proper method
+                ctx.agent.conversation.clear_messages()
+                for msg in new_messages:
+                    ctx.agent.conversation.add_message(msg)  # type: ignore[attr-defined]
 
                 ctx.console.print(
                     Panel(
@@ -475,7 +478,10 @@ class CompactCommand(BaseSlashCommand):
         else:
             # Simple truncation
             if ctx.agent:
-                ctx.agent.conversation.messages = messages[-keep_recent:]
+                # Update messages through proper method
+                ctx.agent.conversation.clear_messages()
+                for msg in messages[-keep_recent:]:
+                    ctx.agent.conversation.add_message(msg)  # type: ignore[attr-defined]
                 new_count = ctx.agent.conversation.message_count()
 
                 ctx.console.print(

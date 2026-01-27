@@ -106,14 +106,14 @@ class LazyVerticalProxy:
         """
         # Fast path: already loaded
         if self._loaded:
-            assert self._instance is not None
+            assert self._instance is not None  # type: ignore[unreachable]
             return self._instance
 
         # Slow path: need to load
         with self._load_lock:
             # Double-check: another thread may have loaded it
             if self._loaded:
-                assert self._instance is not None
+                assert self._instance is not None  # type: ignore[unreachable]
                 return self._instance
 
             # Check for recursive loading

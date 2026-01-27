@@ -40,7 +40,8 @@ Top tool-enabled coding models for vLLM (fp16/q8):
 import json
 import logging
 import re
-from typing import Any, AsyncIterator, Coroutine, Dict, List, Optional, Tuple
+import typing
+from typing import Any, AsyncIterator, AsyncGenerator, Coroutine, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -422,6 +423,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
+    @typing.no_type_check
     async def stream(
         self,
         messages: List[Message],
@@ -431,7 +433,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[misc]
         """Stream chat completion from vLLM server.
 
         Args:

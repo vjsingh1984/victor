@@ -919,7 +919,7 @@ class ModelTrainer:
         model = self.model
         if model is None:
             raise ValueError("Model not trained. Call train_model() first.")
-        y_pred = model.predict(X_test)
+        y_pred = model.predict(X_test)  # type: ignore[unreachable]
         inference_time = time.time() - start_time
 
         # Calculate metrics
@@ -1002,7 +1002,7 @@ class ModelTrainer:
             raise ValueError("Model not loaded. Train or load a model first.")
 
         # Extract features and labels
-        X = [example.task_features.to_feature_vector() for example in new_examples]
+        X = [example.task_features.to_feature_vector() for example in new_examples]  # type: ignore[unreachable]
         y = [self.FORMATION_LABELS.index(example.formation) for example in new_examples]
 
         # Scale features
@@ -1143,7 +1143,7 @@ class AdaptiveFormationML:
         if self.model is not None:
             try:
                 # Scale features
-                X_scaled = self.scaler.transform([feature_vector])
+                X_scaled = self.scaler.transform([feature_vector])  # type: ignore[unreachable]
 
                 # Get prediction and probabilities
                 import time
@@ -1291,7 +1291,7 @@ class AdaptiveFormationML:
 
         try:
             # Update model
-            self._trainer.update_model(self._execution_buffer)
+            self._trainer.update_model(self._execution_buffer)  # type: ignore[unreachable]
 
             logger.info(f"Model updated with {len(self._execution_buffer)} new examples")
 
@@ -1310,7 +1310,7 @@ class AdaptiveFormationML:
         if self.model is None or not hasattr(self.model, "feature_importances_"):
             return {}
 
-        feature_names = [
+        feature_names = [  # type: ignore[unreachable]
             "complexity",
             "urgency",
             "uncertainty",

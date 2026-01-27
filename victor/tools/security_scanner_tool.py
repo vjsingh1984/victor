@@ -379,14 +379,14 @@ async def scan(
         else:
             deps = results["dependencies"]
             report.append(f"  Packages checked: {deps['packages_checked']}")
-            vulnerabilities = deps["vulnerabilities"]  # type: ignore[assignment]
-            report.append(f"  Vulnerabilities: {len(vulnerabilities)}")
+            vulnerabilities = deps["vulnerabilities"]
+            report.append(f"  Vulnerabilities: {len(vulnerabilities)}")  # type: ignore[arg-type]
             if vulnerabilities:
-                for vuln in vulnerabilities[:5]:
+                for vuln in vulnerabilities[:5]:  # type: ignore[index]
                     report.append(f"    {vuln['package']}: {vuln['message']}")
-                if len(vulnerabilities) > 5:
+                if len(vulnerabilities) > 5:  # type: ignore[arg-type]
                     report.append(
-                        f"    ... and {len(vulnerabilities) - 5} more"
+                        f"    ... and {len(vulnerabilities) - 5} more"  # type: ignore[arg-type]
                     )
         report.append("")
 

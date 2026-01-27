@@ -303,8 +303,8 @@ class TestStateGraphThroughput:
         compiled = graph.compile()
 
         def execute_graph():
-            result = compiled.invoke({"value": 0})
-            return result
+            result = asyncio.run(compiled.invoke({"value": 0}))
+            return result.state
 
         result = benchmark(execute_graph)
         assert result["value"] == 5
@@ -333,8 +333,8 @@ class TestStateGraphThroughput:
         compiled = graph.compile()
 
         def execute_graph():
-            result = compiled.invoke({"value": 1})
-            return result
+            result = asyncio.run(compiled.invoke({"value": 1}))
+            return result.state
 
         result = benchmark(execute_graph)
         assert result["result"] in ["A", "B"]
@@ -357,11 +357,12 @@ class TestStateGraphThroughput:
             lambda state: {"total": state.get("b1", 0) + state.get("b2", 0) + state.get("b3", 0)},
         )
 
-        # For parallel execution, we need to use START as entry
-        graph.set_entry_point(START)
-        graph.add_edge(START, "branch1")
-        graph.add_edge(START, "branch2")
-        graph.add_edge(START, "branch3")
+        # For parallel execution, use start node instead of START constant
+        graph.add_node("start", lambda state: {})
+        graph.set_entry_point("start")
+        graph.add_edge("start", "branch1")
+        graph.add_edge("start", "branch2")
+        graph.add_edge("start", "branch3")
         graph.add_edge("branch1", "merge")
         graph.add_edge("branch2", "merge")
         graph.add_edge("branch3", "merge")
@@ -370,8 +371,8 @@ class TestStateGraphThroughput:
         compiled = graph.compile()
 
         def execute_graph():
-            result = compiled.invoke({})
-            return result
+            result = asyncio.run(compiled.invoke({}))
+            return result.state
 
         result = benchmark(execute_graph)
         assert result["total"] == 3
@@ -599,10 +600,11 @@ class TestPerformanceAssertions:
 
         # Measure execution time
         start = time.perf_counter()
-        result = compiled.invoke({"step": 0})
+        result = asyncio.run(compiled.invoke({"step": 0}))
         elapsed = time.perf_counter() - start
 
         # Should complete in < 100ms
         assert elapsed < 0.1, f"Workflow execution too slow: {elapsed:.3f}s (target: < 100ms)"
 
         assert result is not None
+        assert result.state is not None
