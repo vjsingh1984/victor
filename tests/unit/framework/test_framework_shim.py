@@ -379,7 +379,10 @@ class TestFrameworkShimVertical:
             # New capability-based approach calls orchestrator.set_custom_prompt directly
             # Check the call list since set_custom_prompt is a real method, not a MagicMock
             assert len(mock_orchestrator.set_custom_prompt_calls_list) == 1
-            assert mock_orchestrator.set_custom_prompt_calls_list[0] == "You are a framework shim test assistant."
+            assert (
+                mock_orchestrator.set_custom_prompt_calls_list[0]
+                == "You are a framework shim test assistant."
+            )
 
     @pytest.mark.asyncio
     async def test_vertical_stages_applied(self, mock_settings, mock_orchestrator):

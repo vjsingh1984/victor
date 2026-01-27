@@ -18,9 +18,7 @@ import shutil
 class TestProtocolTypeChecking:
     """Test suite for mypy strict mode compliance."""
 
-    @pytest.mark.skipif(
-        not shutil.which("mypy"), reason="mypy is not installed"
-    )
+    @pytest.mark.skipif(not shutil.which("mypy"), reason="mypy is not installed")
     def test_protocol_files_pass_mypy_strict(self):
         """All protocol files should pass mypy strict mode."""
         protocol_files = [
@@ -78,14 +76,18 @@ class TestProtocolTypeChecking:
         assert "name" in sig.parameters
         assert sig.parameters["name"].annotation is str
 
-    @pytest.mark.skipif(
-        not shutil.which("mypy"), reason="mypy is not installed"
-    )
+    @pytest.mark.skipif(not shutil.which("mypy"), reason="mypy is not installed")
     @pytest.mark.skip(reason="Test files don't need strict mypy checking with return types")
     def test_test_file_passes_mypy(self):
         """Test file itself should pass mypy type checking."""
         result = subprocess.run(
-            ["mypy", "--strict", "--follow-imports=skip", "--no-error-summary", "tests/unit/protocols/test_capability_protocol.py"],
+            [
+                "mypy",
+                "--strict",
+                "--follow-imports=skip",
+                "--no-error-summary",
+                "tests/unit/protocols/test_capability_protocol.py",
+            ],
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent.parent.parent,

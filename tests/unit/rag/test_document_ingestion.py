@@ -853,7 +853,12 @@ class TestEmbeddingGeneration:
 
         # Use smaller min_chunk_size to ensure content gets chunked
         chunker = DocumentChunker(ChunkingConfig(min_chunk_size=10))
-        doc = Document(id="error", content="Test content for error handling", source="test.txt", doc_type="text")
+        doc = Document(
+            id="error",
+            content="Test content for error handling",
+            source="test.txt",
+            doc_type="text",
+        )
 
         # Should propagate the error
         with pytest.raises(RuntimeError, match="Embedding service unavailable"):
@@ -923,7 +928,11 @@ class TestDocumentStorage:
         )
         await store.initialize()
 
-        doc = Document(id="store1", content="Test content for store that is long enough to be chunked", source="test.txt")
+        doc = Document(
+            id="store1",
+            content="Test content for store that is long enough to be chunked",
+            source="test.txt",
+        )
         chunks = await store.add_document(doc)
 
         assert len(chunks) > 0
@@ -942,7 +951,11 @@ class TestDocumentStorage:
         )
         await store.initialize()
 
-        doc = Document(id="get1", content="Content for retrieval that is long enough to chunk", source="test.txt")
+        doc = Document(
+            id="get1",
+            content="Content for retrieval that is long enough to chunk",
+            source="test.txt",
+        )
         await store.add_document(doc)
 
         retrieved = await store.get_document("get1")
@@ -963,7 +976,9 @@ class TestDocumentStorage:
         )
         await store.initialize()
 
-        doc = Document(id="del1", content="Content to delete that is long enough", source="test.txt")
+        doc = Document(
+            id="del1", content="Content to delete that is long enough", source="test.txt"
+        )
         await store.add_document(doc)
 
         # Delete the document
@@ -989,7 +1004,9 @@ class TestDocumentStorage:
 
         # Add multiple documents
         for i in range(3):
-            doc = Document(id=f"list{i}", content=f"Content {i} that is long enough", source=f"test{i}.txt")
+            doc = Document(
+                id=f"list{i}", content=f"Content {i} that is long enough", source=f"test{i}.txt"
+            )
             await store.add_document(doc)
 
         docs = await store.list_documents()
@@ -1009,7 +1026,9 @@ class TestDocumentStorage:
         )
         await store.initialize()
 
-        doc = Document(id="stats1", content="Content for stats that is long enough", source="test.txt")
+        doc = Document(
+            id="stats1", content="Content for stats that is long enough", source="test.txt"
+        )
         await store.add_document(doc)
 
         stats = await store.get_stats()
@@ -1032,7 +1051,9 @@ class TestDocumentStorage:
         await store.initialize()
 
         doc = Document(
-            id="search1", content="Machine learning is a subset of AI and is very important", source="test.txt"
+            id="search1",
+            content="Machine learning is a subset of AI and is very important",
+            source="test.txt",
         )
         await store.add_document(doc)
 

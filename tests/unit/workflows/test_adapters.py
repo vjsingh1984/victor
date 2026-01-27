@@ -506,6 +506,7 @@ class TestWorkflowToGraphAdapterExecution:
         )
 
         mock_executor = MagicMock()
+
         # Make execute_by_name an async function that raises an exception
         async def mock_execute(*args, **kwargs):
             raise Exception("Execution failed")

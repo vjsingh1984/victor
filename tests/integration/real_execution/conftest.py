@@ -101,15 +101,179 @@ def has_provider_api_key(provider: str) -> bool:
 
 
 # Cheapest/fastest models for each provider (for cost-effective testing)
+#
+# Ollama models organized by speed/capability:
+# - Ultra-fast (0.5B-3B): qwen2.5:0.5b, qwen2.5:1.5b, qwen2.5:3b, phi3:mini, gemma2:2b
+# - Fast (7B-8B): qwen2.5-coder:7b, deepseek-coder:7b, phi3:3.8b, llama3.2:3b
+# - Balanced (14B-20B): qwen2.5-coder:14b, deepseek-v3:32b, gpt-oss-tools:20b-64K
+# - Capable (30B+): qwen3:32b, qwen3:72b, deepseek-v3:70b, glm-4:9b
+#
+# LM Studio models (user downloads, typical fast options):
+# - Phi-3 models (3.8B): Very fast, good for simple tasks
+# - Qwen2.5/Qwen3 smaller models (3B, 7B): Fast for coding
+# - DeepSeek-Coder models (7B, 32B): Excellent for coding
+# - Llama 3.2 models (1B, 3B): Ultra-fast
+# - GLM-4 models (9B, 34B): Capable for complex tasks
+#
+# Complex 30B+ Category Models (Qwen3, DeepSeek, GLM):
+# - qwen3:32b - Strong reasoning, tool use (Qwen3 > Qwen2.5)
+# - qwen3:72b - Best quality for complex tasks
+# - deepseek-v3:32b - Excellent coding capabilities
+# - deepseek-r1:32b - Reasoning-optimized
+# - glm-4:9b - Fast and capable (Zhipu AI)
+# - glm-4:34b - Complex task specialist
+
 PROVIDER_MODELS: Dict[str, List[str]] = {
     "ollama": [
-        "qwen2.5-coder:14b",  # Fast and capable
-        "gpt-oss-tools:20b-64K",  # Alternative with good tool support
-        "qwen2.5-coder:7b",  # Fastest fallback
+        # === ULTRA-FAST MODELS (0.5B-3B) ===
+        # Use for: Simple queries, error detection, basic file reads
+        # Installed models from 'ollama list':
+        "qwen2.5-coder:1.5b",  # 986 MB - FASTEST, great for simple tasks
+        "llama3.2:latest",  # 2.0 GB - Fast, general purpose
+        "mistral:latest",  # 4.1 GB - Fast, good quality
+        # === FAST MODELS (7B-8B) ===
+        # Use for: Coding tasks, syntax analysis, single tool calls
+        # Installed models from 'ollama list':
+        "qwen2.5-coder:7b",  # 4.7 GB - Excellent for coding
+        "llama3.1:8b",  # 4.9 GB - Fast, capable
+        "mistral:7b-instruct",  # 4.4 GB - Fast, good for tools
+        "gemma3:12b",  # 8.1 GB - Fast coding model
+        # === BALANCED MODELS (14B-20B) ===
+        # Use for: Multi-step tasks, tool orchestration, complex reasoning
+        # Installed models from 'ollama list':
+        "deepseek-coder-v2:16b",  # 8.9 GB - Fast for coding + tools
+        "qwen25-coder-tools:14b-64K",  # 9.0 GB - Tool-optimized 14B
+        "deepseek-r1:14b",  # 9.0 GB - Reasoning-optimized 14B
+        "qwen2.5-coder:14b",  # 9.0 GB - Balanced capability
+        "gpt-oss-tools:20b-64K",  # 13 GB - Good tool support
+        "phi4-reasoning:plus",  # 11 GB - Reasoning specialist
+        # === CAPABLE MODELS (30B+) for Complex Tasks ===
+        # Use for: Heavy tool orchestration, complex reasoning, multi-file operations
+        # Installed models from 'ollama list':
+        # Qwen3 series (newest, best for complex tasks)
+        "qwen3-coder-tools:30b-64K",  # 18 GB - EXCELLENT for coding + tools
+        "qwen3-coder-tools:30b",  # 18 GB - Qwen3 Coder 30B
+        "qwen3-coder-tools:30b-262K",  # 18 GB - Qwen3 with 262K context
+        "qwen3-coder-tools:30b-128k",  # 18 GB - Qwen3 with 128K context
+        "qwen3:32b",  # 20 GB - Qwen3 32B general
+        "qwen3:30b",  # 18 GB - Qwen3 30B general
+        # DeepSeek series (excellent for coding and reasoning)
+        "deepseek-coder:33b",  # 18 GB - DeepSeek Coder 33B
+        "deepseek-coder-tools:33b",  # 18 GB - With tool optimizations
+        "deepseek-coder-tools:33b-128K",  # 18 GB - 128K context
+        "deepseek-coder-tools:33b-262K",  # 18 GB - 262K context
+        "deepseek-coder-tools:33b-instruct",  # 18 GB - Instruction-tuned
+        "deepseek-r1:32b",  # 19 GB - DeepSeek R1 reasoning
+        "deepseek-r1-tools:32b",  # 19 GB - R1 with tool support
+        "deepseek-r1-tools:32b-262K",  # 19 GB - R1 with long context
+        # Other capable 30B+ models
+        "gemma3:27b",  # 17 GB - Gemma3 27B
+        "gemma3-tools:27b",  # 17 GB - Gemma3 with tools
+        "gemma3-tools:27b-128K",  # 17 GB - Gemma3 128K context
+        "mixtral:8x7b",  # 26 GB - Mixtral 8x7b Mixture of Experts
+        # === LARGE MODELS (70B+) for Maximum Capability ===
+        # Use only when: Maximum reasoning capability is required
+        # Installed models from 'ollama list':
+        "deepseek-r1:70b",  # 42 GB - Maximum reasoning
+        "deepseek-r1-tools:70b-64K",  # 42 GB - With tools
+        "deepseek-r1-tools:70b-96K",  # 42 GB - 96K context
+        "deepseek-r1-tools:70b-128K",  # 42 GB - 128K context
+        "llama3.1:70b",  # 42 GB - Llama 3.1 70B
+        "llama3.3:70b",  # 42 GB - Llama 3.3 70B
+        "llama3.1-tools:70b-64K",  # 42 GB - With tools
+        "llama3.1-tools:70b-96K",  # 42 GB - 96K context
+        "llama3.1-tools:70b-128K",  # 42 GB - 128K context
+        "llama3.1-tools:70b-262K",  # 42 GB - 262K context
+        "llama3.3-tools:70b-64K",  # 42 GB - Llama 3.3 with tools
+        "llama3.3-tools:70b-96K",  # 42 GB - 96K context
+    ],
+    "lmstudio": [
+        # Models available from LM Studio API at localhost:1234
+        # Organized by speed/capability (fastest first)
+        # === ULTRA-FAST MODELS (1B-3B) ===
+        # Use for: Simple queries, error detection, basic file reads
+        "qwen2.5-coder-1.5b",  # FASTEST, great for simple tasks
+        "llama3.2",  # Fast, general purpose
+        "mistral",  # Fast, good quality
+        # === FAST MODELS (7B-12B) ===
+        # Use for: Coding tasks, syntax analysis, single tool calls
+        "qwen2.5-coder-7b",  # Excellent for coding
+        "llama3.1-8b",  # Fast, capable
+        "llama3.1-8b-instruct",  # Instruction-tuned 8B
+        "mistral-7b-instruct",  # Fast, good for tools
+        "gemma3-12b",  # Fast coding model
+        "mistral-tools-7b-instruct",  # With tool optimizations
+        # === BALANCED MODELS (14B-20B) ===
+        # Use for: Multi-step tasks, tool orchestration, complex reasoning
+        "deepseek-coder-v2-tools-16b",  # Fast for coding + tools
+        "deepseek-coder-v2-tools-16b-64k",  # With 64K context
+        "deepseek-coder-v2-16b",  # Capable 16B model
+        "qwen25-coder-tools-14b-64k",  # Tool-optimized 14B
+        "deepseek-r1-tools-14b-64k",  # Reasoning-optimized 14B
+        "deepseek-r1-14b",  # DeepSeek R1 14B
+        "qwen2.5-coder-14b",  # Balanced capability
+        "gpt-oss-tools-20b-64k",  # Good tool support
+        "gpt-oss-20b",  # GPT-OSS 20B
+        "phi4-reasoning-tools-plus",  # Reasoning specialist
+        "phi-4-16k-custom-tools",  # Phi-4 with tools
+        "devstral-tools",  # Devstral with tools
+        "mixtral-tools-8x7b",  # Mixtral MoE
+        # === CAPABLE MODELS (30B+) for Complex Tasks ===
+        # Use for: Heavy tool orchestration, complex reasoning, multi-file operations
+        # Qwen3 series (newest, best for complex tasks)
+        "qwen3-coder-tools-30b-64K",  # EXCELLENT for coding + tools
+        "qwen3-coder-tools-30b-128k",  # With 128K context
+        "qwen3-coder-tools-30b",  # Qwen3 Coder 30B
+        "qwen3-coder-tools-30b-262k",  # With 262K context
+        "qwen3-30b",  # Qwen3 30B general
+        "qwen3-30b-a3b",  # A3B variant
+        "qwen3-30b-40k-financial",  # Financial-specialized
+        "qwen3-32b",  # Qwen3 32B general
+        # DeepSeek series (excellent for coding and reasoning)
+        "deepseek-coder-tools-33b",  # DeepSeek Coder 33B with tools
+        "deepseek-coder-tools-33b-128k",  # With 128K context
+        "deepseek-coder-tools-33b-262k",  # With 262K context
+        "deepseek-coder-tools-33b-instruct",  # Instruction-tuned
+        "deepseek-coder-33b",  # DeepSeek Coder 33B
+        "deepseek-coder-33b-instruct",  # Instruction-tuned 33B
+        "deepseek-r1-tools-32b",  # R1 with tool support
+        "deepseek-r1-tools-32b-262k",  # R1 with long context
+        "deepseek-r1-32b",  # DeepSeek R1 reasoning
+        # Other capable 30B+ models
+        "gemma3-tools-27b",  # Gemma3 27B with tools
+        "gemma3-tools-27b-128k",  # With 128K context
+        "gemma3-27b",  # Gemma3 27B
+        "mixtral-tools-8x7b-65k",  # Mixtral with 65K context
+        "mixtral-8x7b-32k",  # Mixtral with 32K context
+        "mixtral-8x7b",  # Mixtral MoE general
+        "qwen2.5-coder-tools-32b-262k",  # Qwen2.5 Coder with 262K context
+        "qwen2.5-coder-32b",  # Qwen2.5 Coder 32B
+        "qwen2.5-32b-instruct",  # Qwen2.5 32B instruction-tuned
+        "codellama-34b-python",  # CodeLlama 34B Python
+        "phi4-reasoning-plus",  # Phi-4 reasoning specialist
+        # === LARGE MODELS (70B+) for Maximum Capability ===
+        # Use only when: Maximum reasoning capability is required
+        "deepseek-r1-70b",  # Maximum reasoning
+        "deepseek-r1-tools-70b-64k",  # With tools
+        "deepseek-r1-tools-70b-96k",  # With 96K context
+        "deepseek-r1-tools-70b-128k",  # With 128K context
+        "llama3.1-70b",  # Llama 3.1 70B
+        "llama3.3-70b",  # Llama 3.3 70B
+        "llama-3.3-70b-instruct-128k-custom",  # Custom 128K variant
+        "llama3.1-tools-70b-64k",  # With tools
+        "llama3.1-tools-70b-96k",  # With 96K context
+        "llama3.1-tools-70b-128k",  # With 128K context
+        "llama3.1-tools-70b-262k",  # With 262K context
+        "llama3.3-tools-70b-64k",  # Llama 3.3 with tools
+        "llama3.3-tools-70b-96k",  # With 96K context
+        "llama3.3-tools-70b-128k",  # With 128K context
     ],
     "deepseek": [
-        "deepseek-chat",  # Cheapest, good for general use
-        "deepseek-coder",  # For coding tasks
+        "deepseek-chat",  # Cheapest, good for general use (~$0.14/$0.28 per 1M)
+        "deepseek-coder",  # For coding tasks (optimized for code)
+        # DeepSeek V3 (newer, more capable)
+        "deepseek-v3",  # Latest model, excellent for complex tasks
+        "deepseek-r1",  # Reasoning-optimized model
     ],
     "xai": [
         "grok-beta",  # Cheapest Grok model
@@ -127,6 +291,8 @@ PROVIDER_MODELS: Dict[str, List[str]] = {
     "zai": [
         "glm-4-flash",  # Cheapest
         "glm-4-plus",  # More capable
+        "glm-4-0520",  # Latest GLM-4 model
+        "glm-4-long",  # Long context version (128K+)
     ],
 }
 
@@ -200,15 +366,21 @@ def zai_available() -> bool:
 async def ollama_provider() -> AsyncGenerator[OllamaProvider, None]:
     """Create Ollama provider for testing.
 
-    Uses smaller models for faster execution:
-    - qwen2.5-coder:14b (preferred, fast and capable)
-    - gpt-oss-tools:20b-64K (alternative, good tool support)
-    - qwen2.5-coder:7b (fallback, fastest)
+    Uses fastest available models for speed:
+    - Ultra-fast (0.5B-3B): qwen2.5:0.5b, qwen2.5:1.5b, qwen2.5:3b, phi3:mini, gemma2:2b
+    - Fast (7B-8B): qwen2.5-coder:7b, phi3:3.8b, llama3.2:3b
+    - Balanced (14B): qwen2.5-coder:14b, phi3:14b
+    - Capable (20B+): gpt-oss-tools:20b-64K
+
+    To install faster models:
+      ollama pull qwen2.5:0.5b      # Ultra-fast, ~600MB
+      ollama pull phi3:mini          # Ultra-fast, ~2.3GB
+      ollama pull qwen2.5-coder:7b   # Fast for coding, ~4.7GB
     """
     if not is_ollama_running():
         pytest.skip("Ollama not available at localhost:11434")
 
-    # Try to find an available model
+    # Try to find an available model (fastest first)
     model = None
     for candidate_model in PROVIDER_MODELS["ollama"]:
         if is_ollama_model_available(candidate_model):
@@ -216,7 +388,11 @@ async def ollama_provider() -> AsyncGenerator[OllamaProvider, None]:
             break
 
     if not model:
-        pytest.skip("No suitable Ollama model found. " "Run: ollama pull qwen2.5-coder:14b")
+        pytest.skip(
+            "No suitable Ollama model found. "
+            "Install a fast model: ollama pull qwen2.5:0.5b (600MB) "
+            "or ollama pull phi3:mini (2.3GB)"
+        )
 
     provider = OllamaProvider(
         base_url="http://localhost:11434",

@@ -1083,9 +1083,9 @@ class TestCredentialManager:
         pytest.importorskip("boto3")
 
         # Mock boto3.session to avoid reading actual AWS credentials from ~/.aws/credentials
-        with patch('boto3.Session') as mock_session_class:
+        with patch("boto3.Session") as mock_session_class:
             mock_session = MagicMock()
-            mock_session.region_name = 'us-east-1'
+            mock_session.region_name = "us-east-1"
             # Mock the session to return no credentials (simulate nonexistent profile)
             mock_session.get_credentials.return_value = None
             mock_session_class.return_value = mock_session

@@ -420,15 +420,14 @@ class TestContextManagementBaselines:
     @pytest.mark.benchmark
     async def test_context_compaction_performance(self):
         """Measure context compaction performance."""
-        compactor = ContextCompactor()
         strategy = TruncationCompactionStrategy(max_chars=100)
 
         # Create large conversation
         large_conversation = [{"role": "user", "content": f"Message {i}" * 10} for i in range(1000)]
 
-        # Measure compaction time
+        # Measure compaction time using the strategy directly
         start = time.time()
-        compacted = compactor.compact(large_conversation, strategy)
+        compacted = strategy.compact(large_conversation, target_tokens=1000)
         elapsed_ms = (time.time() - start) * 1000
 
         print("\n✓ Context Compaction Performance:")
@@ -447,8 +446,6 @@ class TestContextManagementBaselines:
     @pytest.mark.benchmark
     async def test_context_strategies_comparison(self):
         """Compare different context compaction strategies."""
-        compactor = ContextCompactor()
-
         strategies = {
             "truncation": TruncationCompactionStrategy(max_chars=100),
             "hybrid": HybridCompactionStrategy(),
@@ -460,7 +457,12 @@ class TestContextManagementBaselines:
 
         for name, strategy in strategies.items():
             start = time.time()
-            compacted = compactor.compact(conversation, strategy)
+            # Use strategy directly for synchronous compaction
+            if hasattr(strategy, "compact"):
+                compacted = strategy.compact(conversation, target_tokens=1000)
+            else:
+                # For async strategies, run them
+                compacted = await strategy.compact_async(conversation, target_tokens=1000)
             elapsed_ms = (time.time() - start) * 1000
 
             results[name] = {

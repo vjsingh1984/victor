@@ -587,6 +587,7 @@ def test_consensus_formation_performance(benchmark, team_coordinator, members, r
     result = benchmark(lambda: run_async(run_consensus()))
     assert result["success"]
 
+
 # =============================================================================
 # Performance Summary Tests
 # =============================================================================

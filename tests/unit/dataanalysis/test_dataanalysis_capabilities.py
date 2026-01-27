@@ -35,7 +35,7 @@ class TestDataQualityCapability:
         orchestrator.vertical_context = mock_context
         configure_data_quality(orchestrator)
 
-       # Verify config was set
+        # Verify config was set
         mock_context.set_capability_config.assert_called_once()
         call_args = mock_context.set_capability_config.call_args
         assert call_args[0][0] == "data_quality"
@@ -84,7 +84,7 @@ class TestDataQualityCapability:
             "handle_missing": "impute",
         }
         mock_context.get_capability_config.return_value = default_config
-        
+
         orchestrator = MagicMock()
         orchestrator.vertical_context = mock_context
 
@@ -139,7 +139,6 @@ class TestVisualizationStyleCapability:
             save_format="svg",
         )
 
-       
         # Verify config was set
         mock_context.set_capability_config.assert_called_once()
         call_args = mock_context.set_capability_config.call_args
@@ -166,7 +165,6 @@ class TestStatisticalAnalysisCapability:
         orchestrator.vertical_context = mock_context
         configure_statistical_analysis(orchestrator)
 
-       
         # Verify config was set
         mock_context.set_capability_config.assert_called_once()
         call_args = mock_context.set_capability_config.call_args

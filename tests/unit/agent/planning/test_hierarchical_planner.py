@@ -691,9 +691,7 @@ class TestLLMIntegration:
 
         # Mock get_provider to return a provider with chat method
         mock_provider = AsyncMock()
-        mock_provider.chat = AsyncMock(
-            return_value=Mock(content=json.dumps({"subtasks": []}))
-        )
+        mock_provider.chat = AsyncMock(return_value=Mock(content=json.dumps({"subtasks": []})))
         mock_provider_manager.get_provider = Mock(return_value=mock_provider)
 
         await planner.decompose_task("Test task")
@@ -1107,9 +1105,7 @@ class TestEdgeCases:
 
         # Mock get_provider to return a provider with chat method
         mock_provider = AsyncMock()
-        mock_provider.chat = AsyncMock(
-            return_value=Mock(content=json.dumps({"subtasks": []}))
-        )
+        mock_provider.chat = AsyncMock(return_value=Mock(content=json.dumps({"subtasks": []})))
         mock_provider_manager.get_provider = Mock(return_value=mock_provider)
 
         await planner.decompose_task("Test task")

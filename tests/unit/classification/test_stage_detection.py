@@ -152,8 +152,8 @@ class TestConversationStateMachine:
         # EXECUTION requires going through READING or ANALYSIS first
         assert machine.get_stage() in [
             ConversationStage.INITIAL,  # Transition blocked
-            ConversationStage.READING,    # Skipped to reading
-            ConversationStage.PLANNING,   # Went to planning first
+            ConversationStage.READING,  # Skipped to reading
+            ConversationStage.PLANNING,  # Went to planning first
         ]
 
     def test_detect_stage_from_tool_execution(self):
@@ -264,6 +264,7 @@ class TestStageTransitions:
         # First transition forward to EXECUTION (requires going through valid path)
         machine._transition_to(ConversationStage.PLANNING, confidence=0.8)
         import time
+
         time.sleep(machine.TRANSITION_COOLDOWN_SECONDS + 0.1)
         machine._transition_to(ConversationStage.READING, confidence=0.8)
         time.sleep(machine.TRANSITION_COOLDOWN_SECONDS + 0.1)

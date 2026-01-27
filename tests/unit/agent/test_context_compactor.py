@@ -733,7 +733,7 @@ class TestCheckAndCompactWithRL:
             "config": {
                 "compaction_threshold": 0.65,
                 "min_messages_keep": 4,
-            }
+            },
         }
         mock_learner.get_recommendation.return_value = mock_recommendation
 

@@ -723,11 +723,13 @@ def rbac_manager():
     # Create test roles
     admin = Role(
         name="admin",
-        permissions=frozenset([
-            Permission.READ,
-            Permission.WRITE,
-            Permission.ADMIN,  # Changed from DELETE/EXECUTE_TOOLS to ADMIN
-        ]),
+        permissions=frozenset(
+            [
+                Permission.READ,
+                Permission.WRITE,
+                Permission.ADMIN,  # Changed from DELETE/EXECUTE_TOOLS to ADMIN
+            ]
+        ),
     )
 
     user = Role(

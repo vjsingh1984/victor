@@ -182,6 +182,7 @@ class TestCreateGraphStore:
         """Test DuckDB raises when not installed."""
         # Patch _duckdb_available directly since import happens at module load
         import victor.storage.graph.registry as registry_module
+
         original_available = registry_module._duckdb_available
         try:
             registry_module._duckdb_available = None

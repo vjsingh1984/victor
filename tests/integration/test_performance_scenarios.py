@@ -48,6 +48,7 @@ from contextlib import asynccontextmanager, contextmanager
 # Import from parent conftest for Ollama availability checking
 import sys
 from pathlib import Path as PathLib
+
 # Add tests directory to path to import from root conftest
 sys.path.insert(0, str(PathLib(__file__).parent.parent.parent))
 # Use absolute import to avoid conftest confusion
@@ -625,14 +626,18 @@ class TestMemory:
 
             # Use per-iteration timeout (15 seconds each) for graceful degradation
             # If any iteration times out, the entire test skips (as expected for slow hardware)
-            async with skip_on_timeout(150, "memory_leak_detection"):  # 15s * 10 iterations = 150s total
+            async with skip_on_timeout(
+                150, "memory_leak_detection"
+            ):  # 15s * 10 iterations = 150s total
                 async with benchmark_suite.measure("memory_leak_test", "memory"):
                     # Perform operations with real LLM
                     for i in range(10):
                         # Per-iteration timeout for individual requests
                         try:
                             async with asyncio.timeout(15):  # 15 second timeout per iteration
-                                result = await orchestrator.chat(f"Message {i}: What is {i} plus {i}?")
+                                result = await orchestrator.chat(
+                                    f"Message {i}: What is {i} plus {i}?"
+                                )
                                 assert result is not None
                                 assert hasattr(result, "content")
                         except asyncio.TimeoutError:
@@ -656,12 +661,14 @@ class TestMemory:
 
                 # Memory growth threshold set to 500 MB for 10 iterations with real LLM
                 # Real memory leaks would show 1-2 GB growth, not a few hundred MB
-                assert memory_growth < 500, f"Excessive memory growth detected (potential leak): {memory_growth:.2f} MB"
+                assert (
+                    memory_growth < 500
+                ), f"Excessive memory growth detected (potential leak): {memory_growth:.2f} MB"
 
         finally:
             await provider.close()
             # Cleanup orchestrator resources (idempotent - safe to call multiple times)
-            if 'orchestrator' in locals():
+            if "orchestrator" in locals():
                 await orchestrator.cleanup()
 
     @pytest.mark.asyncio

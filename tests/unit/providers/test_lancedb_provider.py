@@ -67,9 +67,11 @@ def mock_lancedb():
             return True
         return original_is_dir(self)
 
-    with patch.object(Path, "exists", mock_exists), \
-         patch.object(Path, "is_dir", mock_is_dir), \
-         patch("victor.storage.vector_stores.lancedb_provider.lancedb.connect") as mock_connect:
+    with (
+        patch.object(Path, "exists", mock_exists),
+        patch.object(Path, "is_dir", mock_is_dir),
+        patch("victor.storage.vector_stores.lancedb_provider.lancedb.connect") as mock_connect,
+    ):
 
         mock_db = MagicMock()
         mock_table = MagicMock()

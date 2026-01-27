@@ -721,7 +721,10 @@ class TestSecurityAuthorizationOverhead:
         ]
 
         start = time.perf_counter()
-        results = [authorizer.check_permission(admin_user_obj, resource, action) for resource, action in checks]
+        results = [
+            authorizer.check_permission(admin_user_obj, resource, action)
+            for resource, action in checks
+        ]
         bulk_check_time = (time.perf_counter() - start) * 1000
 
         avg_bulk_time = bulk_check_time / len(checks)

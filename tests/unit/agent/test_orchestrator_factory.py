@@ -44,17 +44,20 @@ from victor.agent.orchestrator_factory import (
 def mock_settings():
     """Create mock settings."""
     from unittest.mock import Mock
+
     # Use spec to limit allowed attributes and prevent auto-creation
-    settings = Mock(spec=[
-        'streaming_metrics_enabled',
-        'streaming_metrics_history_size',
-        'cache_dir',
-        'enable_prometheus_export',
-        'use_predefined_patterns',
-        'sequence_learning_rate',
-        'enable_recovery_system',
-        'enable_observability',
-    ])
+    settings = Mock(
+        spec=[
+            "streaming_metrics_enabled",
+            "streaming_metrics_history_size",
+            "cache_dir",
+            "enable_prometheus_export",
+            "use_predefined_patterns",
+            "sequence_learning_rate",
+            "enable_recovery_system",
+            "enable_observability",
+        ]
+    )
     settings.streaming_metrics_enabled = True
     settings.streaming_metrics_history_size = 100
     settings.cache_dir = "/tmp/cache"
@@ -550,6 +553,7 @@ class TestCreateToolCache:
         mock_settings.tool_cache_allowlist = []
 
         from pathlib import Path
+
         with patch("victor.config.settings.get_project_paths") as mock_paths:
             mock_paths.return_value.global_cache_dir = Path("/tmp/cache")
             with patch("victor.storage.cache.tool_cache.ToolCache") as mock_cache_cls:

@@ -342,13 +342,12 @@ class TestDirectProtocolAdapterPatch:
     async def test_apply_patch(self, adapter):
         """Test applying patch."""
         # Mock the actual functions used by apply_patch
-        mock_parse = MagicMock(return_value=[
-            MagicMock(new_path="test.py", old_path=None, is_new_file=True)
-        ])
+        mock_parse = MagicMock(
+            return_value=[MagicMock(new_path="test.py", old_path=None, is_new_file=True)]
+        )
 
         with patch.dict(
-            sys.modules,
-            {"victor.tools.patch_tool": MagicMock(parse_unified_diff=mock_parse)}
+            sys.modules, {"victor.tools.patch_tool": MagicMock(parse_unified_diff=mock_parse)}
         ):
             result = await adapter.apply_patch("--- a/test.py\n+++ b/test.py", dry_run=True)
 

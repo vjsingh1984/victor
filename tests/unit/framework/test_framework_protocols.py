@@ -172,7 +172,11 @@ class TestToolAccessController:
         from victor.agent.protocols import ToolAccessContext
 
         controller = create_tool_access_controller()
-        tools = ["read_file", "write_file", "code_search"]  # Removed 'shell' as it's blocked by safety layer
+        tools = [
+            "read_file",
+            "write_file",
+            "code_search",
+        ]  # Removed 'shell' as it's blocked by safety layer
 
         allowed, denials = controller.filter_tools(tools)
         assert len(allowed) == len(tools)  # All allowed without restrictions

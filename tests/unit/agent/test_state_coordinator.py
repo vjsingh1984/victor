@@ -148,7 +148,9 @@ class TestStateCoordinator:
 
         assert result is True
         # The implementation uses _transition_to (internal method), not set_stage
-        mock_state_machine._transition_to.assert_called_once_with(ConversationStage.PLANNING, confidence=0.8)
+        mock_state_machine._transition_to.assert_called_once_with(
+            ConversationStage.PLANNING, confidence=0.8
+        )
 
     def test_transition_to_same_stage(self, coordinator, mock_state_machine):
         """Test transition to same stage (no-op)."""

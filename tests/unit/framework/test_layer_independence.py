@@ -158,6 +158,7 @@ class TestCoreTypeLocations:
         # Verify it's a dataclass with expected fields
         # Dataclass fields are instance attributes, not class attributes
         from dataclasses import fields
+
         field_names = {f.name for f in fields(VerticalContext)}
 
         assert "name" in field_names

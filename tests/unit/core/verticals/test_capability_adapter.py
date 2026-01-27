@@ -239,12 +239,15 @@ class TestDeprecationWarnings:
         # Should not emit warning (no orchestrator access in context_only mode)
         # In context_only mode, the adapter doesn't access orchestrator attributes, so no deprecation warning
         import warnings
+
         with warnings.catch_warnings(record=True) as warning_list:
             warnings.simplefilter("always")
             adapter.set_capability_config(orchestrator, "code_style", {"formatter": "black"})
 
         # Filter for DeprecationWarning
-        deprecation_warnings = [w for w in warning_list if issubclass(w.category, DeprecationWarning)]
+        deprecation_warnings = [
+            w for w in warning_list if issubclass(w.category, DeprecationWarning)
+        ]
         assert len(deprecation_warnings) == 0
 
 

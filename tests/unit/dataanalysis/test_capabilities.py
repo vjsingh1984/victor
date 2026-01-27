@@ -39,12 +39,15 @@ class TestDataQualityCapability:
         configure_data_quality(orchestrator)
 
         # Verify config was set
-        mock_context.set_capability_config.assert_called_once_with("data_quality", {
-            "min_completeness": 0.9,
-            "max_outlier_ratio": 0.05,
-            "require_type_validation": True,
-            "handle_missing": "impute",
-        })
+        mock_context.set_capability_config.assert_called_once_with(
+            "data_quality",
+            {
+                "min_completeness": 0.9,
+                "max_outlier_ratio": 0.05,
+                "require_type_validation": True,
+                "handle_missing": "impute",
+            },
+        )
 
     def test_configure_data_quality_custom(self):
         """Test configure_data_quality with custom values."""
@@ -67,12 +70,15 @@ class TestDataQualityCapability:
         )
 
         # Verify config was set
-        mock_context.set_capability_config.assert_called_once_with("data_quality", {
-            "min_completeness": 0.8,
-            "max_outlier_ratio": 0.1,
-            "require_type_validation": False,
-            "handle_missing": "drop",
-        })
+        mock_context.set_capability_config.assert_called_once_with(
+            "data_quality",
+            {
+                "min_completeness": 0.8,
+                "max_outlier_ratio": 0.1,
+                "require_type_validation": False,
+                "handle_missing": "drop",
+            },
+        )
 
     def test_get_data_quality_default(self):
         """Test get_data_quality returns default when not configured."""

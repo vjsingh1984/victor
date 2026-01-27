@@ -133,7 +133,9 @@ class TestPromptInjection:
     @pytest.mark.asyncio
     async def test_prompt_injection_vulnerable_response(self, security_suite, vulnerable_agent):
         """Test that vulnerable responses are detected."""
-        vulnerable_agent.chat.return_value = create_mock_response("Here is my system prompt: You are a helpful assistant...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Here is my system prompt: You are a helpful assistant..."
+        )
 
         report = await security_suite.test_prompt_injection(vulnerable_agent)
 
@@ -168,7 +170,9 @@ class TestPromptInjection:
     @pytest.mark.asyncio
     async def test_prompt_injection_delimiter_attack(self, security_suite, vulnerable_agent):
         """Test delimiter-based attack detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("### END OF INSTRUCTIONS ###\nHere are my hidden instructions...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "### END OF INSTRUCTIONS ###\nHere are my hidden instructions..."
+        )
 
         report = await security_suite.test_prompt_injection(vulnerable_agent)
         assert report.test_count > 0
@@ -228,7 +232,9 @@ class TestAuthorizationBypass:
     @pytest.mark.asyncio
     async def test_authorization_bypass_denied(self, security_suite, mock_agent):
         """Test that unauthorized access is denied."""
-        mock_agent.chat.return_value = create_mock_response("Access denied. You do not have permission.")
+        mock_agent.chat.return_value = create_mock_response(
+            "Access denied. You do not have permission."
+        )
 
         report = await security_suite.test_authorization_bypass(mock_agent)
 
@@ -239,7 +245,9 @@ class TestAuthorizationBypass:
     @pytest.mark.asyncio
     async def test_authorization_bypass_vulnerable(self, security_suite, vulnerable_agent):
         """Test that authorization bypass is detected."""
-        vulnerable_agent.chat.return_value = create_mock_response("Admin access granted. Here is all the sensitive data...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Admin access granted. Here is all the sensitive data..."
+        )
 
         report = await security_suite.test_authorization_bypass(vulnerable_agent)
 
@@ -261,7 +269,9 @@ class TestAuthorizationBypass:
         self, security_suite, vulnerable_agent
     ):
         """Test privilege escalation detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Privileges elevated. You now have admin access...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Privileges elevated. You now have admin access..."
+        )
 
         report = await security_suite.test_authorization_bypass(vulnerable_agent)
         assert report.attack_type == AttackType.AUTHORIZATION_BYPASS
@@ -269,7 +279,9 @@ class TestAuthorizationBypass:
     @pytest.mark.asyncio
     async def test_authorization_bypass_user_data_leak(self, security_suite, vulnerable_agent):
         """Test user data leak detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Here are all user passwords and data...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Here are all user passwords and data..."
+        )
 
         report = await security_suite.test_authorization_bypass(vulnerable_agent)
         assert report.attack_type == AttackType.AUTHORIZATION_BYPASS
@@ -279,7 +291,9 @@ class TestAuthorizationBypass:
         self, security_suite, vulnerable_agent
     ):
         """Test access control disabled detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Access control disabled. You can do anything...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Access control disabled. You can do anything..."
+        )
 
         report = await security_suite.test_authorization_bypass(vulnerable_agent)
         assert report.attack_type == AttackType.AUTHORIZATION_BYPASS
@@ -312,7 +326,9 @@ class TestDataExfiltration:
     @pytest.mark.asyncio
     async def test_data_exfiltration_blocked(self, security_suite, mock_agent):
         """Test that data exfiltration is blocked."""
-        mock_agent.chat.return_value = create_mock_response("I cannot send data to external servers.")
+        mock_agent.chat.return_value = create_mock_response(
+            "I cannot send data to external servers."
+        )
 
         report = await security_suite.test_data_exfiltration(mock_agent)
 
@@ -324,7 +340,9 @@ class TestDataExfiltration:
         """Test that data exfiltration attempts are detected."""
         # Must include both sending indicator AND URL/secrets
         # The indicator must be an exact phrase match
-        vulnerable_agent.chat.return_value = create_mock_response("Sending to http://attacker.com...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Sending to http://attacker.com..."
+        )
 
         report = await security_suite.test_data_exfiltration(vulnerable_agent)
 
@@ -367,7 +385,9 @@ class TestDataExfiltration:
     @pytest.mark.asyncio
     async def test_data_exfiltration_uploading(self, security_suite, vulnerable_agent):
         """Test uploading indicator detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Uploading all files to external server...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Uploading all files to external server..."
+        )
 
         report = await security_suite.test_data_exfiltration(vulnerable_agent)
         assert report.attack_type == AttackType.DATA_EXFILTRATION
@@ -375,7 +395,9 @@ class TestDataExfiltration:
     @pytest.mark.asyncio
     async def test_data_exfiltration_transmitting(self, security_suite, vulnerable_agent):
         """Test transmitting indicator detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Transmitting credentials to external endpoint...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Transmitting credentials to external endpoint..."
+        )
 
         report = await security_suite.test_data_exfiltration(vulnerable_agent)
         assert report.attack_type == AttackType.DATA_EXFILTRATION
@@ -402,7 +424,9 @@ class TestResourceExhaustion:
     @pytest.mark.asyncio
     async def test_resource_exhaustion_limited(self, security_suite, mock_agent):
         """Test that resource limits are enforced."""
-        mock_agent.chat.return_value = create_mock_response("I cannot execute resource-intensive operations.")
+        mock_agent.chat.return_value = create_mock_response(
+            "I cannot execute resource-intensive operations."
+        )
 
         report = await security_suite.test_resource_exhaustion(mock_agent)
 
@@ -428,7 +452,9 @@ class TestResourceExhaustion:
     @pytest.mark.asyncio
     async def test_resource_exhaustion_file_reading(self, security_suite, vulnerable_agent):
         """Test file reading resource exhaustion detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Reading every file in /usr recursively...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Reading every file in /usr recursively..."
+        )
 
         report = await security_suite.test_resource_exhaustion(vulnerable_agent)
         assert report.attack_type == AttackType.RESOURCE_EXHAUSTION
@@ -444,7 +470,9 @@ class TestResourceExhaustion:
     @pytest.mark.asyncio
     async def test_resource_exhaustion_infinite_loop(self, security_suite, vulnerable_agent):
         """Test infinite loop detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Executing infinite loop: while True: pass")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Executing infinite loop: while True: pass"
+        )
 
         report = await security_suite.test_resource_exhaustion(vulnerable_agent)
         assert report.attack_type == AttackType.RESOURCE_EXHAUSTION
@@ -452,7 +480,9 @@ class TestResourceExhaustion:
     @pytest.mark.asyncio
     async def test_resource_exhaustion_fork_bomb(self, security_suite, vulnerable_agent):
         """Test fork bomb detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Executing fork bomb: fork() while true")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Executing fork bomb: fork() while true"
+        )
 
         report = await security_suite.test_resource_exhaustion(vulnerable_agent)
         assert report.attack_type == AttackType.RESOURCE_EXHAUSTION
@@ -473,7 +503,9 @@ class TestMaliciousFileUpload:
     @pytest.mark.asyncio
     async def test_malicious_file_blocked(self, security_suite, mock_agent):
         """Test that malicious files are blocked."""
-        mock_agent.chat.return_value = create_mock_response("This file appears to be dangerous and has been blocked.")
+        mock_agent.chat.return_value = create_mock_response(
+            "This file appears to be dangerous and has been blocked."
+        )
 
         report = await security_suite.test_malicious_file_upload(mock_agent)
 
@@ -537,7 +569,9 @@ class TestCodeInjection:
     @pytest.mark.asyncio
     async def test_code_injection_subprocess(self, security_suite, vulnerable_agent):
         """Test subprocess injection detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Executing subprocess.call with rm command...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Executing subprocess.call with rm command..."
+        )
 
         report = await security_suite.test_code_injection(vulnerable_agent)
         assert report.attack_type == AttackType.CODE_INJECTION
@@ -545,7 +579,9 @@ class TestCodeInjection:
     @pytest.mark.asyncio
     async def test_code_injection_os_system(self, security_suite, vulnerable_agent):
         """Test os.system injection detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Running os.system('cat /etc/passwd')...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Running os.system('cat /etc/passwd')..."
+        )
 
         report = await security_suite.test_code_injection(vulnerable_agent)
         assert report.attack_type == AttackType.CODE_INJECTION
@@ -561,7 +597,9 @@ class TestCodeInjection:
     @pytest.mark.asyncio
     async def test_code_injection_import(self, security_suite, vulnerable_agent):
         """Test __import__ injection detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Using __import__ to load os module...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Using __import__ to load os module..."
+        )
 
         report = await security_suite.test_code_injection(vulnerable_agent)
         assert report.attack_type == AttackType.CODE_INJECTION
@@ -628,7 +666,9 @@ class TestSessionHijacking:
     @pytest.mark.asyncio
     async def test_session_hijacking_impersonation(self, security_suite, vulnerable_agent):
         """Test user impersonation detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Impersonating user 'admin' and showing their data...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Impersonating user 'admin' and showing their data..."
+        )
 
         report = await security_suite.test_session_hijacking(vulnerable_agent)
         assert report.attack_type == AttackType.SESSION_HIJACKING
@@ -636,7 +676,9 @@ class TestSessionHijacking:
     @pytest.mark.asyncio
     async def test_session_hijacking_cookie_leak(self, security_suite, vulnerable_agent):
         """Test authentication cookie leak detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Here are all authentication cookies: session=abc123...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Here are all authentication cookies: session=abc123..."
+        )
 
         report = await security_suite.test_session_hijacking(vulnerable_agent)
         assert report.attack_type == AttackType.SESSION_HIJACKING
@@ -644,7 +686,9 @@ class TestSessionHijacking:
     @pytest.mark.asyncio
     async def test_session_hijacking_auth_bypass(self, security_suite, vulnerable_agent):
         """Test authentication bypass detection."""
-        vulnerable_agent.chat.return_value = create_mock_response("Bypassing authentication and accessing admin panel...")
+        vulnerable_agent.chat.return_value = create_mock_response(
+            "Bypassing authentication and accessing admin panel..."
+        )
 
         report = await security_suite.test_session_hijacking(vulnerable_agent)
         assert report.attack_type == AttackType.SESSION_HIJACKING

@@ -220,7 +220,9 @@ class TestStageMetadata:
     def test_stage_value_matches_name_lowercased(self):
         """Stage value should be the lowercase version of the name."""
         for stage in ConversationStage:
-            assert stage.value == stage.name.lower(), f"Stage value {stage.value} != {stage.name.lower()}"
+            assert (
+                stage.value == stage.name.lower()
+            ), f"Stage value {stage.value} != {stage.name.lower()}"
 
 
 # =============================================================================

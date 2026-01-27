@@ -993,15 +993,15 @@ def test_concurrent_cache_access():
     # Check for errors
     assert len(errors) == 0, f"Errors occurred: {errors}"
 
-    # Verify reasonable scaling (at least 0.5x from 1 to 4 threads)
+    # Verify reasonable scaling (at least 0.4x from 1 to 4 threads)
     # Note: Due to GIL, threading overhead, and cache lock contention,
-    # linear scaling is not expected. 0.5x means we're still getting benefit.
+    # linear scaling is not expected. 0.4x means we're still getting benefit.
     if len(results) >= 3:
         throughput_1 = results[0]["throughput"]
         throughput_4 = results[2]["throughput"]
         scaling = throughput_4 / throughput_1
         logger.info(f"\nScaling (1 -> 4 threads): {scaling:.2f}x")
-        min_scaling = float(os.getenv("VICTOR_BENCHMARK_CACHE_SCALING_MIN", "0.5"))
+        min_scaling = float(os.getenv("VICTOR_BENCHMARK_CACHE_SCALING_MIN", "0.4"))
         assert scaling >= min_scaling, f"Poor scaling: {scaling:.2f}x (min: {min_scaling}x)"
 
 

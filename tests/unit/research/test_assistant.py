@@ -351,7 +351,9 @@ class TestResearchAssistant:
         prompt = ResearchAssistant.get_system_prompt()
 
         # Prompt mentions distinguishing facts from opinions and considering biases
-        assert ("distinguish" in prompt.lower() and "opinion" in prompt.lower()) or "bias" in prompt.lower()
+        assert (
+            "distinguish" in prompt.lower() and "opinion" in prompt.lower()
+        ) or "bias" in prompt.lower()
 
     def test_completion_stage_has_no_tools(self):
         """Test that COMPLETION stage has no tools."""

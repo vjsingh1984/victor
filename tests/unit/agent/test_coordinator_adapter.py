@@ -96,9 +96,11 @@ class TestCoordinatorAdapter:
         from unittest.mock import AsyncMock
 
         mock_eval_coordinator = Mock()
+
         # Create an async coroutine that will be called
         async def mock_send_reward(session):
             return None
+
         mock_eval_coordinator.send_rl_reward_signal = mock_send_reward
 
         adapter = CoordinatorAdapter(evaluation_coordinator=mock_eval_coordinator)

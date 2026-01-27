@@ -34,6 +34,7 @@ def mock_provider():
     async def mock_stream(*args, **kwargs):
         """Mock stream generator that yields content."""
         from victor.providers.base import StreamChunk
+
         yield StreamChunk(content="Response", delta="Response", is_final=True)
 
     provider.stream = mock_stream
@@ -599,6 +600,7 @@ class TestChatMethod:
         async def mock_stream(*args, **kwargs):
             """Mock stream generator that yields content."""
             from victor.providers.base import StreamChunk
+
             yield StreamChunk(content="Test response", delta="Test response", is_final=True)
 
         mock_provider.stream = mock_stream
@@ -632,6 +634,7 @@ class TestChatMethod:
         async def mock_stream(*args, **kwargs):
             """Mock stream generator that yields content."""
             from victor.providers.base import StreamChunk
+
             yield StreamChunk(content="Using tools", delta="Using tools", is_final=True)
 
         mock_provider.stream = mock_stream
@@ -665,6 +668,7 @@ class TestChatMethod:
         async def mock_stream(*args, **kwargs):
             """Mock stream generator that yields content."""
             from victor.providers.base import StreamChunk
+
             yield StreamChunk(content="Thought response", delta="Thought response", is_final=True)
 
         mock_provider.stream = mock_stream

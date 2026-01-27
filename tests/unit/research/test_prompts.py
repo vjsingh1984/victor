@@ -285,13 +285,23 @@ class TestResearchPromptContributor:
     def test_all_task_hints_have_structured_steps(self):
         """Test that research-specific task hints have structured steps."""
         research_only_hints = {
-            k: v for k, v in RESEARCH_TASK_TYPE_HINTS.items()
-            if k in ["fact_check", "literature_review", "competitive_analysis",
-                     "trend_research", "technical_research", "general_query"]
+            k: v
+            for k, v in RESEARCH_TASK_TYPE_HINTS.items()
+            if k
+            in [
+                "fact_check",
+                "literature_review",
+                "competitive_analysis",
+                "trend_research",
+                "technical_research",
+                "general_query",
+            ]
         }
         for key, hint in research_only_hints.items():
             # Research hints should have numbered steps
-            assert any(str(i) in hint.hint for i in range(1, 10)), f"{key} hint should have numbered steps"
+            assert any(
+                str(i) in hint.hint for i in range(1, 10)
+            ), f"{key} hint should have numbered steps"
 
     def test_all_task_hints_mention_tools(self):
         """Test that all task hints mention relevant tools implicitly."""
