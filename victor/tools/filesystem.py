@@ -33,12 +33,14 @@ from victor.protocols.path_resolver import PathResolver, create_path_resolver
 
 logger = logging.getLogger(__name__)
 
+
 # Type for truncation info
 class TruncationInfo(TypedDict):
     lines_returned: int
     bytes_returned: int
     was_truncated: bool
     truncation_reason: str
+
 
 # Global PathResolver instance (lazy initialized)
 _path_resolver: Optional[PathResolver] = None
@@ -1538,7 +1540,11 @@ async def read(
         return grep_result.to_string(show_line_numbers=True, max_matches=50)
 
     # Import truncation utilities
-    from victor.tools.output_utils import truncate_by_lines, format_with_line_numbers, TruncationInfo
+    from victor.tools.output_utils import (
+        truncate_by_lines,
+        format_with_line_numbers,
+        TruncationInfo,
+    )
 
     # Determine truncation limits based on model context
     # Cloud models (Anthropic, OpenAI, etc.): ~2500 lines / 100KB (~25K tokens)

@@ -168,7 +168,7 @@ Actions:
             ],
         )
 
-    async def execute(self, **kwargs: Any) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Execute audit action."""
         action = kwargs.get("action", "summary")
         framework_str = kwargs.get("framework")

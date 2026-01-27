@@ -745,7 +745,7 @@ def parse_docker_ps(stdout: str) -> List[Dict[str, str]]:
     Returns:
         List of container info dictionaries.
     """
-    containers = []
+    containers: list[dict[str, str]] = []
     lines = stdout.strip().split("\n")
 
     if len(lines) <= 1:

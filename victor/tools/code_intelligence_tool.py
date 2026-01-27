@@ -114,9 +114,13 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
                     if node.text and node.text.decode("utf8") == symbol_name:
                         # We found the name identifier, now get the parent definition node
                         definition_node = node.parent
-                        start_line = definition_node.start_point[0] + 1 if definition_node else 0  # type: ignore[union-attr]
-                        end_line = definition_node.end_point[0] + 1 if definition_node else 0  # type: ignore[union-attr]
-                        code_block = definition_node.text.decode("utf8") if definition_node and definition_node.text else ""  # type: ignore[union-attr]
+                        start_line = definition_node.start_point[0] + 1 if definition_node else 0
+                        end_line = definition_node.end_point[0] + 1 if definition_node else 0
+                        code_block = (
+                            definition_node.text.decode("utf8")
+                            if definition_node and definition_node.text
+                            else ""
+                        )
 
                         return {
                             "symbol_name": symbol_name,

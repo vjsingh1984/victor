@@ -326,7 +326,7 @@ async def code_review(
 
     # Validate aspects
     valid_aspects = {"security", "complexity", "best_practices", "documentation", "all"}
-    invalid = [a for a in aspects if a not in valid_aspects]
+    invalid = [a for a in aspects if a not in valid_aspects]  # type: ignore[misc]
     if invalid:
         return {
             "success": False,
@@ -379,7 +379,7 @@ async def code_review(
         }
 
     # Initialize results
-    results = {aspect: {"issues": [], "count": 0} for aspect in aspects}
+    results: Dict[str, Dict[str, Any]] = {aspect: {"issues": [], "count": 0} for aspect in aspects}
     all_issues = []
     files_reviewed = 0
     languages_found = set()

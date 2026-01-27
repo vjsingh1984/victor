@@ -263,7 +263,7 @@ class ToolCompositionBuilder:
             if callable(factory):
                 self._tools[name] = factory()
             else:
-                self._tools[name] = factory
+                self._tools[name] = factory  # type: ignore[unreachable]
         return self
 
     def add_lazy(

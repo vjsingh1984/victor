@@ -41,7 +41,7 @@ async def workflow(
     Returns:
         A dictionary containing the results of the workflow execution.
     """
-    workflow_registry: WorkflowRegistry = context.get("workflow_registry")
+    workflow_registry: WorkflowRegistry | None = context.get("workflow_registry")
     if not workflow_registry:
         return {"error": "WorkflowRegistry not found in context."}
 

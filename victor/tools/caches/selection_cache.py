@@ -675,7 +675,7 @@ class ToolSelectionCache:
         Returns:
             Dictionary with cache stats including latency metrics
         """
-        stats = {
+        stats: Dict[str, Any] = {
             "enabled": self._enabled,
             "max_size": self._max_size,
             "namespaces": {},
@@ -864,7 +864,7 @@ def reset_tool_selection_cache() -> None:
             "tool_selection_rl",
         ]:
             try:
-                registry = UniversalRegistry.get_registry(registry_name)
+                registry: Any = UniversalRegistry.get_registry(registry_name)
                 registry.invalidate()
             except Exception:
                 # Ignore any errors during cleanup

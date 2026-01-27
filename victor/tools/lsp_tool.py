@@ -172,7 +172,9 @@ async def _do_completions(
     }
 
 
-async def _do_hover(file_path: str, line: Optional[int], character: Optional[int]) -> Dict[str, Any]:
+async def _do_hover(
+    file_path: str, line: Optional[int], character: Optional[int]
+) -> Dict[str, Any]:
     """Get hover information."""
     from victor.coding.lsp.manager import get_lsp_manager
 
@@ -193,7 +195,9 @@ async def _do_hover(file_path: str, line: Optional[int], character: Optional[int
         return {"success": False, "message": "No hover information available"}
 
 
-async def _do_definition(file_path: str, line: Optional[int], character: Optional[int]) -> Dict[str, Any]:
+async def _do_definition(
+    file_path: str, line: Optional[int], character: Optional[int]
+) -> Dict[str, Any]:
     """Go to definition."""
     from victor.coding.lsp.manager import get_lsp_manager
 

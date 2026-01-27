@@ -29,12 +29,15 @@ import os
 from pathlib import Path
 from typing import Any, List, Optional
 import weakref
+
 logger = logging.getLogger(__name__)
 # LAZY IMPORT: Docker library is imported only when actually needed (not at module load time).
 # This reduces Victor's startup time by ~0.9s (56% reduction).
 # Docker is only needed when code execution tools are used.
 _docker_available = None  # Cached check: None=unknown, True=False
-docker = None  
+docker = None
+
+
 def _check_docker_available() -> bool:
     """Check if docker package is available, with caching.
     Returns:
@@ -45,6 +48,7 @@ def _check_docker_available() -> bool:
         return _docker_available  # type: ignore[unreachable]
     try:
         import docker as docker_module
+
         docker = docker_module
         _docker_available = True
         return True
@@ -63,12 +67,16 @@ def _get_docker_components() -> tuple[Any, Any, type]:
         import docker as docker_module
         from docker.models.containers import Container  # type: ignore[import-not-found]
         from docker.errors import DockerException  # type: ignore[import-not-found]
+
         return docker_module, Container, DockerException
     except ImportError:
         return None, None, Exception
+
+
 from victor.core.errors import FileError, ConfigurationError
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
+
 # Container label for identifying Victor sandbox containers
 SANDBOX_CONTAINER_LABEL = "victor.sandbox"
 SANDBOX_CONTAINER_VALUE = "code-executor"
@@ -78,6 +86,8 @@ _cleanup_registered = False
 _signal_handlers_registered = False
 _original_sigint_handler = None
 _original_sigterm_handler = None
+
+
 def cleanup_all_sandboxes() -> int:
     """Clean up all active sandbox containers.
     Returns:
@@ -95,6 +105,8 @@ def cleanup_all_sandboxes() -> int:
             # Catch-all for truly unexpected errors
             logger.warning(f"Failed to cleanup sandbox: {e}")
     return cleaned
+
+
 def startup_cleanup(include_unlabeled: bool = True) -> int:
     """Clean up any orphaned containers from previous sessions at startup.
     This should be called during Victor initialization to ensure no
@@ -116,6 +128,8 @@ def startup_cleanup(include_unlabeled: bool = True) -> int:
     if cleaned > 0:
         logger.info(f"Startup cleanup: removed {cleaned} orphaned sandbox container(s)")
     return cleaned
+
+
 def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
     """Clean up any orphaned Victor sandbox containers.
     This finds and removes any containers labeled as Victor sandboxes
@@ -205,6 +219,8 @@ def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
         # Catch-all for truly unexpected errors
         logger.warning(f"Failed to cleanup orphaned containers: {e}")
         return 0
+
+
 def _signal_cleanup_handler(signum: int, frame: Any) -> None:
     """Signal handler that cleans up containers before exiting.
     This ensures containers are cleaned up even when the process
@@ -228,7 +244,10 @@ def _signal_cleanup_handler(signum: int, frame: Any) -> None:
         elif _original_sigterm_handler == signal.SIG_DFL:
             # Exit with the signal for default behavior
             import sys
+
             sys.exit(128 + signum)
+
+
 def _register_signal_handlers() -> None:
     """Register signal handlers for cleanup on SIGINT/SIGTERM."""
     global _signal_handlers_registered, _original_sigint_handler, _original_sigterm_handler
@@ -237,6 +256,7 @@ def _register_signal_handlers() -> None:
     try:
         # Only register in main thread
         import threading
+
         if threading.current_thread() is not threading.main_thread():
             logger.debug("Not registering signal handlers (not main thread)")
             return
@@ -252,6 +272,7 @@ def _register_signal_handlers() -> None:
         # Can fail in some environments (e.g., non-main thread, Windows service)
         logger.debug(f"Could not register signal handlers: {e}")
 
+
 def _register_atexit_cleanup() -> None:
     """Register atexit handler for cleanup (called once)."""
     global _cleanup_registered
@@ -261,8 +282,10 @@ def _register_atexit_cleanup() -> None:
         # Also register signal handlers for graceful termination
         _register_signal_handlers()
 
+
 class CodeSandbox:
     """Manages a persistent, isolated Docker container for stateful code execution."""
+
     def __init__(
         self,
         docker_image: str | None = None,
@@ -302,20 +325,25 @@ class CodeSandbox:
                 ) from e
             # Docker not available, but not required - continue without it
             self.docker_client = None
+
     def __enter__(self) -> "CodeSandbox":
         """Context manager entry - start the container."""
         self.start()
         return self
+
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit - stop and cleanup the container."""
         self.stop()
+
     async def __aenter__(self) -> "CodeSandbox":
         """Async context manager entry - start the container."""
         self.start()
         return self
+
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Async context manager exit - stop and cleanup the container."""
         self.stop()
+
     def start(self) -> None:
         """Starts the persistent Docker container.
         If Docker fails to start, the code executor will continue in
@@ -356,10 +384,11 @@ class CodeSandbox:
                 f"Docker container startup failed: {e}. "
                 "Code execution in containers will be unavailable."
             )
-            self.container = None  # type: ignore[no-redef]
-            self.docker_available = False  # type: ignore[no-redef]  # Mark Docker as unavailable
+            self.container = None
+            self.docker_available = False  # Mark Docker as unavailable
             # Remove from active set since startup failed
             _active_sandboxes.discard(self)
+
     def stop(self) -> None:
         """Stops and removes the Docker container."""
         if not self.docker_available:
@@ -377,9 +406,10 @@ class CodeSandbox:
                 # Catch-all for truly unexpected errors
                 logger.debug(f"Failed to remove container {container_id}: {e}")
                 logger.debug(f"Container {container_id} cleanup: {e}")
-            self.container = None  # type: ignore[no-redef]
+            self.container = None
         # Remove from active set (safe even if not present)
         _active_sandboxes.discard(self)
+
     def execute(self, code: str, timeout: int = 60) -> dict:
         """Executes a block of Python code inside the running container."""
         if not self.docker_available:
@@ -419,6 +449,7 @@ class CodeSandbox:
                 tar.add(str(p), arcname=p.name)
         tar_stream.seek(0)
         self.container.put_archive(self.working_dir, tar_stream)
+
     def get_file(self, remote_path: str) -> bytes:
         """Retrieves a single file from the container."""
         if not self.docker_available:
@@ -436,6 +467,8 @@ class CodeSandbox:
                 if file_obj:
                     return file_obj.read()
         raise FileNotFoundError(f"File not found in container: {remote_path}")
+
+
 async def _execute_code(sandbox_instance: CodeSandbox, code: str) -> str:
     """Internal: Execute Python code in sandbox."""
     result = sandbox_instance.execute(code)
@@ -445,6 +478,8 @@ async def _execute_code(sandbox_instance: CodeSandbox, code: str) -> str:
     if result["stderr"]:
         output += f"--- STDERR ---\n{result['stderr']}\n"
     return output
+
+
 async def _upload_files(sandbox_instance: CodeSandbox, file_paths: List[str]) -> str:
     """Internal: Upload files to sandbox."""
     try:
@@ -452,6 +487,8 @@ async def _upload_files(sandbox_instance: CodeSandbox, file_paths: List[str]) ->
         return f"Successfully uploaded {len(file_paths)} files to the sandbox."
     except Exception as e:
         return f"Error uploading files: {e}"
+
+
 @tool(
     category="execution",
     priority=Priority.MEDIUM,  # Task-specific code execution

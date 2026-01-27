@@ -43,7 +43,7 @@ def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> "ICacheNamesp
                 return cache_manager.index_cache
 
     # Fallback to global cache for backward compatibility
-    return _INDEX_CACHE
+    return _INDEX_CACHE  # type: ignore[return-value]
 
 
 # Directories that indicate non-core code (lower importance)

@@ -176,7 +176,7 @@ class ToolComposer:
         Returns:
             Self for chaining
         """
-        tool_name = name or getattr(tool, "name", str(id(tool)))
+        tool_name = name or str(getattr(tool, "name", str(id(tool))))
 
         spec = ToolSpec(
             name=tool_name,
@@ -291,7 +291,7 @@ class ToolComposer:
                     )
                 )
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
 
         return processed_results
 

@@ -447,7 +447,7 @@ class BaseTool(ABC):
         from victor.tools.enums import SchemaLevel
 
         # MyPy check - level cannot be None here due to Optional type
-        if level is None:  # type: ignore[unreachable]
+        if level is None:
             level = SchemaLevel.FULL
 
         if level == SchemaLevel.FULL:

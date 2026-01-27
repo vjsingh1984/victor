@@ -19,7 +19,7 @@ from victor.tools.graph_tool import graph
     ],
     access_mode=AccessMode.READONLY,
     danger_level=DangerLevel.SAFE,
-    execution_category=ExecutionCategory.READ_ONLY,
+    execution_category="read_only",
     stages=["initial", "planning", "analysis"],
     task_types=["design", "analysis"],
     keywords=[

@@ -339,7 +339,7 @@ class ToolMetadataEntry:
         priority = getattr(tool, "priority", Priority.MEDIUM)
         access_mode = getattr(tool, "access_mode", AccessMode.READONLY)
         danger_level = getattr(tool, "danger_level", DangerLevel.SAFE)
-        aliases = getattr(tool, "aliases", set())
+        aliases: Set[str] = getattr(tool, "aliases", set())
         category = getattr(tool, "category", None)
         # Extract keywords from tool decorator metadata, filtering short keywords
         raw_keywords = getattr(tool, "keywords", None) or []
@@ -1171,7 +1171,7 @@ class ToolMetadataRegistry:
 
         return results
 
-    def get_all_categories(self) -> Set[str]:
+    def get_all_discovered_categories(self) -> Set[str]:
         """Get all categories discovered from registered tools.
 
         Returns:
@@ -1611,7 +1611,7 @@ def _get_instance_impl() -> ToolMetadataRegistry:
 
 
 # Add get_instance as a class method after the class is fully defined
-ToolMetadataRegistry.get_instance = classmethod(lambda cls: _get_instance_impl())
+ToolMetadataRegistry.get_instance = classmethod(lambda cls: _get_instance_impl())  # type: ignore[attr-defined]
 
 
 def register_tool_metadata(tool: BaseTool) -> None:

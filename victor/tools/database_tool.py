@@ -115,6 +115,7 @@ async def _connect_postgresql(
     """Connect to PostgreSQL database."""
     pool = connection_pool if connection_pool is not None else _connections
     try:
+        # type: ignore[import-untyped]
         import psycopg2
 
         conn = psycopg2.connect(

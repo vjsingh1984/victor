@@ -365,7 +365,7 @@ class BrowserTool:
 
         try:
             if self._page:
-                response: Any = await self._page.goto(url, wait_until=wait_for)  # type: ignore[assignment]
+                response: Any = await self._page.goto(url, wait_until=wait_for)
             else:
                 return ActionResult(
                     success=False,
@@ -373,8 +373,8 @@ class BrowserTool:
                     error="Page not available",
                 )
 
-            self._state.url = self._page.url  # type: ignore[attr-defined]
-            self._state.title = await self._page.title()  # type: ignore[attr-defined]
+            self._state.url = self._page.url  # type: ignore[unreachable]
+            self._state.title = await self._page.title()  # type: ignore[unreachable]
             self._state.page_count += 1
             self._state.action_count = 0  # Reset per-page counter
 
@@ -588,7 +588,9 @@ class BrowserTool:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 name = f"screenshot_{timestamp}_{len(self._state.screenshots)}.png"
 
-            filepath = self.config.screenshot_dir / name if self.config.screenshot_dir else Path(name)
+            filepath = (
+                self.config.screenshot_dir / name if self.config.screenshot_dir else Path(name)
+            )
 
             # Take screenshot
             if selector:

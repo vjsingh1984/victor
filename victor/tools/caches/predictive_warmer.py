@@ -387,6 +387,7 @@ class PredictiveCacheWarmer:
         try:
             # If tools already known, cache directly
             if tools:
+                # type: ignore[union-attr]
                 if hasattr(self._cache, "put"):
                     # Generate cache key (simplified)
                     cache_key = hashlib.sha256(query.encode()).hexdigest()[:16]
@@ -395,7 +396,7 @@ class PredictiveCacheWarmer:
 
             # Otherwise, use selection function if available
             if selection_fn:
-                selected_tools = await selection_fn(query)
+                selected_tools = selection_fn(query)
                 if selected_tools and hasattr(self._cache, "put"):
                     cache_key = hashlib.sha256(query.encode()).hexdigest()[:16]
                     self._cache.put(cache_key, [t.name for t in selected_tools])

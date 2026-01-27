@@ -319,8 +319,8 @@ class RunnableSequence(Runnable[Input, Output]):
         """
         current = input
         for runnable in self._runnables:
-            current = await runnable.invoke(current, config)  # type: ignore[arg-type]
-        return current
+            current = await runnable.invoke(current, config)
+        return current  # type: ignore[return-value]
 
     def __or__(
         self, other: Union[Runnable[Output, Other], Callable[[Output], Other]]
@@ -358,8 +358,8 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
 
     def __init__(
         self,
-        steps: Optional[Mapping[str, Runnable]] = None,
-        **kwargs: Runnable[Any],
+        steps: Optional[Mapping[str, Runnable[Any, Any]]] = None,
+        **kwargs: Runnable[Any, Any],
     ):
         """Initialize with named runnables.
 
@@ -391,7 +391,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
         """
         config = config or RunnableConfig()
 
-        async def run_step(name: str, runnable: Runnable) -> Tuple[str, Any]:  # type: ignore[type-arg]
+        async def run_step(name: str, runnable: Runnable[Any, Any]) -> Tuple[str, Any]:
             try:
                 result = await runnable.invoke(input, config)
                 return (name, result)
@@ -402,7 +402,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
         # Create tasks with optional concurrency limit
         semaphore = asyncio.Semaphore(config.max_concurrency)
 
-        async def bounded_run(name: str, runnable: Runnable) -> Tuple[str, Any]:  # type: ignore[type-arg]
+        async def bounded_run(name: str, runnable: Runnable[Any, Any]) -> Tuple[str, Any]:
             async with semaphore:
                 return await run_step(name, runnable)
 
@@ -422,7 +422,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
             if isinstance(result, Exception):
                 logger.error(f"Parallel execution error: {result}")
                 continue
-            if isinstance(result, tuple):  # type: ignore[misc]
+            if isinstance(result, tuple):
                 name, value = result
                 output[name] = value
 
@@ -531,7 +531,7 @@ class RunnableLambda(Runnable[Input, Output]):
             name: Optional name for debugging
         """
         self._func = func
-        self._name = name or getattr(func, "__name__", "lambda")
+        self._name: str = str(name or getattr(func, "__name__", "lambda"))
         self._is_async = asyncio.iscoroutinefunction(func)
 
     @property
@@ -898,7 +898,7 @@ def as_runnable(
     # Import here to avoid circular imports
     from victor.tools.base import BaseTool
 
-    runnable: Runnable[Any]
+    runnable: Runnable[Any, Any]
     if isinstance(tool_or_func, BaseTool):
         runnable = ToolRunnable(tool_or_func, output_key, input_mapping)
     elif hasattr(tool_or_func, "Tool"):
@@ -1003,7 +1003,7 @@ def branch(
         else:
             raise TypeError(f"Cannot branch to {type(r)}")
 
-    default_runnable: Optional[Runnable[Any]] = None
+    default_runnable: Optional[Runnable[Any, Any]] = None
     if default is not None:
         if isinstance(default, Runnable):
             default_runnable = default

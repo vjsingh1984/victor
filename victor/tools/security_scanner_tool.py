@@ -184,7 +184,11 @@ async def scan(
     if "secrets" in scan_types:
         if path_obj.is_file():
             secrets_findings: List[Dict[str, Any]] = _scan_file_for_secrets(path_obj)
-            results["secrets"] = {"files_scanned": 1, "findings": secrets_findings, "count": len(secrets_findings)}
+            results["secrets"] = {
+                "files_scanned": 1,
+                "findings": secrets_findings,
+                "count": len(secrets_findings),
+            }
             all_findings.extend(secrets_findings)
         else:
             # Use gather_files_by_pattern to exclude venv, node_modules, etc.
@@ -203,7 +207,11 @@ async def scan(
     if "config" in scan_types:
         if path_obj.is_file():
             config_findings: List[Dict[str, Any]] = _scan_file_for_config_issues(path_obj)
-            results["config"] = {"files_scanned": 1, "findings": config_findings, "count": len(config_findings)}
+            results["config"] = {
+                "files_scanned": 1,
+                "findings": config_findings,
+                "count": len(config_findings),
+            }
             all_findings.extend(config_findings)
         else:
             # Use gather_files_by_pattern to exclude venv, node_modules, etc.
