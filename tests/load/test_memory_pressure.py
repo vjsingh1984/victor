@@ -33,7 +33,7 @@ from pytest import mark
 
 
 # Test configuration
-API_HOST = "http://localhost:8000"
+API_HOST = "http://localhost:8765"
 DEFAULT_TIMEOUT = 30.0
 
 
@@ -379,10 +379,13 @@ class TestMemoryPressure:
         # Allow some growth for cached items
         assert total_growth < 100, f"Memory not cleaned up properly: {total_growth:.2f}MB growth"
 
-    async def test_tool_execution_memory(self):
+    async def test_tool_execution_memory(self, api_server_available):
         """Test memory usage during tool execution.
 
         Verify tool operations don't leak memory.
+
+        Note: This test requires the API server to be running.
+        Start with: victor serve
         """
         gc.collect()
         initial_memory = get_memory_usage()
