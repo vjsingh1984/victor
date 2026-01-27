@@ -153,9 +153,15 @@ class CppValidator:
                 is_valid=False,
                 language="cpp",
                 issues=[],
-                warnings=[ValidationIssue(
-                    message="libclang not available, basic validation only"
-                )]
+                warnings=[
+                    ValidationIssue(
+                        line=1,
+                        column=0,
+                        severity=ValidationSeverity.WARNING,
+                        source="cpp_validator",
+                        message="libclang not available, basic validation only",
+                    )
+                ],
             )
 
         try:
@@ -250,8 +256,7 @@ class CppValidator:
         """
         if not self.is_available():
             return self._ts_validator.has_errors(code, language)
-
-        if self._index is None:
+        elif self._index is None:
             # Fallback to tree-sitter validation
             return self._ts_validator.has_errors(code, language)
 

@@ -54,7 +54,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
-import numpy as np  # type: ignore[import-not-found]
+import numpy as np  # type: ignore[import-untyped]
 
 from victor.providers.base import Message, CompletionResponse
 
@@ -196,7 +196,7 @@ class SemanticCache:
             with self._embedding_lock:
                 if self._embedding_service is None:
                     try:
-                        from victor.agents.embeddings import EmbeddingService  # type: ignore[import]
+                        from victor.agents.embeddings import EmbeddingService  # type: ignore[import-not-found]
 
                         self._embedding_service = EmbeddingService(model_name=self.embedding_model)
                         logger.info(
@@ -474,20 +474,14 @@ class SemanticCache:
                         best_similarity = similarity
                         best_key = cache_keys[j]
 
-            # Return best match if found
-            if best_key is not None:
-                entry = self._cache[best_key]
-                entry.touch()
-                entry.similarity_score = best_similarity
-                self._cache.move_to_end(best_key)
-                self._semantic_hits += 1
-                self._hits += 1
-
-                logger.debug(
-                    f"Semantic cache hit: similarity={best_similarity:.3f}, "
-                    f"threshold={threshold:.3f}"
-                )
-                return entry.response
+        # Return best match if found
+        if best_key is not None:
+            entry = self._cache[best_key]
+            entry.touch()
+            entry.similarity_score = best_similarity
+            self._cache.move_to_end(best_key)
+            self._semantic_hits += 1
+            self._hits += 1
 
         # No similar entry found
         self._misses += 1

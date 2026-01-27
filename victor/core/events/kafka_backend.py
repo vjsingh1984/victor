@@ -70,8 +70,8 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
 try:
-    from aiokafka import AIOKafkaConsumer, AIOKafkaProducer  # type: ignore[import]
-    from aiokafka.errors import KafkaError  # type: ignore[import]
+    from aiokafka import AIOKafkaConsumer, AIOKafkaProducer  # type: ignore[import-not-found]
+    from aiokafka.errors import KafkaError  # type: ignore[import-not-found]
 except ImportError:
     AIOKafkaConsumer = None
     AIOKafkaProducer = None

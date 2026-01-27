@@ -1193,7 +1193,7 @@ class VerticalBase(
             List of capability names available for this vertical.
         """
         caps = cls.get_capabilities()
-        return caps.list_capabilities()  # type: ignore[no-any-return]
+        return caps.list_capabilities()
 
     # =========================================================================
     # Capability Provider (Canonical - using CapabilityLoader)
@@ -1291,7 +1291,7 @@ class VerticalBase(
             # ["code_review_team", "feature_implementation_team"]
         """
         provider = cls.get_team_provider()
-        return provider.list_teams()  # type: ignore[no-any-return]
+        return provider.list_teams()
 
     @classmethod
     async def create_agent(

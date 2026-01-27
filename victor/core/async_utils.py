@@ -90,7 +90,8 @@ def run_sync(coro: Awaitable[T]) -> T:
         # No running loop - safe to use asyncio.run()
         pass
 
-    return asyncio.run(coro)  # type: ignore[arg-type]  
+    return asyncio.run(coro)  # type: ignore[arg-type]
+
 
 def run_sync_in_thread(coro: Awaitable[T]) -> T:
     """Run an async coroutine from sync context using a thread.

@@ -58,7 +58,7 @@ class HTMLChunkingStrategy(ChunkingStrategy):
             List of Chunk objects
         """
         try:
-            from bs4 import BeautifulSoup
+            from bs4 import BeautifulSoup  # type: ignore[import-untyped]
         except ImportError:
             logger.warning("BeautifulSoup not available, falling back to text chunking")
             from victor.core.chunking.strategies.text import TextChunkingStrategy

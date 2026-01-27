@@ -327,7 +327,10 @@ class RequestBatcher:
             await self._add_to_batch(batch_key, entry)
 
             # Wait for result
-            result = await entry.future
+            if entry.future:
+                result = await entry.future
+            else:
+                raise RuntimeError("Future not available for batch entry")
 
             # Record statistics
             wait_time = time.time() - start_time

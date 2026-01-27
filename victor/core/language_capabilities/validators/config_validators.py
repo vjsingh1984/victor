@@ -245,7 +245,7 @@ class HoconValidator:
         self._hocon_available = False
 
         try:
-            from pyhocon import ConfigFactory  # type: ignore[import-not-found]
+            from pyhocon import ConfigFactory  # type: ignore[import-untyped]
 
             self._config_factory = ConfigFactory
             self._hocon_available = True
