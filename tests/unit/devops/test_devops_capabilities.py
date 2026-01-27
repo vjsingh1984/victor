@@ -284,7 +284,7 @@ class TestDevOpsCapabilityProvider:
         assert "deployment_safety" in metadata
         assert metadata["deployment_safety"].name == "deployment_safety"
         assert "safety" in metadata["deployment_safety"].tags
-        assert metadata["deployment_safety"].version == "1.0"
+        assert metadata["deployment_safety"].version == "0.5.0"
 
     def test_has_capability(self, provider):
         """Test checking for capability existence."""

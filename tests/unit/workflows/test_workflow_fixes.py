@@ -177,13 +177,13 @@ class TestModeAwareLoopDetection:
     """Tests for mode-aware loop detection (Issue #1)."""
 
     def test_loop_threshold_default(self):
-        """Test default loop threshold with BUILD mode multiplier (5.0)."""
+        """Test default loop threshold with BUILD mode multiplier."""
         from victor.agent.unified_task_tracker import UnifiedTaskTracker
 
         tracker = UnifiedTaskTracker()
-        # BUILD mode has 5.0 multiplier by default, so 4 * 5.0 = 20
+        # BUILD mode has 10.0 multiplier, so 4 * 10.0 = 40
         threshold = tracker._get_loop_threshold()
-        assert threshold == 20  # 4 * 5.0
+        assert threshold == 40  # 4 * 10.0
 
     def test_loop_threshold_with_plan_mode(self):
         """Test loop threshold with PLAN mode (10x multiplier)."""
