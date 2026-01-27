@@ -15,6 +15,7 @@
 """Tests for code_intelligence_tool module and consolidated rename from refactor_tool."""
 
 import pytest
+from unittest.mock import MagicMock, patch
 
 from victor.tools.code_intelligence_tool import (
     symbol,

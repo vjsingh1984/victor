@@ -64,7 +64,7 @@ class TestToolPipelineConfig:
     def test_default_config(self):
         """Test default configuration values."""
         config = ToolPipelineConfig()
-        assert config.tool_budget == 25
+        assert config.tool_budget == 100
         assert config.enable_caching is True
         assert config.enable_analytics is True
 

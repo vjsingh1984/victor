@@ -364,7 +364,9 @@ class TestPluginInitialization:
 
         call_args = mock_registry_class.call_args
         plugin_dirs = call_args.kwargs.get("plugin_dirs", [])
-        assert "/custom/plugins" in plugin_dirs
+        # Convert to strings for comparison (can be str or Path objects)
+        plugin_dirs_str = [str(p) for p in plugin_dirs]
+        assert "/custom/plugins" in plugin_dirs_str
 
     @patch("victor.tools.plugin_registry.ToolPluginRegistry")
     @patch("victor.config.settings.get_project_paths")

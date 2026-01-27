@@ -34,7 +34,7 @@ class TestCodeSandbox:
         """Test successful initialization with Docker available."""
         with patch("docker.from_env") as mock_docker:
             mock_docker.return_value = MagicMock()
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
 
             assert manager.docker_image == "python:3.11-slim"
             assert manager.container is None
@@ -57,7 +57,7 @@ class TestCodeSandbox:
             mock_container = MagicMock()
             mock_client.containers.run.return_value = mock_container
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             manager.start()
 
             mock_client.images.pull.assert_called_once_with("python:3.11-slim")
@@ -71,7 +71,7 @@ class TestCodeSandbox:
             mock_docker.return_value = mock_client
             mock_container = MagicMock()
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             manager.container = mock_container
             manager.start()
 
@@ -85,7 +85,7 @@ class TestCodeSandbox:
             mock_docker.return_value = mock_client
             mock_client.containers.run.side_effect = Exception("Container start failed")
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             # Should NOT raise - instead logs warning and continues
             manager.start()
 
@@ -100,7 +100,7 @@ class TestCodeSandbox:
             mock_docker.return_value = mock_client
             mock_container = MagicMock()
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             manager.container = mock_container
             manager.stop()
 
@@ -113,7 +113,7 @@ class TestCodeSandbox:
             mock_client = MagicMock()
             mock_docker.return_value = mock_client
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             manager.stop()  # Should not raise
 
             assert manager.container is None
@@ -128,7 +128,7 @@ class TestCodeSandbox:
             mock_container = MagicMock()
             mock_container.remove.side_effect = docker.errors.NotFound("Container not found")
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             manager.container = mock_container
             manager.stop()  # Should handle gracefully
 
@@ -147,7 +147,7 @@ class TestCodeSandbox:
             mock_exec_result.output = (b"Hello, World!\n", b"")
             mock_container.exec_run.return_value = mock_exec_result
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             manager.container = mock_container
 
             result = manager.execute("print('Hello, World!')")
@@ -169,7 +169,7 @@ class TestCodeSandbox:
             mock_exec_result.output = (b"", b"NameError: name 'x' is not defined\n")
             mock_container.exec_run.return_value = mock_exec_result
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             manager.container = mock_container
 
             result = manager.execute("print(x)")
@@ -184,7 +184,7 @@ class TestCodeSandbox:
             mock_client = MagicMock()
             mock_docker.return_value = mock_client
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
 
             with pytest.raises(RuntimeError, match="Execution session not started"):
                 manager.execute("print('hello')")
@@ -200,7 +200,7 @@ class TestCodeSandbox:
             mock_docker.return_value = mock_client
             mock_container = MagicMock()
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             manager.container = mock_container
 
             manager.put_files([str(test_file)])
@@ -214,7 +214,7 @@ class TestCodeSandbox:
             mock_docker.return_value = mock_client
             mock_container = MagicMock()
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             manager.container = mock_container
 
             with pytest.raises(FileNotFoundError, match="Local file not found"):
@@ -226,7 +226,7 @@ class TestCodeSandbox:
             mock_client = MagicMock()
             mock_docker.return_value = mock_client
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
 
             with pytest.raises(RuntimeError, match="Execution session not started"):
                 manager.put_files(["test.txt"])
@@ -249,7 +249,7 @@ class TestCodeSandbox:
             tar_stream.seek(0)
             mock_container.get_archive.return_value = ([tar_stream.read()], {})
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             manager.container = mock_container
 
             result = manager.get_file("/app/test.txt")
@@ -263,7 +263,7 @@ class TestCodeSandbox:
             mock_client = MagicMock()
             mock_docker.return_value = mock_client
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
 
             with pytest.raises(RuntimeError, match="Execution session not started"):
                 manager.get_file("/app/test.txt")
@@ -285,7 +285,7 @@ class TestCodeSandbox:
             tar_stream.seek(0)
             mock_container.get_archive.return_value = ([tar_stream.read()], {})
 
-            manager = CodeSandbox()
+            manager = CodeSandbox(docker_image="python:3.11-slim")
             manager.container = mock_container
 
             with pytest.raises(FileNotFoundError, match="File not found in container"):

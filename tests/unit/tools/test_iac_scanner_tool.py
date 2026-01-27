@@ -207,7 +207,7 @@ class TestDetectAction:
             mock_manager.detect_platforms.return_value = []
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="detect")
+            result = await tool.execute({}, action="detect")
 
             assert result.success is True
             assert "No IaC files detected" in result.output
@@ -224,7 +224,7 @@ class TestDetectAction:
             ]
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="detect")
+            result = await tool.execute({}, action="detect")
 
             assert result.success is True
             assert "Detected IaC Platforms" in result.output
@@ -248,7 +248,7 @@ class TestSummaryAction:
             mock_manager.get_summary.return_value = sample_summary
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="summary")
+            result = await tool.execute({}, action="summary")
 
             assert result.success is True
             assert "IaC Security Summary" in result.output
@@ -272,7 +272,7 @@ class TestSummaryAction:
             mock_manager.get_summary.return_value = summary
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="summary")
+            result = await tool.execute({}, action="summary")
 
             assert result.success is True
             assert "🟢" in result.output  # low risk icon
@@ -296,7 +296,7 @@ class TestSummaryAction:
             mock_manager.get_summary.return_value = summary
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="summary")
+            result = await tool.execute({}, action="summary")
 
             assert result.success is True
             assert "🔴" in result.output  # critical risk icon
@@ -319,7 +319,7 @@ class TestScanAction:
             mock_manager.scan.return_value = sample_scan_result
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="scan")
+            result = await tool.execute({}, action="scan")
 
             assert result.success is True
             assert "IaC Security Scan Results" in result.output
@@ -333,7 +333,7 @@ class TestScanAction:
             mock_manager.scan.return_value = sample_scan_result
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="scan", platform="terraform")
+            result = await tool.execute({}, action="scan", platform="terraform")
 
             assert result.success is True
             call_args = mock_manager.scan.call_args
@@ -347,7 +347,7 @@ class TestScanAction:
             mock_manager.scan.return_value = sample_scan_result
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="scan", min_severity="high")
+            result = await tool.execute({}, action="scan", min_severity="high")
 
             assert result.success is True
 
@@ -377,7 +377,7 @@ class TestScanAction:
             mock_manager.scan.return_value = scan_result
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="scan")
+            result = await tool.execute({}, action="scan")
 
             assert "🔴" in result.output  # critical severity
             assert "CRIT001" in result.output
@@ -400,7 +400,7 @@ class TestScanFileAction:
             mock_manager.scan_file.return_value = [sample_finding]
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="scan_file", file_path="main.tf")
+            result = await tool.execute({}, action="scan_file", file_path="main.tf")
 
             assert result.success is True
             assert "Security Findings" in result.output
@@ -414,7 +414,7 @@ class TestScanFileAction:
             mock_manager.scan_file.return_value = []
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="scan_file", file_path="clean.tf")
+            result = await tool.execute({}, action="scan_file", file_path="clean.tf")
 
             assert result.success is True
             assert "No security issues found" in result.output
@@ -422,7 +422,7 @@ class TestScanFileAction:
     @pytest.mark.asyncio
     async def test_scan_file_missing_path(self, tool):
         """Test scan_file without file path."""
-        result = await tool.execute(action="scan_file")
+        result = await tool.execute({}, action="scan_file")
 
         assert result.success is False
         assert "file_path is required" in result.output
@@ -442,7 +442,7 @@ class TestErrorHandling:
         with patch("victor.tools.iac_scanner_tool.IaCManager") as MockManager:
             MockManager.return_value = AsyncMock()
 
-            result = await tool.execute(action="invalid_action")
+            result = await tool.execute({}, action="invalid_action")
 
             assert result.success is False
             assert "Unknown action" in result.output
@@ -455,7 +455,7 @@ class TestErrorHandling:
             mock_manager.detect_platforms.side_effect = Exception("Scanner error")
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="detect")
+            result = await tool.execute({}, action="detect")
 
             assert result.success is False
             assert "IaC scanning failed" in result.output
@@ -629,16 +629,16 @@ class TestIntegrationStyle:
             MockManager.return_value = mock_manager
 
             # Step 1: Detect
-            detect_result = await tool.execute(action="detect")
+            detect_result = await tool.execute({}, action="detect")
             assert detect_result.success is True
             assert len(detect_result.metadata["platforms"]) == 2
 
             # Step 2: Summary
-            summary_result = await tool.execute(action="summary")
+            summary_result = await tool.execute({}, action="summary")
             assert summary_result.success is True
 
             # Step 3: Full scan
-            scan_result = await tool.execute(action="scan")
+            scan_result = await tool.execute({}, action="scan")
             assert scan_result.success is True
             assert scan_result.metadata is not None
 
@@ -673,7 +673,7 @@ class TestIntegrationStyle:
             mock_manager.scan.return_value = scan_result
             MockManager.return_value = mock_manager
 
-            result = await tool.execute(action="scan", platform="kubernetes")
+            result = await tool.execute({}, action="scan", platform="kubernetes")
 
             assert result.success is True
             call_args = mock_manager.scan.call_args
