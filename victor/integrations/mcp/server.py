@@ -109,15 +109,18 @@ class MCPServer:
 
         if isinstance(tool.parameters, dict):
             # JSON Schema format: convert to list
+            properties = tool.parameters.get("properties", {})
+            required_set = set(tool.parameters.get("required", []))
+
             tool_params = [
                 ToolParameter(
                     name=name,
                     type=param.get("type", "string"),
                     description=param.get("description", ""),
                     enum=param.get("enum"),
-                    required=param.get("required", True)
+                    required=name in required_set
                 )
-                for name, param in tool.parameters.items()
+                for name, param in properties.items()
             ]
         else:
             # ToolParameter list format

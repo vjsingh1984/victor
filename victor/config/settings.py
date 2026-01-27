@@ -28,6 +28,12 @@ from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_P
 logger = logging.getLogger(__name__)
 
 # =============================================================================
+# VERSION
+# =============================================================================
+# Centralized version constant for consistency across the codebase
+VERSION = "0.5.0"
+
+# =============================================================================
 # CENTRALIZED PATH CONFIGURATION
 # =============================================================================
 # All Victor paths are centralized here for consistency and easy configuration.
