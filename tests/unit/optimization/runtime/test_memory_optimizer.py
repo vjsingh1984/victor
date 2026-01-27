@@ -239,11 +239,16 @@ class TestMemoryOptimizer:
 
     def test_collect_garbage(self):
         """Test garbage collection."""
+        from unittest.mock import patch
+
         optimizer = MemoryOptimizer()
 
-        result = optimizer.collect_garbage()
+        # Mock gc.collect to avoid hanging on background threads (LanceDB, tqdm)
+        with patch("victor.optimization.runtime.memory.gc.collect", return_value=42):
+            result = optimizer.collect_garbage()
 
         assert "collected" in result
+        assert result["collected"] == 42  # Mocked value
         assert "objects_before" in result
         assert "objects_after" in result
 

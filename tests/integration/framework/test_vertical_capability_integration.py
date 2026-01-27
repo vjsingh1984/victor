@@ -219,7 +219,7 @@ class TestResearchVerticalCapabilities:
         source_verify_meta = metadata["source_verification"]
         assert source_verify_meta.name == "source_verification"
         assert "credibility" in source_verify_meta.description.lower()
-        assert source_verify_meta.version == "1.0"
+        assert source_verify_meta.version == "0.5.0"
         assert "safety" in source_verify_meta.tags
 
         # Check research_quality has dependencies
