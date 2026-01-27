@@ -216,7 +216,7 @@ class BrowserTool:
                 self._context.on("page", lambda p: asyncio.create_task(p.close()))  # type: ignore[attr-defined]
 
             # Create initial page
-            self._page = await self._context.new_page()
+            self._page = await self._context.new_page()  # type: ignore[attr-defined]
 
             # Set up console log capture
             self._page.on("console", self._handle_console_message)  # type: ignore[attr-defined]
@@ -366,6 +366,12 @@ class BrowserTool:
         try:
             if self._page:
                 response: Any = await self._page.goto(url, wait_until=wait_for)  # type: ignore[assignment]
+            else:
+                return ActionResult(
+                    success=False,
+                    action=BrowserAction.NAVIGATE,
+                    error="Page not available",
+                )
 
             self._state.url = self._page.url  # type: ignore[attr-defined]
             self._state.title = await self._page.title()  # type: ignore[attr-defined]

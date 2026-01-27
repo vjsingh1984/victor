@@ -49,7 +49,7 @@ def main():
     # Build pytest command
     pytest_cmd = [
         "pytest",
-        "tests/benchmark/benchmarks/test_embedding_operations_baseline.py",
+        "tests/benchmark/test_embedding_operations_baseline.py",
         "-v",
         "--benchmark-only",
         "--benchmark-sort=name",

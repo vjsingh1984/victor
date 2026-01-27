@@ -28,7 +28,7 @@ def run_benchmark_tests() -> Dict[str, Any]:
             sys.executable,
             "-m",
             "pytest",
-            "tests/benchmark/benchmarks/test_tool_selection_benchmark.py",
+            "tests/benchmark/test_tool_selection_benchmark.py",
             "-v",
             "-m",
             "benchmark or summary",

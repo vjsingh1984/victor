@@ -25,7 +25,7 @@ def run_benchmarks(
     """
     cmd = [
         "pytest",
-        "tests/benchmark/benchmarks/test_tool_selection_performance.py",
+        "tests/benchmark/test_tool_selection_performance.py",
         "-v" if verbose else "",
         "--benchmark-only",
         "--sort=name",  # Sort by benchmark name for consistency
@@ -62,7 +62,7 @@ def generate_summary():
     subprocess.run(
         [
             "pytest",
-            "tests/benchmark/benchmarks/test_tool_selection_performance.py::test_benchmark_summary",
+            "tests/benchmark/test_tool_selection_performance.py::test_benchmark_summary",
             "-v",
             "-s",
         ]
