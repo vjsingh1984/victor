@@ -325,7 +325,7 @@ class TestStateGraphThroughput:
         graph.add_node("branch_b", lambda state: {"result": "B"})
 
         graph.add_edge(START, "process")
-        graph.add_conditional_edge("process", route_fn)
+        graph.add_conditional_edge("process", route_fn, {"branch_a": "branch_a", "branch_b": "branch_b"})
         graph.add_edge("branch_a", END)
         graph.add_edge("branch_b", END)
 

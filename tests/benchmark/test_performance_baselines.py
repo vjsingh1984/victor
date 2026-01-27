@@ -421,7 +421,7 @@ class TestContextManagementBaselines:
     async def test_context_compaction_performance(self):
         """Measure context compaction performance."""
         compactor = ContextCompactor()
-        strategy = TruncationCompactionStrategy(max_tokens=100)
+        strategy = TruncationCompactionStrategy(max_chars=100)
 
         # Create large conversation
         large_conversation = [{"role": "user", "content": f"Message {i}" * 10} for i in range(1000)]
@@ -450,8 +450,8 @@ class TestContextManagementBaselines:
         compactor = ContextCompactor()
 
         strategies = {
-            "truncation": TruncationCompactionStrategy(max_tokens=100),
-            "hybrid": HybridCompactionStrategy(max_tokens=100),
+            "truncation": TruncationCompactionStrategy(max_chars=100),
+            "hybrid": HybridCompactionStrategy(),
         }
 
         conversation = [{"role": "user", "content": f"Message {i}" * 5} for i in range(500)]

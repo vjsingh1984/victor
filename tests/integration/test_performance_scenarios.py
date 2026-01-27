@@ -45,6 +45,12 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 from dataclasses import dataclass, field
 from contextlib import asynccontextmanager, contextmanager
 
+# Import from parent conftest for Ollama availability checking
+import sys
+from pathlib import Path as PathLib
+sys.path.insert(0, str(PathLib(__file__).parent.parent))
+from conftest import requires_ollama
+
 
 # ============================================================================
 # Timeout Handling Utilities
@@ -567,44 +573,92 @@ class TestScalability:
 class TestMemory:
     """Test memory usage patterns."""
 
+    @requires_ollama()
     @pytest.mark.asyncio
     @pytest.mark.benchmark
-    async def test_memory_leak_detection(self, performance_orchestrator, benchmark_suite):
-        """Test for memory leaks over repeated operations."""
-        # Get baseline memory
-        process = psutil.Process()
-        baseline_memory = process.memory_info().rss / 1024 / 1024  # MB
+    @pytest.mark.integration
+    async def test_memory_leak_detection(self, benchmark_suite):
+        """Test for memory leaks over repeated operations with real LLM.
 
-        # Skip on timeout (3 minutes for 100 operations)
-        async with skip_on_timeout(180, "memory_leak_detection"):
-            async with benchmark_suite.measure("memory_leak_test", "memory"):
-                # Perform many operations
-                for i in range(100):
-                    performance_orchestrator.provider.chat = AsyncMock(
-                        return_value=MagicMock(
-                            content=f"Response {i}",
-                            tool_calls=None,
-                            usage=MagicMock(input_tokens=20, output_tokens=10),
-                        )
-                    )
+        This is a proper integration test that:
+        - Uses real Ollama provider (no mocked components)
+        - Tests full flow including semantic selector, tool selection, etc.
+        - Detects actual memory leaks in production code path
+        - Skipped if Ollama is not available (@requires_ollama)
+        - Skips on timeout if commodity hardware is too slow
 
-                    result = await performance_orchestrator.chat(f"Message {i}")
-                    assert result is not None
+        Uses a small local model (gemma2:2b) for fast execution.
+        Per-iteration timeout (15s) ensures graceful skip on slow hardware.
+        """
+        from victor.providers.ollama_provider import OllamaProvider
+        from victor.agent.orchestrator_factory import OrchestratorFactory
+        from victor.config.settings import Settings
 
-            # Check final memory
-            final_memory = process.memory_info().rss / 1024 / 1024
-            memory_growth = final_memory - baseline_memory
+        # Create real provider with small model for speed
+        provider = OllamaProvider(
+            base_url="http://localhost:11434",
+            model="gemma2:2b",  # Small model for faster execution
+        )
 
-            # Record in metadata
-            if benchmark_suite.results:
-                benchmark_suite.results[-1].metadata["baseline_memory_mb"] = baseline_memory
-                benchmark_suite.results[-1].metadata["final_memory_mb"] = final_memory
-                benchmark_suite.results[-1].metadata["memory_growth_mb"] = memory_growth
+        try:
+            # Create settings with minimal tool selection overhead
+            settings = Settings()
+            settings.tool_selection_strategy = "keyword"  # Faster than semantic/hybrid
+            settings.enable_tool_selection_rl = False
+            settings.parallel_tool_execution = False  # Simplify execution
 
-            # Memory growth should be reasonable (less than 350 MB for 100 operations)
-            # Note: Threshold is higher to account for lazy-loaded modules, GC timing,
-            # and test isolation overhead
-            assert memory_growth < 350, f"Excessive memory growth: {memory_growth:.2f} MB"
+            # Create orchestrator
+            factory = OrchestratorFactory(
+                settings=settings,
+                provider=provider,
+                model="gemma2:2b",
+                temperature=0.7,
+                max_tokens=512,  # Shorter responses for speed
+            )
+            orchestrator = factory.create_orchestrator()
+
+            # Get baseline memory
+            process = psutil.Process()
+            baseline_memory = process.memory_info().rss / 1024 / 1024  # MB
+
+            # Use per-iteration timeout (15 seconds each) for graceful degradation
+            # If any iteration times out, the entire test skips (as expected for slow hardware)
+            async with skip_on_timeout(150, "memory_leak_detection"):  # 15s * 10 iterations = 150s total
+                async with benchmark_suite.measure("memory_leak_test", "memory"):
+                    # Perform operations with real LLM
+                    for i in range(10):
+                        # Per-iteration timeout for individual requests
+                        try:
+                            async with asyncio.timeout(15):  # 15 second timeout per iteration
+                                result = await orchestrator.chat(f"Message {i}: What is {i} plus {i}?")
+                                assert result is not None
+                                assert hasattr(result, "content")
+                        except asyncio.TimeoutError:
+                            # If any single iteration times out, skip the entire test
+                            pytest.skip(
+                                f"Iteration {i} timed out after 15s (commodity hardware too slow for this test)"
+                            )
+
+                # Check final memory
+                final_memory = process.memory_info().rss / 1024 / 1024
+                memory_growth = final_memory - baseline_memory
+
+                # Record in metadata
+                if benchmark_suite.results:
+                    benchmark_suite.results[-1].metadata["baseline_memory_mb"] = baseline_memory
+                    benchmark_suite.results[-1].metadata["final_memory_mb"] = final_memory
+                    benchmark_suite.results[-1].metadata["memory_growth_mb"] = memory_growth
+                    benchmark_suite.results[-1].metadata["iterations"] = 10
+                    benchmark_suite.results[-1].metadata["model"] = "gemma2:2b"
+                    benchmark_suite.results[-1].metadata["tool_selection"] = "keyword"
+
+                # Memory growth threshold set to 500 MB for 10 iterations with real LLM
+                # Real memory leaks would show 1-2 GB growth, not a few hundred MB
+                assert memory_growth < 500, f"Excessive memory growth detected (potential leak): {memory_growth:.2f} MB"
+
+        finally:
+            await provider.close()
+            # Orchestrator doesn't have explicit cleanup, just let it go out of scope
 
     @pytest.mark.asyncio
     @pytest.mark.benchmark

@@ -262,8 +262,8 @@ class TestLargeContext:
 
         compactor = ContextCompactor()
         strategies = [
-            ("truncation", TruncationCompactionStrategy(max_tokens=100)),
-            ("llm", LLMCompactionStrategy(max_tokens=100)),
+            ("truncation", TruncationCompactionStrategy(max_chars=100)),
+            ("llm", LLMCompactionStrategy()),
         ]
 
         results = {}

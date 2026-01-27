@@ -524,7 +524,7 @@ class TestPersonaManagerPerformance:
                 name=f"Test Persona {i}",
                 description=f"A test persona {i}",
                 personality=PersonalityType.CREATIVE,
-                communication_style=CommunicationStyle.FRIENDLY,
+                communication_style=CommunicationStyle.CASUAL,
                 expertise=["testing", "benchmarking"],
             )
             manager.repository.save(persona)
@@ -673,7 +673,7 @@ class TestSecurityAuthorizationOverhead:
         )
 
         # Setup: Create user and assign role
-        authorizer.create_user("user1", roles=["developer"])
+        authorizer.create_user(user_id="user1", username="user1", roles=["developer"])
 
         def auth_check():
             return authorizer.check_permission("user1", Permission("tools", "execute"))
@@ -702,7 +702,7 @@ class TestSecurityAuthorizationOverhead:
                 Permission("code", "delete"),
             },
         )
-        authorizer.create_user("admin_user", roles=["admin"])
+        authorizer.create_user(user_id="admin_user", username="admin_user", roles=["admin"])
 
         # Single check baseline
         start = time.perf_counter()
