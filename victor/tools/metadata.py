@@ -99,12 +99,16 @@ class ToolMetadata:
     @property
     def requires_approval(self) -> bool:
         """Check if this tool requires user approval."""
-        return self.access_mode.requires_approval or self.danger_level.requires_confirmation
+        return (self.access_mode.requires_approval if self.access_mode else False) or (
+            self.danger_level.requires_confirmation if self.danger_level else False
+        )
 
     @property
     def is_safe(self) -> bool:
         """Check if this tool is safe (readonly, no danger)."""
-        return self.access_mode.is_safe and self.danger_level == DangerLevel.SAFE
+        return (self.access_mode.is_safe if self.access_mode else False) and (
+            self.danger_level == DangerLevel.SAFE if self.danger_level else False
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary format for YAML/JSON export."""

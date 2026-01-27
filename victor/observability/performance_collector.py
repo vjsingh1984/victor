@@ -695,7 +695,7 @@ class PerformanceMetricsCollector:
 
     def _collect_system_metrics(self) -> None:
         """Collect system resource metrics."""
-        import psutil  # type: ignore[import]
+        import psutil  # type: ignore[import-untyped]
 
         try:
             # Memory

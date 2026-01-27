@@ -59,7 +59,7 @@ async def test_imports() -> bool:
 
     try:
         # Unified server
-        from victor.integrations.api.unified_server import (
+        from victor.integrations.api.unified_orchestrator import (
             create_unified_server,
             run_unified_server,
         )
@@ -82,7 +82,7 @@ async def test_server_creation() -> bool:
     print_section("Testing Server Creation")
 
     try:
-        from victor.integrations.api.unified_server import create_unified_server
+        from victor.integrations.api.unified_orchestrator import create_unified_server
 
         # Create server with default settings
         app = create_unified_server(
@@ -135,7 +135,7 @@ async def test_endpoint_structure() -> bool:
     print_section("Testing Endpoint Structure")
 
     try:
-        from victor.integrations.api.unified_server import create_unified_server
+        from victor.integrations.api.unified_orchestrator import create_unified_server
 
         app = create_unified_server()
 
@@ -184,7 +184,7 @@ async def test_hitl_integration() -> bool:
     print_section("Testing HITL Integration")
 
     try:
-        from victor.integrations.api.unified_server import create_unified_server
+        from victor.integrations.api.unified_orchestrator import create_unified_server
 
         app = create_unified_server(enable_hitl=True, hitl_persistent=False)
 
@@ -233,7 +233,7 @@ async def test_health_check() -> bool:
     print_section("Testing Health Check")
 
     try:
-        from victor.integrations.api.unified_server import create_unified_server
+        from victor.integrations.api.unified_orchestrator import create_unified_server
         from fastapi.testclient import TestClient
 
         app = create_unified_server()

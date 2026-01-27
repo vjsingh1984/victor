@@ -489,6 +489,7 @@ def setup_structured_logging(
     root_logger.handlers.clear()
 
     # Create formatter
+    formatter: logging.Formatter
     if log_format == "json":
         formatter = StructuredFormatter(
             service_name=service_name,

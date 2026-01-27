@@ -136,29 +136,16 @@ class LifecycleEventEmitter(ILifecycleEventEmitter):
 
     def emit(
         self,
-        topic: str,
-        data: Dict[str, Any],
+        event: MessagingEvent,
     ) -> None:
         """Emit a lifecycle event synchronously (for gradual migration).
 
-        This method wraps the async emit_async() method using emit_event_sync()
-        to avoid asyncio.run() errors in running event loops.
-
         Args:
-            topic: Event topic (e.g., "lifecycle.session.start")
-            data: Event payload
+            event: The lifecycle event to emit
         """
         try:
-            from victor.core.events.emit_helper import emit_event_sync
-
-            bus = self._get_bus()
-            if bus:
-                emit_event_sync(
-                    bus,
-                    topic=topic,
-                    data=data,
-                    source="LifecycleEventEmitter",
-                )
+            # For backward compatibility, convert to topic/data format
+            self._event_bus.emit(event.topic, event.data)  # type: ignore[attr-defined]
         except Exception as e:
             logger.debug(f"Failed to emit lifecycle event: {e}")
 

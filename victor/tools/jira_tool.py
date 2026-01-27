@@ -25,7 +25,7 @@ import logging
 from typing import Any, Dict, Optional
 
 try:
-    from jira import JIRA, JIRAError
+    from jira import JIRA, JIRAError  # type: ignore[import-not-found]
 
     JIRA_AVAILABLE = True
 except ImportError:

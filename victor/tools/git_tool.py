@@ -88,7 +88,7 @@ async def _run_git_async(
     # Registry-driven metadata for tool selection and cache management
     stages=["execution", "verification", "completion"],  # Conversation stages where relevant
     task_types=["action", "analysis"],  # Task types for classification-aware selection
-    execution_category=ExecutionCategory.MIXED,  # Can both read and write
+    execution_category="MIXED",  # Can both read and write
     progress_params=["operation", "files", "branch"],  # Params indicating different operations
     keywords=[
         "git",

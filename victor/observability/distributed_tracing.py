@@ -76,10 +76,10 @@ if TYPE_CHECKING:
         from opentelemetry import trace
         from opentelemetry.trace import Span, Status, StatusCode
     except ImportError:
-        trace = None  # type: ignore[assignment]
-        Span = None  # type: ignore[assignment]
-        Status = None  # type: ignore[assignment]
-        StatusCode = None  # type: ignore[assignment]
+        trace = None  # type: ignore[misc]
+        Span = None  # type: ignore[misc]
+        Status = None  # type: ignore[misc]
+        StatusCode = None  # type: ignore[misc]
 
 logger = logging.getLogger(__name__)
 
@@ -344,7 +344,7 @@ class DistributedTracer:
             context=ctx,
             kind=kind,
             attributes=attributes or {},
-        )
+        )  # type: ignore[abstract,call-arg]
 
         # Set as current context
         _trace_context.set(ctx)

@@ -303,7 +303,7 @@ class MonitoringMiddleware:
                 )
 
                 # Update span
-                span.set_error(e)  # type: ignore[attr-defined]
+                span.set_error(e)  # type: ignore[union-attr]
 
                 logger.exception(f"Request failed: {e}")
                 raise

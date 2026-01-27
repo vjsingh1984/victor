@@ -37,6 +37,7 @@ from typing import Any, Dict, Optional
 from datetime import datetime, timezone
 
 from victor.observability.emitters.base import IToolEventEmitter
+from victor.core.events import MessagingEvent
 from victor.core.events import ObservabilityBus, SyncEventWrapper
 
 logger = logging.getLogger(__name__)
@@ -134,31 +135,18 @@ class ToolEventEmitter(IToolEventEmitter):
 
         return False
 
-    async def emit(
+    def emit(
         self,
-        topic: str,
-        data: Dict[str, Any],
+        event: MessagingEvent,
     ) -> None:
         """Emit a tool event synchronously (for gradual migration).
 
-        This method wraps the async emit_async() method using emit_event_sync()
-        to avoid asyncio.run() errors in running event loops.
-
         Args:
-            topic: Event topic (e.g., "tool.start", "tool.result")
-            data: Event payload
+            event: The tool event to emit
         """
         try:
-            from victor.core.events.emit_helper import emit_event_sync
-
-            bus = self._get_bus()
-            if bus:
-                emit_event_sync(
-                    bus,
-                    topic=topic,
-                    data=data,
-                    source="ToolEventEmitter",
-                )
+            # For backward compatibility, convert to topic/data format
+            self._event_bus.emit(event.topic, event.data)  # type: ignore[attr-defined]
         except Exception as e:
             logger.debug(f"Failed to emit tool event: {e}")
 
@@ -172,7 +160,7 @@ class ToolEventEmitter(IToolEventEmitter):
             True if emission succeeded, False otherwise
         """
         try:
-            self.emit(topic=event.topic, data=event.data)
+            self.emit(MessagingEvent(topic=event.topic, data=event.data))  # type: ignore[arg-type]
             return True
         except Exception as e:
             logger.debug(f"Failed to emit tool event safely: {e}")
@@ -194,7 +182,7 @@ class ToolEventEmitter(IToolEventEmitter):
         Returns:
             True if emission succeeded
         """
-        return await self.emit_async(
+        return self.emit_async(
             topic="tool.start",
             data={
                 "tool_name": tool_name,
@@ -250,7 +238,7 @@ class ToolEventEmitter(IToolEventEmitter):
             if len(result_str) > 1000:
                 result_str = result_str[:1000] + "... (truncated)"
 
-        return await self.emit_async(
+        return self.emit_async(
             topic="tool.result",
             data={
                 "tool_name": tool_name,
@@ -312,7 +300,7 @@ class ToolEventEmitter(IToolEventEmitter):
         Returns:
             True if emission succeeded
         """
-        return await self.emit_async(
+        return self.emit_async(
             topic="tool.error",
             data={
                 "tool_name": tool_name,

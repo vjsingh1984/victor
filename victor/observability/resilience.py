@@ -428,8 +428,6 @@ class ObservableCircuitBreaker:
                     return True
                 return False
 
-            return False
-
     async def _record_success(self) -> None:
         """Record successful call."""
         async with self._lock:
@@ -873,6 +871,7 @@ class ResiliencePolicy:
                     raise CircuitBreakerError(
                         f"Circuit breaker is {self._circuit_breaker.state.value}",
                         self._circuit_breaker.state,
+                        self._circuit_breaker.recovery_timeout,
                     )
 
             try:

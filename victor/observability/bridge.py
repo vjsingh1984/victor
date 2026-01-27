@@ -95,7 +95,7 @@ class ObservabilityBridge:
         self._error_emitter = error_emitter or ErrorEventEmitter(bus=bus)  # type: ignore[abstract]
 
         self._event_bus = bus
-        self._jsonl_exporter: Optional[JsonLineExporter] = None
+        self._jsonl_exporter: Optional[JsonLineExporter] = None  # type: ignore[name-defined]
 
         self._enabled = True
         self._session_start_time: Optional[float] = None
@@ -129,7 +129,7 @@ class ObservabilityBridge:
         """
         if self._jsonl_exporter is not None:
             # Already setup
-            return  # type: ignore[unreachable]
+            return
 
         # Determine log path
         if log_path is None:

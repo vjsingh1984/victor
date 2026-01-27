@@ -252,7 +252,7 @@ async def _do_update(packages: List[str], dry_run: bool) -> Dict[str, Any]:
             "message": f"Dry run: Would update {len(packages)} packages: {', '.join(packages)}",
         }
 
-    updated = []
+    updated: list[str] = []
     for package in packages:
         success, stdout, stderr = await run_pip_async("install", "--upgrade", package)
         if not success:

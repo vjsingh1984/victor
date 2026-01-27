@@ -63,15 +63,22 @@ def _get_connection_pool(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str,
 
         if isinstance(exec_ctx, ToolExecutionContext):
             if exec_ctx.cache_manager is not None:
-                return exec_ctx.connection_pool
+                # Convert to dict
+                return {
+                    "connection_pool": exec_ctx.connection_pool,
+                    "cache_manager": exec_ctx.cache_manager,
+                }
         elif isinstance(exec_ctx, dict):
             # Legacy dict context - check for cache_manager
             cache_manager = exec_ctx.get("cache_manager")
             if cache_manager is not None:
-                return cache_manager.connection_pool
+                return {
+                    "connection_pool": cache_manager.connection_pool,
+                    "cache_manager": cache_manager,
+                }
 
     # Fallback to global cache for backward compatibility
-    return _connections  # type: ignore[return-value]
+    return _connections
 
 
 # Dangerous SQL patterns that should be blocked
@@ -115,8 +122,7 @@ async def _connect_postgresql(
     """Connect to PostgreSQL database."""
     pool = connection_pool if connection_pool is not None else _connections
     try:
-        # type: ignore[import-untyped]
-        import psycopg2
+        import psycopg2  # type: ignore[import-untyped]
 
         conn = psycopg2.connect(
             host=kwargs.get("host", "localhost"),

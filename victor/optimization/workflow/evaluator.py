@@ -77,7 +77,7 @@ class EvaluationResult:
         if self.metrics is None:
             self.metrics = {}
 
-    def to_dict(self) -> Dict[str, Any]:  # type: ignore[unreachable]
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "variant_id": self.variant_id,

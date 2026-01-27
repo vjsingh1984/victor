@@ -19,7 +19,7 @@ audit logging, compliance checking, and report generation.
 """
 
 import logging
-from typing import Any
+from typing import Any, Dict
 
 from victor.core.security.audit import (
     AuditManager,

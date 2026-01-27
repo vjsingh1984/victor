@@ -426,7 +426,7 @@ else:
     class RAGPanelStub:  # Renamed to avoid conflict
         """Stub RAG panel when Textual is not available."""
 
-        def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        def __init__(self, *args, **kwargs):
             raise ImportError(
                 "Textual is required for RAG UI. " "Install with: pip install textual"
             )

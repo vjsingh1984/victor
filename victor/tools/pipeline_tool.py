@@ -154,7 +154,7 @@ class PipelineAnalyzerTool(BaseTool):
             ],
         )
 
-    async def execute(self, **kwargs: Any) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Execute pipeline analysis action."""
         action = kwargs.get("action", "summary")
         platform_str = kwargs.get("platform", "all")

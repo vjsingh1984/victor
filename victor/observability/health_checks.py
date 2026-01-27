@@ -643,7 +643,7 @@ class FeatureHealthChecker:
                     )
                 )
             else:
-                health_results.append(result)
+                health_results.append(result)  # type: ignore[arg-type]
 
         return health_results
 

@@ -600,7 +600,7 @@ async def scaffold(
         if not path:
             return {"success": False, "error": "Add operation requires 'path' parameter"}
 
-        file_path = Path(path)
+        file_path: Path = Path(path)  # type: ignore[assignment]
 
         # Create parent directories
         file_path.parent.mkdir(parents=True, exist_ok=True)

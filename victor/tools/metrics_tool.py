@@ -153,9 +153,9 @@ async def metrics(
         }
 
     # Initialize results
-    results = {metric: [] for metric in metrics_list}
+    results: Dict[str, Any] = {metric: [] for metric in metrics_list}
     total_complexity = 0
-    total_maintainability = 0
+    total_maintainability = 0.0
     total_debt_hours = 0
     total_lines = 0
     total_functions = 0

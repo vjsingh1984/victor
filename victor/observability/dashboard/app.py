@@ -772,7 +772,7 @@ class ExecutionTraceView(TimeOrderedTableView):
         super().__init__(*args, max_rows=max_rows, **kwargs)
         self._spans: list = []
 
-    def clear(self) -> None:
+    def clear(self, columns: bool = ...) -> ExecutionTraceView:
         """Clear all spans."""
         self._spans.clear()
         self.update_data([])  # type: ignore[attr-defined]
@@ -838,7 +838,7 @@ class ToolCallHistoryView(TimeOrderedTableView):
         super().__init__(*args, max_rows=max_rows, **kwargs)
         self._tool_calls: list = []
 
-    def clear(self) -> None:
+    def clear(self, columns: bool = ...) -> ToolCallHistoryView:
         """Clear all tool calls."""
         self._tool_calls.clear()
         self.update_data([])  # type: ignore[attr-defined]
@@ -943,7 +943,7 @@ class StateTransitionView(TimeOrderedTableView):
         super().__init__(*args, max_rows=max_rows, enable_dedup=True, **kwargs)
         self._transitions: list = []
 
-    def clear(self) -> None:
+    def clear(self, columns: bool = ...) -> StateTransitionView:
         """Clear all transitions."""
         self._transitions.clear()
         self.update_data([])  # type: ignore[attr-defined]

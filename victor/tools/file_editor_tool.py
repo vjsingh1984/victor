@@ -332,9 +332,6 @@ async def edit(
     # Allow callers (models) to pass ops as a JSON string; normalize to list[dict[str, Any]]
     if isinstance(ops, str):
         import json
-        import logging
-
-        logger = logging.getLogger(__name__)
 
         def _fix_json_control_chars(json_str: str) -> str:
             """Fix raw control characters inside JSON strings.

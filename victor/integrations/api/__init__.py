@@ -18,8 +18,8 @@ Provides REST API endpoints for IDE integrations (VS Code, JetBrains, etc.)
 and external tool access.
 
 Components:
-- VictorAPIServer: Legacy aiohttp-based server
-- VictorFastAPIServer: Modern FastAPI-based server (recommended, requires fastapi)
+- VictorFastAPIServer: FastAPI-based server (recommended, requires fastapi)
+- Unified Orchestrator: Advanced composition layer for workflow editor UI
 - APIMiddlewareStack: Authentication, rate limiting, and CORS middleware
 - EventBridge: Real-time event streaming to WebSocket clients
 """
@@ -28,8 +28,8 @@ from typing import TYPE_CHECKING
 
 # Lazy imports for optional dependencies
 if TYPE_CHECKING:
-    from victor.integrations.api.server import VictorAPIServer
     from victor.integrations.api.fastapi_server import VictorFastAPIServer
+    from victor.integrations.api.unified_orchestrator import create_unified_server
     from victor.integrations.api.middleware import (
         APIMiddlewareStack,
         RateLimitConfig,
@@ -45,14 +45,14 @@ if TYPE_CHECKING:
 
 def __getattr__(name: str) -> object:
     """Lazy import for optional dependencies."""
-    if name == "VictorAPIServer":
-        from victor.integrations.api.server import VictorAPIServer
-
-        return VictorAPIServer
-    elif name == "VictorFastAPIServer":
+    if name == "VictorFastAPIServer":
         from victor.integrations.api.fastapi_server import VictorFastAPIServer
 
         return VictorFastAPIServer
+    elif name == "create_unified_server":
+        from victor.integrations.api.unified_orchestrator import create_unified_server
+
+        return create_unified_server
     elif name in ("APIMiddlewareStack", "RateLimitConfig", "AuthConfig", "TokenBucket"):
         from victor.integrations.api import middleware
 
@@ -66,8 +66,8 @@ def __getattr__(name: str) -> object:
 
 __all__ = [
     # Servers
-    "VictorAPIServer",
     "VictorFastAPIServer",
+    "create_unified_server",
     # Middleware
     "APIMiddlewareStack",
     "RateLimitConfig",

@@ -827,7 +827,7 @@ class ToolGraphRegistry:
 
     _instance: Optional["ToolGraphRegistry"] = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the registry."""
         self._graphs: Dict[str, ToolExecutionGraph] = {}
         self._default_graph = ToolExecutionGraph("default")

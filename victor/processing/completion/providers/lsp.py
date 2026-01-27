@@ -203,7 +203,7 @@ class LSPCompletionProvider(BaseCompletionProvider):
             logger.warning(f"LSP completion resolution failed: {e}")
             return item
 
-    def _convert_lsp_response(self, lsp_result: dict[str, Any]) -> CompletionList:
+    def _convert_lsp_response(self, lsp_result: dict[str, Any] | list[Any]) -> CompletionList:
         """Convert LSP completion response to our format.
 
         Args:

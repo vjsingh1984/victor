@@ -490,7 +490,7 @@ def setup_coordinator_logging(
     if output_file:
         handler = logging.FileHandler(output_file)
     else:
-        handler = logging.StreamHandler(sys.stderr)
+        handler = logging.StreamHandler(sys.stderr)  # type: ignore[assignment]
 
     # Set formatter
     if format_type == "json":
@@ -499,7 +499,7 @@ def setup_coordinator_logging(
             environment=environment,
         )
     else:
-        formatter = TextFormatter(use_colors=True)
+        formatter = TextFormatter(use_colors=True)  # type: ignore[assignment]
 
     handler.setFormatter(formatter)
     handler.setLevel(level)

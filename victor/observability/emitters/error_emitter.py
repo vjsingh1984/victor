@@ -135,18 +135,19 @@ class ErrorEventEmitter(IErrorEventEmitter):
 
     def emit(
         self,
-        topic: str,
-        data: Dict[str, Any],
+        event: MessagingEvent,
     ) -> None:
         """Emit an error event synchronously (for gradual migration).
 
-        This method wraps the async emit_async() method using emit_event_sync()
-        to avoid asyncio.run() errors in running event loops.
-
         Args:
-            topic: Event topic (e.g., "error.raised")
-            data: Event payload
+            event: The error event to emit
         """
+        try:
+            # For backward compatibility, convert to topic/data format
+            self._event_bus.emit(event.topic, event.data)  # type: ignore[attr-defined]
+        except Exception as e:
+            logger.debug(f"Failed to emit error event: {e}")
+
         try:
             from victor.core.events.emit_helper import emit_event_sync
 

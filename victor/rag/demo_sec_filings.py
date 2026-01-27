@@ -566,9 +566,8 @@ async def query_filings(
     if filter_symbol:
         metadata_filter["symbol"] = filter_symbol.upper()
 
-    from victor.workflows.execution_context import ExecutionContext
-
-    exec_ctx = ExecutionContext()
+    # Create a dict for the execution context
+    exec_ctx: Dict[str, Any] = {}
 
     result = await tool.execute(
         _exec_ctx=exec_ctx,

@@ -469,7 +469,7 @@ class EnhancedUsageLogger:
 
         if self._log_file.exists():
             stats["log_size_bytes"] = self._log_file.stat().st_size
-            stats["log_size_mb"] = round(float(stats["log_size_bytes"]) / (1024 * 1024), 2)
+            stats["log_size_mb"] = round(float(stats["log_size_bytes"]) / (1024 * 1024), 2)  # type: ignore[arg-type]
 
         return stats
 

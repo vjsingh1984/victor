@@ -52,7 +52,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Callable
 from contextlib import contextmanager
 from functools import wraps
-import psutil
+import psutil  # type: ignore[import-untyped]
 import os
 
 logger = logging.getLogger(__name__)

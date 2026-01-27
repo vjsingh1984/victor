@@ -175,7 +175,7 @@ class SemanticToolSelector:
         # This eliminates redundant embedding generation for repeated queries
         # Expected: 10x improvement for repeated queries
         # Phase 2.1: Expanded from 100 to 500 entries for higher hit rate
-        self._query_embedding_cache: OrderedDict[str, np.ndarray] = OrderedDict()
+        self._query_embedding_cache: OrderedDict[str, np.ndarray | None] = OrderedDict()
         self._query_cache_max_size = 500
 
         # PERF-002: Category memberships cache for fast pre-filtering
@@ -1279,6 +1279,16 @@ class SemanticToolSelector:
         if not self.cost_aware_selection:
             return 0.0
 
+        # Defensive: Check tools is actually a ToolRegistry
+        from victor.tools.registry import ToolRegistry
+
+        if not isinstance(tools, ToolRegistry):  # type: ignore[unreachable]
+            logger.warning(
+                f"_get_cost_penalty expected ToolRegistry, got {type(tools).__name__}. "
+                "Skipping cost penalty calculation."
+            )
+            return 0.0
+
         cost_tier = tools.get_tool_cost(tool.name)
         if cost_tier is None:
             return 0.0
@@ -1453,6 +1463,16 @@ class SemanticToolSelector:
             List of warning messages for display to user
         """
         if not self.cost_aware_selection:
+            return []
+
+        # Defensive: Check tools is actually a ToolRegistry
+        from victor.tools.registry import ToolRegistry
+
+        if not isinstance(tools, ToolRegistry):  # type: ignore[unreachable]
+            logger.warning(
+                f"_generate_cost_warnings expected ToolRegistry, got {type(tools).__name__}. "
+                "Skipping cost warning generation."
+            )
             return []
 
         warnings = []
@@ -2014,7 +2034,7 @@ class SemanticToolSelector:
             Embedding vector
         """
         try:
-            response = await self._client.post(
+            response = await self._client.post(  # type: ignore[union-attr]
                 "/api/embeddings",
                 json={"model": self.embedding_model, "prompt": text},
             )
@@ -2390,7 +2410,7 @@ class SemanticToolSelector:
         # Add sequence tracking stats if enabled
         if self._sequence_tracker:
             sequence_stats = self._sequence_tracker.get_statistics()
-            stats["sequence_tracking"] = {
+            stats["sequence_tracking"] = {  # type: ignore[assignment]
                 "enabled": True,
                 "history_length": sequence_stats["history_length"],
                 "unique_tools_used": sequence_stats["unique_tools_used"],
@@ -2398,7 +2418,7 @@ class SemanticToolSelector:
                 "workflow_progress": sequence_stats["workflow_progress"],
             }
         else:
-            stats["sequence_tracking"] = {"enabled": False}
+            stats["sequence_tracking"] = {"enabled": False}  # type: ignore[assignment]
 
         return stats
 
@@ -2587,6 +2607,17 @@ class SemanticToolSelector:
         # New IToolSelector protocol calling convention
         # Map IToolSelector protocol to existing method
         tools_registry = context.metadata.get("tools") if context and context.metadata else None
+
+        # Validate that tools_registry is actually a ToolRegistry (not ToolPipeline or other types)
+        if tools_registry is not None:
+            from victor.tools.registry import ToolRegistry
+
+            if not isinstance(tools_registry, ToolRegistry):
+                logger.warning(
+                    f"ToolSelectionContext.metadata['tools'] must be ToolRegistry, got {type(tools_registry).__name__}. "
+                    "Falling back to stored registry."
+                )
+                tools_registry = None
 
         if not tools_registry:
             # Fall back to stored tools registry from initialize_tool_embeddings()

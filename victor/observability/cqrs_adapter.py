@@ -72,7 +72,7 @@ from uuid import uuid4
 from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
 if TYPE_CHECKING:
-    from victor.core.cqrs import Event as CQRSEvent
+    from victor.core.cqrs import Event as CQRSEvent  # type: ignore[attr-defined]
     from victor.core.event_sourcing import EventDispatcher
 
 logger = logging.getLogger(__name__)
@@ -373,7 +373,7 @@ class CQRSEventAdapter:
 
         for pattern in patterns:
             try:
-                handle = await self._event_bus.subscribe(pattern, self._on_observability_event)
+                handle = await self._event_bus.subscribe(pattern, self._on_observability_event)  # type: ignore[arg-type,union-attr]
 
                 # Create sync unsubscribe function
                 def make_unsub(h=handle):
@@ -448,7 +448,7 @@ class CQRSEventAdapter:
             # Convert and publish to observability
             victor_event = self._convert_to_victor_event(event)
             if victor_event and self._event_bus:
-                self._event_bus.publish(victor_event)
+                self._event_bus.publish(victor_event)  # type: ignore[attr-defined]
                 self._events_bridged_to_obs += 1
 
         finally:

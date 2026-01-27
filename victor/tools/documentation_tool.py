@@ -493,9 +493,11 @@ async def docs(
                 lines = content.split("\n")
                 for item in items_to_document:
                     if item["type"] == "function":
-                        docstring = _generate_function_docstring(item["node"], format)
+                        docstring = _generate_function_docstring(
+                            ast.FunctionDef(**item["node"]), format
+                        )
                     else:
-                        docstring = _generate_class_docstring(item["node"], format)
+                        docstring = _generate_class_docstring(ast.ClassDef(**item["node"]), format)
 
                     insert_line = item["line"]
                     def_line = lines[insert_line - 1]
@@ -511,7 +513,9 @@ async def docs(
                             formatted_docstring.append("")
                     formatted_docstring.append(f'{indent}"""')
 
-                    lines = lines[:insert_line] + formatted_docstring + lines[insert_line:]
+                    lines = (
+                        lines[: int(insert_line)] + formatted_docstring + lines[int(insert_line) :]
+                    )
 
                 new_content = "\n".join(lines)
                 file_obj.write_text(new_content)
@@ -615,7 +619,7 @@ async def docs(
         "documentation coverage",
     ],  # From MANDATORY_TOOL_KEYWORDS "docs" -> ["docs", "docs_coverage"]
     stages=["analysis", "reading"],
-    execution_category="read_only",  # type: ignore[arg-type]
+    execution_category="read_only",
 )
 async def docs_coverage(
     path: str,

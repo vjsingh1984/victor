@@ -316,17 +316,12 @@ async def code_review(
     if aspects is None:
         aspects = ["all"]
     elif isinstance(aspects, str):
-        import json
-
-        try:
-            aspects = json.loads(aspects)
-        except json.JSONDecodeError:
-            # Single aspect as string
-            aspects = [aspects]
+        # Single aspect as string
+        aspects = [aspects]
 
     # Validate aspects
     valid_aspects = {"security", "complexity", "best_practices", "documentation", "all"}
-    invalid = [a for a in aspects if a not in valid_aspects]  # type: ignore[misc]
+    invalid = [a for a in aspects if a not in valid_aspects]
     if invalid:
         return {
             "success": False,

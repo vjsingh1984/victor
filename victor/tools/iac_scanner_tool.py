@@ -149,7 +149,7 @@ class IaCScannerTool(BaseTool):
             ],
         )
 
-    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:  # type: ignore[override]
+    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
         """Execute IaC scanning action."""
         action = kwargs.get("action", "summary")
         file_path = kwargs.get("file_path")

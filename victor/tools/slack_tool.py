@@ -24,13 +24,13 @@ import logging
 from typing import Any, Dict, List, Optional
 
 try:
-    from slack_sdk import WebClient  # type: ignore[import]
-    from slack_sdk.errors import SlackApiError  # type: ignore[import]
+    from slack_sdk import WebClient  # type: ignore[import-not-found]
+    from slack_sdk.errors import SlackApiError  # type: ignore[import-not-found]
 
     SLACK_AVAILABLE = True
 except ImportError:
-    WebClient = None  # type: ignore
-    SlackApiError = Exception  # type: ignore
+    WebClient = None  # type: ignore[import-not-found]
+    SlackApiError = Exception  # type: ignore[import-not-found]
     SLACK_AVAILABLE = False
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
@@ -135,7 +135,7 @@ async def slack(
             response = slack_client.search_messages(query=query)
             if response.get("ok"):
                 matches = response.get("messages", {}).get("matches", [])
-                results: List[Dict[str, Any]] = [
+                message_results: List[Dict[str, Any]] = [
                     {
                         "ts": message.get("ts"),
                         "text": message.get("text", "")[:200],  # Truncate long messages
@@ -144,7 +144,7 @@ async def slack(
                     }
                     for message in matches[:10]  # Limit to 10 results
                 ]
-                return {"success": True, "results": results, "count": len(results)}
+                return {"success": True, "results": message_results, "count": len(message_results)}
             else:
                 return {"success": False, "error": response.get("error", "Unknown error")}
 
@@ -153,7 +153,7 @@ async def slack(
             response = slack_client.conversations_list(types="public_channel,private_channel")
             if response.get("ok"):
                 channels_data = response.get("channels", [])
-                results: List[Dict[str, Any]] = [
+                channel_results: List[Dict[str, Any]] = [
                     {
                         "id": ch.get("id"),
                         "name": ch.get("name"),
@@ -162,7 +162,7 @@ async def slack(
                     }
                     for ch in channels_data[:20]  # Limit to 20 channels
                 ]
-                return {"success": True, "results": results, "count": len(results)}
+                return {"success": True, "results": channel_results, "count": len(channel_results)}
             else:
                 return {"success": False, "error": response.get("error", "Unknown error")}
 

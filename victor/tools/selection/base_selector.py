@@ -297,7 +297,7 @@ class BaseToolSelector(ABC):
         Returns:
             Tool description or empty string
         """
-        tool = self._tool_registry.get_tool(tool_name)
+        tool = self._tool_registry.get(tool_name)
         if tool:
             return getattr(tool, "description", "")
         return ""

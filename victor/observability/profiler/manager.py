@@ -109,7 +109,7 @@ class ProfilerManager:
         try:
             yield lambda: result_holder[0]
         finally:
-            result_holder[0] = profiler.stop()
+            result_holder[0] = profiler.stop()  # type: ignore[assignment]
 
     def profile_function(
         self,
@@ -117,7 +117,7 @@ class ProfilerManager:
         *args,
         profiler_type: ProfilerType = ProfilerType.CPU,
         **kwargs,
-    ) -> tuple[Any, ProfileResult]:
+    ) -> tuple[Any, ProfileResult | None]:
         """Profile a function execution.
 
         Args:

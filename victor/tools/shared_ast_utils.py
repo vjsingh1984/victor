@@ -271,30 +271,30 @@ def calculate_complexity(node: ast.AST) -> int:
     Returns:
         Cyclomatic complexity score (minimum 1).
     """
-    complexity = 1  # Base complexity
+    complexity = [1]  # Base complexity
 
     for child in ast.walk(node):
         # Each decision point adds 1
         if isinstance(child, (ast.If, ast.While, ast.For)):
-            complexity += 1
+            complexity[0] += 1
         elif isinstance(child, ast.ExceptHandler):
-            complexity += 1
+            complexity[0] += 1
         elif isinstance(child, ast.With):
-            complexity += 1
+            complexity[0] += 1
         elif isinstance(child, ast.Assert):
-            complexity += 1
+            complexity[0] += 1
         elif isinstance(child, ast.BoolOp):
             # Boolean operators add (num_values - 1) complexity
-            complexity += len(child.values) - 1
+            complexity[0] += len(child.values) - 1
         elif isinstance(child, ast.comprehension):
             # List/dict/set comprehensions add complexity
-            complexity += 1
-            complexity += len(child.ifs)  # Additional complexity for if clauses
+            complexity[0] += 1
+            complexity[0] += len(child.ifs)  # Additional complexity for if clauses
         elif isinstance(child, ast.IfExp):
             # Ternary expressions
-            complexity += 1
+            complexity[0] += 1
 
-    return complexity
+    return complexity[0]
 
 
 def calculate_maintainability_index(code: str) -> float:
@@ -324,14 +324,14 @@ def calculate_maintainability_index(code: str) -> float:
         return 100.0  # Empty code is perfectly maintainable
 
     # Calculate average complexity
-    total_complexity = 0
+    total_complexity = [0]
     function_count = 0
     for node in ast.walk(result.tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            total_complexity += calculate_complexity(node)
+            total_complexity[0] += calculate_complexity(node)
             function_count += 1
 
-    avg_complexity = total_complexity / max(function_count, 1)
+    avg_complexity = total_complexity[0] / max(function_count, 1)
 
     # Simplified Halstead Volume estimation (based on tokens)
     # Real implementation would count unique operators and operands
@@ -367,8 +367,9 @@ def calculate_cognitive_complexity(node: ast.AST) -> int:
     Returns:
         Cognitive complexity score.
     """
-    complexity = 0
-    nesting_level = 0
+    # Use mutable objects to track state across visitor methods
+    complexity = [0]
+    nesting_level = [0]
 
     class CognitiveVisitor(ast.NodeVisitor):
         """AST visitor for calculating cognitive complexity.
@@ -379,58 +380,56 @@ def calculate_cognitive_complexity(node: ast.AST) -> int:
         code more heavily, reflecting the cognitive load on developers.
 
         Complexity increments:
-        - If/For/While/ExceptHandler: +1 base, +nesting_level penalty
+        - If/For/While/ExceptHandler: +1 base, +nesting_level[0] penalty
         - BoolOp (and/or): +(num_values - 1) for chained conditions
         - Lambda: +1 for inline function complexity
 
-        Uses nonlocal to track state across the recursive visit.
+        Uses mutable list to track state across visitor methods.
         """
 
-        nonlocal complexity, nesting_level
-
         def visit_If(self, node: ast.If) -> None:
-            nonlocal complexity, nesting_level
-            complexity += 1 + nesting_level
-            nesting_level += 1
+            # Use list indices to track state
+            complexity[0] += 1 + nesting_level[0]
+            nesting_level[0] += 1
             self.generic_visit(node)
-            nesting_level -= 1
+            nesting_level[0] -= 1
 
         def visit_For(self, node: ast.For) -> None:
-            nonlocal complexity, nesting_level
-            complexity += 1 + nesting_level
-            nesting_level += 1
+            # Use list indices to track state
+            complexity[0] += 1 + nesting_level[0]
+            nesting_level[0] += 1
             self.generic_visit(node)
-            nesting_level -= 1
+            nesting_level[0] -= 1
 
         def visit_While(self, node: ast.While) -> None:
-            nonlocal complexity, nesting_level
-            complexity += 1 + nesting_level
-            nesting_level += 1
+            # Use list indices to track state
+            complexity[0] += 1 + nesting_level[0]
+            nesting_level[0] += 1
             self.generic_visit(node)
-            nesting_level -= 1
+            nesting_level[0] -= 1
 
         def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
-            nonlocal complexity, nesting_level
-            complexity += 1 + nesting_level
-            nesting_level += 1
+            # Use list indices to track state
+            complexity[0] += 1 + nesting_level[0]
+            nesting_level[0] += 1
             self.generic_visit(node)
-            nesting_level -= 1
+            nesting_level[0] -= 1
 
         def visit_BoolOp(self, node: ast.BoolOp) -> None:
             nonlocal complexity
             # Each boolean operator adds 1
-            complexity += len(node.values) - 1
+            complexity[0] += len(node.values) - 1
             self.generic_visit(node)
 
         def visit_Lambda(self, node: ast.Lambda) -> None:
             nonlocal complexity
-            complexity += 1
+            complexity[0] += 1
             self.generic_visit(node)
 
     visitor = CognitiveVisitor()
     visitor.visit(node)
 
-    return complexity
+    return complexity[0]
 
 
 # =============================================================================

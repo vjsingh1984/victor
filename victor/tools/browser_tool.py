@@ -373,8 +373,8 @@ class BrowserTool:
                     error="Page not available",
                 )
 
-            self._state.url = self._page.url  # type: ignore[unreachable]
-            self._state.title = await self._page.title()  # type: ignore[unreachable]
+            self._state.url = self._page.url
+            self._state.title = await self._page.title()
             self._state.page_count += 1
             self._state.action_count = 0  # Reset per-page counter
 
@@ -700,6 +700,13 @@ class BrowserTool:
             )
 
         try:
+            if not self._page:
+                return ActionResult(
+                    success=False,
+                    action=BrowserAction.WAIT,
+                    error="Page not available",
+                )
+
             if selector:
                 await self._page.wait_for_selector(
                     selector,
@@ -770,6 +777,13 @@ class BrowserTool:
                 )
 
         try:
+            if not self._page:
+                return ActionResult(
+                    success=False,
+                    action=BrowserAction.EVALUATE,
+                    error="Page not available",
+                )
+
             result = await self._page.evaluate(script)
 
             duration = int((datetime.now() - start).total_seconds() * 1000)

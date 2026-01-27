@@ -58,7 +58,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Set, runt
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStage
-    from victor.agent.task_classifier import ClassificationResult
+    from victor.storage.embeddings.task_classifier import ClassificationResult
 
 
 @dataclass

@@ -302,7 +302,7 @@ class WorkflowProfiler:
             return bottlenecks
 
         # Calculate median duration
-        median_duration = np.median([stats.avg_duration for stats in node_stats.values()])
+        median_duration = float(np.median([stats.avg_duration for stats in node_stats.values()]))
 
         total_cost = sum(stats.total_cost for stats in node_stats.values())
 

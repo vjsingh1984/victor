@@ -1835,14 +1835,14 @@ async def ls(
 
     # Normalize limit (handle non-int input from model)
     if not isinstance(limit, int):
-        limit = int(limit) if isinstance(limit, str) and limit.isdigit() else 1000
+        limit = int(limit) if isinstance(limit, str) and limit.isdigit() else 1000  # type: ignore[unreachable]
 
     items = []
     count = 0
 
     # Normalize depth (handle non-int input from model)
     if not isinstance(depth, int):
-        depth = int(depth) if isinstance(depth, str) and depth.isdigit() else 1
+        depth = int(depth) if isinstance(depth, str) and depth.isdigit() else 1  # type: ignore[unreachable]
 
     try:
         dir_path = Path(path).expanduser().resolve()

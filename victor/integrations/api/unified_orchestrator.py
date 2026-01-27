@@ -12,18 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unified Victor API Server - Simplified Version.
+"""Unified Victor API Orchestrator - Advanced Composition Layer.
 
-This is a cleaner implementation that properly integrates all three servers
-by including their routers with appropriate prefixes.
+This module provides a composition layer that combines multiple Victor services
+into a single FastAPI application for advanced deployment scenarios.
+
+IMPORTANT: This is NOT the standard server! For most use cases, use VictorFastAPIServer:
+    from victor.integrations.api.fastapi_server import VictorFastAPIServer
+    server = VictorFastAPIServer(port=8765)
+
+Use this orchestrator ONLY if you need:
+- Workflow Editor UI (separate frontend application)
+- Custom composition of multiple API services
+- Landing pages and custom UI routes
+- Alternative HITL implementation (from victor.workflows.hitl_api)
 
 Server Structure:
-    /api/v1/*              - Main API (chat, completions, search)
-    /api/v1/hitl/*         - HITL approval endpoints
-    /api/v1/workflows/*    - Workflow editor endpoints
+    /api/v1/*              - Main API (mounted from VictorFastAPIServer)
+    /api/v1/hitl/*         - Alternative HITL approval endpoints (victor.workflows.hitl_api)
+    /workflow-editor/*     - Workflow editor backend (tools/workflow_editor)
     /ui                    - Landing page
     /ui/hitl               - HITL approval UI
     /ui/workflow-editor    - Workflow editor frontend
+
+Standard Path (Recommended):
+    victor serve                    # Uses VictorFastAPIServer directly
+    victor serve --enable-hitl      # Enables built-in HITL endpoints
+
+Advanced Path (Optional):
+    Use run_unified_server() from this module for custom deployments
+
+Port: 8765 (matches VictorFastAPIServer default)
 """
 
 from __future__ import annotations
@@ -349,29 +368,34 @@ LANDING_PAGE_HTML = """<!DOCTYPE html>
 
 def create_unified_server(
     host: str = "0.0.0.0",
-    port: int = 8000,
+    port: int = 8765,
     workspace_root: Optional[str] = None,
     enable_hitl: bool = True,
     hitl_persistent: bool = True,
     hitl_auth_token: Optional[str] = None,
     enable_cors: bool = True,
 ) -> FastAPI:
-    """Create the unified Victor API server.
+    """Create the unified Victor API orchestrator.
 
-    This server consolidates all Victor backend services into a single
-    FastAPI application with proper URL routing and CORS configuration.
+    This consolidates multiple Victor services into a single FastAPI application
+    for advanced deployment scenarios (workflow editor UI, custom composition).
+
+    NOTE: For standard use, use VictorFastAPIServer directly instead.
 
     Args:
-        host: Host to bind to
-        port: Port to listen on
+        host: Host to bind to (default: 0.0.0.0 for all interfaces)
+        port: Port to listen on (default: 8765, matches VictorFastAPIServer)
         workspace_root: Root directory of the workspace
-        enable_hitl: Enable HITL (Human-in-the-Loop) endpoints (default: True)
+        enable_hitl: Enable alternative HITL endpoints (default: True)
         hitl_persistent: Use SQLite for persistent HITL storage (default: True)
         hitl_auth_token: Optional auth token for HITL endpoints
         enable_cors: Enable CORS headers (default: True)
 
     Returns:
-        Configured FastAPI application
+        Configured FastAPI application with multiple services mounted
+
+    Raises:
+        ImportError: If required dependencies are missing
     """
     # Create FastAPI app
     app = FastAPI(
@@ -739,14 +763,22 @@ def _setup_health_check(app: FastAPI) -> None:
 
 def run_unified_server(
     host: str = "0.0.0.0",
-    port: int = 8000,
+    port: int = 8765,
     workspace_root: Optional[str] = None,
     enable_hitl: bool = True,
     hitl_persistent: bool = True,
     hitl_auth_token: Optional[str] = None,
     log_level: str = "info",
 ) -> None:
-    """Run the unified server."""
+    """Run the unified Victor API orchestrator.
+
+    NOTE: For standard use, prefer VictorFastAPIServer directly:
+        from victor.integrations.api.fastapi_server import VictorFastAPIServer
+        server = VictorFastAPIServer(port=8765)
+        # ... start server ...
+
+    Use this orchestrator only if you need workflow editor UI or custom composition.
+    """
     import uvicorn
 
     app = create_unified_server(

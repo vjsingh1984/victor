@@ -705,7 +705,7 @@ class GraphAnalyzer:
         incoming: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
         # Map node_id -> module for quick lookup
-        node_to_module_c: Dict[str, str] = {}
+        node_to_module: Dict[str, str] = {}
         for module, nodes in module_to_nodes.items():
             for node_id in nodes:
                 node_to_module[node_id] = module
@@ -1735,47 +1735,33 @@ async def graph(
             module_to_nodes, outgoing_modules, incoming_modules = analyzer._build_module_graph(
                 effective_granularity, weighted_edges
             )
-            # Build node->module map
-            node_to_module_c: Dict[str, str] = {}
-            for mod, nodes in module_to_nodes.items():
-                for nid in nodes:
-                    node_to_module_c[nid] = mod
+            # Reuse existing node->module map and edge counts
+            # node_to_module_2 already defined above
+            # module_edge_counts_c already defined above
 
-            # Aggregate edge counts per module by edge type
-            module_edge_counts_c_c: Dict[str, Dict[str, int]] = defaultdict(
-                lambda: {
-                    "calls_in": 0,
-                    "calls_out": 0,
-                    "refs_in": 0,
-                    "refs_out": 0,
-                    "imports": 0,
-                    "inherits": 0,
-                    "implements": 0,
-                    "composed_of": 0,
-                }
-            )
+            # Continue processing
             for src_id, edges in analyzer.outgoing.items():
-                src_mod = node_to_module.get(src_id)
+                src_mod = node_to_module_2.get(src_id)
                 if not src_mod or _skip_path(src_mod):
                     continue
                 for dst_id, etype, _w in edges:
-                    dst_mod = node_to_module.get(dst_id)
+                    dst_mod = node_to_module_2.get(dst_id)
                     if not dst_mod or src_mod == dst_mod or _skip_path(dst_mod):
                         continue
                     if etype == "CALLS" and include_calls:
-                        module_edge_counts_c[src_mod]["calls_out"] += 1
-                        module_edge_counts_c[dst_mod]["calls_in"] += 1
+                        module_edge_counts_2[src_mod]["calls_out"] += 1
+                        module_edge_counts_2[dst_mod]["calls_in"] += 1
                     elif etype == "REFERENCES" and include_refs:
-                        module_edge_counts_c[src_mod]["refs_out"] += 1
-                        module_edge_counts_c[dst_mod]["refs_in"] += 1
+                        module_edge_counts_2[src_mod]["refs_out"] += 1
+                        module_edge_counts_2[dst_mod]["refs_in"] += 1
                     elif etype == "IMPORTS":
-                        module_edge_counts_c[src_mod]["imports"] += 1
+                        module_edge_counts_2[src_mod]["imports"] += 1
                     elif etype == "INHERITS":
-                        module_edge_counts_c[src_mod]["inherits"] += 1
+                        module_edge_counts_2[src_mod]["inherits"] += 1
                     elif etype == "IMPLEMENTS":
-                        module_edge_counts_c[src_mod]["implements"] += 1
+                        module_edge_counts_2[src_mod]["implements"] += 1
                     elif etype == "COMPOSED_OF":
-                        module_edge_counts_c[src_mod]["composed_of"] += 1
+                        module_edge_counts_2[src_mod]["composed_of"] += 1
             for r in analyzer.module_pagerank(
                 granularity=effective_granularity,
                 edge_types=weighted_edges,
@@ -1787,7 +1773,7 @@ async def graph(
                 _in_edges = sum(incoming_modules.get(module_name, {}).values() or [0])  # noqa: F841
                 out_edges = sum(outgoing_modules.get(module_name, {}).values() or [0])
                 # Merge aggregated counts with aggregate totals
-                edge_counts = module_edge_counts_c.get(module_name, {}).copy()  # type: ignore[assignment]  # type: ignore[assignment]
+                edge_counts = module_edge_counts_2.get(module_name, {}).copy()  # type: ignore[assignment]  # type: ignore[assignment]
                 edge_counts["imports"] = out_edges  # keep imports total
                 edge_counts.setdefault("calls_in", 0)
                 edge_counts.setdefault("calls_out", 0)
@@ -1841,11 +1827,11 @@ async def graph(
             module_to_nodes, outgoing_modules, incoming_modules = analyzer._build_module_graph(
                 effective_granularity_c, weighted_edges
             )
-            node_to_module_c: Dict[str, str] = {}
+            node_to_module_2: Dict[str, str] = {}
             for mod, nodes in module_to_nodes.items():
                 for nid in nodes:
-                    node_to_module_c[nid] = mod
-            module_edge_counts_c_c: Dict[str, Dict[str, int]] = defaultdict(
+                    node_to_module_2[nid] = mod
+            module_edge_counts_2: Dict[str, Dict[str, int]] = defaultdict(
                 lambda: {
                     "calls_in": 0,
                     "calls_out": 0,
@@ -1858,27 +1844,27 @@ async def graph(
                 }
             )
             for src_id, edges in analyzer.outgoing.items():
-                src_mod = node_to_module.get(src_id)
+                src_mod = node_to_module_2.get(src_id)
                 if not src_mod or _skip_path(src_mod):
                     continue
                 for dst_id, etype, _w in edges:
-                    dst_mod = node_to_module.get(dst_id)
+                    dst_mod = node_to_module_2.get(dst_id)
                     if not dst_mod or src_mod == dst_mod or _skip_path(dst_mod):
                         continue
                     if etype == "CALLS" and include_calls:
-                        module_edge_counts_c[src_mod]["calls_out"] += 1
-                        module_edge_counts_c[dst_mod]["calls_in"] += 1
+                        module_edge_counts_2[src_mod]["calls_out"] += 1
+                        module_edge_counts_2[dst_mod]["calls_in"] += 1
                     elif etype == "REFERENCES" and include_refs:
-                        module_edge_counts_c[src_mod]["refs_out"] += 1
-                        module_edge_counts_c[dst_mod]["refs_in"] += 1
+                        module_edge_counts_2[src_mod]["refs_out"] += 1
+                        module_edge_counts_2[dst_mod]["refs_in"] += 1
                     elif etype == "IMPORTS":
-                        module_edge_counts_c[src_mod]["imports"] += 1
+                        module_edge_counts_2[src_mod]["imports"] += 1
                     elif etype == "INHERITS":
-                        module_edge_counts_c[src_mod]["inherits"] += 1
+                        module_edge_counts_2[src_mod]["inherits"] += 1
                     elif etype == "IMPLEMENTS":
-                        module_edge_counts_c[src_mod]["implements"] += 1
+                        module_edge_counts_2[src_mod]["implements"] += 1
                     elif etype == "COMPOSED_OF":
-                        module_edge_counts_c[src_mod]["composed_of"] += 1
+                        module_edge_counts_2[src_mod]["composed_of"] += 1
             for r in analyzer.module_centrality(
                 granularity=effective_granularity_c,
                 edge_types=weighted_edges,
@@ -1889,7 +1875,7 @@ async def graph(
                     continue
                 _in_edges = sum(incoming_modules.get(module_name, {}).values() or [0])  # noqa: F841
                 out_edges = sum(outgoing_modules.get(module_name, {}).values() or [0])
-                edge_counts = module_edge_counts_c.get(module_name, {}).copy()  # type: ignore[assignment]
+                edge_counts = module_edge_counts_2.get(module_name, {}).copy()  # type: ignore[assignment]
                 edge_counts["imports"] = out_edges
                 edge_counts.setdefault("calls_in", 0)
                 edge_counts.setdefault("calls_out", 0)
