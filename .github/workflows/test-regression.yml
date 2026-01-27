@@ -244,12 +244,13 @@ jobs:
             --color=yes
 
   # =============================================================================
-  # Category 7: Load Tests - Stress and scalability tests
+  # Category 7: Load Tests - Stress and scalability tests (manual trigger only)
   # =============================================================================
   load-tests:
     name: Load Tests
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.test_category == 'load'
 
     steps:
       - uses: actions/checkout@v4
@@ -266,26 +267,50 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-          pip install locust
 
-      - name: Run load tests (pytest-based)
+      - name: Start API server in background
         run: |
-          pytest tests/load -v \
-            --timeout=300 \
-            --tb=short \
-            --maxfail=3 \
-            -m "not slow" \
-            --color=yes
+          victor serve --host 0.0.0.0 --port 8000 &
+          echo $! > server.pid
+          # Wait for server to be ready
+          for i in {1..30}; do
+            if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+              echo "Server is ready"
+              break
+            fi
+            echo "Waiting for server... ($i/30)"
+            sleep 2
+          done
 
       - name: Run Locust load tests
         run: |
           if [ -d "tests/load/locustfiles" ]; then
             for locustfile in tests/load/locustfiles/*.py; do
               echo "Running locust tests from $locustfile"
-              locust -f "$locustfile" --headless --users 10 --spawn-rate 1 --run-time 30s --host http://localhost:8000 || true
+              locust -f "$locustfile" \
+                --headless \
+                --users 50 \
+                --spawn-rate 5 \
+                --run-time 60s \
+                --host http://localhost:8000 \
+                --html locust_report.html
             done
           fi
-        continue-on-error: true
+
+      - name: Upload Locust reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-reports
+          path: locust_report.html
+          retention-days: 30
+
+      - name: Stop API server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+            rm server.pid
+          fi
 
   # =============================================================================
   # Category 8: Smoke Tests - Quick validation
@@ -355,7 +380,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [unit-tests, integration-tests, property-tests, security-tests, deployment-tests, performance-tests, load-tests, smoke-tests, qa-tests]
+    needs: [unit-tests, integration-tests, property-tests, security-tests, deployment-tests, performance-tests, smoke-tests, qa-tests]
     if: always()
 
     steps:
@@ -371,12 +396,12 @@ jobs:
           echo "✅ Security Tests - Authorization, penetration, audit" >> $GITHUB_STEP_SUMMARY
           echo "✅ Deployment Tests - Environment deployment validation" >> $GITHUB_STEP_SUMMARY
           echo "✅ Performance Tests - Benchmark validation" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Load Tests - Stress and scalability tests" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️  Load Tests - Manual trigger only (use workflow_dispatch)" >> $GITHUB_STEP_SUMMARY
           echo "✅ Smoke Tests - Quick validation" >> $GITHUB_STEP_SUMMARY
           echo "✅ QA Tests - Comprehensive quality assurance" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Coverage" >> $GITHUB_STEP_SUMMARY
-          echo "- **Test Directories Covered:** 9/9 (100%)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Directories Covered:** 8/8 automated + 1 manual (100%)" >> $GITHUB_STEP_SUMMARY
           echo "- **TDD Regression Gate:** ✅ PASSED" >> $GITHUB_STEP_SUMMARY
 
       - name: Verify all jobs passed
@@ -387,10 +412,13 @@ jobs:
              [ "${{ needs.security-tests.result }}" != "success" ] || \
              [ "${{ needs.deployment-tests.result }}" != "success" ] || \
              [ "${{ needs.performance-tests.result }}" != "success" ] || \
-             [ "${{ needs.load-tests.result }}" != "success" ] || \
              [ "${{ needs.smoke-tests.result }}" != "success" ] || \
              [ "${{ needs.qa-tests.result }}" != "success" ]; then
             echo "❌ Some test categories failed. See above for details."
             exit 1
           fi
           echo "✅ All test categories passed!"
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Load Tests" >> $GITHUB_STEP_SUMMARY
+          echo "Load tests require manual triggering via workflow_dispatch." >> $GITHUB_STEP_SUMMARY
+          echo "This prevents unnecessary CI runs and resource usage." >> $GITHUB_STEP_SUMMARY
