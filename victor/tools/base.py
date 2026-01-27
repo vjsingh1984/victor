@@ -425,7 +425,7 @@ class BaseTool(ABC):
             },
         }
 
-    def to_schema(self, level: "SchemaLevel" = None) -> Dict[str, Any]:
+    def to_schema(self, level: Optional["SchemaLevel"] = None) -> Dict[str, Any]:
         """Generate JSON schema at specified verbosity level.
 
         Args:
@@ -446,7 +446,8 @@ class BaseTool(ABC):
         """
         from victor.tools.enums import SchemaLevel
 
-        if level is None:
+        # MyPy check - level cannot be None here due to Optional type
+        if level is None:  # type: ignore[unreachable]
             level = SchemaLevel.FULL
 
         if level == SchemaLevel.FULL:

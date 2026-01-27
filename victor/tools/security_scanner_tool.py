@@ -25,7 +25,7 @@ import re
 import subprocess
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import logging
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -119,7 +119,7 @@ def _scan_file_for_config_issues(file_path: Path) -> List[Dict[str, Any]]:
 )
 async def scan(
     path: str,
-    scan_types: List[str] = None,
+    scan_types: Optional[List[str]] = None,
     file_pattern: str = "*.py",
     severity_threshold: str = "low",
     requirements_file: str = "requirements.txt",
@@ -178,45 +178,45 @@ async def scan(
         return {"success": False, "error": f"Path not found: {path}"}
 
     results = {}
-    all_findings = []
+    all_findings: List[Dict[str, Any]] = []
 
     # Secrets scan
     if "secrets" in scan_types:
         if path_obj.is_file():
-            findings = _scan_file_for_secrets(path_obj)
-            results["secrets"] = {"files_scanned": 1, "findings": findings, "count": len(findings)}
-            all_findings.extend(findings)
+            secrets_findings: List[Dict[str, Any]] = _scan_file_for_secrets(path_obj)
+            results["secrets"] = {"files_scanned": 1, "findings": secrets_findings, "count": len(secrets_findings)}
+            all_findings.extend(secrets_findings)
         else:
             # Use gather_files_by_pattern to exclude venv, node_modules, etc.
             files = gather_files_by_pattern(path_obj, file_pattern)
-            findings = []
+            secrets_findings_batch: List[Dict[str, Any]] = []
             for file in files:
-                findings.extend(_scan_file_for_secrets(file))
+                secrets_findings_batch.extend(_scan_file_for_secrets(file))
             results["secrets"] = {
                 "files_scanned": len(files),
-                "findings": findings,
-                "count": len(findings),
+                "findings": secrets_findings_batch,
+                "count": len(secrets_findings_batch),
             }
-            all_findings.extend(findings)
+            all_findings.extend(secrets_findings_batch)
 
     # Configuration scan
     if "config" in scan_types:
         if path_obj.is_file():
-            findings = _scan_file_for_config_issues(path_obj)
-            results["config"] = {"files_scanned": 1, "findings": findings, "count": len(findings)}
-            all_findings.extend(findings)
+            config_findings: List[Dict[str, Any]] = _scan_file_for_config_issues(path_obj)
+            results["config"] = {"files_scanned": 1, "findings": config_findings, "count": len(config_findings)}
+            all_findings.extend(config_findings)
         else:
             # Use gather_files_by_pattern to exclude venv, node_modules, etc.
             files = gather_files_by_pattern(path_obj, file_pattern)
-            findings = []
+            config_findings_batch: List[Dict[str, Any]] = []
             for file in files:
-                findings.extend(_scan_file_for_config_issues(file))
+                config_findings_batch.extend(_scan_file_for_config_issues(file))
             results["config"] = {
                 "files_scanned": len(files),
-                "findings": findings,
-                "count": len(findings),
+                "findings": config_findings_batch,
+                "count": len(config_findings_batch),
             }
-            all_findings.extend(findings)
+            all_findings.extend(config_findings_batch)
 
     # Dependency scan (optional external tool)
     if "dependencies" in scan_types and dependency_scan:
@@ -280,9 +280,9 @@ async def scan(
                 check=True,
             )
             bandit = json.loads(proc.stdout)
-            findings = []
+            iac_findings: List[Dict[str, Any]] = []
             for res in bandit.get("results", []):
-                findings.append(
+                iac_findings.append(
                     {
                         "type": "iac_issue",
                         "file": res.get("filename"),
@@ -293,9 +293,10 @@ async def scan(
                     }
                 )
             results.setdefault("config", {"findings": [], "count": 0})
-            results["config"]["findings"].extend(findings)
-            results["config"]["count"] = len(results["config"]["findings"])
-            all_findings.extend(findings)
+            findings_list = results["config"]["findings"]
+            findings_list.extend(iac_findings)  # type: ignore[attr-defined]
+            results["config"]["count"] = len(findings_list)  # type: ignore[arg-type]
+            all_findings.extend(iac_findings)
         except FileNotFoundError:
             results.setdefault("config", {})
             results["config"]["error"] = "bandit not installed. Install with: pip install bandit"
@@ -337,9 +338,10 @@ async def scan(
     if "secrets" in results:
         report.append("Secrets Detection:")
         report.append(f"  Files scanned: {results['secrets']['files_scanned']}")
+        secrets_findings = results["secrets"]["findings"]  # type: ignore[assignment]
         secrets_filtered = [
             f
-            for f in results["secrets"]["findings"]
+            for f in secrets_findings
             if severity_levels.get(f.get("severity", "low"), 0) >= threshold_level
         ]
         report.append(f"  Secrets found: {len(secrets_filtered)}")
@@ -355,9 +357,10 @@ async def scan(
     if "config" in results:
         report.append("Configuration Issues:")
         report.append(f"  Files scanned: {results['config']['files_scanned']}")
+        config_findings = results["config"]["findings"]  # type: ignore[assignment]
         config_filtered = [
             f
-            for f in results["config"]["findings"]
+            for f in config_findings
             if severity_levels.get(f.get("severity", "low"), 0) >= threshold_level
         ]
         report.append(f"  Issues found: {len(config_filtered)}")
@@ -374,14 +377,16 @@ async def scan(
         if "error" in results["dependencies"]:
             report.append(f"  {results['dependencies']['error']}")
         else:
-            report.append(f"  Packages checked: {results['dependencies']['packages_checked']}")
-            report.append(f"  Vulnerabilities: {len(results['dependencies']['vulnerabilities'])}")
-            if results["dependencies"]["vulnerabilities"]:
-                for vuln in results["dependencies"]["vulnerabilities"][:5]:
+            deps = results["dependencies"]
+            report.append(f"  Packages checked: {deps['packages_checked']}")
+            vulnerabilities = deps["vulnerabilities"]  # type: ignore[assignment]
+            report.append(f"  Vulnerabilities: {len(vulnerabilities)}")
+            if vulnerabilities:
+                for vuln in vulnerabilities[:5]:
                     report.append(f"    {vuln['package']}: {vuln['message']}")
-                if len(results["dependencies"]["vulnerabilities"]) > 5:
+                if len(vulnerabilities) > 5:
                     report.append(
-                        f"    ... and {len(results['dependencies']['vulnerabilities']) - 5} more"
+                        f"    ... and {len(vulnerabilities) - 5} more"
                     )
         report.append("")
 

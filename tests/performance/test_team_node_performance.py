@@ -587,89 +587,10 @@ def test_consensus_formation_performance(benchmark, team_coordinator, members, r
     result = benchmark(lambda: run_async(run_consensus()))
     assert result["success"]
 
-
 # =============================================================================
 # Performance Summary Tests
 # =============================================================================
 
-
-@pytest.mark.summary
-def test_team_node_performance_summary():
-    """Generate performance summary for team node operations.
-
-    This test runs a subset of key benchmarks and generates a summary
-    report with recommendations for optimal configurations.
-    """
-    import asyncio
-
-    from victor.teams import UnifiedTeamCoordinator
-    from victor.teams.types import TeamFormation
-
-    results = {
-        "formations": {},
-        "scaling": {},
-        "scenarios": {},
-    }
-
-    formations = ["sequential", "parallel", "pipeline", "hierarchical"]
-    team_sizes = [2, 5, 10]
-
-    # Benchmark formations
-    for formation in formations:
-        start = time.time()
-        coordinator = UnifiedTeamCoordinator(lightweight_mode=True)
-        team = [MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01) for i in range(3)]
-        for member in team:
-            coordinator.add_member(member)
-        coordinator.set_formation(TeamFormation(formation))
-
-        result = asyncio.run(
-            coordinator.execute_task(task="Test task", context={"team_name": formation})
-        )
-        elapsed = time.time() - start
-        results["formations"][formation] = {
-            "elapsed": elapsed,
-            "success": result["success"],
-        }
-
-    # Benchmark scaling
-    for size in team_sizes:
-        start = time.time()
-        coordinator = UnifiedTeamCoordinator(lightweight_mode=True)
-        team = [
-            MockTeamMember(f"member_{i}", "assistant", execution_delay=0.01) for i in range(size)
-        ]
-        for member in team:
-            coordinator.add_member(member)
-        coordinator.set_formation(TeamFormation.PARALLEL)
-
-        result = asyncio.run(
-            coordinator.execute_task(task="Scale test", context={"team_name": f"size_{size}"})
-        )
-        elapsed = time.time() - start
-        results["scaling"][size] = {
-            "elapsed": elapsed,
-            "success": result["success"],
-        }
-
-    # Print summary
-    print("\n" + "=" * 80)
-    print("TEAM NODE PERFORMANCE SUMMARY")
-    print("=" * 80)
-
-    print("\nFormation Performance:")
-    print(f"{'Formation':<15} {'Time (s)':<12} {'Success'}")
-    print("-" * 40)
-    for formation, data in results["formations"].items():
-        print(f"{formation:<15} {data['elapsed']:<12.4f} {data['success']}")
-
-    print("\nScaling Performance (Parallel Formation):")
-    print(f"{'Team Size':<15} {'Time (s)':<12} {'Success'}")
-    print("-" * 40)
-    for size, data in results["scaling"].items():
-        print(f"{size:<15} {data['elapsed']:<12.4f} {data['success']}")
-
-    print("\n" + "=" * 80)
-
-    assert all(data["success"] for data in results["formations"].values())
-    assert all(data["success"] for data in results["scaling"].values())
+# Note: test_team_node_performance_summary moved to test_team_node_performance_benchmark.py
+# which provides more comprehensive coverage including nested execution and recursion overhead.
+# The benchmark version includes: single_level, nested, formations, memory, recursion_overhead.

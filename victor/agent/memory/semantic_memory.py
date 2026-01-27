@@ -61,7 +61,7 @@ Usage:
     merged_id = memory.merge_facts([fact_id1, fact_id2])
 
     # Export as networkx graph
-    import networkx as nx
+    import networkx as nx  # type: ignore[import-untyped]
     graph = memory.export_knowledge_graph()
 """
 
@@ -76,7 +76,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
 
-import networkx as nx
+import networkx as nx  # type: ignore[import-untyped]
 import numpy as np
 
 if TYPE_CHECKING:

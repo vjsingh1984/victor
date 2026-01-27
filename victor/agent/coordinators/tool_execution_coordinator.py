@@ -362,7 +362,7 @@ class ToolExecutionCoordinator:
         # Validate structure
         if not isinstance(tool_call, dict):
             logger.warning(f"Skipping invalid tool call (not a dict): {tool_call}")
-            return None
+            return None  # type: ignore[unreachable]
 
         tool_name = tool_call.get("name")
         if not tool_name:

@@ -122,8 +122,8 @@ def _clear_embeddings(targets: list[CacheType], rebuild: bool, yes: bool):
     manager = EmbeddingCacheManager.get_instance()
     status = manager.get_status()
 
-    target_files = sum(status.get_cache(t).file_count for t in targets)
-    target_size = sum(status.get_cache(t).total_size for t in targets)
+    target_files = sum(status.get_cache(t).file_count if status.get_cache(t) else 0 for t in targets)
+    target_size = sum(status.get_cache(t).total_size if status.get_cache(t) else 0 for t in targets)
 
     if target_files == 0:
         console.print("\n[dim]Nothing to clear - selected embeddings are already empty.[/]")

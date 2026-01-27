@@ -486,7 +486,7 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
-    async def stream(
+    async def stream(  # type: ignore[override]
         self,
         messages: List[Message],
         *,
@@ -495,7 +495,7 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Cerebras with thinking content filtering."""
         try:
             payload = self._build_request_payload(
@@ -627,7 +627,8 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
         choices = result.get("choices", [])
         if not choices:
             return CompletionResponse(
-                content="", role="assistant", model=model, raw_response=result
+                content="", role="assistant", model=model, raw_response=result,
+                tool_calls=None, stop_reason=None, usage=None, metadata=None
             )
 
         choice = choices[0]

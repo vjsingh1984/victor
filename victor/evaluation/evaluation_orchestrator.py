@@ -415,7 +415,7 @@ class EvaluationOrchestrator:
         if self.config.dataset_path and self._loader:
             self._tasks = self._loader.load_instances_from_file(self.config.dataset_path)
         elif self._loader:
-            self._tasks = await self._loader.load_from_huggingface(self.config.dataset_name)
+            self._tasks = await self._loader.load_from_huggingface(self.config.dataset_name)  # type: ignore[assignment]
         else:
             raise ValueError("No loader available")
 
@@ -730,7 +730,7 @@ class EvaluationOrchestrator:
             return self._correlator.generate_report(scores)
         else:
             # Fallback to basic report
-            from victor.framework.rl.base import CorrelationReport
+            from victor.framework.rl.base import CorrelationReport  # type: ignore[attr-defined]
             return CorrelationReport(scores=scores, metadata={})
 
     def _notify_progress(self, progress: TaskProgress) -> None:

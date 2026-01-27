@@ -34,7 +34,7 @@ class VulnerabilityScanHandler:
 
     def __init__(self) -> None:
         """Initialize the handler."""
-        self._scanner = None  # Lazy load
+        self._scanner: Optional[Any] = None  # Lazy load
 
     def _get_scanner(self) -> Any:
         """Get or create security scanner."""
@@ -85,7 +85,7 @@ class SecretScanHandler:
 
     def __init__(self) -> None:
         """Initialize the handler."""
-        self._scanner = None  # Lazy load
+        self._scanner: Optional[Any] = None  # Lazy load
 
     def _get_scanner(self) -> Any:
         """Get or create secret scanner."""

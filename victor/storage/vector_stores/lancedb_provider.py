@@ -151,7 +151,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
                 # Check if table exists
                 try:
-                    existing_tables = self.db.list_tables().tables  # type: ignore[attr-defined]
+                    existing_tables = self.db.table_names()  # type: ignore[attr-defined]
                 except AttributeError:
                     # Fallback for older LanceDB versions
                     existing_tables = []

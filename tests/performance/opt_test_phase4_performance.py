@@ -552,7 +552,7 @@ class TestPersonaManagerPerformance:
             name="Test Persona",
             description="A test persona",
             personality=PersonalityType.CREATIVE,
-            communication_style=CommunicationStyle.FRIENDLY,
+            communication_style=CommunicationStyle.CASUAL,
             expertise=["testing"],
         )
         manager.repository.save(persona)
@@ -614,7 +614,7 @@ class TestPersonaManagerPerformance:
             name="Cache Test",
             description="Testing cache",
             personality=PersonalityType.CREATIVE,
-            communication_style=CommunicationStyle.FRIENDLY,
+            communication_style=CommunicationStyle.CASUAL,
             expertise=["caching"],
         )
         manager.repository.save(persona)
@@ -676,7 +676,7 @@ class TestSecurityAuthorizationOverhead:
         authorizer.create_user(user_id="user1", username="user1", roles=["developer"])
 
         def auth_check():
-            return authorizer.check_permission("user1", Permission("tools", "execute"))
+            return authorizer.check_permission("user1", "tools", "execute")
 
         result = benchmark.pedantic(auth_check, rounds=1000, iterations=1)
 
@@ -706,23 +706,23 @@ class TestSecurityAuthorizationOverhead:
 
         # Single check baseline
         start = time.perf_counter()
-        authorizer.check_permission("admin_user", Permission("tools", "execute"))
+        authorizer.check_permission("admin_user", "tools", "execute")
         single_check_time = (time.perf_counter() - start) * 1000
 
         # Bulk checks
-        permissions = [
-            Permission("tools", "read"),
-            Permission("tools", "execute"),
-            Permission("tools", "write"),
-            Permission("code", "read"),
-            Permission("code", "write"),
+        checks = [
+            ("tools", "read"),
+            ("tools", "execute"),
+            ("tools", "write"),
+            ("code", "read"),
+            ("code", "write"),
         ]
 
         start = time.perf_counter()
-        results = [authorizer.check_permission("admin_user", perm) for perm in permissions]
+        results = [authorizer.check_permission("admin_user", resource, action) for resource, action in checks]
         bulk_check_time = (time.perf_counter() - start) * 1000
 
-        avg_bulk_time = bulk_check_time / len(permissions)
+        avg_bulk_time = bulk_check_time / len(checks)
 
         print(f"\nSingle check time: {single_check_time:.2f}ms")
         print(f"Bulk check time (total): {bulk_check_time:.2f}ms")

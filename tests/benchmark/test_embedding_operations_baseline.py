@@ -323,8 +323,8 @@ def test_cache_insert_with_eviction(benchmark):
 
 
 @pytest.mark.benchmark
-def test_cache_hit_rate(benchmark):
-    """Benchmark cache with 80% hit rate."""
+def test_lru_cache_hit_rate(benchmark):
+    """Benchmark LRU cache with 80% hit rate."""
     cache = LRUCache(capacity=1000)
     # Pre-fill cache
     for i in range(800):

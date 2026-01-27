@@ -46,16 +46,18 @@ Usage:
 """
 
 import logging
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-from victor.providers.base import BaseProvider, CompletionResponse, Message, StreamChunk
+from victor.providers.base import BaseProvider, CompletionResponse, Message, StreamChunk, ToolDefinition
 from victor.providers.registry import ProviderRegistry
 from victor.providers.resilience import (
     CircuitBreakerConfig,
     ProviderRetryConfig,
     ResilientProvider,
 )
+from victor.observability.analytics.streaming_metrics import MetricsStreamWrapper
 from victor.providers.concurrency import (
     RequestQueue,
     ConcurrencyConfig,
@@ -250,22 +252,39 @@ class ManagedProvider:
         model = model or (self._config.model if self._config else None)
 
         # Get base stream
-        base_stream = self._active_provider.stream_chat(
-            messages=messages,
-            model=model,
-            tools=tools,
-            **kwargs,
-        )
+        model_str = model or (self._config.model if self._config else "")
+        tools_def = self._convert_tools_to_definitions(tools) if tools else None
+
+        # Use stream method for ResilientProvider, stream_chat for BaseProvider
+        if hasattr(self._active_provider, "stream_chat"):
+            base_stream = self._active_provider.stream_chat(
+                messages=messages,
+                model=model_str,
+                tools=tools_def,
+                **kwargs,
+            )
+        else:
+            # ResilientProvider only has stream method (no tools support)
+            base_stream = self._active_provider.stream(
+                messages=messages,
+                model=model_str,
+                **kwargs,
+            )
 
         # Wrap with metrics collection if enabled
         if self._metrics_collector:
-            wrapped = MetricsStreamWrapper(
-                stream=base_stream,
-                collector=self._metrics_collector,
+            # Create metrics for this stream
+            stream_metrics = self._metrics_collector.create_metrics(
+                request_id=str(uuid.uuid4()),
                 model=model or "unknown",
                 provider=self.name,
             )
-            async for chunk in wrapped:
+            wrapped = MetricsStreamWrapper(
+                stream=base_stream,
+                metrics=stream_metrics,
+                collector=self._metrics_collector,
+            )
+            async for chunk in wrapped:  # type: ignore[var-annotated]
                 yield chunk
         else:
             async for chunk in base_stream:
@@ -285,6 +304,27 @@ class ManagedProvider:
             "recent": self._metrics_collector.get_recent_metrics(),
             "history_size": len(self._metrics_collector._metrics_history),
         }
+
+    def _convert_tools_to_definitions(self, tools: Optional[List[Dict[str, Any]]]) -> Optional[List[ToolDefinition]]:
+        """Convert dict tools to ToolDefinitions.
+
+        Args:
+            tools: List of tool dictionaries
+
+        Returns:
+            List of ToolDefinition objects
+        """
+        if not tools:
+            return None
+
+        return [
+            ToolDefinition(
+                name=tool.get("name", ""),
+                description=tool.get("description", ""),
+                parameters=tool.get("parameters", {}),
+            )
+            for tool in tools
+        ]
 
     def get_resilience_stats(self) -> Optional[Dict[str, Any]]:
         """Get resilience statistics.

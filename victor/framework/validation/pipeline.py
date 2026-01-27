@@ -692,7 +692,7 @@ class ValidationPipeline:
                 return result
 
             if action == ValidationAction.RETRY:
-                if not context.can_retry():
+                if not context.can_retry():  # type: ignore[unreachable]
                     result.add_error(
                         "",
                         "Maximum retries exceeded",

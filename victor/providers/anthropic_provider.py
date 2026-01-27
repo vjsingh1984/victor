@@ -179,7 +179,7 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from Anthropic with tool-use support."""
         try:
             # Separate system messages
@@ -262,10 +262,11 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
                             event, "index", getattr(event, "content_block_index", None)
                         )
                         if delta_type == "text_delta" and hasattr(delta, "text"):
-                            yield StreamChunk(content=delta.text or "", is_final=False)
+                            text = getattr(delta, "text", "")
+                            yield StreamChunk(content=text or "", is_final=False)
                         elif delta_type in {"input_json_delta", "input_delta"}:
                             tc_id = block_index_to_id.get(block_index)
-                            if tc_id:
+                            if tc_id and block_index is not None:  # Ensure block_index is not None
                                 partial = (
                                     getattr(delta, "partial_json", None)
                                     or getattr(delta, "text", "")
@@ -286,7 +287,7 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
                             event, "index", getattr(event, "content_block_index", None)
                         )
                         tc_id = block_index_to_id.get(block_index)
-                        if tc_id and "arguments" in tool_calls.get(tc_id, {}):
+                        if tc_id and block_index is not None and "arguments" in tool_calls.get(tc_id, {}):  # Ensure block_index is not None
                             tool_calls[tc_id]["arguments"] = self._parse_json_arguments(
                                 tool_calls[tc_id].get("arguments")
                             )
@@ -380,6 +381,7 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
             usage=usage,
             model=model,
             raw_response=response.model_dump() if hasattr(response, "model_dump") else None,
+            metadata={},  # Add metadata parameter
         )
 
     @staticmethod

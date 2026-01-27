@@ -118,6 +118,9 @@ AZURE_SUBSCRIPTION_KEY_PATTERN = (
 SLACK_TOKEN_PATTERN = r"xox[baprs]-[0-9]{10,13}-[0-9a-zA-Z]{24}"
 STRIPE_KEY_PATTERN = r"(?:sk|pk)_(?:live|test)_[0-9a-zA-Z]{24,}"
 
+# OpenAI
+OPENAI_API_KEY_PATTERN = r"sk-[a-zA-Z0-9]{20,}"  # OpenAI API keys (20+ chars after sk-)
+
 # Generic Secrets
 GENERIC_PASSWORD_PATTERN = r"(?i)(?:password|passwd|pwd)\s*[=:]\s*['\"][^'\"]{8,}['\"]"
 GENERIC_SECRET_PATTERN = r"(?i)(?:secret|token|api[_-]?key)\s*[=:]\s*['\"][^'\"]{8,}['\"]"
@@ -176,6 +179,11 @@ CREDENTIAL_PATTERNS: Dict[str, Tuple[str, SecretSeverity, str]] = {
         GOOGLE_API_KEY_PATTERN,
         SecretSeverity.HIGH,
         "Use Google Cloud Secret Manager",
+    ),
+    "openai_api_key": (
+        OPENAI_API_KEY_PATTERN,
+        SecretSeverity.CRITICAL,
+        "Use environment variables for OpenAI API keys",
     ),
     "slack_token": (
         SLACK_TOKEN_PATTERN,

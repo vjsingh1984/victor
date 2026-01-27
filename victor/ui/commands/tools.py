@@ -248,10 +248,10 @@ def cleanup_containers(
     """
     from victor.tools.code_executor_tool import (
         cleanup_orphaned_containers,
-        DOCKER_AVAILABLE,
         SANDBOX_CONTAINER_LABEL,
         SANDBOX_CONTAINER_VALUE,
     )
+    from victor.tools.code_executor_tool import DOCKER_AVAILABLE  # type: ignore[attr-defined]
 
     if not DOCKER_AVAILABLE:
         console.print("[red]Docker is not available. Cannot cleanup containers.[/]")
@@ -260,7 +260,7 @@ def cleanup_containers(
     try:
         import docker
 
-        client = docker.from_env()
+        client = docker.from_env()  # type: ignore[attr-defined]
 
         # First, list what we would clean up
         containers_to_clean = []
@@ -381,7 +381,7 @@ def cleanup_images(
     try:
         import docker
 
-        client = docker.from_env()
+        client = docker.from_env()  # type: ignore[attr-defined]
 
         # Find dangling images
         dangling = client.images.list(filters={"dangling": True})

@@ -54,6 +54,7 @@ from typing import (
     Any,
     AsyncIterator,
     Dict,
+    Generator,
     List,
     Optional,
     Protocol,
@@ -193,7 +194,7 @@ class BaseSDKAdapter(ABC):
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[misc]
         """Adapt a raw SDK stream to normalized StreamChunk.
 
         Args:
@@ -228,7 +229,7 @@ class OpenAIAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.OPENAI
 
-    async def adapt_stream(
+    def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -280,7 +281,7 @@ class AnthropicAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.ANTHROPIC
 
-    async def adapt_stream(
+    def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -324,7 +325,7 @@ class GoogleAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.GOOGLE
 
-    async def adapt_stream(
+    def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -376,7 +377,7 @@ class OllamaAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.OLLAMA
 
-    async def adapt_stream(
+    def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -437,7 +438,7 @@ class LMStudioAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.LMSTUDIO
 
-    async def adapt_stream(
+    def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -456,6 +457,11 @@ class LMStudioAdapter(BaseSDKAdapter):
                 async for adapted in adapter.adapt_stream(self._create_async_iterable([chunk])):
                     yield adapted
 
+    def _create_async_iterable(self, items: List[Any]) -> AsyncIterator[Any]:  # type: ignore[misc]
+        """Convert a list to an async iterator."""
+        for item in items:
+            yield item
+
 
 class VLLMAdapter(BaseSDKAdapter):
     """Adapter for vLLM streaming format."""
@@ -464,7 +470,7 @@ class VLLMAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.VLLM
 
-    async def adapt_stream(
+    def adapt_stream(
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -490,6 +496,11 @@ class VLLMAdapter(BaseSDKAdapter):
                 adapter = OpenAIAdapter()
                 async for adapted in adapter.adapt_stream(self._create_async_iterable([chunk])):
                     yield adapted
+
+    def _create_async_iterable(self, items: List[Any]) -> AsyncIterator[Any]:  # type: ignore[misc]
+        """Convert a list to an async iterator."""
+        for item in items:
+            yield item
 
 
 # =============================================================================
@@ -790,6 +801,9 @@ class UnifiedStreamAdapter:
             tool_calls=tool_calls if tool_calls else None,
             stop_reason=stop_reason,
             model=model,
+            usage=None,
+            raw_response=None,
+            metadata=None,
         )
 
 

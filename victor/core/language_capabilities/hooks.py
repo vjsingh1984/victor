@@ -81,7 +81,7 @@ class CodeGroundingHook:
     async def validate_before_write(
         self,
         content: str,
-        file_path: Path,
+        file_path: str | Path,
         strict: bool = False,
         config: Optional[ValidationConfig] = None,
     ) -> Tuple[bool, CodeValidationResult]:
@@ -99,6 +99,7 @@ class CodeGroundingHook:
             - should_proceed: True if write should proceed
             - validation_result: Full validation result with issues
         """
+        # Convert str to Path for consistency
         if isinstance(file_path, str):
             file_path = Path(file_path)
 
@@ -147,7 +148,7 @@ class CodeGroundingHook:
     def validate_before_write_sync(
         self,
         content: str,
-        file_path: Path,
+        file_path: str | Path,
         strict: bool = False,
         config: Optional[ValidationConfig] = None,
     ) -> Tuple[bool, CodeValidationResult]:
@@ -163,6 +164,10 @@ class CodeGroundingHook:
         Returns:
             Tuple of (should_proceed, validation_result)
         """
+        # Convert str to Path for consistency
+        if isinstance(file_path, str):
+            file_path = Path(file_path)
+
         try:
             asyncio.get_running_loop()
             # We're in an async context, need to use run_in_executor or similar
@@ -184,8 +189,7 @@ class CodeGroundingHook:
 
         Uses quick_validate for fast path, then full validation if needed.
         """
-        if isinstance(file_path, str):
-            file_path = Path(file_path)
+        # No need to check isinstance since file_path is already Path from calling method
 
         cap = self._registry.get_for_file(file_path)
 

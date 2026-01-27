@@ -226,7 +226,7 @@ class VictorAPIServer:
             from victor.agent.mode_controller import get_mode_controller
 
             mode_manager = get_mode_controller()
-            current_mode = mode_manager.current_mode.value
+            current_mode = mode_manager.current_mode.value  # type: ignore[unreachable]
 
         return web.json_response(
             {
@@ -529,7 +529,7 @@ class VictorAPIServer:
                 try:
                     provider_class = ProviderRegistry.get(provider_name)
                     if provider_class is None:
-                        continue
+                        continue  # type: ignore[unreachable]
                     # Create a temporary instance to check methods
                     provider = provider_class()
                     providers_info.append(
@@ -695,9 +695,9 @@ class VictorAPIServer:
             format_type = request.query.get("format", "json")
 
             if not self._orchestrator:
-                return web.json_response({"messages": []})  # type: ignore[unreachable]
+                return web.json_response({"messages": []})
 
-            messages = self._orchestrator.get_messages()  # type: ignore[unreachable]
+            messages = self._orchestrator.get_messages()
 
             if format_type == "markdown":
                 content = self._format_messages_markdown(messages)
@@ -791,7 +791,7 @@ class VictorAPIServer:
             from victor.tools import patch_tool
 
             # Apply the patch using the tool module
-            result = await patch_tool.apply_patch(patch=patch_content, dry_run=dry_run)
+            result = await patch_tool.apply_patch(patch=patch_content, dry_run=dry_run)  # type: ignore[attr-defined]
 
             return web.json_response(result)
 
@@ -813,7 +813,7 @@ class VictorAPIServer:
 
             from victor.tools import patch_tool
 
-            result = await patch_tool.create_patch(file_path=target_file, new_content=new_content)
+            result = await patch_tool.create_patch(file_path=target_file, new_content=new_content)  # type: ignore[attr-defined]
 
             return web.json_response(result)
 
@@ -1051,7 +1051,7 @@ class VictorAPIServer:
 
             settings = load_settings()
             # Create orchestrator with settings
-            self._orchestrator = await AgentOrchestrator.from_settings(settings)
+            self._orchestrator = await AgentOrchestrator.from_settings(settings)  # type: ignore[assignment]
 
         return self._orchestrator
 
@@ -1062,9 +1062,9 @@ class VictorAPIServer:
         to update Q-values based on session performance.
         """
         if self._orchestrator is None:
-            return  # type: ignore[unreachable]
+            return
 
-        try:  # type: ignore[unreachable]
+        try:
             from victor.framework.rl.base import RLOutcome
             from victor.framework.rl.coordinator import get_rl_coordinator
 
@@ -2027,7 +2027,7 @@ class VictorAPIServer:
                 return web.json_response({"error": "rate must be a number"}, status=400)
 
             old_rate = getattr(learner, "epsilon", 0.3)
-            learner.epsilon = rate
+            learner.epsilon = rate  # type: ignore[attr-defined]
 
             return web.json_response(
                 {
@@ -2077,7 +2077,7 @@ class VictorAPIServer:
                 old_strategy_value = old_strategy.value
             else:
                 old_strategy_value = "unknown"
-            learner.strategy = strategy
+            learner.strategy = strategy  # type: ignore[attr-defined]
 
             return web.json_response(
                 {

@@ -366,7 +366,7 @@ class ToolResultCache:
 
                 if embedding is None:
                     self.stats.misses += 1
-                    return None  # type: ignore[unreachable]
+                    return None
 
                 query_vec = self._normalize(np.array(embedding, dtype=np.float32))
                 sim_threshold = threshold or SIMILARITY_THRESHOLD.get(tool_name, 0.90)
@@ -453,7 +453,7 @@ class ToolResultCache:
         """
         ttl = TOOL_TTL.get(tool_name, 0)
         if ttl == 0:
-            return False
+            return False  # type: ignore[unreachable]
 
         try:
             # Generate embedding

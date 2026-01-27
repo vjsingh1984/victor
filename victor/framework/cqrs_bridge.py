@@ -805,7 +805,8 @@ class CQRSBridge:
         elif isinstance(result, QueryResult):
             return result.data if result.data is not None else {"error": result.error}
         else:
-            return {"error": "Unknown result type"}
+            # This path should be unreachable based on the isinstance checks above
+            return {"error": "Unknown result type"}  # type: ignore[unreachable]
 
     async def end_session(self, session_id: str) -> Dict[str, Any]:
         """End a session via CQRS command.
@@ -830,7 +831,8 @@ class CQRSBridge:
         elif isinstance(result, QueryResult):
             return result.data if result.data is not None else {"error": result.error}
         else:
-            return {"error": "Unknown result type"}
+            # This path should be unreachable based on the isinstance checks above
+            return {"error": "Unknown result type"}  # type: ignore[unreachable]
 
     async def execute_tool(
         self,
@@ -867,7 +869,8 @@ class CQRSBridge:
         elif isinstance(result, QueryResult):
             return result.data if result.data is not None else {"error": result.error}
         else:
-            return {"error": "Unknown result type"}
+            # This path should be unreachable based on the isinstance checks above
+            return {"error": "Unknown result type"}  # type: ignore[unreachable]
 
     async def send_chat(
         self,
@@ -904,7 +907,8 @@ class CQRSBridge:
         elif isinstance(result, QueryResult):
             return result.data if result.data is not None else {"error": result.error}
         else:
-            return {"error": "Unknown result type"}
+            # This path should be unreachable based on the isinstance checks above
+            return {"error": "Unknown result type"}  # type: ignore[unreachable]
 
     # =========================================================================
     # Queries
@@ -933,7 +937,8 @@ class CQRSBridge:
         elif isinstance(result, CommandResult):
             return result.result if result.result is not None else {"error": result.error}
         else:
-            return {"error": "Unknown result type"}
+            # This path should be unreachable based on the isinstance checks above
+            return {"error": "Unknown result type"}  # type: ignore[unreachable]
 
     async def get_conversation_history(
         self,
@@ -963,7 +968,8 @@ class CQRSBridge:
         elif isinstance(result, CommandResult):
             return result.result if result.result is not None else {"error": result.error}
         else:
-            return {"error": "Unknown result type"}
+            # This path should be unreachable based on the isinstance checks above
+            return {"error": "Unknown result type"}  # type: ignore[unreachable]
 
     async def get_tools(
         self,
@@ -993,7 +999,8 @@ class CQRSBridge:
         elif isinstance(result, CommandResult):
             return result.result if result.result is not None else {"error": result.error}
         else:
-            return {"error": "Unknown result type"}
+            # This path should be unreachable based on the isinstance checks above
+            return {"error": "Unknown result type"}  # type: ignore[unreachable]
 
     async def get_metrics(self, session_id: str) -> Dict[str, Any]:
         """Get session metrics via CQRS query.
@@ -1018,7 +1025,8 @@ class CQRSBridge:
         elif isinstance(result, CommandResult):
             return result.result if result.result is not None else {"error": result.error}
         else:
-            return {"error": "Unknown result type"}
+            # This path should be unreachable based on the isinstance checks above
+            return {"error": "Unknown result type"}  # type: ignore[unreachable]
 
     # =========================================================================
     # Direct Projection Access

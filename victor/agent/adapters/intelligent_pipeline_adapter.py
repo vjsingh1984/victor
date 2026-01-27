@@ -37,7 +37,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator_integration import OrchestratorIntegration
-    from victor.coding.tracker.unified import UnifiedTracker
+    from victor.coding.tracker.unified import UnifiedTracker  # type: ignore[import-not-found]
     from victor.agent.coordinators.validation_coordinator import (
         ValidationCoordinator,
         IntelligentValidationResult,

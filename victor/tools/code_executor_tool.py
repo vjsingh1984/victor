@@ -356,8 +356,8 @@ class CodeSandbox:
                 f"Docker container startup failed: {e}. "
                 "Code execution in containers will be unavailable."
             )
-            self.container: Any | None = None
-            self.docker_available: bool = False  # Mark Docker as unavailable
+            self.container = None  # type: ignore[no-redef]
+            self.docker_available = False  # type: ignore[no-redef]  # Mark Docker as unavailable
             # Remove from active set since startup failed
             _active_sandboxes.discard(self)
     def stop(self) -> None:
@@ -377,7 +377,7 @@ class CodeSandbox:
                 # Catch-all for truly unexpected errors
                 logger.debug(f"Failed to remove container {container_id}: {e}")
                 logger.debug(f"Container {container_id} cleanup: {e}")
-            self.container: Any | None = None
+            self.container = None  # type: ignore[no-redef]
         # Remove from active set (safe even if not present)
         _active_sandboxes.discard(self)
     def execute(self, code: str, timeout: int = 60) -> dict:
@@ -478,7 +478,7 @@ async def sandbox(
     """
     if context is None:
         return "Error: Context not provided."
-    sandbox_instance: CodeSandbox = context.get("code_manager")
+    sandbox_instance: CodeSandbox = context.get("code_manager")  # type: ignore[assignment]
     if not sandbox_instance:
         return "Error: CodeSandbox not found in context."
     op = operation.lower().strip()

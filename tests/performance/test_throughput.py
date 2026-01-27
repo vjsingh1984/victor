@@ -281,7 +281,7 @@ class TestStateGraphThroughput:
 
         Expected: < 50ms for 5-node graph
         """
-        from victor.framework.graph import START, END
+        from victor.framework.graph import END
 
         graph = StateGraph(state_schema=Dict[str, Any])
 
@@ -292,7 +292,8 @@ class TestStateGraphThroughput:
         graph.add_node("node4", lambda state: {"value": state.get("value", 0) + 1})
         graph.add_node("node5", lambda state: {"value": state.get("value", 0) + 1})
 
-        graph.add_edge(START, "node1")
+        # Set entry point and add edges
+        graph.set_entry_point("node1")
         graph.add_edge("node1", "node2")
         graph.add_edge("node2", "node3")
         graph.add_edge("node3", "node4")
@@ -313,7 +314,7 @@ class TestStateGraphThroughput:
 
         Expected: < 100ms for graph with branches
         """
-        from victor.framework.graph import START, END
+        from victor.framework.graph import END
 
         graph = StateGraph(state_schema=Dict[str, Any])
 
@@ -324,7 +325,7 @@ class TestStateGraphThroughput:
         graph.add_node("branch_a", lambda state: {"result": "A"})
         graph.add_node("branch_b", lambda state: {"result": "B"})
 
-        graph.add_edge(START, "process")
+        graph.set_entry_point("process")
         graph.add_conditional_edge("process", route_fn, {"branch_a": "branch_a", "branch_b": "branch_b"})
         graph.add_edge("branch_a", END)
         graph.add_edge("branch_b", END)
@@ -356,6 +357,8 @@ class TestStateGraphThroughput:
             lambda state: {"total": state.get("b1", 0) + state.get("b2", 0) + state.get("b3", 0)},
         )
 
+        # For parallel execution, we need to use START as entry
+        graph.set_entry_point(START)
         graph.add_edge(START, "branch1")
         graph.add_edge(START, "branch2")
         graph.add_edge(START, "branch3")
@@ -575,7 +578,7 @@ class TestPerformanceAssertions:
 
         Target: 20% improvement over baseline
         """
-        from victor.framework.graph import START, END
+        from victor.framework.graph import END
 
         graph = StateGraph(state_schema=Dict[str, Any])
 
@@ -587,7 +590,7 @@ class TestPerformanceAssertions:
             graph.add_node(node_name, lambda state, idx=i: {"step": idx})
 
         # Connect nodes
-        graph.add_edge(START, nodes[0])
+        graph.set_entry_point(nodes[0])
         for i in range(len(nodes) - 1):
             graph.add_edge(nodes[i], nodes[i + 1])
         graph.add_edge(nodes[-1], END)

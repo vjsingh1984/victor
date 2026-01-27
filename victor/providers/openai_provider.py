@@ -198,7 +198,7 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             # Catch-all for truly unexpected errors
             raise self._handle_error(e, self.name)
 
-    async def stream(
+    async def stream(  # type: ignore[override]
         self,
         messages: List[Message],
         *,
@@ -309,6 +309,7 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                     "arguments": tc.function.arguments,
                 }
                 for tc in message.tool_calls
+                if hasattr(tc, "function")  # type: ignore[attr-defined]
             ]
 
         # Parse usage

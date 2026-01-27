@@ -134,7 +134,7 @@ class ToolEventEmitter(IToolEventEmitter):
 
         return False
 
-    def emit(
+    async def emit(
         self,
         topic: str,
         data: Dict[str, Any],
@@ -162,7 +162,7 @@ class ToolEventEmitter(IToolEventEmitter):
         except Exception as e:
             logger.debug(f"Failed to emit tool event: {e}")
 
-    def emit_safe(self, event: MessagingEvent) -> bool:
+    def emit_safe(self, event: "MessagingEvent") -> bool:  # type: ignore[name-defined]
         """Safely emit a tool event, catching any exceptions.
 
         Args:

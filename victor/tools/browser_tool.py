@@ -425,7 +425,7 @@ class BrowserTool:
             )
 
         try:
-            await self._page.click(selector, timeout=self.config.element_timeout)
+            await self._page.click(selector, timeout=self.config.element_timeout)  # type: ignore[attr-defined]
             self._state.action_count += 1
 
             duration = int((datetime.now() - start).total_seconds() * 1000)
@@ -531,7 +531,7 @@ class BrowserTool:
             }
             dx, dy = scroll_map.get(direction.lower(), (0, amount))
 
-            await self._page.mouse.wheel(dx, dy)
+            await self._page.mouse.wheel(dx, dy)  # type: ignore[attr-defined]
             self._state.action_count += 1
 
             duration = int((datetime.now() - start).total_seconds() * 1000)
@@ -588,11 +588,11 @@ class BrowserTool:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 name = f"screenshot_{timestamp}_{len(self._state.screenshots)}.png"
 
-            filepath = self.config.screenshot_dir / name
+            filepath = self.config.screenshot_dir / name if self.config.screenshot_dir else Path(name)
 
             # Take screenshot
             if selector:
-                element = await self._page.query_selector(selector)
+                element = await self._page.query_selector(selector)  # type: ignore[attr-defined]
                 if element:
                     await element.screenshot(path=str(filepath))
                 else:
@@ -602,7 +602,7 @@ class BrowserTool:
                         error=f"Element not found: {selector}",
                     )
             else:
-                await self._page.screenshot(path=str(filepath), full_page=full_page)
+                await self._page.screenshot(path=str(filepath), full_page=full_page)  # type: ignore[attr-defined]
 
             self._state.screenshots.append(str(filepath))
 
@@ -643,7 +643,7 @@ class BrowserTool:
 
         try:
             if selector:
-                element = await self._page.query_selector(selector)
+                element = await self._page.query_selector(selector)  # type: ignore[attr-defined]
                 if element:
                     text = await element.text_content()
                 else:
@@ -653,7 +653,7 @@ class BrowserTool:
                         error=f"Element not found: {selector}",
                     )
             else:
-                text = await self._page.text_content("body")
+                text = await self._page.text_content("body")  # type: ignore[attr-defined]
 
             duration = int((datetime.now() - start).total_seconds() * 1000)
 

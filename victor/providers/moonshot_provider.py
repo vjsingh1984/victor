@@ -391,6 +391,10 @@ class MoonshotProvider(BaseProvider, HTTPErrorHandlerMixin):
                 role="assistant",
                 model=model,
                 raw_response=result,
+                tool_calls=None,
+                stop_reason=None,
+                usage=None,
+                metadata=None,
             )
 
         choice = choices[0]

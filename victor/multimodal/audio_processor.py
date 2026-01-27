@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 # Optional dependencies with graceful fallback
 try:
-    import whisper
+    import whisper  # type: ignore[import-not-found]
 
     WHISPER_AVAILABLE = True
 except ImportError:
@@ -40,7 +40,7 @@ except ImportError:
     logger.warning("Whisper not available. Install with: pip install openai-whisper")
 
 try:
-    from pydub import AudioSegment
+    from pydub import AudioSegment  # type: ignore[import-not-found]
 
     PYDUB_AVAILABLE = True
 except ImportError:
@@ -48,7 +48,7 @@ except ImportError:
     logger.warning("pydub not available. Install with: pip install pydub")
 
 try:
-    import moviepy.editor as mp
+    import moviepy.editor as mp  # type: ignore[import-not-found]
 
     MOVIEPY_AVAILABLE = True
 except ImportError:
@@ -201,7 +201,7 @@ class AudioProcessor:
                 self._whisper_model = whisper.load_model(model_size)
 
             # Transcribe
-            assert self._whisper_model is not None
+            assert self._whisper_model is not None  # type: ignore[unreachable]
             result = self._whisper_model.transcribe(
                 str(path),
                 fp16=False,  # Use FP32 for compatibility

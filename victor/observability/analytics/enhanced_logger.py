@@ -127,16 +127,16 @@ class PIIScrubber:
             if isinstance(value, str):
                 result[key] = self.scrub(value)
             elif isinstance(value, dict):
-                result[key] = self.scrub_dict(value)
+                result[key] = str(self.scrub_dict(value))
             elif isinstance(value, list):
-                result[key] = [
+                result[key] = str([
                     (
                         self.scrub_dict(v)
                         if isinstance(v, dict)
                         else self.scrub(v) if isinstance(v, str) else str(v)
                     )
                     for v in value
-                ]  # type: ignore[list-item]
+                ])  # type: ignore[list-item]
             else:
                 result[key] = value
         return result
@@ -228,7 +228,7 @@ class LogEncryptor:
         self._fernet = None
 
         try:
-            from cryptography.fernet import Fernet  # type: ignore[import-not-found]
+            from cryptography.fernet import Fernet  # type: ignore[import-untyped]
 
             if key:
                 self._fernet = Fernet(key)

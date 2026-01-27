@@ -369,6 +369,56 @@ SENSITIVE_FILE_PATTERNS: List[SafetyPattern] = [
 ]
 
 
+# Shell command injection patterns (dangerous shell operations)
+SHELL_INJECTION_PATTERNS: List[SafetyPattern] = [
+    # Command separators/chaining
+    SafetyPattern(
+        pattern=r";\s*rm\s+-rf",
+        description="Command chaining with destructive rm",
+        risk_level="CRITICAL",
+        category="shell_injection",
+    ),
+    SafetyPattern(
+        pattern=r"\|\s*nc\s+",
+        description="Pipe to netcat (potential backdoor)",
+        risk_level="HIGH",
+        category="shell_injection",
+    ),
+    # Command substitution
+    SafetyPattern(
+        pattern=r"`[^`]*`",
+        description="Backtick command substitution",
+        risk_level="HIGH",
+        category="shell_injection",
+    ),
+    SafetyPattern(
+        pattern=r"\$\([^)]*\)",
+        description="$() command substitution",
+        risk_level="HIGH",
+        category="shell_injection",
+    ),
+    # Dangerous commands
+    SafetyPattern(
+        pattern=r"rm\s+-rf\s+/",
+        description="Delete root filesystem",
+        risk_level="CRITICAL",
+        category="shell_injection",
+    ),
+    SafetyPattern(
+        pattern=r"chmod\s+000",
+        description="Remove all permissions",
+        risk_level="HIGH",
+        category="shell_injection",
+    ),
+    SafetyPattern(
+        pattern=r"mkfs\.|fdisk\s",
+        description="Filesystem operations",
+        risk_level="HIGH",
+        category="shell_injection",
+    ),
+]
+
+
 # =============================================================================
 # CodePatternScanner
 # =============================================================================
@@ -418,6 +468,7 @@ class CodePatternScanner:
     - Refactoring operations
     - Build and deployment commands
     - Sensitive file paths
+    - Shell command injection patterns
 
     Example:
         scanner = CodePatternScanner()
@@ -441,6 +492,7 @@ class CodePatternScanner:
         include_packages: bool = True,
         include_build: bool = True,
         include_files: bool = True,
+        include_shell_injection: bool = True,
         custom_patterns: Optional[List[SafetyPattern]] = None,
     ):
         """Initialize the scanner.
@@ -451,6 +503,7 @@ class CodePatternScanner:
             include_packages: Include package manager patterns
             include_build: Include build/deploy patterns
             include_files: Include sensitive file patterns
+            include_shell_injection: Include shell injection patterns
             custom_patterns: Additional custom patterns to include
         """
         self._patterns: List[SafetyPattern] = []
@@ -464,6 +517,8 @@ class CodePatternScanner:
             self._patterns.extend(PACKAGE_MANAGER_PATTERNS)
         if include_build:
             self._patterns.extend(BUILD_DEPLOY_PATTERNS)
+        if include_shell_injection:
+            self._patterns.extend(SHELL_INJECTION_PATTERNS)
         if include_files:
             self._file_patterns.extend(SENSITIVE_FILE_PATTERNS)
 
@@ -617,6 +672,7 @@ def get_all_patterns() -> List[SafetyPattern]:
         + REFACTORING_PATTERNS
         + PACKAGE_MANAGER_PATTERNS
         + BUILD_DEPLOY_PATTERNS
+        + SHELL_INJECTION_PATTERNS
         + SENSITIVE_FILE_PATTERNS
     )
 
@@ -630,6 +686,7 @@ __all__ = [
     "REFACTORING_PATTERNS",
     "PACKAGE_MANAGER_PATTERNS",
     "BUILD_DEPLOY_PATTERNS",
+    "SHELL_INJECTION_PATTERNS",
     "SENSITIVE_FILE_PATTERNS",
     # Classes
     "ScanResult",

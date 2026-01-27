@@ -107,7 +107,7 @@ class StatsComputeHandler(BaseHandler):
             if key == "data":
                 data = context.get(value) if isinstance(value, str) else value
             elif key == "operations":
-                operations = value if isinstance(value, list) else [value]
+                operations = value if isinstance(value, list) else [value]  # type: ignore[unreachable]
 
         if data is None:
             raise ValueError("No 'data' input provided")
@@ -253,7 +253,7 @@ class PyCaretHandler(BaseHandler):
 
         # Check if PyCaret is available
         try:
-            import pandas as pd  # type: ignore[import-not-found]
+            import pandas as pd  # type: ignore[import-untyped]
         except ImportError:
             raise ImportError("pandas is required for PyCaret. Install with: pip install pandas")
 
@@ -569,7 +569,7 @@ class AutoSklearnHandler(BaseHandler):
     ) -> Dict[str, Any]:
         """Synchronous Auto-sklearn execution."""
         try:
-            from sklearn.model_selection import train_test_split  # type: ignore[import-not-found]
+            from sklearn.model_selection import train_test_split  # type: ignore[import-untyped]
 
             if task == "classification":
                 from autosklearn.classification import AutoSklearnClassifier  # type: ignore[import-not-found]
@@ -750,7 +750,7 @@ class RLTrainingHandler(BaseHandler):
         """Synchronous RL training."""
         try:
             import gymnasium as gym  # type: ignore[import-not-found]
-            from stable_baselines3 import PPO, A2C, DQN, SAC, TD3
+            from stable_baselines3 import PPO, A2C, DQN, SAC, TD3  # type: ignore[import-not-found]
             from stable_baselines3.common.evaluation import evaluate_policy  # type: ignore[import-not-found]
 
             # Algorithm mapping

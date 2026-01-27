@@ -139,7 +139,7 @@ class MetricsCommand(BaseSlashCommand):
             export_format = "csv"
 
         try:
-            from victor.observability.streaming_metrics import get_metrics_collector
+            from victor.observability.streaming_metrics import get_metrics_collector  # type: ignore[import-not-found]
 
             collector = get_metrics_collector()
 
@@ -539,8 +539,8 @@ class LearningCommand(BaseSlashCommand):
                         if hasattr(learner, "get_exploration_rate")
                         else getattr(learner, "_exploration_rate", 0.1)
                     )
-                    strategy_func = getattr(learner, "get_strategy", lambda: None)
-                    strategy = strategy_func() or getattr(learner, "_strategy", None)
+                    strategy_func = getattr(learner, "get_strategy", lambda s: None)
+                    strategy = strategy_func() or getattr(learner, "_strategy", None)  # type: ignore[assignment]
                     content += f"\n  Strategy: {strategy.value if strategy else 'epsilon_greedy'}\n"
                     content += f"  Exploration Rate: {exploration:.2f}\n"
         except Exception as e:

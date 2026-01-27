@@ -25,9 +25,9 @@ Features:
 import logging
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Collection, Dict, Optional
 
-import yaml  # type: ignore[import]
+import yaml
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
@@ -49,7 +49,7 @@ def _get_icon(name: str) -> str:
 
 
 # Workflow templates
-GITHUB_ACTIONS_TEMPLATES = {
+GITHUB_ACTIONS_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "python-test": {
         "name": "Python Tests",
         "on": {
@@ -465,8 +465,8 @@ async def cicd(
                 "name": name,
                 "platform": "github",
                 "display_name": template["name"],
-                "jobs": list(template.get("jobs", {}).keys()),
-                "triggers": list(template.get("on", {}).keys()),
+                "jobs": list((template.get("jobs") or {}).keys()),
+                "triggers": list((template.get("on") or {}).keys()),
             }
             templates.append(template_info)
 
@@ -475,12 +475,12 @@ async def cicd(
 
             # List jobs
             if "jobs" in template:
-                jobs = list(template["jobs"].keys())
+                jobs = list((template["jobs"] or {}).keys())
                 report.append(f"   Jobs: {', '.join(jobs)}")
 
             # List triggers
             if "on" in template:
-                triggers = list(template["on"].keys())
+                triggers = list((template["on"] or {}).keys())
                 report.append(f"   Triggers: {', '.join(triggers)}")
 
             report.append("")

@@ -471,11 +471,11 @@ def test_uncached_query_embedding(benchmark, semantic_selector, run_async):
 
 
 @pytest.mark.benchmark(group="embedding_cache")
-def test_cache_hit_rate(benchmark, mock_tool_registry, semantic_selector, run_async):
+def test_tool_selection_cache_hit_rate(benchmark, mock_tool_registry, semantic_selector, run_async):
     """Benchmark tool selection with realistic cache hit rate.
 
     In production, queries are often similar. This benchmark measures
-    performance with 70% cache hit rate.
+    SemanticToolSelector cache performance with 70% cache hit rate.
     """
 
     registry = mock_tool_registry(num_tools=10)

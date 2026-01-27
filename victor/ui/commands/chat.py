@@ -274,15 +274,15 @@ def chat(
                 )
             )
             return
+        else:
+            automation_mode = json_output or plain or code_only
 
-        automation_mode = json_output or plain or code_only
+            # Smart TUI detection: disable if non-interactive terminal or automation mode
+            use_tui = tui and not automation_mode and sys.stdin.isatty() and sys.stdout.isatty()
 
-        # Smart TUI detection: disable if non-interactive terminal or automation mode
-        use_tui = tui and not automation_mode and sys.stdin.isatty() and sys.stdout.isatty()
-
-        # Use ERROR level for automation modes (cleaner output)
-        if log_level is None and automation_mode:
-            log_level = "ERROR"
+            # Use ERROR level for automation modes (cleaner output)
+            if log_level is None and automation_mode:  # type: ignore[unreachable]
+                log_level = "ERROR"  # type: ignore[unreachable]
 
         # Validate log level if explicitly provided
         if log_level is not None:
@@ -409,14 +409,20 @@ def chat(
                         "[bold yellow]Warning:[/] --endpoint is ignored for this provider."
                     )
 
-            override_profile = ProfileConfig(
-                provider=provider,
-                model=model,
-                temperature=settings.default_temperature,
-                max_tokens=settings.default_max_tokens,
-                tool_budget=extra_fields.get("tool_budget"),
-                base_url=extra_fields.get("base_url"),
-            )
+            # Create profile config with allowed fields
+            profile_data = {
+                "provider": provider,
+                "model_name": model,
+                "temperature": settings.default_temperature,
+                "max_tokens": settings.default_max_tokens,
+            }
+            # Add extra fields if they exist
+            if extra_fields.get("tool_budget"):
+                profile_data["tool_budget"] = extra_fields.get("tool_budget")
+            if extra_fields.get("base_url"):
+                profile_data["base_url"] = extra_fields.get("base_url")
+
+            override_profile = ProfileConfig(**profile_data)  # type: ignore[arg-type]
 
             # Replace profile loader to use the synthetic profile
             # This is a workaround - ideally we should modify the settings object differently
@@ -615,12 +621,12 @@ async def run_oneshot(
             else:
                 # Fallback for non-UIAgentProtocol
                 response = await agent.chat(message)
-                content_buffer = response.content
+                content_buffer = response.content if hasattr(response, 'content') else str(response)
         else:
             response = await agent.chat(message)
-            content_buffer = response.content
-            usage_stats = response.usage
-            model_name = response.model
+            content_buffer = response.content if hasattr(response, 'content') else str(response)
+            usage_stats = response.usage if hasattr(response, 'usage') else None
+            model_name = response.model if hasattr(response, 'model') else "unknown"
             formatter.response(
                 content=content_buffer,
                 usage=usage_stats,
@@ -649,7 +655,7 @@ async def run_oneshot(
                 success=success,
             )
         if agent and isinstance(agent, AgentOrchestrator):
-            await graceful_shutdown(agent)  # type: ignore[arg-type]
+            await graceful_shutdown(agent)
 
 
 async def run_interactive(
@@ -805,7 +811,7 @@ async def run_interactive(
 
             rl_suggestion = get_rl_profile_suggestion(profile_config.provider, profiles)
             await _run_cli_repl(
-                agent,
+                agent,  # type: ignore[arg-type]
                 settings,
                 cmd_handler,
                 profile_config,
@@ -836,7 +842,7 @@ async def run_interactive(
                 success=success,
             )
         if agent and isinstance(agent, AgentOrchestrator):
-            await graceful_shutdown(agent)  # type: ignore[arg-type]
+            await graceful_shutdown(agent)
 
 
 async def _run_cli_repl(
@@ -1147,7 +1153,7 @@ async def run_workflow_mode(
 
         # Cleanup orchestrator
         if orchestrator and isinstance(orchestrator, AgentOrchestrator):
-            await graceful_shutdown(orchestrator)  # type: ignore[arg-type]
+            await graceful_shutdown(orchestrator)
 
     except YAMLWorkflowError as e:
         console.print("[bold red]✗[/] Workflow validation failed")

@@ -126,6 +126,9 @@ class LifecycleManager:
         self._flush_analytics_callback: Optional[Callable[[], Any]] = None
         self._stop_health_monitoring_callback: Optional[Callable[[], Any]] = None
 
+        # Track shutdown state for idempotency
+        self._is_shutdown = False
+
     def reset_conversation(self) -> None:
         """Clear conversation history and session state.
 
@@ -209,6 +212,8 @@ class LifecycleManager:
         """Clean up resources and shutdown gracefully.
 
         Should be called when the orchestrator is no longer needed.
+        This method is idempotent - safe to call multiple times.
+
         Cleans up:
         - Background async tasks
         - Provider connections
@@ -216,85 +221,95 @@ class LifecycleManager:
         - Semantic selector resources
         - HTTP clients
         """
+        # Idempotency check - if already shut down, return immediately
+        if self._is_shutdown:
+            logger.debug("LifecycleManager already shut down, skipping")
+            return
+
         logger.info("Shutting down LifecycleManager...")
 
-        # Cancel all background tasks first
-        if self._background_tasks:
-            logger.debug("Cancelling %d background task(s)...", len(self._background_tasks))
-            for task in self._background_tasks:
-                if not task.done():
-                    task.cancel()
-
-            # Wait for all tasks to complete cancellation (only if they're awaitable)
-            if self._background_tasks:
-                try:
-                    # Filter for actual asyncio.Task objects
-                    real_tasks = [t for t in self._background_tasks if hasattr(t, "_coroutine")]
-                    if real_tasks:
-                        await asyncio.gather(*real_tasks, return_exceptions=True)
-                except Exception as e:
-                    logger.debug(f"Error gathering background tasks: {e}")
-            self._background_tasks.clear()
-            logger.debug("Background tasks cancelled")
-
-        # Close provider connection
-        if self._provider is not None:
-            try:
-                # Check if provider has a close method
-                if hasattr(self._provider, "close") and asyncio.iscoroutinefunction(
-                    self._provider.close
-                ):
-                    await self._provider.close()
-                    logger.debug("Provider connection closed")
-                elif hasattr(self._provider, "close") and callable(self._provider.close):
-                    # Synchronous close method
-                    self._provider.close()
-                    logger.debug("Provider connection closed (sync)")
-                else:
-                    logger.debug("Provider has no close method")
-            except Exception as e:
-                logger.warning("Error closing provider: %s", str(e))
-
-        # Stop code execution manager (cleans up Docker containers)
-        if self._code_manager is not None:
-            try:
-                self._code_manager.stop()
-                logger.debug("Code execution manager stopped")
-            except Exception as e:
-                logger.warning(f"Error stopping code manager: {e}")
-
-        # Close semantic selector
-        if self._semantic_selector is not None:
-            try:
-                # Check if semantic selector has a close method
-                if hasattr(self._semantic_selector, "close") and asyncio.iscoroutinefunction(
-                    self._semantic_selector.close
-                ):
-                    await self._semantic_selector.close()
-                    logger.debug("Semantic selector closed")
-                elif hasattr(self._semantic_selector, "close") and callable(
-                    self._semantic_selector.close
-                ):
-                    # Synchronous close method
-                    self._semantic_selector.close()
-                    logger.debug("Semantic selector closed (sync)")
-                else:
-                    logger.debug("Semantic selector has no close method")
-            except Exception as e:
-                logger.warning(f"Error closing semantic selector: {e}")
-
-        # Signal shutdown to EmbeddingService singleton
-        # This prevents post-shutdown embedding operations
         try:
-            from victor.storage.embeddings.service import EmbeddingService
+            # Cancel all background tasks first
+            if self._background_tasks:
+                logger.debug("Cancelling %d background task(s)...", len(self._background_tasks))
+                for task in self._background_tasks:
+                    if not task.done():
+                        task.cancel()
 
-            if EmbeddingService._instance is not None:
-                EmbeddingService._instance.shutdown()
-                logger.debug("EmbeddingService shutdown signaled")
-        except Exception as e:
-            logger.debug(f"Error signaling EmbeddingService shutdown: {e}")
+                # Wait for all tasks to complete cancellation (only if they're awaitable)
+                if self._background_tasks:
+                    try:
+                        # Filter for actual asyncio.Task objects
+                        real_tasks = [t for t in self._background_tasks if hasattr(t, "_coroutine")]
+                        if real_tasks:
+                            await asyncio.gather(*real_tasks, return_exceptions=True)
+                    except Exception as e:
+                        logger.debug(f"Error gathering background tasks: {e}")
+                self._background_tasks.clear()
+                logger.debug("Background tasks cancelled")
 
-        logger.info("LifecycleManager shutdown complete")
+            # Close provider connection
+            if self._provider is not None:
+                try:
+                    # Check if provider has a close method
+                    if hasattr(self._provider, "close") and asyncio.iscoroutinefunction(
+                        self._provider.close
+                    ):
+                        await self._provider.close()
+                        logger.debug("Provider connection closed")
+                    elif hasattr(self._provider, "close") and callable(self._provider.close):
+                        # Synchronous close method
+                        self._provider.close()
+                        logger.debug("Provider connection closed (sync)")
+                    else:
+                        logger.debug("Provider has no close method")
+                except Exception as e:
+                    logger.warning("Error closing provider: %s", str(e))
+
+            # Stop code execution manager (cleans up Docker containers)
+            if self._code_manager is not None:
+                try:
+                    self._code_manager.stop()
+                    logger.debug("Code execution manager stopped")
+                except Exception as e:
+                    logger.warning(f"Error stopping code manager: {e}")
+
+            # Close semantic selector
+            if self._semantic_selector is not None:
+                try:
+                    # Check if semantic selector has a close method
+                    if hasattr(self._semantic_selector, "close") and asyncio.iscoroutinefunction(
+                        self._semantic_selector.close
+                    ):
+                        await self._semantic_selector.close()
+                        logger.debug("Semantic selector closed")
+                    elif hasattr(self._semantic_selector, "close") and callable(
+                        self._semantic_selector.close
+                    ):
+                        # Synchronous close method
+                        self._semantic_selector.close()
+                        logger.debug("Semantic selector closed (sync)")
+                    else:
+                        logger.debug("Semantic selector has no close method")
+                except Exception as e:
+                    logger.warning(f"Error closing semantic selector: {e}")
+
+            # Signal shutdown to EmbeddingService singleton
+            # This prevents post-shutdown embedding operations
+            try:
+                from victor.storage.embeddings.service import EmbeddingService
+
+                if EmbeddingService._instance is not None:
+                    EmbeddingService._instance.shutdown()
+                    logger.debug("EmbeddingService shutdown signaled")
+            except Exception as e:
+                logger.debug(f"Error signaling EmbeddingService shutdown: {e}")
+
+            logger.info("LifecycleManager shutdown complete")
+
+        finally:
+            # Mark as shut down even if exceptions occurred
+            self._is_shutdown = True
 
     def get_session_stats(self) -> Dict[str, Any]:
         """Get statistics for current session.

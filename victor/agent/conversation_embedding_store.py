@@ -59,7 +59,7 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 try:
     import lancedb  # type: ignore[import-untyped]
-    import pyarrow as pa  # noqa: F401 - Required by LanceDB
+    import pyarrow as pa  # type: ignore[import-untyped]  # noqa: F401 - Required by LanceDB
 
     LANCEDB_AVAILABLE = True
 except ImportError:
@@ -349,8 +349,8 @@ class ConversationEmbeddingStore:
         if self._table is None:
             self._create_table_with_first_record(records[0])
             # MyPy can't determine that _create_table_with_first_record sets _table
-            if len(records) > 1:  # type: ignore[unreachable]
-                self._table.add(records[1:])
+            if len(records) > 1:
+                self._table.add(records[1:])  # type: ignore[attr-defined]
         else:
             self._table.add(records)
 

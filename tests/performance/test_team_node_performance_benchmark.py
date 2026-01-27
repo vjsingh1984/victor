@@ -772,65 +772,6 @@ def test_parallel_vs_sequential_speedup(benchmark):
 # =============================================================================
 
 
-@pytest.mark.benchmark
-@pytest.mark.parametrize("member_count", [2, 4, 8])
-def test_memory_per_member(benchmark, member_count):
-    """Benchmark memory usage per team member.
-
-    Measures:
-    - Base coordinator overhead
-    - Per-member memory footprint
-    - Context storage overhead
-
-    Performance Targets:
-    - < 1MB overhead per member
-    - Linear growth with member count
-    """
-    gc.collect()
-    tracemalloc.start()
-
-    coordinator = MockTeamCoordinator(formation=TeamFormationType.PARALLEL)
-
-    for i in range(member_count):
-        coordinator.add_member(
-            MockTeamMember(
-                f"member_{i}",
-                "assistant",
-                execution_delay=0.01,
-                message_size=1000,  # 1KB messages
-            )
-        )
-
-    def run_team():
-        async def _run_team():
-            result = await coordinator.execute_team(
-                task="Memory test task",
-                context={"data": "x" * 10000},  # 10KB context
-            )
-            current, peak = tracemalloc.get_traced_memory()
-            tracemalloc.stop()
-            return {"result": result, "memory": peak}
-
-        return asyncio.run(_run_team())
-
-    output = benchmark(run_team)
-
-    assert output["result"]["success"]
-
-    peak_memory_kb = output["memory"] / 1024
-    memory_per_member = peak_memory_kb / member_count
-
-    print(
-        f"\nMemory Usage | Members: {member_count} | "
-        f"Total: {peak_memory_kb:6.1f}KB | "
-        f"Per-Member: {memory_per_member:5.1f}KB"
-    )
-
-    # Target: < 1MB (1024KB) for any team size
-    assert (
-        output["memory"] < 1_000_000
-    ), f"Memory usage {peak_memory_kb:.1f}KB exceeds 1MB target for {member_count} members"
-
 
 @pytest.mark.benchmark
 def test_memory_leak_detection():

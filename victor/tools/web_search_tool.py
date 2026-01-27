@@ -27,7 +27,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import httpx
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup  # type: ignore[import-untyped]
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ToolConfig
 from victor.tools.decorators import tool
@@ -424,7 +424,7 @@ async def _summarize_search(
             results_text = _format_results(query, results)
 
         # Fetch top content for deeper summary (best-effort)
-        fetched_contents = []
+        fetched_contents: List[Dict[str, Any]] = []
         for result in results[:fetch_pool]:
             if len(fetched_contents) >= fetch_top:
                 break

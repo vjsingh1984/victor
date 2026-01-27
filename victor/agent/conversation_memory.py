@@ -1673,7 +1673,7 @@ class ConversationStore:
             return MessagePriority.MEDIUM
 
         if role == MessageRole.TOOL_CALL:
-            return MessagePriority.MEDIUM
+            return MessagePriority.MEDIUM  # type: ignore[unreachable]
 
         return MessagePriority.MEDIUM
 

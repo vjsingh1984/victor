@@ -127,13 +127,17 @@ class StatusCommand(BaseSlashCommand):
             return
 
         agent = ctx.agent
+        if agent is None:
+            ctx.console.print("[red]Agent not available[/]")
+            return
+
         history = agent.conversation
         tool_calls = getattr(agent, "_tool_calls", 0)
         tool_budget = ctx.settings.tool_call_budget
 
         content = (
             f"[bold]Provider:[/] {agent.provider_name}\n"
-            f"[bold]Model:[/] {agent.model}\n"
+            f"[bold]Model:[/] {getattr(agent, 'model', 'unknown')}\n"
             f"[bold]Messages:[/] {history.message_count()}\n"
             f"[bold]Tool Calls:[/] {tool_calls} / {tool_budget}\n"
         )
@@ -157,9 +161,10 @@ class StatusCommand(BaseSlashCommand):
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
             if learner:
-                rec = learner.recommend(agent.provider_name, "coding")
-                if rec and rec.confidence > 0:
-                    content += f"\n[dim]RL: Using optimal provider (Q={rec.confidence:.2f})[/]"
+                if hasattr(learner, 'recommend'):
+                    rec = learner.recommend(agent.provider_name, "coding")
+                    if rec and rec.confidence > 0:
+                        content += f"\n[dim]RL: Using optimal provider (Q={rec.confidence:.2f})[/]"
         except Exception:
             pass
 
@@ -185,7 +190,17 @@ class ClearCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        ctx.agent.reset_conversation()
+        agent = ctx.agent
+        if agent is None:
+            ctx.console.print("[red]Agent not available[/]")
+            return
+
+        if hasattr(agent, 'reset_conversation'):
+            agent.reset_conversation()
+        else:
+            ctx.console.print("[yellow]Reset conversation not supported by agent[/]")
+            return
+
         ctx.console.print("[green]Conversation cleared[/]")
 
 
@@ -286,7 +301,8 @@ class ApprovalsCommand(BaseSlashCommand):
         )
 
     def execute(self, ctx: CommandContext) -> None:
-        current_mode = getattr(ctx.settings, "approval_mode", "suggest")
+        # Use dynamic attribute access with fallback
+        current_mode = getattr(ctx.settings, "approval_mode", getattr(ctx.settings, "approval_mode", "suggest"))
 
         if not ctx.args:
             # Show current mode

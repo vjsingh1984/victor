@@ -62,7 +62,7 @@ async def docker(
     operation: str,
     resource_id: Optional[str] = None,
     resource_type: str = "container",
-    options: Dict[str, Any] = None,
+    options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Unified Docker operations for container and image management.
@@ -140,7 +140,7 @@ async def docker(
         return {"success": False, "error": "Docker CLI not found. Please install Docker."}
 
     if options is None:
-        options = {}
+        options = {}  # type: ignore[unreachable]
 
     operation = operation.lower()
 

@@ -416,11 +416,11 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         except httpx.ConnectError as e:
             # Use mixin for connection errors
-            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
+            raise self._handle_error(e, self.name)
         except httpx.TimeoutException as e:
-            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
+            raise self._handle_error(e, self.name)
         except Exception as e:
-            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
+            raise self._handle_error(e, self.name)
 
     async def stream(
         self,
@@ -431,7 +431,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> Coroutine[Any, Any, AsyncIterator[StreamChunk]]:
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from vLLM server.
 
         Args:
@@ -534,9 +534,8 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
                                     _, final_content = _extract_thinking_content(final_content)
 
                                 # Parse accumulated tool calls
-                                parsed_tool_calls = None
+                                parsed_tool_calls: List[Dict[str, Any]] = []
                                 if accumulated_tool_calls:
-                                    parsed_tool_calls: List[Dict[str, Any]] = []
                                     for tc in accumulated_tool_calls:
                                         try:
                                             args = (
@@ -579,9 +578,9 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
                             continue
 
         except httpx.TimeoutException as e:
-            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
+            raise self._handle_error(e, self.name)
         except Exception as e:
-            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
+            raise self._handle_error(e, self.name)
 
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         """Parse vLLM API response.
@@ -597,8 +596,12 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
         if not choices:
             return CompletionResponse(
                 content="",
-                role="assistant",
                 model=model,
+                usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                tool_calls=None,
+                stop_reason=None,
+                raw_response=None,
+                metadata=None,
             )
 
         choice = choices[0]
@@ -637,12 +640,12 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return CompletionResponse(
             content=content,
-            role="assistant",
             model=model,
             tool_calls=tool_calls,
-            stop_reason=choice.get("finish_reason"),
             usage=usage,
-            metadata=metadata if metadata else None,
+            stop_reason=choice.get("finish_reason"),
+            raw_response=result,
+            metadata=None,
         )
 
     async def close(self) -> None:

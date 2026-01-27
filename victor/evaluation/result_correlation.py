@@ -528,7 +528,7 @@ class ResultCorrelator:
             # Get metadata
             metadata = score.metadata or {}
             if metadata_provider:
-                metadata: dict = metadata_provider(score.instance_id)  # type: ignore[assignment]
+                metadata = metadata_provider(score.instance_id)
 
             # Group by repo
             repo = metadata.get("repo", "unknown")
@@ -654,7 +654,7 @@ def analyze_failure_patterns(
 
     patterns["by_category"] = category_counts
     patterns["by_test_pattern"] = dict(
-        sorted(test_pattern_counts.items(), key=lambda x: x[1], reverse=True)[:20]  # type: ignore[arg-type, return-value]
+        sorted(test_pattern_counts.items(), key=lambda x: x[1], reverse=True)[:20]
     )
 
     # Find common error patterns
@@ -666,9 +666,10 @@ def analyze_failure_patterns(
                 key = msg[msg.index(pattern) : msg.index(pattern) + 50]
                 error_patterns[key] = error_patterns.get(key, 0) + 1
 
+    # Sort by count (explicit cast to int to avoid MyPy issues)
     patterns["common_errors"] = sorted(
-        [{"pattern": k, "count": v} for k, v in error_patterns.items()],
-        key=lambda x: x["count"],
+        [{"pattern": k, "count": int(v)} for k, v in error_patterns.items()],
+        key=lambda x: int(x["count"]),  # type: ignore[call-overload]
         reverse=True,
     )[:10]
 

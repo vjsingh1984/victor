@@ -3502,16 +3502,59 @@ class AgentOrchestrator(
         """Clean up resources and shutdown gracefully.
 
         Should be called when the orchestrator is no longer needed.
+        This method is idempotent - safe to call multiple times.
+
         Cleans up:
         - Background async tasks
         - Provider connections
         - Code execution manager (Docker containers)
         - Semantic selector resources
         - HTTP clients
+
+        Example:
+            orchestrator = factory.create_orchestrator()
+            try:
+                result = await orchestrator.chat("Hello")
+            finally:
+                await orchestrator.shutdown()
         """
         # Delegate to LifecycleManager for shutdown
         await self._lifecycle_manager.shutdown()
         logger.info("AgentOrchestrator shutdown complete")
+
+    async def cleanup(self) -> None:
+        """Alias for shutdown() - clean up resources.
+
+        This is an alias for shutdown() for better discoverability and
+        compatibility with common cleanup patterns.
+
+        Example:
+            orchestrator = factory.create_orchestrator()
+            try:
+                result = await orchestrator.chat("Hello")
+            finally:
+                await orchestrator.cleanup()  # Same as shutdown()
+        """
+        await self.shutdown()
+
+    async def __aenter__(self):
+        """Async context manager entry.
+
+        Example:
+            async with factory.create_orchestrator() as orchestrator:
+                result = await orchestrator.chat("Hello")
+            # Automatic cleanup on exit
+        """
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit - ensures cleanup.
+
+        Automatically calls shutdown() when exiting the context,
+        even if an exception occurred.
+        """
+        await self.shutdown()
+        return False  # Don't suppress exceptions
 
     # =========================================================================
     # Protocol Conformance Methods (OrchestratorProtocol)
@@ -3741,14 +3784,7 @@ class AgentOrchestrator(
         """
         self.reset_conversation()
 
-    async def __aenter__(self) -> "AgentOrchestrator":
-        """Async context manager entry."""
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Async context manager exit - ensures cleanup."""
-        await self.shutdown()
-
+    
     @classmethod
     def _from_components(cls, components: "OrchestratorComponents") -> "AgentOrchestrator":
         """Create orchestrator from pre-built components."""

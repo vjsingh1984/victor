@@ -309,6 +309,11 @@ class CompletionResponse(TypedDict):
     usage: Dict[str, int]
     finish_reason: NotRequired[Optional[str]]
     tool_calls: NotRequired[Optional[List[ToolCall]]]
+    # Additional fields for compatibility with different providers
+    role: NotRequired[str]
+    stop_reason: NotRequired[str]
+    raw_response: NotRequired[Any]
+    metadata: NotRequired[Any]
 
 
 # =============================================================================

@@ -658,7 +658,9 @@ class TestMemory:
 
         finally:
             await provider.close()
-            # Orchestrator doesn't have explicit cleanup, just let it go out of scope
+            # Cleanup orchestrator resources (idempotent - safe to call multiple times)
+            if 'orchestrator' in locals():
+                await orchestrator.cleanup()
 
     @pytest.mark.asyncio
     @pytest.mark.benchmark

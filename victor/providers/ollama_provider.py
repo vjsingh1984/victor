@@ -70,7 +70,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         if not candidates:
             if base_url is None:
                 # This should not be reachable since we already checked environment
-                candidates = ["http://localhost:11434"]
+                candidates = ["http://localhost:11434"]  # type: ignore[unreachable]
             elif isinstance(base_url, (list, tuple)):
                 candidates = [str(u).strip() for u in base_url if str(u).strip()]
             elif isinstance(base_url, str):
@@ -79,11 +79,11 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
                 else:
                     candidates = [base_url]
             else:
-                candidates = [str(base_url)]
+                candidates = [str(base_url)]  # type: ignore[unreachable]
 
         if not candidates:
             # This should be unreachable due to previous logic
-            candidates = ["http://localhost:11434"]
+            candidates = ["http://localhost:11434"]  # type: ignore[unreachable]
 
         # Pick first candidate (blindly)
         chosen_base = candidates[0]
@@ -306,7 +306,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
                 else:
                     candidates = [base_url]
             else:
-                candidates = [str(base_url)]
+                candidates = [str(base_url)]  # type: ignore[unreachable]
 
         for url in candidates:
             try:
@@ -421,7 +421,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from Ollama.
 
         Args:
@@ -740,6 +740,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
             usage=usage,
             model=model,
             raw_response=result,
+            metadata={},  # Add metadata parameter
         )
 
     def _parse_stream_chunk(self, chunk_data: Dict[str, Any]) -> StreamChunk:

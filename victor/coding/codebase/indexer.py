@@ -810,7 +810,7 @@ def _parse_file_worker(args: Tuple[str, str]) -> Optional[Dict[str, Any]]:
         return None
 
 
-class CodebaseFileHandler(FileSystemEventHandler):  # type: ignore[misc]
+class CodebaseFileHandler(FileSystemEventHandler):
     """File system event handler for tracking codebase changes.
 
     Tracks file modifications, creations, and deletions to mark
@@ -2798,7 +2798,7 @@ class CodebaseIndex:
             # Create embedding provider
             created_provider = EmbeddingRegistry.create(embedding_config)
             # Store as compatible type (they have the same interface)
-            self.embedding_provider = created_provider
+            self.embedding_provider = created_provider  # type: ignore[assignment]
             print(
                 f"✓ Embeddings enabled: {embedding_config.embedding_model} + "
                 f"{embedding_config.vector_store}"
