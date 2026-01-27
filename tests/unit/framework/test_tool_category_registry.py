@@ -71,14 +71,14 @@ class TestBuiltinCategories:
         registry = get_category_registry()
         tools = registry.get_tools("filesystem")
         assert "ls" in tools
-        assert "glob" in tools
+        assert "read" in tools  # glob was removed, use 'read' or 'write'
 
     def test_get_git_tools(self):
         """Should return built-in git tools."""
         registry = get_category_registry()
         tools = registry.get_tools("git")
         assert "git" in tools
-        assert "git_status" in tools
+        assert "pr" in tools  # git_status was removed, use 'pr' or 'commit_msg'
 
     def test_is_builtin_category(self):
         """Should identify built-in categories."""

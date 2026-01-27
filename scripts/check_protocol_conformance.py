@@ -73,6 +73,9 @@ class ComplianceReport:
     def add_violation(self, violation: Violation) -> None:
         """Add a violation to the report."""
         self.violations.append(violation)
+        # Auto-update is_compliant flag for ERROR violations
+        if violation.severity == Severity.ERROR:
+            self.is_compliant = False
 
     @property
     def error_count(self) -> int:

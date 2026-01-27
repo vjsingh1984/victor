@@ -19,12 +19,12 @@ from victor.protocols.capability import (
 class TestCapabilityContainerProtocol:
     """Test suite for CapabilityContainerProtocol definition and behavior."""
 
-    def test_protocol_is_runtime_checkable(self):
+    def test_protocol_is_runtime_checkable(self) -> None:
         """Protocol should be runtime_checkable for isinstance() checks."""
         # Verify protocol has runtime_checkable decorator
         assert hasattr(CapabilityContainerProtocol, "_is_protocol")
 
-    def test_protocol_defines_has_capability_method(self):
+    def test_protocol_defines_has_capability_method(self) -> None:
         """Protocol must define has_capability(capability_name: str) -> bool."""
         assert hasattr(CapabilityContainerProtocol, "has_capability")
 
@@ -35,7 +35,7 @@ class TestCapabilityContainerProtocol:
         assert "capability_name" in sig.parameters
         assert sig.return_annotation is bool
 
-    def test_protocol_defines_get_capability_method(self):
+    def test_protocol_defines_get_capability_method(self) -> None:
         """Protocol must define get_capability(name: str) -> Optional[Any]."""
         assert hasattr(CapabilityContainerProtocol, "get_capability")
 
@@ -46,7 +46,7 @@ class TestCapabilityContainerProtocol:
         assert "name" in sig.parameters
         assert sig.return_annotation == Optional[Any]
 
-    def test_isinstance_with_compliant_implementation(self):
+    def test_isinstance_with_compliant_implementation(self) -> None:
         """isinstance() should return True for compliant implementations."""
 
         # Create a compliant implementation (regular class, not Protocol)
@@ -67,7 +67,7 @@ class TestCapabilityContainerProtocol:
         assert impl.get_capability("test_capability") == {"name": "test_capability"}
         assert impl.get_capability("nonexistent") is None
 
-    def test_isinstance_with_non_compliant_implementation(self):
+    def test_isinstance_with_non_compliant_implementation(self) -> None:
         """isinstance() should return False for non-compliant implementations."""
 
         # Create a non-compliant implementation (missing methods)
@@ -81,7 +81,7 @@ class TestCapabilityContainerProtocol:
         impl = NonCompliantImpl()
         assert not isinstance(impl, CapabilityContainerProtocol)
 
-    def test_isinstance_with_partial_implementation(self):
+    def test_isinstance_with_partial_implementation(self) -> None:
         """isinstance() returns True for structural typing compatibility.
 
         Note: Python Protocol isinstance() checks are structural and don't
@@ -101,7 +101,7 @@ class TestCapabilityContainerProtocol:
         impl = StructuralImpl()
         assert isinstance(impl, CapabilityContainerProtocol)
 
-    def test_protocol_enforces_type_safety(self):
+    def test_protocol_enforces_type_safety(self) -> None:
         """Protocol should enforce type safety for method calls."""
 
         class TypedImpl:
@@ -132,7 +132,7 @@ class TestCapabilityContainerProtocol:
 class TestGetCapabilityRegistry:
     """Test suite for get_capability_registry() helper function."""
 
-    def test_returns_none_when_no_registry_set(self):
+    def test_returns_none_when_no_registry_set(self) -> None:
         """Should return None when no capability registry is configured."""
         # This test assumes no global registry is set by default
         result = get_capability_registry()
@@ -140,7 +140,7 @@ class TestGetCapabilityRegistry:
         # The key is that the function exists and is callable
         assert callable(get_capability_registry)
 
-    def test_function_exists_and_is_callable(self):
+    def test_function_exists_and_is_callable(self) -> None:
         """get_capability_registry() function should exist and be callable."""
         assert callable(get_capability_registry)
 
@@ -149,7 +149,7 @@ class TestGetCapabilityRegistry:
         # Result type is implementation-dependent
         # Could be None, a dict, or a registry object
 
-    def test_returns_capability_container_when_set(self):
+    def test_returns_capability_container_when_set(self) -> None:
         """Should return CapabilityContainerProtocol instance when configured."""
         # This is an integration test - tests actual functionality
         # Implementation will define the behavior
@@ -163,7 +163,7 @@ class TestGetCapabilityRegistry:
 class TestProtocolComplianceInRealCode:
     """Test protocol compliance with real-world scenarios."""
 
-    def test_capability_container_can_store_and_retrieve_capabilities(self):
+    def test_capability_container_can_store_and_retrieve_capabilities(self) -> None:
         """Protocol should support storing and retrieving capabilities."""
 
         class SimpleCapabilityContainer:
@@ -196,7 +196,7 @@ class TestProtocolComplianceInRealCode:
         nonexistent = container.get_capability("nonexistent")
         assert nonexistent is None
 
-    def test_multiple_independent_containers(self):
+    def test_multiple_independent_containers(self) -> None:
         """Multiple independent containers should coexist."""
 
         class ContainerA:
@@ -233,7 +233,7 @@ class TestProtocolComplianceInRealCode:
 class TestProtocolEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_protocol_with_none_capability(self):
+    def test_protocol_with_none_capability(self) -> None:
         """Protocol should handle None capability names gracefully."""
 
         class NoneHandlingContainer:
@@ -253,7 +253,7 @@ class TestProtocolEdgeCases:
         assert container.has_capability(None) is False  # type: ignore
         assert container.get_capability(None) is None  # type: ignore
 
-    def test_protocol_with_empty_string_capability(self):
+    def test_protocol_with_empty_string_capability(self) -> None:
         """Protocol should handle empty string capability names."""
 
         class EmptyStringContainer:
