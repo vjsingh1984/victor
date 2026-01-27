@@ -195,14 +195,17 @@ async def test_list_directory_success():
         # depth=1 returns immediate children with "name" key
         result = await ls(path=tmpdir, depth=1)
 
-        # Result is now a dict with cwd, target, items, count
-        assert "cwd" in result
-        assert "target" in result
-        assert "items" in result
-        assert "count" in result
-        assert result["count"] == 3
+        # Result is a list containing a dict with cwd, target, items, count
+        assert isinstance(result, list)
+        assert len(result) == 1
+        result_dict = result[0]
+        assert "cwd" in result_dict
+        assert "target" in result_dict
+        assert "items" in result_dict
+        assert "count" in result_dict
+        assert result_dict["count"] == 3
 
-        items = result["items"]
+        items = result_dict["items"]
         names = [item["name"] for item in items]
         assert "file1.txt" in names
         assert "file2.txt" in names
@@ -233,9 +236,12 @@ async def test_list_directory_default_depth():
         # Default depth=2 returns immediate children AND one level nested
         result = await ls(path=tmpdir)
 
-        # Result is now a dict with items
-        assert "items" in result
-        items = result["items"]
+        # Result is a list containing a dict with items
+        assert isinstance(result, list)
+        assert len(result) == 1
+        result_dict = result[0]
+        assert "items" in result_dict
+        items = result_dict["items"]
         # With depth=2: file1.txt, subdir, subdir/nested.txt
         assert len(items) == 3
         paths = [item.get("path", item.get("name")) for item in items]
@@ -262,9 +268,12 @@ async def test_list_directory_recursive():
 
         result = await ls(path=tmpdir, recursive=True)
 
-        # Result is now a dict with items
-        assert "items" in result
-        items = result["items"]
+        # Result is a list containing a dict with items
+        assert isinstance(result, list)
+        assert len(result) == 1
+        result_dict = result[0]
+        assert "items" in result_dict
+        items = result_dict["items"]
         assert len(items) == 3  # subdir, file1.txt, subdir/file2.txt
         paths = [item["path"] for item in items]
         assert "subdir" in paths
@@ -299,10 +308,13 @@ async def test_list_directory_empty():
     with tempfile.TemporaryDirectory() as tmpdir:
         result = await ls(path=tmpdir)
 
-        # Result is now a dict with items
-        assert "items" in result
-        assert result["items"] == []
-        assert result["count"] == 0
+        # Result is a list containing a dict with items
+        assert isinstance(result, list)
+        assert len(result) == 1
+        result_dict = result[0]
+        assert "items" in result_dict
+        assert result_dict["items"] == []
+        assert result_dict["count"] == 0
 
 
 @pytest.mark.asyncio
@@ -663,7 +675,7 @@ async def test_read_file_allows_text_with_no_magic():
         content = await read(path=f.name)
         # Content is now included in formatted output with headers and line numbers
         assert "This is plain text content" in content
-        assert "[Lines 1-1 of 1]" in content
+        assert "Showing lines 1-1 of 1" in content
 
         os.unlink(f.name)
 
