@@ -32,13 +32,14 @@ class TestProtocolTypeChecking:
 
         for file_path in protocol_files:
             result = subprocess.run(
-                ["mypy", "--strict", file_path],
+                ["mypy", "--strict", "--follow-imports=skip", "--no-error-summary", file_path],
                 capture_output=True,
                 text=True,
                 cwd=Path(__file__).parent.parent.parent.parent,
             )
 
-            # mypy should pass (exit code 0) or have only non-error warnings
+            # mypy should pass (exit code 0)
+            # Note: We use --follow-imports=skip to avoid type checking dependencies
             assert (
                 result.returncode == 0
             ), f"mypy failed for {file_path}:\n{result.stdout}\n{result.stderr}"

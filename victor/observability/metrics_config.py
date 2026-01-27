@@ -144,7 +144,7 @@ class FeatureMetrics:
         self.enabled.set(1 if enabled else 0)
 
         if enabled:
-            self.enable_count.inc()
+            self.enable_count.increment()
         else:
             self.disable_count.inc()
 
