@@ -24,17 +24,30 @@ def api_server_available():
     """Check if the API server is running.
 
     Skips load tests if the API server is not available at localhost:8000.
-    """
-    try:
-        # Try to connect to the API server with a short timeout
-        response = asyncio.run(httpx.AsyncClient(timeout=2.0).get("http://localhost:8000/health"))
-        if response.status_code == 200:
-            return True
-    except Exception:
-        pass
 
-    # Server not available, skip tests
-    pytest.skip("API server not running at localhost:8000. Start with: victor api server")
+    Note: This fixture uses a very short timeout to avoid hanging during
+    test collection when the server is not running.
+    """
+    import socket
+
+    # Quick socket check - much faster than HTTP request
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(0.5)  # 500ms timeout
+    try:
+        result = sock.connect_ex(('localhost', 8000))
+        sock.close()
+        if result != 0:
+            pytest.skip(
+                "API server not running at localhost:8000. "
+                "Start with: victor serve"
+            )
+        return True
+    except Exception:
+        sock.close()
+        pytest.skip(
+            "API server not running at localhost:8000. "
+            "Start with: victor serve"
+        )
 
 
 @pytest.fixture(scope="session")

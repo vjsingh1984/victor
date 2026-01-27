@@ -49,7 +49,7 @@ import pytest
 from victor.core.container import ServiceContainer
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
-from .framework import AsyncLoadTestFramework
+from .async_framework import AsyncLoadTestFramework
 
 
 # =============================================================================
