@@ -178,10 +178,10 @@ class ChatUser(HttpUser):
             }
 
         with self.client.post(
-            "/api/v1/chat",
+            "/chat",
             json=payload,
             catch_response=True,
-            name="/api/v1/chat",
+            name="/chat",
         ) as response:
             if response.status_code == 200:
                 try:
@@ -235,10 +235,10 @@ class ChatUser(HttpUser):
         }
 
         with self.client.post(
-            "/api/v1/chat",
+            "/chat",
             json=payload,
             catch_response=True,
-            name="/api/v1/chat (with tool)",
+            name="/chat (with tool)",
         ) as response:
             if response.status_code == 200:
                 self.conversation_history.append(

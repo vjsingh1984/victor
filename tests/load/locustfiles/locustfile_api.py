@@ -82,10 +82,10 @@ class APIUser(HttpUser):
         }
 
         with self.client.post(
-            "/api/v1/chat",
+            "/chat",
             json=payload,
             catch_response=True,
-            name="/api/v1/chat",
+            name="/chat",
         ) as response:
             if response.status_code == 200:
                 response.success()
@@ -132,10 +132,10 @@ class APIUser(HttpUser):
         }
 
         with self.client.post(
-            "/api/v1/chat/stream",
+            "/chat/stream",
             json=payload,
             catch_response=True,
-            name="/api/v1/chat/stream",
+            name="/chat/stream",
             timeout=30.0,
         ) as response:
             if response.status_code == 200:

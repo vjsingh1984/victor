@@ -75,10 +75,10 @@ class ToolUser(HttpUser):
         }
 
         with self.client.post(
-            "/api/v1/chat",
+            "/chat",
             json=payload,
             catch_response=True,
-            name="/api/v1/chat (file operation)",
+            name="/chat (file operation)",
         ) as response:
             if response.status_code == 200:
                 response.success()
@@ -112,10 +112,10 @@ class ToolUser(HttpUser):
         }
 
         with self.client.post(
-            "/api/v1/chat",
+            "/chat",
             json=payload,
             catch_response=True,
-            name="/api/v1/chat (search)",
+            name="/chat (search)",
         ) as response:
             if response.status_code == 200:
                 response.success()
@@ -148,10 +148,10 @@ class ToolUser(HttpUser):
         }
 
         with self.client.post(
-            "/api/v1/chat",
+            "/chat",
             json=payload,
             catch_response=True,
-            name="/api/v1/chat (git operation)",
+            name="/chat (git operation)",
         ) as response:
             if response.status_code == 200:
                 response.success()
@@ -183,10 +183,10 @@ class ToolUser(HttpUser):
         }
 
         with self.client.post(
-            "/api/v1/chat",
+            "/chat",
             json=payload,
             catch_response=True,
-            name="/api/v1/chat (execution)",
+            name="/chat (execution)",
             timeout=60.0,  # Execution operations take longer
         ) as response:
             if response.status_code == 200:
@@ -224,10 +224,10 @@ class ToolUser(HttpUser):
         }
 
         with self.client.post(
-            "/api/v1/chat",
+            "/chat",
             json=payload,
             catch_response=True,
-            name="/api/v1/chat (analysis)",
+            name="/chat (analysis)",
             timeout=45.0,
         ) as response:
             if response.status_code == 200:
@@ -260,10 +260,10 @@ class ToolUser(HttpUser):
         }
 
         with self.client.post(
-            "/api/v1/chat",
+            "/chat",
             json=payload,
             catch_response=True,
-            name="/api/v1/chat (workflow)",
+            name="/chat (workflow)",
             timeout=90.0,  # Workflows take longest
         ) as response:
             if response.status_code == 200:
@@ -314,10 +314,10 @@ class MixedWorkflowUser(ToolUser):
         }
 
         with self.client.post(
-            "/api/v1/chat",
+            "/chat",
             json=payload,
             catch_response=True,
-            name="/api/v1/chat (complex workflow)",
+            name="/chat (complex workflow)",
             timeout=120.0,  # Complex workflows take very long
         ) as response:
             if response.status_code == 200:
