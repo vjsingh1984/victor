@@ -48,8 +48,10 @@ from contextlib import asynccontextmanager, contextmanager
 # Import from parent conftest for Ollama availability checking
 import sys
 from pathlib import Path as PathLib
-sys.path.insert(0, str(PathLib(__file__).parent.parent))
-from conftest import requires_ollama
+# Add tests directory to path to import from root conftest
+sys.path.insert(0, str(PathLib(__file__).parent.parent.parent))
+# Use absolute import to avoid conftest confusion
+from tests.conftest import requires_ollama
 
 
 # ============================================================================
