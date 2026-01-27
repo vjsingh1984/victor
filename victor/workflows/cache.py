@@ -179,8 +179,8 @@ class DependencyGraph:
 
         # Handle both dict and list formats for flexibility
         nodes = workflow.nodes
-        if isinstance(nodes, list):
-            nodes_list = nodes
+        if isinstance(nodes, list):  # type: ignore[unreachable]
+            nodes_list = nodes  # type: ignore[unreachable]
         else:
             nodes_list = nodes.values()
 
@@ -264,20 +264,20 @@ class CascadingInvalidator:
                     cache = cast(Optional["WorkflowCache"], cache_or_graph)
                 else:
                     # cache_or_graph is DependencyGraph, graph is something else (cache)
-                    cache = cast(Optional["WorkflowCache"], graph)
+                    cache = cast(Optional["WorkflowCache"], graph)  # type: ignore[unreachable]
         elif isinstance(graph, DependencyGraph):
             # This branch should be unreachable because if cache_or_graph was not DependencyGraph,
             # but graph is, then we would have been caught above
-            dep_graph = graph  # type: ignore[misc]
+            dep_graph = graph
             cache = cast(Optional["WorkflowCache"], cache_or_graph)
-        elif cache_or_graph is None and isinstance(graph, DependencyGraph):
+        elif cache_or_graph is None and isinstance(graph, DependencyGraph):  # type: ignore[unreachable]
             # This branch should be unreachable for similar reasons
-            dep_graph = graph  # type: ignore[misc]
+            dep_graph = graph  # type: ignore[unreachable]  # type: ignore[unreachable]  # type: ignore[unreachable]
         else:
             # This should be unreachable due to previous logic
             raise TypeError("CascadingInvalidator requires a DependencyGraph and optional cache")
 
-        if dep_graph is None:
+        if dep_graph is None:  # type: ignore[unreachable]
             # This should be unreachable due to previous logic
             dep_graph = DependencyGraph()  # type: ignore[misc]
 

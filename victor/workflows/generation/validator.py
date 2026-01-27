@@ -1243,19 +1243,7 @@ class WorkflowValidator:
         elif isinstance(workflow, dict):
             workflow_dict = workflow
         else:
-            return WorkflowGenerationValidationResult(
-                is_valid=False,
-                schema_errors=[
-                    WorkflowValidationError(
-                        category=ErrorCategory.SCHEMA,
-                        severity=ErrorSeverity.CRITICAL,
-                        message="Workflow must be a dict or have to_dict() method",
-                        location="workflow",
-                        suggestion="Provide workflow as dictionary",
-                    )
-                ],
-                workflow_name=workflow_name,
-            )
+            raise ValueError("Workflow must be a dict or have to_dict() method")
 
         # Run all 4 validation layers
         schema_errors = self.schema_validator.validate(workflow_dict)

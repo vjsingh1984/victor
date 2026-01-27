@@ -549,8 +549,6 @@ class RestartPolicyEnforcer:
             # Restart only if exit code indicates failure
             return exit_code is None or exit_code != 0
 
-        return False
-
     async def restart_service(
         self,
         service_name: str,

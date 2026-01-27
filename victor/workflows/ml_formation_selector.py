@@ -1141,9 +1141,9 @@ class AdaptiveFormationML:
 
         # Predict formation
         if self.model is not None:
-            try:
+            try:  # type: ignore[unreachable]
                 # Scale features
-                X_scaled = self.scaler.transform([feature_vector])  # type: ignore[unreachable]
+                X_scaled = self.scaler.transform([feature_vector])
 
                 # Get prediction and probabilities
                 import time
@@ -1289,9 +1289,9 @@ class AdaptiveFormationML:
             logger.warning("Cannot update model: no model loaded")
             return
 
-        try:
+        try:  # type: ignore[unreachable]
             # Update model
-            self._trainer.update_model(self._execution_buffer)  # type: ignore[unreachable]
+            self._trainer.update_model(self._execution_buffer)
 
             logger.info(f"Model updated with {len(self._execution_buffer)} new examples")
 
@@ -1307,7 +1307,7 @@ class AdaptiveFormationML:
         Returns:
             Dictionary mapping feature names to importance scores
         """
-        if self.model is None or not hasattr(self.model, "feature_importances_"):
+        if self.model is None or not hasattr(self.model, "feature_importances_"):  # type: ignore[unreachable]
             return {}
 
         feature_names = [  # type: ignore[unreachable]
