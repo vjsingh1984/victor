@@ -22,11 +22,27 @@ from unittest.mock import MagicMock
 import pytest
 
 
+class MockVerticalContext:
+    """Mock vertical context for testing."""
+
+    def __init__(self):
+        self._configs: Dict[str, Any] = {}
+
+    def set_capability_config(self, name: str, config: Dict[str, Any]) -> None:
+        """Set capability configuration."""
+        self._configs[name] = config
+
+    def get_capability_config(self, name: str, default: Any = None) -> Any:
+        """Get capability configuration."""
+        return self._configs.get(name, default)
+
+
 class MockOrchestrator:
     """Mock orchestrator for testing RAG capabilities."""
 
     def __init__(self):
         self.rag_config: Dict[str, Any] = {}
+        self.vertical_context = MockVerticalContext()
 
 
 class TestIndexingCapability:
@@ -413,6 +429,7 @@ class TestCapabilityConvenienceFunctions:
 
         capabilities = get_rag_capabilities()
         assert len(capabilities) > 0
+        # Capabilities are registered with rag_ prefix
         assert all(cap.capability.name.startswith("rag_") for cap in capabilities)
 
     def test_create_rag_capability_loader(self):
@@ -450,6 +467,7 @@ class TestCapabilityListGeneration:
         from victor.rag.capabilities import CAPABILITIES
 
         capability_names = {cap.capability.name for cap in CAPABILITIES}
+        # Provider generates capabilities with "rag_" prefix
         expected_names = {
             "rag_indexing",
             "rag_retrieval",

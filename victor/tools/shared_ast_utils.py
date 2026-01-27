@@ -294,7 +294,7 @@ def calculate_complexity(node: ast.AST) -> int:
             # Ternary expressions
             complexity += 1
 
-    return complexity
+    return visitor.complexity  # type: ignore[name-defined]
 
 
 def calculate_maintainability_index(code: str) -> float:
@@ -430,7 +430,7 @@ def calculate_cognitive_complexity(node: ast.AST) -> int:
     visitor = CognitiveVisitor()
     visitor.visit(node)
 
-    return complexity
+    return visitor.complexity  # type: ignore[name-defined]
 
 
 # =============================================================================
@@ -662,7 +662,7 @@ def _get_attribute_name(node: ast.Attribute) -> str:
     while isinstance(current, ast.Attribute):
         parts.append(current.attr)
         current = current.value  # type: ignore[assignment]
-    if isinstance(current, ast.Name):
+    if isinstance(current, ast.Name):  # type: ignore[unreachable]
         parts.append(current.id)
     return ".".join(reversed(parts))
 

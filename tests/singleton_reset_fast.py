@@ -15,8 +15,8 @@
 """Optimized singleton reset for faster test execution.
 
 This module provides a faster alternative to tests/singleton_reset.py by:
-1. Only resetting critical singletons (48 → 4 resets)
-2. Skipping expensive resets (observability, storage, processing)
+1. Only resetting critical singletons (48 → 7 resets)
+2. Skipping expensive resets (storage, processing)
 3. Using lazy evaluation (only import if needed)
 
 Performance: ~0.01s per reset vs 0.8s for full reset
@@ -26,6 +26,9 @@ Critical Singletons Reset:
 2. Mode Config (ModeConfigRegistry) - Affects agent behavior
 3. Vertical Config Cache (VerticalBase._config_cache) - Prevents pollution
 4. Handler Registry (HandlerRegistry) - Prevents "already registered" errors
+5. Escape Hatch Registry (EscapeHatchRegistry) - Prevents condition pollution
+6. Discovery Cache (VerticalBase discovery) - Prevents discovery pollution
+7. Event Bus (ObservabilityBus) - Prevents event loop issues between tests
 
 Usage:
     # In conftest.py, for faster tests:
@@ -50,9 +53,9 @@ class FastSingletonResetRegistry:
     """Optimized registry for fast test execution.
 
     Strategies:
-    - Only 3 critical singletons (down from 48)
+    - Only 7 critical singletons (down from 48)
     - Lazy imports (only import what's needed)
-    - Skip expensive resets (observability, storage)
+    - Skip expensive resets (storage, processing)
     """
 
     def __init__(self) -> None:
@@ -90,13 +93,14 @@ class FastSingletonResetRegistry:
         - Are quick to reset (< 10ms each)
         """
 
-        # 6 critical singletons that cause test pollution:
+        # 7 critical singletons that cause test pollution:
         # 1. DI Container - CRITICAL (holds service instances)
         # 2. Mode Config - CRITICAL (affects agent behavior)
         # 3. Vertical Config Cache - CRITICAL (fast, prevents pollution)
         # 4. Handler Registry - CRITICAL (handlers persist causing "already registered" errors)
         # 5. Escape Hatch Registry - CRITICAL (conditions persist causing "already registered" errors)
         # 6. Discovery Cache - CRITICAL (vertical discovery state persists)
+        # 7. Event Bus - CRITICAL (event loop issues cause test failures)
 
         # DI Container - CRITICAL
         def _reset_container():
@@ -169,6 +173,21 @@ class FastSingletonResetRegistry:
                 pass
 
         self.register(_reset_discovery_cache)
+
+        # Event Bus - CRITICAL (prevents event loop issues between tests)
+        def _reset_event_bus():
+            try:
+                from victor.core.events import ObservabilityBus
+
+                if hasattr(ObservabilityBus, "_instance"):
+                    instance = ObservabilityBus._instance
+                    if instance is not None:
+                        # Clean up any running tasks
+                        ObservabilityBus._instance = None
+            except (ImportError, AttributeError):
+                pass
+
+        self.register(_reset_event_bus)
 
 
 _global_fast_registry: Optional[FastSingletonResetRegistry] = None

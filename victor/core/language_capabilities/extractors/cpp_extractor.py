@@ -86,7 +86,7 @@ class CppExtractor(BaseLanguageProcessor):
         if not LIBCLANG_AVAILABLE:
             return
 
-        try:
+        try:  # type: ignore[unreachable]
             self._index = cindex.Index.create()
 
             # Define symbol kinds mapping
@@ -140,7 +140,7 @@ class CppExtractor(BaseLanguageProcessor):
             # Fallback to tree-sitter
             return self._ts_extractor.extract(code, file_path, language)
 
-        try:
+        try:  # type: ignore[unreachable]
             return self._extract_with_libclang(code, file_path, language)
         except Exception as e:
             logger.warning(f"libclang extraction failed for {file_path}: {e}")
@@ -171,7 +171,7 @@ class CppExtractor(BaseLanguageProcessor):
         if self._index is None:
             return symbols
 
-        try:
+        try:  # type: ignore[unreachable]
             # Parse options
             args = ["-x", "c++" if language == "cpp" else "c"]
 
@@ -251,7 +251,7 @@ class CppExtractor(BaseLanguageProcessor):
         if self._index is None:
             return False
 
-        try:
+        try:  # type: ignore[unreachable]
             args = ["-x", "c++" if language == "cpp" else "c"]
 
             tu = self._index.parse(
@@ -293,7 +293,7 @@ class CppExtractor(BaseLanguageProcessor):
 
         diagnostics = []
 
-        try:
+        try:  # type: ignore[unreachable]
             args = ["-x", "c++" if language == "cpp" else "c"]
 
             tu = self._index.parse(

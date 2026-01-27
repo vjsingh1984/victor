@@ -152,7 +152,7 @@ class LazyInitializer:
 
         with self._init_lock:
             if self._initialized:
-                return self._result
+                return self._result  # type: ignore[unreachable]
 
             # Check for recursive initialization
             if self._initializing:
@@ -207,7 +207,7 @@ class LazyInitializer:
         with self._init_lock:
             # Double-check: another thread may have initialized
             if self._initialized:
-                return self._result
+                return self._result  # type: ignore[unreachable]
 
             # Check for recursive initialization
             if self._initializing:

@@ -698,8 +698,8 @@ class SemanticMatchValidator(AgenticValidator):
                 actual_texts.append(self._normalize_code(trace.generated_patch))
 
             # 2. Compare expected code vs generated code
-            if task.expected_output and trace.generated_code:
-                expected_texts.append(self._normalize_code(task.expected_output))
+            if task.solution and trace.generated_code:
+                expected_texts.append(self._normalize_code(task.solution))
                 actual_texts.append(self._normalize_code(trace.generated_code))
 
             # 3. Compare task description vs completion messages
@@ -1183,8 +1183,9 @@ class AgenticBenchmarkRunner:
             if isinstance(item, Exception):
                 logger.error(f"Task failed with exception: {item}")
                 continue
-            index, result = item
-            results_by_index[index] = result
+            elif isinstance(item, tuple):
+                index, result = item
+                results_by_index[index] = result
 
         # Append results in order
         for i in range(len(tasks)):

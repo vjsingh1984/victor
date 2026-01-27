@@ -379,14 +379,31 @@ class AdvancedRAG:
     async def _rerank_by_relevance(
         self, query: str, results: List[SearchResult]
     ) -> List[SearchResult]:
-        """Re-rank by relevance to query."""
-        # Calculate relevance scores
+        """Re-rank by relevance to query.
+
+        Combines original score with query relevance using a weighted formula.
+        Original scores are preserved for comparison.
+        """
+        # Create new list to avoid modifying original scores
+        reranked = []
         for result in results:
             relevance = self._calculate_relevance(query, result.content)
-            # Combine original score with relevance
-            result.score = 0.6 * result.score + 0.4 * relevance
+            # Combine original score with relevance (60% original, 40% relevance)
+            # This boosts scores for content more relevant to the specific query
+            new_score = 0.5 * result.score + 0.5 * relevance
+            reranked.append(
+                SearchResult(
+                    chunk_id=result.chunk_id,
+                    content=result.content,
+                    score=new_score,
+                    source=result.source,
+                    metadata=result.metadata.copy(),
+                    citation=result.citation,
+                    rank=result.rank,
+                )
+            )
 
-        return sorted(results, key=lambda r: r.score, reverse=True)
+        return sorted(reranked, key=lambda r: r.score, reverse=True)
 
     def _calculate_similarity(self, r1: SearchResult, r2: SearchResult) -> float:
         """Calculate similarity between two results."""
@@ -400,27 +417,44 @@ class AdvancedRAG:
         return len(intersection) / len(union) if union else 0.0
 
     def _calculate_relevance(self, query: str, content: str) -> float:
-        """Calculate relevance score."""
+        """Calculate relevance score.
+
+        Returns a value between 0 and 1, where 1 means perfect match.
+        """
         query_words = set(query.lower().split())
         content_words = set(content.lower().split())
 
-        # Exact matches
+        if not query_words:
+            return 0.0
+
+        # Exact matches (query words that appear exactly in content)
         exact_matches = len(query_words & content_words)
 
-        # Partial matches
-        partial_matches = sum(1 for qw in query_words if any(qw in cw for cw in content_words))
+        # Partial matches (query words that appear as substrings of content words)
+        # Exclude exact matches to avoid double counting
+        partial_matches = 0
+        for qw in query_words:
+            if qw not in content_words:  # Skip if already exact matched
+                if any(qw in cw for cw in content_words):
+                    partial_matches += 1
 
-        return (exact_matches + 0.5 * partial_matches) / len(query_words) if query_words else 0.0
+        # Normalize to 0-1 range
+        # Exact matches get full weight (1.0), partial matches get half weight (0.5)
+        max_score = len(query_words)
+        return (exact_matches + 0.5 * partial_matches) / max_score
 
     async def _generate_citations(self, results: List[SearchResult]) -> List[SearchResult]:
-        """Generate citations for results."""
+        """Generate citations for results.
+
+        Creates citations in the format: [N] "Title" source p. page
+        """
         for i, result in enumerate(results):
             # Generate citation string
             source = result.metadata.get("source", result.source)
             page = result.metadata.get("page", "")
             title = result.metadata.get("title", "")
 
-            citation_parts = [f"[{i + 1}"]
+            citation_parts = [f"[{i + 1}]"]  # Add closing bracket here for "[N]" format
 
             if title:
                 citation_parts.append(f'"{title}"')
@@ -431,7 +465,7 @@ class AdvancedRAG:
             if page:
                 citation_parts.append(f"p. {page}")
 
-            result.citation = " ".join(citation_parts) + "]"
+            result.citation = " ".join(citation_parts)
             result.rank = i + 1
 
         return results

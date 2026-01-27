@@ -22,6 +22,7 @@ import logging
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import List
 
 import yaml
 
@@ -481,7 +482,7 @@ class CoberturaAnalyzer(CoverageAnalyzerProtocol):
             "**/cobertura-coverage.xml",
             "coverage-reports/*.xml",
         ]
-        reports = []
+        reports: List[Path] = []
         for pattern in patterns:
             reports.extend(root_path.glob(pattern))
         return reports
@@ -560,7 +561,7 @@ class LCOVAnalyzer(CoverageAnalyzerProtocol):
             "**/lcov.info",
             "coverage/lcov.info",
         ]
-        reports = []
+        reports: List[Path] = []
         for pattern in patterns:
             reports.extend(root_path.glob(pattern))
         return reports
@@ -655,7 +656,7 @@ class JaCoCoAnalyzer(CoverageAnalyzerProtocol):
             "target/site/jacoco/jacoco.xml",
             "build/reports/jacoco/test/jacocoTestReport.xml",
         ]
-        reports = []
+        reports: List[Path] = []
         for pattern in patterns:
             reports.extend(root_path.glob(pattern))
         return reports

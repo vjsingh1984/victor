@@ -544,7 +544,7 @@ class TestRAGIngestTool:
             mock_store.add_document = AsyncMock(return_value=[])
             mock_store_getter.return_value = mock_store
 
-            result = await ingest_tool.execute(content="Test content", doc_type="text")
+            result = await ingest_tool.execute({}, content="Test content", doc_type="text")
 
             assert result.success
             assert "Successfully ingested" in result.output
@@ -561,7 +561,7 @@ class TestRAGIngestTool:
             mock_store.add_document = AsyncMock(return_value=[])
             mock_store_getter.return_value = mock_store
 
-            result = await ingest_tool.execute(path=str(test_file))
+            result = await ingest_tool.execute({}, path=str(test_file))
 
             assert result.success
             assert "Successfully ingested" in result.output
@@ -577,7 +577,7 @@ class TestRAGIngestTool:
             mock_store.add_document = AsyncMock(return_value=[])
             mock_store_getter.return_value = mock_store
 
-            result = await ingest_tool.execute(path=str(test_file))
+            result = await ingest_tool.execute({}, path=str(test_file))
 
             assert result.success
             assert "doc_type" in result.output.lower() or "markdown" in result.output.lower()
@@ -594,7 +594,7 @@ class TestRAGIngestTool:
             mock_store.add_document = AsyncMock(return_value=[])
             mock_store_getter.return_value = mock_store
 
-            result = await ingest_tool.execute(path=str(temp_dir), recursive=True)
+            result = await ingest_tool.execute({}, path=str(temp_dir), recursive=True)
 
             assert result.success
             assert "Directory ingestion complete" in result.output
@@ -612,7 +612,7 @@ class TestRAGIngestTool:
             mock_store.add_document = AsyncMock(return_value=[])
             mock_store_getter.return_value = mock_store
 
-            result = await ingest_tool.execute(path=str(test_file), metadata=metadata)
+            result = await ingest_tool.execute({}, path=str(test_file), metadata=metadata)
 
             assert result.success
             # Check that metadata is passed to document creation
@@ -631,7 +631,7 @@ class TestRAGIngestTool:
             mock_store.add_document = AsyncMock(return_value=[])
             mock_store_getter.return_value = mock_store
 
-            result = await ingest_tool.execute(path=str(test_file), doc_id="custom_id_123")
+            result = await ingest_tool.execute({}, path=str(test_file), doc_id="custom_id_123")
 
             assert result.success
             assert "custom_id_123" in result.output
@@ -639,7 +639,7 @@ class TestRAGIngestTool:
     @pytest.mark.asyncio
     async def test_ingest_nonexistent_file(self, ingest_tool):
         """Test ingesting a non-existent file."""
-        result = await ingest_tool.execute(path="/nonexistent/file.txt")
+        result = await ingest_tool.execute({}, path="/nonexistent/file.txt")
 
         assert not result.success
         assert "not found" in result.output.lower()
@@ -647,7 +647,7 @@ class TestRAGIngestTool:
     @pytest.mark.asyncio
     async def test_ingest_no_input(self, ingest_tool):
         """Test ingest without any input."""
-        result = await ingest_tool.execute()
+        result = await ingest_tool.execute({})
 
         assert not result.success
         assert "Either 'path', 'url', or 'content' must be provided" in result.output
@@ -912,9 +912,9 @@ class TestDocumentStorage:
     @pytest.mark.asyncio
     async def test_add_document_to_store(self, temp_dir, mock_embedding_fn):
         """Test adding a document to the store."""
-        from victor.rag.document_store import DocumentStore
+        from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(path=temp_dir / "test_store")
+        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
         await store.initialize()
 
         doc = Document(id="store1", content="Test content for store", source="test.txt")
@@ -927,9 +927,9 @@ class TestDocumentStorage:
     @pytest.mark.asyncio
     async def test_get_document_from_store(self, temp_dir, mock_embedding_fn):
         """Test retrieving a document from the store."""
-        from victor.rag.document_store import DocumentStore
+        from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(path=temp_dir / "test_store")
+        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
         await store.initialize()
 
         doc = Document(id="get1", content="Content for retrieval", source="test.txt")
@@ -944,9 +944,9 @@ class TestDocumentStorage:
     @pytest.mark.asyncio
     async def test_delete_document_from_store(self, temp_dir, mock_embedding_fn):
         """Test deleting a document from the store."""
-        from victor.rag.document_store import DocumentStore
+        from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(path=temp_dir / "test_store")
+        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
         await store.initialize()
 
         doc = Document(id="del1", content="Content to delete", source="test.txt")
@@ -964,9 +964,9 @@ class TestDocumentStorage:
     @pytest.mark.asyncio
     async def test_list_documents_in_store(self, temp_dir, mock_embedding_fn):
         """Test listing all documents in the store."""
-        from victor.rag.document_store import DocumentStore
+        from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(path=temp_dir / "test_store")
+        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
         await store.initialize()
 
         # Add multiple documents
@@ -982,9 +982,9 @@ class TestDocumentStorage:
     @pytest.mark.asyncio
     async def test_document_store_stats(self, temp_dir, mock_embedding_fn):
         """Test getting store statistics."""
-        from victor.rag.document_store import DocumentStore
+        from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(path=temp_dir / "test_store")
+        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
         await store.initialize()
 
         doc = Document(id="stats1", content="Content for stats", source="test.txt")
@@ -1000,9 +1000,9 @@ class TestDocumentStorage:
     @pytest.mark.asyncio
     async def test_document_search_in_store(self, temp_dir, mock_embedding_fn):
         """Test searching documents in the store."""
-        from victor.rag.document_store import DocumentStore
+        from victor.rag.document_store import DocumentStore, DocumentStoreConfig
 
-        store = DocumentStore(path=temp_dir / "test_store")
+        store = DocumentStore(config=DocumentStoreConfig(path=temp_dir / "test_store"))
         await store.initialize()
 
         doc = Document(

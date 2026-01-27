@@ -44,15 +44,39 @@ def mock_lancedb():
     """Mock LanceDB client and table."""
     # Check if lancedb is available, skip tests if not
     import importlib.util
+    from pathlib import Path
 
     if importlib.util.find_spec("lancedb") is None:
         pytest.skip("lancedb not installed")
 
-    with patch("lancedb.connect") as mock_connect:
+    # Mock Path.exists and Path.is_dir before importing
+    original_exists = Path.exists
+    original_is_dir = Path.is_dir
+
+    def mock_exists(self):
+        # Return True for test database paths
+        path_str = str(self)
+        if "test_lancedb" in path_str or "embeddings" in path_str:
+            return True
+        return original_exists(self)
+
+    def mock_is_dir(self):
+        # Return True for database directories
+        path_str = str(self)
+        if "test_lancedb" in path_str or "embeddings" in path_str:
+            return True
+        return original_is_dir(self)
+
+    with patch.object(Path, "exists", mock_exists), \
+         patch.object(Path, "is_dir", mock_is_dir), \
+         patch("victor.storage.vector_stores.lancedb_provider.lancedb.connect") as mock_connect:
+
         mock_db = MagicMock()
         mock_table = MagicMock()
         mock_table.count_rows.return_value = 0
         mock_table.to_pandas.return_value.__len__ = lambda x: 0  # Empty dataframe
+        # Mock search to return empty results by default
+        mock_table.search.return_value.to_pandas.return_value = []
 
         # Mock list_tables() API (new)
         mock_list_response = MagicMock()
@@ -65,6 +89,7 @@ def mock_lancedb():
         mock_db.open_table.return_value = mock_table
         mock_db.create_table.return_value = mock_table
         mock_connect.return_value = mock_db
+
         yield mock_connect, mock_db, mock_table, mock_list_response
 
 
@@ -91,7 +116,7 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_initialize_persistent(self, lancedb_config, mock_lancedb):
         """Test initialization with persistent storage."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -122,7 +147,7 @@ class TestLanceDBProvider:
             extra_config={"dimension": 3584},
         )
 
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -142,7 +167,7 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_embed_text(self, lancedb_config, mock_lancedb):
         """Test single text embedding."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -164,7 +189,7 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_embed_batch(self, lancedb_config, mock_lancedb):
         """Test batch embedding."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -188,7 +213,7 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_index_document_create_table(self, lancedb_config, mock_lancedb):
         """Test indexing single document when table doesn't exist."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -219,10 +244,10 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_index_document_add_to_existing(self, lancedb_config, mock_lancedb):
         """Test indexing document when table exists."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
         # Set up mock to indicate table exists
         mock_db.table_names.return_value = ["test_table"]
-        mock_db.list_tables().tables = ["test_table"]
+        mock_list_response.tables = ["test_table"]
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -252,7 +277,7 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_index_documents(self, lancedb_config, mock_lancedb):
         """Test batch indexing documents."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -282,10 +307,10 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_search_similar(self, lancedb_config, mock_lancedb):
         """Test semantic similarity search."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
         # Set up mock to indicate table exists
         mock_db.table_names.return_value = ["test_table"]
-        mock_db.list_tables().tables = ["test_table"]
+        mock_list_response.tables = ["test_table"]
 
         # Mock search results
         mock_search = MagicMock()
@@ -309,8 +334,8 @@ class TestLanceDBProvider:
 
         mock_search_result.to_list.return_value = [result1, result2]
         mock_search_result.where.return_value = mock_search_result
-        mock_search.limit.return_value = mock_search_result
-        mock_table.search.return_value = mock_search
+        mock_search_result.limit.return_value = mock_search_result
+        mock_table.search.return_value = mock_search_result
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -335,7 +360,7 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_search_similar_no_table(self, lancedb_config, mock_lancedb):
         """Test search when table doesn't exist."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -355,10 +380,10 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_delete_document(self, lancedb_config, mock_lancedb):
         """Test deleting document."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
         # Set up mock to indicate table exists
         mock_db.table_names.return_value = ["test_table"]
-        mock_db.list_tables().tables = ["test_table"]
+        mock_list_response.tables = ["test_table"]
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -378,7 +403,7 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_delete_document_no_table(self, lancedb_config, mock_lancedb):
         """Test delete when table doesn't exist."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -397,7 +422,7 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_clear_index(self, lancedb_config, mock_lancedb):
         """Test clearing entire index."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
         mock_db.list_tables.return_value.tables = ["test_table"]
 
         with patch(
@@ -420,10 +445,10 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_get_stats(self, lancedb_config, mock_lancedb):
         """Test getting index statistics."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
         # Set up mock to indicate table exists
         mock_db.table_names.return_value = ["test_table"]
-        mock_db.list_tables().tables = ["test_table"]
+        mock_list_response.tables = ["test_table"]
         mock_table.count_rows.return_value = 42
 
         with patch(
@@ -449,7 +474,7 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_get_stats_no_table(self, lancedb_config, mock_lancedb):
         """Test stats when table doesn't exist."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
@@ -469,7 +494,7 @@ class TestLanceDBProvider:
     @pytest.mark.asyncio
     async def test_close(self, lancedb_config, mock_lancedb):
         """Test cleanup."""
-        mock_connect, mock_db, mock_table = mock_lancedb
+        mock_connect, mock_db, mock_table, mock_list_response = mock_lancedb
 
         with patch(
             "victor.storage.vector_stores.lancedb_provider.create_embedding_model"
