@@ -351,7 +351,7 @@ def validate(
         with open(variant_file, "r") as f:
             variant_data = json.load(f)
 
-        from victor.optimization.generator import WorkflowVariant
+        from victor.optimization.generator import WorkflowVariant  # type: ignore[import-not-found]
 
         variant = WorkflowVariant(
             variant_id=variant_data["variant_id"],

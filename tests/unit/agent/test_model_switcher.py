@@ -134,8 +134,10 @@ class TestModelSwitcher:
         history = switcher.get_switch_history()
 
         assert len(history) == 1
-        assert history[0]["from"] == "openai:gpt-4"
-        assert history[0]["to"] == "anthropic:claude-3"
+        assert history[0]["from_provider"] == "openai"
+        assert history[0]["from_model"] == "gpt-4"
+        assert history[0]["to_provider"] == "anthropic"
+        assert history[0]["to_model"] == "claude-3"
 
     def test_switch_with_reason(self, switcher):
         """Test switching with different reasons."""
@@ -143,7 +145,8 @@ class TestModelSwitcher:
         switcher.switch("ollama", "llama3", reason=SwitchReason.COST)
 
         history = switcher.get_switch_history()
-        assert history[0]["reason"] == "cost"
+        # reason is now a SwitchReason enum
+        assert history[0]["reason"] == SwitchReason.COST
 
     def test_switch_by_id(self, switcher):
         """Test switching by full ID."""
@@ -266,7 +269,7 @@ class TestFallbackChain:
 
         # Check reason is FALLBACK
         history = switcher.get_switch_history()
-        assert history[-1]["reason"] == "fallback"
+        assert history[-1]["reason"] == SwitchReason.FALLBACK
 
 
 class TestCallbacks:

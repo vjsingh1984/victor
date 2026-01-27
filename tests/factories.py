@@ -1137,7 +1137,6 @@ class TestFixtureFactory:
         Returns:
             Mock tool registry
         """
-        from victor.tools.base import Tool
         from victor.tools.registry import ToolRegistry
 
         # Create real registry
@@ -1153,7 +1152,6 @@ class TestFixtureFactory:
         registry._real_registry = real_registry
 
         # Delegate methods to real registry
-        registry.get_all_tools = Mock(return_value=real_registry.get_all_tools())
         registry.get_tool = lambda name: real_registry.get_tool(name)
         registry.has_tool = lambda name: real_registry.has_tool(name)
         registry.list_tools = Mock(return_value=real_registry.list_tools())

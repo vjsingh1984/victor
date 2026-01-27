@@ -58,7 +58,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 try:
-    import lancedb
+    import lancedb  # type: ignore[import-not-found]
     import pyarrow as pa  # noqa: F401 - Required by LanceDB
 
     LANCEDB_AVAILABLE = True

@@ -93,6 +93,7 @@ from victor.framework.state_merging import (
 )
 from victor.teams.types import TeamConfig, TeamFormation, TeamMember
 
+# TYPE_CHECKING: Import orchestrator for type hints in workflow nodes
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.teams import ITeamCoordinator, TeamResult

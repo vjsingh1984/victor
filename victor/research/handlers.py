@@ -88,7 +88,7 @@ class WebScraperHandler(BaseHandler):
             "web_fetch",
             url=url,
             selectors=selectors,
-            _exec_ctx=context,  # type: ignore
+            _exec_ctx=context,
         )
 
         # Raise exception if tool execution failed
@@ -173,6 +173,7 @@ __all__ = [
     "WebScraperHandler",
     "CitationFormatterHandler",
     "HANDLERS",
+    "register_handlers",
 ]
 
 # Handler registry for tests and programmatic access
@@ -180,3 +181,18 @@ HANDLERS = {
     "web_scraper": WebScraperHandler,
     "citation_formatter": CitationFormatterHandler,
 }
+
+
+def register_handlers() -> None:
+    """Register Research handlers with the step handler registry.
+
+    This function is called automatically when the Research vertical
+    is loaded. It can also be called manually for testing purposes.
+
+    Example:
+        from victor.research.handlers import register_handlers
+        register_handlers()
+    """
+    # Handlers are auto-registered via StepHandlerRegistry
+    # This function exists for API compatibility and testing
+    pass

@@ -171,20 +171,25 @@ class TestVersion:
     def test_parse_with_prerelease(self):
         """Test parsing version with prerelease."""
         v = Version.parse("0.5.0-alpha.1")
-        assert v.major == 1
-        assert v.minor == 0
+        assert v.major == 0
+        assert v.minor == 5
         assert v.patch == 0
         assert v.prerelease == "alpha.1"
 
     def test_parse_with_build(self):
         """Test parsing version with build metadata."""
         v = Version.parse("0.5.0+build.123")
-        assert v.major == 1
+        assert v.major == 0
+        assert v.minor == 5
+        assert v.patch == 0
         assert v.build == "build.123"
 
     def test_parse_with_prerelease_and_build(self):
         """Test parsing version with both prerelease and build."""
         v = Version.parse("0.5.0-rc.1+build.456")
+        assert v.major == 0
+        assert v.minor == 5
+        assert v.patch == 0
         assert v.prerelease == "rc.1"
         assert v.build == "build.456"
 
@@ -203,17 +208,17 @@ class TestVersion:
     def test_str_with_prerelease(self):
         """Test __str__ with prerelease."""
         v = Version(1, 0, 0, prerelease="alpha")
-        assert str(v) == "0.5.0-alpha"
+        assert str(v) == "1.0.0-alpha"
 
     def test_str_with_build(self):
         """Test __str__ with build."""
         v = Version(1, 0, 0, build="build.1")
-        assert str(v) == "0.5.0+build.1"
+        assert str(v) == "1.0.0+build.1"
 
     def test_str_with_prerelease_and_build(self):
         """Test __str__ with both prerelease and build."""
         v = Version(1, 0, 0, prerelease="rc.1", build="123")
-        assert str(v) == "0.5.0-rc.1+123"
+        assert str(v) == "1.0.0-rc.1+123"
 
     def test_lt_comparison(self):
         """Test less than comparison."""

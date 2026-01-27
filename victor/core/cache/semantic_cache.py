@@ -54,7 +54,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
-import numpy as np
+import numpy as np  # type: ignore[import-not-found]
 
 from victor.providers.base import Message, CompletionResponse
 
@@ -196,7 +196,7 @@ class SemanticCache:
             with self._embedding_lock:
                 if self._embedding_service is None:
                     try:
-                        from victor.agents.embeddings import EmbeddingService
+                        from victor.agents.embeddings import EmbeddingService  # type: ignore[import]
 
                         self._embedding_service = EmbeddingService(model_name=self.embedding_model)
                         logger.info(

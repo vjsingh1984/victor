@@ -320,8 +320,8 @@ class MLOpsHandler(BaseHandler):
     ) -> Dict[str, Any]:
         """Synchronous MLOps execution."""
         try:
-            import mlflow
-            from mlflow.tracking import MlflowClient
+            import mlflow  # type: ignore[import]
+            from mlflow.tracking import MlflowClient  # type: ignore[import]
 
             mlflow.set_tracking_uri(self.tracking_uri)
             client = MlflowClient()
@@ -507,11 +507,27 @@ __all__ = [
     "TerraformHandler",
     "MLOpsHandler",
     "HANDLERS",
+    "register_handlers",
 ]
 
 # Handler registry for tests and programmatic access
-HANDLERS = {
+HANDLERS: Dict[str, type[object]] = {  # type: ignore[dict-item]
     "container_ops": ContainerOpsHandler,
     "terraform_apply": TerraformHandler,
     "mlops": MLOpsHandler,
 }
+
+
+def register_handlers() -> None:
+    """Register DevOps handlers with the framework.
+
+    This function is called during vertical initialization to register
+    all DevOps-specific handlers with the workflow engine.
+
+    Note: In the current architecture, handlers are registered implicitly
+    through the HANDLERS dictionary. This function is provided for API
+    compatibility and may be used in the future for explicit registration.
+    """
+    # Handlers are pre-registered via HANDLERS dict
+    # This function exists for API compatibility and future extensibility
+    pass

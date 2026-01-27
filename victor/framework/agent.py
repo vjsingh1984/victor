@@ -666,7 +666,7 @@ class Agent:
             agent.event_bus.backend.subscribe("tool.*", on_tool_event)
         """
         from typing import cast
-        from victor.observability.event_bus import ObservabilityBus
+        from victor.core.events import ObservabilityBus
 
         observability = getattr(self._orchestrator, "observability", None)
         if observability:

@@ -40,7 +40,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from victor.tools.base import BaseTool
-    from victor.tools.protocols import ToolExecutorProtocol
+    from victor.agent.protocols import ToolExecutorProtocol
 
 
 logger = logging.getLogger(__name__)

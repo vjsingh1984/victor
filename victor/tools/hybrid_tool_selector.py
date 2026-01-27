@@ -30,7 +30,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from victor.providers.base import ToolDefinition
 from victor.tools.selection_filters import blend_tool_results, deduplicate_tools
@@ -160,7 +160,7 @@ class HybridToolSelector:
             from victor.framework.rl.coordinator import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
-            self._rl_learner = coordinator.get_learner("tool_selector")
+            self._rl_learner = coordinator.get_learner("tool_selector")  # type: ignore[assignment]
             if self._rl_learner:
                 logger.info("RL: ToolSelectorLearner initialized for hybrid selector")
             return self._rl_learner
@@ -205,20 +205,22 @@ class HybridToolSelector:
                 return cached_result
 
         # 1. Get semantic results
-        semantic_tools = await self.semantic.select_tools(prompt, context)
+        semantic_selector: Callable[[str, Any], Any] = getattr(self.semantic, "select_tools", lambda p, c: [])
+        semantic_tools = await semantic_selector(prompt, context)
 
         # 2. Get keyword results
-        keyword_tools = await self.keyword.select_tools(prompt, context)
+        keyword_selector: Callable[[str, Any], Any] = getattr(self.keyword, "select_tools", lambda p, c: [])
+        keyword_tools = await keyword_selector(prompt, context)
 
         logger.debug(
-            f"Hybrid selection: {len(semantic_tools)} semantic tools, "
-            f"{len(keyword_tools)} keyword tools"
+            f"Hybrid selection: {len(semantic_tools if isinstance(semantic_tools, list) else semantic_tools.tools)} semantic tools, "
+            f"{len(keyword_tools if isinstance(keyword_tools, list) else keyword_tools.tools)} keyword tools"
         )
 
         # 3. Blend with weights (semantic first, then keyword)
         blended = blend_tool_results(
-            semantic_tools=semantic_tools,
-            keyword_tools=keyword_tools,
+            semantic_tools=semantic_tools if isinstance(semantic_tools, list) else getattr(semantic_tools, 'tools', []),
+            keyword_tools=keyword_tools if isinstance(keyword_tools, list) else getattr(keyword_tools, 'tools', []),
             semantic_weight=self.config.semantic_weight,
             keyword_weight=self.config.keyword_weight,
         )
@@ -233,8 +235,8 @@ class HybridToolSelector:
         # 6. Ensure minimum tool requirements
         blended = self._ensure_minimum_tools(
             blended=blended,
-            semantic_tools=semantic_tools,
-            keyword_tools=keyword_tools,
+            semantic_tools=semantic_tools if isinstance(semantic_tools, list) else getattr(semantic_tools, 'tools', []),
+            keyword_tools=keyword_tools if isinstance(keyword_tools, list) else getattr(keyword_tools, 'tools', []),
         )
 
         # 7. Cap to max_total_tools
@@ -294,7 +296,7 @@ class HybridToolSelector:
 
             # Exploitation: boost based on learned Q-values
             tool_names = [t.name for t in tools]
-            rankings = learner.get_tool_rankings(tool_names, task_type)
+            rankings: List[Any] = getattr(learner, "get_tool_rankings", lambda n, t: [])(tool_names, task_type)
 
             if not rankings:
                 return tools
@@ -374,8 +376,10 @@ class HybridToolSelector:
                 - efficiency_score: Time/resource efficiency (0-1)
         """
         # Delegate to both selectors
-        self.semantic.record_tool_execution(tool_name, success, context)
-        self.keyword.record_tool_execution(tool_name, success, context)
+        if hasattr(self.semantic, 'record_tool_execution'):
+            self.semantic.record_tool_execution(tool_name, success, context)
+        if hasattr(self.keyword, 'record_tool_execution'):
+            self.keyword.record_tool_execution(tool_name, success, context)
 
         # Record to RL learner for Q-value updates
         self._record_rl_outcome(tool_name, success, context)
@@ -450,8 +454,10 @@ class HybridToolSelector:
         Ensures both semantic and keyword selectors clean up properly.
         """
         # Close both selectors
-        await self.semantic.close()
-        await self.keyword.close()
+        if hasattr(self.semantic, 'close'):
+            await self.semantic.close()
+        if hasattr(self.keyword, 'close'):
+            await self.keyword.close()
 
     # =========================================================================
     # Helper Methods

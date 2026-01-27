@@ -440,7 +440,7 @@ class TimeOrderedTableView(DataTable):
         self._events: List[MessagingEvent] = []
         self._max_rows = max_rows
         self._enable_dedup = enable_dedup
-        self._seen_event_ids: set = set() if enable_dedup else None
+        self._seen_event_ids: Optional[set] = set() if enable_dedup else None
 
     def add_event(self, event: MessagingEvent) -> None:
         """Add an event to the table.
@@ -1559,7 +1559,8 @@ class ObservabilityDashboard(App):
 
         try:
             # Update stats
-            self._stats.increment(event.category)
+            if self._stats:
+                self._stats.increment(event.category)
         except Exception as e:
             logger.error(
                 f"[Dashboard._process_event] Error updating stats: {e}\n{traceback.format_exc()}"
@@ -1567,14 +1568,16 @@ class ObservabilityDashboard(App):
 
         try:
             # Add to views
-            self._event_log.add_event(event)
+            if self._event_log:
+                self._event_log.add_event(event)
         except Exception as e:
             logger.error(
                 f"[Dashboard._process_event] Error adding to EventLogView: {e}\n{traceback.format_exc()}"
             )
 
         try:
-            self._event_table.add_event(event)
+            if self._event_table:
+                self._event_table.add_event(event)
         except Exception as e:
             logger.error(
                 f"[Dashboard._process_event] Error adding to EventTableView: {e}\n{traceback.format_exc()}"
@@ -1583,23 +1586,31 @@ class ObservabilityDashboard(App):
         try:
             # Handle specific event types - migrated to canonical topic patterns
             if event.topic.startswith("tool."):
-                self._tool_view.add_tool_event(event)
+                if self._tool_view:
+                    self._tool_view.add_tool_event(event)
                 # Update debugging views
-                self._tool_call_history_view.add_tool_call_event(event)
-                self._performance_metrics_view.update_from_tool_event(event)
+                if self._tool_call_history_view:
+                    self._tool_call_history_view.add_tool_call_event(event)
+                if self._performance_metrics_view:
+                    self._performance_metrics_view.update_from_tool_event(event)
             elif event.topic.startswith("vertical."):
-                self._vertical_view.add_vertical_event(event)
+                if self._vertical_view:
+                    self._vertical_view.add_vertical_event(event)
             elif event.topic.startswith("lifecycle."):
                 # Update execution trace view
-                self._execution_trace_view.add_span_event(event)
-                self._performance_metrics_view.update_from_span_event(event)
+                if self._execution_trace_view:
+                    self._execution_trace_view.add_span_event(event)
+                if self._performance_metrics_view:
+                    self._performance_metrics_view.update_from_span_event(event)
                 # Also route chunk tool events to tool view
-                if event.topic == "lifecycle.chunk.tool_start":
+                if event.topic == "lifecycle.chunk.tool_start" and self._tool_view:
                     self._tool_view.add_tool_event(event)
             elif event.topic.startswith("state."):
                 # Update state transition view
-                self._state_transition_view.add_state_event(event)
-                self._performance_metrics_view.update_from_state_event(event)
+                if self._state_transition_view:
+                    self._state_transition_view.add_state_event(event)
+                if self._performance_metrics_view:
+                    self._performance_metrics_view.update_from_state_event(event)
         except Exception as e:
             logger.error(
                 f"[Dashboard._process_event] Error updating specific views: {e}\n{traceback.format_exc()}"
@@ -1607,10 +1618,14 @@ class ObservabilityDashboard(App):
 
         # Explicitly refresh display to show new events
         try:
-            self._event_log.refresh()
-            self._event_table.refresh()
-            self._tool_view.refresh()
-            self._stats.refresh()
+            if self._event_log:
+                self._event_log.refresh()
+            if self._event_table:
+                self._event_table.refresh()
+            if self._tool_view:
+                self._tool_view.refresh()
+            if self._stats:
+                self._stats.refresh()
         except Exception as e:
             logger.error(
                 f"[Dashboard._process_event] Error refreshing display: {e}\n{traceback.format_exc()}"
@@ -1624,7 +1639,7 @@ class ObservabilityDashboard(App):
             if count > 0:
                 self.notify(f"Loaded {count} events from {self._log_file.name}")
 
-    def action_quit(self) -> None:
+    async def action_quit(self) -> None:
         """Quit the application."""
         self.exit()
 
@@ -1645,51 +1660,70 @@ class ObservabilityDashboard(App):
     def action_clear_events(self) -> None:
         """Clear all event displays (internal state only, not log file)."""
         # Clear stats
-        self._stats.total_events = 0
-        self._stats.tool_events = 0
-        self._stats.state_events = 0
-        self._stats.error_events = 0
+        if self._stats:
+            self._stats.total_events = 0
+            self._stats.tool_events = 0
+            self._stats.state_events = 0
+            self._stats.error_events = 0
 
         # Clear event log
-        self._event_log.clear()
+        if self._event_log:
+            self._event_log.clear()
 
         # Clear table
-        self._event_table.clear()
+        if self._event_table:
+            self._event_table.clear()
 
         # Clear tool view
-        self._tool_view.clear()
-        self._tool_view._tool_stats.clear()
+        if self._tool_view:
+            self._tool_view.clear()
+            self._tool_view._tool_stats.clear()
 
         # Clear vertical trace view
-        self._vertical_view.clear()
+        if self._vertical_view:
+            self._vertical_view.clear()
 
         # Clear debugging views
-        self._execution_trace_view.clear()
-        self._execution_trace_view._spans.clear()
+        if self._execution_trace_view:
+            self._execution_trace_view.clear()
+            self._execution_trace_view._spans.clear()
 
-        self._tool_call_history_view.clear()
-        self._tool_call_history_view._tool_calls.clear()
+        if self._tool_call_history_view:
+            self._tool_call_history_view.clear()
+            self._tool_call_history_view._tool_calls.clear()
 
-        self._state_transition_view.clear()
-        self._state_transition_view._transitions.clear()
+        if self._state_transition_view:
+            self._state_transition_view.clear()
+            self._state_transition_view._transitions.clear()
 
-        self._performance_metrics_view.clear()
+        if self._performance_metrics_view:
+            self._performance_metrics_view.clear()
 
         self.notify("Events cleared (log file preserved)")
 
     def action_refresh(self) -> None:
         """Refresh all views in the display."""
         # Refresh all views to ensure latest data is shown
-        self._event_log.refresh()
-        self._event_table.refresh()
-        self._tool_view.refresh()
-        self._vertical_view.refresh()
-        self._execution_trace_view.refresh()
-        self._tool_call_history_view.refresh()
-        self._state_transition_view.refresh()
-        self._performance_metrics_view.refresh()
-        self._stats.refresh()
-        self._jsonl_browser.refresh()
+        if self._event_log:
+            self._event_log.refresh()
+        if self._event_table:
+            self._event_table.refresh()
+        if self._tool_view:
+            self._tool_view.refresh()
+        if self._vertical_view:
+            self._vertical_view.refresh()
+        if self._execution_trace_view:
+            self._execution_trace_view.refresh()
+        if self._tool_call_history_view:
+            self._tool_call_history_view.refresh()
+        if self._state_transition_view:
+            self._state_transition_view.refresh()
+        if self._performance_metrics_view:
+            self._performance_metrics_view.refresh()
+        if self._stats:
+            self._stats.refresh()
+        if self._jsonl_browser:
+            self._jsonl_browser.refresh()
         self.refresh()  # Refresh the dashboard itself
         self.notify("Display refreshed")
 

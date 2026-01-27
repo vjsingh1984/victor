@@ -85,7 +85,7 @@ class SecurityAnalysisAssistant(VerticalBase):
         "Security analysis assistant for vulnerability scanning, "
         "penetration testing, and security assessment"
     )
-    version: ClassVar[str] = "1.0.0"
+    version: ClassVar[str] = "0.5.0"
 
     @classmethod
     def get_tools(cls) -> List[str]:
@@ -193,34 +193,34 @@ Security Best Practices:
         return SecurityAnalysisServiceProvider()
 
     @classmethod
-    def get_stages(cls) -> List["StageDefinition"]:
+    def get_stages(cls) -> Dict[str, "StageDefinition"]:
         """Get workflow stages for security analysis.
 
         Returns:
-            List of stage definitions.
+            Dict of stage definitions.
         """
-        return [
-            StageDefinition(
+        return {
+            "DISCOVERY": StageDefinition(
                 name="DISCOVERY",
                 description="Discover potential security issues",
-                tool_hints=["grep", "code_search", "ls"],
+                tools={"grep", "code_search", "ls"},
             ),
-            StageDefinition(
+            "SCANNING": StageDefinition(
                 name="SCANNING",
                 description="Scan for vulnerabilities and security issues",
-                tool_hints=["shell", "grep"],
+                tools={"shell", "grep"},
             ),
-            StageDefinition(
+            "ANALYSIS": StageDefinition(
                 name="ANALYSIS",
                 description="Analyze findings and assess risk",
-                tool_hints=["read", "web_search"],
+                tools={"read", "web_search"},
             ),
-            StageDefinition(
+            "REPORTING": StageDefinition(
                 name="REPORTING",
                 description="Generate security reports and recommendations",
-                tool_hints=["write"],
+                tools={"write"},
             ),
-        ]
+        }
 
 
 # Export for entry point registration

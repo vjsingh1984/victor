@@ -36,6 +36,9 @@ def test_metrics_logging_builder_wires_components():
     orchestrator.provider = provider
     orchestrator._cumulative_token_usage = {"total_tokens": 0}
     orchestrator.tools = MagicMock()
+    # Delete auto-created Mock attributes so builder can create real ones
+    del orchestrator._background_tasks
+    del orchestrator._embedding_preload_task
 
     with (
         patch("victor.agent.session_cost_tracker.SessionCostTracker") as tracker_cls,

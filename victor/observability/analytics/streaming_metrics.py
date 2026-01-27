@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, TypeVar
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, TypeVar, cast
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,7 @@ class StreamMetrics:
     start_time: float = 0
     first_token_time: Optional[float] = None
     last_token_time: Optional[float] = None
+    end_time: Optional[float] = None
 
     # Token metrics
     total_chunks: int = 0
@@ -755,7 +756,7 @@ class MetricsStreamWrapper:
                 self.metrics.tool_calls_count += len(tool_calls)
                 self.metrics.tool_call_times.append(current_time)
 
-            return chunk
+            return cast(T, chunk)
 
         except StopAsyncIteration:
             # Stream complete - finalize metrics

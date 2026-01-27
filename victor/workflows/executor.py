@@ -491,7 +491,7 @@ class WorkflowExecutor:
             # Use the orchestrator directly if it has the required interface
             # SubAgentOrchestrator will adapt to the orchestrator protocol
             # Type ignore: orchestrator is WorkflowAgentProtocol but SubAgentOrchestrator accepts AgentOrchestrator
-            self._sub_agents = SubAgentOrchestrator(self.orchestrator)  # type: ignore[arg-type]
+            self._sub_agents = SubAgentOrchestrator(self.orchestrator)
         return self._sub_agents
 
     @property

@@ -104,19 +104,19 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
         root_node = tree.root_node
 
         for symbol_type in ["function", "class"]:
-            query = Query(parser.language, PYTHON_QUERIES[symbol_type])
+            query = Query(PYTHON_QUERIES[symbol_type], parser.language)
             cursor = QueryCursor(query)
             captures_dict = cursor.captures(root_node)
 
             # captures_dict is {"function.name": [node1, node2, ...]} or {"class.name": [...]}
             for _capture_name, nodes in captures_dict.items():
                 for node in nodes:
-                    if node.text.decode("utf8") == symbol_name:
+                    if node.text and node.text.decode("utf8") == symbol_name:
                         # We found the name identifier, now get the parent definition node
                         definition_node = node.parent
                         start_line = definition_node.start_point[0] + 1
                         end_line = definition_node.end_point[0] + 1
-                        code_block = definition_node.text.decode("utf8")
+                        code_block = definition_node.text.decode("utf8") if definition_node.text else ""
 
                         return {
                             "symbol_name": symbol_name,
@@ -158,7 +158,7 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
         "where used",
     ],
     stages=["initial", "planning", "reading", "analysis"],  # Available early for impact analysis
-    execution_category=ExecutionCategory.READ_ONLY,
+    execution_category="read_only",
     mandatory_keywords=[
         "find",
         "find references",
@@ -196,7 +196,7 @@ async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]
     """
     references = []
     parser = get_parser("python")
-    query = Query(parser.language, PYTHON_QUERIES["identifier"])
+    query = Query(PYTHON_QUERIES["identifier"], parser.language)
 
     root_path = Path(search_path)
     if not root_path.is_dir():
@@ -217,7 +217,7 @@ async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]
             # captures_dict is {"name": [node1, node2, ...]}
             for _capture_name, nodes in captures_dict.items():
                 for node in nodes:
-                    if node.text.decode("utf8") == symbol_name:
+                    if node.text and node.text.decode("utf8") == symbol_name:
                         line_number = node.start_point[0] + 1
                         col_number = node.start_point[1] + 1
                         references.append(

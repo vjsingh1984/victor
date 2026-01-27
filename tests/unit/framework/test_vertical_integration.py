@@ -1162,7 +1162,7 @@ class TestVerticalIntegrationCaching:
 
         assert cache_key is not None
         assert isinstance(cache_key, str)
-        assert cache_key.startswith("v1_")
+        assert cache_key.startswith("v5_")
         assert "mock_vertical" in cache_key
 
     def test_cache_key_includes_vertical_name(self):

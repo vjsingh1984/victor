@@ -27,6 +27,8 @@ import logging
 from rich.panel import Panel
 from rich.table import Table
 
+from typing import Any, Dict, List
+
 from victor.ui.slash.protocol import BaseSlashCommand, CommandContext, CommandMetadata
 from victor.ui.slash.registry import register_command
 
@@ -53,26 +55,31 @@ class CostCommand(BaseSlashCommand):
             return
 
         # Try capability registry first (DIP compliant)
-        if hasattr(ctx.agent, "get_capability_value"):
+        analytics = None
+        if ctx.agent and hasattr(ctx.agent, "get_capability_value"):
             try:
                 analytics = ctx.agent.get_capability_value("usage_analytics")
             except (KeyError, TypeError):
                 analytics = None
-        elif hasattr(ctx.agent, "usage_analytics"):
+        elif ctx.agent and hasattr(ctx.agent, "usage_analytics"):
             # Public property fallback
             analytics = ctx.agent.usage_analytics
-        else:
-            analytics = None
 
         if analytics:
             summary = analytics.get_session_summary()
             content = (
                 f"[bold]Session Statistics[/]\n\n"
-                f"[bold]Messages:[/] {ctx.agent.conversation.message_count()}\n"
-                f"[bold]Tool Calls:[/] {summary.get('tool_calls', 0)}\n"
-                f"[bold]Total Tokens:[/] {summary.get('total_tokens', 0):,}\n"
-                f"[bold]Estimated Cost:[/] ${summary.get('estimated_cost', 0):.4f}\n"
             )
+
+            # Safely get conversation count
+            conversation_count = "unknown"
+            if ctx.agent and hasattr(ctx.agent, 'conversation') and hasattr(ctx.agent.conversation, 'message_count'):
+                conversation_count = str(ctx.agent.conversation.message_count())
+
+            content += f"[bold]Messages:[/] {conversation_count}\n"
+            content += f"[bold]Tool Calls:[/] {summary.get('tool_calls', 0)}\n"
+            content += f"[bold]Total Tokens:[/] {summary.get('total_tokens', 0):,}\n"
+            content += f"[bold]Estimated Cost:[/] ${summary.get('estimated_cost', 0):.4f}\n"
 
             if summary.get("provider_breakdown"):
                 content += "\n[bold]By Provider:[/]\n"
@@ -81,20 +88,29 @@ class CostCommand(BaseSlashCommand):
         else:
             # Get tool call count via capability or public method
             tool_calls = 0
-            if hasattr(ctx.agent, "get_capability_value"):
+            if ctx.agent and hasattr(ctx.agent, "get_capability_value"):
                 tool_calls = ctx.agent.get_capability_value("tool_metrics", {}).get("call_count", 0)
-            elif hasattr(ctx.agent, "get_tool_call_count"):
+            elif ctx.agent and hasattr(ctx.agent, "get_tool_call_count"):
                 tool_calls = ctx.agent.get_tool_call_count()
-            elif hasattr(ctx.agent, "tool_call_count"):
+            elif ctx.agent and hasattr(ctx.agent, "tool_call_count"):
                 tool_calls = ctx.agent.tool_call_count
 
             content = (
                 f"[bold]Session Statistics[/]\n\n"
-                f"[bold]Messages:[/] {ctx.agent.conversation.message_count()}\n"
-                f"[bold]Tool Calls:[/] {tool_calls}\n"
-                f"[bold]Provider:[/] {ctx.agent.provider_name}\n"
-                f"[bold]Model:[/] {ctx.agent.model}\n"
             )
+
+            # Safely get conversation count
+            conversation_count = "unknown"
+            if ctx.agent and hasattr(ctx.agent, 'conversation') and hasattr(ctx.agent.conversation, 'message_count'):
+                conversation_count = str(ctx.agent.conversation.message_count())
+
+            content += f"[bold]Messages:[/] {conversation_count}\n"
+            content += f"[bold]Tool Calls:[/] {tool_calls}\n"
+            # Safely access provider and model
+            if ctx.agent and hasattr(ctx.agent, 'provider_name'):
+                content += f"[bold]Provider:[/] {ctx.agent.provider_name}\n"
+            if ctx.agent and hasattr(ctx.agent, 'model'):
+                content += f"[bold]Model:[/] {ctx.agent.model}\n"
 
         ctx.console.print(Panel(content, title="Usage Statistics", border_style="cyan"))
 
@@ -114,7 +130,7 @@ class MetricsCommand(BaseSlashCommand):
         )
 
     def execute(self, ctx: CommandContext) -> None:
-        subcommand = self._get_arg(ctx, 0, "summary").lower()
+        subcommand = (self._get_arg(ctx, 0, "summary") or "").lower()
         export_format = None
 
         if self._has_flag(ctx, "--json"):
@@ -203,7 +219,7 @@ class SerializationCommand(BaseSlashCommand):
         )
 
     def execute(self, ctx: CommandContext) -> None:
-        subcommand = self._get_arg(ctx, 0, "summary").lower()
+        subcommand = (self._get_arg(ctx, 0, "summary") or "").lower()
 
         try:
             from victor.processing.serialization.adaptive import get_adaptive_serializer
@@ -310,11 +326,11 @@ class LearningCommand(BaseSlashCommand):
         )
 
     def execute(self, ctx: CommandContext) -> None:
-        subcommand = self._get_arg(ctx, 0, "stats").lower()
+        subcommand = (self._get_arg(ctx, 0, "stats") or "").lower() if ctx.agent else ""
 
         # Handle explore subcommand
         if subcommand == "explore":
-            rate_str = self._get_arg(ctx, 1)
+            rate_str = self._get_arg(ctx, 1) or ""
             if not rate_str:
                 ctx.console.print("[yellow]Usage: /learning explore <rate>[/]")
                 ctx.console.print("[dim]Example: /learning explore 0.2[/]")
@@ -391,8 +407,9 @@ class LearningCommand(BaseSlashCommand):
                 ctx.console.print("[yellow]Model selector learner not available[/]")
                 return
 
-            task_type = self._get_arg(ctx, 1, "coding")
-            rec = learner.recommend(ctx.agent.provider_name if ctx.agent else "unknown", task_type)
+            task_type = self._get_arg(ctx, 1, "coding") or "coding"
+            recommend_func = getattr(learner, "recommend", lambda p, t: None)
+            rec = recommend_func(ctx.agent.provider_name if ctx.agent else "unknown", task_type)
 
             if rec:
                 ctx.console.print(
@@ -413,7 +430,7 @@ class LearningCommand(BaseSlashCommand):
             from victor.framework.rl.coordinator import get_rl_coordinator
             from victor.framework.rl.learners.model_selector import SelectionStrategy
 
-            strategy_name = self._get_arg(ctx, 1)
+            strategy_name = self._get_arg(ctx, 1) or ""
             if not strategy_name:
                 ctx.console.print("[yellow]Usage: /learning strategy <name>[/]")
                 ctx.console.print("[dim]Available: epsilon_greedy, ucb, exploit[/]")
@@ -427,7 +444,8 @@ class LearningCommand(BaseSlashCommand):
 
             try:
                 strategy = SelectionStrategy(strategy_name.lower())
-                learner.set_strategy(strategy)
+                strategy_func = getattr(learner, "set_strategy", lambda s: None)
+                strategy_func(strategy)
                 ctx.console.print(f"[green]Selection strategy set to:[/] {strategy.value}")
             except ValueError:
                 ctx.console.print(f"[red]Invalid strategy:[/] {strategy_name}")
@@ -504,7 +522,7 @@ class LearningCommand(BaseSlashCommand):
             learner = coordinator.get_learner("model_selector")
 
             if learner:
-                rankings = learner.get_provider_rankings()
+                rankings: List[Dict[str, Any]] = getattr(learner, "get_provider_rankings", lambda: [])()
                 if rankings:
                     content += "[bold cyan]Model Selector (Provider Rankings):[/]\n"
                     for rank in rankings[:5]:
@@ -521,11 +539,8 @@ class LearningCommand(BaseSlashCommand):
                         if hasattr(learner, "get_exploration_rate")
                         else getattr(learner, "_exploration_rate", 0.1)
                     )
-                    strategy = (
-                        learner.get_strategy()
-                        if hasattr(learner, "get_strategy")
-                        else getattr(learner, "_strategy", None)
-                    )
+                    strategy_func = getattr(learner, "get_strategy", lambda: None)
+                    strategy = strategy_func() or getattr(learner, "_strategy", None)
                     content += f"\n  Strategy: {strategy.value if strategy else 'epsilon_greedy'}\n"
                     content += f"  Exploration Rate: {exploration:.2f}\n"
         except Exception as e:
@@ -553,7 +568,7 @@ class MLStatsCommand(BaseSlashCommand):
         )
 
     def execute(self, ctx: CommandContext) -> None:
-        subcommand = self._get_arg(ctx, 0, "summary").lower()
+        subcommand = (self._get_arg(ctx, 0, "summary") or "").lower()
 
         try:
             from victor.framework.rl.coordinator import get_rl_coordinator
@@ -574,7 +589,7 @@ class MLStatsCommand(BaseSlashCommand):
                     ctx.console.print("[yellow]Model selector not available[/]")
                     return
 
-                rankings = learner.get_provider_rankings()
+                rankings: List[Dict[str, Any]] = getattr(learner, "get_provider_rankings", lambda: [])()
                 if not rankings:
                     ctx.console.print("[dim]No provider data yet[/]")
                     return
@@ -610,7 +625,8 @@ class MLStatsCommand(BaseSlashCommand):
             for name in learners[:5]:
                 learner = coordinator.get_learner(name)
                 if learner and hasattr(learner, "get_sample_count"):
-                    count = learner.get_sample_count()
+                    count_func = getattr(learner, "get_sample_count", lambda: 0)
+                    count = count_func()
                     content += f"  {name}: {count} samples\n"
 
             # Get coordinator-level stats

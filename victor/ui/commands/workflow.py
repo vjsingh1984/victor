@@ -41,6 +41,7 @@ Example:
 
 import asyncio
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
@@ -728,11 +729,11 @@ def render_workflow(
         )
 
         try:
-            from victor.workflows.hitl import HITLNode
+            from victor.workflows.hitl import HITLNode  # type: ignore[import-not-found,arg-type]
 
             has_hitl = True
         except ImportError:
-            HITLNode = None
+            HITLNode = None  # type: ignore[assignment]
             has_hitl = False
 
         console.print(f"\n[bold cyan]Workflow:[/] {workflow.name}")
@@ -870,7 +871,7 @@ def list_workflows(
                 workflows = {loaded.name: loaded}
 
             for wf_name, workflow in workflows.items():
-                node_types = {}
+                node_types: dict[str, int] = {}
                 for node in workflow.nodes.values():
                     node_type = type(node).__name__.replace("Node", "")
                     node_types[node_type] = node_types.get(node_type, 0) + 1
@@ -1233,8 +1234,6 @@ def list_presets(
     from victor.workflows.presets import (
         list_agent_presets,
         list_workflow_presets,
-        list_agent_presets_by_role,
-        list_workflow_presets_by_category,
         get_agent_preset,
         get_workflow_preset,
     )
@@ -1245,13 +1244,10 @@ def list_presets(
         # List agent presets
         console.print("\n[bold cyan]Agent Presets:[/]\n")
 
-        by_role = list_agent_presets_by_role()
-        for role, preset_names in sorted(by_role.items()):
-            console.print(f"  [bold]{role.title()}[/]")
-            for name in sorted(preset_names):
-                preset = get_agent_preset(name)
-                if preset:
-                    console.print(f"    • [cyan]{name}[/]: {preset.description}")
+        presets = list_agent_presets()
+        for preset in sorted(presets, key=lambda x: x.role):
+            console.print(f"  [bold]{preset.role.title()}[/]")
+            console.print(f"    • [cyan]{preset.name}[/]: {preset.description}")
 
             console.print()
 
@@ -1261,30 +1257,35 @@ def list_presets(
 
         if category:
             # Filter by category
-            by_category = list_workflow_presets_by_category()
-            if category not in by_category:
-                console.print(f"[bold red]Error:[/] Unknown category: {category}")
-                console.print(f"Available: {', '.join(sorted(by_category.keys()))}")
+            presets = list_workflow_presets()
+            category_presets = [p for p in presets if p.category == category]
+
+            if not category_presets:
+                console.print(f"[bold red]Error:[/] No presets found for category: {category}")
+                available_categories = set(p.category for p in presets)
+                if available_categories:
+                    console.print(f"Available: {', '.join(sorted(available_categories))}")
                 raise typer.Exit(1)
 
-            workflow_names = by_category[category]
-            for name in sorted(workflow_names):
-                preset = get_workflow_preset(name)
-                if preset:
-                    console.print(f"  • [cyan]{name}[/]: {preset.description}")
-                    console.print(
-                        f"    [dim]Complexity: {preset.complexity}, "
-                        f"~{preset.estimated_duration_minutes}min[/]"
-                    )
+            for preset in sorted(category_presets, key=lambda x: x.name):
+                console.print(f"  • [cyan]{preset.name}[/]: {preset.description}")
+                console.print(
+                    f"    [dim]Complexity: {preset.complexity}, "
+                    f"~{preset.estimated_duration_minutes}min[/]"
+                )
         else:
             # Show all by category
-            by_category = list_workflow_presets_by_category()
-            for cat, workflow_names in sorted(by_category.items()):
+            presets = list_workflow_presets()
+            by_category: dict[str, list] = {}
+            for preset in presets:
+                if preset.category not in by_category:
+                    by_category[preset.category] = []
+                by_category[preset.category].append(preset)
+
+            for cat, category_presets in sorted(by_category.items()):
                 console.print(f"  [bold]{cat.title()}[/]")
-                for name in sorted(workflow_names):
-                    preset = get_workflow_preset(name)
-                    if preset:
-                        console.print(f"    • [cyan]{name}[/]: {preset.description}")
+                for preset in sorted(category_presets, key=lambda x: x.name):
+                    console.print(f"    • [cyan]{preset.name}[/]: {preset.description}")
 
                 console.print()
 
@@ -1784,7 +1785,7 @@ def debug_workflow(
     # Set debug logging
     import logging
 
-    level = getattr(logging, log_level.upper(), logging.DEBUG)
+    level = getattr(logging, log_level.upper(), logging.DEBUG) if log_level else logging.DEBUG
     logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
 
     path = Path(workflow_path)
@@ -2248,6 +2249,7 @@ def show_metrics(
     # Export if requested
     if export_file:
         import json
+        import time
 
         output_path = Path(export_file)
         metrics_data = {

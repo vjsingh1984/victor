@@ -174,7 +174,8 @@ class WorkflowCacheManager(_LegacyWorkflowCacheManager):
             cache = self._caches.get(workflow_name)
             if cache is None:
                 cache_config = config or self._default_config
-                cache = CacheImpl(cache_config)
+                # Return the wrapper class, not the implementation
+                cache = WorkflowCache(cache_config)
                 self._caches[workflow_name] = cache
             return cache
 

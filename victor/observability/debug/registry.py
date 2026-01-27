@@ -103,7 +103,7 @@ class DebugAdapterRegistry:
         """
         # Convert class to factory if needed
         if isinstance(adapter, type):
-            factory: AdapterFactory = adapter  # type: ignore
+            factory: AdapterFactory = adapter
         else:
             factory = adapter
 
@@ -270,10 +270,10 @@ class DebugAdapterRegistry:
             try:
                 # Import module
                 module_name = py_file.stem
-                spec = importlib.util.spec_from_file_location(module_name, py_file)
+                spec = importlib.util.spec_from_file_location(module_name, py_file)  # type: ignore[attr-defined]
                 if spec and spec.loader:
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
+                    module = importlib.util.module_from_spec(spec)  # type: ignore[attr-defined]
+                    spec.loader.exec_module(module)  # type: ignore[attr-defined]
 
                     # Find adapter classes
                     for name in dir(module):

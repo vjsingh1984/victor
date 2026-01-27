@@ -422,8 +422,12 @@ class CQRSEventAdapter:
             # Convert and dispatch to CQRS
             cqrs_event = self._convert_to_cqrs_event(event)
             if cqrs_event and self._event_dispatcher:
-                self._event_dispatcher.dispatch(cqrs_event)
-                self._events_bridged_to_cqrs += 1
+                if hasattr(self._event_dispatcher, "dispatch"):
+                    result = self._event_dispatcher.dispatch(cqrs_event)
+                    # If dispatch returns a coroutine, we can't await it in sync context
+                    # The dispatcher should handle this internally
+                    # Just count it as bridged
+                    self._events_bridged_to_cqrs += 1
 
         finally:
             self._processing_ids.discard(event.id)
@@ -473,10 +477,11 @@ class CQRSEventAdapter:
         if self._config.include_metadata:
             data["_source"] = "observability"
             data["_original_id"] = event.id
-            data["_category"] = event.category.value
+            data["_category"] = str(event.category) if hasattr(event.category, "__str__") else ""
 
         # Map to concrete event types based on event name and category
-        if "stage_transition" in event.name or "state" in event.name.lower():
+        event_name = getattr(event, 'name', '')
+        if "stage_transition" in event_name or "state" in event_name.lower():
             return StateChangedEvent(
                 task_id=data.get("session_id", ""),
                 from_state=data.get("old_stage", ""),
@@ -484,17 +489,17 @@ class CQRSEventAdapter:
                 reason=f"confidence: {data.get('confidence', 0)}",
             )
 
-        if ".start" in event.name:
+        if ".start" in event_name:
             return ToolCalledEvent(
                 task_id=data.get("session_id", ""),
-                tool_name=data.get("tool_name", event.name.replace(".start", "")),
+                tool_name=str(data.get("tool_name", event_name.replace(".start", ""))),
                 arguments=data.get("arguments", {}),
             )
 
-        if ".end" in event.name:
+        if ".end" in event_name:
             return ToolResultEvent(
                 task_id=data.get("session_id", ""),
-                tool_name=data.get("tool_name", event.name.replace(".end", "")),
+                tool_name=str(data.get("tool_name", event_name.replace(".end", ""))),
                 success=data.get("success", True),
                 result=str(data.get("result", "")),
                 duration_ms=data.get("duration_ms", 0.0),
@@ -504,8 +509,8 @@ class CQRSEventAdapter:
         return StateChangedEvent(
             task_id=data.get("session_id", ""),
             from_state="",
-            to_state=event.name,
-            reason=f"category:{event.category.value}",
+            to_state=event_name,
+            reason=f"category:{str(event.category) if hasattr(event.category, '__str__') else ''}",
         )
 
     def _convert_to_victor_event(self, event: "CQRSEvent") -> Optional[MessagingEvent]:

@@ -1222,6 +1222,19 @@ class ToolPipeline:
 
         return count
 
+    def list_tools(self, only_enabled: bool = True) -> list:
+        """List all registered tools.
+
+        Delegates to the tool registry.
+
+        Args:
+            only_enabled: If True, only return enabled tools (default: True)
+
+        Returns:
+            List of tool instances
+        """
+        return self.tools.list_tools(only_enabled=only_enabled)
+
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics.
 

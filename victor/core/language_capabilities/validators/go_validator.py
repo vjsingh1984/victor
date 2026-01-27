@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Check if gopygo is available
 try:
-    import gopygo
+    import gopygo  # type: ignore[import-not-found]
 
     GOPYGO_AVAILABLE = True
 except ImportError:

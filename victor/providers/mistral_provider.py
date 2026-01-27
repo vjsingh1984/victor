@@ -204,12 +204,12 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
                 message=f"Mistral request timed out after {self.timeout}s",
-                provider=self.name,
+                provider=self.name,  # type: ignore[attr-defined]
             ) from e
         except httpx.HTTPStatusError as e:
-            raise self._handle_http_error(e, self.name)
+            raise self._handle_http_error(e, self.name)  # type: ignore[attr-defined]
         except Exception as e:
-            raise self._handle_error(e, self.name)
+            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
 
     async def stream(
         self,
@@ -278,12 +278,12 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
                 message=f"Mistral stream timed out after {self.timeout}s",
-                provider=self.name,
+                provider=self.name,  # type: ignore[attr-defined]
             ) from e
         except httpx.HTTPStatusError as e:
-            raise self._handle_http_error(e, self.name)
+            raise self._handle_http_error(e, self.name)  # type: ignore[attr-defined]
         except Exception as e:
-            raise self._handle_error(e, self.name)
+            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
 
     def _build_request_payload(
         self,

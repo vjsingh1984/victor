@@ -341,17 +341,16 @@ class TestDirectProtocolAdapterPatch:
     @pytest.mark.asyncio
     async def test_apply_patch(self, adapter):
         """Test applying patch."""
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.data = {"files_modified": ["test.py"]}
+        # Mock the actual functions used by apply_patch
+        mock_parse = MagicMock(return_value=[
+            MagicMock(new_path="test.py", old_path=None, is_new_file=True)
+        ])
 
-        mock_tool = MagicMock()
-        mock_tool.execute = AsyncMock(return_value=mock_result)
-        mock_class = MagicMock(return_value=mock_tool)
-        mock_module = MagicMock(PatchTool=mock_class)
-
-        with patch.dict(sys.modules, {"victor.tools.patch_tool": mock_module}):
-            result = await adapter.apply_patch("--- a\n+++ b", dry_run=False)
+        with patch.dict(
+            sys.modules,
+            {"victor.tools.patch_tool": MagicMock(parse_unified_diff=mock_parse)}
+        ):
+            result = await adapter.apply_patch("--- a/test.py\n+++ b/test.py", dry_run=True)
 
             assert result["success"] is True
             assert "test.py" in result["files_modified"]

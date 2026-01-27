@@ -60,6 +60,9 @@ from importlib import import_module
 from pathlib import Path
 from typing import Dict, Type, Optional, Any, TYPE_CHECKING, cast, List, Union
 
+# yaml module may not be available in some environments
+yaml: Optional[Any] = None
+
 if TYPE_CHECKING:
     from importlib.metadata import EntryPoint
 else:
@@ -76,10 +79,11 @@ else:
     except ImportError:
         from importlib_metadata import entry_points
 
+# Try to import yaml, but handle ImportError gracefully at runtime
 try:
     import yaml
 except ImportError:
-    yaml = None  # type: ignore[assignment]
+    yaml = None
 
 if TYPE_CHECKING:
     from victor.core.verticals.base import VerticalBase
@@ -121,7 +125,7 @@ class DiscoveryResult:
         lazy_imports: Dict mapping vertical name to lazy import string ("module:Class")
     """
 
-    verticals: Dict[str, Type["VerticalBase"]] = field(default_factory=dict)
+    verticals: Dict[str, Optional[Type["VerticalBase"]]] = field(default_factory=dict)
     sources: Dict[str, PluginSource] = field(default_factory=dict)
     lazy_imports: Dict[str, str] = field(default_factory=dict)
 
@@ -308,8 +312,6 @@ class PluginDiscovery:
             return result
 
         # Check if yaml is available
-        # Note: yaml is None when not installed, but MyPy sees it as always available
-        # This check is kept for runtime safety even if MyPy thinks it's unreachable
         if yaml is None:
             self.logger.warning("YAML library not available, skipping YAML discovery")
             return result
@@ -391,7 +393,7 @@ class PluginDiscovery:
             # For built-in, we don't actually import the class
             # Just store the lazy import string for later registration
             # Use a placeholder to satisfy type checking
-            result.verticals[builtin_config.name] = None  # type: ignore[assignment]
+            result.verticals[builtin_config.name] = None
             result.sources[builtin_config.name] = PluginSource.BUILTIN
 
         return result

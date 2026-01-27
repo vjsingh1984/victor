@@ -347,7 +347,7 @@ def _extract_qwen3_thinking(content: str) -> Tuple[str, str]:
         return "", ""
 
     lines = content.split("\n")
-    thinking_lines = []
+    thinking_lines: list[str] = []
     main_lines = []
     in_thinking = True
 
@@ -495,7 +495,7 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from Cerebras with thinking content filtering."""
         try:
             payload = self._build_request_payload(

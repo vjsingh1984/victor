@@ -155,7 +155,7 @@ class ProviderPool:
 
         async with self._lock:
             if self._initialized:
-                return
+                return  # type: ignore[unreachable]
 
             # Get or create health registry
             self._health_registry = await get_health_registry()
@@ -196,6 +196,7 @@ class ProviderPool:
                 return
 
             # Create health monitor
+            assert self._health_registry is not None
             health_monitor = await self._health_registry.register(
                 provider_id=provider_id,
                 config=self.config.health_check_config,
@@ -279,6 +280,7 @@ class ProviderPool:
         if not instances:
             return None
 
+        assert self._load_balancer is not None
         return await self._load_balancer.select_with_fallback(instances)
 
     async def chat(

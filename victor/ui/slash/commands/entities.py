@@ -29,6 +29,7 @@ Commands:
 from __future__ import annotations
 
 import logging
+from typing import Any, Optional
 
 from rich.panel import Panel
 from rich.table import Table
@@ -81,7 +82,7 @@ class EntitiesCommand(BaseSlashCommand):
 
         handler(ctx, subargs)
 
-    def _show_help(self, ctx: CommandContext, args: list = None) -> None:
+    def _show_help(self, ctx: CommandContext, args: Optional[list] = None) -> None:
         """Show entity command help."""
         help_text = """
 [bold]Entity Memory Commands[/]
@@ -141,7 +142,7 @@ class EntitiesCommand(BaseSlashCommand):
                 return
 
             # Filter by type if specified
-            type_filter = None
+            type_filter: Optional[EntityType] = None
             if args:
                 try:
                     type_filter = EntityType(args[0].lower())
@@ -207,7 +208,7 @@ class EntitiesCommand(BaseSlashCommand):
 
         ctx.console.print("[yellow]Entity relations require async context.[/]")
 
-    def _show_stats(self, ctx: CommandContext, args: list = None) -> None:
+    def _show_stats(self, ctx: CommandContext, args: Optional[list] = None) -> None:
         """Show entity memory statistics."""
         memory = self._get_entity_memory(ctx)
 
@@ -227,7 +228,7 @@ class EntitiesCommand(BaseSlashCommand):
 
         ctx.console.print("[yellow]Stats require async context.[/]")
 
-    def _clear_entities(self, ctx: CommandContext, args: list = None) -> None:
+    def _clear_entities(self, ctx: CommandContext, args: Optional[list] = None) -> None:
         """Clear session entities."""
         memory = self._get_entity_memory(ctx)
 

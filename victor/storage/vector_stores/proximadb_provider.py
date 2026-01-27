@@ -48,7 +48,7 @@ from victor.storage.vector_stores.models import (
 
 # Check if ProximaDB is available
 try:
-    import httpx
+    import httpx  # type: ignore[import-not-found]
 
     HTTPX_AVAILABLE = True
 except ImportError:
@@ -163,7 +163,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         """Start ProximaDB in embedded mode if available."""
         try:
             # Try to import proximadb embedded module
-            from proximadb import EmbeddedProximaDB, EmbeddedConfig
+            from proximadb import EmbeddedProximaDB, EmbeddedConfig  # type: ignore[import-not-found]
 
             config = EmbeddedConfig(
                 data_dir=str(self._data_dir),

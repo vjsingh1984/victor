@@ -46,6 +46,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class PayloadLimitExceeded(Exception):
+    """Exception raised when payload exceeds configured limits."""
+
+    def __init__(
+        self,
+        estimated_size: int,
+        limit_size: int,
+        strategy_used: "TruncationStrategy",
+        warning: str,
+    ):
+        self.estimated_size = estimated_size
+        self.limit_size = limit_size
+        self.strategy_used = strategy_used
+        self.warning = warning
+        super().__init__(f"Payload limit exceeded: {estimated_size} > {limit_size} ({warning})")
+
+
 # Default limits (in bytes) - conservative estimates
 DEFAULT_LIMITS = {
     # Cloud providers with strict limits
@@ -370,10 +387,7 @@ class ProviderPayloadLimiter:
             return self._summarize_tool_results(messages, tools, estimate, **kwargs)
         elif strategy == TruncationStrategy.REDUCE_TOOLS:
             return self._reduce_tools(messages, tools, estimate, **kwargs)
-
-        # Fallback to oldest
-        return self._truncate_oldest(messages, tools, estimate, **kwargs)
-
+        # All strategies already handled above
     def _truncate_oldest(
         self,
         messages: List["Message"],

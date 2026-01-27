@@ -994,7 +994,7 @@ class KubernetesDeploymentHandler(DeploymentHandler):
         """Get or create Kubernetes CoreV1Api client."""
         if self._core_v1 is None:
             try:
-                from kubernetes import client, config as k8s_config
+                from kubernetes import client, config as k8s_config  # type: ignore[import]
 
                 # Try in-cluster config first, fall back to kubeconfig
                 try:
@@ -1107,7 +1107,7 @@ class KubernetesDeploymentHandler(DeploymentHandler):
 
         logger.debug(f"Executing node {node.id} in pod {self.pod_name}")
 
-        from kubernetes.stream import stream
+        from kubernetes.stream import stream  # type: ignore[import]
 
         api = self._get_api()
 
@@ -1186,7 +1186,7 @@ class ECSDeploymentHandler(DeploymentHandler):
         """Get or create boto3 ECS client."""
         if self._ecs_client is None:
             try:
-                import boto3
+                import boto3  # type: ignore[import]
 
                 self._ecs_client = boto3.client("ecs")
             except ImportError:

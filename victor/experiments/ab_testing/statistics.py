@@ -20,8 +20,8 @@ experiment variants.
 
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
-import numpy as np
-from scipy import stats
+import numpy as np  # type: ignore[import-not-found]
+from scipy import stats  # type: ignore[import-not-found]
 
 
 class StatisticalAnalyzer:

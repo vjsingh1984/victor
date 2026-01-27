@@ -131,16 +131,16 @@ class CapabilityDiscovery:
         try:
             from victor.framework.chain_registry import get_chain_registry
 
-            registry = get_chain_registry()
-            result["chains"] = registry.list_chains(vertical=vertical)
+            chain_registry = get_chain_registry()
+            result["chains"] = chain_registry.list_chains(vertical=vertical)
         except Exception:
             result["chains"] = []
 
         try:
             from victor.framework.team_registry import get_team_registry
 
-            registry = get_team_registry()
-            teams_data = registry.find_by_vertical(vertical)
+            team_registry = get_team_registry()
+            teams_data = team_registry.find_by_vertical(vertical)
             result["teams"] = list(teams_data.keys()) if teams_data else []
         except Exception:
             result["teams"] = []
@@ -148,16 +148,16 @@ class CapabilityDiscovery:
         try:
             from victor.framework.handler_registry import get_handler_registry
 
-            registry = get_handler_registry()
-            result["handlers"] = registry.list_by_vertical(vertical)
+            handler_registry = get_handler_registry()
+            result["handlers"] = handler_registry.list_by_vertical(vertical)
         except Exception:
             result["handlers"] = []
 
         try:
             from victor.framework.task_types import get_task_type_registry
 
-            registry = get_task_type_registry()
-            result["task_types"] = registry.list_types(vertical=vertical)
+            task_type_registry = get_task_type_registry()
+            result["task_types"] = task_type_registry.list_types(vertical=vertical)
         except Exception:
             result["task_types"] = []
 
@@ -314,13 +314,13 @@ def capabilities_main(
         else:
             _display_vertical_capabilities(vertical, manifest)
     else:
-        manifest = discovery.discover_all()
+        all_manifest = discovery.discover_all()
         if json_output:
             import json
 
-            console.print(json.dumps(manifest.to_dict(), indent=2))
+            console.print(json.dumps(all_manifest.to_dict(), indent=2))
         else:
-            _display_full_capabilities(manifest)
+            _display_full_capabilities(all_manifest)
 
 
 def _display_full_capabilities(manifest: CapabilityManifest) -> None:

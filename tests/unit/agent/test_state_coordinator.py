@@ -138,13 +138,17 @@ class TestStateCoordinator:
 
     def test_transition_to_success(self, coordinator, mock_state_machine):
         """Test successful stage transition."""
+        # Start from INITIAL stage
+        mock_state_machine.get_stage.return_value = ConversationStage.INITIAL
+
         result = coordinator.transition_to(
             ConversationStage.PLANNING,
             reason="Planning phase",
         )
 
         assert result is True
-        mock_state_machine.set_stage.assert_called_once_with(ConversationStage.PLANNING)
+        # The implementation uses _transition_to (internal method), not set_stage
+        mock_state_machine._transition_to.assert_called_once_with(ConversationStage.PLANNING, confidence=0.8)
 
     def test_transition_to_same_stage(self, coordinator, mock_state_machine):
         """Test transition to same stage (no-op)."""

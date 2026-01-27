@@ -16,7 +16,7 @@ import asyncio
 import re
 import sqlite3
 import time
-from typing import TYPE_CHECKING, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from victor.ui.common.constants import CURSOR_COL_INDEX, CURSOR_ROW_INDEX
 
@@ -25,6 +25,7 @@ from rich.syntax import Syntax
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.timer import Timer
 from textual.widgets import Label, Static, RichLog, TextArea, Button, ProgressBar
 from textual.message import Message
 from textual.reactive import reactive
@@ -185,15 +186,13 @@ class StatusBar(Static):
         self.provider = provider
         self.model = model
         provider_label = self.query_one(".provider-info")
-        provider_label.update(
-            Text.assemble(
-                ("Victor ", "bold #7cb7ff"),
-                "| ",
-                (f"{self.provider}", ""),
-                (" / ", ""),
-                (f"{self.model}", "bold"),
-            )
-        )
+        provider_label.update(Text.assemble(
+            ("Victor ", "bold #7cb7ff"),
+            "| ",
+            (f"{self.provider}", ""),
+            (" / ", ""),
+            (f"{self.model}", "bold"),
+        ))
         self.refresh()
 
     def update_status(self, status: str, state: str = "idle") -> None:
@@ -229,7 +228,7 @@ class SubmitTextArea(TextArea):
             super().__init__()
             self.value = value
 
-    def _on_key(self, event) -> None:
+    async def _on_key(self, event) -> None:
         """Handle key events before TextArea processes them."""
         # Ctrl+Enter: Always submit
         if event.key == "ctrl+enter":
@@ -263,7 +262,7 @@ class SubmitTextArea(TextArea):
                 return
 
         # Shift+Enter and all other keys handled normally by parent
-        super()._on_key(event)
+        await super()._on_key(event)
 
 
 class InputWidget(Static):
@@ -559,7 +558,7 @@ class ToolCallWidget(Static):
         # Collapse state management
         self._is_collapsed = False
         self._is_complete = False
-        self._collapse_timer = None
+        self._collapse_timer: Optional[Timer] = None
 
         # Error details state
         self._error_summary = ""
@@ -716,7 +715,6 @@ class ToolCallWidget(Static):
         # Stop collapse timer when manually toggled
         if self._collapse_timer:
             self._collapse_timer.stop()
-            self._collapse_timer = None
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button presses for expand/collapse error details."""
@@ -862,7 +860,7 @@ class IncrementalMarkdownRenderer:
 
         # For incremental rendering, we append to existing content
         # This is a simplified approach - in production you'd use a buffer
-        current_content = widget.renderable.plain if hasattr(widget.renderable, "plain") else ""
+        current_content = widget.text if hasattr(widget, "text") else ""
 
         # Combine previous content with new chunk
         combined_content = current_content + ("\n\n" if current_content else "") + chunk
@@ -952,7 +950,7 @@ class CodeBlock(Static):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle copy button press."""
         try:
-            import pyperclip
+            import pyperclip  # type: ignore[import-untyped]
 
             pyperclip.copy(self.code)
             # Update button text briefly
@@ -1083,7 +1081,7 @@ class StreamingMessageBlock(Static):
             self._render_timer.stop()
 
         # Schedule debounced render
-        self._render_timer = self.set_timer(self._render_debounce_ms / 1000.0, self._do_render)
+        self._render_timer: Timer | None = self.set_timer(self._render_debounce_ms / 1000.0, self._do_render)
 
     def watch_is_streaming(self, streaming: bool) -> None:
         """Show/hide streaming cursor."""
@@ -1224,7 +1222,7 @@ class ToolProgressPanel(Static):
     def __init__(
         self,
         tool_name: str,
-        arguments: Optional[dict[str, Any]] = None,
+        arguments: Optional[Dict[str, Any]] = None,
         on_cancel: Optional[Callable[..., Any]] = None,
         **kwargs,
     ) -> None:
@@ -1384,7 +1382,7 @@ class VirtualScrollContainer(VerticalScroll):
         self._avg_message_height = 10  # Estimate, will be refined
 
         # Performance optimization: Throttled scrolling
-        self._last_scroll_time = 0
+        self._last_scroll_time: float = 0
         self._scroll_throttle_ms = 50  # Scroll max 20fps
         self._update_pending = False
 
@@ -1638,7 +1636,7 @@ class VirtualScrollContainer(VerticalScroll):
     def add_tool_progress(
         self,
         tool_name: str,
-        arguments: Optional[dict[str, Any]] = None,
+        arguments: Optional[Dict[str, Any]] = None,
         on_cancel: Optional[Callable[..., Any]] = None,
     ) -> ToolProgressPanel:
         """Add a tool progress panel and return it for updates."""

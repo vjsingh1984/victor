@@ -35,8 +35,8 @@ warnings.filterwarnings(
 
 # New Google GenAI SDK (replaces deprecated google.generativeai)
 try:
-    from google import genai
-    from google.genai import types
+    from google import genai  # type: ignore[import-untyped]
+    from google.genai import types  # type: ignore[import-untyped]
 
     # Verify that the Client class is available
     if not hasattr(genai, "Client"):
@@ -256,7 +256,7 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from Google.
 
         When tools are provided, this method uses non-streaming chat() internally
@@ -479,7 +479,7 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         # Extract text content and function calls from parts
         content = ""
-        tool_calls = []
+        tool_calls: list[Any] = []
 
         if response.candidates and response.candidates[0].content.parts:
             for part in response.candidates[0].content.parts:
@@ -498,7 +498,7 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
                                 args = fc.args
                             else:
                                 # Fallback: try to convert from protobuf Struct
-                                from google.protobuf.json_format import MessageToDict
+                                from google.protobuf.json_format import MessageToDict  # type: ignore[import-untyped]
 
                                 args = MessageToDict(fc.args)
                         except Exception:

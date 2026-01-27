@@ -118,7 +118,7 @@ class PostgresService(ServiceLifecycle):
 
         # Use asyncpg if available
         try:
-            import asyncpg
+            import asyncpg  # type: ignore[import-not-found]
 
             pool = await asyncpg.create_pool(
                 host=config.config.get("host", "localhost"),
@@ -207,7 +207,7 @@ class RabbitMQService(ServiceLifecycle):
         logger.info(f"Initializing RabbitMQ service: {config.name}")
 
         try:
-            import aio_pika
+            import aio_pika  # type: ignore[import-not-found]
 
             connection = await aio_pika.connect_robust(
                 host=config.config.get("host", "localhost"),
@@ -250,7 +250,7 @@ class KafkaService(ServiceLifecycle):
         logger.info(f"Initializing Kafka service: {config.name}")
 
         try:
-            from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
+            from aiokafka import AIOKafkaProducer, AIOKafkaConsumer  # type: ignore[import-not-found]
 
             bootstrap_servers = config.config.get("bootstrap_servers", "localhost:9092")
 
@@ -321,7 +321,7 @@ class S3Service(ServiceLifecycle):
         logger.info(f"Initializing S3 service: {config.name}")
 
         try:
-            import aioboto3
+            import aioboto3  # type: ignore[import-not-found]
 
             session = aioboto3.Session(
                 aws_access_key_id=config.config.get("aws_access_key_id"),
@@ -369,7 +369,7 @@ class SQLiteService(ServiceLifecycle):
         logger.info(f"Initializing SQLite service: {config.name} at {db_path}")
 
         try:
-            import aiosqlite
+            import aiosqlite  # type: ignore[import-not-found]
 
             # Expand path and ensure parent directory exists
             db_path = Path(db_path).expanduser()

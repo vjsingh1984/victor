@@ -29,6 +29,8 @@ import pytest
 
 
 @pytest.mark.real_execution
+@pytest.mark.slow  # Real LLM execution can be slow and unpredictable
+@pytest.mark.slow  # Real LLM execution can be slow and unpredictable
 @pytest.mark.asyncio
 async def test_real_read_tool_execution(
     ollama_provider, ollama_model_name, sample_code_file, temp_workspace
@@ -89,6 +91,7 @@ async def test_real_read_tool_execution(
 
 
 @pytest.mark.real_execution
+@pytest.mark.slow  # Real LLM execution can be slow and unpredictable
 @pytest.mark.asyncio
 async def test_real_edit_tool_execution(
     ollama_provider, ollama_model_name, sample_code_file, temp_workspace
@@ -176,6 +179,7 @@ async def test_real_edit_tool_execution(
 
 
 @pytest.mark.real_execution
+@pytest.mark.slow  # Real LLM execution can be slow and unpredictable
 @pytest.mark.asyncio
 async def test_real_shell_tool_execution(ollama_provider, ollama_model_name, temp_workspace):
     """Test Shell tool executes real commands.
@@ -226,6 +230,7 @@ async def test_real_shell_tool_execution(ollama_provider, ollama_model_name, tem
 
 
 @pytest.mark.real_execution
+@pytest.mark.slow  # Real LLM execution can be slow and unpredictable
 @pytest.mark.asyncio
 @pytest.mark.timeout(600)  # 10 minutes for 3-turn conversation with tool execution
 async def test_real_multi_tool_execution(
@@ -360,6 +365,8 @@ async def test_real_multi_tool_execution(
 
 
 @pytest.mark.real_execution
+@pytest.mark.slow  # Real LLM execution can be slow and unpredictable
+@pytest.mark.timeout(300)  # 5 minutes for real LLM execution
 @pytest.mark.asyncio
 async def test_real_grep_tool_execution(
     ollama_provider, ollama_model_name, sample_code_file, temp_workspace
@@ -409,6 +416,7 @@ async def test_real_grep_tool_execution(
 
 
 @pytest.mark.real_execution
+@pytest.mark.slow  # Real LLM execution can be slow and unpredictable
 @pytest.mark.asyncio
 async def test_real_write_tool_execution(ollama_provider, ollama_model_name, temp_workspace):
     """Test Write tool creates new files.

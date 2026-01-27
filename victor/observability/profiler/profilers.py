@@ -149,7 +149,7 @@ class CPUProfiler(BaseProfiler):
             total_time_func,
             cumulative_time,
             callers,
-        ) in stats.stats.items():
+        ) in stats.stats:  # type: ignore[attr-defined]
             # Filter based on config
             if not self.config.include_builtins and func_name.startswith("<"):
                 continue
@@ -228,7 +228,7 @@ class CPUProfiler(BaseProfiler):
         # Build nodes from stats
         nodes: dict[tuple, CallGraphNode] = {}
 
-        for key, (_, total_calls, total_time, _, callers) in stats.stats.items():
+        for key, (_, total_calls, total_time, _, callers) in stats.stats:  # type: ignore[attr-defined]
             filename, line_number, func_name = key
             node = CallGraphNode(
                 function_name=func_name,
@@ -243,8 +243,8 @@ class CPUProfiler(BaseProfiler):
                 root.children.append(node)
 
         # Link callers to callees
-        for key, (_, _, _, _, callers) in stats.stats.items():
-            node = nodes.get(key)
+        for key, (_, _, _, _, callers) in stats.stats:  # type: ignore[attr-defined]
+            node = nodes.get(key)  # type: ignore[assignment]
             if not node:
                 continue
 
@@ -424,7 +424,7 @@ class MemoryProfiler(BaseProfiler):
 
         # Try to get more detailed info with psutil if available
         try:
-            import psutil
+            import psutil  # type: ignore[import-untyped]
 
             process = psutil.Process()
             mem_info = process.memory_info()
@@ -524,22 +524,22 @@ class LineProfiler(BaseProfiler):
         self._start_time = time.time()
 
         try:
-            from line_profiler import LineProfiler as LP  # type: ignore
+            from line_profiler import LineProfiler as LP  # type: ignore[import-not-found]
 
             self._line_profiler = LP()
             for func in self._functions_to_profile:
-                self._line_profiler.add_function(func)
-            self._line_profiler.enable_by_count()
+                self._line_profiler.add_function(func)  # type: ignore[attr-defined]
+            self._line_profiler.enable_by_count()  # type: ignore[attr-defined]
         except ImportError:
             logger.warning("line_profiler not available, using fallback")
             self._line_profiler = None
 
     def stop(self) -> ProfileResult:
         """Stop line profiling and return results."""
-        file_profiles = []
+        file_profiles: list[Any] = []
 
         if self._line_profiler is not None:
-            self._line_profiler.disable_by_count()
+            self._line_profiler.disable_by_count()  # type: ignore[unreachable]
 
             # Extract line statistics
             for func, timings in self._line_profiler.get_stats().timings.items():

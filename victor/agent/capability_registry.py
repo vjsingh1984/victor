@@ -603,7 +603,7 @@ class CapabilityRegistryMixin:
         if cap.attribute:
             result = getattr(self, cap.attribute, None)
             if result is not None:
-                return str(result)
+                return result
 
         raise TypeError(f"Capability '{name}' has no getter or attribute")
 

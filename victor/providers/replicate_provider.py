@@ -197,6 +197,10 @@ class ReplicateProvider(BaseProvider, HTTPErrorHandlerMixin):
                 role="assistant",
                 model=model,
                 raw_response=prediction,
+                tool_calls=None,
+                stop_reason=None,
+                usage=None,
+                metadata=None,
             )
 
         except httpx.HTTPStatusError as e:
@@ -215,7 +219,7 @@ class ReplicateProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from Replicate."""
         try:
             prompt = self._messages_to_prompt(messages)

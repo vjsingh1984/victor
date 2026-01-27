@@ -30,7 +30,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Counter, Dict, List, Optional, Set, Tuple
 
 from victor.coding.codebase.ignore_patterns import (
     DEFAULT_SKIP_DIRS,
@@ -693,14 +693,14 @@ class CodebaseAnalyzer:
                 import json
 
                 data = json.loads(package_json.read_text(encoding="utf-8"))
-                deps: Dict[str, List[str]] = {"core": [], "dev": []}
+                package_deps: Dict[str, List[str]] = {"core": [], "dev": []}
 
                 if "dependencies" in data:
-                    deps["core"] = list(data["dependencies"].keys())[:15]
+                    package_deps["core"] = list(data["dependencies"].keys())[:15]
                 if "devDependencies" in data:
-                    deps["dev"] = list(data["devDependencies"].keys())[:10]
+                    package_deps["dev"] = list(data["devDependencies"].keys())[:10]
 
-                self.analysis.dependencies = deps
+                self.analysis.dependencies = package_deps
 
             except Exception as e:
                 logger.debug(f"Failed to parse package.json dependencies: {e}")
@@ -744,9 +744,9 @@ class CodebaseAnalyzer:
         self.analysis.loc_stats = {
             "total_lines": total_lines,
             "total_files": total_files,
-            "largest_file": largest_file,
+            "largest_file": str(largest_file) if largest_file else "",
             "largest_file_lines": largest_file_lines,
-            "top_files": top_files,
+            "top_files_size": sum(size for _, size in top_files),
         }
 
     def _extract_top_imports(self) -> None:
@@ -1050,8 +1050,8 @@ def _generate_generic_victor_md(
                 break
         else:
             sections.append(f"**{context['project_name']}**: [Add project description here]\n")
-    else:
-        sections.append(f"**{context['project_name']}**: [Add project description here]\n")
+    # This else block is unreachable because of the else: clause above
+    pass
 
     # Languages detected
     if context["detected_languages"]:
@@ -1304,7 +1304,7 @@ def gather_project_context(
     max_files: int = 50,
     include_dirs: Optional[List[str]] = None,
     exclude_dirs: Optional[List[str]] = None,
-) -> Dict[str, any]:
+) -> Dict[str, Any]:
     """Gather project context for LLM analysis (works with any language).
 
     This function collects structural information about any project type
@@ -1386,7 +1386,7 @@ def gather_project_context(
         ".svelte": "Svelte",
     }
 
-    context = {
+    context: Dict[str, Any] = {
         "project_name": root.name,
         "root_path": str(root),
         "detected_languages": [],
@@ -1426,7 +1426,7 @@ def gather_project_context(
 
     # Collect directory structure (depth 2)
     def walk_dirs(path: Path, depth: int = 0, max_depth: int = 2) -> List[str]:
-        dirs = []
+        dirs: List[str] = []
         if depth > max_depth:
             return dirs
         try:
@@ -1505,16 +1505,14 @@ def gather_project_context(
     for file_path in key_files_to_read:
         try:
             content = (root / file_path).read_text(encoding="utf-8")
-            context["key_files_content"][file_path] = content[
-                :8192
-            ]  # Limit content size (fits 10-12 parallel reads)
+            context["key_files_content"][file_path] = content[:8192]  # Limit content size (fits 10-12 parallel reads)
         except Exception:
             pass
 
     return context
 
 
-def build_llm_prompt_for_victor_md(context: Dict[str, any]) -> str:
+def build_llm_prompt_for_victor_md(context: Dict[str, Any]) -> str:
     """Build the prompt for LLM to generate project context file.
 
     Args:
@@ -1542,21 +1540,26 @@ Analyze the following project data and generate the {VICTOR_CONTEXT_FILE} file.
 """
 
     # Dynamic part of the prompt (the "20%")
+    languages = context['detected_languages'] or []
+    config_files = context['config_files'] or []
+    directory_structure = context['directory_structure'] or []
+    source_files = context['source_files'] or []
+
     dynamic_context = f"""
 **Project Name**: {context['project_name']}
-**Detected Languages**: {', '.join(context['detected_languages']) or 'Unknown'}
+**Detected Languages**: {', '.join(languages) or 'Unknown'}
 
 **Configuration Files**:
-{chr(10).join('- ' + f for f in context['config_files']) or 'None detected'}
+{chr(10).join('- ' + f for f in config_files) or 'None detected'}
 
 **Directory Structure Overview**:
 ```
-{chr(10).join(context['directory_structure'][:50]) or 'Unable to determine'}
+{chr(10).join(directory_structure[:50]) or 'Unable to determine'}
 ```
 
 **Sample of Source Files**:
 ```
-{chr(10).join(context['source_files'][:30]) or 'No source files found'}
+{chr(10).join(source_files[:30]) or 'No source files found'}
 ```
 """
 
@@ -1698,7 +1701,7 @@ def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[
         default_dir = get_project_paths(root).embeddings_dir
         persist_dir = Path(getattr(settings, "codebase_persist_directory", None) or default_dir)
 
-        import lancedb  # type: ignore
+        import lancedb  # type: ignore[import-untyped]
 
         if persist_dir.exists():
             db = lancedb.connect(str(persist_dir))
@@ -2248,7 +2251,7 @@ async def generate_victor_md_from_index(
             )
 
         # Show top 3 largest files
-        top_files = loc.get("top_files", [])[:3]
+        top_files = loc.get("top_files", [])[:3]  # type: ignore[index]
         if top_files:
             sections.append("- Top files by size:")
             for path, lines in top_files:
@@ -2457,7 +2460,7 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
         )
 
         queries = [row[0] for row in cursor.fetchall()]
-        query_counter = Counter()
+        query_counter: Counter[str] = Counter()
 
         # Extract key topics from queries
         topic_keywords = [
@@ -2500,7 +2503,7 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
         """
         )
 
-        file_counter = Counter()
+        file_counter: Counter[str] = Counter()
         file_pattern = re.compile(r"`([a-zA-Z_/]+\.(py|ts|js|go|rs))[:`]")
 
         for row in cursor.fetchall():
@@ -2697,12 +2700,12 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
 
                 ga = GraphAnalyzer()
                 store = SqliteGraphStore(project_path=root)
-                nodes = await store.get_all_nodes()
+                nodes = await store.get_all_nodes()  # type: ignore[attr-defined]
                 edges = await store.get_all_edges()
                 for n in nodes:
                     ga.add_node(n)
                 for e in edges:
-                    ga.add_edge(e)
+                    ga.add_edge(e)  # type: ignore[arg-type]
 
                 pagerank_top = ga.pagerank(
                     top_k=8,
@@ -2865,7 +2868,7 @@ async def generate_enhanced_init_md(
     root_path: Optional[str] = None,
     use_llm: bool = False,
     include_conversations: bool = True,
-    on_progress: Optional[callable] = None,
+    on_progress: Optional[Callable[[str, str], None]] = None,
     force: bool = False,
     include_dirs: Optional[List[str]] = None,
     exclude_dirs: Optional[List[str]] = None,
@@ -2890,7 +2893,7 @@ async def generate_enhanced_init_md(
 
     from victor.providers.base import Message
 
-    step_times: dict = {}
+    step_times: Dict[str, float] = {}
     step_start: float = 0
 
     def progress(stage: str, msg: str, complete: bool = False):

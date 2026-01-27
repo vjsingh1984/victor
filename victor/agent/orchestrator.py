@@ -1344,7 +1344,7 @@ class AgentOrchestrator(
         self._checkpoint_coordinator.update_session_id(self._memory_session_id)
 
         # Delegate to coordinator
-        return await self._checkpoint_coordinator.save_checkpoint(  # type: ignore[no-any-return]
+        return await self._checkpoint_coordinator.save_checkpoint(
             description=description,
             tags=tags,
         )
@@ -1362,7 +1362,7 @@ class AgentOrchestrator(
         self._checkpoint_coordinator.update_session_id(self._memory_session_id)
 
         # Delegate to coordinator
-        return await self._checkpoint_coordinator.restore_checkpoint(checkpoint_id)  # type: ignore[no-any-return]
+        return await self._checkpoint_coordinator.restore_checkpoint(checkpoint_id)
 
     async def maybe_auto_checkpoint(self) -> Optional[str]:
         """Trigger auto-checkpoint if interval threshold is met.
@@ -1377,7 +1377,7 @@ class AgentOrchestrator(
         self._checkpoint_coordinator.update_session_id(self._memory_session_id)
 
         # Delegate to coordinator
-        return await self._checkpoint_coordinator.maybe_auto_checkpoint()  # type: ignore[no-any-return]
+        return await self._checkpoint_coordinator.maybe_auto_checkpoint()
 
     def _get_checkpoint_state(self) -> dict[str, Any]:
         """Build a dictionary representing current conversation state for checkpointing."""
@@ -1644,7 +1644,7 @@ class AgentOrchestrator(
         """
         # Delegate to ContextManager if available
         if hasattr(self, "_context_manager") and self._context_manager is not None:
-            return self._context_manager.get_model_context_window()  # type: ignore[no-any-return]
+            return self._context_manager.get_model_context_window()
 
         # Fallback for calls during __init__ before ContextManager is created
         try:
@@ -1663,7 +1663,7 @@ class AgentOrchestrator(
         Returns:
             Maximum context size in characters
         """
-        return self._validation_coordinator.get_max_context_chars()  # type: ignore[no-any-return]
+        return self._validation_coordinator.get_max_context_chars()
 
     def _check_context_overflow(self, max_context_chars: int = 200000) -> bool:
         """Check if context is at risk of overflow.
@@ -1675,7 +1675,7 @@ class AgentOrchestrator(
         Returns:
             True if context is dangerously large
         """
-        return self._validation_coordinator.check_context_overflow(max_context_chars).is_overflow  # type: ignore[no-any-return]
+        return self._validation_coordinator.check_context_overflow(max_context_chars).is_overflow
 
     def get_context_metrics(self) -> ContextMetrics:
         """Get detailed context metrics.
@@ -1683,7 +1683,7 @@ class AgentOrchestrator(
         Returns:
             ContextMetrics with size and overflow information
         """
-        return self._context_manager.get_context_metrics()  # type: ignore[no-any-return]
+        return self._context_manager.get_context_metrics()
 
     def _init_conversation_embedding_store(self) -> None:
         """Initialize LanceDB embedding store for semantic conversation retrieval.
@@ -2244,7 +2244,7 @@ class AgentOrchestrator(
         Returns:
             Dictionary with provider health information
         """
-        return await self._provider_coordinator.get_health()  # type: ignore[no-any-return]
+        return await self._provider_coordinator.get_health()
 
     async def graceful_shutdown(self) -> Dict[str, bool]:
         """Perform graceful shutdown of all orchestrator components.
@@ -2256,7 +2256,7 @@ class AgentOrchestrator(
             Dictionary with shutdown status for each component
         """
         # Delegate to LifecycleManager for graceful shutdown
-        return await self._lifecycle_manager.graceful_shutdown()  # type: ignore[no-any-return]
+        return await self._lifecycle_manager.graceful_shutdown()
 
     # =========================================================================
     # Provider/Model Hot-Swap Methods
@@ -2304,12 +2304,33 @@ class AgentOrchestrator(
                     "switch_provider() called from async context - "
                     "deprecated sync path will be removed in future version"
                 )
-                return asyncio.run(self._provider_coordinator.switch_provider(provider_name, model))  # type: ignore[no-any-return]
+                return asyncio.run(self._provider_coordinator.switch_provider(provider_name, model))
             else:
-                return asyncio.run(self._provider_coordinator.switch_provider(provider_name, model))  # type: ignore[no-any-return]
+                return asyncio.run(self._provider_coordinator.switch_provider(provider_name, model))
         except Exception as e:
             logger.error(f"Failed to switch provider to {provider_name}: {e}")
             return False
+
+    async def switch_provider_async(
+        self,
+        provider_name: str,
+        model: Optional[str] = None,
+        **provider_kwargs: Any,
+    ) -> bool:
+        """Async version of switch_provider (protocol method).
+
+        Args:
+            provider_name: Name of the provider (ollama, lmstudio, anthropic, etc.)
+            model: Optional model name. If not provided, uses current model.
+            **provider_kwargs: Additional provider-specific arguments (base_url, api_key, etc.)
+
+        Returns:
+            True if switch was successful, False otherwise
+
+        Raises:
+            ProviderNotFoundError: If provider not found
+        """
+        return await self._protocol_adapter.switch_provider(provider_name, model, None)
 
     def switch_model(self, model: str) -> bool:
         """Switch to a different model on the current provider.
@@ -2338,9 +2359,9 @@ class AgentOrchestrator(
                     "switch_model() called from async context - "
                     "consider using await coordinator.switch_model() instead"
                 )
-                return asyncio.run(self._provider_coordinator.switch_model(model))  # type: ignore[no-any-return]
+                return asyncio.run(self._provider_coordinator.switch_model(model))
             else:
-                return asyncio.run(self._provider_coordinator.switch_model(model))  # type: ignore[no-any-return]
+                return asyncio.run(self._provider_coordinator.switch_model(model))
         except Exception as e:
             logger.error(f"Failed to switch model to {model}: {e}")
             return False
@@ -2455,7 +2476,7 @@ class AgentOrchestrator(
                 f"(confidence={result.confidence})"
             )
 
-        return result  # type: ignore[no-any-return]
+        return result
 
     def _build_system_prompt_with_adapter(self) -> str:
         """Build system prompt using the tool calling adapter.
@@ -2464,7 +2485,7 @@ class AgentOrchestrator(
         Returns:
             Built system prompt with dynamic budget hint if applicable
         """
-        return self._prompt_coordinator.build_system_prompt_with_adapter(  # type: ignore[no-any-return]
+        return self._prompt_coordinator.build_system_prompt_with_adapter(
             prompt_builder=self.prompt_builder,
             get_model_context_window=self._get_model_context_window,
             model=self.model,
@@ -2481,7 +2502,7 @@ class AgentOrchestrator(
         Returns:
             Prompt with thinking disable prefix if available, otherwise base_prompt
         """
-        return self._prompt_coordinator.get_thinking_disabled_prompt(base_prompt)  # type: ignore[no-any-return]
+        return self._prompt_coordinator.get_thinking_disabled_prompt(base_prompt)
 
     def _resolve_shell_variant(self, tool_name: str) -> str:
         """Resolve shell aliases to the appropriate enabled shell variant.
@@ -2532,7 +2553,7 @@ class AgentOrchestrator(
             The appropriate shell variant based on mode and tool availability.
         """
         # Delegate to ModeCoordinator for mode-aware shell variant resolution
-        return self._mode_coordinator.resolve_shell_variant(tool_name)  # type: ignore[no-any-return]
+        return self._mode_coordinator.resolve_shell_variant(tool_name)
 
     def _log_tool_call(self, name: str, kwargs: dict[str, Any]) -> None:
         """A hook that logs information before a tool is called."""
@@ -2740,7 +2761,7 @@ class AgentOrchestrator(
                 f"Running without tools.[/]"
             )
             self._tool_capability_warned = True
-        return supported  # type: ignore[no-any-return]
+        return supported
 
     def add_message(self, role: str, content: str) -> None:
         """Add a message to conversation history.
@@ -2766,7 +2787,7 @@ class AgentOrchestrator(
         Returns:
             CompletionResponse from the model with complete response
         """
-        return await self._chat_coordinator.chat(user_message)  # type: ignore[no-any-return]
+        return await self._chat_coordinator.chat(user_message)
 
     # NOTE: Dead code removed - chat logic delegated to ChatCoordinator
     # Lines 3592-4849 removed (~1258 lines of unused chat-related helper methods)
@@ -3320,7 +3341,7 @@ class AgentOrchestrator(
         Returns:
             True if cancelled, False otherwise.
         """
-        return self._validation_coordinator.is_cancelled()  # type: ignore[no-any-return]
+        return self._validation_coordinator.is_cancelled()
 
     # =========================================================================
     # Conversation Memory Management
@@ -3387,7 +3408,7 @@ class AgentOrchestrator(
             else:
                 logger.warning(f"Failed to recover session {session_id}")
 
-            return success  # type: ignore[no-any-return]
+            return success
         except Exception as e:
             logger.warning(f"Failed to recover session {session_id}: {e}")
             return False
@@ -3563,7 +3584,7 @@ class AgentOrchestrator(
     # --- ProviderProtocol ---
 
     @property
-    def current_provider(self) -> str:  # type: ignore[override]
+    def current_provider(self) -> str:
         """Get current provider name (protocol property).
 
         Returns:
@@ -3572,7 +3593,7 @@ class AgentOrchestrator(
         return self._protocol_adapter.current_provider
 
     @property
-    def current_model(self) -> str:  # type: ignore[override]
+    def current_model(self) -> str:
         """Get current model name (protocol property).
 
         Returns:
@@ -3666,6 +3687,14 @@ class AgentOrchestrator(
         self._protocol_adapter.append_to_system_prompt(content)
 
     # --- MessagesProtocol ---
+
+    def get_messages(self) -> list:
+        """Get all messages from conversation history (protocol method).
+
+        Returns:
+            List of messages in conversation
+        """
+        return self._conversation_controller.messages
 
     def get_message_count(self) -> int:
         """Get message count (protocol method).

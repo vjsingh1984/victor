@@ -85,7 +85,7 @@ class BatchEntry:
     kwargs: Dict[str, Any]
     priority: BatchPriority = BatchPriority.MEDIUM
     timestamp: float = field(default_factory=time.time)
-    future: "asyncio.Future[Any]" = field(default_factory=lambda: asyncio.Future())
+    future: Optional["asyncio.Future[Any]"] = None
 
     def __hash__(self) -> int:
         """Make entry hashable for set operations."""
@@ -307,12 +307,13 @@ class RequestBatcher:
         # Generate unique request ID
         request_id = f"{id(asyncio.current_task())}_{time.time()}_{id(args)}"
 
-        # Create batch entry
+        # Create batch entry with future
         entry = BatchEntry(
             request_id=request_id,
             args=args,
             kwargs=kwargs,
             priority=priority,
+            future=asyncio.Future(),
         )
 
         # Get batch key
@@ -335,7 +336,7 @@ class RequestBatcher:
             return result
         except Exception as e:
             # Ensure future is cancelled on error
-            if not entry.future.done():
+            if entry.future is not None and not entry.future.done():
                 entry.future.set_exception(e)
             raise
 
@@ -400,7 +401,7 @@ class RequestBatcher:
             # Resolve futures
             for entry, result in zip(entries, results):
                 if entry.request_id in pending_ids:
-                    if not entry.future.done():
+                    if entry.future is not None and not entry.future.done():
                         entry.future.set_result(result)
                     self._pending_entries[batch_key].discard(entry.request_id)
 
@@ -416,7 +417,7 @@ class RequestBatcher:
             # Reject all entries in batch
             for entry in entries:
                 if entry.request_id in pending_ids:
-                    if not entry.future.done():
+                    if entry.future is not None and not entry.future.done():
                         entry.future.set_exception(e)
                     self._pending_entries[batch_key].discard(entry.request_id)
 
@@ -664,10 +665,16 @@ def reset_batchers() -> None:
     global _global_llm_batcher, _global_tool_batcher
 
     with _batcher_lock:
-        if _global_llm_batcher is not None:
-            asyncio.create_task(_global_llm_batcher.stop())
-        _global_llm_batcher = None
+        # Try to stop batchers gracefully if there's a running event loop
+        try:
+            loop = asyncio.get_running_loop()
+            if _global_llm_batcher is not None:
+                loop.create_task(_global_llm_batcher.stop())
+            if _global_tool_batcher is not None:
+                loop.create_task(_global_tool_batcher.stop())
+        except RuntimeError:
+            # No running event loop, skip async cleanup
+            pass
 
-        if _global_tool_batcher is not None:
-            asyncio.create_task(_global_tool_batcher.stop())
+        _global_llm_batcher = None
         _global_tool_batcher = None

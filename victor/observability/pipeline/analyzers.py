@@ -180,7 +180,7 @@ class GitHubActionsAnalyzer(PipelineAnalyzerProtocol):
                 steps.append(
                     PipelineStep(
                         name=f"{job_name}/{step_name}",
-                        step_type=detect_step_type(step_name, command),
+                        step_type=detect_step_type(step_name, command),  # type: ignore[arg-type]
                         command=command,
                         image=image,
                         depends_on=job_config.get("needs", []),

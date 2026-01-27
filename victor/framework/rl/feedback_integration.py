@@ -50,6 +50,7 @@ from victor.framework.rl.implicit_feedback import (
 )
 from victor.framework.rl.base import RLOutcome
 
+# TYPE_CHECKING: Import QualityResult for orchestrator business logic type hints
 if TYPE_CHECKING:
     from victor.agent.response_quality import QualityResult
     from victor.framework.rl.coordinator import RLCoordinator

@@ -24,6 +24,7 @@ from victor.core.verticals.protocols import (
     # Composite
     VerticalExtensions,
 )
+from victor.core.verticals.lazy_extensions import LazyVerticalExtensions
 
 # Import SafetyPattern from its canonical location
 from victor.core.security.patterns.types import SafetyPattern
@@ -448,10 +449,12 @@ class TestCodingVerticalExtensions:
     def test_coding_has_extensions(self):
         """CodingAssistant should provide extensions."""
         from victor.coding import CodingAssistant
+        from victor.core.verticals.lazy_extensions import LazyVerticalExtensions
 
         extensions = CodingAssistant.get_extensions()
         assert extensions is not None
-        assert isinstance(extensions, VerticalExtensions)
+        # Can be either VerticalExtensions or LazyVerticalExtensions wrapper
+        assert isinstance(extensions, (VerticalExtensions, LazyVerticalExtensions))
 
     def test_coding_middleware(self):
         """CodingAssistant should provide middleware."""
@@ -504,10 +507,12 @@ class TestResearchVerticalExtensions:
     def test_research_has_extensions(self):
         """ResearchAssistant should provide extensions (even if empty)."""
         from victor.research import ResearchAssistant
+        from victor.core.verticals.lazy_extensions import LazyVerticalExtensions
 
         extensions = ResearchAssistant.get_extensions()
         assert extensions is not None
-        assert isinstance(extensions, VerticalExtensions)
+        # Can be either VerticalExtensions or LazyVerticalExtensions wrapper
+        assert isinstance(extensions, (VerticalExtensions, LazyVerticalExtensions))
 
     def test_research_complete_extensions(self):
         """ResearchAssistant now has complete extensions."""

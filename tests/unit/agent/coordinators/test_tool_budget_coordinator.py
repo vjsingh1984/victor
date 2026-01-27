@@ -299,7 +299,7 @@ class TestToolBudgetCoordinatorBudgetSetter:
         coordinator.budget = 100
 
         # Should update manager config
-        assert mock_budget_manager.config.base_max_tool_calls == 100
+        assert mock_budget_manager.config.base_tool_calls == 100
 
 
 class TestToolBudgetCoordinatorBudgetUsed:

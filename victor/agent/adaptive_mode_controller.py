@@ -599,8 +599,8 @@ class AdaptiveModeController:
         "edit": 15,  # Increased from 5
         "search": 25,  # Increased from 6
         "action": 50,  # Increased from 10
-        "analysis_deep": 100,  # Increased from 15 (KEY FIX for architectural reviews)
-        "analyze": 50,  # Increased from 8
+        "analysis_deep": 150,  # Deep architectural analysis (increased for thorough exploration)
+        "analyze": 150,  # Increased from 50 to 150 for comprehensive codebase analysis
         "design": 100,  # Increased from 20
         "general": 50,  # Increased from 8
         "research": 75,  # NEW: Added for research tasks

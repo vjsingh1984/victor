@@ -390,8 +390,6 @@ class BaseProvider(ABC):
             ProviderError: If the request fails
         """
         # Abstract async generator - yield needed for mypy to recognize as generator
-        if False:  # pragma: no cover (unreachable but needed for type checking)
-            yield StreamChunk()
         raise NotImplementedError
 
     async def discover_capabilities(self, model: str) -> ProviderRuntimeCapabilities:
@@ -447,7 +445,7 @@ class BaseProvider(ABC):
             max_tokens=max_tokens,
             tools=tools,
             **kwargs,
-        ):
+        ):  # type: ignore[attr-defined]
             yield chunk
 
     async def count_tokens(self, text: str) -> int:

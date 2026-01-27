@@ -721,7 +721,8 @@ async def edit(
     # Block operation if strict validation is enabled and there are errors
     if strict_validation and validation_errors:
         editor.abort()
-        tracker._current_group = None
+        if hasattr(tracker, "_current_group"):
+            tracker._current_group = None
         return {
             "success": False,
             "error": f"Validation failed: {len(validation_errors)} syntax errors detected",
@@ -803,12 +804,15 @@ async def edit(
             return result
         else:
             # Clear change group on failure
-            tracker._current_group = None
+            if hasattr(tracker, "_current_group"):
+                tracker._current_group = None
             return {"success": False, "error": "Failed to commit changes. Transaction rolled back."}
     else:
         # Queue only, don't commit
         editor.abort()  # Abort to clean up, since we're not committing
-        tracker._current_group = None  # Clear uncommitted changes
+        if hasattr(tracker, "_current_group"):
+            if hasattr(tracker, "_current_group"):
+                tracker._current_group = None  # Clear uncommitted changes
         return {
             "success": True,
             "operations_queued": operations_queued,

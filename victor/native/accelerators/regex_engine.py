@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 # Try to import native Rust implementation
 try:
-    from victor_native import regex_engine as _native_regex
+    from victor_native import regex_engine as _native_regex  # type: ignore[import-not-found]
 
     _RUST_AVAILABLE = True
     logger.info("Rust regex engine accelerator loaded")
@@ -398,7 +398,7 @@ class RegexEngineAccelerator:
                 compiled[name] = re.compile(pattern)
             except re.error as e:
                 logger.warning(f"Invalid pattern '{name}' for {language}: {e}")
-                compiled[name] = None
+                compiled[name] = None  # type: ignore[assignment]
         return compiled
 
     def match_all(
@@ -571,7 +571,7 @@ class RegexEngineAccelerator:
 
         if custom_patterns:
             # Hash custom patterns (non-cryptographic, used for cache key only)
-            pattern_str = "|".join(sorted(custom_patterns.items()))
+            pattern_str = "|".join(sorted(list(custom_patterns.keys())))
             pattern_hash = hashlib.md5(pattern_str.encode(), usedforsecurity=False).hexdigest()
             key_parts.append(pattern_hash)
 

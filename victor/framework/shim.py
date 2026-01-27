@@ -57,6 +57,7 @@ from victor.framework.vertical_integration import (
     IntegrationResult,
 )
 
+# TYPE_CHECKING: Import orchestrator for type hints only (backward compatibility bridge)
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator as ConcreteAgentOrchestrator
     from victor.config.settings import Settings

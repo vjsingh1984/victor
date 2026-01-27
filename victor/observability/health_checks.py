@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import psutil
+import psutil  # type: ignore[import-untyped]
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
@@ -429,7 +429,7 @@ class DegradationDetector:
 
         # Filter metrics within baseline window
         baseline_metrics = [
-            m for m in historical_metrics if now - m.get("timestamp", now) <= self._baseline_window
+            m for m in historical_metrics if now - datetime.fromtimestamp(m.get("timestamp", now.timestamp())) <= self._baseline_window
         ]
 
         if not baseline_metrics:

@@ -50,7 +50,7 @@ DEFAULT_BASE_URL = "https://api.x.ai/v1"
 
 # Available xAI Grok models
 # Reference: https://docs.x.ai/docs/models
-XAI_MODELS = {
+XAI_MODELS: Dict[str, Dict[str, Any]] = {
     "grok-2": {
         "description": "Grok-2 flagship model",
         "context_window": 131072,  # 128K tokens
@@ -156,12 +156,12 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         """
         # Try exact match first
         if model in XAI_MODELS:
-            return XAI_MODELS[model]["context_window"]
+            return int(XAI_MODELS[model]["context_window"])
 
         # Try prefix match (e.g., "grok-2-1212" matches "grok-2")
         for model_prefix, info in XAI_MODELS.items():
             if model.startswith(model_prefix):
-                return info["context_window"]
+                return int(info["context_window"])
 
         # Default to 128K for unknown Grok models
         return 131072

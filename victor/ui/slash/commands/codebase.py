@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -47,7 +48,7 @@ class ReindexCommand(BaseSlashCommand):
         show_stats = self._has_flag(ctx, "--stats", "-s")
 
         try:
-            from victor.coding.codebase.embeddings.manager import get_embedding_manager
+            from victor.coding.codebase.embeddings.manager import get_embedding_manager  # type: ignore[import-not-found]
 
             manager = get_embedding_manager()
 
@@ -241,9 +242,8 @@ class InitCommand(BaseSlashCommand):
             return existing + "\n\n" + "\n".join(new_lines)
         return existing
 
-    def _create_symlinks(self, target: "Path", ctx: CommandContext) -> None:
+    def _create_symlinks(self, target: Path, ctx: CommandContext) -> None:
         """Create symlinks for other tools (CLAUDE.md, etc.)."""
-        from pathlib import Path
 
         aliases = ["CLAUDE.md", "CURSOR.md"]
         for alias in aliases:

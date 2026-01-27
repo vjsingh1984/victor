@@ -411,9 +411,9 @@ class ResponseCache:
 
         # Store in cache
         with self._lock:
-            self._evict_if_needed()
             self._cache[key] = entry
             self._cache.move_to_end(key)  # Mark as recently used
+            self._evict_if_needed()  # Evict after adding if over capacity
 
         # Persist if enabled
         if self.persist_path:

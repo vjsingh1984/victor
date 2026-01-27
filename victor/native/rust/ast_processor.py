@@ -40,13 +40,13 @@ logger = logging.getLogger(__name__)
 
 # Try to import native extension
 _NATIVE_AVAILABLE = False
-_native = None
+_native_module: Any = None
 
 try:
-    import victor_native as _native
+    import victor_native as _native_impl  # type: ignore[import-not-found]
 
     _NATIVE_AVAILABLE = True
-    logger.info(f"Rust AST processor available (version {_native.__version__})")
+    logger.info(f"Rust AST processor available (version {_native_impl.__version__})")
 except ImportError:
     logger.debug("Rust AST processor not available, will use Python tree-sitter fallback")
 
@@ -87,8 +87,8 @@ class ASTProcessorAccelerator:
         if self.rust_available:
             logger.info("AST processing: Using Rust accelerator (10x faster)")
             # Initialize native cache
-            if hasattr(_native, "init_ast_cache"):
-                _native.init_ast_cache(cache_size)
+            if _native_module is not None and hasattr(_native_module, "init_ast_cache"):
+                _native_impl.init_ast_cache(cache_size)
         else:
             logger.info("AST processing: Using Python tree-sitter")
 
@@ -111,10 +111,10 @@ class ASTProcessorAccelerator:
         Raises:
             ValueError: If language is not supported
         """
-        if self.rust_available and hasattr(_native, "parse_to_ast"):
+        if self.rust_available and _native_module is not None and hasattr(_native_module, "parse_to_ast"):
             try:
                 # Use Rust parser
-                tree = _native.parse_to_ast(source_code, language, file_path or "")
+                tree = _native_impl.parse_to_ast(source_code, language, file_path or "")
                 return tree
             except Exception as e:
                 logger.error(f"Rust AST parsing failed for {file_path}: {e}")
@@ -160,9 +160,9 @@ class ASTProcessorAccelerator:
         Raises:
             ValueError: If query syntax is invalid
         """
-        if self.rust_available and hasattr(_native, "execute_query"):
+        if self.rust_available and _native_module is not None and hasattr(_native_module, "execute_query"):
             try:
-                matches = _native.execute_query(tree, query, language)
+                matches = _native_impl.execute_query(tree, query, language)
                 # Convert to Node objects
                 return [self._match_to_node(m) for m in matches]
             except Exception as e:
@@ -216,9 +216,9 @@ class ASTProcessorAccelerator:
         Returns:
             Dictionary mapping file paths to lists of symbol info
         """
-        if self.rust_available and hasattr(_native, "extract_symbols_parallel"):
+        if self.rust_available and _native_module is not None and hasattr(_native_module, "extract_symbols_parallel"):
             try:
-                results = _native.extract_symbols_parallel(files, symbol_types)
+                results = _native_impl.extract_symbols_parallel(files, symbol_types)
                 return self._format_symbol_results(results, [f[2] for f in files])
             except Exception as e:
                 logger.error(f"Rust parallel extraction failed: {e}")
@@ -233,7 +233,7 @@ class ASTProcessorAccelerator:
         symbol_types: List[str],
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Extract symbols using Python tree-sitter (sequential fallback)."""
-        results = {}
+        results: Dict[str, List[Dict[str, Any]]] = {}
 
         for language, source_code, file_path in files:
             try:
@@ -264,7 +264,7 @@ class ASTProcessorAccelerator:
                 for node in nodes:
                     symbols.append(
                         {
-                            "name": node.text.decode("utf-8"),
+                            "name": node.text.decode("utf-8") if node.text else "",
                             "type": node.parent.type if node.parent else "unknown",
                             "line": node.start_point[0] + 1,
                             "column": node.start_point[1],
@@ -296,8 +296,8 @@ class ASTProcessorAccelerator:
         self._cache_hits = 0
         self._cache_misses = 0
 
-        if self.rust_available and hasattr(_native, "clear_ast_cache"):
-            _native.clear_ast_cache()
+        if self.rust_available and _native_module is not None and hasattr(_native_module, "clear_ast_cache"):
+            _native_impl.clear_ast_cache()
 
     @property
     def cache_stats(self) -> Dict[str, int]:

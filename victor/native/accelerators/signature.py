@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 # Try to import native Rust implementation
 try:
-    from victor_native import signature as _native_signature
+    from victor_native import signature as _native_signature  # type: ignore[import-not-found]
 
     _RUST_AVAILABLE = True
     logger.info("Rust signature accelerator loaded")

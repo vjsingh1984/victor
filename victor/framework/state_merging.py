@@ -210,9 +210,7 @@ class BaseMergeStrategy(ABC):
         elif self.mode == MergeMode.MERGE:
             # Attempt to merge compatible types
             return self._attempt_merge(key, graph_value, team_value)
-        else:
-            # Default to team wins
-            return team_value
+        # All MergeMode cases should be handled above
 
     def _attempt_merge(self, key: str, graph_value: Any, team_value: Any) -> Any:
         """Attempt to merge conflicting values.

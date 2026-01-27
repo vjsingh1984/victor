@@ -15,9 +15,9 @@
 """Core conversation state types.
 
 This module provides the canonical conversation stage enum used across
-the entire Victor codebase. It is moved from victor.agent.conversation_state
-to victor.core.state to enforce proper layer boundaries (Framework should
-not depend on Agent).
+the entire Victor codebase. Previously in agent/conversation_state,
+now moved to core/state to enforce proper layer boundaries (Framework
+should not depend on Agent).
 
 This is the SINGLE SOURCE OF TRUTH for conversation stages.
 The Framework's Stage enum is an alias to this ConversationStage.
@@ -53,6 +53,14 @@ class ConversationStage(str, Enum):
     EXECUTION = "execution"  # Making changes, running commands
     VERIFICATION = "verification"  # Testing, validating
     COMPLETION = "completion"  # Summarizing, done
+
+    def __str__(self) -> str:
+        """Return the string value instead of the enum name."""
+        return self.value
+
+    def __repr__(self) -> str:
+        """Return a custom repr with lowercase name."""
+        return f"<{self.__class__.__name__}.{self.name.lower()}: '{self.value}'>"
 
 
 __all__ = ["ConversationStage"]

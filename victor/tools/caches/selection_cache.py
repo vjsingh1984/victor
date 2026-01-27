@@ -693,7 +693,7 @@ class ToolSelectionCache:
                 "hit_rate": metrics.hit_rate,
                 "evictions": metrics.evictions,
                 "total_entries": metrics.total_entries,
-                "utilization": registry_stats.get("utilization", 0.0),
+                "utilization": float(registry_stats.get("utilization", 0.0)),
                 "total_latency_saved_ms": metrics.total_latency_saved_ms,
                 "avg_latency_per_hit_ms": metrics.avg_latency_per_hit_ms,
             }

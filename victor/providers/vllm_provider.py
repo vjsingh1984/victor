@@ -40,7 +40,7 @@ Top tool-enabled coding models for vLLM (fp16/q8):
 import json
 import logging
 import re
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from typing import Any, AsyncIterator, Coroutine, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -147,7 +147,7 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
     Returns:
         Tuple of (parsed_tool_calls, remaining_content)
     """
-    tool_calls = []
+    tool_calls: List[Dict[str, Any]] = []
     remaining = content
 
     # Pattern 1: JSON code block with tool call
@@ -416,11 +416,11 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         except httpx.ConnectError as e:
             # Use mixin for connection errors
-            raise self._handle_error(e, self.name)
+            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
         except httpx.TimeoutException as e:
-            raise self._handle_error(e, self.name)
+            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
         except Exception as e:
-            raise self._handle_error(e, self.name)
+            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
 
     async def stream(
         self,
@@ -431,7 +431,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> Coroutine[Any, Any, AsyncIterator[StreamChunk]]:
         """Stream chat completion from vLLM server.
 
         Args:
@@ -505,8 +505,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
                                 yield StreamChunk(
                                     content=content,
                                     is_final=False,
-                                    role="assistant",
-                                    model=model,
+                                    model_name=model,
                                 )
 
                             # Handle tool calls
@@ -537,7 +536,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
                                 # Parse accumulated tool calls
                                 parsed_tool_calls = None
                                 if accumulated_tool_calls:
-                                    parsed_tool_calls = []
+                                    parsed_tool_calls: List[Dict[str, Any]] = []
                                     for tc in accumulated_tool_calls:
                                         try:
                                             args = (
@@ -571,10 +570,8 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
                                 yield StreamChunk(
                                     content=final_content,
                                     is_final=True,
-                                    role="assistant",
-                                    model=model,
+                                    model_name=model,
                                     tool_calls=parsed_tool_calls,
-                                    stop_reason=finish_reason,
                                 )
 
                         except json.JSONDecodeError:
@@ -582,9 +579,9 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
                             continue
 
         except httpx.TimeoutException as e:
-            raise self._handle_error(e, self.name)
+            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
         except Exception as e:
-            raise self._handle_error(e, self.name)
+            raise self._handle_error(e, self.name)  # type: ignore[attr-defined]
 
     def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
         """Parse vLLM API response.

@@ -51,8 +51,8 @@ logger = logging.getLogger(__name__)
 
 # LanceDB is optional - provide graceful fallback
 try:
-    import lancedb
-    import pyarrow as pa
+    import lancedb  # type: ignore[import]
+    import pyarrow as pa  # type: ignore[import]
 
     LANCEDB_AVAILABLE = True
 except ImportError:
@@ -733,7 +733,7 @@ class DocumentStore:
         """
         await self.initialize()
         stats = dict(self._stats)
-        stats["store_path"] = str(self.config.path)  # type: ignore[assignment]
+        stats["store_path"] = str(self.config.path)
         return stats
 
     async def close(self) -> None:

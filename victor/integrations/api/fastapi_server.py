@@ -35,7 +35,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional, cast
 
-from fastapi import (
+from fastapi import (  # type: ignore[import-not-found]
     Body,
     FastAPI,
     HTTPException,
@@ -44,9 +44,9 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field, field_validator
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import-not-found]
+from fastapi.responses import JSONResponse, StreamingResponse  # type: ignore[import-not-found]
+from pydantic import BaseModel, Field, field_validator  # type: ignore[import-not-found]
 
 from victor.integrations.search_types import CodeSearchResult
 from victor.integrations.api.event_bridge import EventBridge
@@ -961,8 +961,7 @@ class VictorFastAPIServer:
                     iter([content]),
                     media_type="text/markdown",
                 )
-            else:
-                return JSONResponse({"messages": messages})
+            return JSONResponse({"messages": messages})
 
         # Undo/Redo
         @app.post("/undo", tags=["History"])

@@ -95,7 +95,7 @@ class TestReadFileSearch:
             assert "line 1" in result
             assert "line 2" in result
             assert "line 3" in result
-            assert "[File:" in result  # Header present
+            assert "File:" in result  # Header present
 
             Path(f.name).unlink()
 
@@ -110,7 +110,7 @@ class TestReadFileSearch:
 
             assert "line 2" in result
             assert "line 3" in result
-            assert "Lines 2-3" in result
+            assert "Showing lines 2-3" in result
 
             Path(f.name).unlink()
 
@@ -128,13 +128,16 @@ class TestListDirectoryFilters:
             (Path(tmpdir) / "baz.txt").touch()
             (Path(tmpdir) / "qux.js").touch()
 
-            # With pattern, result is a dict with count, filter, items, truncated
+            # With pattern, result is a list containing a dict with count, filter, items, truncated
             result = await ls(tmpdir, pattern="*.py", depth=1)
 
-            assert isinstance(result, dict)
-            assert result["count"] == 2
-            assert result["filter"] == "*.py"
-            assert all(".py" in item["name"] for item in result["items"])
+            assert isinstance(result, list)
+            assert len(result) == 1
+            result_dict = result[0]
+            assert isinstance(result_dict, dict)
+            assert result_dict["count"] == 2
+            assert result_dict["filter"] == "*.py"
+            assert all(".py" in item["name"] for item in result_dict["items"])
 
     @pytest.mark.asyncio
     async def test_extensions_via_pattern(self):
@@ -144,12 +147,15 @@ class TestListDirectoryFilters:
             (Path(tmpdir) / "bar.ts").touch()
             (Path(tmpdir) / "baz.txt").touch()
 
-            # With pattern, result is a dict
+            # With pattern, result is a list containing a dict
             result = await ls(tmpdir, pattern="*.py")
 
-            assert isinstance(result, dict)
-            assert result["count"] == 1
-            item = result["items"][0]
+            assert isinstance(result, list)
+            assert len(result) == 1
+            result_dict = result[0]
+            assert isinstance(result_dict, dict)
+            assert result_dict["count"] == 1
+            item = result_dict["items"][0]
             name = item.get("name", item.get("path", ""))
             assert "foo.py" in name
 
@@ -162,8 +168,10 @@ class TestListDirectoryFilters:
 
             result = await ls(tmpdir, depth=1)
 
-            # Result is a dict with items
-            items = result["items"]
+            # Result is a list containing a dict with items
+            assert isinstance(result, list)
+            result_dict = result[0]
+            items = result_dict["items"]
             # Filter directories manually
             dirs = [item for item in items if item["type"] == "directory"]
             assert len(dirs) == 1
@@ -178,8 +186,10 @@ class TestListDirectoryFilters:
 
             result = await ls(tmpdir, depth=1)
 
-            # Result is a dict with items
-            items = result["items"]
+            # Result is a list containing a dict with items
+            assert isinstance(result, list)
+            result_dict = result[0]
+            items = result_dict["items"]
             # Filter files manually
             files = [item for item in items if item["type"] == "file"]
             assert len(files) == 1
@@ -195,10 +205,12 @@ class TestListDirectoryFilters:
 
             result = await ls(tmpdir, pattern="*.py", limit=5)
 
-            # Result is a dict when using pattern
-            assert isinstance(result, dict)
-            assert result["count"] == 5
-            assert result["truncated"] is True
+            # Result is a list containing a dict when using pattern
+            assert isinstance(result, list)
+            result_dict = result[0]
+            assert isinstance(result_dict, dict)
+            assert result_dict["count"] == 5
+            assert result_dict.get("truncated") is True
 
     @pytest.mark.asyncio
     async def test_unfiltered_returns_dict_with_items(self):
@@ -209,12 +221,14 @@ class TestListDirectoryFilters:
 
             result = await ls(tmpdir, depth=1)
 
-            # ls now always returns dict with cwd, target, items, count
-            assert isinstance(result, dict)
-            assert "items" in result
-            assert "count" in result
-            assert "cwd" in result
-            assert len(result["items"]) == 2
+            # ls now always returns list containing dict with cwd, target, items, count
+            assert isinstance(result, list)
+            result_dict = result[0]
+            assert isinstance(result_dict, dict)
+            assert "items" in result_dict
+            assert "count" in result_dict
+            assert "cwd" in result_dict
+            assert len(result_dict["items"]) == 2
 
     @pytest.mark.asyncio
     async def test_recursive_with_pattern(self):
@@ -228,9 +242,11 @@ class TestListDirectoryFilters:
 
             result = await ls(tmpdir, recursive=True, pattern="*.py")
 
-            # With pattern, result is a dict
-            assert isinstance(result, dict)
-            assert result["count"] == 2
+            # With pattern, result is a list containing a dict
+            assert isinstance(result, list)
+            result_dict = result[0]
+            assert isinstance(result_dict, dict)
+            assert result_dict["count"] == 2
 
 
 class TestTokenEfficiencyComparison:
@@ -271,15 +287,17 @@ class TestTokenEfficiencyComparison:
             for i in range(50):
                 (Path(tmpdir) / f"file{i}.txt").touch()
 
-            # Full listing with depth=1 (returns dict with items)
+            # Full listing with depth=1 (returns list containing dict with items)
             full_result = await ls(tmpdir, depth=1)
 
-            # Filtered listing using pattern (returns dict)
+            # Filtered listing using pattern (returns list containing dict)
             filtered_result = await ls(tmpdir, pattern="*.py")
 
             # Filtered should have fewer items
-            assert filtered_result["count"] < full_result["count"]
-            assert filtered_result["count"] == 50
+            full_dict = full_result[0]
+            filtered_dict = filtered_result[0]
+            assert filtered_dict["count"] < full_dict["count"]
+            assert filtered_dict["count"] == 50
 
 
 class TestTraversalOrdering:
@@ -306,8 +324,9 @@ class TestTraversalOrdering:
 
             result = await ls(tmpdir, depth=2)
 
-            # Result is a dict with items
-            items = result["items"]
+            # Result is a list containing a dict with items
+            result_dict = result[0]
+            items = result_dict["items"]
             # BFS: all depth-1 items should come before any depth-2 items
             paths = [item["path"] for item in items]
 
@@ -342,7 +361,8 @@ class TestTraversalOrdering:
             (b_dir / "b1.txt").touch()
 
             result = await ls(tmpdir, depth=2)
-            items = result["items"]
+            result_dict = result[0]
+            items = result_dict["items"]
             paths = [item["path"] for item in items]
 
             # Both 'a' and 'b' directories should appear before any nested files
@@ -368,9 +388,11 @@ class TestTraversalOrdering:
             # With limit=8 and BFS, should see all 5 directories first
             result = await ls(tmpdir, depth=2, limit=8)
 
-            # Result is a dict with 'items' when using non-default depth/limit
-            assert isinstance(result, dict)
-            items = result["items"]
+            # Result is a list containing a dict with 'items' when using non-default depth/limit
+            assert isinstance(result, list)
+            result_dict = result[0]
+            assert isinstance(result_dict, dict)
+            items = result_dict["items"]
 
             # Should see all 5 top-level directories
             top_level_dirs = [
@@ -401,7 +423,8 @@ class TestDepthParameter:
 
             result = await ls(tmpdir, depth=1)
 
-            items = result["items"]
+            result_dict = result[0]
+            items = result_dict["items"]
             assert len(items) == 2
             names = [item["name"] for item in items]
             assert "file.txt" in names
@@ -422,7 +445,8 @@ class TestDepthParameter:
 
             result = await ls(tmpdir, depth=2)
 
-            items = result["items"]
+            result_dict = result[0]
+            items = result_dict["items"]
             paths = [item["path"] for item in items]
             assert "file.txt" in paths
             assert "subdir" in paths
@@ -442,7 +466,8 @@ class TestDepthParameter:
 
             result = await ls(tmpdir, depth=3)
 
-            items = result["items"]
+            result_dict = result[0]
+            items = result_dict["items"]
             paths = [item["path"] for item in items]
             assert any("deep.txt" in p for p in paths)
 
@@ -457,7 +482,8 @@ class TestDepthParameter:
             result = await ls(tmpdir, depth=0)
 
             # With depth=0, we get nothing since the iterator never yields
-            items = result["items"]
+            result_dict = result[0] if isinstance(result, list) else result
+            items = result_dict["items"]
             assert len(items) == 0
 
     @pytest.mark.asyncio
@@ -474,7 +500,8 @@ class TestDepthParameter:
             # depth=1 with recursive=True should still find deep.txt
             result = await ls(tmpdir, recursive=True, depth=1)
 
-            items = result["items"]
+            result_dict = result[0]
+            items = result_dict["items"]
             paths = [item["path"] for item in items]
             assert any("deep.txt" in p for p in paths)
 
@@ -491,10 +518,12 @@ class TestLimitParameter:
 
             result = await ls(tmpdir, limit=10)
 
-            # Non-default limit returns dict with items
-            assert isinstance(result, dict)
-            assert result["count"] == 10
-            assert result["truncated"] is True
+            # Non-default limit returns list containing dict with items
+            assert isinstance(result, list)
+            result_dict = result[0]
+            assert isinstance(result_dict, dict)
+            assert result_dict["count"] == 10
+            assert result_dict.get("truncated") is True
 
     @pytest.mark.asyncio
     async def test_limit_with_recursive(self):
@@ -509,9 +538,11 @@ class TestLimitParameter:
 
             result = await ls(tmpdir, recursive=True, limit=15)
 
-            # Non-default limit returns dict with items
-            assert isinstance(result, dict)
-            assert result["count"] == 15
+            # Non-default limit returns list containing dict with items
+            assert isinstance(result, list)
+            result_dict = result[0]
+            assert isinstance(result_dict, dict)
+            assert result_dict["count"] == 15
 
     @pytest.mark.asyncio
     async def test_limit_default_1000(self):
@@ -523,9 +554,11 @@ class TestLimitParameter:
 
             result = await ls(tmpdir, depth=1)
 
-            # Result is always a dict with items
-            assert isinstance(result, dict)
-            assert result["count"] == 50
+            # Result is always a list containing dict with items
+            assert isinstance(result, list)
+            result_dict = result[0]
+            assert isinstance(result_dict, dict)
+            assert result_dict["count"] == 50
 
     @pytest.mark.asyncio
     async def test_limit_string_coercion(self):
@@ -534,11 +567,13 @@ class TestLimitParameter:
             for i in range(20):
                 (Path(tmpdir) / f"file{i}.txt").touch()
 
-            # Simulate model passing string - non-default returns dict
+            # Simulate model passing string - non-default returns list containing dict
             result = await ls(tmpdir, limit="5")
 
-            assert isinstance(result, dict)
-            assert result["count"] == 5
+            assert isinstance(result, list)
+            result_dict = result[0]
+            assert isinstance(result_dict, dict)
+            assert result_dict["count"] == 5
 
 
 class TestListDirectoryEdgeCases:
@@ -549,8 +584,9 @@ class TestListDirectoryEdgeCases:
         """Test listing empty directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
             result = await ls(tmpdir, depth=1)
-            assert result["items"] == []
-            assert result["count"] == 0
+            result_dict = result[0] if isinstance(result, list) else result
+            assert result_dict["items"] == []
+            assert result_dict["count"] == 0
 
     @pytest.mark.asyncio
     async def test_permission_error_handled(self):
@@ -573,7 +609,8 @@ class TestListDirectoryEdgeCases:
                 try:
                     result = await ls(tmpdir, depth=2)
                     # Should still get accessible results
-                    items = result["items"]
+                    result_dict = result[0] if isinstance(result, list) else result
+                    items = result_dict["items"]
                     paths = [item.get("path", item.get("name")) for item in items]
                     assert "accessible" in paths
                 finally:
@@ -590,7 +627,8 @@ class TestListDirectoryEdgeCases:
 
             result = await ls(tmpdir, depth=2)
 
-            items = result["items"]
+            result_dict = result[0] if isinstance(result, list) else result
+            items = result_dict["items"]
             # Check depth info is included
             for item in items:
                 assert "depth" in item
@@ -615,7 +653,8 @@ class TestListDirectoryEdgeCases:
             (Path(tmpdir) / "mango.txt").touch()
 
             result = await ls(tmpdir, depth=1)
-            items = result["items"]
+            result_dict = result[0] if isinstance(result, list) else result
+            items = result_dict["items"]
             names = [item["name"] for item in items]
 
             assert names == sorted(names)
@@ -630,7 +669,8 @@ class TestListDirectoryEdgeCases:
 
             result = await ls(tmpdir, depth=1)
 
-            items = result["items"]
+            result_dict = result[0] if isinstance(result, list) else result
+            items = result_dict["items"]
             types = {item["name"]: item["type"] for item in items}
             assert types["file.txt"] == "file"
             assert types["subdir"] == "directory"
@@ -646,7 +686,8 @@ class TestListDirectoryEdgeCases:
 
             result = await ls(tmpdir, recursive=True, depth=1)
 
-            items = result["items"]
+            result_dict = result[0] if isinstance(result, list) else result
+            items = result_dict["items"]
             # Should use 'path' key with relative path
             for item in items:
                 assert "path" in item
@@ -661,7 +702,8 @@ class TestListDirectoryEdgeCases:
 
             result = await ls(tmpdir, depth=1)
 
-            items = result["items"]
+            result_dict = result[0] if isinstance(result, list) else result
+            items = result_dict["items"]
             # Should use 'name' key
             for item in items:
                 assert "name" in item
@@ -678,7 +720,8 @@ class TestListDirectoryEdgeCases:
             # Simulate model passing string
             result = await ls(tmpdir, depth="2")
 
-            items = result["items"]
+            result_dict = result[0] if isinstance(result, list) else result
+            items = result_dict["items"]
             # Should include nested file
             paths = [item.get("path", item.get("name")) for item in items]
             assert any("nested.txt" in p for p in paths)

@@ -791,14 +791,14 @@ class ModelTrainer:
         X, y = self._load_training_data(training_data_path)
 
         # Split data
-        from sklearn.model_selection import train_test_split
+        from sklearn.model_selection import train_test_split  # type: ignore[import]
 
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=self.test_size, random_state=self.random_state, stratify=y
         )
 
         # Scale features
-        from sklearn.preprocessing import StandardScaler
+        from sklearn.preprocessing import StandardScaler  # type: ignore[import]
 
         scaler = StandardScaler()
         X_train_scaled = scaler.fit_transform(X_train)
@@ -853,8 +853,8 @@ class ModelTrainer:
             Model instance
         """
         try:
-            from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-            from sklearn.neural_network import MLPClassifier
+            from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier  # type: ignore[import]
+            from sklearn.neural_network import MLPClassifier  # type: ignore[import]
 
             if self.algorithm == "random_forest":
                 return RandomForestClassifier(
@@ -924,7 +924,7 @@ class ModelTrainer:
 
         # Calculate metrics
         try:
-            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score  # type: ignore[import]
 
             accuracy = accuracy_score(y_test, y_pred)
             precision = precision_score(y_test, y_pred, average="weighted", zero_division=0)

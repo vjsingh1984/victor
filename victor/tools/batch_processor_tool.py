@@ -353,7 +353,7 @@ async def batch(
         if not find:
             return {"success": False, "error": "Replace operation requires 'find' parameter"}
 
-        results = await _parallel_replace(files, find, replace, regex, dry_run)
+        results = await _parallel_replace(files, find, replace or "", regex, dry_run)
         total_replacements = sum(r.get("replacements", 0) for r in results)
 
         # Build report

@@ -166,8 +166,6 @@ class AgenticTimeoutConfig:
 
     def __post_init__(self) -> None:
         """Initialize policy if needed."""
-        if self.policy is None:
-            self.policy = SafeTimeoutPolicy(min_turn_timeout=self.min_turn_timeout)
 
     @property
     def turn_timeout(self) -> int:

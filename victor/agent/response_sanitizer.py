@@ -31,12 +31,12 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 if TYPE_CHECKING:
     # Type stubs for native extensions (optional)
     try:
-        import victor_native
+        import victor_native  # type: ignore[import-not-found]
     except ImportError:
         pass
 
@@ -44,14 +44,13 @@ logger = logging.getLogger(__name__)
 
 # Try to import native extensions for performance
 _NATIVE_AVAILABLE = False
-_native = None
+_native: Any = None
 
 try:
-    import victor_native as _native  # type: ignore
-
+    import victor_native as _native_module  
     _NATIVE_AVAILABLE = True
-    if _native:
-        logger.debug(f"Native streaming filter loaded (v{_native.__version__})")
+    if _native_module:
+        logger.debug(f"Native streaming filter loaded (v{_native_module.__version__})")
 except ImportError:
     logger.debug("Native extensions not available, using Python streaming filter")
 

@@ -114,9 +114,11 @@ def sample_graph(sample_tasks):
     graph = TaskGraph()
     for task in sample_tasks:
         graph.add_node(task)
+    # Add edges: from dependency to dependent task (dep_id -> task.id)
+    # This is the reverse of the task.depends_on list
     for task in sample_tasks:
         for dep_id in task.depends_on:
-            graph.add_edge(task.id, dep_id)
+            graph.add_edge(dep_id, task.id)
     return graph
 
 
@@ -686,14 +688,18 @@ class TestLLMIntegration:
 
         # Ensure provider_manager is set
         planner._provider_manager = mock_provider_manager
-        mock_provider_manager.chat = AsyncMock(
+
+        # Mock get_provider to return a provider with chat method
+        mock_provider = AsyncMock()
+        mock_provider.chat = AsyncMock(
             return_value=Mock(content=json.dumps({"subtasks": []}))
         )
+        mock_provider_manager.get_provider = Mock(return_value=mock_provider)
 
         await planner.decompose_task("Test task")
 
-        # Verify provider manager was called
-        assert mock_provider_manager.chat.called
+        # Verify provider was called
+        assert mock_provider.chat.called
 
     @pytest.mark.asyncio
     async def test_no_llm_provider_raises_error(self, planner):
@@ -908,8 +914,8 @@ class TestEdgeCases:
         graph.add_node(Task(id="task_1", description="Independent 1"))
         graph.add_node(Task(id="task_2", description="Independent 2"))
         graph.add_node(Task(id="task_3", description="Dependent", depends_on=["task_1", "task_2"]))
-        graph.add_edge("task_3", "task_1")
-        graph.add_edge("task_3", "task_2")
+        graph.add_edge("task_1", "task_3")  # task_3 depends on task_1
+        graph.add_edge("task_2", "task_3")  # task_3 depends on task_2
 
         tasks = await planner.suggest_next_tasks(graph)
 
@@ -924,7 +930,7 @@ class TestEdgeCases:
         graph = TaskGraph()
         graph.add_node(Task(id="task_1", description="Base"))
         graph.add_node(Task(id="task_2", description="Depends on 1", depends_on=["task_1"]))
-        graph.add_edge("task_2", "task_1")
+        graph.add_edge("task_1", "task_2")  # Edge from dependency to dependent
 
         # Initially only task_1 should be ready
         tasks = await planner.suggest_next_tasks(graph)
@@ -1099,14 +1105,17 @@ class TestEdgeCases:
         planner._orchestrator = None
         planner._provider_manager = mock_provider_manager
 
-        mock_provider_manager.chat = AsyncMock(
+        # Mock get_provider to return a provider with chat method
+        mock_provider = AsyncMock()
+        mock_provider.chat = AsyncMock(
             return_value=Mock(content=json.dumps({"subtasks": []}))
         )
+        mock_provider_manager.get_provider = Mock(return_value=mock_provider)
 
         await planner.decompose_task("Test task")
 
-        # Should use provider manager
-        assert mock_provider_manager.chat.called
+        # Should use provider
+        assert mock_provider.chat.called
 
     @pytest.mark.asyncio
     async def test_update_plan_with_in_progress_tasks(self, planner):
@@ -1114,7 +1123,7 @@ class TestEdgeCases:
         graph = TaskGraph()
         graph.add_node(Task(id="task_1", description="Task 1"))
         graph.add_node(Task(id="task_2", description="Task 2", depends_on=["task_1"]))
-        graph.add_edge("task_2", "task_1")
+        graph.add_edge("task_1", "task_2")  # task_2 depends on task_1
 
         # Mark task as in progress
         graph.nodes["task_1"].status = "in_progress"

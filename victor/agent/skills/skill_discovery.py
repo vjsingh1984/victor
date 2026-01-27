@@ -661,7 +661,7 @@ class SkillDiscoveryEngine:
                     metadata={"tools": available_tools},
                 )
 
-                result = await self._tool_selector.select_tools(
+                result = self._tool_selector.select_tools(
                     task,
                     limit=limit,
                     min_score=min_score,

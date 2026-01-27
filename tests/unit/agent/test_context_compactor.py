@@ -727,7 +727,9 @@ class TestCheckAndCompactWithRL:
         mock_recommendation = MagicMock()
         mock_recommendation.action = "aggressive_compact"
         mock_recommendation.confidence = 0.9
-        mock_recommendation.metadata = {
+        # The code expects recommendation.value to be a dict
+        mock_recommendation.value = {
+            "action": "aggressive_compact",
             "config": {
                 "compaction_threshold": 0.65,
                 "min_messages_keep": 4,
@@ -779,10 +781,9 @@ class TestCheckAndCompactWithRL:
             # Verify RL learner was called with correct parameters
             mock_learner.get_recommendation.assert_called_once()
             call_kwargs = mock_learner.get_recommendation.call_args[1]
-            assert call_kwargs["context_utilization"] == 0.7
-            assert call_kwargs["tool_call_count"] == 5
-            assert call_kwargs["task_complexity"] == "high"
-            assert call_kwargs["provider_type"] == "cloud"
+            assert call_kwargs["provider"] == "cloud"
+            assert call_kwargs["model"] == "claude-sonnet-4-5"
+            assert call_kwargs["task_type"] == "high"
         finally:
             object.__setattr__(constants.RL_LEARNER_CONFIG, "enabled", original_enabled)
 
@@ -870,11 +871,12 @@ class TestRecordTaskOutcome:
             compactor.record_task_outcome(task_success=True, tokens_saved=500)
 
             mock_learner.record_outcome.assert_called_once()
-            call_kwargs = mock_learner.record_outcome.call_args[1]
-            assert call_kwargs["action"] == "conservative_prune"
-            assert call_kwargs["task_success"] is True
-            assert call_kwargs["tokens_saved"] == 500
-            assert call_kwargs["provider_type"] == "local"
+            # Get the RLOutcome object that was passed
+            outcome = mock_learner.record_outcome.call_args[0][0]
+            assert outcome.metadata["action"] == "conservative_prune"
+            assert outcome.success is True
+            assert outcome.metadata["tokens_saved"] == 500
+            assert outcome.metadata["provider_type"] == "local"
             assert compactor._last_rl_action is None  # Should be cleared
         finally:
             object.__setattr__(constants.RL_LEARNER_CONFIG, "enabled", original_enabled)

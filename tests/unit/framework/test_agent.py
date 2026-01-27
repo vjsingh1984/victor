@@ -41,6 +41,7 @@ def mock_orchestrator():
     orchestrator = MagicMock()
     orchestrator.provider = MagicMock()
     orchestrator.provider.name = "test_provider"
+    orchestrator.provider_name = "test_provider"  # for from_orchestrator
     orchestrator.model = "test-model"
     orchestrator.messages = []
     orchestrator.reset_conversation = MagicMock()
@@ -170,9 +171,11 @@ class TestAgentFromOrchestrator:
         """from_orchestrator should handle missing provider name."""
         from victor.framework.agent import Agent
 
-        orchestrator = MagicMock()
-        orchestrator.provider = MagicMock(spec=[])  # No 'name' attribute
-        orchestrator.model = None
+        # Use a simple object that doesn't auto-create attributes
+        class MockOrchestrator:
+            model = None
+
+        orchestrator = MockOrchestrator()
 
         agent = Agent.from_orchestrator(orchestrator)
 

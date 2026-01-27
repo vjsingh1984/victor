@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Optional, Protocol, runtime_checkable, TYPE_
 
 if TYPE_CHECKING:
     try:
-        from langchain_core.runnables import Runnable
+        from langchain_core.runnables import Runnable  # type: ignore[import-not-found]
     except ImportError:
         Runnable = object
 

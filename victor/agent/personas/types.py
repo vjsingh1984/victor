@@ -279,9 +279,7 @@ class ContextAdjustment:
 
     def __post_init__(self) -> None:
         """Initialize defaults and validate the adjustment."""
-        # Ensure lists are initialized
-        if self.additional_expertise is None:
-            self.additional_expertise = []
+        # additional_expertise has default_factory=list
         if self.tool_preference is None:
             self.tool_preference = []
         if self.expertise_boost is None:

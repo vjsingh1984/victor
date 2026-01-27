@@ -128,7 +128,7 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
     Returns:
         Tuple of (parsed_tool_calls, remaining_content)
     """
-    tool_calls = []
+    tool_calls: List[Dict[str, Any]] = []
     remaining = content
 
     # Pattern 1: JSON code block with tool call
@@ -516,8 +516,7 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
                                 yield StreamChunk(
                                     content=content,
                                     is_final=False,
-                                    role="assistant",
-                                    model=model,
+                                    model_name=model,
                                 )
 
                             # Handle tool calls
@@ -584,8 +583,7 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
                                 yield StreamChunk(
                                     content=final_content,
                                     is_final=True,
-                                    role="assistant",
-                                    model=model,
+                                    model_name=model,
                                     tool_calls=parsed_tool_calls,
                                     stop_reason=finish_reason,
                                 )
@@ -615,6 +613,11 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
                 content="",
                 role="assistant",
                 model=model,
+                tool_calls=None,
+                stop_reason=None,
+                usage=None,
+                raw_response=result,
+                metadata=None,
             )
 
         choice = choices[0]
@@ -658,6 +661,7 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
             tool_calls=tool_calls,
             stop_reason=choice.get("finish_reason"),
             usage=usage,
+            raw_response=result,
             metadata=metadata if metadata else None,
         )
 

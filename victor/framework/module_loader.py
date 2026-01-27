@@ -55,7 +55,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 if TYPE_CHECKING:
     from watchdog.observers.api import BaseObserver
 else:
-    BaseObserver = object  # type: ignore[misc,assignment]
+    BaseObserver = object  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -290,9 +290,6 @@ class DynamicModuleLoader:
         # Remove any modules that came from this directory
         modules_to_remove = []
         for mod_name, mod in list(sys.modules.items()):
-            if mod is None:
-                continue
-
             try:
                 mod_file = getattr(mod, "__file__", None)
                 if mod_file and path_str in str(Path(mod_file).resolve()):

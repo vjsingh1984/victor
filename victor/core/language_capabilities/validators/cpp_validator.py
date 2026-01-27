@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # Check if libclang is available
 try:
-    import clang.cindex as cindex
+    import clang.cindex as cindex  # type: ignore[import-not-found]
 
     LIBCLANG_AVAILABLE = True
 except ImportError:
@@ -148,7 +148,15 @@ class CppValidator:
         warnings: List[ValidationIssue] = []
 
         if self._index is None:
-            raise RuntimeError("libclang index not initialized")
+            # Fallback to basic validation if libclang not available
+            return CodeValidationResult(
+                is_valid=False,
+                language="cpp",
+                issues=[],
+                warnings=[ValidationIssue(
+                    message="libclang not available, basic validation only"
+                )]
+            )
 
         try:
             # Parse options
@@ -244,7 +252,8 @@ class CppValidator:
             return self._ts_validator.has_errors(code, language)
 
         if self._index is None:
-            return False
+            # Fallback to tree-sitter validation
+            return self._ts_validator.has_errors(code, language)
 
         try:
             args = ["-x", "c++" if language == "cpp" else "c"]

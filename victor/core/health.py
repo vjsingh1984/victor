@@ -495,7 +495,7 @@ class MemoryHealthCheck(BaseHealthCheck):
     async def _do_check(self) -> ComponentHealth:
         """Check memory usage."""
         try:
-            import psutil
+            import psutil  # type: ignore[import-untyped]
 
             process = psutil.Process()
             memory_info = process.memory_info()

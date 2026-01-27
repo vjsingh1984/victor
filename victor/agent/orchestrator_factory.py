@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.prompt_builder import SystemPromptBuilder
-    from victor.agent.context_project import ProjectContext
+    from victor.agent.context_project import ProjectContext  # type: ignore[import]
     from victor.framework.task import TaskComplexityService as ComplexityClassifier
     from victor.agent.action_authorizer import ActionAuthorizer
     from victor.agent.search_router import SearchRouter
@@ -195,25 +195,25 @@ class OrchestratorComponents:
     """
 
     # Provider
-    provider: ProviderComponents = field(default_factory=lambda: None)  # type: ignore
+    provider: ProviderComponents = field(default_factory=lambda: None)
 
     # Core services
-    services: CoreServices = field(default_factory=lambda: None)  # type: ignore
+    services: CoreServices = field(default_factory=lambda: None)
 
     # Conversation
-    conversation: ConversationComponents = field(default_factory=lambda: None)  # type: ignore
+    conversation: ConversationComponents = field(default_factory=lambda: None)
 
     # Tools
-    tools: ToolComponents = field(default_factory=lambda: None)  # type: ignore
+    tools: ToolComponents = field(default_factory=lambda: None)
 
     # Streaming
-    streaming: StreamingComponents = field(default_factory=lambda: None)  # type: ignore
+    streaming: StreamingComponents = field(default_factory=lambda: None)
 
     # Analytics
-    analytics: AnalyticsComponents = field(default_factory=lambda: None)  # type: ignore
+    analytics: AnalyticsComponents = field(default_factory=lambda: None)
 
     # Recovery
-    recovery: RecoveryComponents = field(default_factory=lambda: None)  # type: ignore
+    recovery: RecoveryComponents = field(default_factory=lambda: None)
 
     # Observability
     observability: Optional["ObservabilityIntegration"] = None
@@ -261,8 +261,8 @@ class OrchestratorFactory(ModeAwareMixin):
         settings: "Settings",
         provider: "BaseProvider",
         model: str,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
         console: Optional["Console"] = None,
         provider_name: Optional[str] = None,
         profile_name: Optional[str] = None,
@@ -275,8 +275,8 @@ class OrchestratorFactory(ModeAwareMixin):
             settings: Application settings
             provider: LLM provider instance
             model: Model identifier
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature (uses settings if None)
+            max_tokens: Maximum tokens to generate (uses settings if None)
             console: Optional rich console for output
             provider_name: Provider label (for OpenAI-compatible disambiguation)
             profile_name: Profile name for session tracking
@@ -286,8 +286,9 @@ class OrchestratorFactory(ModeAwareMixin):
         self.settings = settings
         self.provider = provider
         self.model = model
-        self.temperature = temperature
-        self.max_tokens = max_tokens
+        # Use parameter if provided, otherwise fall back to settings
+        self.temperature = temperature if temperature is not None else getattr(settings, 'temperature', 0.7)
+        self.max_tokens = max_tokens if max_tokens is not None else getattr(settings, 'max_tokens', 4096)
         self.console = console
         self.provider_name = provider_name
         self.profile_name = profile_name
@@ -412,11 +413,11 @@ class OrchestratorFactory(ModeAwareMixin):
         )
         core_services = CoreServices(
             sanitizer=orchestrator.sanitizer,
-            prompt_builder=orchestrator.prompt_builder,  # type: ignore[arg-type]
+            prompt_builder=orchestrator.prompt_builder,
             project_context=orchestrator.project_context,
             complexity_classifier=orchestrator.task_classifier,
             action_authorizer=orchestrator.intent_detector,
-            search_router=orchestrator.search_router,  # type: ignore[arg-type]
+            search_router=orchestrator.search_router,
         )
         conversation_components = ConversationComponents(
             conversation_controller=orchestrator._conversation_controller,
@@ -478,7 +479,7 @@ class OrchestratorFactory(ModeAwareMixin):
             from victor.core.container import ServiceContainer
 
             new_container: ServiceContainer = ensure_bootstrapped(self.settings)
-            self._container = new_container  # type: ignore[assignment]
+            self._container = new_container
 
             # Verify orchestrator services are registered
             # If ResponseSanitizer is not registered, bootstrapping was incomplete
@@ -487,7 +488,7 @@ class OrchestratorFactory(ModeAwareMixin):
                 from victor.core.bootstrap import bootstrap_container
 
                 # Create a new fully-bootstrapped container
-                self._container = bootstrap_container(self.settings)  # type: ignore[assignment]
+                self._container = bootstrap_container(self.settings)
 
         return self._container
 
@@ -495,7 +496,7 @@ class OrchestratorFactory(ModeAwareMixin):
         """Create response sanitizer (from DI container)."""
         from victor.agent.protocols import ResponseSanitizerProtocol
 
-        return self.container.get(ResponseSanitizerProtocol)  # type: ignore[no-any-return]
+        return self.container.get(ResponseSanitizerProtocol)
 
     def create_prompt_builder(
         self,
@@ -541,19 +542,19 @@ class OrchestratorFactory(ModeAwareMixin):
         """Create complexity classifier (from DI container)."""
         from victor.agent.protocols import ComplexityClassifierProtocol
 
-        return self.container.get(ComplexityClassifierProtocol)  # type: ignore[no-any-return]
+        return self.container.get(ComplexityClassifierProtocol)
 
     def create_action_authorizer(self) -> "ActionAuthorizer":
         """Create action authorizer (from DI container)."""
         from victor.agent.protocols import ActionAuthorizerProtocol
 
-        return self.container.get(ActionAuthorizerProtocol)  # type: ignore[no-any-return]
+        return self.container.get(ActionAuthorizerProtocol)
 
     def create_search_router(self) -> "SearchRouter":
         """Create search router (from DI container)."""
         from victor.agent.protocols import SearchRouterProtocol
 
-        return self.container.get(SearchRouterProtocol)  # type: ignore[no-any-return]
+        return self.container.get(SearchRouterProtocol)
 
     def create_presentation_adapter(self) -> Any:
         """Create presentation adapter for icon/emoji rendering.
@@ -899,20 +900,20 @@ class OrchestratorFactory(ModeAwareMixin):
         """Create usage analytics (from DI container)."""
         from victor.agent.protocols import UsageAnalyticsProtocol
 
-        return self.container.get(UsageAnalyticsProtocol)  # type: ignore[no-any-return]
+        return self.container.get(UsageAnalyticsProtocol)
 
     def create_sequence_tracker(self) -> "ToolSequenceTracker":
         """Create tool sequence tracker (from DI container)."""
         from victor.agent.protocols import ToolSequenceTrackerProtocol
 
-        return self.container.get(ToolSequenceTrackerProtocol)  # type: ignore[no-any-return]
+        return self.container.get(ToolSequenceTrackerProtocol)
 
     def create_recovery_handler(self) -> Optional["RecoveryHandler"]:
         """Create recovery handler (from DI container)."""
         from victor.agent.protocols import RecoveryHandlerProtocol
 
         # RecoveryHandler is always registered, but may be disabled via settings
-        return self.container.get(RecoveryHandlerProtocol)  # type: ignore[no-any-return]
+        return self.container.get(RecoveryHandlerProtocol)
 
     def create_observability(self) -> Optional["ObservabilityIntegration"]:
         """Create observability integration if enabled."""
@@ -2338,7 +2339,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.info(f"Provider pool stats: {stats}")
 
         # Return pool as BaseProvider (ProviderPool is a BaseProvider subclass)
-        return pool, True  # type: ignore[return-value]
+        return pool, True
 
     async def _create_provider_for_url(
         self,
@@ -2912,6 +2913,39 @@ class OrchestratorFactory(ModeAwareMixin):
             agent = await factory.create_agent(mode="foreground")
 
             # Foreground agent with UnifiedAgentConfig
+
+        This is the ONLY method that should create agents. All other entrypoints
+        (Agent.create, BackgroundAgentManager.start_agent, Vertical.create_agent)
+        must delegate here to ensure consistent code maintenance and eliminate
+        code proliferation (SOLID SRP, DIP).
+
+        Args:
+            mode: Agent creation mode
+                - "foreground": Interactive Agent instance (default)
+                - "background": BackgroundAgent for async task execution
+                - "team_member": TeamMember/SubAgent for multi-agent teams
+            config: Optional unified agent configuration (UnifiedAgentConfig)
+            task: Optional task description (for background agents)
+            **kwargs: Additional agent-specific parameters
+                - For foreground: provider, model, temperature, max_tokens, tools, etc.
+                - For background: mode_type ("build", "plan", "explore"), websocket, etc.
+                - For team_member: role, capabilities, description, etc.
+
+        Returns:
+            Agent instance based on mode:
+            - mode="foreground": Agent (victor.framework.agent.Agent)
+            - mode="background": BackgroundAgent (victor.agent.background_agent.BackgroundAgent)
+            - mode="team_member": TeamMember/SubAgent (victor.teams.types.TeamMember)
+
+        Raises:
+            ValueError: If mode is invalid or required parameters are missing
+            ProviderError: If provider initialization fails
+
+        Examples:
+            # Foreground agent (simple)
+            agent = await factory.create_agent(mode="foreground")
+
+            # Foreground agent with UnifiedAgentConfig
             from victor.agent.config import UnifiedAgentConfig
             config = UnifiedAgentConfig.foreground(
                 provider="openai",
@@ -2950,6 +2984,14 @@ class OrchestratorFactory(ModeAwareMixin):
             )
         """
         from victor.agent.orchestrator import AgentOrchestrator
+
+        # Validate mode early (before expensive setup)
+        valid_modes = {"foreground", "background", "team_member"}
+        if mode not in valid_modes:
+            raise ValueError(
+                f"Invalid agent mode: {mode!r}. "
+                f"Must be one of {sorted(valid_modes)}"
+            )
 
         # Extract parameters from UnifiedAgentConfig if provided
         if config:
@@ -3038,12 +3080,12 @@ class OrchestratorFactory(ModeAwareMixin):
             from victor.framework.agent import Agent
 
             # Create foreground Agent
-            agent = Agent(orchestrator)  # type: ignore[arg-type]
+            agent = Agent(orchestrator)
 
             # Apply tools if specified
             tools = kwargs.get("tools")
             if tools:
-                from victor.framework.tools import configure_tools  # type: ignore[attr-defined]
+                from victor.framework.tools import configure_tools
 
                 configure_tools(orchestrator, tools, airgapped=kwargs.get("airgapped", False))
 
@@ -3089,9 +3131,10 @@ class OrchestratorFactory(ModeAwareMixin):
             return member
 
         else:
+            # This should never be reached due to early validation above
             raise ValueError(
                 f"Invalid agent mode: {mode!r}. "
-                "Must be 'foreground', 'background', or 'team_member'"
+                f"Must be one of {sorted(valid_modes)}"
             )
 
 

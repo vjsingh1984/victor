@@ -480,26 +480,42 @@ class TestFallbackAndMandatoryTools:
         """Test _get_mandatory_tools returns git tools for commit (covers lines 412-418)."""
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        result = selector._get_mandatory_tools("please commit my changes")
-        # Accept any git-related tools (git, commit_msg, shell)
-        assert "git" in result or "commit_msg" in result or "shell" in result
+        # Mock the registry lookup to simulate tools with mandatory keywords
+        with patch(
+            "victor.tools.semantic_selector.get_tools_matching_mandatory_keywords",
+            return_value={"commit_msg", "git"},
+        ):
+            result = selector._get_mandatory_tools("please commit my changes")
+            # Accept any git-related tools (git, commit_msg, shell)
+            assert "git" in result or "commit_msg" in result or "shell" in result
 
     @pytest.mark.asyncio
     async def test_get_mandatory_tools_with_test(self, temp_cache_dir):
         """Test _get_mandatory_tools returns test tools."""
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        result = selector._get_mandatory_tools("run the tests")
-        assert "shell" in result or "test" in result
+        # Mock the registry lookup to simulate tools with mandatory keywords
+        with patch(
+            "victor.tools.semantic_selector.get_tools_matching_mandatory_keywords",
+            return_value={"test"},
+        ):
+            result = selector._get_mandatory_tools("run the tests")
+            assert "shell" in result or "test" in result
 
     @pytest.mark.asyncio
     async def test_get_mandatory_tools_no_keywords(self, temp_cache_dir):
         """Test _get_mandatory_tools returns empty for generic query."""
         selector = SemanticToolSelector(cache_dir=temp_cache_dir)
 
-        result = selector._get_mandatory_tools("hello world")
-        # May return empty or minimal list
-        assert isinstance(result, list)
+        # Mock the registry lookup to return empty set for generic query
+        with patch(
+            "victor.tools.semantic_selector.get_tools_matching_mandatory_keywords",
+            return_value=set(),
+        ):
+            result = selector._get_mandatory_tools("hello world")
+            # Should return empty list when no mandatory keywords match
+            assert isinstance(result, list)
+            assert len(result) == 0
 
 
 class TestToolsHash:

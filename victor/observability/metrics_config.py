@@ -144,9 +144,9 @@ class FeatureMetrics:
         self.enabled.set(1 if enabled else 0)
 
         if enabled:
-            self.enable_count.increment()
+            self.enable_count.inc()
         else:
-            self.disable_count.increment()
+            self.disable_count.inc()
 
     def record_execution(
         self,
@@ -161,13 +161,12 @@ class FeatureMetrics:
             success: Whether execution succeeded
             error_type: Type of error (if failed)
         """
-        self.executions.increment()
+        self.executions.inc()
         self.duration.observe(duration_ms)
 
         if not success:
-            self.errors.increment(
-                labels={"error_type": error_type or "unknown"} if error_type else None
-            )
+            if error_type:
+                self.errors.inc()
 
     def record_user_activity(self, user_count: int) -> None:
         """Record active user count.
@@ -416,9 +415,9 @@ class BusinessMetrics:
             success: Whether task completed successfully
         """
         if success:
-            self.tasks_completed.increment()
+            self.tasks_completed.inc()
         else:
-            self.tasks_failed.increment()
+            self.tasks_failed.inc()
 
         # Update completion rate
         total = self.tasks_completed.value + self.tasks_failed.value

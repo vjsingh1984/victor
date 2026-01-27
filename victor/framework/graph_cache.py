@@ -364,7 +364,7 @@ class CompiledGraphCache:
             stats = self._stats.copy()
 
             total = stats["hits"] + stats["misses"]
-            stats["hit_rate"] = int(stats["hits"] / total if total > 0 else 0.0)
+            stats["hit_rate"] = stats["hits"] / total if total > 0 else 0.0
 
             if self._cache is not None:
                 stats["current_size"] = len(self._cache)

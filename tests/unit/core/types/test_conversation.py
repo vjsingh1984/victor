@@ -203,12 +203,12 @@ class TestStageWorkflow:
 class TestStageMetadata:
     """Test stage metadata and properties."""
 
-    def test_stage_names_are_snake_case(self):
-        """Stage names should be snake_case (Python convention)."""
+    def test_stage_names_are_uppercase(self):
+        """Stage names should be uppercase (Python enum convention)."""
         for stage in ConversationStage:
             name = stage.name
-            assert name.islower(), f"Stage {name} is not lowercase"
-            assert "_" in name or name.isidentifier(), f"Stage {name} is not snake_case"
+            assert name.isupper(), f"Stage {name} is not uppercase"
+            assert name.isidentifier(), f"Stage {name} is not a valid identifier"
 
     def test_stage_values_are_lowercase(self):
         """Stage values should be lowercase for API consistency."""
@@ -217,10 +217,10 @@ class TestStageMetadata:
             assert value.islower(), f"Stage value {value} is not lowercase"
             assert value == value.lower(), f"Stage value {value} is not lowercase"
 
-    def test_stage_name_equals_value(self):
-        """Stage name should equal its value (for consistency)."""
+    def test_stage_value_matches_name_lowercased(self):
+        """Stage value should be the lowercase version of the name."""
         for stage in ConversationStage:
-            assert stage.name == stage.value
+            assert stage.value == stage.name.lower(), f"Stage value {stage.value} != {stage.name.lower()}"
 
 
 # =============================================================================

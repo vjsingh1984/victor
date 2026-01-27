@@ -481,7 +481,7 @@ class ModelConfigSchema(BaseModel):
         ...,
         min_length=1,
         description="Model identifier",
-        validation_alias="model",
+        validation_alias=AliasChoices("model", "model_name"),
         serialization_alias="model",
     )
     temperature: float = Field(0.7, ge=0.0, le=2.0, description="Sampling temperature")

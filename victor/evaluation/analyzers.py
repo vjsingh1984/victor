@@ -22,7 +22,7 @@ between harness.py and code_quality.py.
 """
 
 import logging
-from typing import Any, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class AnalyzerRegistry:
     """
 
     _instances: dict[str, Any] = {}
-    _factories: dict[str, callable] = {}
+    _factories: dict[str, Callable] = {}
 
     @classmethod
     def register(cls, name: str, instance: Any) -> None:
@@ -62,7 +62,7 @@ class AnalyzerRegistry:
         logger.debug(f"Registered analyzer: {name}")
 
     @classmethod
-    def register_factory(cls, name: str, factory: callable) -> None:
+    def register_factory(cls, name: str, factory: Callable) -> None:
         """Register a factory function for lazy instantiation.
 
         Args:

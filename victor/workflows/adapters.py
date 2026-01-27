@@ -246,11 +246,23 @@ class WorkflowToGraphAdapter:
 
             return handler
 
+        # Extract tool_budget and allowed_tools if node is an AgentNode
+        tool_budget = 10  # default
+        allowed_tools = []  # default
+
+        if hasattr(node, "tool_budget") and node.tool_budget is not None:
+            tool_budget = node.tool_budget
+
+        if hasattr(node, "allowed_tools") and node.allowed_tools is not None:
+            allowed_tools = node.allowed_tools
+
         return AdaptedNode(
             name=node.name,
             node_type=node.node_type,
             handler=create_handler(node),
             next_nodes=node.next_nodes,
+            tool_budget=tool_budget,
+            allowed_tools=allowed_tools,
         )
 
     def adapt_with_execution(

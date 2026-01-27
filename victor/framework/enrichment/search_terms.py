@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Set
 if TYPE_CHECKING:
     # Type stubs for native extensions (optional)
     try:
-        import victor_native
+        import victor_native  # type: ignore
     except ImportError:
         pass
 
@@ -46,8 +46,7 @@ _NATIVE_AVAILABLE = False
 _native = None
 
 try:
-    import victor_native as _native  # type: ignore
-
+    import victor_native as _native_module
     _NATIVE_AVAILABLE = True
     logger.debug("Native pattern matching available for search term extraction")
 except ImportError:

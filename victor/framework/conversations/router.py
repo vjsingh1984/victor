@@ -135,8 +135,6 @@ class MessageRouter:
                 return [last_speaker]
             return []
 
-        return self._broadcast_route(speaker, participants)
-
     def _broadcast_route(
         self, speaker: str, participants: List[ConversationParticipant]
     ) -> List[str]:

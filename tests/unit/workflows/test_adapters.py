@@ -506,7 +506,11 @@ class TestWorkflowToGraphAdapterExecution:
         )
 
         mock_executor = MagicMock()
-        mock_executor.execute_node = AsyncMock(side_effect=Exception("Execution failed"))
+        # Make execute_by_name an async function that raises an exception
+        async def mock_execute(*args, **kwargs):
+            raise Exception("Execution failed")
+
+        mock_executor.execute_by_name = mock_execute
 
         adapter = WorkflowToGraphAdapter()
         handler = adapter._create_execution_handler(node, mock_executor)
@@ -521,6 +525,7 @@ class TestWorkflowToGraphAdapterExecution:
             "is_complete": False,
         }
 
+        # Handler is sync wrapper, call it synchronously
         new_state = handler(state)
         assert new_state["error"] is not None
         assert "Execution failed" in new_state["error"]

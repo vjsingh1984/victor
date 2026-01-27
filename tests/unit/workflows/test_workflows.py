@@ -841,7 +841,8 @@ class TestWorkflowExecutorExtended:
         executor = WorkflowExecutor(mock_orchestrator)
         assert executor._sub_agents is None
 
-        with patch("victor.agent.subagents.SubAgentOrchestrator") as mock_class:
+        # Patch where SubAgentOrchestrator is imported, not where it's defined
+        with patch("victor.agent.subagents.orchestrator.SubAgentOrchestrator") as mock_class:
             mock_instance = MagicMock()
             mock_class.return_value = mock_instance
 

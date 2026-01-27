@@ -49,7 +49,7 @@ YAML Configuration (NEW):
           version: "2.0.0"
 
         core:
-          tools: list[Any]: [read, write, edit, code_search]
+          tools: [read, write, edit, code_search]  # list[Any] would be actual Python code
           system_prompt:
             source: inline
             text: "You are an expert software developer..."

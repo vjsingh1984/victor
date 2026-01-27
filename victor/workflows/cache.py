@@ -258,18 +258,28 @@ class CascadingInvalidator:
 
         if isinstance(cache_or_graph, DependencyGraph):
             dep_graph = cache_or_graph
-            if graph is not None and not isinstance(graph, DependencyGraph):
-                cache = cast(Optional["WorkflowCache"], graph)
+            if graph is not None:
+                if isinstance(graph, DependencyGraph):
+                    # Both are DependencyGraph, use cache_or_graph as cache
+                    cache = cast(Optional["WorkflowCache"], cache_or_graph)
+                else:
+                    # cache_or_graph is DependencyGraph, graph is something else (cache)
+                    cache = cast(Optional["WorkflowCache"], graph)
         elif isinstance(graph, DependencyGraph):
-            dep_graph = graph
+            # This branch should be unreachable because if cache_or_graph was not DependencyGraph,
+            # but graph is, then we would have been caught above
+            dep_graph = graph  # type: ignore[misc]
             cache = cast(Optional["WorkflowCache"], cache_or_graph)
         elif cache_or_graph is None and isinstance(graph, DependencyGraph):
-            dep_graph = graph
+            # This branch should be unreachable for similar reasons
+            dep_graph = graph  # type: ignore[misc]
         else:
+            # This should be unreachable due to previous logic
             raise TypeError("CascadingInvalidator requires a DependencyGraph and optional cache")
 
         if dep_graph is None:
-            dep_graph = DependencyGraph()
+            # This should be unreachable due to previous logic
+            dep_graph = DependencyGraph()  # type: ignore[misc]
 
         self.dependency_graph = dep_graph
         self.cache = cache  # Optional cache for convenience methods

@@ -110,12 +110,16 @@ class TestDiscoverFromEntryPoints:
         mock_ep.name = "test_vertical"
         mock_ep.value = "test_module:TestVertical"
 
-        with patch("victor.core.verticals.plugin_discovery.entry_points") as mock_eps:
-            mock_eps.return_value.group.return_value = [mock_ep]
+        # Mock the load method
+        mock_vertical = MockVertical(name="test_vertical")
+        mock_ep.load.return_value = mock_vertical
 
-            # Mock the load method
-            mock_vertical = MockVertical(name="test_vertical")
-            mock_ep.load.return_value = mock_vertical
+        # Patch the importlib.metadata.entry_points import that happens inside the function
+        with patch("importlib.metadata.entry_points") as mock_eps:
+            # Mock the entry_points() call to return an object with .select() method
+            mock_eps_result = Mock()
+            mock_eps_result.select = Mock(return_value=[mock_ep])
+            mock_eps.return_value = mock_eps_result
 
             result = discovery.discover_from_entry_points()
 
@@ -131,8 +135,10 @@ class TestDiscoverFromEntryPoints:
         mock_ep.value = "broken:BrokenVertical"
         mock_ep.load.side_effect = ImportError("Module not found")
 
-        with patch("victor.core.verticals.plugin_discovery.entry_points") as mock_eps:
-            mock_eps.return_value.group.return_value = [mock_ep]
+        with patch("importlib.metadata.entry_points") as mock_eps:
+            mock_eps_result = Mock()
+            mock_eps_result.select = Mock(return_value=[mock_ep])
+            mock_eps.return_value = mock_eps_result
 
             result = discovery.discover_from_entry_points()
 
@@ -153,8 +159,10 @@ class TestDiscoverFromEntryPoints:
 
         mock_ep.load.return_value = NotAVertical
 
-        with patch("victor.core.verticals.plugin_discovery.entry_points") as mock_eps:
-            mock_eps.return_value.group.return_value = [mock_ep]
+        with patch("importlib.metadata.entry_points") as mock_eps:
+            mock_eps_result = Mock()
+            mock_eps_result.select = Mock(return_value=[mock_ep])
+            mock_eps.return_value = mock_eps_result
 
             result = discovery.discover_from_entry_points()
 
@@ -540,9 +548,11 @@ class TestErrorHandling:
         """Should handle missing entry point group gracefully."""
         discovery = PluginDiscovery()
 
-        with patch("victor.core.verticals.plugin_discovery.entry_points") as mock_eps:
+        with patch("importlib.metadata.entry_points") as mock_eps:
             # Simulate no entry points for the group
-            mock_eps.return_value.group.return_value = []
+            mock_eps_result = Mock()
+            mock_eps_result.select = Mock(return_value=[])
+            mock_eps.return_value = mock_eps_result
 
             result = discovery.discover_from_entry_points()
 

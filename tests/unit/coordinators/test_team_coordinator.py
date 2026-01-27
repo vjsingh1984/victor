@@ -257,8 +257,9 @@ class TestTeamCoordinator:
         """Test that get_team_specs returns empty dict when specs not set."""
         # Arrange
         orchestrator = Mock()
-        # Don't set _team_specs attribute
-        del orchestrator._team_specs
+        # Configure mock to return None/empty values for fallback checks
+        orchestrator.vertical_context = None
+        orchestrator.configure_mock(**{"_team_specs": {}})
         mode_coordinator = Mock()
         mode_workflow_team_coordinator = Mock()
 

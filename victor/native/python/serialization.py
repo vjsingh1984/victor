@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 try:
-    from victor_native import (
+    from victor_native import (  # type: ignore[import]
         apply_json_patch,
         json_deep_get,
         json_deep_set,
@@ -522,7 +522,7 @@ def create_incremental_json_parser(expected_depth: int = 10) -> "IncrementalJson
     if NATIVE_AVAILABLE:
         return IncrementalJsonParserWrapper(expected_depth)
     else:
-        return PythonIncrementalJsonParser(expected_depth)
+        return PythonIncrementalJsonParser(expected_depth)  # type: ignore[return-value]
 
 
 class IncrementalJsonParserWrapper:

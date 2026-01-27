@@ -59,7 +59,6 @@ try:
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
     from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
-
     _otel_available = True
 except ImportError:
     logger.debug(

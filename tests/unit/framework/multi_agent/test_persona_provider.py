@@ -378,15 +378,15 @@ class TestSemVerSorting:
 
     def test_semver_key_basic(self):
         """_semver_key should convert versions to comparable tuples."""
-        assert FrameworkPersonaProvider._semver_key("0.5.0") == (1, 0, 0)
+        assert FrameworkPersonaProvider._semver_key("0.5.0") == (0, 5, 0)
         assert FrameworkPersonaProvider._semver_key("2.1.3") == (2, 1, 3)
         assert FrameworkPersonaProvider._semver_key("10.20.30") == (10, 20, 30)
 
     def test_semver_key_ignores_pre_release_and_build(self):
         """_semver_key should strip pre-release and build metadata."""
-        assert FrameworkPersonaProvider._semver_key("0.5.0-alpha") == (1, 0, 0)
-        assert FrameworkPersonaProvider._semver_key("0.5.0+build") == (1, 0, 0)
-        assert FrameworkPersonaProvider._semver_key("0.5.0-alpha+build") == (1, 0, 0)
+        assert FrameworkPersonaProvider._semver_key("0.5.0-alpha") == (0, 5, 0)
+        assert FrameworkPersonaProvider._semver_key("0.5.0+build") == (0, 5, 0)
+        assert FrameworkPersonaProvider._semver_key("0.5.0-alpha+build") == (0, 5, 0)
 
     def test_get_latest_version_basic(self):
         """_get_latest_version should return the highest version."""

@@ -29,8 +29,8 @@ try:
 
     JIRA_AVAILABLE = True
 except ImportError:
-    JIRA = None  # type: ignore
-    JIRAError = Exception  # type: ignore
+    JIRA = None
+    JIRAError = Exception
     JIRA_AVAILABLE = False
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority

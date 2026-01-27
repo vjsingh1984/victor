@@ -998,9 +998,9 @@ class TestErrorHandling:
             def get_middleware(cls):
                 raise RuntimeError("Middleware loading failed")
 
-        # Should raise in strict mode
+        # Should raise in strict mode - disable lazy loading for immediate error
         with pytest.raises(ExtensionLoadError):
-            FailingVertical.get_extensions(strict=True)
+            FailingVertical.get_extensions(strict=True, use_lazy=False)
 
     def test_required_extension_failure_raises_error(self, mock_vertical):
         """Test that required extension failure raises error."""
@@ -1012,6 +1012,6 @@ class TestErrorHandling:
             def get_middleware(cls):
                 raise RuntimeError("Required middleware failed")
 
-        # Should raise even in non-strict mode
+        # Should raise even in non-strict mode - disable lazy loading for immediate error
         with pytest.raises(ExtensionLoadError):
-            RequiredFailingVertical.get_extensions(strict=False)
+            RequiredFailingVertical.get_extensions(strict=False, use_lazy=False)

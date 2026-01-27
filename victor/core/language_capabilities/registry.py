@@ -621,8 +621,6 @@ class LanguageCapabilityRegistry:
 
     def get_for_file(self, file_path: Path) -> Optional[UnifiedLanguageCapability]:
         """Detect language and get capability for a file."""
-        if isinstance(file_path, str):
-            file_path = Path(file_path)
 
         # Try filename first (exact matches like Dockerfile, Makefile)
         name = file_path.name.lower()

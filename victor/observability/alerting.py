@@ -416,7 +416,7 @@ class SlackNotifier(NotificationChannel):
             color = colors.get(alert.severity, "#ff9900")
 
             # Build attachment
-            attachment = {
+            attachment: dict[str, Any] = {
                 "color": color,
                 "title": f"{alert.severity.value.upper()}: {alert.rule_name}",
                 "text": alert.message,

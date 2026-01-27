@@ -319,7 +319,7 @@ class RunnableSequence(Runnable[Input, Output]):
         """
         current = input
         for runnable in self._runnables:
-            current = await runnable.invoke(current, config)
+            current = await runnable.invoke(current, config)  # type: ignore[arg-type]
         return current
 
     def __or__(
@@ -391,7 +391,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
         """
         config = config or RunnableConfig()
 
-        async def run_step(name: str, runnable: Runnable[Any]) -> Tuple[str, Any]:
+        async def run_step(name: str, runnable: Runnable) -> Tuple[str, Any]:  # type: ignore[type-arg]
             try:
                 result = await runnable.invoke(input, config)
                 return (name, result)
@@ -402,7 +402,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
         # Create tasks with optional concurrency limit
         semaphore = asyncio.Semaphore(config.max_concurrency)
 
-        async def bounded_run(name: str, runnable: Runnable[Any]) -> Tuple[str, Any]:
+        async def bounded_run(name: str, runnable: Runnable) -> Tuple[str, Any]:  # type: ignore[type-arg]
             async with semaphore:
                 return await run_step(name, runnable)
 
@@ -422,8 +422,9 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
             if isinstance(result, Exception):
                 logger.error(f"Parallel execution error: {result}")
                 continue
-            name, value = result
-            output[name] = value
+            if isinstance(result, tuple):  # type: ignore[misc]
+                name, value = result
+                output[name] = value
 
         return output
 
@@ -553,8 +554,8 @@ class RunnableLambda(Runnable[Input, Output]):
             Output from function
         """
         if self._is_async:
-            return await self._func(input)
-        return self._func(input)
+            return await self._func(input)  # type: ignore[misc]
+        return self._func(input)  # type: ignore[return-value]
 
     def __repr__(self) -> str:
         return f"RunnableLambda({self._name})"
@@ -631,10 +632,10 @@ class RunnableBinding(Runnable[Input, Output]):
         if isinstance(input, dict):
             merged = {**self._kwargs, **input}
         else:
-            merged = input
+            merged = input  # type: ignore[assignment]
 
         use_config = config or self._config
-        return await self._bound.invoke(merged, use_config)
+        return await self._bound.invoke(merged, use_config)  # type: ignore[arg-type]
 
     def __repr__(self) -> str:
         return f"RunnableBinding({self._bound}, kwargs={list(self._kwargs.keys())})"

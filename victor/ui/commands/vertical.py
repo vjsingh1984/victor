@@ -291,7 +291,7 @@ def list_verticals(
 
         if verbose:
             # Get additional metadata
-            category = vertical.metadata.category if vertical.metadata else "-"
+            category = vertical.metadata.category if vertical.metadata else "-"  # type: ignore[assignment]
             tools = (
                 ", ".join(vertical.metadata.class_spec.provides_tools[:3])
                 if vertical.metadata and vertical.metadata.class_spec.provides_tools
@@ -771,7 +771,7 @@ def export_template(
     from victor.framework.vertical_extractor import VerticalExtractor
 
     extractor = VerticalExtractor()
-    template = extractor.extract_from_vertical(vertical_class)
+    template = extractor.extract_from_class(vertical_class)
 
     if template is None:
         console.print("[red]Error: Failed to extract template from vertical[/]")
@@ -779,7 +779,7 @@ def export_template(
 
     # Determine output path
     if output is None:
-        output = f"{vertical_name}_template.yaml"
+        output = f"{vertical_name}_template.yaml"  # type: ignore[unreachable]
 
     output_path = Path(output)
 

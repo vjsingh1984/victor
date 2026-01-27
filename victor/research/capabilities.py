@@ -388,7 +388,7 @@ class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
                 name="source_verification",
                 type=CapabilityType.SAFETY,
                 description="Source credibility validation and verification settings",
-                version="1.0",
+                version="0.5.0",
                 configure_fn="configure_source_verification",
                 get_fn="get_source_verification",
                 default_config={
@@ -403,7 +403,7 @@ class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
                 name="citation_management",
                 type=CapabilityType.TOOL,
                 description="Citation management and bibliography formatting",
-                version="1.0",
+                version="0.5.0",
                 configure_fn="configure_citation_management",
                 get_fn="get_citation_config",
                 default_config={
@@ -418,7 +418,7 @@ class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
                 name="research_quality",
                 type=CapabilityType.MODE,
                 description="Research quality standards and coverage requirements",
-                version="1.0",
+                version="0.5.0",
                 configure_fn="configure_research_quality",
                 get_fn="get_research_quality",
                 default_config={
@@ -434,7 +434,7 @@ class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
                 name="literature_analysis",
                 type=CapabilityType.TOOL,
                 description="Literature analysis and academic paper evaluation",
-                version="1.0",
+                version="0.5.0",
                 configure_fn="configure_literature_analysis",
                 get_fn="get_literature_config",
                 default_config={
@@ -450,7 +450,7 @@ class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
                 name="fact_checking",
                 type=CapabilityType.SAFETY,
                 description="Fact-checking and claim verification configuration",
-                version="1.0",
+                version="0.5.0",
                 configure_fn="configure_fact_checking",
                 get_fn="get_fact_checking_config",
                 default_config={

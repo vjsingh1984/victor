@@ -383,14 +383,12 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
     # =============================================================================
 
     @property
-    def _budgets(self) -> Dict[str, Any]:
+    def _budgets(self) -> Dict[BudgetType, Any]:
         """Backward compatibility property for _budgets.
 
         Deprecated: Use get_status() or get_diagnostics() instead.
         """
-        budgets = self._tracker._budgets if self._tracker else {}
-        # Convert BudgetType keys to strings for backward compatibility
-        return {str(k): v for k, v in budgets.items()}
+        return self._tracker._budgets if self._tracker else {}
 
     @property
     def _model_multiplier(self) -> float:

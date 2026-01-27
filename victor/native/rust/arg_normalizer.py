@@ -30,7 +30,7 @@ import json
 from typing import Any, Optional, Tuple
 
 try:
-    import victor_native
+    import victor_native  # type: ignore[import-not-found]
 
     RUST_AVAILABLE = True
 except ImportError:

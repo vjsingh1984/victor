@@ -455,7 +455,7 @@ class AgentModeController:
                 "mode": mode.value,
                 "name": MODE_CONFIGS[mode].name,
                 "description": MODE_CONFIGS[mode].description,
-                "current": str(mode == self._current_mode),
+                "current": mode == self._current_mode,
             }
             for mode in AgentMode
         ]

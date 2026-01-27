@@ -39,6 +39,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
+# TYPE_CHECKING: Import QualityResult for orchestrator business logic type hints
 if TYPE_CHECKING:
     from victor.agent.response_quality import QualityResult
 

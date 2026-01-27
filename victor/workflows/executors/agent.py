@@ -53,7 +53,7 @@ class AgentNodeExecutor:
         new_state = await executor.execute(agent_node, current_state)
     """
 
-    def __init__(self, context: Any = None):
+    def __init__(self, context: Optional[Any] = None):
         """Initialize the executor.
 
         Args:

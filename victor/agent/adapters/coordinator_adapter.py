@@ -131,13 +131,18 @@ class CoordinatorAdapter:
             # The caller should use an async context or the coordinator should handle this
             import asyncio
 
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
+            try:
+                loop = asyncio.get_running_loop()
                 # We're in an async context, schedule the coroutine
                 asyncio.create_task(self._evaluation_coordinator.send_rl_reward_signal(session))
-            else:
-                # We're in a sync context, run the coroutine
-                loop.run_until_complete(self._evaluation_coordinator.send_rl_reward_signal(session))
+            except RuntimeError:
+                # No running loop, create a new one
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(self._evaluation_coordinator.send_rl_reward_signal(session))
+                finally:
+                    loop.close()
             logger.debug("RL reward signal sent successfully")
         except Exception as e:
             logger.warning(f"Failed to send RL reward signal: {e}")

@@ -64,7 +64,7 @@ from typing import (
 )
 
 try:
-    import psutil
+    import psutil  # type: ignore[import]
 
     PSUTIL_AVAILABLE = True
 except ImportError:

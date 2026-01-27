@@ -161,7 +161,7 @@ class LMStudioCommand(BaseSlashCommand):
             lmstudio = LMStudioProvider(**provider_settings)
 
             # Check connectivity
-            if not lmstudio.is_available():
+            if not lmstudio._models_available():
                 ctx.console.print(
                     Panel(
                         "[red]LMStudio not detected[/]\n\n"
@@ -177,8 +177,8 @@ class LMStudioCommand(BaseSlashCommand):
                 return
 
             # Get models and system info
-            models = lmstudio.list_loaded_models()
-            endpoint = lmstudio.get_active_endpoint()
+            models = lmstudio.list_models()
+            endpoint = lmstudio._base_url
 
             content = f"[green]LMStudio Connected[/]\n\n"
             content += f"[bold]Endpoint:[/] {endpoint}\n"

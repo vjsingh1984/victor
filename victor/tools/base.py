@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol, Union, runtime_checkable
 
-import jsonschema
+import jsonschema  # type: ignore[import-untyped]
 from jsonschema import Draft7Validator, ValidationError as JsonSchemaValidationError
 from pydantic import BaseModel, Field
 
@@ -667,8 +667,8 @@ class BaseTool(ABC):
             "number": (int, float),
             "integer": int,
             "boolean": bool,
-            "array": list[Any],
-            "object": dict[str, Any],
+            "array": list,
+            "object": dict,
         }
 
         expected_python_type = type_mapping.get(expected_type)

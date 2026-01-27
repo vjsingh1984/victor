@@ -127,6 +127,7 @@ dev = [
     "pandas>=2.0",  # For data analysis handler tests
     "fastapi>=0.109",  # For API integration tests
     "uvicorn>=0.27",
+    "boto3>=1.34",  # For AWS credentials testing
 
     # Linting/Formatting
     "ruff>=0.5",

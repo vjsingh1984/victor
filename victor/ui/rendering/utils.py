@@ -28,7 +28,7 @@ def format_tool_args(arguments: dict[str, Any], max_width: int = 80) -> str:
     """
     if not arguments:
         return ""
-    parts = []
+    parts: list[str] = []
     total_len = 0
     for k, v in arguments.items():
         if isinstance(v, str):

@@ -55,7 +55,7 @@ class TestToolCoordinatorInit:
         """Create mock ToolPipeline."""
         pipeline = Mock()
         pipeline.execute_tool_calls = AsyncMock()
-        pipeline._execute_single_tool = AsyncMock()
+        pipeline._execute_single_call = AsyncMock()
         return pipeline
 
     @pytest.fixture
@@ -516,7 +516,7 @@ class TestToolCoordinatorExecution:
         mock_result = Mock()
         mock_result.success = True
         mock_result.result = "File content"
-        coordinator._pipeline._execute_single_tool = AsyncMock(return_value=mock_result)
+        coordinator._pipeline._execute_single_call = AsyncMock(return_value=mock_result)
 
         result, success, error = await coordinator.execute_tool_with_retry(
             "read_file", {"path": "/test"}, {}
@@ -556,7 +556,7 @@ class TestToolCoordinatorExecution:
         mock_result = Mock()
         mock_result.success = False
         mock_result.error = "Invalid argument: path is required"
-        coordinator._pipeline._execute_single_tool = AsyncMock(return_value=mock_result)
+        coordinator._pipeline._execute_single_call = AsyncMock(return_value=mock_result)
 
         result, success, error = await coordinator.execute_tool_with_retry("read_file", {}, {})
 
@@ -577,7 +577,7 @@ class TestToolCoordinatorExecution:
         mock_result_fail.success = False
         mock_result_fail.error = "Transient error"
 
-        coordinator._pipeline._execute_single_tool = AsyncMock(
+        coordinator._pipeline._execute_single_call = AsyncMock(
             side_effect=[mock_result_fail, mock_result_success]
         )
 
@@ -586,7 +586,7 @@ class TestToolCoordinatorExecution:
         )
 
         assert success is True
-        assert coordinator._pipeline._execute_single_tool.call_count == 2
+        assert coordinator._pipeline._execute_single_call.call_count == 2
 
     @pytest.mark.asyncio
     async def test_execute_tool_with_retry_exception(self, coordinator: ToolCoordinator):
@@ -594,7 +594,7 @@ class TestToolCoordinatorExecution:
         # Patch config to add missing attribute (implementation bug workaround)
         coordinator._config.max_retry_attempts = 3
 
-        coordinator._pipeline._execute_single_tool = AsyncMock(
+        coordinator._pipeline._execute_single_call = AsyncMock(
             side_effect=PermissionError("Access denied")
         )
 

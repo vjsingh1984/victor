@@ -25,7 +25,7 @@ Features:
 
 import ast
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import logging
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -78,7 +78,7 @@ def _calculate_maintainability_index(code: str) -> float:
 )
 async def metrics(
     path: str,
-    metrics_list: List[str] = None,
+    metrics_list: Optional[List[str]] = None,
     file_pattern: str = "*.py",
     complexity_threshold: int = 10,
     format: str = "summary",

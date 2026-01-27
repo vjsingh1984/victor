@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 try:
-    import lancedb
+    import lancedb  # type: ignore[import]
 
     LANCEDB_AVAILABLE = True
 except ImportError:

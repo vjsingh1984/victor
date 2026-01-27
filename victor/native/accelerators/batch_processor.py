@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 # Optional: Import native implementation
 try:
-    from victor_native import (
+    from victor_native import (  # type: ignore[import-not-found]
         BatchProcessor as RustBatchProcessor,
         BatchTask as RustBatchTask,
         BatchResult as RustBatchResult,

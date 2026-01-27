@@ -370,34 +370,51 @@ class TestEventEmission:
 
         assert engine._event_bus == mock_bus
 
-    def test_transition_emits_event(self):
+    @pytest.mark.asyncio
+    async def test_transition_emits_event(self):
         """Transition should emit event to event bus."""
         from victor.agent.stage_transition_engine import StageTransitionEngine
+        from unittest.mock import AsyncMock
+        import asyncio
 
-        mock_bus = Mock()
+        mock_bus = AsyncMock()
+        mock_bus.emit = AsyncMock()
+        mock_bus.backend = AsyncMock()
+        mock_bus.backend._is_connected = True  # Allow event emission
         engine = StageTransitionEngine(event_bus=mock_bus)
 
         engine.transition_to(ConversationStage.PLANNING)
+
+        # Give the async event emission time to complete
+        await asyncio.sleep(0.01)
 
         # Event should be emitted
-        mock_bus.emit.assert_called()
+        mock_bus.emit.assert_called_once()
 
-    def test_event_contains_stage_info(self):
+    @pytest.mark.asyncio
+    async def test_event_contains_stage_info(self):
         """Emitted event should contain stage information."""
         from victor.agent.stage_transition_engine import StageTransitionEngine
+        from unittest.mock import AsyncMock
+        import asyncio
 
-        mock_bus = Mock()
+        mock_bus = AsyncMock()
+        mock_bus.emit = AsyncMock()
+        mock_bus.backend = AsyncMock()
+        mock_bus.backend._is_connected = True  # Allow event emission
         engine = StageTransitionEngine(event_bus=mock_bus)
 
         engine.transition_to(ConversationStage.PLANNING)
 
+        # Give the async event emission time to complete
+        await asyncio.sleep(0.01)
+
         # Check the call args
+        assert mock_bus.emit.called
         call_args = mock_bus.emit.call_args
         assert call_args is not None
-        # Event should contain old_stage and new_stage
-        event_data = call_args[1] if len(call_args) > 1 else call_args[0]
-        # Depending on implementation, check for stage info
-        assert mock_bus.emit.called
+        # Event should contain stage info
+        assert len(call_args) > 0
 
 
 class TestTransitionCooldown:

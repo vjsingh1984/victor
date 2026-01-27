@@ -139,8 +139,8 @@ async def _do_stop(language: str) -> Dict[str, Any]:
 
 async def _do_completions(
     file_path: str,
-    line: int,
-    character: int,
+    line: Optional[int],
+    character: Optional[int],
     max_items: int = 20,
 ) -> Dict[str, Any]:
     """Get code completions."""
@@ -172,7 +172,7 @@ async def _do_completions(
     }
 
 
-async def _do_hover(file_path: str, line: int, character: int) -> Dict[str, Any]:
+async def _do_hover(file_path: str, line: Optional[int], character: Optional[int]) -> Dict[str, Any]:
     """Get hover information."""
     from victor.coding.lsp.manager import get_lsp_manager
 
@@ -193,7 +193,7 @@ async def _do_hover(file_path: str, line: int, character: int) -> Dict[str, Any]
         return {"success": False, "message": "No hover information available"}
 
 
-async def _do_definition(file_path: str, line: int, character: int) -> Dict[str, Any]:
+async def _do_definition(file_path: str, line: Optional[int], character: Optional[int]) -> Dict[str, Any]:
     """Go to definition."""
     from victor.coding.lsp.manager import get_lsp_manager
 
@@ -217,8 +217,8 @@ async def _do_definition(file_path: str, line: int, character: int) -> Dict[str,
 
 async def _do_references(
     file_path: str,
-    line: int,
-    character: int,
+    line: Optional[int],
+    character: Optional[int],
     max_results: int = 50,
 ) -> Dict[str, Any]:
     """Find references."""

@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-import numpy as np
+import numpy as np  # type: ignore[import-not-found]
 
 if TYPE_CHECKING:
     from victor.teams.team_predictor import TaskFeatures

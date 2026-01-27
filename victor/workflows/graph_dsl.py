@@ -154,7 +154,7 @@ class State(ABC):
         """
         if is_dataclass(self):
             return {f.name: getattr(self, f.name) for f in fields(self)}
-        return self.__dict__.copy()
+        return self.__dict__.copy()  # type: ignore[unreachable]
 
     @classmethod
     def from_dict(cls: Type[S], data: Dict[str, Any]) -> S:
@@ -172,7 +172,7 @@ class State(ABC):
             return cls(**filtered)
         instance = object.__new__(cls)
         instance.__dict__.update(data)
-        return instance
+        return instance  # type: ignore[unreachable]
 
     def copy(self: S) -> S:
         """Create a shallow copy of the state.

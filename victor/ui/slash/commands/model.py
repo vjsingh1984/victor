@@ -51,8 +51,8 @@ class ModelCommand(BaseSlashCommand):
         if ctx.args:
             # Switch model
             model_name = ctx.args[FIRST_ARG_INDEX]
-            if ctx.agent.switch_model(model_name):
-                info = ctx.agent.get_current_provider_info()
+            if ctx.agent and getattr(ctx.agent, 'switch_model', lambda x: False)(model_name):
+                info = ctx.agent.get_current_provider_info()  # type: ignore[attr-defined]
                 ctx.console.print(f"[green]Switched to model:[/] [cyan]{model_name}[/]")
                 ctx.console.print(
                     f"  [dim]Native tools: {info['native_tool_calls']}, "
@@ -84,7 +84,7 @@ class ModelCommand(BaseSlashCommand):
             table.add_column("Size", style="yellow")
             table.add_column("Status", style="green")
 
-            current_model = ctx.agent.model if ctx.agent else None
+            current_model = getattr(ctx.agent, 'model', None) if ctx.agent else None
 
             for model in models_list:
                 name = model.get("name", "unknown")
@@ -144,11 +144,11 @@ class ProfileCommand(BaseSlashCommand):
                 f"({profile_config.provider}:{profile_config.model_name})...[/]"
             )
 
-            if ctx.agent.switch_provider(
-                provider_name=profile_config.provider,
-                model=profile_config.model_name,
+            if ctx.agent and getattr(ctx.agent, 'switch_provider', lambda p, m=None: False)(
+                profile_config.provider,
+                profile_config.model_name,
             ):
-                info = ctx.agent.get_current_provider_info()
+                info = ctx.agent.get_current_provider_info()  # type: ignore[attr-defined]
                 ctx.console.print(f"[green]Switched to profile:[/] [cyan]{profile_name}[/]")
                 ctx.console.print(f"  [dim]Provider: {info['provider']}, Model: {info['model']}[/]")
                 ctx.console.print(
@@ -164,8 +164,8 @@ class ProfileCommand(BaseSlashCommand):
             return
 
         # Show profiles
-        current_provider = ctx.agent.provider_name if ctx.agent else None
-        current_model = ctx.agent.model if ctx.agent else None
+        current_provider = getattr(ctx.agent, 'provider_name', None) if ctx.agent else None
+        current_model = getattr(ctx.agent, 'model', None) if ctx.agent else None
 
         # Get RL Q-values for provider ranking
         rl_rankings = {}
@@ -176,7 +176,7 @@ class ProfileCommand(BaseSlashCommand):
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("model_selector")
             if learner:
-                rankings = learner.get_provider_rankings()
+                rankings = learner.get_provider_rankings()  # type: ignore[attr-defined]
                 rl_rankings = {r["provider"].lower(): r["q_value"] for r in rankings}
                 if rankings:
                     rl_best_provider = rankings[FIRST_MATCH_INDEX]["provider"].lower()
@@ -230,7 +230,7 @@ class ProviderCommand(BaseSlashCommand):
 
         from victor.providers.registry import ProviderRegistry
 
-        info = ctx.agent.get_current_provider_info()
+        info = ctx.agent.get_current_provider_info() if ctx.agent else {}  # type: ignore[attr-defined]
         available_providers = ProviderRegistry.list_providers()
 
         if not ctx.args:
@@ -255,7 +255,7 @@ class ProviderCommand(BaseSlashCommand):
                 coordinator = get_rl_coordinator()
                 learner = coordinator.get_learner("model_selector")
                 if learner:
-                    rankings = learner.get_provider_rankings()
+                    rankings = learner.get_provider_rankings()  # type: ignore[attr-defined]
                     if rankings:
                         ctx.console.print("\n[bold]Provider Rankings (RL):[/]")
                         for r in rankings[:5]:
@@ -290,8 +290,8 @@ class ProviderCommand(BaseSlashCommand):
 
         ctx.console.print(f"[dim]Switching to {provider_name}...[/]")
 
-        if ctx.agent.switch_provider(provider_name=provider_name, model=model):
-            info = ctx.agent.get_current_provider_info()
+        if ctx.agent and getattr(ctx.agent, 'switch_provider', lambda p, m=None: False)(provider_name, model):
+            info = ctx.agent.get_current_provider_info()  # type: ignore[attr-defined]
             ctx.console.print(f"[green]Switched to:[/] {info['provider']}:{info['model']}")
             ctx.console.print(
                 f"  [dim]Native tools: {info['native_tool_calls']}, "

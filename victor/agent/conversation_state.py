@@ -614,12 +614,13 @@ class ConversationStateMachine:
 
         return False
 
-    def _transition_to(self, new_stage: ConversationStage, confidence: float = 0.5) -> None:
+    def _transition_to(self, new_stage: ConversationStage, confidence: float = 0.5, force: bool = False) -> None:
         """Transition to a new stage.
 
         Args:
             new_stage: Stage to transition to
             confidence: Confidence in this transition
+            force: If True, bypass StageTransitionEngine validation (for testing)
 
         Note: Transitions are rate-limited by TRANSITION_COOLDOWN_SECONDS to
         prevent rapid stage thrashing observed in analysis tasks.
@@ -637,8 +638,8 @@ class ConversationStateMachine:
         old_stage = self.state.stage
         current_time: float  # Will be set in both engine and legacy paths
 
-        # Use StageTransitionEngine for validation if enabled
-        if self._transition_engine:
+        # Use StageTransitionEngine for validation if enabled (unless force=True)
+        if self._transition_engine and not force:
             # Check if transition is valid using the engine's graph
             if not self._transition_engine.can_transition(new_stage, confidence):
                 logger.debug(

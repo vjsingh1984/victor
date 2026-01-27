@@ -27,6 +27,7 @@ class MockStateImplementation:
     """Mock implementation of StateProtocol for testing."""
 
     def __init__(self):
+        self._messages = []
         self._tool_calls_used = 5
         self._executed_tools = ["read_file", "search", "read_file"]
         self._failed_tool_signatures = {
@@ -37,6 +38,11 @@ class MockStateImplementation:
             "/path/to/file1.py",
             "/path/to/file2.py",
         }
+
+    @property
+    def messages(self) -> List:
+        """Get conversation messages."""
+        return self._messages
 
     @property
     def tool_calls_used(self) -> int:

@@ -151,7 +151,7 @@ def get_code_style(orchestrator: Any) -> Dict[str, Any]:
             "enforce_type_hints": True,
         },
     )
-    return result  # type: ignore[no-any-return]
+    return result
 
 
 def configure_test_requirements(

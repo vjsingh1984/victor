@@ -81,6 +81,10 @@ def normalize_model_name(model_name: str) -> str:
     Returns:
         Normalized model name (e.g., "qwen2.5-coder-tools:14b-64K")
     """
+    # Handle non-string input (e.g., Mock objects in tests)
+    if not isinstance(model_name, str):
+        return str(model_name) if model_name is not None else ""
+
     if not model_name:
         return model_name
 
@@ -317,6 +321,10 @@ class ModelCapabilityLoader:
         - Glob patterns (*, ?)
         - Prefix matching (llama3.1* matches llama3.1:8b)
         """
+        # Handle non-string input (e.g., Mock objects in tests)
+        if not isinstance(model_name, str):
+            return False
+
         # Try fnmatch first
         if fnmatch.fnmatch(model_name, pattern):
             return True

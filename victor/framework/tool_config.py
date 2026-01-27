@@ -307,8 +307,6 @@ class ToolConfigurator:
                 except Exception as e:
                     warnings.append(f"Filter failed: {e}")
             final_tools = final_tools - excluded
-        else:
-            final_tools = enabled_tools - excluded
 
         # Validate tools exist
         invalid_tools = final_tools - available_tools

@@ -20,17 +20,25 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Callable, Tuple
+from typing import List, Dict, Any, Optional, Callable, Tuple, TypedDict
 
 import aiofiles
 
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
+from typing import TypedDict
 
 # PathResolver for centralized path normalization
 from victor.protocols.path_resolver import PathResolver, create_path_resolver
 
 logger = logging.getLogger(__name__)
+
+# Type for truncation info
+class TruncationInfo(TypedDict):
+    lines_returned: int
+    bytes_returned: int
+    was_truncated: bool
+    truncation_reason: str
 
 # Global PathResolver instance (lazy initialized)
 _path_resolver: Optional[PathResolver] = None
@@ -1094,7 +1102,7 @@ TEXT_EXTENSIONS = {
     progress_params=["path", "offset", "limit"],  # Params indicating exploration progress
     stages=["reading", "initial", "analysis", "verification"],  # Conversation stages where relevant
     task_types=["analysis", "search"],  # Task types for classification-aware selection
-    execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
+    execution_category="read_only",  # Safe for parallel execution
     keywords=[
         "read",
         "file",
@@ -1151,8 +1159,8 @@ async def read(
     ctx: int = 2,
     regex: bool = False,
     # Parameter aliases for models that use different names (e.g., gpt-oss)
-    line_start: int = None,
-    line_end: int = None,
+    line_start: Optional[int] = None,
+    line_end: Optional[int] = None,
     # Capture malformed calls with incorrect parameter names
     **kwargs,
 ) -> str:
@@ -1403,7 +1411,7 @@ async def read(
         return f"Cannot read binary file: {filename} (extension: {ext}). This is not a text file."
 
     # Flatten all binary extensions
-    ALL_BINARY_EXTENSIONS = set()
+    ALL_BINARY_EXTENSIONS: set[str] = set()
     for info in BINARY_CATEGORIES.values():
         ALL_BINARY_EXTENSIONS.update(info["extensions"])
 
@@ -1517,7 +1525,7 @@ async def read(
     if search:
         from victor.tools.output_utils import grep_lines
 
-        result = grep_lines(
+        grep_result = grep_lines(
             content=content,
             pattern=search,
             context_before=ctx,
@@ -1527,10 +1535,10 @@ async def read(
             max_matches=50,
             file_path=path,
         )
-        return result.to_string(show_line_numbers=True, max_matches=50)
+        return grep_result.to_string(show_line_numbers=True, max_matches=50)
 
     # Import truncation utilities
-    from victor.tools.output_utils import truncate_by_lines, format_with_line_numbers
+    from victor.tools.output_utils import truncate_by_lines, format_with_line_numbers, TruncationInfo
 
     # Determine truncation limits based on model context
     # Cloud models (Anthropic, OpenAI, etc.): ~2500 lines / 100KB (~25K tokens)
@@ -1592,7 +1600,7 @@ async def read(
         effective_max_lines = MAX_LINES
 
     # Apply truncation (always ends on complete lines)
-    truncated_content, info = truncate_by_lines(
+    truncated_content, info: TruncationInfo = truncate_by_lines(
         remaining_content,
         max_lines=effective_max_lines,
         max_bytes=MAX_BYTES,
@@ -1650,7 +1658,7 @@ async def read(
     progress_params=["path"],  # Same file = loop, regardless of content
     stages=["execution"],  # Conversation stages where relevant
     task_types=["edit", "generation", "action"],  # Task types for classification-aware selection
-    execution_category=ExecutionCategory.WRITE,  # Cannot run in parallel with conflicting ops
+    execution_category="write",  # Cannot run in parallel with conflicting ops
     keywords=[
         "write",
         "file",
@@ -1753,7 +1761,7 @@ async def write(path: str, content: str) -> str:
     progress_params=["path", "depth", "pattern"],  # Params indicating exploration progress
     stages=["initial", "planning", "reading", "analysis"],  # Conversation stages where relevant
     task_types=["search", "analysis"],  # Task types for classification-aware selection
-    execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
+    execution_category="read_only",  # Safe for parallel execution
     keywords=[
         "list",
         "directory",
@@ -1853,8 +1861,6 @@ async def ls(
                     f"Path is not a directory: {path}\n"
                     f"Suggestion: Use read_file(path='{path}') to read this file instead."
                 )
-        if not dir_path.is_dir():
-            raise NotADirectoryError(f"Path is not a directory: {path}")
 
         # Normalize limit (handle non-int input from model)
         if not isinstance(limit, int):
@@ -1950,30 +1956,14 @@ async def ls(
             items.append(item)
             count += 1
 
-        # Build result with cwd context for better LLM orientation
-        cwd = str(Path.cwd())
-
-        # Try to express the target path relative to cwd for clarity
-        try:
-            relative_target = str(dir_path.relative_to(Path.cwd()))
-        except ValueError:
-            relative_target = str(dir_path)  # Use absolute if outside cwd
-
         # Always include cwd context and relative target path in response
-        result = {
-            "cwd": cwd,
-            "target": relative_target if relative_target != "." else ".",
-            "items": items,
-            "count": len(items),
-        }
+        for item in items:
+            if pattern:
+                item["filter"] = pattern
+            if count >= limit:
+                item["truncated"] = True
 
-        # Add optional metadata
-        if pattern:
-            result["filter"] = pattern
-        if count >= limit:
-            result["truncated"] = True
-
-        return result
+        return items
 
     except Exception as e:
         # Let the decorator handle the exception and format it
@@ -2033,6 +2023,7 @@ async def find(
         find("test*", type="dir") # Find directories starting with 'test'
     """
     import fnmatch
+    import os
 
     try:
         base_path = Path(path).expanduser().resolve()
@@ -2044,7 +2035,7 @@ async def find(
         count = 0
 
         # Walk the directory tree
-        for root, dirs, files in base_path.walk():
+        for root, dirs, files in os.walk(base_path):
             # Skip hidden and common excluded directories
             dirs[:] = [
                 d
@@ -2057,7 +2048,7 @@ async def find(
             if type in ("all", "dir"):
                 for d in dirs:
                     if fnmatch.fnmatch(d, name) or fnmatch.fnmatch(d.lower(), name.lower()):
-                        dir_path = root / d
+                        dir_path = Path(root) / d
                         results.append(
                             {
                                 "path": str(dir_path.relative_to(base_path)),
@@ -2073,7 +2064,7 @@ async def find(
             if type in ("all", "file") and count < limit:
                 for f in files:
                     if fnmatch.fnmatch(f, name) or fnmatch.fnmatch(f.lower(), name.lower()):
-                        file_path = root / f
+                        file_path = Path(root) / f
                         try:
                             size = file_path.stat().st_size
                         except OSError:
@@ -2132,7 +2123,7 @@ IMPORTANT_DOC_PATTERNS = [
     progress_params=["path", "max_depth"],  # Params indicating exploration progress
     stages=["initial", "planning", "reading", "analysis"],  # Best used at start of conversation
     task_types=["analysis", "search"],  # Task types for classification-aware selection
-    execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
+    execution_category="read_only",  # Safe for parallel execution
     keywords=[
         "overview",
         "project",

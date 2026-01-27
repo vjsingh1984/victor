@@ -640,6 +640,7 @@ class RLCoordinator:
 
                 return PromptTemplateLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "team_composition":
+                # coordinator: Business logic for team composition optimization in agent layer
                 from victor.agent.teams.learner import TeamCompositionLearner
 
                 # TeamCompositionLearner has different signature - uses db_path instead of db_connection

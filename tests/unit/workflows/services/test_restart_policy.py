@@ -262,9 +262,9 @@ class TestRestartPolicyEnforcerRestart:
     def registry(self):
         """Create a mock service registry with mocked methods."""
         registry = ServiceRegistry()
-        # Mock the stop_service and start_service methods that would be called
-        registry.stop_service = AsyncMock()
-        registry.start_service = AsyncMock()
+        # Mock the _stop_service and _start_service methods that would be called
+        registry._stop_service = AsyncMock()
+        registry._start_service = AsyncMock()
         return registry
 
     @pytest.fixture
@@ -335,7 +335,8 @@ class TestRestartPolicyEnforcerRestart:
             image="redis:7",
         )
         registry.add_service(config)
-        registry.start_service = AsyncMock(side_effect=Exception("Start failed"))
+        # Mock the _start_service method (with underscore) to raise exception
+        registry._start_service = AsyncMock(side_effect=Exception("Start failed"))
 
         result = await enforcer.restart_service("fail_svc")
 

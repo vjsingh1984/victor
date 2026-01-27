@@ -289,10 +289,10 @@ class SnapshotsCommand(BaseSlashCommand):
 
                 for snap in snapshots[-10:]:
                     table.add_row(
-                        snap.get("id", "?")[:8],
-                        snap.get("description", "")[:40],
-                        str(snap.get("file_count", 0)),
-                        snap.get("created_at", "")[:19],
+                        snap.snapshot_id[:8],
+                        snap.description[:40],
+                        str(snap.file_count),
+                        snap.created_at[:19],
                     )
 
                 ctx.console.print(table)
@@ -304,7 +304,7 @@ class SnapshotsCommand(BaseSlashCommand):
                 ctx.console.print(f"[green]Snapshot created:[/] {snapshot_id[:8]}")
 
             elif subcommand == "restore":
-                snapshot_id = self._get_arg(ctx, 1)
+                snapshot_id = self._get_arg(ctx, 1) or ""
                 if not snapshot_id:
                     ctx.console.print("[yellow]Usage: /snapshots restore <id>[/]")
                     return
@@ -315,12 +315,12 @@ class SnapshotsCommand(BaseSlashCommand):
                     ctx.console.print(f"[red]Snapshot not found:[/] {snapshot_id}")
 
             elif subcommand == "diff":
-                snapshot_id = self._get_arg(ctx, 1)
+                snapshot_id = self._get_arg(ctx, 1) or ""
                 if not snapshot_id:
                     ctx.console.print("[yellow]Usage: /snapshots diff <id>[/]")
                     return
 
-                diff = store.get_diff(snapshot_id)
+                diff = store.diff_snapshot(snapshot_id)
                 if diff:
                     ctx.console.print(
                         Panel(diff[:2000], title=f"Diff: {snapshot_id[:8]}", border_style="yellow")
@@ -329,7 +329,11 @@ class SnapshotsCommand(BaseSlashCommand):
                     ctx.console.print(f"[red]Snapshot not found:[/] {snapshot_id}")
 
             elif subcommand == "clear":
-                count = store.clear_snapshots()
+                # Clear all snapshots by deleting them one by one
+                count = 0
+                for snapshot_id in list(store._snapshots.keys()):
+                    if store.delete_snapshot(snapshot_id):
+                        count += 1
                 ctx.console.print(f"[green]Cleared {count} snapshots[/]")
 
             else:
@@ -408,6 +412,9 @@ class CommitCommand(BaseSlashCommand):
             )
 
             try:
+                if ctx.agent is None:
+                    ctx.console.print("[red]Agent not available for commit message generation[/]")
+                    return
                 response = await ctx.agent.chat(prompt)
                 commit_message = response.content.strip().split("\n")[0]
                 # Clean up any markdown formatting
@@ -462,6 +469,9 @@ class CopyCommand(BaseSlashCommand):
             return
 
         # Get last assistant message
+        if ctx.agent is None or ctx.agent.conversation is None:
+            ctx.console.print("[red]No conversation available[/]")
+            return
         messages = ctx.agent.conversation.messages
         last_assistant = None
         for msg in reversed(messages):

@@ -1107,8 +1107,6 @@ class TierAwareChunker:
         elif fallback == ChunkingFallback.SLIDING_WINDOW:
             return self._chunk_with_overlap(file_path, relative_path, language, content)
 
-        return []
-
     def _chunk_with_tree_sitter(
         self,
         file_path: Path,

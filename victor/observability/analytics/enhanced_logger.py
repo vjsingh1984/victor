@@ -133,10 +133,10 @@ class PIIScrubber:
                     (
                         self.scrub_dict(v)
                         if isinstance(v, dict)
-                        else self.scrub(v) if isinstance(v, str) else v
+                        else self.scrub(v) if isinstance(v, str) else str(v)
                     )
                     for v in value
-                ]
+                ]  # type: ignore[list-item]
             else:
                 result[key] = value
         return result
@@ -228,7 +228,7 @@ class LogEncryptor:
         self._fernet = None
 
         try:
-            from cryptography.fernet import Fernet
+            from cryptography.fernet import Fernet  # type: ignore[import-not-found]
 
             if key:
                 self._fernet = Fernet(key)
@@ -467,7 +467,7 @@ class EnhancedUsageLogger:
 
         if self._log_file.exists():
             stats["log_size_bytes"] = self._log_file.stat().st_size
-            stats["log_size_mb"] = round(stats["log_size_bytes"] / (1024 * 1024), 2)
+            stats["log_size_mb"] = round(float(stats["log_size_bytes"]) / (1024 * 1024), 2)
 
         return stats
 
@@ -496,4 +496,4 @@ def create_usage_logger(
     # Fall back to basic logger
     from victor.observability.analytics.logger import UsageLogger
 
-    return UsageLogger(log_file=log_file, enabled=enabled)
+    return UsageLogger(log_file=log_file, enabled=enabled)  # type: ignore[return-value]

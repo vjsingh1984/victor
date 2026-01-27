@@ -233,7 +233,7 @@ class ToolCoordinator:
         budget_manager: Optional["BudgetManager"] = None,
         tool_cache: Optional["ToolCache"] = None,
         argument_normalizer: Optional["ArgumentNormalizer"] = None,
-        tool_adapter: Optional["ToolCallingAdapter"] = None,
+        tool_adapter: Optional["BaseToolCallingAdapter"] = None,
         tool_access_controller: Optional[Any] = None,
         config: Optional[ToolCoordinatorConfig] = None,
         on_selection_complete: Optional[Callable[[str, int], None]] = None,  # method, count
@@ -408,13 +408,21 @@ class ToolCoordinator:
             # Build context dict for selector
 
             # Use selector's async select_tools method
-            # Note: ToolSelector.select_tools signature is:
-            # (user_message, use_semantic, conversation_history, conversation_depth, planned_tools)
-            tools = await self._selector.select_tools(
-                user_message=context.message,
-                conversation_history=context.conversation_history,
-                conversation_depth=context.conversation_depth,
-            )
+            # Note: ToolSelector.select_tools signature varies by implementation:
+            # - Old: (user_message, use_semantic, conversation_history, conversation_depth, planned_tools)
+            # - New: (context: ToolSelectionContext, max_tools: int = 10)
+            # Support both patterns
+            selector_kwargs: Dict[str, Any] = {
+                "user_message": context.message,
+                "conversation_history": context.conversation_history,
+                "conversation_depth": context.conversation_depth,
+            }
+
+            # Add max_tools if provided (for new-style selectors)
+            if max_tools is not None:
+                selector_kwargs["max_tools"] = max_tools
+
+            tools = await self._selector.select_tools(**selector_kwargs)
 
             # Track selection
             method = getattr(self._selector, "last_selection_method", "unknown")
@@ -791,7 +799,7 @@ class ToolCoordinator:
 
             # Validate tool name format
             if self._tool_adapter and hasattr(self._tool_adapter, "sanitizer"):
-                sanitizer = self._tool_adapter.sanitizer
+                sanitizer: Optional[Any] = self._tool_adapter.sanitizer
                 if sanitizer and not sanitizer.is_valid_tool_name(tool_name):
                     results.append(
                         {
@@ -850,8 +858,8 @@ class ToolCoordinator:
 
             # Apply adapter-based normalization
             if self._tool_adapter:
-                normalized_args.copy()
-                normalized_args = self._tool_adapter.normalize_arguments(normalized_args, tool_name)
+                if hasattr(self._tool_adapter, "normalize_arguments"):
+                    normalized_args = self._tool_adapter.normalize_arguments(normalized_args, tool_name)
 
             # Check for repeated failures
             try:
@@ -969,7 +977,10 @@ class ToolCoordinator:
                 warnings=["No tool adapter configured"],
             )
 
-        result = self._tool_adapter.parse_tool_calls(content, raw_tool_calls)
+        if hasattr(self._tool_adapter, "parse_tool_calls"):
+            result = self._tool_adapter.parse_tool_calls(content, raw_tool_calls)
+        else:
+            raise AttributeError("Tool adapter does not have parse_tool_calls method")
 
         # Log any warnings
         for warning in result.warnings:

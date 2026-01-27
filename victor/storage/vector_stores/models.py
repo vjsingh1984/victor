@@ -38,12 +38,12 @@ if TYPE_CHECKING:
         AsyncOpenAIType = None  # type: ignore[assignment]
 
     try:
-        import cohere
+        import cohere  # type: ignore[import-not-found]
     except ImportError:
         pass
 
     try:
-        import httpx
+        import httpx  # type: ignore[import-not-found]
     except ImportError:
         pass
 

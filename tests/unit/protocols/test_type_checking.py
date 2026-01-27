@@ -12,10 +12,15 @@ import subprocess
 import pytest
 from pathlib import Path
 
+import shutil
+
 
 class TestProtocolTypeChecking:
     """Test suite for mypy strict mode compliance."""
 
+    @pytest.mark.skipif(
+        not shutil.which("mypy"), reason="mypy is not installed"
+    )
     def test_protocol_files_pass_mypy_strict(self):
         """All protocol files should pass mypy strict mode."""
         protocol_files = [
@@ -72,6 +77,9 @@ class TestProtocolTypeChecking:
         assert "name" in sig.parameters
         assert sig.parameters["name"].annotation is str
 
+    @pytest.mark.skipif(
+        not shutil.which("mypy"), reason="mypy is not installed"
+    )
     def test_test_file_passes_mypy(self):
         """Test file itself should pass mypy type checking."""
         result = subprocess.run(

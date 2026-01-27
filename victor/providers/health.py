@@ -440,7 +440,7 @@ class ProviderHealthChecker:
 
         # Run checks in parallel
         tasks = [self.check_provider(name, provider) for name, provider in providers.items()]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)  # type: ignore[list-item]
 
         # Build report
         report = ProviderHealthReport()
@@ -451,11 +451,11 @@ class ProviderHealthChecker:
                 logger.warning(f"Health check failed with exception: {result}")
                 continue
 
-            report.results[result.provider_name] = result
+            report.results[result.provider_name] = result  # type: ignore[union-attr]
 
-            if result.status == HealthStatus.HEALTHY:
+            if result.status == HealthStatus.HEALTHY:  # type: ignore[union-attr]
                 report.healthy_count += 1
-            elif result.status == HealthStatus.DEGRADED:
+            elif result.status == HealthStatus.DEGRADED:  # type: ignore[union-attr]
                 report.degraded_count += 1
             else:
                 report.unhealthy_count += 1

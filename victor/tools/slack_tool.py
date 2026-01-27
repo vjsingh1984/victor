@@ -24,8 +24,8 @@ import logging
 from typing import Any, Dict, List, Optional
 
 try:
-    from slack_sdk import WebClient
-    from slack_sdk.errors import SlackApiError
+    from slack_sdk import WebClient  # type: ignore[import]
+    from slack_sdk.errors import SlackApiError  # type: ignore[import]
 
     SLACK_AVAILABLE = True
 except ImportError:

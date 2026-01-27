@@ -452,7 +452,7 @@ class DistributedTracer:
 # =============================================================================
 
 
-class Span:
+class Span:  # type: ignore[no-redef]
     """Span representing an operation.
 
     Spans should be used as context managers to ensure proper timing.

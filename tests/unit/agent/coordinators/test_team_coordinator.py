@@ -622,8 +622,9 @@ class TestTeamCoordinatorEdgeCases:
         mock_mw_coordinator: Mock,
     ):
         """Test get_team_specs when _team_specs is None."""
-        # Setup - set to None
+        # Setup - set to None and ensure no vertical_context fallback
         mock_orchestrator._team_specs = None
+        mock_orchestrator.vertical_context = None  # Prevent fallback to auto-created Mock
 
         # Execute
         coordinator = TeamCoordinator(
@@ -633,21 +634,9 @@ class TestTeamCoordinatorEdgeCases:
         )
         result = coordinator.get_team_specs()
 
-        # Assert - returns None (not empty dict)
-        # This is expected behavior based on implementation using getattr with default {}
-        # The implementation actually returns {} when attribute doesn't exist
-        # but returns the actual value (even None) when it exists
-        # So let's check what the actual behavior is
-        # Based on the code: return getattr(self._orchestrator, "_team_specs", {})
-        # When _team_specs is None, getattr returns None, not {}
-        # Wait, no - getattr returns the actual value if it exists
-        # So if _team_specs is None, it returns None
-        # Actually, let me check the implementation again
-        # From team_coordinator.py line 144:
-        # return getattr(self._orchestrator, "_team_specs", {})
-        # This returns the actual value if it exists, or {} if it doesn't
-        # So if _team_specs is None, it returns None
-        assert result is None
+        # Assert - returns empty dict (default when no specs available)
+        # Per implementation, final fallback is {} at line 173
+        assert result == {}
 
     def test_get_team_specs_with_special_characters_in_team_names(
         self, coordinator: TeamCoordinator, mock_orchestrator: Mock

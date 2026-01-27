@@ -338,15 +338,17 @@ class ModelSwitcher:
             limit: Maximum entries to return
 
         Returns:
-            List of switch events as dicts
+            List of switch events as dicts with ModelSwitchEvent-compatible keys
         """
         return [
             {
-                "from": f"{e.from_provider}:{e.from_model}",
-                "to": f"{e.to_provider}:{e.to_model}",
-                "reason": e.reason.value,
-                "timestamp": e.timestamp.isoformat(),
-                "messages_at_switch": e.message_count,
+                "from_provider": e.from_provider,
+                "from_model": e.from_model,
+                "to_provider": e.to_provider,
+                "to_model": e.to_model,
+                "reason": e.reason,
+                "timestamp": e.timestamp,
+                "message_count": e.message_count,
             }
             for e in self._switch_history[-limit:]
         ]

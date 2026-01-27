@@ -205,7 +205,8 @@ class PersistentSelectionCache:
         with self._lock:
             try:
                 cursor = self._get_cursor()
-                cursor.execute(
+                if cursor:
+                        cursor.execute(
                     """
                     SELECT value, created_at, last_accessed, access_count, ttl
                     FROM cache_entries
@@ -214,7 +215,7 @@ class PersistentSelectionCache:
                     (key, namespace),
                 )
 
-                row = cursor.fetchone()
+                row = cursor.fetchone() if cursor else None
                 if row is None:
                     self._misses += 1
                     return default
@@ -226,17 +227,20 @@ class PersistentSelectionCache:
                 # Check expiration
                 if ttl and (time.time() - created_at) > ttl:
                     # Expired - remove entry
-                    cursor.execute(
+                    if cursor:
+                        cursor.execute(
                         "DELETE FROM cache_entries WHERE key = ? AND namespace = ?",
                         (key, namespace),
                     )
-                    self._conn.commit()
+                    if self._conn:
+                        self._conn.commit()
                     self._evictions += 1
                     self._misses += 1
                     return default
 
                 # Update access metrics
-                cursor.execute(
+                if cursor:
+                        cursor.execute(
                     """
                     UPDATE cache_entries
                     SET last_accessed = ?, access_count = access_count + 1
@@ -244,8 +248,8 @@ class PersistentSelectionCache:
                 """,
                     (time.time(), key, namespace),
                 )
-                self._conn.commit()
-
+                if self._conn:
+                    self._conn.commit()
                 self._hits += 1
 
                 # Trigger auto-compaction if needed
@@ -287,7 +291,8 @@ class PersistentSelectionCache:
                 metadata_json = json.dumps(metadata or {})
 
                 # Insert or replace
-                cursor.execute(
+                if cursor:
+                        cursor.execute(
                     """
                     INSERT OR REPLACE INTO cache_entries
                     (key, value, namespace, created_at, last_accessed, access_count, ttl, metadata)
@@ -305,8 +310,8 @@ class PersistentSelectionCache:
                     ),
                 )
 
-                self._conn.commit()
-
+                if self._conn:
+                    self._conn.commit()
                 # Trigger auto-save if needed
                 self._maybe_save()
 
@@ -335,21 +340,24 @@ class PersistentSelectionCache:
                 cursor = self._get_cursor()
 
                 if key and namespace:
-                    cursor.execute(
+                    if cursor:
+                        cursor.execute(
                         "DELETE FROM cache_entries WHERE key = ? AND namespace = ?",
                         (key, namespace),
                     )
                 elif namespace:
-                    cursor.execute(
+                    if cursor:
+                        cursor.execute(
                         "DELETE FROM cache_entries WHERE namespace = ?",
                         (namespace,),
                     )
                 else:
-                    cursor.execute("DELETE FROM cache_entries")
+                    if cursor:
+                        cursor.execute("DELETE FROM cache_entries")
 
-                count = cursor.rowcount
-                self._conn.commit()
-
+                count = cursor.rowcount if cursor else 0
+                if self._conn:
+                    self._conn.commit()
                 logger.info(f"Invalidated {count} cache entries")
                 return count
 
@@ -371,18 +379,20 @@ class PersistentSelectionCache:
                 cursor = self._get_cursor()
 
                 # Remove expired entries
-                cursor.execute(
+                if cursor:
+                        cursor.execute(
                     """
                     DELETE FROM cache_entries
                     WHERE ttl > 0 AND (strftime('%s', 'now') - created_at) > ttl
                 """
                 )
 
-                count = cursor.rowcount
-                self._conn.commit()
-
+                count = cursor.rowcount if cursor else 0
+                if self._conn:
+                    self._conn.commit()
                 # Vacuum to reclaim space
-                cursor.execute("VACUUM")
+                if cursor:
+                        cursor.execute("VACUUM")
 
                 self._last_compaction = time.time()
 
@@ -421,12 +431,14 @@ class PersistentSelectionCache:
                 cursor = self._get_cursor()
 
                 # Get entry count
-                cursor.execute("SELECT COUNT(*) FROM cache_entries")
-                total_entries = cursor.fetchone()[0]
+                if cursor:
+                        cursor.execute("SELECT COUNT(*) FROM cache_entries")
+                total_entries = cursor.fetchone()[0] if cursor else 0
 
                 # Get entries by namespace
-                cursor.execute("SELECT namespace, COUNT(*) FROM cache_entries GROUP BY namespace")
-                namespaces = dict(cursor.fetchall())
+                if cursor:
+                        cursor.execute("SELECT namespace, COUNT(*) FROM cache_entries GROUP BY namespace")
+                namespaces = dict(cursor.fetchall()) if cursor else {}
 
                 # Get database size
                 db_size = self._cache_path.stat().st_size if self._cache_path.exists() else 0
@@ -464,9 +476,10 @@ class PersistentSelectionCache:
         with self._lock:
             try:
                 cursor = self._get_cursor()
-                cursor.execute("DELETE FROM cache_entries")
-                self._conn.commit()
-
+                if cursor:
+                        cursor.execute("DELETE FROM cache_entries")
+                if self._conn:
+                    self._conn.commit()
                 # Reset metrics
                 self._hits = 0
                 self._misses = 0
@@ -501,10 +514,11 @@ class PersistentSelectionCache:
             )  # Write-Ahead Logging for better concurrency
             self._conn.execute("PRAGMA synchronous=NORMAL")  # Balance safety and performance
 
-            cursor = self._conn.cursor()
+            cursor = self._conn.cursor() if self._conn else None
 
             # Create table
-            cursor.execute(
+            if cursor:
+                        cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS cache_entries (
                     key TEXT NOT NULL,
@@ -521,14 +535,16 @@ class PersistentSelectionCache:
             )
 
             # Create indexes for performance
-            cursor.execute(
+            if cursor:
+                        cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_namespace
                 ON cache_entries(namespace)
             """
             )
 
-            cursor.execute(
+            if cursor:
+                        cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_created_at
                 ON cache_entries(created_at)
@@ -536,7 +552,8 @@ class PersistentSelectionCache:
             )
 
             # Create metadata table for version tracking
-            cursor.execute(
+            if cursor:
+                        cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS cache_metadata (
                     key TEXT PRIMARY KEY,
@@ -546,15 +563,18 @@ class PersistentSelectionCache:
             )
 
             # Check version
-            cursor.execute("SELECT value FROM cache_metadata WHERE key = 'version'")
-            row = cursor.fetchone()
+            if cursor:
+                        cursor.execute("SELECT value FROM cache_metadata WHERE key = 'version'")
+            row = cursor.fetchone() if cursor else None
             if row is None:
                 # Initialize version
-                cursor.execute(
+                if cursor:
+                        cursor.execute(
                     "INSERT INTO cache_metadata (key, value) VALUES ('version', ?)",
                     (str(CACHE_VERSION),),
                 )
-                cursor.execute(
+                if cursor:
+                        cursor.execute(
                     "INSERT INTO cache_metadata (key, value) VALUES ('schema_version', ?)",
                     (str(CACHE_SCHEMA_VERSION),),
                 )
@@ -564,8 +584,8 @@ class PersistentSelectionCache:
                 if version < CACHE_VERSION:
                     self._migrate_db(version, CACHE_VERSION)
 
-            self._conn.commit()
-
+            if self._conn:
+                    self._conn.commit()
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
             raise
@@ -580,28 +600,30 @@ class PersistentSelectionCache:
         logger.info(f"Migrating cache database from v{from_version} to v{to_version}")
 
         try:
-            cursor = self._conn.cursor()
+            cursor = self._conn.cursor() if self._conn else None
 
             # Version-specific migrations
             if from_version == 0 and to_version >= 1:
                 # Add metadata column if not exists
-                cursor.execute("ALTER TABLE cache_entries ADD COLUMN metadata TEXT")
+                if cursor:
+                        cursor.execute("ALTER TABLE cache_entries ADD COLUMN metadata TEXT")
 
             # Update version
-            cursor.execute(
+            if cursor:
+                        cursor.execute(
                 "UPDATE cache_metadata SET value = ? WHERE key = 'version'",
                 (str(to_version),),
             )
 
-            self._conn.commit()
-
+            if self._conn:
+                    self._conn.commit()
             logger.info("Database migration complete")
 
         except Exception as e:
             logger.error(f"Failed to migrate database: {e}")
             raise
 
-    def _get_cursor(self) -> sqlite3.Cursor:
+    def _get_cursor(self) -> Optional[sqlite3.Cursor]:
         """Get database cursor, initializing connection if needed.
 
         Returns:
@@ -609,8 +631,7 @@ class PersistentSelectionCache:
         """
         if self._conn is None:
             self._init_db()
-        return self._conn.cursor()
-
+        return self._conn.cursor() if self._conn else None
     def _maybe_compact(self) -> None:
         """Compact if enough time has passed."""
         if not self._auto_compact:

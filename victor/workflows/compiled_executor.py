@@ -113,7 +113,8 @@ class CompiledWorkflowExecutor:
             ExecutionEventProtocol: Execution events as they occur
         """
         if hasattr(compiled_graph, "stream"):
-            stream_result = await compiled_graph.stream(initial_state, thread_id=thread_id)
+            # stream() is an async generator, not a coroutine, so don't await it
+            stream_result = compiled_graph.stream(initial_state, thread_id=thread_id)
             async for event in stream_result:
                 yield event
 

@@ -69,6 +69,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         if not candidates:
             if base_url is None:
+                # This should not be reachable since we already checked environment
                 candidates = ["http://localhost:11434"]
             elif isinstance(base_url, (list, tuple)):
                 candidates = [str(u).strip() for u in base_url if str(u).strip()]
@@ -81,6 +82,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
                 candidates = [str(base_url)]
 
         if not candidates:
+            # This should be unreachable due to previous logic
             candidates = ["http://localhost:11434"]
 
         # Pick first candidate (blindly)
@@ -262,10 +264,11 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
             except Exception as exc:
                 logger.warning(f"Ollama endpoint {url} not reachable ({exc}); trying next.")
 
+        # Fallback if no URLs are reachable
         logger.error(
             f"No Ollama endpoints reachable from: {candidates}. Falling back to {base_url}"
         )
-        return base_url
+        return str(base_url)
 
     @classmethod
     async def _select_base_url_async(

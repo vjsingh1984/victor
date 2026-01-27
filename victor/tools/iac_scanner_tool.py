@@ -20,7 +20,7 @@ Infrastructure-as-Code security scanning.
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 from victor.iac import (
     IaCManager,
@@ -149,7 +149,7 @@ class IaCScannerTool(BaseTool):
             ],
         )
 
-    async def execute(self, **kwargs: Any) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:  # type: ignore[override]
         """Execute IaC scanning action."""
         action = kwargs.get("action", "summary")
         file_path = kwargs.get("file_path")

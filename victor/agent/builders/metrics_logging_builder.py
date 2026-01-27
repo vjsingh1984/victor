@@ -74,7 +74,7 @@ class MetricsLoggingBuilder(FactoryAwareBuilder):
         components["embedding_preload_task"] = orchestrator._embedding_preload_task
 
         # Metrics collection (via factory)
-        from victor.tools.base import CostTier  # type: ignore[attr-defined]
+        from victor.tools.base import CostTier
 
         orchestrator._metrics_collector = factory.create_metrics_collector(
             streaming_metrics_collector=orchestrator.streaming_metrics_collector,

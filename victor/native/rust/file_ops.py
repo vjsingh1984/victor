@@ -53,7 +53,7 @@ from typing import List, Dict, Optional, Union
 
 # Import Rust extension (will be available after compilation)
 try:
-    from victor_native import (
+    from victor_native import (  # type: ignore[import-not-found]
         FileInfo,
         FileMetadata,
         walk_directory_parallel,

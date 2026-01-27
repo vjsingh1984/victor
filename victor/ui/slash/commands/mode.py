@@ -88,7 +88,7 @@ class ModeCommand(BaseSlashCommand):
                 mode_controller.switch_mode(new_mode)
             else:
                 # Use ModeAwareMixin's mode_controller property (lazy-loads)
-                mc = ctx.agent.mode_controller
+                mc = getattr(ctx.agent, "mode_controller", None)
                 if mc:
                     mc.switch_mode(new_mode)
                 else:
@@ -197,7 +197,7 @@ class PlanCommand(BaseSlashCommand):
 
         # Switch to plan mode using public interface
         # Uses ModeAwareMixin's mode_controller property (lazy-loads)
-        mc = ctx.agent.mode_controller
+        mc = getattr(ctx.agent, "mode_controller", None)
         if mc:
             mc.switch_mode(AgentMode.PLAN)
         else:
@@ -261,7 +261,7 @@ class PlanCommand(BaseSlashCommand):
 
         if not current_plan:
             # Check if there's a plan in conversation context using public interface
-            conv_controller = ctx.agent.conversation_controller
+            conv_controller = getattr(ctx.agent, "conversation_controller", None)
             if conv_controller:
                 current_plan = conv_controller.current_plan
 
@@ -386,7 +386,7 @@ class PlanCommand(BaseSlashCommand):
 
         if not current_plan:
             # Use public interface for conversation controller and current_plan
-            conv_controller = ctx.agent.conversation_controller
+            conv_controller = getattr(ctx.agent, "conversation_controller", None)
             if conv_controller:
                 current_plan = conv_controller.current_plan
 

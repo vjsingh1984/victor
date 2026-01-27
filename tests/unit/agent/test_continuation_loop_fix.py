@@ -526,9 +526,9 @@ class TestBestEffortFinalize:
         )
         pipeline._grounding_verifier = mock_verifier
 
-        # Mock the lazy initializer to return True
+        # Mock the lazy initializer to return the verifier
         with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = True
+            mock_get.return_value = mock_verifier
 
             result = await pipeline.process_response(
                 response="This is my analysis...",
@@ -564,7 +564,7 @@ class TestBestEffortFinalize:
         pipeline._grounding_verifier = mock_verifier
 
         with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = True
+            mock_get.return_value = mock_verifier
 
             result = await pipeline.process_response(
                 response="This is my analysis...",
@@ -599,7 +599,7 @@ class TestBestEffortFinalize:
         pipeline._grounding_verifier = mock_verifier
 
         with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = True
+            mock_get.return_value = mock_verifier
 
             await pipeline.process_response(
                 response="Verified analysis...",

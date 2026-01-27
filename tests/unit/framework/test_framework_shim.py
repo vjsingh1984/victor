@@ -259,15 +259,27 @@ class TestFrameworkShimVertical:
     def mock_orchestrator(self):
         """Create mock orchestrator with capability protocol support."""
         from victor.framework.protocols import CapabilityRegistryProtocol
+        from victor.core.mode_config import ModeConfig
 
-        class MockOrchestrator:
+        # Track method calls
+        set_custom_prompt_calls = []
+        enabled_tools_set = set()
+
+        class MockOrchestrator(CapabilityRegistryProtocol):
             """Mock orchestrator that implements capability protocols."""
 
             def __init__(self):
                 self._enabled_tools = set()
                 self._vertical_context = None
-                self.set_custom_prompt = MagicMock()
-                self.set_custom_prompt_calls = []
+                # Use a real method instead of MagicMock for better call tracking
+                self._set_custom_prompt_value = None
+                # Use list for tracking calls
+                self.set_custom_prompt_calls_list = set_custom_prompt_calls
+
+            def set_custom_prompt(self, prompt: str) -> None:
+                """Set custom system prompt."""
+                self._set_custom_prompt_value = prompt
+                self.set_custom_prompt_calls_list.append(prompt)
 
             def set_enabled_tools(self, tools):
                 self._enabled_tools = set(tools) if tools else set()
@@ -306,7 +318,6 @@ class TestFrameworkShimVertical:
                     self.set_enabled_tools(args[0])
                     return True
                 elif name == "custom_prompt" and args:
-                    self.set_custom_prompt_calls.append(args[0])
                     self.set_custom_prompt(args[0])
                     return True
                 elif name == "vertical_context" and args:
@@ -314,7 +325,15 @@ class TestFrameworkShimVertical:
                     return True
                 return False
 
-        return MockOrchestrator()
+            # CapabilityRegistryProtocol required methods
+            def get_mode_configs(self) -> dict[str, ModeConfig]:
+                return {}
+
+        # Create instance and attach the tracking list
+        orchestrator = MockOrchestrator()
+        # Make set_custom_prompt callable return value match what's expected
+        orchestrator.set_custom_prompt_calls = set_custom_prompt_calls
+        return orchestrator
 
     @pytest.fixture(autouse=True)
     def register_mock_vertical(self):
@@ -358,9 +377,9 @@ class TestFrameworkShimVertical:
             await shim.create_orchestrator()
 
             # New capability-based approach calls orchestrator.set_custom_prompt directly
-            mock_orchestrator.set_custom_prompt.assert_called_once_with(
-                "You are a framework shim test assistant."
-            )
+            # Check the call list since set_custom_prompt is a real method, not a MagicMock
+            assert len(mock_orchestrator.set_custom_prompt_calls_list) == 1
+            assert mock_orchestrator.set_custom_prompt_calls_list[0] == "You are a framework shim test assistant."
 
     @pytest.mark.asyncio
     async def test_vertical_stages_applied(self, mock_settings, mock_orchestrator):

@@ -16,21 +16,38 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from unittest.mock import MagicMock
 
 import pytest
+
+
+class MockVerticalContext:
+    """Mock vertical context for testing capabilities."""
+
+    def __init__(self):
+        self._configs: Dict[str, Any] = {}
+
+    def set_capability_config(self, name: str, config: Dict[str, Any]) -> None:
+        """Store capability configuration."""
+        self._configs[name] = config
+
+    def get_capability_config(
+        self, name: str, default: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Retrieve capability configuration."""
+        return self._configs.get(name, default if default is not None else {})
+
+    def has_capability_config(self, name: str) -> bool:
+        """Check if capability configuration exists."""
+        return name in self._configs
 
 
 class MockOrchestrator:
     """Mock orchestrator for testing capabilities."""
 
     def __init__(self):
-        self.safety_config: Dict[str, Any] = {}
-        self.container_config: Dict[str, Any] = {}
-        self.infra_config: Dict[str, Any] = {}
-        self.cicd_config: Dict[str, Any] = {}
-        self.monitoring_config: Dict[str, Any] = {}
+        self.vertical_context = MockVerticalContext()
 
 
 class TestDeploymentSafetyCapability:
@@ -46,7 +63,7 @@ class TestDeploymentSafetyCapability:
 
         configure_deployment_safety(orchestrator)
 
-        config = orchestrator.safety_config.get("deployment", {})
+        config = orchestrator.vertical_context.get_capability_config("deployment_safety")
         assert config["require_approval_for_production"] is True
         assert config["require_backup_before_deploy"] is True
         assert config["enable_rollback"] is True
@@ -65,7 +82,7 @@ class TestDeploymentSafetyCapability:
             protected_environments=["prod", "uat"],
         )
 
-        config = orchestrator.safety_config.get("deployment", {})
+        config = orchestrator.vertical_context.get_capability_config("deployment_safety")
         assert config["require_approval_for_production"] is False
         assert config["require_backup_before_deploy"] is False
         assert config["enable_rollback"] is False
@@ -85,9 +102,10 @@ class TestContainerSettingsCapability:
 
         configure_container_settings(orchestrator)
 
-        assert orchestrator.container_config["runtime"] == "docker"
-        assert orchestrator.container_config["security_scan_enabled"] is True
-        assert orchestrator.container_config["max_image_size_mb"] == 2000
+        config = orchestrator.vertical_context.get_capability_config("container_settings")
+        assert config["runtime"] == "docker"
+        assert config["security_scan_enabled"] is True
+        assert config["max_image_size_mb"] == 2000
 
     def test_podman_runtime(self, orchestrator):
         """Test container settings with podman runtime."""
@@ -99,8 +117,9 @@ class TestContainerSettingsCapability:
             default_registry="registry.example.com",
         )
 
-        assert orchestrator.container_config["runtime"] == "podman"
-        assert orchestrator.container_config["default_registry"] == "registry.example.com"
+        config = orchestrator.vertical_context.get_capability_config("container_settings")
+        assert config["runtime"] == "podman"
+        assert config["default_registry"] == "registry.example.com"
 
     def test_get_container_settings(self):
         """Test getter for container settings."""
@@ -109,11 +128,8 @@ class TestContainerSettingsCapability:
             get_container_settings,
         )
 
-        # Test with orchestrator that doesn't have container_config attr
-        class NoConfigOrchestrator:
-            pass
-
-        no_config = NoConfigOrchestrator()
+        # Test with orchestrator that has no config set (returns defaults)
+        no_config = MockOrchestrator()
         settings = get_container_settings(no_config)
         assert settings["runtime"] == "docker"  # Should return defaults
 
@@ -137,9 +153,10 @@ class TestInfrastructureSettingsCapability:
 
         configure_infrastructure_settings(orchestrator)
 
-        assert orchestrator.infra_config["iac_tool"] == "terraform"
-        assert orchestrator.infra_config["require_plan_before_apply"] is True
-        assert orchestrator.infra_config["auto_approve_non_destructive"] is False
+        config = orchestrator.vertical_context.get_capability_config("infrastructure_settings")
+        assert config["iac_tool"] == "terraform"
+        assert config["require_plan_before_apply"] is True
+        assert config["auto_approve_non_destructive"] is False
 
     def test_opentofu_configuration(self, orchestrator):
         """Test infrastructure settings with OpenTofu."""
@@ -152,9 +169,10 @@ class TestInfrastructureSettingsCapability:
             state_backend="s3",
         )
 
-        assert orchestrator.infra_config["iac_tool"] == "opentofu"
-        assert orchestrator.infra_config["auto_approve_non_destructive"] is True
-        assert orchestrator.infra_config["state_backend"] == "s3"
+        config = orchestrator.vertical_context.get_capability_config("infrastructure_settings")
+        assert config["iac_tool"] == "opentofu"
+        assert config["auto_approve_non_destructive"] is True
+        assert config["state_backend"] == "s3"
 
 
 class TestCICDSettingsCapability:
@@ -170,10 +188,11 @@ class TestCICDSettingsCapability:
 
         configure_cicd_settings(orchestrator)
 
-        assert orchestrator.cicd_config["platform"] == "github_actions"
-        assert orchestrator.cicd_config["run_tests_before_deploy"] is True
-        assert orchestrator.cicd_config["require_passing_checks"] is True
-        assert orchestrator.cicd_config["enable_security_scan"] is True
+        config = orchestrator.vertical_context.get_capability_config("cicd_settings")
+        assert config["platform"] == "github_actions"
+        assert config["run_tests_before_deploy"] is True
+        assert config["require_passing_checks"] is True
+        assert config["enable_security_scan"] is True
 
     def test_gitlab_configuration(self, orchestrator):
         """Test CI/CD settings with GitLab CI."""
@@ -185,8 +204,9 @@ class TestCICDSettingsCapability:
             run_tests_before_deploy=False,
         )
 
-        assert orchestrator.cicd_config["platform"] == "gitlab_ci"
-        assert orchestrator.cicd_config["run_tests_before_deploy"] is False
+        config = orchestrator.vertical_context.get_capability_config("cicd_settings")
+        assert config["platform"] == "gitlab_ci"
+        assert config["run_tests_before_deploy"] is False
 
 
 class TestMonitoringSettingsCapability:
@@ -202,10 +222,11 @@ class TestMonitoringSettingsCapability:
 
         configure_monitoring_settings(orchestrator)
 
-        assert orchestrator.monitoring_config["metrics_backend"] == "prometheus"
-        assert orchestrator.monitoring_config["logging_backend"] == "loki"
-        assert orchestrator.monitoring_config["alerting_enabled"] is True
-        assert orchestrator.monitoring_config["dashboard_tool"] == "grafana"
+        config = orchestrator.vertical_context.get_capability_config("monitoring_settings")
+        assert config["metrics_backend"] == "prometheus"
+        assert config["logging_backend"] == "loki"
+        assert config["alerting_enabled"] is True
+        assert config["dashboard_tool"] == "grafana"
 
     def test_custom_configuration(self, orchestrator):
         """Test monitoring settings with custom backends."""
@@ -218,9 +239,10 @@ class TestMonitoringSettingsCapability:
             dashboard_tool="kibana",
         )
 
-        assert orchestrator.monitoring_config["metrics_backend"] == "datadog"
-        assert orchestrator.monitoring_config["logging_backend"] == "elasticsearch"
-        assert orchestrator.monitoring_config["dashboard_tool"] == "kibana"
+        config = orchestrator.vertical_context.get_capability_config("monitoring_settings")
+        assert config["metrics_backend"] == "datadog"
+        assert config["logging_backend"] == "elasticsearch"
+        assert config["dashboard_tool"] == "kibana"
 
 
 class TestDevOpsCapabilityProvider:
@@ -281,17 +303,18 @@ class TestDevOpsCapabilityProvider:
 
     def test_apply_deployment_safety(self, provider, orchestrator):
         """Test applying deployment safety capability."""
-        provider.configure_deployment_safety(orchestrator)
+        provider.apply_deployment_safety(orchestrator)
 
         assert "deployment_safety" in provider.get_applied()
-        assert "deployment" in orchestrator.safety_config
+        assert orchestrator.vertical_context.has_capability_config("deployment_safety")
 
     def test_apply_container_settings(self, provider, orchestrator):
         """Test applying container settings capability."""
-        provider.configure_container_settings(orchestrator, runtime="podman")
+        provider.apply_container_settings(orchestrator, runtime="podman")
 
         assert "container_settings" in provider.get_applied()
-        assert orchestrator.container_config["runtime"] == "podman"
+        config = orchestrator.vertical_context.get_capability_config("container_settings")
+        assert config["runtime"] == "podman"
 
     def test_apply_all(self, provider, orchestrator):
         """Test applying all capabilities."""

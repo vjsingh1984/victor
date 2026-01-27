@@ -50,7 +50,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set, Union
 
 logger = logging.getLogger(__name__)
 
@@ -84,34 +84,28 @@ class ModeConfig:
     tool_budget: int
     max_iterations: int
     exploration_multiplier: float = 1.0
-    allowed_tools: Optional[Set[str]] = None
+    allowed_tools: Optional[Union[List[str], Set[str]]] = None
 
     def __post_init__(self) -> None:
         """Validate configuration at construction time."""
         # Validate tool_budget (1-500)
         if not isinstance(self.tool_budget, int):
-            try:
-                self.tool_budget = int(self.tool_budget)
-            except (TypeError, ValueError) as e:
-                raise ValueError(f"tool_budget must be an integer: {e}")
+            self.tool_budget = int(self.tool_budget)  # type: ignore[assignment]
+
         if not (1 <= self.tool_budget <= 500):
             raise ValueError(f"tool_budget must be between 1 and 500, got {self.tool_budget}")
 
         # Validate max_iterations (1-500)
         if not isinstance(self.max_iterations, int):
-            try:
-                self.max_iterations = int(self.max_iterations)
-            except (TypeError, ValueError) as e:
-                raise ValueError(f"max_iterations must be an integer: {e}")
+            self.max_iterations = int(self.max_iterations)  # type: ignore[assignment]
+
         if not (1 <= self.max_iterations <= 500):
             raise ValueError(f"max_iterations must be between 1 and 500, got {self.max_iterations}")
 
         # Validate exploration_multiplier (0.1-10.0)
         if not isinstance(self.exploration_multiplier, (int, float)):
-            try:
-                self.exploration_multiplier = float(self.exploration_multiplier)
-            except (TypeError, ValueError) as e:
-                raise ValueError(f"exploration_multiplier must be numeric: {e}")
+            self.exploration_multiplier = float(self.exploration_multiplier)  # type: ignore[assignment]
+
         if not (0.1 <= self.exploration_multiplier <= 10.0):
             raise ValueError(
                 f"exploration_multiplier must be between 0.1 and 10.0, "
@@ -174,7 +168,7 @@ class ModeDefinition:
     exploration_multiplier: float = 1.0
     allowed_stages: List[str] = field(default_factory=list)
     priority_tools: List[str] = field(default_factory=list)
-    allowed_tools: Optional[Set[str]] = None
+    allowed_tools: Optional[Union[List[str], Set[str]]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -187,28 +181,19 @@ class ModeDefinition:
 
         # Validate tool_budget (1-500)
         if not isinstance(self.tool_budget, int):
-            try:
-                self.tool_budget = int(self.tool_budget)
-            except (TypeError, ValueError) as e:
-                raise ValueError(f"tool_budget must be an integer: {e}")
+            self.tool_budget = int(self.tool_budget)  # type: ignore[assignment]
         if not (1 <= self.tool_budget <= 500):
             raise ValueError(f"tool_budget must be between 1 and 500, got {self.tool_budget}")
 
         # Validate max_iterations (1-500)
         if not isinstance(self.max_iterations, int):
-            try:
-                self.max_iterations = int(self.max_iterations)
-            except (TypeError, ValueError) as e:
-                raise ValueError(f"max_iterations must be an integer: {e}")
+            self.max_iterations = int(self.max_iterations)  # type: ignore[assignment]
         if not (1 <= self.max_iterations <= 500):
             raise ValueError(f"max_iterations must be between 1 and 500, got {self.max_iterations}")
 
         # Validate temperature (0.0-2.0)
         if not isinstance(self.temperature, (int, float)):
-            try:
-                self.temperature = float(self.temperature)
-            except (TypeError, ValueError) as e:
-                raise ValueError(f"temperature must be numeric: {e}")
+            self.temperature = float(self.temperature)  # type: ignore[assignment]
         if not (0.0 <= self.temperature <= 2.0):
             raise ValueError(f"temperature must be between 0.0 and 2.0, got {self.temperature}")
 
@@ -221,10 +206,7 @@ class ModeDefinition:
 
         # Validate exploration_multiplier (0.1-10.0)
         if not isinstance(self.exploration_multiplier, (int, float)):
-            try:
-                self.exploration_multiplier = float(self.exploration_multiplier)
-            except (TypeError, ValueError) as e:
-                raise ValueError(f"exploration_multiplier must be numeric: {e}")
+            self.exploration_multiplier = float(self.exploration_multiplier)  # type: ignore[assignment]
         if not (0.1 <= self.exploration_multiplier <= 10.0):
             raise ValueError(
                 f"exploration_multiplier must be between 0.1 and 10.0, "

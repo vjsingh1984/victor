@@ -156,7 +156,7 @@ class TeamCoordinator(ITeamCoordinator):
         self.orchestrator = orchestrator
         # Type ignore: SubAgentOrchestrator expects AgentOrchestrator, but we have IAgentOrchestrator
         # At runtime, this will be AgentOrchestrator which satisfies the protocol
-        self.sub_agents = sub_agent_orchestrator or SubAgentOrchestrator(orchestrator)  # type: ignore[arg-type]
+        self.sub_agents = sub_agent_orchestrator or SubAgentOrchestrator(orchestrator)
         self._active_teams: Dict[str, TeamExecution] = {}
         self._on_progress: Optional[Callable[[str, str, float], None]] = None
 

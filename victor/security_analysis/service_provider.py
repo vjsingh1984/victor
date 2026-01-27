@@ -21,10 +21,20 @@ analysis services.
 from __future__ import annotations
 
 import logging
-from typing import Any, List, TYPE_CHECKING
+from typing import Any, List, TYPE_CHECKING, Type
+
+from victor.core.container import ServiceLifetime
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
+    from victor.config.settings import Settings
+    from victor.security_analysis.tools import SecurityScanner, SecurityManager
+    from victor.core.security.patterns import SecretScanner
+    from victor.security_analysis.handlers import (
+        VulnerabilityScanHandler,
+        SecretScanHandler,
+        ComplianceCheckHandler,
+    )
 
 from victor.core.verticals.protocols import ServiceProviderProtocol
 
@@ -40,79 +50,94 @@ class SecurityAnalysisServiceProvider(ServiceProviderProtocol):
     - SecurityManager: High-level security orchestration
     """
 
-    def register_services(self, container: "ServiceContainer") -> None:
+    def register_services(self, container: "ServiceContainer", settings: "Settings") -> None:
         """Register security analysis services.
 
         Args:
             container: DI container to register services with
         """
+        # Import classes needed for registration
+        from victor.security_analysis.tools import SecurityScanner, SecurityManager
+        from victor.core.security.patterns import SecretScanner
+        from victor.security_analysis.handlers import (
+            VulnerabilityScanHandler,
+            SecretScanHandler,
+            ComplianceCheckHandler,
+        )
+
         # Register security scanner as singleton
-        container.register_singleton(
-            "security_scanner",
+        container.register(
+            SecurityScanner,
             self._create_security_scanner,
+            ServiceLifetime.SINGLETON,
         )
 
         # Register secret scanner as singleton
-        container.register_singleton(
-            "secret_scanner",
+        container.register(
+            SecretScanner,
             self._create_secret_scanner,
+            ServiceLifetime.SINGLETON,
         )
 
         # Register security manager as singleton
-        container.register_singleton(
-            "security_manager",
+        container.register(
+            SecurityManager,
             self._create_security_manager,
+            ServiceLifetime.SINGLETON,
         )
 
         # Register workflow handlers
-        container.register_transient(
-            "vulnerability_scan_handler",
+        container.register(
+            VulnerabilityScanHandler,
             self._create_vulnerability_handler,
+            ServiceLifetime.TRANSIENT,
         )
 
-        container.register_transient(
-            "secret_scan_handler",
+        container.register(
+            SecretScanHandler,
             self._create_secret_handler,
+            ServiceLifetime.TRANSIENT,
         )
 
-        container.register_transient(
-            "compliance_check_handler",
+        container.register(
+            ComplianceCheckHandler,
             self._create_compliance_handler,
+            ServiceLifetime.TRANSIENT,
         )
 
         logger.debug("Registered security analysis services")
 
-    def _create_security_scanner(self) -> Any:
+    def _create_security_scanner(self, container: ServiceContainer) -> "SecurityScanner":
         """Create security scanner instance."""
         from victor.security_analysis.tools import get_scanner
 
         return get_scanner()
 
-    def _create_secret_scanner(self) -> Any:
+    def _create_secret_scanner(self, container: ServiceContainer) -> "SecretScanner":
         """Create secret scanner instance."""
         from victor.core.security.patterns import SecretScanner
 
         return SecretScanner()
 
-    def _create_security_manager(self) -> Any:
+    def _create_security_manager(self, container: ServiceContainer) -> "SecurityManager":
         """Create security manager instance."""
         from victor.security_analysis.tools import get_security_manager
 
         return get_security_manager()
 
-    def _create_vulnerability_handler(self) -> Any:
+    def _create_vulnerability_handler(self, container: ServiceContainer) -> "VulnerabilityScanHandler":
         """Create vulnerability scan handler."""
         from victor.security_analysis.handlers import VulnerabilityScanHandler
 
         return VulnerabilityScanHandler()
 
-    def _create_secret_handler(self) -> Any:
+    def _create_secret_handler(self, container: ServiceContainer) -> "SecretScanHandler":
         """Create secret scan handler."""
         from victor.security_analysis.handlers import SecretScanHandler
 
         return SecretScanHandler()
 
-    def _create_compliance_handler(self) -> Any:
+    def _create_compliance_handler(self, container: ServiceContainer) -> "ComplianceCheckHandler":
         """Create compliance check handler."""
         from victor.security_analysis.handlers import ComplianceCheckHandler
 
@@ -125,12 +150,12 @@ class SecurityAnalysisServiceProvider(ServiceProviderProtocol):
             List of service names this provider registers
         """
         return [
-            "security_scanner",
-            "secret_scanner",
-            "security_manager",
-            "vulnerability_scan_handler",
-            "secret_scan_handler",
-            "compliance_check_handler",
+            "SecurityScanner",
+            "SecretScanner",
+            "SecurityManager",
+            "VulnerabilityScanHandler",
+            "SecretScanHandler",
+            "ComplianceCheckHandler",
         ]
 
     @property

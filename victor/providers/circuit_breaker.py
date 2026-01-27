@@ -208,7 +208,7 @@ class CircuitBreaker:
         if state == CircuitState.HALF_OPEN:
             return self._half_open_calls < self.half_open_max_calls
 
-        return False
+        return False  # type: ignore[unreachable]
 
     def record_success(self) -> None:
         """Record a successful execution.

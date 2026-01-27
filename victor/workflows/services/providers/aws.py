@@ -58,8 +58,8 @@ logger = logging.getLogger(__name__)
 
 # Optional boto3 import
 try:
-    import boto3
-    from botocore.exceptions import ClientError, WaiterError
+    import boto3  # type: ignore[import-not-found]
+    from botocore.exceptions import ClientError, WaiterError  # type: ignore[import-not-found]
 
     BOTO3_AVAILABLE = True
 except ImportError:

@@ -253,8 +253,13 @@ class TestMutableVerticalContext:
         context = MutableVerticalContext("test", {})
         context.apply_capability("cap1", value=1)
 
-        assert "_applied_capabilities" in context.config
-        assert context.config["_applied_capabilities"]["cap1"] == {"value": 1}
+        # Check that capability was stored in _capability_values
+        assert "cap1" in context._capability_values
+        assert context._capability_values["cap1"] == {"value": 1}
+
+        # Check mutation was recorded
+        assert len(context._mutations) == 1
+        assert context._mutations[0].capability == "cap1"
 
     def test_multiple_apply_same_capability(self):
         """Test applying same capability multiple times."""

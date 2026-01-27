@@ -2,7 +2,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.common import EXCLUDE_DIRS, DEFAULT_CODE_EXTENSIONS, latest_mtime
@@ -146,7 +146,7 @@ def _latest_mtime(root: Path) -> float:
     return latest_mtime(root)
 
 
-def _normalize_extensions(exts: Optional[List[str]]) -> Set[str]:
+def _normalize_extensions(exts: Optional[Union[str, List[str]]]) -> Set[str]:
     """Normalize extensions to ensure they have leading dots.
 
     Handles:

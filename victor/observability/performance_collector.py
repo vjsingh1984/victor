@@ -412,7 +412,7 @@ class PerformanceMetricsCollector:
     def __init__(self) -> None:
         """Initialize collector (use get_instance() instead)."""
         self._start_time = time.time()
-        self._lock = threading.RLock()
+        self._lock = threading.RLock()  # type: ignore[assignment]
 
         # Metric storage
         self._tool_selection_metrics = ToolSelectionMetrics()
@@ -695,7 +695,7 @@ class PerformanceMetricsCollector:
 
     def _collect_system_metrics(self) -> None:
         """Collect system resource metrics."""
-        import psutil
+        import psutil  # type: ignore[import]
 
         try:
             # Memory

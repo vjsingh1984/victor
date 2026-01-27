@@ -223,7 +223,7 @@ class WorkflowProfiler:
                 "costs": [],
                 "successes": [],
                 "errors": defaultdict(int),
-                "tool_calls": [],
+                "tool_calls": defaultdict(lambda: {"count": 0, "cost": 0}),
             }
         )
 

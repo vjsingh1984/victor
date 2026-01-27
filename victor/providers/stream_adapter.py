@@ -453,7 +453,7 @@ class LMStudioAdapter(BaseSDKAdapter):
             else:
                 # Fallback to OpenAI format parsing
                 adapter = OpenAIAdapter()
-                async for adapted in adapter.adapt_stream(iter([chunk]).__aiter__()):
+                async for adapted in adapter.adapt_stream(self._create_async_iterable([chunk])):
                     yield adapted
 
 
@@ -488,7 +488,7 @@ class VLLMAdapter(BaseSDKAdapter):
             else:
                 # Fallback to OpenAI format
                 adapter = OpenAIAdapter()
-                async for adapted in adapter.adapt_stream(iter([chunk]).__aiter__()):
+                async for adapted in adapter.adapt_stream(self._create_async_iterable([chunk])):
                     yield adapted
 
 
@@ -508,6 +508,11 @@ class SDKAdapterRegistry:
         SDKType.LMSTUDIO: LMStudioAdapter(),
         SDKType.VLLM: VLLMAdapter(),
     }
+
+    def _create_async_iterable(self, items: List[Any]) -> AsyncIterator[Any]:  # type: ignore[misc]
+        """Convert a list to an async iterator."""
+        for item in items:
+            yield item
 
     @classmethod
     def get_adapter(cls, sdk_type: SDKType) -> BaseSDKAdapter:

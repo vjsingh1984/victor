@@ -65,12 +65,12 @@ from typing import Any, Dict, List, Optional, Protocol, Set, Tuple, Type, runtim
 
 # Import Rust-accelerated regex engine for 10-20x faster pattern matching
 try:
-    from victor.native.accelerators import get_regex_engine_accelerator
+    from victor.native.accelerators import get_regex_engine_accelerator  # type: ignore[attr-defined]
 
     _REGEX_ACCELERATOR_AVAILABLE = True
 except ImportError:
     _REGEX_ACCELERATOR_AVAILABLE = False
-    get_regex_engine_accelerator = None  # type: ignore
+    get_regex_engine_accelerator = None
 
 logger = logging.getLogger(__name__)
 
@@ -1889,7 +1889,7 @@ class BaseLanguageAnalyzer(ABC):
 
     def check_documentation(self, content: str, file_path: Path) -> List[AnalysisIssue]:
         """Check documentation coverage using tree-sitter."""
-        issues = []
+        issues: List[AnalysisIssue] = []
         parser = self._get_parser()
 
         if parser is None:
@@ -1983,7 +1983,7 @@ class BaseLanguageAnalyzer(ABC):
             List of PatternMatch objects
         """
         # Import PatternMatch locally to avoid circular import
-        from victor.native.accelerators.regex_engine import PatternMatch
+        from victor.native.accelerators.regex_engine import PatternMatch  # type: ignore[attr-defined]
 
         matches = []
         lines = source_code.split("\n")

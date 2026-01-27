@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test suite for victor.optimizations module."""
+"""Unit tests for workflow optimization."""

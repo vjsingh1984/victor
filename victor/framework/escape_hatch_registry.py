@@ -157,8 +157,12 @@ class EscapeHatchRegistry:
 
     @classmethod
     def reset_instance(cls) -> None:
-        """Reset singleton instance (for testing)."""
+        """Reset singleton instance and clear all registrations (for testing)."""
         cls._instance = None
+        cls._class_conditions.clear()
+        cls._class_transforms.clear()
+        cls._class_global_conditions.clear()
+        cls._class_global_transforms.clear()
 
     def register_condition(
         self,

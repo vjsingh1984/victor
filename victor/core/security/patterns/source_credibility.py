@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional
 if TYPE_CHECKING:
     # Type stubs for native extensions (optional)
     try:
-        import victor_native
+        import victor_native  # type: ignore
     except ImportError:
         pass
 
@@ -43,9 +43,9 @@ _NATIVE_AVAILABLE = False
 _PatternMatcher = None
 
 try:
-    import victor_native as _native
-
-    _PatternMatcher = _native.PatternMatcher
+    import victor_native  
+    if hasattr(victor_native, 'PatternMatcher'):
+        _PatternMatcher = victor_native.PatternMatcher
     _NATIVE_AVAILABLE = True
     logger.debug("Native pattern matching available for source credibility")
 except ImportError:

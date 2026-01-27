@@ -35,52 +35,52 @@ from victor.core.security.protocol import (
 # =============================================================================
 
 
-class TestSeverity:
+class TestCVESeverity:
     """Tests for Severity enum."""
 
     def test_none_severity(self):
         """Test none severity."""
-        assert Severity.NONE.value == "none"
+        assert CVESeverity.NONE.value == "none"
 
     def test_low_severity(self):
         """Test low severity."""
-        assert Severity.LOW.value == "low"
+        assert CVESeverity.LOW.value == "low"
 
     def test_medium_severity(self):
         """Test medium severity."""
-        assert Severity.MEDIUM.value == "medium"
+        assert CVESeverity.MEDIUM.value == "medium"
 
     def test_high_severity(self):
         """Test high severity."""
-        assert Severity.HIGH.value == "high"
+        assert CVESeverity.HIGH.value == "high"
 
     def test_critical_severity(self):
         """Test critical severity."""
-        assert Severity.CRITICAL.value == "critical"
+        assert CVESeverity.CRITICAL.value == "critical"
 
     def test_from_cvss_zero(self):
         """Test from_cvss with zero score."""
-        assert Severity.from_cvss(0.0) == Severity.NONE
+        assert CVESeverity.from_cvss(0.0) == CVESeverity.NONE
 
     def test_from_cvss_low(self):
         """Test from_cvss with low score."""
-        assert Severity.from_cvss(1.0) == Severity.LOW
-        assert Severity.from_cvss(3.9) == Severity.LOW
+        assert CVESeverity.from_cvss(1.0) == CVESeverity.LOW
+        assert CVESeverity.from_cvss(3.9) == CVESeverity.LOW
 
     def test_from_cvss_medium(self):
         """Test from_cvss with medium score."""
-        assert Severity.from_cvss(4.0) == Severity.MEDIUM
-        assert Severity.from_cvss(6.9) == Severity.MEDIUM
+        assert CVESeverity.from_cvss(4.0) == CVESeverity.MEDIUM
+        assert CVESeverity.from_cvss(6.9) == CVESeverity.MEDIUM
 
     def test_from_cvss_high(self):
         """Test from_cvss with high score."""
-        assert Severity.from_cvss(7.0) == Severity.HIGH
-        assert Severity.from_cvss(8.9) == Severity.HIGH
+        assert CVESeverity.from_cvss(7.0) == CVESeverity.HIGH
+        assert CVESeverity.from_cvss(8.9) == CVESeverity.HIGH
 
     def test_from_cvss_critical(self):
         """Test from_cvss with critical score."""
-        assert Severity.from_cvss(9.0) == Severity.CRITICAL
-        assert Severity.from_cvss(10.0) == Severity.CRITICAL
+        assert CVESeverity.from_cvss(9.0) == CVESeverity.CRITICAL
+        assert CVESeverity.from_cvss(10.0) == CVESeverity.CRITICAL
 
 
 class TestVulnerabilityStatus:
@@ -154,10 +154,10 @@ class TestCVE:
         cve = CVE(
             cve_id="CVE-2021-44228",
             description="Log4j vulnerability",
-            severity=Severity.CRITICAL,
+            severity=CVESeverity.CRITICAL,
         )
         assert cve.cve_id == "CVE-2021-44228"
-        assert cve.severity == Severity.CRITICAL
+        assert cve.severity == CVESeverity.CRITICAL
         assert cve.cvss is None
         assert cve.references == []
         assert cve.cwe_ids == []
@@ -169,7 +169,7 @@ class TestCVE:
         cve = CVE(
             cve_id="CVE-2021-44228",
             description="Log4j vulnerability",
-            severity=Severity.CRITICAL,
+            severity=CVESeverity.CRITICAL,
             cvss=cvss,
             published_date=now,
             modified_date=now,
@@ -186,7 +186,7 @@ class TestCVE:
         cve = CVE(
             cve_id="CVE-2021-44228",
             description="Test",
-            severity=Severity.CRITICAL,
+            severity=CVESeverity.CRITICAL,
             cvss=CVSSMetrics(score=10.0),
         )
         assert cve.cvss_score == 10.0
@@ -196,7 +196,7 @@ class TestCVE:
         cve = CVE(
             cve_id="CVE-2021-44228",
             description="Test",
-            severity=Severity.CRITICAL,
+            severity=CVESeverity.CRITICAL,
         )
         assert cve.cvss_score == 0.0
 
@@ -206,12 +206,12 @@ class TestCVE:
 # =============================================================================
 
 
-class TestDependency:
+class TestSecurityDependency:
     """Tests for Dependency dataclass."""
 
     def test_creation_minimal(self):
         """Test minimal dependency creation."""
-        dep = Dependency(
+        dep = SecurityDependency(
             name="requests",
             version="2.28.0",
             ecosystem="pypi",
@@ -225,7 +225,7 @@ class TestDependency:
 
     def test_creation_full(self):
         """Test full dependency creation."""
-        dep = Dependency(
+        dep = SecurityDependency(
             name="express",
             version="4.18.2",
             ecosystem="npm",
@@ -239,7 +239,7 @@ class TestDependency:
 
     def test_package_url(self):
         """Test package_url property."""
-        dep = Dependency(
+        dep = SecurityDependency(
             name="requests",
             version="2.28.0",
             ecosystem="pypi",
@@ -248,7 +248,7 @@ class TestDependency:
 
     def test_package_url_npm(self):
         """Test package_url for npm."""
-        dep = Dependency(
+        dep = SecurityDependency(
             name="express",
             version="4.18.2",
             ecosystem="npm",
@@ -270,13 +270,13 @@ class TestVulnerability:
         return CVE(
             cve_id="CVE-2021-44228",
             description="Log4j vulnerability",
-            severity=Severity.CRITICAL,
+            severity=CVESeverity.CRITICAL,
         )
 
     @pytest.fixture
     def sample_dependency(self):
         """Create sample dependency."""
-        return Dependency(
+        return SecurityDependency(
             name="log4j",
             version="2.14.0",
             ecosystem="maven",
@@ -354,21 +354,21 @@ class TestSecurityScanResult:
     def sample_dependencies(self):
         """Create sample dependencies."""
         return [
-            Dependency("requests", "2.28.0", "pypi"),
-            Dependency("flask", "2.0.0", "pypi"),
-            Dependency("django", "3.2.0", "pypi"),
+            SecurityDependency("requests", "2.28.0", "pypi"),
+            SecurityDependency("flask", "2.0.0", "pypi"),
+            SecurityDependency("django", "3.2.0", "pypi"),
         ]
 
     @pytest.fixture
     def sample_vulnerabilities(self):
         """Create sample vulnerabilities."""
-        critical_cve = CVE("CVE-2021-44228", "Critical", Severity.CRITICAL)
-        high_cve = CVE("CVE-2022-1234", "High", Severity.HIGH)
-        medium_cve = CVE("CVE-2022-5678", "Medium", Severity.MEDIUM)
-        low_cve = CVE("CVE-2022-9999", "Low", Severity.LOW)
+        critical_cve = CVE("CVE-2021-44228", "Critical", CVESeverity.CRITICAL)
+        high_cve = CVE("CVE-2022-1234", "High", CVESeverity.HIGH)
+        medium_cve = CVE("CVE-2022-5678", "Medium", CVESeverity.MEDIUM)
+        low_cve = CVE("CVE-2022-9999", "Low", CVESeverity.LOW)
 
-        dep1 = Dependency("log4j", "2.14.0", "maven")
-        dep2 = Dependency("requests", "2.20.0", "pypi")
+        dep1 = SecurityDependency("log4j", "2.14.0", "maven")
+        dep2 = SecurityDependency("requests", "2.20.0", "pypi")
 
         return [
             Vulnerability(critical_cve, dep1),
@@ -433,15 +433,15 @@ class TestSecurityScanResult:
     def test_get_by_severity(self, sample_vulnerabilities):
         """Test get_by_severity method."""
         result = SecurityScanResult(vulnerabilities=sample_vulnerabilities)
-        critical = result.get_by_severity(Severity.CRITICAL)
+        critical = result.get_by_severity(CVESeverity.CRITICAL)
         assert len(critical) == 1
         assert critical[0].cve.cve_id == "CVE-2021-44228"
 
     def test_get_fixable(self):
         """Test get_fixable method."""
-        cve1 = CVE("CVE-2021-44228", "Critical", Severity.CRITICAL)
-        cve2 = CVE("CVE-2022-1234", "High", Severity.HIGH)
-        dep = Dependency("log4j", "2.14.0", "maven")
+        cve1 = CVE("CVE-2021-44228", "Critical", CVESeverity.CRITICAL)
+        cve2 = CVE("CVE-2022-1234", "High", CVESeverity.HIGH)
+        dep = SecurityDependency("log4j", "2.14.0", "maven")
 
         result = SecurityScanResult(
             vulnerabilities=[
@@ -500,8 +500,8 @@ class TestSecurityPolicy:
     def test_check_fail_on_critical(self):
         """Test policy fails on critical vulnerability."""
         policy = SecurityPolicy(fail_on_critical=True)
-        cve = CVE("CVE-2021-44228", "Critical", Severity.CRITICAL)
-        dep = Dependency("log4j", "2.14.0", "maven")
+        cve = CVE("CVE-2021-44228", "Critical", CVESeverity.CRITICAL)
+        dep = SecurityDependency("log4j", "2.14.0", "maven")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)
@@ -511,8 +511,8 @@ class TestSecurityPolicy:
     def test_check_fail_on_high(self):
         """Test policy fails on high vulnerability."""
         policy = SecurityPolicy(fail_on_high=True)
-        cve = CVE("CVE-2022-1234", "High", Severity.HIGH)
-        dep = Dependency("requests", "2.20.0", "pypi")
+        cve = CVE("CVE-2022-1234", "High", CVESeverity.HIGH)
+        dep = SecurityDependency("requests", "2.20.0", "pypi")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)
@@ -522,8 +522,8 @@ class TestSecurityPolicy:
     def test_check_fail_on_medium(self):
         """Test policy fails on medium when configured."""
         policy = SecurityPolicy(fail_on_medium=True)
-        cve = CVE("CVE-2022-5678", "Medium", Severity.MEDIUM)
-        dep = Dependency("flask", "2.0.0", "pypi")
+        cve = CVE("CVE-2022-5678", "Medium", CVESeverity.MEDIUM)
+        dep = SecurityDependency("flask", "2.0.0", "pypi")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)
@@ -533,8 +533,8 @@ class TestSecurityPolicy:
     def test_check_fail_on_low(self):
         """Test policy fails on low when configured."""
         policy = SecurityPolicy(fail_on_low=True)
-        cve = CVE("CVE-2022-9999", "Low", Severity.LOW)
-        dep = Dependency("package", "0.5.0", "pypi")
+        cve = CVE("CVE-2022-9999", "Low", CVESeverity.LOW)
+        dep = SecurityDependency("package", "0.5.0", "pypi")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)
@@ -544,8 +544,8 @@ class TestSecurityPolicy:
     def test_check_exceeds_max_critical(self):
         """Test policy fails when exceeding max critical."""
         policy = SecurityPolicy(fail_on_critical=False, max_critical=0)
-        cve = CVE("CVE-2021-44228", "Critical", Severity.CRITICAL)
-        dep = Dependency("log4j", "2.14.0", "maven")
+        cve = CVE("CVE-2021-44228", "Critical", CVESeverity.CRITICAL)
+        dep = SecurityDependency("log4j", "2.14.0", "maven")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)
@@ -555,8 +555,8 @@ class TestSecurityPolicy:
     def test_check_exceeds_max_high(self):
         """Test policy fails when exceeding max high."""
         policy = SecurityPolicy(fail_on_high=False, max_high=0)
-        cve = CVE("CVE-2022-1234", "High", Severity.HIGH)
-        dep = Dependency("requests", "2.20.0", "pypi")
+        cve = CVE("CVE-2022-1234", "High", CVESeverity.HIGH)
+        dep = SecurityDependency("requests", "2.20.0", "pypi")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)
@@ -566,8 +566,8 @@ class TestSecurityPolicy:
     def test_check_exceeds_max_medium(self):
         """Test policy fails when exceeding max medium."""
         policy = SecurityPolicy(max_medium=0)
-        cve = CVE("CVE-2022-5678", "Medium", Severity.MEDIUM)
-        dep = Dependency("flask", "2.0.0", "pypi")
+        cve = CVE("CVE-2022-5678", "Medium", CVESeverity.MEDIUM)
+        dep = SecurityDependency("flask", "2.0.0", "pypi")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)
@@ -577,8 +577,8 @@ class TestSecurityPolicy:
     def test_check_exceeds_max_low(self):
         """Test policy fails when exceeding max low."""
         policy = SecurityPolicy(max_low=0)
-        cve = CVE("CVE-2022-9999", "Low", Severity.LOW)
-        dep = Dependency("package", "0.5.0", "pypi")
+        cve = CVE("CVE-2022-9999", "Low", CVESeverity.LOW)
+        dep = SecurityDependency("package", "0.5.0", "pypi")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)
@@ -591,8 +591,8 @@ class TestSecurityPolicy:
             fail_on_critical=True,
             ignored_cves=["CVE-2021-44228"],
         )
-        cve = CVE("CVE-2021-44228", "Critical", Severity.CRITICAL)
-        dep = Dependency("log4j", "2.14.0", "maven")
+        cve = CVE("CVE-2021-44228", "Critical", CVESeverity.CRITICAL)
+        dep = SecurityDependency("log4j", "2.14.0", "maven")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)
@@ -605,8 +605,8 @@ class TestSecurityPolicy:
             fail_on_critical=True,
             ignored_dependencies=["log4j"],
         )
-        cve = CVE("CVE-2021-44228", "Critical", Severity.CRITICAL)
-        dep = Dependency("log4j", "2.14.0", "maven")
+        cve = CVE("CVE-2021-44228", "Critical", CVESeverity.CRITICAL)
+        dep = SecurityDependency("log4j", "2.14.0", "maven")
         result = SecurityScanResult(vulnerabilities=[Vulnerability(cve, dep)])
 
         passed, failures = policy.check(result)
@@ -619,9 +619,9 @@ class TestSecurityPolicy:
             fail_on_critical=True,
             fail_on_high=True,
         )
-        cve1 = CVE("CVE-2021-44228", "Critical", Severity.CRITICAL)
-        cve2 = CVE("CVE-2022-1234", "High", Severity.HIGH)
-        dep = Dependency("log4j", "2.14.0", "maven")
+        cve1 = CVE("CVE-2021-44228", "Critical", CVESeverity.CRITICAL)
+        cve2 = CVE("CVE-2022-1234", "High", CVESeverity.HIGH)
+        dep = SecurityDependency("log4j", "2.14.0", "maven")
         result = SecurityScanResult(
             vulnerabilities=[
                 Vulnerability(cve1, dep),

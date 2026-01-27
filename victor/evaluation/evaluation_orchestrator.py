@@ -412,10 +412,12 @@ class EvaluationOrchestrator:
         """Load tasks from dataset."""
         logger.info("Loading SWE-bench tasks...")
 
-        if self.config.dataset_path:
+        if self.config.dataset_path and self._loader:
             self._tasks = self._loader.load_instances_from_file(self.config.dataset_path)
-        else:
+        elif self._loader:
             self._tasks = await self._loader.load_from_huggingface(self.config.dataset_name)
+        else:
+            raise ValueError("No loader available")
 
         # Filter by instance IDs if specified
         if self.config.instance_ids:
@@ -488,34 +490,43 @@ class EvaluationOrchestrator:
             progress.stage = EvaluationStage.ENVIRONMENT_SETUP
             self._notify_progress(progress)
 
-            workspace = await self._workspace_manager.setup_workspace(
-                task=benchmark_task,
-                use_cache=True,
-            )
+            if self._workspace_manager:
+                workspace = await self._workspace_manager.setup_workspace(
+                    task=benchmark_task,
+                    use_cache=True,
+                )
 
-            # Setup environment
-            env_result = await self._env_setup.setup_environment(workspace)
-            progress.env_setup_result = env_result
+                # Setup environment
+                if self._env_setup:
+                    env_result = await self._env_setup.setup_environment(workspace)
+                    progress.env_setup_result = env_result
 
-            if not env_result.success:
-                raise RuntimeError(f"Environment setup failed: {env_result.error_message}")
+                    if not env_result.success:
+                        raise RuntimeError(f"Environment setup failed: {env_result.error_message}")
+                else:
+                    progress.env_setup_result = None
+            else:
+                progress.env_setup_result = None
 
             # Stage 2: Establish baseline
             progress.stage = EvaluationStage.BASELINE_ESTABLISHMENT
             self._notify_progress(progress)
 
-            baseline = await self._baseline_validator.establish_baseline(
-                instance_id=task.instance_id,
-                repo=task.repo,
-                base_commit=task.base_commit,
-                workspace_dir=workspace,
-                fail_to_pass=task.fail_to_pass,
-                pass_to_pass=task.pass_to_pass,
-            )
-            progress.baseline = baseline
+            if self._baseline_validator:
+                baseline = await self._baseline_validator.establish_baseline(
+                    instance_id=task.instance_id,
+                    repo=task.repo,
+                    base_commit=task.base_commit,
+                    workspace_dir=workspace,
+                    fail_to_pass=task.fail_to_pass,
+                    pass_to_pass=task.pass_to_pass,
+                )
+                progress.baseline = baseline
 
-            if not baseline.is_valid():
-                raise RuntimeError(f"Baseline invalid: {baseline.error_message}")
+                if not baseline.is_valid():
+                    raise RuntimeError(f"Baseline invalid: {baseline.error_message}")
+            else:
+                progress.baseline = None
 
             # Stage 3: Run agent
             progress.stage = EvaluationStage.AGENT_EXECUTION
@@ -553,21 +564,23 @@ class EvaluationOrchestrator:
                 await self._apply_patch(workspace, trace.generated_patch)
 
             # Run validation
-            validation_result = await self._baseline_validator.validate_changes(
-                baseline=baseline,
-                workspace_dir=workspace,
-            )
-            progress.validation_result = validation_result
+            if self._baseline_validator:
+                validation_result = await self._baseline_validator.validate_changes(
+                    baseline=baseline,
+                    workspace_dir=workspace,
+                )
+                progress.validation_result = validation_result
 
             # Stage 5: Compute score
             progress.stage = EvaluationStage.CORRELATION
             self._notify_progress(progress)
 
-            score = self._correlator.compute_score(
-                validation_result=validation_result,
-                instance_metadata={"instance_id": task.instance_id, "repo": task.repo},
-            )
-            progress.score = score
+            if self._correlator:
+                score = self._correlator.compute_score(
+                    validation_result=validation_result,
+                    instance_metadata={"instance_id": task.instance_id, "repo": task.repo},
+                )
+                progress.score = score
 
             # Complete
             progress.stage = EvaluationStage.COMPLETED
@@ -713,7 +726,12 @@ class EvaluationOrchestrator:
             )
 
         # Generate correlation report
-        return self._correlator.generate_report(scores)
+        if self._correlator:
+            return self._correlator.generate_report(scores)
+        else:
+            # Fallback to basic report
+            from victor.framework.rl.base import CorrelationReport
+            return CorrelationReport(scores=scores, metadata={})
 
     def _notify_progress(self, progress: TaskProgress) -> None:
         """Notify progress callback if configured."""

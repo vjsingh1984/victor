@@ -202,7 +202,7 @@ def _check_capability(
     Raises:
         TypeError: If strict_mode=True and obj doesn't implement CapabilityRegistryProtocol
     """
-    # Delegate to consolidated CapabilityHelper (DRY principle)
+    # Delegate to consolidated CapabilityHelper for capability_registry (capability check)
     from victor.agent.capability_registry import CapabilityHelper
 
     return CapabilityHelper.check_capability(
@@ -243,7 +243,7 @@ def _invoke_capability(
         TypeError: If strict_mode=True and obj doesn't implement CapabilityRegistryProtocol
         AttributeError: If capability cannot be invoked via public methods
     """
-    # Delegate to consolidated CapabilityHelper (DRY principle)
+    # Delegate to consolidated CapabilityHelper for capability_registry (capability check)
     from victor.agent.capability_registry import CapabilityHelper
 
     return CapabilityHelper.invoke_capability(

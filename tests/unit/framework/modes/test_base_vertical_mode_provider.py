@@ -43,11 +43,11 @@ class TestBaseVerticalModeProvider:
         architect_mode = provider.get_mode("architect")
         assert architect_mode is not None
         assert architect_mode.name == "architect"
-        assert architect_mode.tool_budget == 40
+        assert architect_mode.tool_budget == 100
 
         refactor_mode = provider.get_mode("refactor")
         assert refactor_mode is not None
-        assert refactor_mode.tool_budget == 25
+        assert refactor_mode.tool_budget == 50
 
     def test_auto_register_devops_modes(self):
         """Test that DevOps modes are auto-registered from VerticalModeDefaults."""
@@ -73,11 +73,11 @@ class TestBaseVerticalModeProvider:
         # Check that research-specific modes are available
         deep_mode = provider.get_mode("deep")
         assert deep_mode is not None
-        assert deep_mode.tool_budget == 25
+        assert deep_mode.tool_budget == 75
 
         academic_mode = provider.get_mode("academic")
         assert academic_mode is not None
-        assert academic_mode.tool_budget == 40
+        assert academic_mode.tool_budget == 100
 
     def test_auto_register_dataanalysis_modes(self):
         """Test that dataanalysis modes are auto-registered from VerticalModeDefaults."""
@@ -90,7 +90,7 @@ class TestBaseVerticalModeProvider:
         # Check that dataanalysis-specific modes are available
         insights_mode = provider.get_mode("insights")
         assert insights_mode is not None
-        assert insights_mode.tool_budget == 30
+        assert insights_mode.tool_budget == 75
 
     def test_idempotent_registration(self):
         """Test that multiple instantiations don't cause duplicate registration."""
@@ -168,10 +168,10 @@ class TestBaseVerticalModeProvider:
         provider = BaseVerticalModeProvider(vertical="coding")
 
         # Test coding-specific task budgets
-        assert provider.get_tool_budget_for_task("code_generation") == 3
-        assert provider.get_tool_budget_for_task("refactor") == 15
-        assert provider.get_tool_budget_for_task("debug") == 12
-        assert provider.get_tool_budget_for_task("test") == 10
+        assert provider.get_tool_budget_for_task("code_generation") == 10
+        assert provider.get_tool_budget_for_task("refactor") == 50
+        assert provider.get_tool_budget_for_task("debug") == 20
+        assert provider.get_tool_budget_for_task("test") == 15
 
     def test_get_tool_budget_for_task_devops(self):
         """Test getting tool budget for DevOps task types."""
@@ -213,7 +213,7 @@ class TestBaseVerticalModeProvider:
 
         # Check that configs are ModeConfig objects
         quick_config = configs["quick"]
-        assert quick_config.tool_budget == 5
+        assert quick_config.tool_budget == 10
         assert quick_config.max_iterations == 10
 
     def test_unknown_vertical(self):
@@ -294,7 +294,7 @@ class TestVerticalModeProvidersIntegration:
         # Should inherit all functionality
         assert provider.get_mode("architect") is not None
         assert provider.get_mode_for_complexity("highly_complex") == "architect"
-        assert provider.get_tool_budget_for_task("refactor") == 15
+        assert provider.get_tool_budget_for_task("refactor") == 50
 
     def test_devops_mode_config_provider(self):
         """Test DevOpsModeConfigProvider uses BaseVerticalModeProvider."""
@@ -316,7 +316,8 @@ class TestVerticalModeProvidersIntegration:
         # Should inherit all functionality
         assert provider.get_mode("academic") is not None
         assert provider.get_mode_for_complexity("highly_complex") == "academic"
-        assert provider.get_tool_budget_for_task("literature_review") == 40
+        # "literature_review" not in task budgets, falls back to default_budget (12)
+        assert provider.get_tool_budget_for_task("literature_review") == 12
 
     def test_dataanalysis_mode_config_provider(self):
         """Test DataAnalysisModeConfigProvider uses BaseVerticalModeProvider."""
@@ -336,10 +337,10 @@ class TestVerticalModeProvidersIntegration:
         # Test get_mode_config
         mode = get_mode_config("architect")
         assert mode is not None
-        assert mode.tool_budget == 40
+        assert mode.tool_budget == 100
 
         # Test get_tool_budget with mode
-        assert get_tool_budget(mode_name="architect") == 40
+        assert get_tool_budget(mode_name="architect") == 100
 
         # Test get_tool_budget with task type
-        assert get_tool_budget(task_type="refactor") == 15
+        assert get_tool_budget(task_type="refactor") == 50

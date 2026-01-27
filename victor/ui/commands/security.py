@@ -64,13 +64,13 @@ def security(
 
 def _trust_plugin(plugin_path: str):
     # Trust a plugin
-    plugin_path = Path(plugin_path).expanduser().resolve()
-    if not plugin_path.exists():
+    plugin_path_obj = Path(plugin_path).expanduser().resolve()
+    if not plugin_path_obj.exists():
         console.print(f"[red]Plugin not found:[/] {plugin_path}")
         raise typer.Exit(1)
 
-    if do_trust_plugin(plugin_path):
-        console.print(f"[green]✓[/] Trusted plugin: [cyan]{plugin_path.name}[/]")
+    if do_trust_plugin(plugin_path_obj):
+        console.print(f"[green]✓[/] Trusted plugin: [cyan]{plugin_path_obj.name}[/]")
     else:
         console.print("[red]Failed to trust plugin[/]")
         raise typer.Exit(1)

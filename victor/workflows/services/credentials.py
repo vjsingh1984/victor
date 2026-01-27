@@ -81,7 +81,7 @@ try:
     KEYRING_AVAILABLE = True
 except ImportError:
     KEYRING_AVAILABLE = False
-    keyring = None
+    keyring = None  # type: ignore[assignment]
 
 try:
     from cryptography.fernet import Fernet

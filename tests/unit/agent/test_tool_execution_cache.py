@@ -17,6 +17,7 @@
 Tests the hot path optimization cache for tool execution decisions.
 """
 import pytest
+from unittest.mock import Mock
 
 from victor.agent.tool_execution_cache import (
     ToolExecutionDecisionCache,
@@ -54,6 +55,12 @@ class MockToolRegistry:
 
     def has_tool(self, name):
         return name in self._tools
+
+    def get(self, name):
+        """Get tool by name, returns mock object if exists."""
+        if name in self._tools:
+            return Mock()  # Return a mock tool object
+        return None
 
 
 class MockNormalizer:

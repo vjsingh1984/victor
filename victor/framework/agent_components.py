@@ -478,10 +478,8 @@ class AgentBuilder:
             from victor.framework.service_provider import ToolConfiguratorService
             from typing import cast
 
-            # Use the factory function directly instead of getting from container
-            from victor.framework.service_provider import _create_tool_configurator
-
-            service_impl = _create_tool_configurator(self._container)
+            # Get from container to ensure we get the singleton instance
+            service_impl = self._container.get(ToolConfiguratorService)
             return cast(ToolConfiguratorService, service_impl)
         except Exception as e:
             logger.debug(f"Could not get ToolConfigurator from container: {e}")

@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 try:
-    import lancedb
+    import lancedb  # type: ignore[import-untyped]
 
     LANCEDB_AVAILABLE = True
 except ImportError:
@@ -244,7 +244,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         # Close existing connection
         if self.db:
             try:
-                del self.db
+                del self.db  # type: ignore[unreachable]
             except Exception:
                 pass
             self.db = None
@@ -282,13 +282,13 @@ class LanceDBProvider(BaseEmbeddingProvider):
         """Ensure database connection is initialized."""
         if self.db is None:
             raise RuntimeError("LanceDB connection not initialized. Call initialize() first.")
-        return self.db
+        return self.db  # type: ignore[unreachable]
 
     def _ensure_table(self) -> Any:
         """Ensure table is initialized."""
         if self.table is None:
             raise RuntimeError("LanceDB table not initialized. Call initialize() first.")
-        return self.table
+        return self.table  # type: ignore[unreachable]
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text.

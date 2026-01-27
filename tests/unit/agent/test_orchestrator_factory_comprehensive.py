@@ -530,7 +530,7 @@ class TestOrchestratorFactoryConversationComponents:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.get_project_paths"):
+        with patch("victor.config.settings.get_project_paths"):
             memory_manager, session_id = factory.create_memory_components(
                 provider_name="anthropic",
                 tool_capable=True,
@@ -1252,7 +1252,7 @@ class TestOrchestratorFactoryAdvancedComponents:
         tool_selection = {}
         on_selection_recorded = Mock()
 
-        with patch("victor.agent.orchestrator_factory.get_embedding_service"):
+        with patch("victor.storage.embeddings.service.get_embedding_service"):
             selector = factory.create_tool_selector(
                 tools=tools,
                 conversation_state=conversation_state,
@@ -1323,6 +1323,8 @@ class TestOrchestratorFactorySpecializedMethods:
 
     def test_create_middleware_chain(self):
         """Test middleware chain creation."""
+        from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
+
         settings = TestSettingsBuilder().build()
         provider = MockProviderFactory.create_anthropic()
 
@@ -1335,8 +1337,10 @@ class TestOrchestratorFactorySpecializedMethods:
         with patch("victor.core.bootstrap.bootstrap_container"):
             middleware_chain, code_correction_middleware = factory.create_middleware_chain()
 
-        # Middleware might be None if no verticals loaded
-        assert code_correction_middleware is None or isinstance(code_correction_middleware, Mock)
+        # Middleware is either None, Mock, or a real CodeCorrectionMiddleware (fallback)
+        assert code_correction_middleware is None or isinstance(
+            code_correction_middleware, (Mock, CodeCorrectionMiddleware)
+        )
 
     def test_create_auto_committer(self):
         """Test auto committer creation."""
@@ -1416,7 +1420,7 @@ class TestOrchestratorFactorySpecializedMethods:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.get_project_paths"):
+        with patch("victor.config.settings.get_project_paths"):
             manager = factory.create_checkpoint_manager()
 
         # Might be None if creation fails

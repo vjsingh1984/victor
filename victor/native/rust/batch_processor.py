@@ -64,7 +64,7 @@ from typing import Callable, List, Optional, Any
 from dataclasses import dataclass
 
 try:
-    from victor_native import (
+    from victor_native import (  # type: ignore[import-not-found]
         BatchTask as RustBatchTask,
         BatchResult as RustBatchResult,
         BatchProcessor as RustBatchProcessor,

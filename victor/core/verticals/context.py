@@ -623,8 +623,15 @@ class VerticalContext:
             mode_name = self.default_mode
 
         config = self.mode_configs.get(mode_name)
-        if config and hasattr(config, "tool_budget"):
-            budget = config.tool_budget
+        if config:
+            # Handle both dict and object configs
+            if hasattr(config, "tool_budget"):
+                budget = config.tool_budget
+            elif isinstance(config, dict) and "tool_budget" in config:
+                budget = config["tool_budget"]
+            else:
+                return self.default_budget
+
             if isinstance(budget, int):
                 return budget
 

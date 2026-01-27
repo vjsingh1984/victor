@@ -14,14 +14,14 @@
 
 """OpenTelemetry setup and configuration."""
 
-from opentelemetry import trace, metrics
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-from opentelemetry.sdk.resources import Resource
+from opentelemetry import trace, metrics  # type: ignore[import]
+from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import]
+from opentelemetry.sdk.trace.export import BatchSpanProcessor  # type: ignore[import]
+from opentelemetry.sdk.metrics import MeterProvider  # type: ignore[import]
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader  # type: ignore[import]
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # type: ignore[import]
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter  # type: ignore[import]
+from opentelemetry.sdk.resources import Resource  # type: ignore[import]
 
 
 def setup_opentelemetry(service_name: str, service_version: str):

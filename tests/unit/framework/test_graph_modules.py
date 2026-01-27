@@ -178,11 +178,17 @@ class TestCreateGraphStore:
         with pytest.raises(ValueError, match="Unsupported graph store backend"):
             create_graph_store("invalid_backend", Path("."))
 
-    @patch("victor.storage.graph.registry.DuckDBGraphStore", None)
     def test_duckdb_not_installed(self):
         """Test DuckDB raises when not installed."""
-        with pytest.raises(ValueError, match="DuckDB.*not installed"):
-            create_graph_store("duckdb", Path("."))
+        # Patch _duckdb_available directly since import happens at module load
+        import victor.storage.graph.registry as registry_module
+        original_available = registry_module._duckdb_available
+        try:
+            registry_module._duckdb_available = None
+            with pytest.raises(ValueError, match="DuckDB.*not installed"):
+                create_graph_store("duckdb", Path("."))
+        finally:
+            registry_module._duckdb_available = original_available
 
 
 class TestMemoryGraphStore:

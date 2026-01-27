@@ -181,17 +181,17 @@ class BrowserTool:
             return True
 
         try:
-            from playwright.async_api import async_playwright  # type: ignore
+            from playwright.async_api import async_playwright  # type: ignore[import-not-found]
 
             self._playwright = await async_playwright().start()
 
             # Select browser type
             if self.config.browser_type == "firefox":
-                browser_launcher = self._playwright.firefox
+                browser_launcher = self._playwright.firefox  # type: ignore[attr-defined]
             elif self.config.browser_type == "webkit":
-                browser_launcher = self._playwright.webkit
+                browser_launcher = self._playwright.webkit  # type: ignore[attr-defined]
             else:
-                browser_launcher = self._playwright.chromium
+                browser_launcher = self._playwright.chromium  # type: ignore[attr-defined]
 
             # Launch browser
             self._browser = await browser_launcher.launch(
@@ -209,7 +209,7 @@ class BrowserTool:
             if self.config.user_agent:
                 context_options["user_agent"] = self.config.user_agent
 
-            self._context = await self._browser.new_context(**context_options)
+            self._context = await self._browser.new_context(**context_options)  # type: ignore[attr-defined]
 
             # Block popups if configured
             if self.config.block_popups:
@@ -219,12 +219,12 @@ class BrowserTool:
             self._page = await self._context.new_page()
 
             # Set up console log capture
-            self._page.on("console", self._handle_console_message)
-            self._page.on("pageerror", self._handle_page_error)
+            self._page.on("console", self._handle_console_message)  # type: ignore[attr-defined]
+            self._page.on("pageerror", self._handle_page_error)  # type: ignore[attr-defined]
 
             # Set timeouts
-            self._page.set_default_navigation_timeout(self.config.navigation_timeout)
-            self._page.set_default_timeout(self.config.action_timeout)
+            self._page.set_default_navigation_timeout(self.config.navigation_timeout)  # type: ignore[attr-defined]
+            self._page.set_default_timeout(self.config.action_timeout)  # type: ignore[attr-defined]
 
             self._initialized = True
             logger.info(f"Browser initialized: {self.config.browser_type}")
@@ -346,6 +346,8 @@ class BrowserTool:
                     action=BrowserAction.NAVIGATE,
                     error="Browser not initialized",
                 )
+            # MyPy doesn't understand this always returns True, so we need an assertion
+            assert self._initialized, "Browser should be initialized"
 
         if not self._is_domain_allowed(url):
             return ActionResult(
@@ -364,8 +366,8 @@ class BrowserTool:
         try:
             response = await self._page.goto(url, wait_until=wait_for)
 
-            self._state.url = self._page.url
-            self._state.title = await self._page.title()
+            self._state.url = self._page.url  # type: ignore[attr-defined]
+            self._state.title = await self._page.title()  # type: ignore[attr-defined]
             self._state.page_count += 1
             self._state.action_count = 0  # Reset per-page counter
 
@@ -407,6 +409,8 @@ class BrowserTool:
                 action=BrowserAction.CLICK,
                 error="Browser not initialized",
             )
+        # MyPy doesn't understand the null checks above, so add explicit type check
+        assert self._initialized and self._page is not None, "Browser should be initialized"
 
         if not self._check_rate_limit():
             return ActionResult(

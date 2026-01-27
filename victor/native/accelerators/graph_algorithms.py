@@ -22,7 +22,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 # Try to import Rust native Graph class
 try:
-    from victor_native import Graph as _NativeGraph
+    from victor_native import Graph as _NativeGraph  # type: ignore[import-not-found]
 
     _RUST_AVAILABLE = True
 except ImportError:

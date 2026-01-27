@@ -73,6 +73,7 @@ class MockOrchestratorImplementation:
     def __init__(self):
         # Chat
         self._message_count = 0
+        self._messages = []  # Add messages list
 
         # Provider
         self._provider = MockProvider()
@@ -160,6 +161,11 @@ class MockOrchestratorImplementation:
     # =========================================================================
     # StateProtocol implementation
     # =========================================================================
+
+    @property
+    def messages(self) -> List[Any]:
+        """Get conversation messages."""
+        return self._messages
 
     @property
     def tool_calls_used(self) -> int:

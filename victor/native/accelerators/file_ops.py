@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 # Try to import native Rust implementation
 try:
-    from victor_native import file_ops as _native_file_ops
+    from victor_native import file_ops as _native_file_ops  # type: ignore[import-not-found]
 
     _RUST_AVAILABLE = True
     logger.info("Rust file operations accelerator loaded")
@@ -252,7 +252,7 @@ class FileOpsAccelerator:
         """
         import fnmatch
 
-        files = []
+        files: list[FileInfo] = []
         root_path = Path(root).resolve()
 
         if not root_path.exists():

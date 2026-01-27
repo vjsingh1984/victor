@@ -346,7 +346,7 @@ async def _run_hitl_server(
             logger.info("Using in-memory HITL store")
 
         app = create_hitl_app(
-            store=store,
+            store=store,  # type: ignore[arg-type]
             require_auth=require_auth,
             auth_token=auth_token,
         )

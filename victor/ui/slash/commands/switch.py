@@ -105,7 +105,7 @@ class SwitchCommand(BaseSlashCommand):
 
         # Resume session if requested
         if resume_session_id or resume_index is not None:
-            if not self._resume_session(ctx, resume_session_id, resume_index):
+            if not self._resume_session(ctx, resume_session_id or "", resume_index or 1):
                 # Resume failed, don't switch
                 return
 
@@ -124,7 +124,7 @@ class SwitchCommand(BaseSlashCommand):
             ctx: Command context
         """
         try:
-            info = ctx.agent.get_current_provider_info()
+            info = ctx.agent.get_current_provider_info()  # type: ignore[union-attr]
 
             ctx.console.print(
                 Panel(
@@ -189,7 +189,7 @@ class SwitchCommand(BaseSlashCommand):
             logger.exception("Error listing sessions")
 
     def _resume_session(
-        self, ctx: CommandContext, session_id: str = None, index: int = None
+        self, ctx: CommandContext, session_id: str = "", index: int = 1
     ) -> bool:
         """Resume a session.
 
@@ -227,17 +227,17 @@ class SwitchCommand(BaseSlashCommand):
             metadata = session_data.get("metadata", {})
             conversation_dict = session_data.get("conversation", {})
 
-            ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
+            ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)  # type: ignore[union-attr]
 
             # Set active session ID for parallel session support
-            ctx.agent.active_session_id = session_id
+            ctx.agent.active_session_id = session_id  # type: ignore[union-attr]
 
             conversation_state_dict = session_data.get("conversation_state")
             if conversation_state_dict:
                 try:
                     ctx.agent.conversation_state = ConversationStateMachine.from_dict(
                         conversation_state_dict
-                    )
+                    )  # type: ignore[union-attr]
                 except Exception as e:
                     logger.warning(f"Failed to restore conversation state: {e}")
 
@@ -260,8 +260,8 @@ class SwitchCommand(BaseSlashCommand):
             model: Model name
         """
         try:
-            if ctx.agent.switch_model(model):
-                info = ctx.agent.get_current_provider_info()
+            if ctx.agent.switch_model(model):  # type: ignore[attr-defined,union-attr]
+                info = ctx.agent.get_current_provider_info()  # type: ignore[union-attr]
                 ctx.console.print(
                     f"[green]✓[/] Switched to [cyan]{model}[/]\n"
                     f"  [dim]Native tools: {info['native_tool_calls']}, "
@@ -282,8 +282,8 @@ class SwitchCommand(BaseSlashCommand):
             model: Model name
         """
         try:
-            if ctx.agent.switch_provider(provider_name=provider, model=model):
-                info = ctx.agent.get_current_provider_info()
+            if ctx.agent.switch_provider(provider_name=provider, model=model):  # type: ignore[attr-defined,union-attr]
+                info = ctx.agent.get_current_provider_info()  # type: ignore[union-attr]
                 ctx.console.print(
                     f"[green]✓[/] Switched to [cyan]{provider}:{model}[/]\n"
                     f"  [dim]Native tools: {info.get('native_tool_calls', 'N/A')}, "

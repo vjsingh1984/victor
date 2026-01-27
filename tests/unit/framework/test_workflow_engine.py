@@ -250,9 +250,11 @@ class TestWorkflowEngineExecution:
             mock_executor = MagicMock()
             mock_result = MagicMock()
             mock_result.success = True
-            mock_result.final_state = {"output": "done"}
-            mock_result.nodes_executed = ["node1", "node2"]
             mock_result.error = None
+            # Mock context.to_dict() to return the final state
+            mock_context = MagicMock()
+            mock_context.to_dict.return_value = {"output": "done"}
+            mock_result.context = mock_context
 
             mock_executor.execute = AsyncMock(return_value=mock_result)
             mock_get_executor.return_value = mock_executor
@@ -267,7 +269,7 @@ class TestWorkflowEngineExecution:
 
             assert result.success is True
             assert result.final_state == {"output": "done"}
-            assert result.nodes_executed == ["node1", "node2"]
+            assert result.nodes_executed == []  # Not tracked in execute_definition path
 
 
 class TestWorkflowEngineStreaming:

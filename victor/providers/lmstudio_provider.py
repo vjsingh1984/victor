@@ -406,7 +406,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
                 else:
                     candidates = [base_url]
             else:
-                candidates = [str(base_url)]
+                candidates = [str(base_url)]  # type: ignore[unreachable]
 
         for url in candidates:
             try:
@@ -484,7 +484,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
                 else:
                     candidates = [base_url]
             else:
-                candidates = [str(base_url)]
+                candidates = [str(base_url)]  # type: ignore[unreachable]
 
         for url in candidates:
             try:
@@ -639,7 +639,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from LMStudio.
 
         Args:
@@ -951,8 +951,12 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
             return CompletionResponse(
                 content="",
                 role="assistant",
+                tool_calls=None,
+                stop_reason=None,
+                usage=None,
                 model=model,
                 raw_response=result,
+                metadata=None,
             )
 
         choice = choices[0]

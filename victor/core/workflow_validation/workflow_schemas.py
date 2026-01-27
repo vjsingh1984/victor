@@ -186,7 +186,7 @@ class WorkflowNodeSchema(BaseModel):
                             f"Branch target '{branch_val}' must be alphanumeric "
                             "(underscores and hyphens allowed, or __end__ for terminal)"
                         )
-        return v
+        return v  # type: ignore[unreachable]
 
 
 class WorkflowEdgeSchema(BaseModel):

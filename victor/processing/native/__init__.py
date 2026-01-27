@@ -63,7 +63,7 @@ _NATIVE_AVAILABLE = False
 _native_module: Any = None
 
 try:
-    import victor_native
+    import victor_native  # type: ignore[import]
 
     _native_module = victor_native
     _NATIVE_AVAILABLE = True
@@ -791,12 +791,15 @@ else:
     # Use Python fallback from response_sanitizer
     try:
         from victor.agent.response_sanitizer import (
-            StreamingContentFilter as StreamingFilter,
-            StreamingChunkResult,
+            StreamingContentFilter as PythonStreamingFilter,
+            StreamingChunkResult as PythonStreamingChunkResult,
         )
+        # Set both to Python fallbacks
+        StreamingFilter = PythonStreamingFilter
+        StreamingChunkResult = PythonStreamingChunkResult
     except ImportError:
         StreamingFilter = None
-        StreamingChunkResult = StreamingChunkResultFallback
+        StreamingChunkResult = PythonStreamingChunkResultFallback
 
 
 # =============================================================================

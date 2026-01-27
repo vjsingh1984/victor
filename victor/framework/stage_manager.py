@@ -443,7 +443,7 @@ class StageManager:
             stage: Stage to transition to
             confidence: Confidence level for the transition
         """
-        self._machine._transition_to(stage, confidence)
+        self._machine._transition_to(stage, confidence, force=True)
 
     def get_state_summary(self) -> Dict[str, Any]:
         """Get detailed summary of current state.

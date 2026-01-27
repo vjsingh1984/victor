@@ -46,20 +46,20 @@ from victor.workflows.services.providers.base import BaseServiceProvider
 
 if TYPE_CHECKING:
     import docker
-    from docker.models.containers import Container
+    from docker.models.containers import Container  # type: ignore[import-not-found]
 
 logger = logging.getLogger(__name__)
 
 # Optional Docker SDK import
 try:
     import docker as docker_mod
-    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound
-    from docker.models.containers import Container
+    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound  # type: ignore[import-not-found]
+    from docker.models.containers import Container  # type: ignore[import-not-found]
 
     DOCKER_AVAILABLE = True
 except ImportError:
     DOCKER_AVAILABLE = False
-    docker_mod = None  # type: ignore
+    docker_mod = None
 
 
 class DockerServiceProvider(BaseServiceProvider):
@@ -100,9 +100,9 @@ class DockerServiceProvider(BaseServiceProvider):
         """Get or create Docker client."""
         if self._client is None:
             if self._docker_host:
-                self._client = docker_mod.DockerClient(base_url=self._docker_host)  # type: ignore
+                self._client = docker_mod.DockerClient(base_url=self._docker_host)  # type: ignore[attr-defined]
             else:
-                self._client = docker_mod.from_env()  # type: ignore
+                self._client = docker_mod.from_env()  # type: ignore[attr-defined]
         return self._client
 
     def _ensure_network(self) -> None:
@@ -396,7 +396,7 @@ class DockerServiceProvider(BaseServiceProvider):
             count = 0
             for container in containers:
                 try:
-                    from docker.models.containers import Container
+                    from docker.models.containers import Container  # type: ignore[import-not-found]
 
                     def remove_container(c: Container = container) -> None:
                         c.remove(force=True)

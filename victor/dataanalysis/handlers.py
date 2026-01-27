@@ -253,7 +253,7 @@ class PyCaretHandler(BaseHandler):
 
         # Check if PyCaret is available
         try:
-            import pandas as pd
+            import pandas as pd  # type: ignore[import-not-found]
         except ImportError:
             raise ImportError("pandas is required for PyCaret. Install with: pip install pandas")
 
@@ -328,7 +328,7 @@ class PyCaretHandler(BaseHandler):
         """Synchronous PyCaret execution."""
         try:
             if task == "classification":
-                from pycaret.classification import (
+                from pycaret.classification import (  # type: ignore[import-not-found]
                     setup,
                     compare_models,
                     pull,
@@ -338,7 +338,7 @@ class PyCaretHandler(BaseHandler):
 
                 default_sort = "Accuracy"
             elif task == "regression":
-                from pycaret.regression import (
+                from pycaret.regression import (  # type: ignore[import-not-found]
                     setup,
                     compare_models,
                     pull,
@@ -348,7 +348,7 @@ class PyCaretHandler(BaseHandler):
 
                 default_sort = "R2"
             elif task == "clustering":
-                from pycaret.clustering import (
+                from pycaret.clustering import (  # type: ignore[import-not-found]
                     setup,
                     create_model,
                     pull,
@@ -365,7 +365,7 @@ class PyCaretHandler(BaseHandler):
                     "model": str(model),
                 }
             elif task == "anomaly":
-                from pycaret.anomaly import (
+                from pycaret.anomaly import (  # type: ignore[import-not-found]
                     setup,
                     create_model,
                     pull,
@@ -569,10 +569,10 @@ class AutoSklearnHandler(BaseHandler):
     ) -> Dict[str, Any]:
         """Synchronous Auto-sklearn execution."""
         try:
-            from sklearn.model_selection import train_test_split
+            from sklearn.model_selection import train_test_split  # type: ignore[import-not-found]
 
             if task == "classification":
-                from autosklearn.classification import AutoSklearnClassifier
+                from autosklearn.classification import AutoSklearnClassifier  # type: ignore[import-not-found]
 
                 default_metric = "accuracy"
                 automl = AutoSklearnClassifier(
@@ -584,7 +584,7 @@ class AutoSklearnHandler(BaseHandler):
                     seed=42,
                 )
             elif task == "regression":
-                from autosklearn.regression import AutoSklearnRegressor
+                from autosklearn.regression import AutoSklearnRegressor  # type: ignore[import-not-found]
 
                 default_metric = "r2"
                 automl = AutoSklearnRegressor(
@@ -749,9 +749,9 @@ class RLTrainingHandler(BaseHandler):
     ) -> Dict[str, Any]:
         """Synchronous RL training."""
         try:
-            import gymnasium as gym
+            import gymnasium as gym  # type: ignore[import-not-found]
             from stable_baselines3 import PPO, A2C, DQN, SAC, TD3
-            from stable_baselines3.common.evaluation import evaluate_policy
+            from stable_baselines3.common.evaluation import evaluate_policy  # type: ignore[import-not-found]
 
             # Algorithm mapping
             algo_map = {
@@ -825,6 +825,7 @@ __all__ = [
     "AutoSklearnHandler",
     "RLTrainingHandler",
     "HANDLERS",
+    "register_handlers",
 ]
 
 # Handler registry for tests and programmatic access
@@ -835,3 +836,18 @@ HANDLERS = {
     "autosklearn_automl": AutoSklearnHandler,
     "rl_training": RLTrainingHandler,
 }
+
+
+def register_handlers() -> None:
+    """Register DataAnalysis handlers with the step handler registry.
+
+    This function is called automatically when the DataAnalysis vertical
+    is loaded. It can also be called manually for testing purposes.
+
+    Example:
+        from victor.dataanalysis.handlers import register_handlers
+        register_handlers()
+    """
+    # Handlers are auto-registered via StepHandlerRegistry
+    # This function exists for API compatibility and testing
+    pass

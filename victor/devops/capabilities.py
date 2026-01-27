@@ -280,7 +280,7 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
                 name="deployment_safety",  # External name: devops_deployment_safety
                 type=CapabilityType.SAFETY,
                 description="Deployment safety rules for preventing dangerous operations",
-                version="1.0",
+                version="0.5.0",
                 configure_fn="configure_deployment_safety",
                 default_config={
                     "require_approval_for_production": True,
@@ -294,7 +294,7 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
                 name="container",  # External name: devops_container (without _settings)
                 type=CapabilityType.TOOL,
                 description="Container management and configuration",
-                version="1.0",
+                version="0.5.0",
                 configure_fn="configure_container_settings",
                 get_fn="get_container_settings",
                 default_config={
@@ -309,7 +309,7 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
                 name="infrastructure",  # External name: devops_infrastructure
                 type=CapabilityType.TOOL,
                 description="Infrastructure as Code configuration",
-                version="1.0",
+                version="0.5.0",
                 configure_fn="configure_infrastructure_settings",
                 default_config={
                     "iac_tool": "terraform",
@@ -323,7 +323,7 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
                 name="cicd",  # External name: devops_cicd
                 type=CapabilityType.TOOL,
                 description="CI/CD pipeline configuration",
-                version="1.0",
+                version="0.5.0",
                 configure_fn="configure_cicd_settings",
                 default_config={
                     "platform": "github_actions",
@@ -337,7 +337,7 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
                 name="monitoring",  # External name: devops_monitoring
                 type=CapabilityType.TOOL,
                 description="Monitoring and observability configuration",
-                version="1.0",
+                version="0.5.0",
                 configure_fn="configure_monitoring_settings",
                 default_config={
                     "metrics_backend": "prometheus",

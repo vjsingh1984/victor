@@ -353,7 +353,8 @@ class VertexAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         candidates = result.get("candidates", [])
         if not candidates:
             return CompletionResponse(
-                content="", role="assistant", model=model, raw_response=result
+                content="", role="assistant", model=model, tool_calls=None,
+                stop_reason=None, usage=None, raw_response=result, metadata=None
             )
 
         candidate = candidates[0]

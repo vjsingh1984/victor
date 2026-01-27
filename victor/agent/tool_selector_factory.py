@@ -30,7 +30,7 @@ import logging
 from typing import TYPE_CHECKING, Optional, Set
 
 from victor.protocols.tool_selector import IToolSelector
-from victor.tools.base import ToolRegistry  # type: ignore[attr-defined]
+from victor.tools.base import ToolRegistry
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine
@@ -224,8 +224,7 @@ def _create_semantic_selector(
         embedding_provider=embedding_provider,
         cache_embeddings=True,  # Enable caching for performance
     )
-    return selector  # type: ignore[return-value]
-
+    return selector  
 
 def _create_keyword_selector(
     tools: ToolRegistry,
@@ -255,8 +254,7 @@ def _create_keyword_selector(
         provider_name=provider_name,
         enabled_tools=enabled_tools,
     )
-    return selector  # type: ignore[return-value]
-
+    return selector  
 
 def _create_hybrid_selector(
     tools: ToolRegistry,
@@ -332,4 +330,4 @@ def _create_hybrid_selector(
         semantic_selector=semantic_selector,
         keyword_selector=keyword_selector,
         config=config,
-    )  # type: ignore[return-value]
+    )  

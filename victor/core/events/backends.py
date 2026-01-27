@@ -669,7 +669,10 @@ def create_event_backend(
     # Check for registered factory
     factory = _backend_factories.get(selected_type)
     if factory:
-        return factory(config)
+        backend = factory(config)
+        if backend is not None:
+            return backend
+        # Factory returned None (e.g., missing dependencies), fall through to default
 
     # Default to InMemory for unregistered types
     if selected_type != BackendType.IN_MEMORY:
@@ -720,9 +723,16 @@ def _register_distributed_backends() -> None:
     try:
         from victor.core.events.kafka_backend import KafkaEventBackend
 
+        def _create_kafka_backend(config: BackendConfig):
+            try:
+                return KafkaEventBackend(config)
+            except ImportError:
+                # Dependencies not available, return None to trigger fallback
+                return None
+
         register_backend_factory(
             BackendType.KAFKA,
-            lambda config: KafkaEventBackend(config),
+            _create_kafka_backend,
         )
         logger.debug("Registered KafkaEventBackend")
     except ImportError:

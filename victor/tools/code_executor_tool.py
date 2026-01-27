@@ -11,10 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 A tool for executing Python code in a secure, stateful Docker container.
-
 Features:
 - Proper context manager support for automatic cleanup (sync and async)
 - Container labeling for cleanup identification
@@ -22,7 +20,6 @@ Features:
 - Signal handlers for cleanup on SIGINT/SIGTERM
 - Container reuse within session
 """
-
 import atexit
 import io
 import logging
@@ -30,32 +27,24 @@ import signal
 import tarfile
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 import weakref
-
 logger = logging.getLogger(__name__)
-
 # LAZY IMPORT: Docker library is imported only when actually needed (not at module load time).
 # This reduces Victor's startup time by ~0.9s (56% reduction).
 # Docker is only needed when code execution tools are used.
 _docker_available = None  # Cached check: None=unknown, True=False
-docker = None  # type: ignore
-
-
+docker = None  
 def _check_docker_available() -> bool:
     """Check if docker package is available, with caching.
-
     Returns:
         True if docker package is installed, False otherwise
     """
     global _docker_available, docker
-
     if _docker_available is not None:
-        return _docker_available
-
+        return _docker_available  # type: ignore[unreachable]
     try:
         import docker as docker_module
-
         docker = docker_module
         _docker_available = True
         return True
@@ -64,42 +53,33 @@ def _check_docker_available() -> bool:
         return False
 
 
-def _get_docker_components():
+def _get_docker_components() -> tuple[Any, Any, type]:
     """Lazy import docker components only when needed.
-
     Returns:
         Tuple of (docker module, Container class, DockerException class)
         or (None, None, Exception) if docker not available
     """
     try:
         import docker as docker_module
-        from docker.models.containers import Container
-        from docker.errors import DockerException
-
+        from docker.models.containers import Container  # type: ignore[import-not-found]
+        from docker.errors import DockerException  # type: ignore[import-not-found]
         return docker_module, Container, DockerException
     except ImportError:
         return None, None, Exception
-
-
 from victor.core.errors import FileError, ConfigurationError
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
-
 # Container label for identifying Victor sandbox containers
 SANDBOX_CONTAINER_LABEL = "victor.sandbox"
 SANDBOX_CONTAINER_VALUE = "code-executor"
-
 # Global registry of active sandbox instances for cleanup
-_active_sandboxes: weakref.WeakSet = weakref.WeakSet()
+_active_sandboxes: weakref.WeakSet[Any] = weakref.WeakSet()
 _cleanup_registered = False
 _signal_handlers_registered = False
 _original_sigint_handler = None
 _original_sigterm_handler = None
-
-
 def cleanup_all_sandboxes() -> int:
     """Clean up all active sandbox containers.
-
     Returns:
         Number of containers cleaned up
     """
@@ -115,22 +95,16 @@ def cleanup_all_sandboxes() -> int:
             # Catch-all for truly unexpected errors
             logger.warning(f"Failed to cleanup sandbox: {e}")
     return cleaned
-
-
 def startup_cleanup(include_unlabeled: bool = True) -> int:
     """Clean up any orphaned containers from previous sessions at startup.
-
     This should be called during Victor initialization to ensure no
     stale containers are left running from crashed or interrupted sessions.
-
     Args:
         include_unlabeled: If True, also removes unlabeled legacy containers
             matching the sandbox profile (python-slim with sleep infinity).
             Default True for thorough cleanup.
-
     Returns:
         Number of containers cleaned up
-
     Example:
         # In application startup code:
         from victor.tools.code_executor_tool import startup_cleanup
@@ -142,30 +116,23 @@ def startup_cleanup(include_unlabeled: bool = True) -> int:
     if cleaned > 0:
         logger.info(f"Startup cleanup: removed {cleaned} orphaned sandbox container(s)")
     return cleaned
-
-
 def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
     """Clean up any orphaned Victor sandbox containers.
-
     This finds and removes any containers labeled as Victor sandboxes
     that may have been left behind from previous sessions.
-
     Args:
         include_unlabeled: If True, also removes python:*-slim containers
             running 'sleep infinity' that lack labels. Use for cleaning up
             legacy containers from before labeling was implemented.
-
     Returns:
         Number of containers cleaned up
     """
     if not _check_docker_available():
         return 0
-
     try:
         docker_module, _, _ = _get_docker_components()
         client = docker_module.from_env()
         cleaned = 0
-
         # First, clean up labeled containers
         containers = client.containers.list(
             all=True,
@@ -182,7 +149,6 @@ def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
             except Exception as e:
                 # Catch-all for truly unexpected errors
                 logger.warning(f"Failed to remove container {container.short_id}: {e}")
-
         # Optionally clean up unlabeled legacy containers
         if include_unlabeled:
             # Find containers with 'sleep infinity' command on python images
@@ -201,7 +167,6 @@ def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
                     container_name = container.name.lower()
                     if any(container_name.startswith(p) for p in k8s_name_patterns):
                         continue
-
                     # Check if it's a python-slim based sandbox container
                     image_tags = container.image.tags
                     is_python_slim = (
@@ -209,7 +174,6 @@ def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
                         if image_tags
                         else False
                     )
-
                     # Also check for untagged python images (dangling)
                     if not image_tags:
                         # Container might be from old python image
@@ -217,7 +181,6 @@ def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
                         cmd = container.attrs.get("Config", {}).get("Cmd", [])
                         if cmd and "sleep" in str(cmd) and "infinity" in str(cmd):
                             is_python_slim = True
-
                     # If it's a python-slim container with sleep infinity command
                     if is_python_slim:
                         cmd = container.attrs.get("Config", {}).get("Cmd", [])
@@ -233,7 +196,6 @@ def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
                 except Exception as e:
                     # Catch-all for truly unexpected errors
                     logger.debug(f"Skipping container check: {e}")
-
         return cleaned
     except (FileError, ConfigurationError) as e:
         # Known error types
@@ -243,69 +205,54 @@ def cleanup_orphaned_containers(include_unlabeled: bool = False) -> int:
         # Catch-all for truly unexpected errors
         logger.warning(f"Failed to cleanup orphaned containers: {e}")
         return 0
-
-
-def _signal_cleanup_handler(signum, frame):
+def _signal_cleanup_handler(signum: int, frame: Any) -> None:
     """Signal handler that cleans up containers before exiting.
-
     This ensures containers are cleaned up even when the process
     is terminated via SIGINT (Ctrl+C) or SIGTERM.
     """
     global _original_sigint_handler, _original_sigterm_handler
-
     logger.info(f"Received signal {signum}, cleaning up sandbox containers...")
     cleaned = cleanup_all_sandboxes()
     if cleaned > 0:
         logger.info(f"Cleaned up {cleaned} sandbox container(s)")
-
     # Call the original handler if it exists
     if signum == signal.SIGINT and _original_sigint_handler:
-        if callable(_original_sigint_handler):
+        if callable(_original_sigint_handler):  # type: ignore[unreachable]
             _original_sigint_handler(signum, frame)
         elif _original_sigint_handler == signal.SIG_DFL:
             # Re-raise KeyboardInterrupt for default behavior
             raise KeyboardInterrupt
     elif signum == signal.SIGTERM and _original_sigterm_handler:
-        if callable(_original_sigterm_handler):
+        if callable(_original_sigterm_handler):  # type: ignore[unreachable]
             _original_sigterm_handler(signum, frame)
         elif _original_sigterm_handler == signal.SIG_DFL:
             # Exit with the signal for default behavior
             import sys
-
             sys.exit(128 + signum)
-
-
-def _register_signal_handlers():
+def _register_signal_handlers() -> None:
     """Register signal handlers for cleanup on SIGINT/SIGTERM."""
     global _signal_handlers_registered, _original_sigint_handler, _original_sigterm_handler
-
     if _signal_handlers_registered:
         return
-
     try:
         # Only register in main thread
         import threading
-
         if threading.current_thread() is not threading.main_thread():
             logger.debug("Not registering signal handlers (not main thread)")
             return
-
         # Save original handlers
         _original_sigint_handler = signal.getsignal(signal.SIGINT)
         _original_sigterm_handler = signal.getsignal(signal.SIGTERM)
-
         # Install our handlers
         signal.signal(signal.SIGINT, _signal_cleanup_handler)
         signal.signal(signal.SIGTERM, _signal_cleanup_handler)
-
         _signal_handlers_registered = True
         logger.debug("Signal handlers registered for sandbox cleanup")
     except (ValueError, OSError) as e:
         # Can fail in some environments (e.g., non-main thread, Windows service)
         logger.debug(f"Could not register signal handlers: {e}")
 
-
-def _register_atexit_cleanup():
+def _register_atexit_cleanup() -> None:
     """Register atexit handler for cleanup (called once)."""
     global _cleanup_registered
     if not _cleanup_registered:
@@ -314,90 +261,76 @@ def _register_atexit_cleanup():
         # Also register signal handlers for graceful termination
         _register_signal_handlers()
 
-
 class CodeSandbox:
     """Manages a persistent, isolated Docker container for stateful code execution."""
-
     def __init__(
         self,
-        docker_image: str = "python:3.11-slim",
+        docker_image: str | None = None,
         require_docker: bool = False,
         network_disabled: bool = True,
         memory_limit: str | None = os.getenv("VICTOR_CODE_EXECUTOR_MEM", "512m"),
         cpu_shares: int | None = None,
     ):
-        self.docker_image = docker_image
-        self.container = None  # Will be typed based on docker.Container
-        self.working_dir = "/app"
-        self.docker_available = False
+        self.docker_image: str | None = docker_image
+        self.working_dir: str = "/app"
+        self.docker_available: bool = False
         self.docker_client = None
-        self.network_disabled = network_disabled
-        self.memory_limit = memory_limit
+        self.network_disabled: bool = network_disabled
+        self.memory_limit: str | None = memory_limit
         try:
-            self.cpu_shares = (
+            self.cpu_shares: int | None = (
                 int(os.getenv("VICTOR_CODE_EXECUTOR_CPU_SHARES", "256"))
                 if cpu_shares is None
                 else cpu_shares
             )
         except ValueError:
             self.cpu_shares = None
-
         if not _check_docker_available():
             if require_docker:
                 raise RuntimeError("Docker package not installed. Install with: pip install docker")
             # Docker package not available - continue without it
             return
-
         try:
             docker_module, _, DockerException = _get_docker_components()
             self.docker_client = docker_module.from_env()
             self.docker_available = True
-        except DockerException as e:
+        except Exception as e:  # DockerException is already derived from Exception
             if require_docker:
                 raise RuntimeError(
                     "Docker is not running or not installed. This feature requires Docker."
                 ) from e
             # Docker not available, but not required - continue without it
             self.docker_client = None
-
     def __enter__(self) -> "CodeSandbox":
         """Context manager entry - start the container."""
         self.start()
         return self
-
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit - stop and cleanup the container."""
         self.stop()
-
     async def __aenter__(self) -> "CodeSandbox":
         """Async context manager entry - start the container."""
         self.start()
         return self
-
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Async context manager exit - stop and cleanup the container."""
         self.stop()
-
     def start(self) -> None:
         """Starts the persistent Docker container.
-
         If Docker fails to start, the code executor will continue in
         degraded mode (no container execution available).
         """
         if not self.docker_available:
             # Docker not available - skip container startup
             return
-
         if self.container:
             return  # Already started
-
         # Register for atexit cleanup
         _register_atexit_cleanup()
         _active_sandboxes.add(self)
-
         try:
-            self.docker_client.images.pull(self.docker_image)
-            self.container = self.docker_client.containers.run(
+            self.docker_client.images.pull(self.docker_image)  # type: ignore[union-attr]
+            self.container = self.docker_client.containers.run(  # type: ignore[union-attr]
                 self.docker_image,
                 command="sleep infinity",  # Keep the container running
                 detach=True,
@@ -422,17 +355,15 @@ class CodeSandbox:
                 f"Docker container startup failed: {e}. "
                 "Code execution in containers will be unavailable."
             )
-            self.container = None
-            self.docker_available = False  # Mark Docker as unavailable
+            self.container: Any | None = None
+            self.docker_available: bool = False  # Mark Docker as unavailable
             # Remove from active set since startup failed
             _active_sandboxes.discard(self)
-
     def stop(self) -> None:
         """Stops and removes the Docker container."""
         if not self.docker_available:
             # Docker not available - nothing to stop
             return
-
         if self.container:
             container_id = self.container.short_id
             try:
@@ -445,11 +376,9 @@ class CodeSandbox:
                 # Catch-all for truly unexpected errors
                 logger.debug(f"Failed to remove container {container_id}: {e}")
                 logger.debug(f"Container {container_id} cleanup: {e}")
-            self.container = None
-
+            self.container: Any | None = None
         # Remove from active set (safe even if not present)
         _active_sandboxes.discard(self)
-
     def execute(self, code: str, timeout: int = 60) -> dict:
         """Executes a block of Python code inside the running container."""
         if not self.docker_available:
@@ -458,33 +387,27 @@ class CodeSandbox:
                 "stdout": "",
                 "stderr": "Docker is not available. Code execution in containers is disabled.",
             }
-
         if not self.container:
             raise RuntimeError("Execution session not started. Call start() first.")
-
         exec_result = self.container.exec_run(
             ["python", "-c", code],
             demux=True,  # Separate stdout and stderr
         )
-
         stdout = exec_result.output[0].decode("utf-8") if exec_result.output[0] else ""
         stderr = exec_result.output[1].decode("utf-8") if exec_result.output[1] else ""
-
         return {
             "exit_code": exec_result.exit_code,
             "stdout": stdout,
             "stderr": stderr,
         }
 
-    def put_files(self, file_paths: List[str]):
+    def put_files(self, file_paths: List[str]) -> None:
         """Copies files from the local filesystem into the container's working dir."""
         if not self.docker_available:
             # Docker not available - skip file operations
             return
-
         if not self.container:
             raise RuntimeError("Execution session not started. Call start() first.")
-
         # Create a tarball in memory
         tar_stream = io.BytesIO()
         with tarfile.open(fileobj=tar_stream, mode="w") as tar:
@@ -493,21 +416,16 @@ class CodeSandbox:
                 if not p.exists():
                     raise FileNotFoundError(f"Local file not found: {file_path}")
                 tar.add(str(p), arcname=p.name)
-
         tar_stream.seek(0)
         self.container.put_archive(self.working_dir, tar_stream)
-
     def get_file(self, remote_path: str) -> bytes:
         """Retrieves a single file from the container."""
         if not self.docker_available:
             # Docker not available - return empty bytes
             return b""
-
         if not self.container:
             raise RuntimeError("Execution session not started. Call start() first.")
-
         bits, _ = self.container.get_archive(remote_path)
-
         # Read the tar archive from the bits
         with io.BytesIO(b"".join(bits)) as tar_stream:
             with tarfile.open(fileobj=tar_stream, mode="r") as tar:
@@ -517,8 +435,6 @@ class CodeSandbox:
                 if file_obj:
                     return file_obj.read()
         raise FileNotFoundError(f"File not found in container: {remote_path}")
-
-
 async def _execute_code(sandbox_instance: CodeSandbox, code: str) -> str:
     """Internal: Execute Python code in sandbox."""
     result = sandbox_instance.execute(code)
@@ -528,8 +444,6 @@ async def _execute_code(sandbox_instance: CodeSandbox, code: str) -> str:
     if result["stderr"]:
         output += f"--- STDERR ---\n{result['stderr']}\n"
     return output
-
-
 async def _upload_files(sandbox_instance: CodeSandbox, file_paths: List[str]) -> str:
     """Internal: Upload files to sandbox."""
     try:
@@ -537,8 +451,6 @@ async def _upload_files(sandbox_instance: CodeSandbox, file_paths: List[str]) ->
         return f"Successfully uploaded {len(file_paths)} files to the sandbox."
     except Exception as e:
         return f"Error uploading files: {e}"
-
-
 @tool(
     category="execution",
     priority=Priority.MEDIUM,  # Task-specific code execution
@@ -549,42 +461,33 @@ async def _upload_files(sandbox_instance: CodeSandbox, file_paths: List[str]) ->
 async def sandbox(
     operation: str,
     code: str = "",
-    file_paths: List[str] = None,
-    context: dict = None,
+    file_paths: Optional[List[str]] = None,
+    context: Optional[dict[str, Any]] = None,
 ) -> str:
     """Unified sandbox operations for code execution in isolated Docker container.
-
     Operations:
     - "execute": Run Python code in the sandbox
     - "upload": Upload local files to the sandbox
-
     Args:
         operation: Operation to perform - "execute" or "upload"
         code: Python code to execute (for "execute" operation)
-        file_paths: List of local file paths to upload (for "upload" operation)
         context: Tool context provided by orchestrator
-
     Returns:
         Operation result string
     """
     if context is None:
         return "Error: Context not provided."
-
     sandbox_instance: CodeSandbox = context.get("code_manager")
     if not sandbox_instance:
         return "Error: CodeSandbox not found in context."
-
     op = operation.lower().strip()
-
     if op == "execute":
         if not code:
             return "Error: 'code' parameter required for execute operation."
         return await _execute_code(sandbox_instance, code)
-
     elif op == "upload":
         if not file_paths:
             return "Error: 'file_paths' parameter required for upload operation."
         return await _upload_files(sandbox_instance, file_paths)
-
     else:
         return f"Error: Unknown operation '{operation}'. Use 'execute' or 'upload'."

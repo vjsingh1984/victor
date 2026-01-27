@@ -29,11 +29,17 @@ class TestDataQualityCapability:
         from victor.dataanalysis.capabilities import configure_data_quality
 
         orchestrator = MagicMock()
-        orchestrator.data_quality_config = {}
-
+        mock_context = MagicMock()
+        mock_capability_config = {}
+        mock_context.get_capability_config.return_value = mock_capability_config
+        orchestrator.vertical_context = mock_context
         configure_data_quality(orchestrator)
 
-        config = orchestrator.data_quality_config
+       # Verify config was set
+        mock_context.set_capability_config.assert_called_once()
+        call_args = mock_context.set_capability_config.call_args
+        assert call_args[0][0] == "data_quality"
+        config = call_args[0][1]
         assert config["min_completeness"] == 0.9
         assert config["max_outlier_ratio"] == 0.05
         assert config["require_type_validation"] is True
@@ -44,8 +50,10 @@ class TestDataQualityCapability:
         from victor.dataanalysis.capabilities import configure_data_quality
 
         orchestrator = MagicMock()
-        orchestrator.data_quality_config = {}
-
+        mock_context = MagicMock()
+        mock_capability_config = {}
+        mock_context.get_capability_config.return_value = mock_capability_config
+        orchestrator.vertical_context = mock_context
         configure_data_quality(
             orchestrator,
             min_completeness=0.8,
@@ -54,7 +62,11 @@ class TestDataQualityCapability:
             handle_missing="drop",
         )
 
-        config = orchestrator.data_quality_config
+        # Verify config was set
+        mock_context.set_capability_config.assert_called_once()
+        call_args = mock_context.set_capability_config.call_args
+        assert call_args[0][0] == "data_quality"
+        config = call_args[0][1]
         assert config["min_completeness"] == 0.8
         assert config["max_outlier_ratio"] == 0.1
         assert config["require_type_validation"] is False
@@ -64,7 +76,17 @@ class TestDataQualityCapability:
         """Test get_data_quality returns default when not configured."""
         from victor.dataanalysis.capabilities import get_data_quality
 
-        orchestrator = MagicMock(spec=[])  # No data_quality_config attribute
+        mock_context = MagicMock()
+        default_config = {
+            "min_completeness": 0.9,
+            "max_outlier_ratio": 0.05,
+            "require_type_validation": True,
+            "handle_missing": "impute",
+        }
+        mock_context.get_capability_config.return_value = default_config
+        
+        orchestrator = MagicMock()
+        orchestrator.vertical_context = mock_context
 
         config = get_data_quality(orchestrator)
 
@@ -79,12 +101,20 @@ class TestVisualizationStyleCapability:
         """Test configure_visualization_style with defaults."""
         from victor.dataanalysis.capabilities import configure_visualization_style
 
+        mock_context = MagicMock()
+        mock_capability_config = {}
+        mock_context.get_capability_config.return_value = mock_capability_config
+
         orchestrator = MagicMock()
-        orchestrator.visualization_config = {}
+        orchestrator.vertical_context = mock_context
 
         configure_visualization_style(orchestrator)
 
-        config = orchestrator.visualization_config
+        # Verify config was set
+        mock_context.set_capability_config.assert_called_once()
+        call_args = mock_context.set_capability_config.call_args
+        assert call_args[0][0] == "visualization_style"
+        config = call_args[0][1]
         assert config["backend"] == "matplotlib"
         assert config["theme"] == "seaborn-v0_8-whitegrid"
         assert config["figure_size"] == (10, 6)
@@ -96,8 +126,10 @@ class TestVisualizationStyleCapability:
         from victor.dataanalysis.capabilities import configure_visualization_style
 
         orchestrator = MagicMock()
-        orchestrator.visualization_config = {}
-
+        mock_context = MagicMock()
+        mock_capability_config = {}
+        mock_context.get_capability_config.return_value = mock_capability_config
+        orchestrator.vertical_context = mock_context
         configure_visualization_style(
             orchestrator,
             default_backend="plotly",
@@ -107,7 +139,12 @@ class TestVisualizationStyleCapability:
             save_format="svg",
         )
 
-        config = orchestrator.visualization_config
+       
+        # Verify config was set
+        mock_context.set_capability_config.assert_called_once()
+        call_args = mock_context.set_capability_config.call_args
+        assert call_args[0][0] == "visualization_style"
+        config = call_args[0][1]
         assert config["backend"] == "plotly"
         assert config["theme"] == "dark"
         assert config["figure_size"] == (12, 8)
@@ -123,11 +160,18 @@ class TestStatisticalAnalysisCapability:
         from victor.dataanalysis.capabilities import configure_statistical_analysis
 
         orchestrator = MagicMock()
-        orchestrator.statistics_config = {}
-
+        mock_context = MagicMock()
+        mock_capability_config = {}
+        mock_context.get_capability_config.return_value = mock_capability_config
+        orchestrator.vertical_context = mock_context
         configure_statistical_analysis(orchestrator)
 
-        config = orchestrator.statistics_config
+       
+        # Verify config was set
+        mock_context.set_capability_config.assert_called_once()
+        call_args = mock_context.set_capability_config.call_args
+        assert call_args[0][0] == "statistical_analysis"
+        config = call_args[0][1]
         assert config["significance_level"] == 0.05
         assert config["confidence_interval"] == 0.95
         assert config["multiple_testing_correction"] == "bonferroni"
@@ -138,8 +182,10 @@ class TestStatisticalAnalysisCapability:
         from victor.dataanalysis.capabilities import configure_statistical_analysis
 
         orchestrator = MagicMock()
-        orchestrator.statistics_config = {}
-
+        mock_context = MagicMock()
+        mock_capability_config = {}
+        mock_context.get_capability_config.return_value = mock_capability_config
+        orchestrator.vertical_context = mock_context
         configure_statistical_analysis(
             orchestrator,
             significance_level=0.01,
@@ -148,7 +194,11 @@ class TestStatisticalAnalysisCapability:
             effect_size_threshold=0.3,
         )
 
-        config = orchestrator.statistics_config
+        # Verify config was set
+        mock_context.set_capability_config.assert_called_once()
+        call_args = mock_context.set_capability_config.call_args
+        assert call_args[0][0] == "statistical_analysis"
+        config = call_args[0][1]
         assert config["significance_level"] == 0.01
         assert config["confidence_interval"] == 0.99
         assert config["multiple_testing_correction"] == "fdr_bh"
@@ -162,12 +212,20 @@ class TestMLPipelineCapability:
         """Test configure_ml_pipeline with defaults."""
         from victor.dataanalysis.capabilities import configure_ml_pipeline
 
+        mock_context = MagicMock()
+        mock_capability_config = {}
+        mock_context.get_capability_config.return_value = mock_capability_config
+
         orchestrator = MagicMock()
-        orchestrator.ml_config = {}
+        orchestrator.vertical_context = mock_context
 
         configure_ml_pipeline(orchestrator)
 
-        config = orchestrator.ml_config
+        # Verify config was set
+        mock_context.set_capability_config.assert_called_once()
+        call_args = mock_context.set_capability_config.call_args
+        assert call_args[0][0] == "ml_pipeline"
+        config = call_args[0][1]
         assert config["framework"] == "sklearn"
         assert config["cv_folds"] == 5
         assert config["test_size"] == 0.2
@@ -179,8 +237,12 @@ class TestMLPipelineCapability:
         """Test configure_ml_pipeline with custom values."""
         from victor.dataanalysis.capabilities import configure_ml_pipeline
 
+        mock_context = MagicMock()
+        mock_capability_config = {}
+        mock_context.get_capability_config.return_value = mock_capability_config
+
         orchestrator = MagicMock()
-        orchestrator.ml_config = {}
+        orchestrator.vertical_context = mock_context
 
         configure_ml_pipeline(
             orchestrator,
@@ -192,7 +254,11 @@ class TestMLPipelineCapability:
             tuning_method="bayesian",
         )
 
-        config = orchestrator.ml_config
+        # Verify config was set
+        mock_context.set_capability_config.assert_called_once()
+        call_args = mock_context.set_capability_config.call_args
+        assert call_args[0][0] == "ml_pipeline"
+        config = call_args[0][1]
         assert config["framework"] == "xgboost"
         assert config["cv_folds"] == 10
         assert config["test_size"] == 0.3
@@ -311,32 +377,54 @@ class TestDataAnalysisCapabilityProvider:
 
     def test_apply_capability_by_name(self, provider):
         """Test apply_capability applies capability by name."""
+        mock_context = MagicMock()
+        mock_capability_config = {}
+        mock_context.get_capability_config.return_value = mock_capability_config
+
         orchestrator = MagicMock()
-        orchestrator.data_quality_config = {}
+        orchestrator.vertical_context = mock_context
 
         provider.apply_capability(orchestrator, "data_quality")
 
-        assert orchestrator.data_quality_config["min_completeness"] == 0.9
+        # Verify config was set
+        mock_context.set_capability_config.assert_called_once()
+        call_args = mock_context.set_capability_config.call_args
+        assert call_args[0][0] == "data_quality"
+        config = call_args[0][1]
+        assert config["min_completeness"] == 0.9
         assert "data_quality" in provider.get_applied()
 
     def test_apply_capability_with_custom_config(self, provider):
         """Test apply_capability merges custom config with defaults."""
+        mock_context = MagicMock()
+        mock_capability_config = {}
+        mock_context.get_capability_config.return_value = mock_capability_config
+
         orchestrator = MagicMock()
-        orchestrator.data_quality_config = {}
+        orchestrator.vertical_context = mock_context
 
         provider.apply_capability(orchestrator, "data_quality", min_completeness=0.95)
 
-        assert orchestrator.data_quality_config["min_completeness"] == 0.95
+        # Verify config was set
+        mock_context.set_capability_config.assert_called_once()
+        call_args = mock_context.set_capability_config.call_args
+        assert call_args[0][0] == "data_quality"
+        config = call_args[0][1]
+        assert config["min_completeness"] == 0.95
         # Other defaults should still be present
-        assert orchestrator.data_quality_config["handle_missing"] == "impute"
+        assert config["handle_missing"] == "impute"
 
     def test_get_capability_config(self, provider):
         """Test get_capability_config retrieves current config."""
-        orchestrator = MagicMock()
-        orchestrator.data_quality_config = {
+        mock_context = MagicMock()
+        existing_config = {
             "min_completeness": 0.95,
             "max_outlier_ratio": 0.1,
         }
+        mock_context.get_capability_config.return_value = existing_config
+
+        orchestrator = MagicMock()
+        orchestrator.vertical_context = mock_context
 
         config = provider.get_capability_config(orchestrator, "data_quality")
 
@@ -352,12 +440,20 @@ class TestDataAnalysisCapabilityProvider:
 
     def test_apply_data_quality(self, provider):
         """Test apply_capability with data_quality sets config and tracks application."""
+        mock_context = MagicMock()
+        mock_capability_config = {}
+        mock_context.get_capability_config.return_value = mock_capability_config
+
         orchestrator = MagicMock()
-        orchestrator.data_quality_config = {}
+        orchestrator.vertical_context = mock_context
 
         provider.apply_capability(orchestrator, "data_quality")
 
-        assert orchestrator.data_quality_config["min_completeness"] == 0.9
+        # Verify config was set
+        mock_context.set_capability_config.assert_called_once()
+        call_args = mock_context.set_capability_config.call_args
+        config = call_args[0][1]
+        assert config["min_completeness"] == 0.9
         assert "data_quality" in provider.get_applied()
 
     def test_apply_all(self, provider):

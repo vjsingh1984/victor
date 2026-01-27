@@ -161,7 +161,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         wrapped = self._wrap_hook(hook, critical=critical, name=name)
         self._after_hooks.append(wrapped)
 
-    def register(self, *args, enabled: bool = True, **kwargs) -> None:  # type: ignore[override]
+    def register(self, *args, enabled: bool = True, **kwargs) -> None:
         """Register a tool - supports both signatures for flexibility.
 
         Signatures:
@@ -257,7 +257,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         # Invalidate schema cache after registration
         self._invalidate_schema_cache()
 
-    def unregister(self, name: str) -> bool:  # type: ignore[override]
+    def unregister(self, name: str) -> bool:
         """Unregister a tool.
 
         Args:

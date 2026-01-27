@@ -129,7 +129,7 @@ class ObservabilityBridge:
         """
         if self._jsonl_exporter is not None:
             # Already setup
-            return
+            return  # type: ignore[unreachable]
 
         # Determine log path
         if log_path is None:
@@ -164,8 +164,8 @@ class ObservabilityBridge:
     def disable_jsonl_exporter(self) -> None:
         """Disable JSONL exporter and close log file."""
         if self._jsonl_exporter is not None:
-            self._event_bus.remove_exporter(self._jsonl_exporter)
-            self._jsonl_exporter.close()
+            self._event_bus.remove_exporter(self._jsonl_exporter)  # type: ignore[unreachable]
+            self._jsonl_exporter.close()  # type: ignore[unreachable]
             self._jsonl_exporter = None
             logger.info("JSONL event logging disabled")
 

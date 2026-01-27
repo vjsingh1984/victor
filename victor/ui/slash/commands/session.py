@@ -64,7 +64,7 @@ class SaveCommand(BaseSlashCommand):
                 # Create new session (ignore active_session_id)
                 session_id = None
                 action = "Created new session"
-            elif getattr(ctx.agent, "active_session_id", None):
+            elif ctx.agent and getattr(ctx.agent, "active_session_id", None):
                 # Update existing active session
                 session_id = ctx.agent.active_session_id
                 action = f"Updated session {session_id}"
@@ -75,16 +75,16 @@ class SaveCommand(BaseSlashCommand):
 
             # Save to SQLite
             session_id = sqlite_persistence.save_session(
-                conversation=ctx.agent.conversation,
-                model=ctx.agent.model,
-                provider=ctx.agent.provider_name,
+                conversation=ctx.agent.conversation if ctx.agent else None,
+                model=ctx.agent.model if ctx.agent else None,
+                provider=ctx.agent.provider_name if ctx.agent else None,
                 profile=getattr(ctx.settings, "current_profile", "default"),
                 session_id=session_id,  # Use existing or None for new
                 title=title,
-                conversation_state=getattr(ctx.agent, "conversation_state", None),
+                conversation_state=getattr(ctx.agent, "conversation_state", None) if ctx.agent else None,
             )
 
-            if session_id:
+            if session_id and ctx.agent:
                 # Set active_session_id on agent
                 ctx.agent.active_session_id = session_id
 
@@ -147,19 +147,20 @@ class LoadCommand(BaseSlashCommand):
                 return
 
             # Restore conversation
-            ctx.agent.conversation = MessageHistory.from_dict(session.conversation)
+            if ctx.agent:
+                ctx.agent.conversation = MessageHistory.from_dict(session.conversation)
 
-            # Set active session ID for parallel session support
-            ctx.agent.active_session_id = session_id
+                # Set active session ID for parallel session support
+                ctx.agent.active_session_id = session_id
 
-            # Restore conversation state machine if available
-            if session.conversation_state:
-                ctx.agent.conversation_state = ConversationStateMachine.from_dict(
-                    session.conversation_state
-                )
-                logger.info(
-                    f"Restored conversation state: stage={ctx.agent.conversation_state.get_stage().name}"
-                )
+                # Restore conversation state machine if available
+                if session.conversation_state:
+                    ctx.agent.conversation_state = ConversationStateMachine.from_dict(
+                        session.conversation_state
+                    )
+                    logger.info(
+                        f"Restored conversation state: stage={ctx.agent.conversation_state.get_stage().name}"
+                    )
 
             ctx.console.print(
                 Panel(
@@ -348,23 +349,24 @@ class ResumeCommand(BaseSlashCommand):
             metadata = session_data.get("metadata", {})
             conversation_dict = session_data.get("conversation", {})
 
-            ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
+            if ctx.agent:
+                ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
 
-            # Set active session ID for parallel session support
-            ctx.agent.active_session_id = session_id
+                # Set active session ID for parallel session support
+                ctx.agent.active_session_id = session_id
 
-            # Restore conversation state if available
-            conversation_state_dict = session_data.get("conversation_state")
-            if conversation_state_dict:
-                try:
-                    ctx.agent.conversation_state = ConversationStateMachine.from_dict(
-                        conversation_state_dict
-                    )
-                    logger.info(
-                        f"Restored conversation state: stage={ctx.agent.conversation_state.get_stage().name}"
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to restore conversation state: {e}")
+                # Restore conversation state if available
+                conversation_state_dict = session_data.get("conversation_state")
+                if conversation_state_dict:
+                    try:
+                        ctx.agent.conversation_state = ConversationStateMachine.from_dict(
+                            conversation_state_dict
+                        )
+                        logger.info(
+                            f"Restored conversation state: stage={ctx.agent.conversation_state.get_stage().name}"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to restore conversation state: {e}")
 
             ctx.console.print(
                 Panel(
@@ -404,25 +406,29 @@ class CompactCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        original_count = ctx.agent.conversation.message_count()
+        if ctx.agent:
+            original_count = ctx.agent.conversation.message_count()
 
-        if original_count < 5:
-            ctx.console.print("[dim]Conversation is already small enough, nothing to compact[/]")
+            if original_count < 5:
+                ctx.console.print("[dim]Conversation is already small enough, nothing to compact[/]")
+                return
+
+            use_smart = self._has_flag(ctx, "--smart", "-s")
+            keep_recent = 6
+
+            # Parse --keep N
+            keep_val = self._get_flag_value(ctx, "--keep") or self._get_flag_value(ctx, "-k")
+            if keep_val:
+                try:
+                    keep_recent = int(keep_val)
+                except ValueError:
+                    pass
+
+            keep_recent = min(keep_recent, len(ctx.agent.conversation.messages) // 2)
+            messages = ctx.agent.conversation.messages
+        else:
+            ctx.console.print("[red]No agent available for compaction[/]")
             return
-
-        use_smart = self._has_flag(ctx, "--smart", "-s")
-        keep_recent = 6
-
-        # Parse --keep N
-        keep_val = self._get_flag_value(ctx, "--keep") or self._get_flag_value(ctx, "-k")
-        if keep_val:
-            try:
-                keep_recent = int(keep_val)
-            except ValueError:
-                pass
-
-        keep_recent = min(keep_recent, len(ctx.agent.conversation.messages) // 2)
-        messages = ctx.agent.conversation.messages
 
         if use_smart:
             ctx.console.print("[dim]Generating AI summary...[/]")
@@ -448,7 +454,7 @@ class CompactCommand(BaseSlashCommand):
                 summary = summary_response.content
 
                 # Create new conversation with summary + recent messages
-                from victor.agent.message_types import Message
+                from victor.agent.message_types import Message  # type: ignore[import-not-found]
 
                 new_messages = [
                     Message(role="system", content=f"[Previous conversation summary]\n{summary}"),
@@ -468,10 +474,11 @@ class CompactCommand(BaseSlashCommand):
                 ctx.console.print(f"[red]Smart compaction failed:[/] {e}")
         else:
             # Simple truncation
-            ctx.agent.conversation.messages = messages[-keep_recent:]
-            new_count = ctx.agent.conversation.message_count()
+            if ctx.agent:
+                ctx.agent.conversation.messages = messages[-keep_recent:]
+                new_count = ctx.agent.conversation.message_count()
 
-            ctx.console.print(
-                f"[green]Compacted:[/] {original_count} -> {new_count} messages\n"
-                "[dim]Use /compact --smart for AI-powered summarization[/]"
-            )
+                ctx.console.print(
+                    f"[green]Compacted:[/] {original_count} -> {new_count} messages\n"
+                    "[dim]Use /compact --smart for AI-powered summarization[/]"
+                )

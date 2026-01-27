@@ -59,7 +59,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set, Union
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ class TaskTypeDefinition:
     tool_budget: int = 10
     priority_tools: List[str] = field(default_factory=list)
     max_iterations: int = 30
-    aliases: Set[str] = field(default_factory=set)
+    aliases: Union[List[str], Set[str]] = field(default_factory=set)
     vertical: Optional[str] = None
     needs_tools: bool = True
     force_action_after_read: bool = False

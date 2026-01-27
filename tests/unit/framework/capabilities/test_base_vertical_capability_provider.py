@@ -192,8 +192,8 @@ class TestMapFrameworkCapabilityType:
         assert _map_capability_type(FrameworkCapabilityType.MODE) == "tool"
 
     def test_map_safety(self):
-        """Test mapping SAFETY to MIDDLEWARE."""
-        assert _map_capability_type(FrameworkCapabilityType.SAFETY) == "middleware"
+        """Test mapping SAFETY to TOOL (core CapabilityType has no 'middleware')."""
+        assert _map_capability_type(FrameworkCapabilityType.SAFETY) == "tool"
 
     def test_map_prompt(self):
         """Test mapping PROMPT type."""

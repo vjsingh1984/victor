@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 # Try to import native Rust implementation
 try:
-    from victor_native import ast_processor as _native_ast
+    from victor_native import ast_processor as _native_ast  # type: ignore[import-not-found]
 
     _RUST_AVAILABLE = True
     logger.info("Rust AST processor accelerator loaded")
@@ -562,7 +562,7 @@ class AstProcessorAccelerator:
         if language and language in language_symbol_map:
             lang_map = language_symbol_map[language]
             for sym_type in symbol_types:
-                mapped = lang_map.get(sym_type, sym_type)
+                mapped = lang_map.get(sym_type, sym_type)  # type: ignore[attr-defined]
                 # Handle lists of mapped types (e.g., function_definition -> [function_declaration, method_definition])
                 if isinstance(mapped, list):
                     mapped_symbol_types.extend(mapped)

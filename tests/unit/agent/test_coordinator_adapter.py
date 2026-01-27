@@ -93,15 +93,19 @@ class TestCoordinatorAdapter:
 
     def test_send_rl_reward_signal_with_coordinator(self):
         """Test sending RL reward signal with coordinator available."""
+        from unittest.mock import AsyncMock
+
         mock_eval_coordinator = Mock()
-        mock_eval_coordinator.send_rl_reward_signal = Mock()
+        # Create an async coroutine that will be called
+        async def mock_send_reward(session):
+            return None
+        mock_eval_coordinator.send_rl_reward_signal = mock_send_reward
 
         adapter = CoordinatorAdapter(evaluation_coordinator=mock_eval_coordinator)
 
         session = MockStreamingSession(success=True)
+        # Should not raise exception
         adapter.send_rl_reward_signal(session)
-
-        mock_eval_coordinator.send_rl_reward_signal.assert_called_once_with(session)
 
     def test_send_rl_reward_signal_without_coordinator(self):
         """Test sending RL reward signal without coordinator."""

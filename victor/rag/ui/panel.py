@@ -28,33 +28,33 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional
 
 try:
-    from textual.app import ComposeResult
-    from textual.binding import Binding
-    from textual.containers import Container, Horizontal, Vertical
-    from textual.message import Message
-    from textual.reactive import reactive
+    from textual.app import ComposeResult  # type: ignore[import-not-found]
+    from textual.binding import Binding  # type: ignore[import-not-found]
+    from textual.containers import Container, Horizontal, Vertical  # type: ignore[import-not-found]
+    from textual.message import Message  # type: ignore[import-not-found]
+    from textual.reactive import reactive  # type: ignore[import-not-found]
     from textual.widgets import (
-        Button,
-        Footer,
-        Header,
-        Input,
-        Label,
-        ListItem,
-        ListView,
-        Markdown,
-        Static,
-        TabbedContent,
-        TabPane,
+        Button,  # type: ignore[import-not-found]
+        Footer,  # type: ignore[import-not-found]
+        Header,  # type: ignore[import-not-found]
+        Input,  # type: ignore[import-not-found]
+        Label,  # type: ignore[import-not-found]
+        ListItem,  # type: ignore[import-not-found]
+        ListView,  # type: ignore[import-not-found]
+        Markdown,  # type: ignore[import-not-found]
+        Static,  # type: ignore[import-not-found]
+        TabbedContent,  # type: ignore[import-not-found]
+        TabPane,  # type: ignore[import-not-found]
     )
-    from textual.widget import Widget
+    from textual.widget import Widget  # type: ignore[import-not-found]
 
     TEXTUAL_AVAILABLE = True
 except ImportError:
     TEXTUAL_AVAILABLE = False
 
     # Stub classes for when Textual is not available
-    Widget = object  # type: ignore
-    ComposeResult = object  # type: ignore
+    Widget = object  # type: ignore[attr-defined]
+    ComposeResult = object  # type: ignore[attr-defined]
 
 
 if TEXTUAL_AVAILABLE:
@@ -426,9 +426,9 @@ else:
     class RAGPanelStub:  # Renamed to avoid conflict
         """Stub RAG panel when Textual is not available."""
 
-        def __init__(self, *args, **kwargs):  # type: ignore
+        def __init__(self, *args, **kwargs):  # type: ignore[attr-defined]
             raise ImportError(
                 "Textual is required for RAG UI. " "Install with: pip install textual"
             )
 
-    RAGPanel = RAGPanelStub  # type: ignore
+    RAGPanel = RAGPanelStub  # type: ignore[attr-defined]

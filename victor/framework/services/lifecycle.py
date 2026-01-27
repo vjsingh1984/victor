@@ -531,7 +531,7 @@ class SQLiteServiceHandler(BaseService):
     async def _do_start(self) -> None:
         """Initialize SQLite connection."""
         try:
-            import aiosqlite
+            import aiosqlite  # type: ignore[import]
 
             db_path = Path(self._sqlite_config.db_path).expanduser()
 
@@ -658,8 +658,8 @@ class DockerServiceHandler(BaseService):
     async def _do_start(self) -> None:
         """Start Docker container."""
         try:
-            import docker
-            from docker.models.containers import Container
+            import docker  # type: ignore[import]
+            from docker.models.containers import Container  # type: ignore[import]
 
             self._client = docker.from_env(skip_ssl_verification=True)  # type: ignore[attr-defined]
 

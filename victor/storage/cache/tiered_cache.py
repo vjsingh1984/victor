@@ -24,7 +24,7 @@ try:
     from cachetools import TTLCache  # type: ignore[import-untyped]
 except ImportError:
     TTLCache = None
-import diskcache
+import diskcache  # type: ignore[import-untyped]
 
 from victor.storage.cache.config import CacheConfig
 

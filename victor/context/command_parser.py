@@ -327,7 +327,7 @@ class FolderResolver(ContextResolver):
         return False
 
     def _build_tree(
-        self, path: Path, prefix: str = "", depth: int = 0, file_count: List[int] = None
+        self, path: Path, prefix: str = "", depth: int = 0, file_count: Optional[List[int]] = None
     ) -> str:
         """Build a tree representation of the folder."""
         if file_count is None:

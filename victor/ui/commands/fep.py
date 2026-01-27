@@ -34,7 +34,7 @@ Example:
 import re
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 import typer
 from rich.console import Console
@@ -614,7 +614,7 @@ def view_fep(
         console.print()
 
         # Extract and show summary
-        sections = {}
+        sections: dict[str, Any] = {}
         validator._extract_and_validate_sections(
             validator._remove_frontmatter(content),
             sections,

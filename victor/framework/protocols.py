@@ -676,7 +676,7 @@ class OrchestratorCapability:
         if not self._is_valid_version(self.version):
             raise ValueError(
                 f"Capability '{self.name}' has invalid version '{self.version}'. "
-                "Expected format: 'MAJOR.MINOR' (e.g., '1.0', '2.1')"
+                "Expected format: 'MAJOR.MINOR' or 'MAJOR.MINOR.PATCH' (e.g., '1.0', '2.1', '1.2.3')"
             )
 
     @staticmethod
@@ -687,14 +687,14 @@ class OrchestratorCapability:
             version: Version string to validate
 
         Returns:
-            True if version is valid MAJOR.MINOR format
+            True if version is valid MAJOR.MINOR or MAJOR.MINOR.PATCH format
         """
         try:
             parts = version.split(".")
-            if len(parts) != 2:
+            if len(parts) not in (2, 3):
                 return False
-            major, minor = int(parts[0]), int(parts[1])
-            return major >= 0 and minor >= 0
+            # Validate all parts are non-negative integers
+            return all(int(part) >= 0 for part in parts)
         except (ValueError, AttributeError):
             return False
 

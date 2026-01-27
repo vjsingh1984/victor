@@ -134,11 +134,15 @@ class ProfilerManager:
             return profiler.profile_function(func, *args, **kwargs)
 
         # Fallback for other profilers
-        profiler.start()
-        try:
+        if profiler:
+            profiler.start()
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                profile_result = profiler.stop()
+        else:
             result = func(*args, **kwargs)
-        finally:
-            profile_result = profiler.stop()
+            profile_result = None
 
         return result, profile_result
 

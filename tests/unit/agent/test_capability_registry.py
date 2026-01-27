@@ -229,14 +229,15 @@ class TestCapabilityVersioning:
             )
 
     def test_invalid_version_three_parts(self):
-        """Test that three-part version is invalid."""
-        with pytest.raises(ValueError, match="invalid version"):
-            OrchestratorCapability(
-                name="test_cap",
-                capability_type=CapabilityType.TOOL,
-                setter="set_test",
-                version="1.2.3",
-            )
+        """Test that three-part version is valid (MAJOR.MINOR.PATCH format)."""
+        # Three-part versions are now valid (e.g., "1.2.3")
+        cap = OrchestratorCapability(
+            name="test_cap",
+            capability_type=CapabilityType.TOOL,
+            setter="set_test",
+            version="1.2.3",
+        )
+        assert cap.version == "1.2.3"
 
     def test_is_compatible_with_same_version(self):
         """Test capability is compatible with same version."""

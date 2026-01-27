@@ -35,7 +35,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state_machine import ConversationStage
+    from victor.agent.conversation_state_machine import ConversationStage  # type: ignore[import-not-found]
 
 from victor.tools.tool_names import get_canonical_name
 

@@ -167,7 +167,7 @@ class Histogram:
         if not self._bucket_counts:
             for bucket in self.buckets:
                 self._bucket_counts[bucket] = 0
-            self._bucket_counts["+Inf"] = 0
+            self._bucket_counts[float("inf")] = 0
 
     def observe(self, value: float) -> None:
         """Observe a value.
@@ -182,7 +182,7 @@ class Histogram:
             for bucket in self.buckets:
                 if value <= bucket:
                     self._bucket_counts[bucket] += 1
-            self._bucket_counts["+Inf"] += 1
+            self._bucket_counts[float("inf")] += 1
 
     def to_prometheus(self) -> str:
         """Export in Prometheus format."""
@@ -198,7 +198,7 @@ class Histogram:
 
         # Bucket counts
         cumulative = 0
-        for bucket in sorted(self.buckets) + ["+Inf"]:
+        for bucket in sorted(self.buckets) + [float("inf")]:
             cumulative += self._bucket_counts[bucket]
             if label_str:
                 bucket_label = label_str.replace("}", f',le="{bucket}"}}')
@@ -247,7 +247,8 @@ class PrometheusRegistry:
         Returns:
             Counter instance.
         """
-        key = (name, tuple(sorted(labels.items())) if labels else ())
+        label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items())) if labels else ""
+        key = f"{name}{{{label_str}}}" if label_str else name
         with self._lock:
             if key not in self._counters:
                 self._counters[key] = Counter(
@@ -273,7 +274,8 @@ class PrometheusRegistry:
         Returns:
             Gauge instance.
         """
-        key = (name, tuple(sorted(labels.items())) if labels else ())
+        label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items())) if labels else ""
+        key = f"{name}{{{label_str}}}" if label_str else name
         with self._lock:
             if key not in self._gauges:
                 self._gauges[key] = Gauge(
@@ -301,14 +303,16 @@ class PrometheusRegistry:
         Returns:
             Histogram instance.
         """
-        key = (name, tuple(sorted(labels.items())) if labels else ())
+        label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items())) if labels else ""
+        key = f"{name}{{{label_str}}}" if label_str else name
         with self._lock:
             if key not in self._histograms:
+                default_buckets = buckets or [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
                 self._histograms[key] = Histogram(
                     name=name,
                     help=help,
                     labels=labels or {},
-                    buckets=buckets or Histogram.__dataclass_fields__["buckets"].default_factory(),
+                    buckets=default_buckets,
                 )
             return self._histograms[key]
 

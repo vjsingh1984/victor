@@ -63,7 +63,7 @@ class TestCapabilityDefinition:
         assert definition.default_config == {}
         assert definition.dependencies == []
         assert definition.tags == []
-        assert definition.version == "1.0"
+        assert definition.version == "0.5.0"
 
     def test_definition_validates_config_against_schema(self):
         """Test that config validation works against JSON schema."""

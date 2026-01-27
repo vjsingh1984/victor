@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 # Try to import native Rust implementation
 try:
-    from victor_native import embedding_ops as _native_embeddings
+    from victor_native import embedding_ops as _native_embeddings  # type: ignore[import]
 
     _RUST_AVAILABLE = True
     logger.info("Rust embedding operations accelerator loaded")
@@ -257,7 +257,7 @@ class EmbeddingOpsAccelerator:
             # Create cache key from query and embeddings
             cache_data = (
                 tuple(query)
-                + tuple(len(embeddings))
+                + tuple([float(len(embeddings))])  # type: ignore[arg-type]
                 + tuple(len(emb[0]) if emb else 0 for emb in embeddings[:5])
             )
             cache_key = hashlib.sha256(str(cache_data).encode()).hexdigest()

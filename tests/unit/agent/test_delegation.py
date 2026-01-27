@@ -382,6 +382,7 @@ class TestDelegateTool:
 
         tool = DelegateTool(mock_handler)
         result = await tool.execute(
+            {},  # _exec_ctx
             task="Find all API endpoints",
             role="researcher",
             tool_budget=15,
@@ -405,7 +406,7 @@ class TestDelegateTool:
         )
 
         tool = DelegateTool(mock_handler)
-        result = await tool.execute(task="Test task")
+        result = await tool.execute({}, task="Test task")  # _exec_ctx added
 
         assert result.success is False
         assert "rejected" in result.error.lower()
@@ -425,6 +426,7 @@ class TestDelegateTool:
 
         tool = DelegateTool(mock_handler)
         result = await tool.execute(
+            {},  # _exec_ctx
             task="Background task",
             await_result=False,
         )

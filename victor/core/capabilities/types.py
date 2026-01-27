@@ -126,7 +126,7 @@ class CapabilityDefinition:
     default_config: Dict[str, Any] = field(default_factory=dict)
     dependencies: List[str] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
-    version: str = "1.0"
+    version: str = "0.5.0"
     enabled: bool = True
 
     def validate_config(self, config: Dict[str, Any]) -> bool:
@@ -145,7 +145,7 @@ class CapabilityDefinition:
             return True
 
         try:
-            import jsonschema
+            import jsonschema  # type: ignore[import-untyped]
 
             jsonschema.validate(instance=config, schema=self.config_schema)
             return True
@@ -170,7 +170,7 @@ class CapabilityDefinition:
             return []
 
         try:
-            import jsonschema
+            import jsonschema  # type: ignore[import-untyped]
 
             validator = jsonschema.Draft7Validator(self.config_schema)
             return [error.message for error in validator.iter_errors(config)]
@@ -198,7 +198,7 @@ class CapabilityDefinition:
             result["dependencies"] = self.dependencies
         if self.tags:
             result["tags"] = self.tags
-        if self.version != "1.0":
+        if self.version != "0.5.0":
             result["version"] = self.version
         if not self.enabled:
             result["enabled"] = self.enabled

@@ -82,20 +82,24 @@ class TestCapabilityContainerProtocol:
         assert not isinstance(impl, CapabilityContainerProtocol)
 
     def test_isinstance_with_partial_implementation(self):
-        """isinstance() should return False for partial implementations."""
+        """isinstance() returns True for structural typing compatibility.
 
-        # Create a partial implementation (wrong signature)
-        class PartialImpl:
-            def has_capability(self, capability_name: str) -> bool:  # Correct
+        Note: Python Protocol isinstance() checks are structural and don't
+        validate exact parameter signatures at runtime. Signature mismatches
+        are caught by static type checkers (mypy), not runtime checks.
+        """
+
+        # Create an implementation with all required methods
+        class StructuralImpl:
+            def has_capability(self, capability_name: str) -> bool:
                 return True
 
-            def get_capability(self) -> Optional[Any]:  # Wrong signature (missing param)
+            def get_capability(self, name: str) -> Optional[Any]:
                 return None
 
-        # Test isinstance() - partial implementation should not be considered fully compliant
-        impl = PartialImpl()
-        # Structural typing should fail due to wrong signature
-        assert not isinstance(impl, CapabilityContainerProtocol)
+        # Test isinstance() - structural typing passes if methods exist
+        impl = StructuralImpl()
+        assert isinstance(impl, CapabilityContainerProtocol)
 
     def test_protocol_enforces_type_safety(self):
         """Protocol should enforce type safety for method calls."""

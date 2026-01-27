@@ -35,7 +35,7 @@ try:
         compile_language_patterns,
         list_supported_languages,
         get_language_categories,
-    )
+    )  # type: ignore[import-not-found]
 except ImportError:
     # Fallback if native module is not available
     CompiledRegexSet = None

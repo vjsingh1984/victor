@@ -105,11 +105,11 @@ class TestOrchestratorFactoryMissingMethods:
             model="claude-sonnet-4-5",
         )
 
-        # Create mocks with order method
+        # Create mocks with priority method
         contributor1 = Mock()
-        contributor1.order = Mock(return_value=1)
+        contributor1.priority = Mock(return_value=1)
         contributor2 = Mock()
-        contributor2.order = Mock(return_value=2)
+        contributor2.priority = Mock(return_value=2)
 
         coordinator = factory.create_prompt_coordinator(
             prompt_contributors=[contributor1, contributor2]
@@ -893,16 +893,19 @@ class TestOrchestratorFactoryAdvancedScenarios:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.core.bootstrap.bootstrap_container") as mock_boot:
-            mock_boot.return_value = Mock()
+        # Patch ensure_bootstrapped which is called first
+        with patch("victor.core.bootstrap.ensure_bootstrapped") as mock_ensure:
+            mock_container = Mock()
+            mock_ensure.return_value = mock_container
 
             # Access container multiple times
             container1 = factory.container
             container2 = factory.container
 
-            # Should only bootstrap once
-            assert mock_boot.call_count == 1
+            # Should only bootstrap once (ensure_bootstrapped is cached)
+            assert mock_ensure.call_count == 1
             assert container1 is container2
+            assert container1 is mock_container
 
     def test_factory_with_all_parameters(self):
         """Test factory with all possible parameters."""
@@ -951,7 +954,7 @@ class TestOrchestratorFactoryErrorHandling:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.get_project_paths"):
+        with patch("victor.config.settings.get_project_paths"):
             # Force an error
             memory_manager, session_id = factory.create_memory_components(
                 provider_name="anthropic",
@@ -972,7 +975,7 @@ class TestOrchestratorFactoryErrorHandling:
             model="claude-sonnet-4-5",
         )
 
-        with patch("victor.agent.orchestrator_factory.get_project_paths"):
+        with patch("victor.config.settings.get_project_paths"):
             manager = factory.create_checkpoint_manager()
 
         # Should return None on error

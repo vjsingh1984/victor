@@ -42,7 +42,7 @@ console = Console()
 
 
 @memory_app.command("list")
-def list_entities(
+async def list_entities(
     entity_type: Optional[str] = typer.Option(
         None,
         "--type",
@@ -92,7 +92,7 @@ def list_entities(
 
             try:
                 entity_type_enum = EntityType[entity_type.upper()]
-                entities = memory.get_by_type(entity_type_enum, limit=limit)
+                entities = await memory.get_by_type(entity_type_enum, limit=limit)
             except KeyError:
                 console.print(f"[bold red]Error:[/] Unknown entity type: {entity_type}")
                 console.print(
@@ -104,7 +104,7 @@ def list_entities(
                 raise typer.Exit(1)
         else:
             # Get all entities (limited)
-            entities = memory.search("", limit=limit)
+            entities = await memory.search("", limit=limit)
 
         if not entities:
             console.print("[dim]No entities found in memory.[/]")
@@ -116,8 +116,8 @@ def list_entities(
                 {
                     "name": e.name,
                     "type": e.entity_type.value,
-                    "mentions": e.mention_count,
-                    "last_seen": e.last_mention_time.isoformat() if e.last_mention_time else None,
+                    "mentions": e.mentions,
+                    "last_seen": e.last_seen.isoformat() if e.last_seen else None,
                     "attributes": e.attributes,
                 }
                 for e in entities
@@ -133,14 +133,14 @@ def list_entities(
 
             for entity in entities:
                 last_seen = (
-                    entity.last_mention_time.strftime("%Y-%m-%d %H:%M")
-                    if entity.last_mention_time
+                    entity.last_seen.strftime("%Y-%m-%d %H:%M")
+                    if entity.last_seen
                     else "Never"
                 )
                 table.add_row(
                     entity.name[:50],
                     entity.entity_type.value,
-                    str(entity.mention_count),
+                    str(entity.mentions),
                     last_seen,
                 )
 
@@ -152,7 +152,7 @@ def list_entities(
 
 
 @memory_app.command("show")
-def show_entity(
+async def show_entity(
     entity_name: str = typer.Argument(
         ...,
         help="Name or ID of the entity to show",
@@ -183,10 +183,10 @@ def show_entity(
         # Try to find entity by name
         if entity_type:
             entity_type_enum = EntityType[entity_type.upper()]
-            entity = memory.get(entity_name, entity_type_enum)
+            entity = await memory.get(entity_name)
         else:
             # Search by name
-            results = memory.search(entity_name, limit=10)
+            results = await memory.search(entity_name, limit=10)
             if len(results) == 1:
                 entity = results[0]
             elif len(results) > 1:
@@ -214,11 +214,11 @@ def show_entity(
 
         table.add_row("ID", entity.id)
         table.add_row("Type", entity.entity_type.value)
-        table.add_row("Mentions", str(entity.mention_count))
-        if entity.first_seen_time:
-            table.add_row("First Seen", entity.first_seen_time.strftime("%Y-%m-%d %H:%M:%S"))
-        if entity.last_mention_time:
-            table.add_row("Last Seen", entity.last_mention_time.strftime("%Y-%m-%d %H:%M:%S"))
+        table.add_row("Mentions", str(entity.mentions))
+        if entity.first_seen:
+            table.add_row("First Seen", entity.first_seen.strftime("%Y-%m-%d %H:%M:%S"))
+        if entity.last_seen:
+            table.add_row("Last Seen", entity.last_seen.strftime("%Y-%m-%d %H:%M:%S"))
 
         console.print(table)
 
@@ -233,7 +233,7 @@ def show_entity(
             )
 
         # Relationships
-        related = memory.get_related(entity.id, depth=1)
+        related = await memory.get_related(entity.id)
         if related:
             console.print("\n[bold]Related Entities:[/]")
             rel_table = Table()
@@ -241,10 +241,10 @@ def show_entity(
             rel_table.add_column("Relation Type", style="green")
             rel_table.add_column("Mentions", justify="right")
 
-            for rel_entity in related[:20]:  # Limit to 20
+            for rel_entity, relation in related[:20]:  # Limit to 20
                 # Get relation type if available
                 relation_str = "RELATED"
-                rel_table.add_row(rel_entity.name[:50], relation_str, str(rel_entity.mention_count))
+                rel_table.add_row(rel_entity.name[:50], relation_str, str(rel_entity.mentions))
 
             console.print(rel_table)
 
@@ -257,7 +257,7 @@ def show_entity(
 
 
 @memory_app.command("search")
-def search_entities(
+async def search_entities(
     query: str = typer.Argument(
         ...,
         help="Search query (entity name or attribute value)",
@@ -291,7 +291,7 @@ def search_entities(
         memory = EntityMemory(config=config)
 
         # Search entities
-        entities = memory.search(query, limit=limit)
+        entities = await memory.search(query, limit=limit)
 
         # Filter by type if specified
         if entity_type:
@@ -325,7 +325,7 @@ def search_entities(
             table.add_row(
                 entity.name[:50],
                 entity.entity_type.value,
-                str(entity.mention_count),
+                str(entity.mentions),
                 attr_preview[:80],
             )
 
@@ -340,7 +340,7 @@ def search_entities(
 
 
 @memory_app.command("graph")
-def show_graph(
+async def show_graph(
     entity_name: Optional[str] = typer.Option(
         None,
         "--entity",
@@ -379,7 +379,7 @@ def show_graph(
             from victor.storage.memory.entity_graph import EntityGraph
 
             graph = EntityGraph()
-            stats_dict = graph.get_statistics()
+            stats_dict = await graph.get_stats()
 
             console.print("\n[bold cyan]Entity Graph Statistics[/]\n")
             console.print("[dim]" + "─" * 50 + "[/]\n")
@@ -388,17 +388,16 @@ def show_graph(
             stats_table.add_column("Metric", style="cyan")
             stats_table.add_column("Value")
 
-            stats_table.add_row("Total Entities", str(stats_dict.get("total_entities", 0)))
-            stats_table.add_row("Total Relations", str(stats_dict.get("total_relations", 0)))
+            stats_table.add_row("Total Entities", str(stats_dict.entity_count))
+            stats_table.add_row("Total Relations", str(stats_dict.relation_count))
 
             # Most connected entities
-            most_connected = stats_dict.get("most_connected", [])
+            most_connected = stats_dict.most_connected_entities
             if most_connected:
                 console.print("\n[bold]Most Connected Entities:[/]")
-                for entity_info in most_connected[:5]:
+                for entity_name, relation_count in most_connected[:5]:
                     console.print(
-                        f"  • {entity_info.get('name', 'Unknown')}: "
-                        f"{entity_info.get('relation_count', 0)} relations"
+                        f"  • {entity_name}: {relation_count} relations"
                     )
 
             console.print(stats_table)
@@ -407,7 +406,7 @@ def show_graph(
             # Show relationships for specific entity
             console.print(f"\n[bold]Relationships for '{entity_name}':[/]\n")
 
-            related = memory.get_related(entity_name, depth=depth)
+            related = await memory.get_related(entity_name)
 
             if not related:
                 console.print(f"[dim]No relationships found for '{entity_name}'[/]")
@@ -420,14 +419,14 @@ def show_graph(
             table.add_column("Distance", justify="right")
             table.add_column("Mentions", justify="right")
 
-            for entity in related[:50]:  # Limit to 50
+            for rel_entity, relation in related[:50]:  # Limit to 50
                 # Calculate distance (simplified)
                 distance = 1  # Would need proper path calculation
                 table.add_row(
-                    entity.name[:50],
-                    entity.entity_type.value,
+                    rel_entity.name[:50],
+                    rel_entity.entity_type.value,
                     str(distance),
-                    str(entity.mention_count),
+                    str(rel_entity.mentions),
                 )
 
             console.print(table)
@@ -438,7 +437,7 @@ def show_graph(
 
 
 @memory_app.command("clear")
-def clear_memory(
+async def clear_memory(
     confirm: bool = typer.Option(
         False,
         "--confirm",
@@ -500,7 +499,7 @@ def clear_memory(
 
 
 @memory_app.command("types")
-def list_types() -> None:
+async def list_types() -> None:
     """List all available entity types.
 
     Shows all entity types that can be used in filters and queries.

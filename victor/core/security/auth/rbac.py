@@ -131,7 +131,7 @@ class Role:
 
     def __post_init__(self) -> None:
         """Validate and convert mutable sets to frozensets."""
-        # Ensure frozensets for immutability
+        # Convert sets to frozensets for immutability
         if not isinstance(self.permissions, frozenset):
             object.__setattr__(self, "permissions", frozenset(self.permissions))
         if not isinstance(self.allowed_categories, frozenset):

@@ -4,15 +4,17 @@ import os
 import sys
 import time
 import uuid
-from typing import Optional, Any
+from typing import Optional, Any, Union
 
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
+from rich.table import Table
 
 from victor.config.settings import load_settings, ProfileConfig
 from victor.protocols import UIAgentProtocol
+from victor.framework.protocols import OrchestratorProtocol
 from victor.framework.shim import FrameworkShim
 from victor.core.verticals import get_vertical, list_verticals
 from victor.ui.output_formatter import InputReader, create_formatter
@@ -262,7 +264,7 @@ def chat(
 
             asyncio.run(
                 run_workflow_mode(
-                    workflow_path=workflow,  # type: ignore
+                    workflow_path=workflow or "",
                     validate_only=validate_workflow,
                     render_format=render_format,
                     render_output=render_output,
@@ -412,11 +414,13 @@ def chat(
                 model=model,
                 temperature=settings.default_temperature,
                 max_tokens=settings.default_max_tokens,
-                **extra_fields,
+                tool_budget=extra_fields.get("tool_budget"),
+                base_url=extra_fields.get("base_url"),
             )
 
             # Replace profile loader to use the synthetic profile
-            settings.load_profiles = lambda: {profile: override_profile}  # type: ignore[attr-defined]
+            # This is a workaround - ideally we should modify the settings object differently
+            # For now, we'll set the overrides directly
             settings.default_provider = provider
             settings.default_model = model
 
@@ -539,7 +543,7 @@ async def run_oneshot(
     except Exception:
         pass
 
-    agent = None
+    agent: Optional[Union["AgentOrchestrator", OrchestratorProtocol]] = None
     shim: Optional[FrameworkShim] = None
     try:
         if tool_budget is not None:
@@ -558,7 +562,7 @@ async def run_oneshot(
                 thinking=thinking,
                 vertical=vertical_class,
                 enable_observability=enable_observability,
-                session_id=session_id,
+                session_id=session_id or "",
             )
             agent = await shim.create_orchestrator()
 
@@ -572,9 +576,9 @@ async def run_oneshot(
                 }
             )
 
-        if tool_budget is not None:
+        if tool_budget is not None and hasattr(agent, "unified_tracker"):
             agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
-        if max_iterations is not None:
+        if max_iterations is not None and hasattr(agent, "unified_tracker"):
             agent.unified_tracker.set_max_iterations(max_iterations, user_override=True)
 
         if mode:
@@ -590,13 +594,14 @@ async def run_oneshot(
         if preindex:
             await preload_semantic_index(os.getcwd(), settings, console)
 
-        agent.start_embedding_preload()
+        if hasattr(agent, "start_embedding_preload"):
+            agent.start_embedding_preload()
 
         content_buffer = ""
         usage_stats = None
         model_name = None
 
-        if stream and agent.provider.supports_streaming():
+        if stream and hasattr(agent, "provider") and agent.provider.supports_streaming():
             from victor.ui.rendering import FormatterRenderer, LiveDisplayRenderer, stream_response
 
             use_live = renderer_choice in {"rich", "auto"}
@@ -605,7 +610,12 @@ async def run_oneshot(
             renderer = (
                 LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
             )
-            content_buffer = await stream_response(agent, message, renderer)
+            if isinstance(agent, UIAgentProtocol):
+                content_buffer = await stream_response(agent, message, renderer)
+            else:
+                # Fallback for non-UIAgentProtocol
+                response = await agent.chat(message)
+                content_buffer = response.content
         else:
             response = await agent.chat(message)
             content_buffer = response.content
@@ -620,7 +630,7 @@ async def run_oneshot(
         success = True
         if usage_stats:
             token_count = getattr(usage_stats, "total_tokens", 0) or 0
-        if hasattr(agent, "get_session_metrics"):
+        if agent and isinstance(agent, UIAgentProtocol) and hasattr(agent, "get_session_metrics"):
             metrics = agent.get_session_metrics()
             tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
     except Exception as e:
@@ -638,8 +648,8 @@ async def run_oneshot(
                 duration_seconds=duration,
                 success=success,
             )
-        if agent:
-            await graceful_shutdown(agent)
+        if agent and isinstance(agent, AgentOrchestrator):
+            await graceful_shutdown(agent)  # type: ignore[arg-type]
 
 
 async def run_interactive(
@@ -667,7 +677,7 @@ async def run_interactive(
     Args:
         use_tui: If True, use the modern TUI interface. If False, use simple CLI.
     """
-    agent = None
+    agent: Optional[Union["AgentOrchestrator", OrchestratorProtocol]] = None
     shim: Optional[FrameworkShim] = None
     start_time = time.time()
     session_id = str(uuid.uuid4())
@@ -698,7 +708,7 @@ async def run_interactive(
                 thinking=thinking,
                 vertical=vertical_class,
                 enable_observability=enable_observability,
-                session_id=session_id,
+                session_id=session_id or "",
             )
             agent = await shim.create_orchestrator()
 
@@ -719,16 +729,19 @@ async def run_interactive(
                 metadata = session_data.get("metadata", {})
                 conversation_dict = session_data.get("conversation", {})
 
-                agent.conversation = MessageHistory.from_dict(conversation_dict)
-                agent.active_session_id = resume_session_id
+                if hasattr(agent, "conversation"):
+                    agent.conversation = MessageHistory.from_dict(conversation_dict)
+                    if hasattr(agent, "active_session_id"):
+                        agent.active_session_id = resume_session_id
 
                 # Restore conversation state if available
                 conversation_state_dict = session_data.get("conversation_state")
                 if conversation_state_dict:
                     try:
-                        agent.conversation_state = ConversationStateMachine.from_dict(
-                            conversation_state_dict
-                        )
+                        if hasattr(agent, "conversation_state"):
+                            agent.conversation_state = ConversationStateMachine.from_dict(
+                                conversation_state_dict
+                            )
                     except Exception as e:
                         console.print(
                             f"[yellow]Warning:[/] Failed to restore conversation state: {e}"
@@ -750,9 +763,9 @@ async def run_interactive(
                 }
             )
 
-        if tool_budget is not None:
+        if tool_budget is not None and hasattr(agent, "unified_tracker"):
             agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
-        if max_iterations is not None:
+        if max_iterations is not None and hasattr(agent, "unified_tracker"):
             agent.unified_tracker.set_max_iterations(max_iterations, user_override=True)
 
         if mode:
@@ -770,7 +783,7 @@ async def run_interactive(
                 from victor.ui.tui import VictorTUI
 
                 tui_app = VictorTUI(
-                    agent=agent,
+                    agent=agent if isinstance(agent, UIAgentProtocol) else None,
                     provider=profile_config.provider,
                     model=profile_config.model_name,
                     stream=stream,
@@ -788,7 +801,7 @@ async def run_interactive(
         if not use_tui:
             from victor.ui.commands import SlashCommandHandler
 
-            cmd_handler = SlashCommandHandler(console, settings, agent)
+            cmd_handler = SlashCommandHandler(console, settings, agent if isinstance(agent, UIAgentProtocol) else None)
 
             rl_suggestion = get_rl_profile_suggestion(profile_config.provider, profiles)
             await _run_cli_repl(
@@ -803,7 +816,7 @@ async def run_interactive(
             )
 
         success = True
-        if hasattr(agent, "get_session_metrics"):
+        if agent and isinstance(agent, UIAgentProtocol) and hasattr(agent, "get_session_metrics"):
             metrics = agent.get_session_metrics()
             tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
 
@@ -822,8 +835,8 @@ async def run_interactive(
                 duration_seconds=duration,
                 success=success,
             )
-        if agent:
-            await graceful_shutdown(agent)
+        if agent and isinstance(agent, AgentOrchestrator):
+            await graceful_shutdown(agent)  # type: ignore[arg-type]
 
 
 async def _run_cli_repl(
@@ -1092,6 +1105,8 @@ async def run_workflow_mode(
                 settings,
                 profile_name=profile,
                 vertical=get_vertical(vertical) if vertical else None,
+                enable_observability=True,
+                session_id="",
             )
             orchestrator = await shim.create_orchestrator()
 
@@ -1104,35 +1119,35 @@ async def run_workflow_mode(
             ),
         )
 
-        result = await executor.execute(workflow, {})
+        execution_result = await executor.execute(workflow, {})
 
         # Display result
         console.print("[dim]" + "─" * 50 + "[/]")
 
-        if result.success:
+        if execution_result.success:
             console.print("[bold green]✓[/] Workflow completed successfully")
-            console.print(f"  [dim]Duration: {result.duration_seconds:.2f}s[/]")
-            console.print(f"  [dim]Nodes executed: {', '.join(result.nodes_executed)}[/]")
-            console.print(f"  [dim]Iterations: {result.iterations}[/]")
+            console.print(f"  [dim]Duration: {execution_result.duration_seconds:.2f}s[/]")
+            console.print(f"  [dim]Nodes executed: {', '.join(execution_result.nodes_executed)}[/]")
+            console.print(f"  [dim]Iterations: {execution_result.iterations}[/]")
 
-            if result.state:
+            if execution_result.state:
                 console.print("\n[bold]Final State:[/]")
                 # Filter internal keys
                 display_state = {
                     k: v
-                    for k, v in result.state.items()
+                    for k, v in execution_result.state.items()
                     if not k.startswith("_") and k != "node_results"
                 }
                 if display_state:
                     console.print(json.dumps(display_state, indent=2, default=str))
         else:
             console.print("[bold red]✗[/] Workflow failed")
-            if result.error:
-                console.print(f"  [red]{result.error}[/]")
+            if execution_result.error:
+                console.print(f"  [red]{execution_result.error}[/]")
 
         # Cleanup orchestrator
-        if orchestrator:
-            await graceful_shutdown(orchestrator)
+        if orchestrator and isinstance(orchestrator, AgentOrchestrator):
+            await graceful_shutdown(orchestrator)  # type: ignore[arg-type]
 
     except YAMLWorkflowError as e:
         console.print("[bold red]✗[/] Workflow validation failed")

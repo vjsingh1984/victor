@@ -44,15 +44,19 @@ class TestWorkflowVersion:
         """Test parsing version with prerelease tag."""
         from victor.workflows.versioning import WorkflowVersion
 
-        version = WorkflowVersion.parse("0.5.0-beta.1")
+        version = WorkflowVersion.parse("1.5.0-beta.1")
         assert version.major == 1
+        assert version.minor == 5
         assert version.prerelease == "beta.1"
 
     def test_parse_build_metadata(self):
         """Test parsing version with build metadata."""
         from victor.workflows.versioning import WorkflowVersion
 
-        version = WorkflowVersion.parse("0.5.0+build.123")
+        version = WorkflowVersion.parse("1.5.0+build.123")
+        assert version.major == 1
+        assert version.minor == 5
+        assert version.patch == 0
         assert version.build == "build.123"
 
     def test_invalid_version_raises_error(self):
@@ -70,7 +74,7 @@ class TestWorkflowVersion:
         assert str(version) == "1.2.3"
 
         version_pre = WorkflowVersion(1, 0, 0, prerelease="alpha")
-        assert str(version_pre) == "0.5.0-alpha"
+        assert str(version_pre) == "1.0.0-alpha"
 
     def test_version_comparison(self):
         """Test version comparison operators."""
@@ -203,7 +207,7 @@ class TestWorkflowMigration:
             breaking=True,
         )
 
-        assert migration.migration_id == "0.5.0->2.0.0"
+        assert migration.migration_id == "1.0.0->2.0.0"
         assert migration.breaking
 
     def test_migration_apply(self):
@@ -268,7 +272,7 @@ class TestVersionedWorkflow:
             definition={"nodes": []},
         )
 
-        assert workflow.version_id == "test_workflow@0.5.0"
+        assert workflow.version_id == "test_workflow@1.0.0"
         assert workflow.checksum  # Should be computed
 
     def test_versioned_workflow_deprecated(self):
@@ -306,7 +310,7 @@ class TestWorkflowVersionRegistry:
 
         registry.register(workflow)
 
-        assert registry.get("pipeline", "0.5.0") is workflow
+        assert registry.get("pipeline", "1.0.0") is workflow
 
     def test_get_latest_version(self):
         """Test getting latest version."""
@@ -387,7 +391,7 @@ class TestWorkflowVersionRegistry:
         )
 
         assert len(path) == 2
-        assert path[0].migration_id == "0.5.0->1.1.0"
+        assert path[0].migration_id == "1.0.0->1.1.0"
         assert path[1].migration_id == "1.1.0->2.0.0"
 
     def test_migrate_state(self):
@@ -421,12 +425,12 @@ class TestWorkflowVersionRegistry:
         result, applied = registry.migrate_state(
             "pipeline",
             state,
-            "0.5.0",
+            "1.0.0",
             "2.0.0",
         )
 
         assert result["new_field"] == "data"
-        assert "0.5.0->2.0.0" in applied
+        assert "1.0.0->2.0.0" in applied
 
     def test_deprecate_version(self):
         """Test deprecating a version."""
@@ -444,7 +448,7 @@ class TestWorkflowVersionRegistry:
         )
         registry.register(workflow)
 
-        result = registry.deprecate("old", "0.5.0", "Use v2")
+        result = registry.deprecate("old", "1.0.0", "Use v2")
 
         assert result
-        assert registry.get("old", "0.5.0").deprecated
+        assert registry.get("old", "1.0.0").deprecated

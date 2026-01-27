@@ -218,7 +218,7 @@ def _check_capability(obj: Any, capability_name: str, strict_mode: bool = False)
     Raises:
         TypeError: If strict_mode=True and obj doesn't implement CapabilityRegistryProtocol
     """
-    # Delegate to consolidated CapabilityHelper (DRY principle)
+    # Delegate to consolidated CapabilityHelper for capability_registry (capability discovery)
     from victor.agent.capability_registry import CapabilityHelper
 
     return CapabilityHelper.check_capability(obj, capability_name, strict=strict_mode)
@@ -258,7 +258,7 @@ def _invoke_capability(
         TypeError: If strict_mode=True and obj doesn't implement CapabilityRegistryProtocol
         AttributeError: If capability cannot be invoked
     """
-    # Delegate to consolidated CapabilityHelper (DRY principle)
+    # Delegate to consolidated CapabilityHelper for capability_registry (capability invocation)
     from victor.agent.capability_registry import CapabilityHelper
 
     return CapabilityHelper.invoke_capability(
@@ -1508,7 +1508,7 @@ class FrameworkStepHandler(BaseStepHandler):
                         loader.register_capability(
                             name=cap.name,
                             handler=cap.handler,
-                            capability_type=cap_type if cap_type is not None else "custom",  # type: ignore[arg-type]
+                            capability_type=cap_type if cap_type is not None else "custom",
                             version=getattr(cap, "version", "1.0"),
                         )
 

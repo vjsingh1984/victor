@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import io
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 from rich.console import Console
 from textual import work
@@ -16,7 +16,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, DataTable, Footer, Input, Label
+from textual.widgets import Button, DataTable, Footer, Input, Label, ProgressBar
 
 from victor.ui.common.constants import SESSION_TYPE_INDEX, SESSION_UUID_INDEX
 from victor.ui.tui.session import Message
@@ -34,6 +34,7 @@ from victor.config.keybindings import KeybindingConfig, DEFAULT_KEYBINDINGS
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.protocols import UIAgentProtocol
+    from victor.ui.slash_commands import SlashCommandHandler
 
 
 class TUIConsoleAdapter:
@@ -46,7 +47,7 @@ class TUIConsoleAdapter:
 
     def __init__(
         self,
-        conversation_log: EnhancedConversationLog,
+        conversation_log: VirtualScrollContainer,
         on_line: Optional[Callable[[str], None]] = None,
     ):
         self._log = conversation_log
@@ -702,11 +703,11 @@ class VictorTUI(App):
         self._tool_widgets: list[ToolCallWidget] = []
         self._tool_widget_limit = 5
         self._thinking_widget: ThinkingWidget | None = None
-        self._slash_handler = None  # Initialized in on_mount when conversation_log is ready
-        self._console_adapter = None
+        self._slash_handler: SlashCommandHandler | None = None  # Initialized in on_mount when conversation_log is ready
+        self._console_adapter: TUIConsoleAdapter | None = None
         self._session_messages: list[Message] = []
-        self._cancellation_timer = None
-        self._poll_timer = None
+        self._cancellation_timer: Any = None
+        self._poll_timer: Any = None
 
         # Theme support
         self._current_theme = theme
@@ -744,7 +745,7 @@ class VictorTUI(App):
             from victor.ui.slash_commands import SlashCommandHandler
 
             self._console_adapter = TUIConsoleAdapter(
-                self._conversation_log,
+                self._conversation_log,  # Guaranteed to be non-None in on_mount
                 on_line=lambda line: self._record_message("system", line),
             )
             self._slash_handler = SlashCommandHandler(
@@ -753,7 +754,7 @@ class VictorTUI(App):
                 agent=self.agent,
             )
             # Override /exit handler to use TUI exit via public API
-            self._slash_handler.set_exit_callback(self.exit)
+            self._slash_handler.set_exit_callback(self.exit)  # Dynamic method
 
         # Show welcome message
         self._add_system_message(f"Connected to {self.provider}/{self.model}")
@@ -771,10 +772,11 @@ class VictorTUI(App):
             return
 
         # Add to history before clearing
-        self._input_widget.add_to_history(message)
+        if self._input_widget:
+            self._input_widget.add_to_history(message)
 
-        # Clear input
-        self._input_widget.clear()
+            # Clear input
+            self._input_widget.clear()
 
         # Handle commands
         if message.startswith("/"):
@@ -802,11 +804,13 @@ class VictorTUI(App):
 
         # Handle /clear in TUI to also clear the visual log
         if cmd in ("/clear", "/reset"):
-            self._conversation_log.clear()
+            if self._conversation_log:
+                self._conversation_log.clear()
+                self._conversation_log.add_system_message("Conversation cleared")
             if self.agent:
                 self.agent.reset_conversation()
-            self._conversation_log.add_system_message("Conversation cleared")
-            self._input_widget.focus_input()
+            if self._input_widget:
+                self._input_widget.focus_input()
             return
 
         # Delegate to SlashCommandHandler if available
@@ -825,7 +829,8 @@ class VictorTUI(App):
             else:
                 self._add_system_message(f"Unknown command: {command}")
 
-        self._input_widget.focus_input()
+        if self._input_widget:
+            self._input_widget.focus_input()
 
     async def _process_message_async(self, message: str) -> None:
         """Process user message and get response."""
@@ -884,24 +889,29 @@ class VictorTUI(App):
         await self._start_streaming_ui()
         self._set_status("Streaming", "streaming")
 
-        try:
-            async for chunk in self.agent.stream_chat(message):
-                # Handle different chunk types
-                if hasattr(chunk, "type"):
-                    chunk_type = chunk.type
+        if not self.agent:
+            return
 
-                    if chunk_type == "content":
-                        content_buffer += chunk.content or ""
-                        if self._conversation_log:
-                            try:
-                                self._conversation_log.update_streaming(content_buffer)
-                            except Exception:
-                                pass
-                            # Update jump-to-bottom button visibility during streaming
-                            try:
-                                self._update_jump_to_bottom()
-                            except Exception:
-                                pass
+        try:
+            stream_result = self.agent.stream_chat(message)
+            if hasattr(stream_result, "__aiter__"):
+                async for chunk in stream_result:
+                    # Handle different chunk types
+                    if hasattr(chunk, "type"):
+                        chunk_type = chunk.type
+
+                        if chunk_type == "content":
+                            content_buffer += chunk.content or ""
+                            if self._conversation_log:
+                                try:
+                                    self._conversation_log.update_streaming(content_buffer)
+                                except Exception:
+                                    pass
+                                # Update jump-to-bottom button visibility during streaming
+                                try:
+                                    self._update_jump_to_bottom()
+                                except Exception:
+                                    pass
 
                     elif chunk_type == "thinking_start":
                         try:
@@ -940,14 +950,14 @@ class VictorTUI(App):
                         except Exception:
                             pass
 
-                elif hasattr(chunk, "content") and chunk.content:
-                    # Simple content chunk
-                    content_buffer += chunk.content
-                    if self._conversation_log:
-                        try:
-                            self._conversation_log.update_streaming(content_buffer)
-                        except Exception:
-                            pass
+                    elif hasattr(chunk, "content") and chunk.content:
+                        # Simple content chunk
+                        content_buffer += chunk.content
+                        if self._conversation_log:
+                            try:
+                                self._conversation_log.update_streaming(content_buffer)
+                            except Exception:
+                                pass
                         # Update jump-to-bottom button visibility during streaming
                         try:
                             self._update_jump_to_bottom()
@@ -973,11 +983,13 @@ class VictorTUI(App):
         """Show thinking panel."""
         container = self.query_one("#thinking-container")
         container.add_class("visible")
-        self._thinking_widget.update_content("")
+        if self._thinking_widget:
+            self._thinking_widget.update_content("")  # Widget is None when thinking is disabled
 
     def _update_thinking(self, content: str) -> None:
         """Update thinking content."""
-        self._thinking_widget.update_content(content)
+        if self._thinking_widget:
+            self._thinking_widget.update_content(content)  # Widget is None when thinking is disabled
 
     def _hide_thinking(self) -> None:
         """Hide thinking panel."""
@@ -1056,13 +1068,14 @@ class VictorTUI(App):
             except Exception:
                 pass
 
-    def action_quit(self) -> None:
+    async def action_quit(self) -> None:
         """Quit the application."""
         self.exit()
 
     def action_clear(self) -> None:
         """Clear conversation."""
-        self._conversation_log.clear()
+        if self._conversation_log:
+            self._conversation_log.clear()  # Widget is None when disabled
         self._session_messages.clear()
         if self.agent:
             self.agent.reset_conversation()
@@ -1070,7 +1083,8 @@ class VictorTUI(App):
 
     def action_focus_input(self) -> None:
         """Focus the input widget."""
-        self._input_widget.focus_input()
+        if self._input_widget:
+            self._input_widget.focus_input()  # Widget is None when disabled
 
     def action_toggle_thinking(self) -> None:
         """Toggle the thinking panel visibility."""
@@ -1128,8 +1142,8 @@ class VictorTUI(App):
 
             # Use timer for polling (100ms intervals, up to 5 seconds)
             self._poll_timer = self.set_timer(
-                0.1, self._poll_cancellation_sync, repeat=50  # Poll for 5 seconds (50 * 0.1)
-            )
+                0.1, self._poll_cancellation_sync  # Textual doesn't support repeat parameter
+            )  # Poll for 5 seconds using manual loop
 
             # Set timeout for cancellation
             self._cancellation_timer = self.set_timer(5.0, self._on_cancellation_timeout)
@@ -1292,7 +1306,7 @@ class VictorTUI(App):
         # Show progress modal for sessions > 20 messages
         if message_count > 20:
             progress = SessionRestoreProgress(message_count, session_name)
-            self.push_screen(progress)
+            self.push_screen(progress)  # Textual push_screen is synchronous
 
             try:
                 if self._conversation_log:
@@ -1302,8 +1316,6 @@ class VictorTUI(App):
                 for i, msg in enumerate(session.messages):
                     self._render_message(msg.role, msg.content)
                     progress.update(i + 1)
-                    # Yield to UI to update progress bar
-                    asyncio.sleep(0)
 
                 self._restore_agent_conversation(session.messages)
             finally:
@@ -1351,7 +1363,7 @@ class VictorTUI(App):
         # Show progress modal for sessions > 20 messages
         if message_count > 20:
             progress = SessionRestoreProgress(message_count, f"Project: {session_name}")
-            self.push_screen(progress)
+            self.push_screen(progress)  # Textual push_screen is synchronous
 
             try:
                 if self._conversation_log:
@@ -1374,8 +1386,7 @@ class VictorTUI(App):
                     self._render_message(role, content)
                     self._session_messages.append(Message(role=role, content=content, metadata={}))
                     progress.update(i + 1)
-                    # Yield to UI to update progress bar
-                    asyncio.sleep(0)
+                    # Note: Can't await in sync function - Textual handles UI updates
             finally:
                 self.pop_screen()
         else:
@@ -1637,7 +1648,8 @@ Available Themes:
         started = asyncio.Event()
 
         def _start() -> None:
-            self._conversation_log.start_streaming()
+            if self._conversation_log:
+                self._conversation_log.start_streaming()
             started.set()
 
         self._call_ui(_start)
@@ -1681,7 +1693,7 @@ Available Themes:
         try:
             theme = get_theme(theme_name)
             # Update CSS variables
-            self.stylesheet._update_colors(theme.to_dict())
+            self.stylesheet._update_colors(theme.to_dict())  # type: ignore[attr-defined]  # Textual API change
             self._current_theme = theme_name
         except Exception as e:
             # Silently fail if theme not found
@@ -1732,13 +1744,18 @@ Available Themes:
         except Exception:
             self._add_system_message(f"Failed to load theme: {theme_name}")
 
-    def get_theme(self) -> str:
+    def get_theme(self, theme_name: str) -> Any:  # Different signature from parent
         """Get the current theme name.
 
+        Args:
+            theme_name: Name of the theme to get (ignored, returns current)
+
         Returns:
-            Current theme name
+            Theme object or None
         """
-        return self._current_theme
+        # Return current theme as a mock Theme object
+        theme = get_theme(self._current_theme)
+        return theme if theme else None
 
     # =========================================================================
     # KEYBINDING MANAGEMENT

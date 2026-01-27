@@ -578,7 +578,7 @@ def get_module_info(code: str, path: Optional[Path] = None) -> Optional[ModuleIn
     functions = [get_function_info(f) for f in find_functions(result.tree)]
     classes = [get_class_info(c) for c in find_classes(result.tree)]
     imports = find_imports(result.tree)
-    docstring = ast.get_docstring(result.tree)
+    docstring = ast.get_docstring(result.tree)  # type: ignore[arg-type]
 
     return ModuleInfo(
         path=path,
@@ -608,7 +608,7 @@ def has_docstring(node: ast.AST) -> bool:
     Returns:
         True if the node has a docstring.
     """
-    return ast.get_docstring(node) is not None
+    return ast.get_docstring(node) is not None  # type: ignore[arg-type]
 
 
 def get_undocumented_functions(tree: ast.AST) -> List[Tuple[str, int]]:
@@ -661,7 +661,7 @@ def _get_attribute_name(node: ast.Attribute) -> str:
     current = node
     while isinstance(current, ast.Attribute):
         parts.append(current.attr)
-        current = current.value
+        current = current.value  # type: ignore[assignment]
     if isinstance(current, ast.Name):
         parts.append(current.id)
     return ".".join(reversed(parts))

@@ -105,6 +105,30 @@ class SecurityAnalysisMiddleware(MiddlewareProtocol):
                 return True
         return False
 
+    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> "MiddlewareResult":
+        """Called before a tool is executed.
+
+        Args:
+            tool_name: Name of the tool being called
+            arguments: Tool arguments
+
+        Returns:
+            Middleware result with proceed/abort decision
+        """
+        from victor.core.vertical_types import MiddlewareResult
+
+        # Basic security checks for dangerous tools
+        dangerous_tools = {"write_file", "delete_file", "execute", "shell"}
+        if tool_name in dangerous_tools:
+            if "content" in arguments and self._contains_potential_secrets(arguments["content"]):
+                logger.warning(f"Blocked potentially dangerous tool call: {tool_name}")
+                return MiddlewareResult(
+                    proceed=False,
+                    error_message="Potential security risk detected in tool arguments"
+                )
+
+        return MiddlewareResult()
+
     @property
     def name(self) -> str:
         """Get middleware name."""

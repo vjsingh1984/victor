@@ -60,7 +60,7 @@ from victor.protocols import (
 if TYPE_CHECKING:
     from victor.agent.coordinators.evaluation_coordinator import EvaluationCoordinator
     from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
-    from victor.agent.memory.memory_manager import MemoryManager
+    from victor.agent.memory.memory_manager import MemoryManager  # type: ignore[import-not-found]
     from victor.agent.stream_handler import StreamMetrics
 
 logger = logging.getLogger(__name__)

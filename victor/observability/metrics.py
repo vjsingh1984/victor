@@ -108,7 +108,7 @@ class Metric(ABC):
         self.name = name
         self.description = description
         self._labels = MetricLabels(labels or {})
-        self._lock = threading.RLock()
+        self._lock = threading.RLock()  # type: ignore[assignment]
         self._created_at = datetime.now(timezone.utc)
 
     @abstractmethod
@@ -450,7 +450,7 @@ class MetricsRegistry:
     def __init__(self) -> None:
         """Initialize registry."""
         self._metrics: Dict[str, Metric] = {}
-        self._lock = threading.RLock()
+        self._lock = threading.RLock()  # type: ignore[assignment]
 
     def counter(
         self,
@@ -472,8 +472,7 @@ class MetricsRegistry:
         with self._lock:
             if key not in self._metrics:
                 self._metrics[key] = Counter(name, description, labels)
-            return self._metrics[key]  # type: ignore
-
+            return self._metrics[key]  
     def gauge(
         self,
         name: str,
@@ -494,8 +493,7 @@ class MetricsRegistry:
         with self._lock:
             if key not in self._metrics:
                 self._metrics[key] = Gauge(name, description, labels)
-            return self._metrics[key]  # type: ignore
-
+            return self._metrics[key]  
     def histogram(
         self,
         name: str,
@@ -518,8 +516,7 @@ class MetricsRegistry:
         with self._lock:
             if key not in self._metrics:
                 self._metrics[key] = Histogram(name, description, labels, buckets)
-            return self._metrics[key]  # type: ignore
-
+            return self._metrics[key]  
     def timer(
         self,
         name: str,
@@ -540,8 +537,7 @@ class MetricsRegistry:
         with self._lock:
             if key not in self._metrics:
                 self._metrics[key] = Timer(name, description, labels)
-            return self._metrics[key]  # type: ignore
-
+            return self._metrics[key]  
     def _make_key(self, name: str, labels: Optional[Dict[str, str]]) -> str:
         """Create unique key for metric lookup."""
         if labels:

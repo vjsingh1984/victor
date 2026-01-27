@@ -376,8 +376,14 @@ class LanguageDetectorHandler(BaseHandler):
         )
 
         # Resolve context variables
-        if isinstance(files, str) and files.startswith("$ctx."):
-            files = context.get(files[5:]) or []
+        if isinstance(files_input, str) and files_input.startswith("$ctx."):
+            context_value = context.get(files_input[5:])
+            if isinstance(context_value, str):
+                files = [context_value]
+            elif isinstance(context_value, list):
+                files = context_value
+            else:
+                files = []
 
         if not files:
             raise ValueError("No files provided")
@@ -516,10 +522,10 @@ class MultiSolutionValidatorHandler(BaseHandler):
         timeout_per = node.input_mapping.get("timeout_per_solution", 30)
 
         # Resolve context variables
-        if isinstance(solutions, str) and solutions.startswith("$ctx."):
-            solutions = context.get(solutions[5:]) or []
-        if isinstance(test_cases, str) and test_cases.startswith("$ctx."):
-            test_cases = context.get(test_cases[5:]) or []
+        if isinstance(solutions_input, str) and solutions_input.startswith("$ctx."):
+            solutions = context.get(solutions_input[5:]) or []
+        if isinstance(test_cases_input, str) and test_cases_input.startswith("$ctx."):
+            test_cases = context.get(test_cases_input[5:]) or []
 
         passed_solutions = 0
         best_solution = ""
@@ -622,8 +628,8 @@ class CodeTesterHandler(BaseHandler):
         # Resolve context variables
         if isinstance(code, str) and code.startswith("$ctx."):
             code = context.get(code[5:]) or ""
-        if isinstance(test_cases, str) and test_cases.startswith("$ctx."):
-            test_cases = context.get(test_cases[5:]) or []
+        if isinstance(test_cases_input, str) and test_cases_input.startswith("$ctx."):
+            test_cases = context.get(test_cases_input[5:]) or []
 
         if not code:
             raise ValueError("No code provided")

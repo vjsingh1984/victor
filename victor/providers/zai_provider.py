@@ -236,14 +236,14 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
                 message=f"z.ai request timed out after {self.timeout}s",
-                provider=self.name,
+                provider=self.name,  # type: ignore[attr-defined]
             ) from e
         except httpx.HTTPStatusError as e:
-            raise self._handle_http_error(e, self.name)
+            raise self._handle_http_error(e, self.name)  # type: ignore[attr-defined]
         except Exception as e:
             raise ProviderError(
                 message=f"z.ai API error: {str(e)}",
-                provider=self.name,
+                provider=self.name,  # type: ignore[attr-defined]
                 raw_error=e,
             )
 
@@ -333,14 +333,14 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
                 message=f"z.ai stream timed out after {self.timeout}s",
-                provider=self.name,
+                provider=self.name,  # type: ignore[attr-defined]
             ) from e
         except httpx.HTTPStatusError as e:
-            raise self._handle_http_error(e, self.name)
+            raise self._handle_http_error(e, self.name)  # type: ignore[attr-defined]
         except Exception as e:
             raise ProviderError(
                 message=f"z.ai streaming error: {str(e)}",
-                provider=self.name,
+                provider=self.name,  # type: ignore[attr-defined]
                 raw_error=e,
             )
 
@@ -614,7 +614,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise ProviderError(
                 message=f"z.ai failed to list models: {str(e)}",
-                provider=self.name,
+                provider=self.name,  # type: ignore[attr-defined]
                 raw_error=e,
             ) from e
 

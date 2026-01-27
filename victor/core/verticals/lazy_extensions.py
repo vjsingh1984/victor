@@ -156,8 +156,7 @@ class LazyVerticalExtensions:
         with self._load_lock:
             # Double-check: another thread may have loaded it
             if self._loaded:
-                assert self._extensions is not None
-                return self._extensions
+                return self._extensions  # type: ignore[union-attr]
 
             # Check for recursive loading
             if self._loading:

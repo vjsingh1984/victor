@@ -248,9 +248,9 @@ def _build_report(
 )
 async def code_review(
     path: str,
-    aspects: List[str] = None,
-    file_pattern: str = None,
-    languages: List[str] = None,
+    aspects: Optional[List[str]] = None,
+    file_pattern: Optional[str] = None,
+    languages: Optional[List[str]] = None,
     severity: str = "low",
     include_metrics: bool = False,
     max_issues: int = 50,

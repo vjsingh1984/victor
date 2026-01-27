@@ -31,12 +31,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
-    import chromadb
-    from chromadb.config import Settings
+    import chromadb  # type: ignore[import-not-found]
+    from chromadb.config import Settings  # type: ignore[import-not-found]
 
 try:
-    import chromadb
-    from chromadb.config import Settings
+    import chromadb  # type: ignore[import-not-found]
+    from chromadb.config import Settings  # type: ignore[import-not-found]
 
     CHROMADB_AVAILABLE = True
 except ImportError:
@@ -399,6 +399,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             "total_documents": count,
             "embedding_model_type": self.config.embedding_model_type,
             "embedding_model": self.config.embedding_model,
+            "embedding_model_name": self.config.embedding_model,
             "dimension": (
                 self.embedding_model.get_dimension() if self.embedding_model is not None else 4096
             ),
