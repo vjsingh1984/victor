@@ -366,7 +366,7 @@ class ToolResultCache:
 
                 if embedding is None:
                     self.stats.misses += 1
-                    return None
+                    return None  # type: ignore[unreachable]
 
                 query_vec = self._normalize(np.array(embedding, dtype=np.float32))
                 sim_threshold = threshold or SIMILARITY_THRESHOLD.get(tool_name, 0.90)

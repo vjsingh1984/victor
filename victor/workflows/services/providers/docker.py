@@ -396,7 +396,7 @@ class DockerServiceProvider(BaseServiceProvider):
             count = 0
             for container in containers:
                 try:
-                    from docker.models.containers import Container  # type: ignore[import-untyped]
+                    from docker.models.containers import Container
 
                     def remove_container(c: Container = container) -> None:
                         c.remove(force=True)

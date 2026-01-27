@@ -661,7 +661,7 @@ class ResilientProvider:
 
         except CircuitOpenError as e:
             logger.warning(f"Primary provider circuit open: {e}")
-            primary_error: CircuitOpenError = e
+            primary_error = e
         except Exception as e:
             logger.warning(f"Primary provider failed: {e}")
             primary_error: Exception = e

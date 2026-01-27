@@ -1322,7 +1322,7 @@ class ToolPipeline:
             raw_args = tc.get("arguments", {})
 
             # Normalize arguments for signature comparison
-            if isinstance(raw_args, str):
+            if isinstance(raw_args, str):  # type: ignore[unreachable]
                 try:
                     raw_args = json.loads(raw_args)
                 except Exception:
@@ -1443,13 +1443,13 @@ class ToolPipeline:
             if isinstance(tool_call, dict):
                 tool_name = tool_call.get("name", "")
                 raw_args = tool_call.get("arguments", {})
-                if isinstance(raw_args, str):
+                if isinstance(raw_args, str):  # type: ignore[unreachable]
                     try:
                         raw_args = json.loads(raw_args)
                     except Exception:
                         raw_args = {"value": raw_args}
                 elif raw_args is None:
-                    raw_args = {}
+                    raw_args = {}  # type: ignore[unreachable]
                 signature = self._get_call_signature(tool_name, raw_args)
                 results_by_signature[signature] = call_result
 
@@ -1643,7 +1643,7 @@ class ToolPipeline:
         for exec_result in parallel_result.results:
             call_result = ToolCallResult(
                 tool_name=exec_result.tool_name,
-                arguments={},  # Arguments already logged
+                arguments={},  # Arguments already logged  # type: ignore[unreachable]
                 success=exec_result.success,
                 result=exec_result.result,
                 error=exec_result.error,
@@ -2055,7 +2055,7 @@ class ToolPipeline:
                     from victor.agent.cache.tool_cache_manager import CacheNamespace
 
                     # Check if tool_cache is a ToolCacheManager
-                    if isinstance(self.tool_cache, ToolCacheManager):
+                    if isinstance(self.tool_cache, ToolCacheManager):  # type: ignore[unreachable]
                         # Update the cached entry with file dependencies
                         self._get_call_signature(tool_name, normalized_args)
                         await self.tool_cache.set_tool_result(
