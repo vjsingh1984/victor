@@ -46,20 +46,20 @@ from victor.workflows.services.providers.base import BaseServiceProvider
 
 if TYPE_CHECKING:
     import docker
-    from docker.models.containers import Container  # type: ignore[import-not-found]
+    from docker.models.containers import Container  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
 # Optional Docker SDK import
 try:
     import docker as docker_mod
-    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound  # type: ignore[import-not-found]
-    from docker.models.containers import Container  # type: ignore[import-not-found]
+    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound  # type: ignore[import-untyped]
+    from docker.models.containers import Container  # type: ignore[import-untyped]
 
     DOCKER_AVAILABLE = True
 except ImportError:
     DOCKER_AVAILABLE = False
-    docker_mod = None
+    docker_mod = None  # type: ignore[assignment]
 
 
 class DockerServiceProvider(BaseServiceProvider):
@@ -396,7 +396,7 @@ class DockerServiceProvider(BaseServiceProvider):
             count = 0
             for container in containers:
                 try:
-                    from docker.models.containers import Container  # type: ignore[import-not-found]
+                    from docker.models.containers import Container  # type: ignore[import-untyped]
 
                     def remove_container(c: Container = container) -> None:
                         c.remove(force=True)

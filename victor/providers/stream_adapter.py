@@ -194,7 +194,7 @@ class BaseSDKAdapter(ABC):
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]  # type: ignore[misc]
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Adapt a raw SDK stream to normalized StreamChunk.
 
         Args:

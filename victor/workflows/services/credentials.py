@@ -1624,7 +1624,7 @@ class SystemAuthenticator:
         """
         # Try LDAP bind
         try:
-            import ldap3
+            import ldap3  # type: ignore[import-untyped]
 
             server = ldap3.Server(
                 domain,
@@ -1666,7 +1666,7 @@ class SystemAuthenticator:
             User info dict or None
         """
         try:
-            import ldap3
+            import ldap3  # type: ignore[import-untyped]
 
             server = ldap3.Server(domain, use_ssl=True)
             conn = ldap3.Connection(server, auto_bind=True)
@@ -1703,8 +1703,8 @@ class SystemAuthenticator:
         """
         if platform.system() == "Windows":
             try:
-                import win32net
-                import win32api
+                import win32net  # type: ignore[import-untyped]
+                import win32api  # type: ignore[import-untyped]
 
                 username = win32api.GetUserName()
                 win32api.GetDomainName()
@@ -1815,7 +1815,7 @@ class SystemAuthenticator:
         # Windows: Check for logged-in user
         if platform.system() == "Windows":
             try:
-                import win32api
+                import win32api  # type: ignore[import-untyped]
 
                 user = win32api.GetUserName()
                 domain = win32api.GetDomainName()
