@@ -27,6 +27,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from victor.providers.base import ToolDefinition
+from victor.protocols.tool_selector import ToolSelectionStrategy
 from victor.tools.base import AccessMode, ExecutionCategory, ToolRegistry
 from victor.tools.selection_common import get_tools_from_message
 from victor.tools.selection_filters import is_small_model
@@ -297,6 +298,56 @@ class KeywordToolSelector:
         Keyword selector has no resources to clean up.
         """
         pass  # No resources to clean up
+
+    async def get_tool_score(
+        self,
+        tool_name: str,
+        task: str,
+        **kwargs: Any,
+    ) -> float:
+        """Get relevance score for a specific tool using keyword matching.
+
+        Keyword selector uses simple keyword matching to score relevance.
+
+        Args:
+            tool_name: Name of the tool to score
+            task: Task description to score against
+            **kwargs: Additional parameters (ignored)
+
+        Returns:
+            Relevance score from 0.0 (not relevant) to 1.0 (highly relevant)
+        """
+        # Get tool definition
+        tool_def = self.tools.get_tool(tool_name)
+        if not tool_def:
+            return 0.0
+
+        # Simple keyword-based scoring
+        task_lower = task.lower()
+        tool_name_lower = tool_name.lower()
+        tool_desc_lower = tool_def.description.lower()
+
+        # Score based on keyword matches
+        score = 0.0
+
+        # Check if tool name contains keywords from task
+        if any(keyword in tool_name_lower for keyword in task_lower.split()):
+            score += 0.5
+
+        # Check if description contains keywords from task
+        if any(keyword in tool_desc_lower for keyword in task_lower.split()):
+            score += 0.3
+
+        # Bonus if tool name is exactly in task
+        if tool_name_lower in task_lower:
+            score += 0.2
+
+        return min(score, 1.0)
+
+    @property
+    def strategy(self) -> ToolSelectionStrategy:
+        """Get the selection strategy used by this selector."""
+        return ToolSelectionStrategy.KEYWORD
 
     # =========================================================================
     # Selection Result Caching (Phase 3 Task 2)

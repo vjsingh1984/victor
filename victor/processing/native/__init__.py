@@ -63,7 +63,7 @@ _NATIVE_AVAILABLE = False
 _native_module: Any = None
 
 try:
-    import victor_native  # type: ignore[import-untyped]
+    import victor_native  # type: ignore[import-not-found]
 
     _native_module = victor_native
     _NATIVE_AVAILABLE = True
@@ -802,7 +802,7 @@ else:
         StreamingFilter = None
 
         # Define a simple fallback class
-        class PythonStreamingChunkResult:
+        class FallbackStreamingChunkResult:
             """Fallback streaming chunk result."""
 
             def __init__(self, content: str, **kwargs):
@@ -810,7 +810,7 @@ else:
                 for key, value in kwargs.items():
                     setattr(self, key, value)
 
-        StreamingChunkResult = PythonStreamingChunkResult
+        StreamingChunkResult = FallbackStreamingChunkResult
 
 
 # =============================================================================

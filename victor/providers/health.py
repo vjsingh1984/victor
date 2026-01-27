@@ -451,11 +451,12 @@ class ProviderHealthChecker:
                 logger.warning(f"Health check failed with exception: {result}")
                 continue
 
-            report.results[result.provider_name] = result  # type: ignore[union-attr]
+            # At this point, result must be a HealthCheckResult
+            report.results[result.provider_name] = result
 
-            if result.status == HealthStatus.HEALTHY:  # type: ignore[union-attr]
+            if result.status == HealthStatus.HEALTHY:
                 report.healthy_count += 1
-            elif result.status == HealthStatus.DEGRADED:  # type: ignore[union-attr]
+            elif result.status == HealthStatus.DEGRADED:
                 report.degraded_count += 1
             else:
                 report.unhealthy_count += 1

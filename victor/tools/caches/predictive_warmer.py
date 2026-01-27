@@ -398,7 +398,7 @@ class PredictiveCacheWarmer:
                 selected_tools = selection_fn(query)
                 if selected_tools and self._cache and hasattr(self._cache, "put"):
                     cache_key = hashlib.sha256(query.encode()).hexdigest()[:16]
-                    self._cache.put(cache_key, [t.name for t in selected_tools])
+                    self._cache.put(cache_key, [getattr(t, "name", "") for t in selected_tools])
                     return True
 
             return False

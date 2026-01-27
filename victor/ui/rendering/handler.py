@@ -6,7 +6,7 @@ source of truth for streaming response handling across all CLI modes.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, AsyncIterator
 
 from victor.agent.response_sanitizer import StreamingContentFilter
 from victor.ui.rendering.protocol import StreamRenderer
@@ -49,7 +49,7 @@ async def stream_response(
         The accumulated response content
     """
     renderer.start()
-    stream_gen = agent.stream_chat(message)
+    stream_gen: AsyncIterator[Any] = agent.stream_chat(message)
 
     # Initialize content filter for thinking markers
     content_filter = StreamingContentFilter(suppress_thinking=suppress_thinking)

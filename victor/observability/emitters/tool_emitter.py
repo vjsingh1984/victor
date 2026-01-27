@@ -238,7 +238,7 @@ class ToolEventEmitter(IToolEventEmitter):
             if len(result_str) > 1000:
                 result_str = result_str[:1000] + "... (truncated)"
 
-        return self.emit_async(
+        return await self.emit_async(
             topic="tool.result",
             data={
                 "tool_name": tool_name,
@@ -271,16 +271,20 @@ class ToolEventEmitter(IToolEventEmitter):
             if len(result_str) > 1000:
                 result_str = result_str[:1000] + "... (truncated)"
 
-        self.emit(
-            topic="tool.result",
-            data={
-                "tool_name": tool_name,
-                "success": True,
-                "duration_ms": duration_ms,
-                "result": result_str,
-                **metadata,
-            },
-        )
+        sync_wrapper = self._get_sync_wrapper()
+        if sync_wrapper:
+            sync_wrapper.publish(
+                MessagingEvent(
+                    topic="tool.result",
+                    data={
+                        "tool_name": tool_name,
+                        "success": True,
+                        "duration_ms": duration_ms,
+                        "result": result_str,
+                        **metadata,
+                    },
+                )
+            )
 
     async def tool_failure_async(
         self,
@@ -300,7 +304,7 @@ class ToolEventEmitter(IToolEventEmitter):
         Returns:
             True if emission succeeded
         """
-        return self.emit_async(
+        return await self.emit_async(
             topic="tool.error",
             data={
                 "tool_name": tool_name,
@@ -327,17 +331,21 @@ class ToolEventEmitter(IToolEventEmitter):
             error: The exception that occurred
             **metadata: Additional metadata
         """
-        self.emit(
-            topic="tool.error",
-            data={
-                "tool_name": tool_name,
-                "success": False,
-                "duration_ms": duration_ms,
-                "error": str(error),
-                "error_type": type(error).__name__,
-                **metadata,
-            },
-        )
+        sync_wrapper = self._get_sync_wrapper()
+        if sync_wrapper:
+            sync_wrapper.publish(
+                MessagingEvent(
+                    topic="tool.error",
+                    data={
+                        "tool_name": tool_name,
+                        "success": False,
+                        "duration_ms": duration_ms,
+                        "error": str(error),
+                        "error_type": type(error).__name__,
+                        **metadata,
+                    },
+                )
+            )
 
     @contextlib.contextmanager
     def track_tool(

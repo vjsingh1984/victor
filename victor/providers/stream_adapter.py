@@ -194,7 +194,7 @@ class BaseSDKAdapter(ABC):
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Adapt a raw SDK stream to normalized StreamChunk.
 
         Args:
@@ -233,7 +233,7 @@ class OpenAIAdapter(BaseSDKAdapter):
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Adapt OpenAI stream to StreamChunk.
 
         OpenAI format:
@@ -285,7 +285,7 @@ class AnthropicAdapter(BaseSDKAdapter):
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Adapt Anthropic stream to StreamChunk.
 
         Anthropic format:
@@ -329,7 +329,7 @@ class GoogleAdapter(BaseSDKAdapter):
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Adapt Google/Gemini stream to StreamChunk.
 
         Gemini format:
@@ -381,7 +381,7 @@ class OllamaAdapter(BaseSDKAdapter):
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Adapt Ollama stream to StreamChunk.
 
         Ollama format (dict or object):
@@ -442,7 +442,7 @@ class LMStudioAdapter(BaseSDKAdapter):
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Adapt LMStudio stream to StreamChunk.
 
         LMStudio uses OpenAI-compatible SSE format.
@@ -474,7 +474,7 @@ class VLLMAdapter(BaseSDKAdapter):
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Adapt vLLM stream to StreamChunk.
 
         vLLM can use OpenAI-compatible format or custom format.

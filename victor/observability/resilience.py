@@ -871,7 +871,7 @@ class ResiliencePolicy:
                     raise CircuitBreakerError(
                         f"Circuit breaker is {self._circuit_breaker.state.value}",
                         self._circuit_breaker.state,
-                        self._circuit_breaker.recovery_timeout,
+                        self._circuit_breaker._timeout_seconds,
                     )
 
             try:

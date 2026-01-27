@@ -729,11 +729,11 @@ def render_workflow(
         )
 
         try:
-            from victor.workflows.hitl import HITLNode  # type: ignore[import-not-found,arg-type]
+            from victor.workflows.hitl import HITLNode  # type: ignore[import-not-found]
 
             has_hitl = True
         except ImportError:
-            HITLNode = None  # type: ignore[assignment]
+            HITLNode = None
             has_hitl = False
 
         console.print(f"\n[bold cyan]Workflow:[/] {workflow.name}")
@@ -1236,6 +1236,7 @@ def list_presets(
         list_workflow_presets,
         get_agent_preset,
         get_workflow_preset,
+        WorkflowPreset,
     )
 
     preset_type = preset_type.lower()
@@ -1260,13 +1261,13 @@ def list_presets(
         if category:
             # Filter by category
             preset_names = list_workflow_presets()
-            category_presets = []
+            workflow_presets = []
             for preset_name in preset_names:
                 preset = get_workflow_preset(preset_name)
-                if preset and preset.category == category:  # type: ignore[union-attr]
-                    category_presets.append(preset)
+                if preset and preset.category == category:
+                    workflow_presets.append(preset)
 
-            if not category_presets:
+            if not workflow_presets:
                 console.print(f"[bold red]Error:[/] No presets found for category: {category}")
                 # Get available categories
                 all_presets = [get_workflow_preset(n) for n in preset_names]
@@ -1284,7 +1285,7 @@ def list_presets(
         else:
             # Show all by category
             preset_names = list_workflow_presets()
-            by_category: dict[str, list] = {}
+            by_category: dict[str, list[WorkflowPreset]] = {}
             for preset_name in preset_names:
                 preset = get_workflow_preset(preset_name)
                 if preset:
@@ -1403,11 +1404,11 @@ def show_preset_info(
 
         console.print(table)
 
-        if preset.example_context:
+        if workflow_preset.example_context:
             console.print("\n[bold]Example Context:[/]")
             import json
 
-            console.print(json.dumps(preset.example_context, indent=2, default=str)[:500])
+            console.print(json.dumps(workflow_preset.example_context, indent=2, default=str)[:500])
 
         console.print("\n[bold]Usage Example:[/]")
         console.print(

@@ -29,7 +29,7 @@ Commands:
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from rich.panel import Panel
 from rich.table import Table
@@ -64,7 +64,7 @@ class EntitiesCommand(BaseSlashCommand):
         subcommand = ctx.args[0].lower()
         subargs = ctx.args[1:]
 
-        handlers = {
+        handlers: dict[str, Callable[[CommandContext, list[Any]], None]] = {
             "list": self._list_entities,
             "search": self._search_entities,
             "show": self._show_entity,

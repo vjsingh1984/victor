@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     try:
         from openai import AsyncOpenAI as AsyncOpenAIType  # noqa: F401
     except ImportError:
-        AsyncOpenAIType = None
+        AsyncOpenAIType = None  # type: ignore[assignment]
 
     try:
         import cohere  # type: ignore[import-not-found]

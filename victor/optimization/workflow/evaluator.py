@@ -74,8 +74,8 @@ class EvaluationResult:
     recommendation: bool = False
 
     def __post_init__(self) -> None:
-        if self.metrics is None:
-            self.metrics = {}
+        # metrics is always initialized by default_factory
+        pass
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""

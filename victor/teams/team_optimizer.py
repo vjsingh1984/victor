@@ -542,7 +542,7 @@ class TeamOptimizer:
                 time_score * 0.25 + success_score * 0.35 + quality_score * 0.25 + cost_score * 0.15
             )
         else:
-            score = 0.5
+            score = 0.5  # type: ignore[unreachable]
 
         # Apply confidence weighting
         conf = metrics.get("confidence", 0.5)

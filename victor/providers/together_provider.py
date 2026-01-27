@@ -188,7 +188,7 @@ class TogetherProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from Together AI."""
         try:
             payload = self._build_request_payload(

@@ -244,7 +244,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         # Close existing connection
         if self.db:
             try:
-                del self.db
+                del self.db  # type: ignore[unreachable]
             except Exception:
                 pass
             self.db = None
@@ -355,7 +355,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if self.table is None:
             self.table = db.create_table(table_name, data=[document])
         else:
-            table = self._ensure_table()
+            table = self._ensure_table()  # type: ignore[unreachable]
             table.add([document])
 
     async def index_documents(self, documents: List[Dict[str, Any]]) -> None:
@@ -391,7 +391,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if self.table is None:
             self.table = db.create_table(table_name, data=lance_docs)
         else:
-            table = self._ensure_table()
+            table = self._ensure_table()  # type: ignore[unreachable]
             table.add(lance_docs)
 
     async def search_similar(
@@ -489,7 +489,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Delete documents with matching file_path
         # LanceDB uses SQL-like predicates
-        table = self._ensure_table()
+        table = self._ensure_table()  # type: ignore[unreachable]
         table.delete(f"file_path = '{file_path}'")
 
         # Count documents after deletion
@@ -526,7 +526,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         count = 0
         if self.table is not None:
             try:
-                count = self.table.count_rows()
+                count = self.table.count_rows()  # type: ignore[unreachable]
             except (AttributeError, RuntimeError, ValueError):
                 count = 0
 

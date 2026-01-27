@@ -37,7 +37,7 @@ try:
 except ImportError:
     Environment = None  # type: ignore[assignment,misc]
     FileSystemLoader = None  # type: ignore[assignment,misc]
-    select_autoescape = None  # type: ignore[assignment,misc]
+    select_autoescape = None
     TemplateNotFound = Exception  # type: ignore[assignment,misc]
 
 scaffold_app = typer.Typer(
@@ -208,13 +208,13 @@ def new_vertical(
             "Install it with: pip install jinja2[/]"
         )
         raise typer.Exit(1)
-
-    # Validate the name
-    try:
-        name = validate_vertical_name(name)
-    except typer.BadParameter as e:
-        console.print(f"[red]Error: {e}[/]")
-        raise typer.Exit(1)
+    else:
+        # Validate the name
+        try:
+            name = validate_vertical_name(name)
+        except typer.BadParameter as e:
+            console.print(f"[red]Error: {e}[/]")
+            raise typer.Exit(1)
 
     # Set default description if not provided
     if not description:

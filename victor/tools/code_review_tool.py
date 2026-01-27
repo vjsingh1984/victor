@@ -317,11 +317,11 @@ async def code_review(
         aspects = ["all"]
     elif isinstance(aspects, str):
         # Single aspect as string
-        aspects = [aspects]
+        aspects = [aspects]  # type: ignore[unreachable]
 
     # Validate aspects
     valid_aspects = {"security", "complexity", "best_practices", "documentation", "all"}
-    invalid = [a for a in aspects if a not in valid_aspects]
+    invalid = [a for a in aspects if a not in valid_aspects]  # type: ignore[unreachable]
     if invalid:
         return {
             "success": False,

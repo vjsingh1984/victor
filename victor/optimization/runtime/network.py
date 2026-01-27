@@ -33,7 +33,7 @@ from __future__ import annotations
 import asyncio
 import gzip
 import hashlib
-import httpx  # type: ignore[import-untyped]
+import httpx  # type: ignore[import-not-found]
 import json
 import logging
 import socket

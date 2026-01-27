@@ -365,7 +365,7 @@ class BrowserTool:
 
         try:
             if self._page:
-                response: Any = await self._page.goto(url, wait_until=wait_for)
+                response: Any = await self._page.goto(url, wait_until=wait_for)  # type: ignore[unreachable]
             else:
                 return ActionResult(
                     success=False,
@@ -373,8 +373,8 @@ class BrowserTool:
                     error="Page not available",
                 )
 
-            self._state.url = self._page.url
-            self._state.title = await self._page.title()
+            self._state.url = self._page.url  # type: ignore[unreachable]
+            self._state.title = await self._page.title()  # type: ignore[unreachable]
             self._state.page_count += 1
             self._state.action_count = 0  # Reset per-page counter
 

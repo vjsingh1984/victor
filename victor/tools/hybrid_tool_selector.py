@@ -481,6 +481,45 @@ class HybridToolSelector:
         if hasattr(self.keyword, "close"):
             await self.keyword.close()
 
+    async def get_tool_score(
+        self,
+        tool_name: str,
+        task: str,
+        **kwargs: Any,
+    ) -> float:
+        """Get relevance score for a specific tool using hybrid approach.
+
+        Hybrid selector combines scores from both semantic and keyword strategies.
+
+        Args:
+            tool_name: Name of the tool to score
+            task: Task description to score against
+            **kwargs: Additional parameters (passed to sub-selectors)
+
+        Returns:
+            Relevance score from 0.0 (not relevant) to 1.0 (highly relevant)
+        """
+        # Get scores from both selectors
+        semantic_score = 0.0
+        keyword_score = 0.0
+
+        if hasattr(self.semantic, "get_tool_score"):
+            semantic_score = await self.semantic.get_tool_score(tool_name, task, **kwargs)
+
+        if hasattr(self.keyword, "get_tool_score"):
+            keyword_score = await self.keyword.get_tool_score(tool_name, task, **kwargs)
+
+        # Blend scores based on config weights
+        semantic_weight = getattr(self.config, "semantic_weight", 0.7)
+        keyword_weight = getattr(self.config, "keyword_weight", 0.3)
+
+        return (semantic_weight * semantic_score) + (keyword_weight * keyword_score)
+
+    @property
+    def strategy(self) -> ToolSelectionStrategy:
+        """Get the selection strategy used by this selector."""
+        return ToolSelectionStrategy.HYBRID
+
     # =========================================================================
     # Helper Methods
     # =========================================================================

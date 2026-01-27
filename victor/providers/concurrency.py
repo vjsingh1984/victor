@@ -516,8 +516,15 @@ class RequestQueue:
             except asyncio.CancelledError:
                 logger.debug(f"{worker_name} cancelled")
                 break
+            except RuntimeError as e:
+                # "no running event loop" errors - suppress log flooding
+                if "no running event loop" not in str(e):
+                    logger.error(f"{worker_name} error: {e}")
+                break  # Exit worker loop on event loop errors
             except Exception as e:
-                logger.error(f"{worker_name} error: {e}")
+                # Log other errors at debug level to reduce noise
+                logger.debug(f"{worker_name} error: {e}")
+                # Continue processing other requests
 
         logger.debug(f"{worker_name} stopped")
 

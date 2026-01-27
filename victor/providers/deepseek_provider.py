@@ -209,7 +209,7 @@ class DeepSeekProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from DeepSeek.
 
         Args:

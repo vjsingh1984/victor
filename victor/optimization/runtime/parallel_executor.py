@@ -630,7 +630,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
                 priority, task_input = task
                 if (
                     isinstance(priority, int)
-                    and isinstance(task_input, tuple)
+                    and isinstance(task_input, tuple)  # type: ignore[unreachable]
                     and len(task_input) == 2
                     and callable(task_input[0])
                     and isinstance(task_input[1], dict)

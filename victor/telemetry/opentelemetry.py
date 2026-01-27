@@ -14,18 +14,56 @@
 
 """OpenTelemetry setup and configuration."""
 
-from opentelemetry import trace, metrics  # type: ignore[import-untyped]
-from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-untyped]
-from opentelemetry.sdk.trace.export import BatchSpanProcessor  # type: ignore[import-untyped]
-from opentelemetry.sdk.metrics import MeterProvider  # type: ignore[import-untyped]
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader  # type: ignore[import-untyped]
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # type: ignore[import-untyped]
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter  # type: ignore[import-untyped]
-from opentelemetry.sdk.resources import Resource  # type: ignore[import-untyped]
+try:
+    from opentelemetry import trace, metrics  # type: ignore[import-untyped]
+    from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-untyped]
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor  # type: ignore[import-untyped]
+    from opentelemetry.sdk.metrics import MeterProvider  # type: ignore[import-untyped]
+    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader  # type: ignore[import-untyped]
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # type: ignore[import-untyped]
+    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter  # type: ignore[import-untyped]
+    from opentelemetry.sdk.resources import Resource  # type: ignore[import-untyped]
+
+    OPENTELEMETRY_AVAILABLE = True
+except ImportError:
+    # Optional dependency, skip if not available
+    OPENTELEMETRY_AVAILABLE = False
+
+    # Create dummy objects to avoid import errors
+    class TracerProvider:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class BatchSpanProcessor:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class MeterProvider:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class PeriodicExportingMetricReader:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class OTLPSpanExporter:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class OTLPMetricExporter:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class Resource:
+        @staticmethod
+        def create(*args, **kwargs):
+            return {}
 
 
 def setup_opentelemetry(service_name: str, service_version: str):
     """Initializes OpenTelemetry tracing and metrics."""
+    if not OPENTELEMETRY_AVAILABLE:
+        return None, None
 
     resource = Resource.create(
         {

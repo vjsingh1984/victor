@@ -70,6 +70,7 @@ def get_formation(formation_name: str) -> "BaseFormationStrategy":
         HierarchicalFormation,
         PipelineFormation,
         ConsensusFormation,
+        BaseFormationStrategy,
     )
     from victor.teams.types import TeamFormation
 
@@ -78,7 +79,7 @@ def get_formation(formation_name: str) -> "BaseFormationStrategy":
         TeamFormation.PARALLEL.value: ParallelFormation(),
         TeamFormation.HIERARCHICAL.value: HierarchicalFormation(),
         TeamFormation.PIPELINE.value: PipelineFormation(),
-        TeamFormation.CONSSENSUS.value: ConsensusFormation(),
+        TeamFormation.CONSENSUS.value: ConsensusFormation(),
     }
 
     if formation_name not in formation_map:
@@ -807,7 +808,8 @@ Format your response as a JSON object:
             Member results
         """
         # TODO: Implement formation registry/factory
-        from victor.coordination.formations import get_formation
+        # Use local get_formation function
+        from . import get_formation
 
         strategy = get_formation(formation)
         return await strategy.execute(agents, context, task)
@@ -1250,7 +1252,8 @@ Rationale: [your reasoning]
         formation = self._map_choice_to_formation(vote_result.winner)
 
         # TODO: Implement formation registry/factory
-        from victor.coordination.formations import get_formation
+        # Use local get_formation function
+        from . import get_formation
 
         strategy = get_formation(formation)
         return await strategy.execute(agents, context, task)

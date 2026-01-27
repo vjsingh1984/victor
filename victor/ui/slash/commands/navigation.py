@@ -94,7 +94,7 @@ class ChangesCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        subcommand = self._get_arg(ctx, 0, "show").lower()
+        subcommand = (self._get_arg(ctx, 0, "show") or "show").lower()
         target_file = self._get_arg(ctx, 1)
 
         # Get file tracker if available
@@ -267,7 +267,7 @@ class SnapshotsCommand(BaseSlashCommand):
         )
 
     def execute(self, ctx: CommandContext) -> None:
-        subcommand = self._get_arg(ctx, 0, "list").lower()
+        subcommand = (self._get_arg(ctx, 0, "list") or "list").lower()
 
         try:
             from victor.agent.snapshot_store import get_snapshot_store
@@ -323,7 +323,11 @@ class SnapshotsCommand(BaseSlashCommand):
                 diff = store.diff_snapshot(snapshot_id)
                 if diff:
                     ctx.console.print(
-                        Panel(diff[:2000], title=f"Diff: {snapshot_id[:8]}", border_style="yellow")
+                        Panel(
+                            "\n".join(diff[:2000]),
+                            title=f"Diff: {snapshot_id[:8]}",
+                            border_style="yellow",
+                        )
                     )
                 else:
                     ctx.console.print(f"[red]Snapshot not found:[/] {snapshot_id}")
@@ -484,7 +488,7 @@ class CopyCommand(BaseSlashCommand):
             return
 
         try:
-            import pyperclip
+            import pyperclip  # type: ignore[import-untyped]
 
             pyperclip.copy(last_assistant)
             preview = last_assistant[:100] + "..." if len(last_assistant) > 100 else last_assistant

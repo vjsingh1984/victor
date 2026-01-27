@@ -105,11 +105,11 @@ class ProfilerManager:
             profiler = CPUProfiler(config or self.config)
 
         profiler.start()
-        result_holder = [None]
+        result_holder: list[ProfileResult | None] = [None]
         try:
             yield lambda: result_holder[0]
         finally:
-            result_holder[0] = profiler.stop()  # type: ignore[assignment]
+            result_holder[0] = profiler.stop()
 
     def profile_function(
         self,

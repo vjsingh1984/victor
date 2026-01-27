@@ -22,7 +22,13 @@ integration tests where you need predictable, controllable responses.
 import asyncio
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-from victor.providers.base import BaseProvider, CompletionResponse, Message, StreamChunk
+from victor.providers.base import (
+    BaseProvider,
+    CompletionResponse,
+    Message,
+    StreamChunk,
+    ToolDefinition,
+)
 
 
 class MockProvider(BaseProvider):

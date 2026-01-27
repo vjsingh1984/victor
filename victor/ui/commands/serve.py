@@ -10,16 +10,10 @@ from victor.ui.commands.utils import setup_logging
 
 serve_app = typer.Typer(
     name="serve",
-    help="Start Victor servers (API, HITL, etc.).",
+    help="Start Victor servers (API, HITL, Workflow Editor, etc.).",
 )
 console = Console()
 logger = logging.getLogger(__name__)
-
-
-class ServerBackend(str, Enum):
-    """Server backend options."""
-
-    FASTAPI = "fastapi"
 
 
 @serve_app.callback(invoke_without_command=True)
@@ -48,16 +42,10 @@ def serve(
         "--profile",
         help="Profile to use for the server",
     ),
-    backend: ServerBackend = typer.Option(
-        ServerBackend.FASTAPI,
-        "--backend",
-        "-b",
-        help="Server backend: 'fastapi' (with OpenAPI docs)",
-    ),
     enable_hitl: bool = typer.Option(
-        False,
-        "--enable-hitl",
-        help="Enable HITL (Human-in-the-Loop) endpoints for workflow approvals",
+        True,
+        "--enable-hitl/--no-hitl",
+        help="Enable HITL (Human-in-the-Loop) endpoints for workflow approvals (default: enabled)",
     ),
     hitl_auth_token: Optional[str] = typer.Option(
         None,
@@ -65,19 +53,32 @@ def serve(
         help="Bearer token for HITL endpoints (or set HITL_AUTH_TOKEN env var)",
         envvar="HITL_AUTH_TOKEN",
     ),
+    minimal: bool = typer.Option(
+        False,
+        "--minimal",
+        help="Run minimal server without workflow editor and extra UIs (API only)",
+    ),
 ):
     """Start the Victor API server for IDE integrations.
 
     The server provides REST API endpoints for IDE integrations (VS Code, JetBrains, etc.)
-    and external tool access.
+    and external tool access. By default, includes workflow editor and HITL UI.
 
     Examples:
-        victor serve                          # Start FastAPI server on port 8765
+        victor serve                          # Start full server with all UIs (default)
+        victor serve --minimal                # Start minimal server (API only, no UIs)
         victor serve -p 9000                  # Custom port
-        victor serve --enable-hitl            # Enable HITL endpoints for approvals
+        victor serve --no-hitl                # Disable HITL endpoints
+        victor serve --host 0.0.0.0           # Listen on all interfaces
+
+    Available UIs (when not using --minimal):
+        - Landing Page:     http://localhost:8765/
+        - API Docs:         http://localhost:8765/docs
+        - Workflow Editor:  http://localhost:8765/ui/workflow-editor
+        - HITL Approvals:   http://localhost:8765/ui/hitl (if HITL enabled)
     """
     if ctx.invoked_subcommand is None:
-        _serve(host, port, log_level, profile, backend, enable_hitl, hitl_auth_token)
+        _serve(host, port, log_level, profile, enable_hitl, hitl_auth_token, minimal)
 
 
 def _serve(
@@ -85,9 +86,9 @@ def _serve(
     port: int,
     log_level: Optional[str],
     profile: str,
-    backend: ServerBackend,
-    enable_hitl: bool = False,
+    enable_hitl: bool = True,
     hitl_auth_token: Optional[str] = None,
+    minimal: bool = False,
 ):
     # Normalize log level if provided
     if log_level is not None:
@@ -98,42 +99,23 @@ def _serve(
     # Use centralized logging config (serve has INFO default in logging_config.yaml)
     setup_logging(command="serve", cli_log_level=log_level)
 
-    # Backend-specific information
-    backend_info = ""
-    if backend == ServerBackend.FASTAPI:
-        backend_info = f"\n[bold]Docs:[/] [cyan]http://{host}:{port}/docs[/]"
-
-    # HITL-specific information
-    hitl_info = ""
-    if enable_hitl and backend == ServerBackend.FASTAPI:
-        hitl_info = f"\n[bold]HITL UI:[/] [cyan]http://{host}:{port}/hitl/ui[/]"
-
-    console.print(
-        Panel(
-            f"[bold blue]Victor API Server[/]\n\n"
-            f"[bold]Host:[/] [cyan]{host}[/]\n"
-            f"[bold]Port:[/] [cyan]{port}[/]\n"
-            f"[bold]Backend:[/] [cyan]{backend.value}[/]\n"
-            f"[bold]Profile:[/] [cyan]{profile}[/]"
-            f"{backend_info}"
-            f"{hitl_info}\n\n"
-            f"[dim]Press Ctrl+C to stop[/]",
-            title="Victor Server",
-            border_style="blue",
-        )
-    )
-
-    asyncio.run(_run_fastapi_server(host, port, profile, enable_hitl, hitl_auth_token))
+    # Determine which server to use
+    if minimal:
+        # Use minimal server (VictorFastAPIServer directly)
+        asyncio.run(_run_minimal_server(host, port, profile, enable_hitl, hitl_auth_token))
+    else:
+        # Use unified orchestrator (full server with workflow editor and all UIs)
+        asyncio.run(_run_unified_server(host, port, profile, enable_hitl, hitl_auth_token))
 
 
-async def _run_fastapi_server(
+async def _run_minimal_server(
     host: str,
     port: int,
     profile: str,
-    enable_hitl: bool = False,
+    enable_hitl: bool = True,
     hitl_auth_token: Optional[str] = None,
 ) -> None:
-    """Run the FastAPI server (modern backend with OpenAPI docs)."""
+    """Run the minimal FastAPI server (API only, no workflow editor or extra UIs)."""
     try:
         from pathlib import Path
 
@@ -149,6 +131,25 @@ async def _run_fastapi_server(
             hitl_auth_token=hitl_auth_token,
         )
 
+        # Display minimal server banner
+        hitl_info = ""
+        if enable_hitl:
+            hitl_info = f"\n[bold]HITL:[/] [green]Enabled[/] (http://{host}:{port}/api/v1/hitl)"
+
+        console.print(
+            Panel(
+                f"[bold blue]Victor API Server (Minimal)[/]\n\n"
+                f"[bold]Host:[/] [cyan]{host}[/]\n"
+                f"[bold]Port:[/] [cyan]{port}[/]\n"
+                f"[bold]Profile:[/] [cyan]{profile}[/]"
+                f"\n[bold]API Docs:[/] [cyan]http://{host}:{port}/docs[/]"
+                f"{hitl_info}\n\n"
+                f"[dim]Press Ctrl+C to stop[/]",
+                title="Victor Server",
+                border_style="blue",
+            )
+        )
+
         config = uvicorn.Config(
             server.app,
             host=host,
@@ -160,6 +161,74 @@ async def _run_fastapi_server(
 
     except ImportError as e:
         console.print(f"[red]Error:[/] Missing dependency for FastAPI server: {e}")
+        console.print("\nInstall with: [bold]pip install fastapi uvicorn[/]")
+        raise typer.Exit(1)
+    except KeyboardInterrupt:
+        console.print("\n[dim]Server stopped[/]")
+    except Exception as e:
+        console.print(f"[red]Error:[/] {e}")
+        raise typer.Exit(1)
+
+
+async def _run_unified_server(
+    host: str,
+    port: int,
+    profile: str,
+    enable_hitl: bool = True,
+    hitl_auth_token: Optional[str] = None,
+) -> None:
+    """Run the unified server with workflow editor and all UIs (default)."""
+    try:
+        from pathlib import Path
+
+        import uvicorn
+
+        from victor.integrations.api.unified_orchestrator import create_unified_server
+
+        # Create unified server with all features
+        app = create_unified_server(
+            host=host,
+            port=port,
+            workspace_root=str(Path.cwd()),
+            enable_hitl=enable_hitl,
+            hitl_persistent=False,  # Use in-memory HITL store for serve command
+            hitl_auth_token=hitl_auth_token,
+            enable_cors=True,
+        )
+
+        # Display full server banner
+        hitl_info = ""
+        if enable_hitl:
+            hitl_info = f"\n[bold]HITL UI:[/] [cyan]http://{host}:{port}/ui/hitl[/]"
+
+        console.print(
+            Panel(
+                f"[bold blue]Victor API Server (Full)[/]\n\n"
+                f"[bold]Host:[/] [cyan]{host}[/]\n"
+                f"[bold]Port:[/] [cyan]{port}[/]\n"
+                f"[bold]Profile:[/] [cyan]{profile}[/]\n\n"
+                f"[bold]Available UIs:[/]"
+                f"\n  [bold]Landing:[/]     [cyan]http://{host}:{port}/[/]"
+                f"\n  [bold]API Docs:[/]     [cyan]http://{host}:{port}/docs[/]"
+                f"\n  [bold]Workflows:[/]    [cyan]http://{host}:{port}/ui/workflow-editor[/]"
+                f"{hitl_info}\n\n"
+                f"[dim]Press Ctrl+C to stop[/]",
+                title="Victor Server",
+                border_style="blue",
+            )
+        )
+
+        config = uvicorn.Config(
+            app,
+            host=host,
+            port=port,
+            log_level="info",
+        )
+        uvicorn_server = uvicorn.Server(config)
+        await uvicorn_server.serve()
+
+    except ImportError as e:
+        console.print(f"[red]Error:[/] Missing dependency for unified server: {e}")
         console.print("\nInstall with: [bold]pip install fastapi uvicorn[/]")
         raise typer.Exit(1)
     except KeyboardInterrupt:

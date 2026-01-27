@@ -35,8 +35,8 @@ if TYPE_CHECKING:
     from chromadb.config import Settings  # type: ignore[import-not-found]
 
 try:
-    import chromadb  # type: ignore[import-not-found]
-    from chromadb.config import Settings  # type: ignore[import-not-found]
+    import chromadb
+    from chromadb.config import Settings
 
     CHROMADB_AVAILABLE = True
 except ImportError:

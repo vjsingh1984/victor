@@ -257,7 +257,7 @@ class AzureOpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from Azure OpenAI."""
         try:
             payload = self._build_request_payload(
@@ -382,8 +382,8 @@ class AzureOpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             content=message.get("content", "") or "",
             role="assistant",
             tool_calls=tool_calls,
-            stop_reason=choice.get("finish_reason"),
             usage=usage,
+            stop_reason=choice.get("finish_reason"),
             model=model,
             metadata={},
             raw_response=result,

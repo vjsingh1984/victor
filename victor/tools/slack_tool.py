@@ -29,8 +29,8 @@ try:
 
     SLACK_AVAILABLE = True
 except ImportError:
-    WebClient = None  # type: ignore[import-not-found]
-    SlackApiError = Exception  # type: ignore[import-not-found]
+    WebClient = None
+    SlackApiError = Exception
     SLACK_AVAILABLE = False
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
