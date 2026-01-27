@@ -1911,7 +1911,7 @@ async def graph(
                                         {
                                             "name": src_node.name,
                                             "file": src_node.file,
-                                            "line": src_node.line,
+                                            "line": str(src_node.line),  # type: ignore[arg-type]
                                         }
                                     )
                         if len(callsites) >= int(max_callsites_modules):

@@ -1600,12 +1600,13 @@ async def read(
         effective_max_lines = MAX_LINES
 
     # Apply truncation (always ends on complete lines)
-    truncated_content, info: TruncationInfo = truncate_by_lines(
+    truncated_content, info = truncate_by_lines(
         remaining_content,
         max_lines=effective_max_lines,
         max_bytes=MAX_BYTES,
         start_line=0,  # Already applied offset above
     )
+    info: TruncationInfo = info  # type: ignore[assignment]
 
     # Format with line numbers (1-indexed, adjusted for offset)
     numbered_content = format_with_line_numbers(truncated_content, start_line=offset + 1)
@@ -1826,6 +1827,17 @@ async def ls(
     """
     import fnmatch
 
+    # Normalize limit (handle non-int input from model)
+    if not isinstance(limit, int):
+        limit = int(limit) if isinstance(limit, str) and limit.isdigit() else 1000
+
+    items = []
+    count = 0
+
+    # Normalize depth (handle non-int input from model)
+    if not isinstance(depth, int):
+        depth = int(depth) if isinstance(depth, str) and depth.isdigit() else 1
+
     try:
         dir_path = Path(path).expanduser().resolve()
 
@@ -1861,17 +1873,6 @@ async def ls(
                     f"Path is not a directory: {path}\n"
                     f"Suggestion: Use read_file(path='{path}') to read this file instead."
                 )
-
-        # Normalize limit (handle non-int input from model)
-        if not isinstance(limit, int):
-            limit = int(limit) if isinstance(limit, str) and limit.isdigit() else 1000
-
-        items = []
-        count = 0
-
-        # Normalize depth (handle non-int input from model)
-        if not isinstance(depth, int):
-            depth = int(depth) if isinstance(depth, str) and depth.isdigit() else 1
 
         # Determine max depth for traversal
         max_depth = float("inf") if recursive else depth

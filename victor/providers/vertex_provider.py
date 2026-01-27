@@ -392,6 +392,7 @@ class VertexAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             usage=usage,
             model=model,
             raw_response=result,
+            metadata=None,
         )
 
     def _parse_stream_chunk(self, chunk_data, accumulated_tool_calls) -> StreamChunk:

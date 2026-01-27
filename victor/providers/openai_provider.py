@@ -328,6 +328,7 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             usage=usage,
             model=model,
             raw_response=response.model_dump() if hasattr(response, "model_dump") else None,
+            metadata=None,
         )
 
     def _parse_stream_chunk(
@@ -419,6 +420,7 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             stop_reason=finish_reason,
             is_final=is_final,
             usage=usage,
+            model_name=None,
         )
 
     async def list_models(self) -> List[Dict[str, Any]]:
@@ -451,7 +453,7 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                         }
                     )
             # Sort by name for consistent output
-            models.sort(key=lambda x: x["id"])
+            models.sort(key=lambda x: str(x["id"]))
             return models
         except (ProviderError, ProviderAuthError, ProviderRateLimitError):
             # Re-raise already-converted provider errors

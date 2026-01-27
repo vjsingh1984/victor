@@ -62,9 +62,9 @@ try:
     STARLETTE_AVAILABLE = True
 except ImportError:
     STARLETTE_AVAILABLE = False
-    Request = None
-    Response = None
-    Headers = None  
+    Request = None  # type: ignore
+    Response = None  # type: ignore
+    Headers = None  # type: ignore  
 from victor.observability.production_metrics import ProductionMetricsCollector
 from victor.observability.distributed_tracing import (
     DistributedTracer,
@@ -303,7 +303,7 @@ class MonitoringMiddleware:
                 )
 
                 # Update span
-                span.set_error(e)
+                span.set_error(e)  # type: ignore[attr-defined]
 
                 logger.exception(f"Request failed: {e}")
                 raise
@@ -359,7 +359,7 @@ class MonitoringMiddleware:
             return real_ip
 
         # Fall back to direct client IP
-        if hasattr(request.client, "host"):
+        if request.client and hasattr(request.client, "host"):
             return request.client.host
 
         return None
