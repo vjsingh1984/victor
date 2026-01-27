@@ -294,7 +294,7 @@ def calculate_complexity(node: ast.AST) -> int:
             # Ternary expressions
             complexity += 1
 
-    return visitor.complexity  # type: ignore[name-defined]
+    return complexity
 
 
 def calculate_maintainability_index(code: str) -> float:
@@ -430,7 +430,7 @@ def calculate_cognitive_complexity(node: ast.AST) -> int:
     visitor = CognitiveVisitor()
     visitor.visit(node)
 
-    return visitor.complexity  # type: ignore[name-defined]
+    return complexity
 
 
 # =============================================================================
