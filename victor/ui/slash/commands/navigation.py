@@ -324,7 +324,7 @@ class SnapshotsCommand(BaseSlashCommand):
                 if diff:
                     ctx.console.print(
                         Panel(
-                            "\n".join(diff[:2000]),
+                            "\n".join(str(d) for d in diff[:2000]),
                             title=f"Diff: {snapshot_id[:8]}",
                             border_style="yellow",
                         )

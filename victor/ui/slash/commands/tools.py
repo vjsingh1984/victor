@@ -152,7 +152,7 @@ class LMStudioCommand(BaseSlashCommand):
             category="tools",
         )
 
-    def execute(self, ctx: CommandContext) -> None:
+    async def execute(self, ctx: CommandContext) -> None:
         try:
             from victor.providers.lmstudio_provider import LMStudioProvider
 
@@ -162,7 +162,17 @@ class LMStudioCommand(BaseSlashCommand):
             lmstudio = LMStudioProvider(**provider_settings)
 
             # Check connectivity
-            if not asyncio.run(lmstudio._models_available()):
+            try:
+                # Test basic connectivity with a simple request
+                response = await lmstudio.client.get("/models", timeout=5.0)
+                if response.status_code == 200:
+                    models_data = response.json()
+                    models = models_data.get("data", [])
+                    has_models = len(models) > 0
+                else:
+                    has_models = False
+            except Exception:
+                has_models = False
                 ctx.console.print(
                     Panel(
                         "[red]LMStudio not detected[/]\n\n"
@@ -177,8 +187,7 @@ class LMStudioCommand(BaseSlashCommand):
                 )
                 return
 
-            # Get models and system info
-            models = await lmstudio.list_models()
+            # Use the models we already fetched
             endpoint = lmstudio._raw_base_urls
 
             content = f"[green]LMStudio Connected[/]\n\n"
@@ -223,9 +232,9 @@ class MCPCommand(BaseSlashCommand):
             from victor.integrations.mcp.registry import MCPRegistry
 
             registry = MCPRegistry()
-            servers = registry.list_servers()
+            server_names = registry.list_servers()
 
-            if not servers:
+            if not server_names:
                 ctx.console.print(
                     Panel(
                         "[yellow]No MCP servers configured[/]\n\n"
@@ -243,15 +252,20 @@ class MCPCommand(BaseSlashCommand):
             table.add_column("Status", style="yellow")
             table.add_column("Tools", justify="right")
 
-            for server in servers:
-                status = "connected" if server.get("connected") else "disconnected"
-                tool_count = len(server.get("tools", []))
-                table.add_row(
-                    server.get("name", "unknown"),
-                    server.get("type", "stdio"),
-                    status,
-                    str(tool_count),
-                )
+            for server_name in server_names:
+                server_info = registry.get_server_status(server_name)
+                if server_info:
+                    status = "connected" if server_info.get("connected") else "disconnected"
+                    tools = server_info.get("tools", [])
+                    tool_count = len(tools)
+                    table.add_row(
+                        server_name,
+                        server_info.get("type", "stdio"),
+                        status,
+                        str(tool_count),
+                    )
+                else:
+                    table.add_row(server_name, "stdio", "disconnected", "0")
 
             ctx.console.print(table)
             ctx.console.print("\n[dim]Manage servers: victor mcp --help[/]")
@@ -340,7 +354,7 @@ class ReviewCommand(BaseSlashCommand):
 """
 
         try:
-            response = await ctx.agent.chat(prompt)
+            response = await ctx.agent.chat(prompt)  # type: ignore[union-attr]
             ctx.console.print(
                 Panel(
                     Markdown(response.content),
