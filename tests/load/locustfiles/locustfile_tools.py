@@ -67,12 +67,7 @@ class ToolUser(HttpUser):
 
         message = random.choice(operations)
 
-        payload = {
-            "message": message,
-            "provider": self.provider,
-            "model": self.model,
-            "stream": False,
-        }
+        payload = {"messages": [{"role": "user", "content": message}]}
 
         with self.client.post(
             "/chat",
@@ -104,12 +99,7 @@ class ToolUser(HttpUser):
 
         message = random.choice(searches)
 
-        payload = {
-            "message": message,
-            "provider": self.provider,
-            "model": self.model,
-            "stream": False,
-        }
+        payload = {"messages": [{"role": "user", "content": message}]}
 
         with self.client.post(
             "/chat",
@@ -140,12 +130,7 @@ class ToolUser(HttpUser):
 
         message = random.choice(git_commands)
 
-        payload = {
-            "message": message,
-            "provider": self.provider,
-            "model": self.model,
-            "stream": False,
-        }
+        payload = {"messages": [{"role": "user", "content": message}]}
 
         with self.client.post(
             "/chat",
@@ -175,12 +160,7 @@ class ToolUser(HttpUser):
 
         message = random.choice(executions)
 
-        payload = {
-            "message": message,
-            "provider": self.provider,
-            "model": self.model,
-            "stream": False,
-        }
+        payload = {"messages": [{"role": "user", "content": message}]}
 
         with self.client.post(
             "/chat",
@@ -216,12 +196,7 @@ class ToolUser(HttpUser):
 
         message = random.choice(analyses)
 
-        payload = {
-            "message": message,
-            "provider": self.provider,
-            "model": self.model,
-            "stream": False,
-        }
+        payload = {"messages": [{"role": "user", "content": message}]}
 
         with self.client.post(
             "/chat",
@@ -252,12 +227,7 @@ class ToolUser(HttpUser):
 
         message = random.choice(workflows)
 
-        payload = {
-            "message": message,
-            "provider": self.provider,
-            "model": self.model,
-            "stream": False,
-        }
+        payload = {"messages": [{"role": "user", "content": message}]}
 
         with self.client.post(
             "/chat",
@@ -306,12 +276,7 @@ class MixedWorkflowUser(ToolUser):
 
         message = random.choice(workflows)
 
-        payload = {
-            "message": message,
-            "provider": self.provider,
-            "model": self.model,
-            "stream": False,
-        }
+        payload = {"messages": [{"role": "user", "content": message}]}
 
         with self.client.post(
             "/chat",

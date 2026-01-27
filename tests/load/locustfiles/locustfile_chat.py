@@ -163,19 +163,14 @@ class ChatUser(HttpUser):
 
         message = self.get_next_message()
 
-        payload = {
-            "message": message,
-            "provider": self.provider,
-            "model": self.model,
-            "stream": False,
-        }
+        # Build messages list with conversation history
+        messages = []
+        for msg in self.conversation_history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        # Add current message
+        messages.append({"role": "user", "content": message})
 
-        # Add context from conversation history
-        if self.conversation_history:
-            payload["context"] = {
-                "history_length": len(self.conversation_history),
-                "turn_count": self.turn_count,
-            }
+        payload = {"messages": messages}
 
         with self.client.post(
             "/chat",
@@ -227,12 +222,14 @@ class ChatUser(HttpUser):
 
         message = random.choice(tool_messages)
 
-        payload = {
-            "message": message,
-            "provider": self.provider,
-            "model": self.model,
-            "stream": False,
-        }
+        # Build messages list with conversation history
+        messages = []
+        for msg in self.conversation_history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        # Add current message
+        messages.append({"role": "user", "content": message})
+
+        payload = {"messages": messages}
 
         with self.client.post(
             "/chat",
