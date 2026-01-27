@@ -540,6 +540,9 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
             tool_calls=tool_calls if tool_calls else None,
             usage=usage,
             model=model,
+            stop_reason=None,
+            raw_response=result,
+            metadata=None,
         )
 
     def _parse_stream_chunk(self, chunk: Any) -> Optional[StreamChunk]:

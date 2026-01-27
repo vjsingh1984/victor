@@ -433,7 +433,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[misc]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from vLLM server.
 
         Args:

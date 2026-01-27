@@ -237,7 +237,7 @@ class VertexAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from Vertex AI."""
         try:
             headers = await self._get_auth_headers()
@@ -353,8 +353,14 @@ class VertexAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         candidates = result.get("candidates", [])
         if not candidates:
             return CompletionResponse(
-                content="", role="assistant", model=model, tool_calls=None,
-                stop_reason=None, usage=None, raw_response=result, metadata=None
+                content="",
+                role="assistant",
+                model=model,
+                tool_calls=None,
+                stop_reason=None,
+                usage=None,
+                raw_response=result,
+                metadata=None,
             )
 
         candidate = candidates[0]

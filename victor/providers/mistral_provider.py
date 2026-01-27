@@ -211,7 +211,7 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
-    async def stream(
+    async def stream(  # type: ignore[override]
         self,
         messages: List[Message],
         *,
@@ -371,6 +371,7 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
                 usage=None,
                 raw_response=result,
                 metadata=None,
+                tool_calls=None,
             )
 
         choice = choices[0]

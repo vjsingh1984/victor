@@ -50,7 +50,13 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-from victor.providers.base import BaseProvider, CompletionResponse, Message, StreamChunk, ToolDefinition
+from victor.providers.base import (
+    BaseProvider,
+    CompletionResponse,
+    Message,
+    StreamChunk,
+    ToolDefinition,
+)
 from victor.providers.registry import ProviderRegistry
 from victor.providers.resilience import (
     CircuitBreakerConfig,
@@ -305,7 +311,9 @@ class ManagedProvider:
             "history_size": len(self._metrics_collector._metrics_history),
         }
 
-    def _convert_tools_to_definitions(self, tools: Optional[List[Dict[str, Any]]]) -> Optional[List[ToolDefinition]]:
+    def _convert_tools_to_definitions(
+        self, tools: Optional[List[Dict[str, Any]]]
+    ) -> Optional[List[ToolDefinition]]:
         """Convert dict tools to ToolDefinitions.
 
         Args:

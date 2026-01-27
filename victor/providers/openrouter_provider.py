@@ -213,7 +213,7 @@ class OpenRouterProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[return-value]
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from OpenRouter."""
         try:
             payload = self._build_request_payload(
@@ -305,8 +305,14 @@ class OpenRouterProvider(BaseProvider, HTTPErrorHandlerMixin):
         choices = result.get("choices", [])
         if not choices:
             return CompletionResponse(
-                content="", role="assistant", model=model, raw_response=result,
-                tool_calls=None, stop_reason=None, usage=None, metadata=None
+                content="",
+                role="assistant",
+                model=model,
+                raw_response=result,
+                tool_calls=None,
+                stop_reason=None,
+                usage=None,
+                metadata=None,
             )
 
         choice = choices[0]

@@ -290,7 +290,7 @@ class TogetherProvider(BaseProvider, HTTPErrorHandlerMixin):
                 tool_calls=None,
                 stop_reason=None,
                 usage=None,
-                metadata={}
+                metadata={},
             )
 
         choice = choices[0]
@@ -313,7 +313,7 @@ class TogetherProvider(BaseProvider, HTTPErrorHandlerMixin):
             usage=usage,
             model=model,
             raw_response=result,
-            metadata={}
+            metadata={},
         )
 
     def _normalize_tool_calls(self, tool_calls) -> Optional[List[Dict[str, Any]]]:

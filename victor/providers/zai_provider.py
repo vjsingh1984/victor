@@ -169,12 +169,12 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         """
         # Try exact match first
         if model in ZAI_MODELS:
-            return int(ZAI_MODELS[model]["context_window"])
+            return ZAI_MODELS[model]["context_window"]
 
         # Try prefix match (e.g., "glm-4.7-custom" matches "glm-4.7")
         for model_prefix, info in ZAI_MODELS.items():
             if model.startswith(model_prefix):
-                return int(info["context_window"])
+                return info["context_window"]
 
         # Default to 128K for unknown GLM models
         return 128000
@@ -256,7 +256,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from z.ai with tool call accumulation.
 
         Args:
@@ -483,6 +483,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                 usage=None,
                 raw_response=result,
                 metadata=None,
+                tool_calls=None,
             )
 
         choice = choices[0]

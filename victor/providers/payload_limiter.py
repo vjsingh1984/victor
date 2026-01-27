@@ -388,6 +388,7 @@ class ProviderPayloadLimiter:
         elif strategy == TruncationStrategy.REDUCE_TOOLS:
             return self._reduce_tools(messages, tools, estimate, **kwargs)
         # All strategies already handled above
+
     def _truncate_oldest(
         self,
         messages: List["Message"],

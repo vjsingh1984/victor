@@ -226,7 +226,7 @@ class HuggingFaceProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
-    async def stream(
+    async def stream(  # type: ignore[override]
         self,
         messages: List[Message],
         *,
@@ -338,7 +338,7 @@ class HuggingFaceProvider(BaseProvider, HTTPErrorHandlerMixin):
                 tool_calls=None,
                 stop_reason=None,
                 usage=None,
-                metadata=None
+                metadata=None,
             )
 
         choice = choices[0]
@@ -361,7 +361,7 @@ class HuggingFaceProvider(BaseProvider, HTTPErrorHandlerMixin):
             usage=usage,
             model=model,
             raw_response=result,
-            metadata=None
+            metadata=None,
         )
 
     def _normalize_tool_calls(self, tool_calls) -> Optional[List[Dict[str, Any]]]:

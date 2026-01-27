@@ -627,8 +627,14 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
         choices = result.get("choices", [])
         if not choices:
             return CompletionResponse(
-                content="", role="assistant", model=model, raw_response=result,
-                tool_calls=None, stop_reason=None, usage=None, metadata=None
+                content="",
+                role="assistant",
+                model=model,
+                raw_response=result,
+                tool_calls=None,
+                stop_reason=None,
+                usage=None,
+                metadata=None,
             )
 
         choice = choices[0]

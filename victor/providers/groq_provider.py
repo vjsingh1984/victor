@@ -276,7 +276,7 @@ class GroqProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from Groq.
 
         Args:
@@ -496,6 +496,10 @@ class GroqProvider(BaseProvider, HTTPErrorHandlerMixin):
                 role="assistant",
                 model=model,
                 raw_response=result,
+                metadata=None,
+                stop_reason=None,
+                tool_calls=None,
+                usage=None,
             )
 
         choice = choices[0]

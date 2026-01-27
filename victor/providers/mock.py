@@ -126,7 +126,7 @@ class MockProvider(BaseProvider):
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Generate a mock chat completion.
@@ -185,9 +185,9 @@ class MockProvider(BaseProvider):
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream mock chat completion.
 
         Args:

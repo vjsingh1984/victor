@@ -437,7 +437,7 @@ class BedrockProvider(BaseProvider):
             usage=usage,
             model=model,
             raw_response=response,
-            metadata=None
+            metadata=None,
         )
 
     async def stream(  # type: ignore[override]

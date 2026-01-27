@@ -287,7 +287,11 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
                             event, "index", getattr(event, "content_block_index", None)
                         )
                         tc_id = block_index_to_id.get(block_index)
-                        if tc_id and block_index is not None and "arguments" in tool_calls.get(tc_id, {}):  # Ensure block_index is not None
+                        if (
+                            tc_id
+                            and block_index is not None
+                            and "arguments" in tool_calls.get(tc_id, {})
+                        ):  # Ensure block_index is not None
                             tool_calls[tc_id]["arguments"] = self._parse_json_arguments(
                                 tool_calls[tc_id].get("arguments")
                             )

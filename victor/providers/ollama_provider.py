@@ -70,7 +70,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         if not candidates:
             if base_url is None:
                 # This should not be reachable since we already checked environment
-                candidates = ["http://localhost:11434"]  # type: ignore[unreachable]
+                candidates = ["http://localhost:11434"]  # type: ignore
             elif isinstance(base_url, (list, tuple)):
                 candidates = [str(u).strip() for u in base_url if str(u).strip()]
             elif isinstance(base_url, str):
@@ -79,11 +79,11 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
                 else:
                     candidates = [base_url]
             else:
-                candidates = [str(base_url)]  # type: ignore[unreachable]
+                candidates = [str(base_url)]  # type: ignore
 
         if not candidates:
             # This should be unreachable due to previous logic
-            candidates = ["http://localhost:11434"]  # type: ignore[unreachable]
+            candidates = ["http://localhost:11434"]  # type: ignore
 
         # Pick first candidate (blindly)
         chosen_base = candidates[0]
@@ -306,7 +306,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
                 else:
                     candidates = [base_url]
             else:
-                candidates = [str(base_url)]  # type: ignore[unreachable]
+                candidates = [str(base_url)]  # type: ignore
 
         for url in candidates:
             try:

@@ -252,7 +252,7 @@ class ResilienceMetricsExporter:
 
     def _collect_health_metrics(self) -> Dict[str, HealthMetrics]:
         """Collect metrics from health checker."""
-        metrics = {}
+        metrics: Dict[str, Any] = {}
 
         if not self._health_checker:
             return metrics

@@ -628,7 +628,7 @@ class RequestQueue:
         coroutines: List[Awaitable[T]],
         priority: RequestPriority = RequestPriority.NORMAL,
         return_exceptions: bool = True,
-    ) -> List[T]:
+    ) -> List[T | BaseException]:
         """Submit multiple requests for parallel execution.
 
         Args:

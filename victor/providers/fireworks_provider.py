@@ -181,7 +181,7 @@ class FireworksProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:
+    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
         """Stream chat completion from Fireworks."""
         try:
             payload = self._build_request_payload(
@@ -276,7 +276,14 @@ class FireworksProvider(BaseProvider, HTTPErrorHandlerMixin):
         choices = result.get("choices", [])
         if not choices:
             return CompletionResponse(
-                content="", role="assistant", model=model, raw_response=result
+                content="",
+                role="assistant",
+                model=model,
+                raw_response=result,
+                metadata=None,
+                stop_reason=None,
+                tool_calls=None,
+                usage=None,
             )
 
         choice = choices[0]
@@ -299,6 +306,7 @@ class FireworksProvider(BaseProvider, HTTPErrorHandlerMixin):
             usage=usage,
             model=model,
             raw_response=result,
+            metadata=None,
         )
 
     def _normalize_tool_calls(self, tool_calls) -> Optional[List[Dict[str, Any]]]:
