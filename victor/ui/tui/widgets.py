@@ -715,6 +715,7 @@ class ToolCallWidget(Static):
         # Stop collapse timer when manually toggled
         if self._collapse_timer:
             self._collapse_timer.stop()
+            self._collapse_timer = None
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button presses for expand/collapse error details."""

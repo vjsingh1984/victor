@@ -131,9 +131,8 @@ class StateEventEmitter(IStateEventEmitter):
 
     def emit(
         self,
-        topic: str,
-        data: Dict[str, Any],
-    ) -> None:
+        event: "MessagingEvent",
+    ) -> None:  # type: ignore[override]
         """Emit a state event synchronously (for gradual migration).
 
         This method wraps the async emit_async() method using emit_event_sync()
