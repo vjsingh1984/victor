@@ -292,9 +292,7 @@ async def export_to_yaml(graph: WorkflowGraph) -> dict[str, Any]:
         yaml_content = yaml.dump(
             {
                 "name": workflow_def.name,
-                "nodes": {
-                    node_id: node.model_dump() for node_id, node in workflow_def.nodes.items()
-                },
+                "nodes": {node_id: node.to_dict() for node_id, node in workflow_def.nodes.items()},
                 "start_node": workflow_def.start_node,
             },
             default_flow_style=False,
