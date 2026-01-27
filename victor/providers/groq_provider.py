@@ -349,6 +349,7 @@ class GroqProvider(BaseProvider, HTTPErrorHandlerMixin):
                                 ),
                                 stop_reason="stop",
                                 is_final=True,
+                                model_name=None,
                             )
                             break
 

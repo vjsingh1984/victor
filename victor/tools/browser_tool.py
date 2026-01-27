@@ -212,8 +212,8 @@ class BrowserTool:
             self._context = await self._browser.new_context(**context_options)  # type: ignore[attr-defined]
 
             # Block popups if configured
-            if self.config.block_popups:
-                self._context.on("page", lambda p: asyncio.create_task(p.close()))
+            if self.config.block_popups and self._context:
+                self._context.on("page", lambda p: asyncio.create_task(p.close()))  # type: ignore[attr-defined]
 
             # Create initial page
             self._page = await self._context.new_page()
