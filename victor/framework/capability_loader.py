@@ -422,7 +422,7 @@ class CapabilityLoader(DynamicModuleLoader):
                 capability=entry,
                 source_module=source_module,
             )
-        elif isinstance(entry, dict):
+        else:  # isinstance(entry, dict)
             # Dict format: construct capability from dict
             capability = OrchestratorCapability(
                 name=entry["name"],
@@ -439,9 +439,6 @@ class CapabilityLoader(DynamicModuleLoader):
                 getter_handler=entry.get("getter_handler"),
                 source_module=source_module,
             )
-        else:
-            logger.warning(f"Unknown capability entry type: {type(entry)}")
-            return None
 
     def _register_from_meta(
         self,

@@ -190,13 +190,14 @@ class TaskCoordinator:
                 f"Generation task detected, limiting iterations to {complexity_tool_budget + 1}"
             )
         else:
+            # MEDIUM, COMPLEX, ACTION, ANALYSIS
             logger.info(
                 f"Task complexity: {task_classification.complexity.value}, "
                 f"confidence: {task_classification.confidence:.2f}"
             )
 
         # Update reminder manager with task complexity and hint
-        if self._reminder_manager:
+        if self._reminder_manager is not None:
             from victor.framework.enrichment.strategies import get_complexity_hint
 
             self._reminder_manager.update_state(

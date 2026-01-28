@@ -156,7 +156,10 @@ class LazyVerticalExtensions:
         with self._load_lock:
             # Double-check: another thread may have loaded it
             if self._loaded:
-                return self._extensions  # type: ignore[union-attr]
+                if self._extensions is not None:
+                    return self._extensions
+                # Should never happen, but handle gracefully
+                raise RuntimeError("Extension loading failed: _extensions is None")
 
             # Check for recursive loading
             if self._loading:
@@ -164,6 +167,7 @@ class LazyVerticalExtensions:
                     f"Recursive loading detected for extensions of vertical '{self.vertical_name}'"
                 )
 
+            # Load extensions
             try:
                 self._loading = True
                 logger.debug(f"Lazy loading extensions for vertical: {self.vertical_name}")

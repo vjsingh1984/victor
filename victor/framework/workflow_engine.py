@@ -675,7 +675,7 @@ class WorkflowEngine:
                 async for event in compiled.stream(initial_state or {}, **kwargs):
                     # Convert CompiledGraph events to WorkflowEvent format
                     if isinstance(event, dict):
-                        yield WorkflowEvent(
+                        yield WorkflowEvent(  # type: ignore[unreachable]
                             event_type=event.get("event_type", "state_update"),
                             node_id=event.get("node_id", ""),
                             timestamp=time.time(),
@@ -714,7 +714,7 @@ class WorkflowEngine:
                 # Event should be WorkflowEvent from coordinator.stream()
                 # Type: Union[WorkflowEvent, tuple[str, Dict[str, Any]]] for backward compat
                 if isinstance(event, WorkflowEvent):
-                    yield event
+                    yield event  # type: ignore[unreachable]
                 else:
                     # Handle tuple format for backward compatibility
                     event_type, data = event

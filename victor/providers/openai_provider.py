@@ -309,7 +309,7 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                     "arguments": tc.function.arguments,
                 }
                 for tc in message.tool_calls
-                if hasattr(tc, "function")  # type: ignore[attr-defined]
+                if hasattr(tc, "function")
             ]
 
         # Parse usage

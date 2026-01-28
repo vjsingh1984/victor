@@ -1,0 +1,250 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: {{ name_title }} Example Workflow
+description: Example workflow demonstrating {{ name }} vertical capabilities
+version: 0.1.0
+
+# Workflow metadata
+metadata:
+  vertical: {{ name }}
+  author: Your Name
+  tags: [{{ name }}, example, workflow]
+
+# Input schema
+input_schema:
+  type: object
+  properties:
+    task:
+      type: string
+      description: The {{ name }} task to execute
+    context:
+      type: object
+      description: Additional context for the task
+      properties:
+        files:
+          type: array
+          items:
+            type: string
+          description: List of files to analyze
+  required: [task]
+
+# Output schema
+output_schema:
+  type: object
+  properties:
+    result:
+      type: string
+      description: The result of the {{ name }} operation
+    analysis:
+      type: object
+      description: Detailed analysis results
+    recommendations:
+      type: array
+      items:
+        type: string
+      description: List of recommendations
+
+# Workflow definition using StateGraph
+workflow:
+  # Define states
+  states:
+    - name: initialize
+      description: Initialize workflow context
+      type: function
+
+    - name: analyze_task
+      description: Analyze the {{ name }} task requirements
+      type: llm
+      tools: [read_file, list_directory]
+
+    - name: execute_{{ name }}
+      description: Execute the {{ name }} operation
+      type: llm
+      tools: [write_file, execute_command]
+
+    - name: validate_result
+      description: Validate the operation result
+      type: function
+
+    - name: finalize
+      description: Prepare final output
+      type: function
+
+  # Define transitions
+  transitions:
+    - from: initialize
+      to: analyze_task
+      condition: null
+
+    - from: analyze_task
+      to: execute_{{ name }}
+      condition: analysis_complete
+
+    - from: analyze_task
+      to: finalize
+      condition: analysis_failed
+
+    - from: execute_{{ name }}
+      to: validate_result
+      condition: null
+
+    - from: validate_result
+      to: finalize
+      condition: validation_passed
+
+    - from: validate_result
+      to: execute_{{ name }}
+      condition: validation_failed
+
+  # Define start and end
+  start_state: initialize
+  end_state: finalize
+
+# State implementations
+state_implementations:
+  initialize:
+    type: python
+    code: |
+      def initialize(state):
+          state["initialized"] = True
+          state["timestamp"] = datetime.now().isoformat()
+          return state
+
+  analyze_task:
+    type: llm
+    prompt: |
+      Analyze the following {{ name }} task:
+      {task}
+
+      Context: {context}
+
+      Determine:
+      1. What {{ name }} operations are needed
+      2. What tools are required
+      3. Any safety considerations
+      4. Expected outcome
+    tools:
+      - read_file
+      - list_directory
+      - search_code
+
+  execute_{{ name }}:
+    type: llm
+    prompt: |
+      Execute the following {{ name }} operation:
+      {analysis}
+
+      Use the available tools to complete the task.
+      Follow safety guidelines and best practices.
+    tools:
+      - write_file
+      - execute_command
+      - read_file
+
+  validate_result:
+    type: python
+    code: |
+      def validate_result(state):
+          # Validate the operation was successful
+          result = state.get("result", {})
+          errors = result.get("errors", [])
+
+          if errors:
+              state["validation_passed"] = False
+              state["validation_errors"] = errors
+          else:
+              state["validation_passed"] = True
+
+          return state
+
+  finalize:
+    type: python
+    code: |
+      def finalize(state):
+          # Prepare final output
+          return {
+              "result": state.get("result", {}),
+              "analysis": state.get("analysis", {}),
+              "recommendations": state.get("recommendations", []),
+              "metadata": {
+                  "vertical": "{{ name }}",
+                  "timestamp": state.get("timestamp"),
+              }
+          }
+
+# Error handling
+error_handling:
+  retry_policy:
+    max_retries: 3
+    backoff_factor: 2
+
+  fallback_states:
+    analyze_task: finalize
+    execute_{{ name }}: finalize
+
+# Tool configuration
+tool_config:
+  enabled_tools:
+    - read_file
+    - write_file
+    - list_directory
+    - search_code
+    - execute_command
+
+  tool_budgets:
+    low: 10
+    medium: 5
+    high: 2
+
+# Safety configuration
+safety:
+  enabled: true
+  validate_before_execution: true
+  dangerous_operations:
+    - execute_command
+    - write_file
+
+  validation_rules:
+    - rule: no_destructive_commands
+      description: Prevent execution of destructive commands
+      patterns: ["rm -rf", "del /q", "format"]
+
+    - rule: confirm_file_overwrites
+      description: Require confirmation before overwriting files
+      apply_to: [write_file]
+
+# Logging and observability
+logging:
+  level: INFO
+  log_file: /tmp/victor_{{ name }}.log
+
+  events:
+    - workflow_started
+    - workflow_completed
+    - state_entered
+    - state_exited
+    - tool_called
+    - error_occurred
+
+# Performance optimization
+optimization:
+  cache_results: true
+  cache_ttl: 3600
+
+  parallel_states:
+    - analyze_task
+    - validate_result
+
+  lazy_loading: true

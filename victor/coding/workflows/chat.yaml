@@ -1,0 +1,263 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Coding Chat Workflow - Agentic chat for coding tasks.
+
+Phase 2: Vertical Chat Workflow Definition
+==========================================
+This workflow implements a complete agentic chat loop for coding tasks using
+StateGraph for execution. The workflow is defined entirely in YAML with no
+Python workflow code required.
+
+Architecture:
+    - Hybrid YAML + StateGraph approach
+    - YAML defines workflow structure
+    - StateGraph provides state management and execution
+    - Escape hatches for complex conditions (in escape_hatches.py)
+
+Workflow Stages:
+    1. extract_requirements: Analyze user message for task requirements
+    2. check_strategy: Branch on task complexity
+    3. create_plan: Generate implementation plan (complex tasks)
+    4. generate_response: Generate response with tool calls
+    5. check_for_tool_calls: Agentic loop condition
+    6. execute_tools: Execute pending tool calls
+    7. update_conversation: Add tool results to conversation
+    8. format_response: Format final response
+
+Usage:
+    # Enable workflow chat
+    VICTOR_USE_WORKFLOW_CHAT=true
+
+    # Run chat
+    await orchestrator.chat("Fix the bug in user.py")
+"""
+
+workflows:
+  coding_chat:
+    description: "Agentic chat workflow for coding tasks with full tool support"
+
+    metadata:
+      version: "1.0"
+      author: "victor"
+      vertical: coding
+      category: chat
+      complexity: variable
+
+    # StateGraph schema for type safety
+    state_schema:
+      type: object
+      properties:
+        user_message: {type: string}
+        conversation_history: {type: array}
+        required_files: {type: array}
+        iteration_count: {type: integer, default: 0}
+        max_iterations: {type: integer, default: 50}
+        pending_tool_calls: {type: array}
+        completed_tool_results: {type: array}
+        task_complexity: {type: string}
+        last_response: {type: string}
+        final_response: {type: string}
+
+    nodes:
+      # =======================================================================
+      # Node 1: Extract Task Requirements
+      # =======================================================================
+      - id: extract_requirements
+        type: agent
+        stage: analyze_stage
+        overrides:
+          name: "Extract Requirements"
+          role: analyzer
+          goal: |
+            Extract task requirements from the user message:
+            1. Identify what the user wants to accomplish
+            2. List files that need to be read or modified
+            3. Identify expected outputs
+            4. Assess task complexity (simple, moderate, complex)
+          tool_budget: 10
+          tools: [read, grep, code_search]
+          llm_config:
+            temperature: 0.2
+          output:
+            required_files: "List[str]"
+            task_complexity: "str"
+            required_outputs: "List[str]"
+        next: [check_strategy]
+
+      # =======================================================================
+      # Node 2: Branch on Complexity
+      # =======================================================================
+      - id: check_strategy
+        type: condition
+        name: "Check Task Complexity"
+        condition: "chat_task_complexity"
+        branches:
+          "complex": create_plan
+          "moderate": create_plan
+          "simple": generate_response
+
+      # =======================================================================
+      # Node 3: Create Plan (Complex Tasks)
+      # =======================================================================
+      - id: create_plan
+        type: agent
+        stage: analyze_stage
+        overrides:
+          name: "Create Implementation Plan"
+          role: planner
+          goal: |
+            Create a detailed implementation plan for complex tasks:
+            1. Break down the task into steps
+            2. Identify dependencies and risks
+            3. Plan the order of operations
+            4. Consider edge cases
+          tool_budget: 15
+          tools: [read, grep, code_search]
+          llm_config:
+            temperature: 0.3
+          input_mapping:
+            requirements: extract_requirements
+          output:
+            plan: "str"
+            steps: "List[dict]"
+        next: [generate_response]
+
+      # =======================================================================
+      # Node 4: Generate Response with Tools
+      # =======================================================================
+      - id: generate_response
+        type: agent
+        stage: synthesis_stage
+        overrides:
+          name: "Generate Response"
+          role: coder
+          goal: |
+            Generate a response to accomplish the user's task:
+            1. Use tools to read files, search code, or make changes
+            2. Provide clear explanations
+            3. Show code changes when applicable
+            4. Follow best practices for the language
+          tool_budget: 50
+          tools: [read, write, edit, grep, code_search, shell, test, git]
+          llm_config:
+            temperature: 0.3
+          input_mapping:
+            plan: create_plan
+            requirements: extract_requirements
+          output:
+            content: "str"
+            tool_calls: "list"
+        next: [check_for_tool_calls]
+
+      # =======================================================================
+      # Node 5: Agentic Loop Check
+      # =======================================================================
+      - id: check_for_tool_calls
+        type: condition
+        name: "Check for Tool Calls"
+        condition: "has_pending_tool_calls"
+        branches:
+          "has_tools": execute_tools
+          "no_tools": update_conversation
+
+      # =======================================================================
+      # Node 6: Execute Tools
+      # =======================================================================
+      - id: execute_tools
+        type: tool_execution
+        name: "Execute Tools"
+        # Tools are executed from the tool_calls generated by generate_response
+        tools: "{{tool_calls}}"
+        next: [update_conversation]
+
+      # =======================================================================
+      # Node 7: Update Conversation
+      # =======================================================================
+      - id: update_conversation
+        type: transform
+        name: "Update Conversation State"
+        transform: update_conversation_with_tool_results
+        output:
+          iteration_count: "{{iteration_count + 1}}"
+        next: [check_iteration_limit]
+
+      # =======================================================================
+      # Node 8: Check Iteration Limit
+      # =======================================================================
+      - id: check_iteration_limit
+        type: condition
+        name: "Check Iteration Limit"
+        condition: "can_continue_iteration"
+        branches:
+          "continue": generate_response  # Loop back for next iteration
+          "max_reached": format_response
+
+      # =======================================================================
+      # Node 9: Format Final Response
+      # =======================================================================
+      - id: format_response
+        type: transform
+        name: "Format Final Response"
+        transform: format_coding_response
+        next: [__end__]
+
+  # ===========================================================================
+  # Quick Chat Workflow (for simple queries)
+  # ===========================================================================
+  quick_chat:
+    description: "Simplified chat workflow for quick coding questions"
+
+    metadata:
+      version: "1.0"
+      vertical: coding
+      category: chat
+      complexity: low
+
+    state_schema:
+      type: object
+      properties:
+        user_message: {type: string}
+        conversation_history: {type: array}
+        iteration_count: {type: integer, default: 0}
+        max_iterations: {type: integer, default: 10}
+
+    nodes:
+      - id: quick_response
+        type: agent
+        stage: synthesis_stage
+        overrides:
+          name: "Quick Response"
+          role: coder
+          goal: |
+            Provide a quick, helpful response:
+            1. Answer the question directly
+            2. Use tools only if necessary
+            3. Keep response concise
+          tool_budget: 5
+          tools: [read, grep, code_search]
+          llm_config:
+            temperature: 0.3
+          output:
+            content: "str"
+            tool_calls: "list"
+        next: [finalize]
+
+      - id: finalize
+        type: transform
+        name: "Finalize Response"
+        transform: |
+          final_response = content or "I understand your request."
+          status = "completed"
+        next: [__end__]

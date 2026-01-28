@@ -859,7 +859,7 @@ class TaskDecomposition:
 
         # Use graphviz layout if available, otherwise spring layout
         try:
-            import pygraphviz
+            import pygraphviz  # type: ignore[import-not-found]
 
             pos = nx.nx_agraph.graphviz_layout(self._graph, prog="dot")
         except (ImportError, AttributeError):

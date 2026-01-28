@@ -75,6 +75,11 @@ from victor.core.cache.cache_analytics import (
     Recommendation,
 )
 
+from victor.core.cache.vertical_integration_cache import (
+    VerticalIntegrationCache,
+    create_vertical_integration_cache,
+)
+
 __all__ = [
     # Response cache (original)
     "ResponseCache",
@@ -109,4 +114,7 @@ __all__ = [
     "CacheMetrics",
     "HotKey",
     "Recommendation",
+    # Vertical integration cache (SOLID improvement)
+    "VerticalIntegrationCache",
+    "create_vertical_integration_cache",
 ]

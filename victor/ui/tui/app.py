@@ -751,7 +751,7 @@ class VictorTUI(App):
                 on_line=lambda line: self._record_message("system", line),
             )
             self._slash_handler = SlashCommandHandler(
-                console=self._console_adapter,
+                console=self._console_adapter,  # type: ignore[arg-type]
                 settings=self.settings,
                 agent=self.agent,
             )

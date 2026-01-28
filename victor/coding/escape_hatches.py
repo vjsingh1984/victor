@@ -439,11 +439,181 @@ def format_implementation_plan(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # =============================================================================
+# Chat Workflow Escape Hatches (Phase 2)
+# =============================================================================
+
+
+def chat_task_complexity(ctx: Dict[str, Any]) -> str:
+    """Determine task complexity for chat workflow routing.
+
+    Args:
+        ctx: Workflow context with keys:
+            - task_complexity (str): Complexity from extract_requirements
+            - user_message (str): Original user message
+            - required_files (list): Files required for the task
+
+    Returns:
+        "complex", "moderate", or "simple"
+    """
+    # First check if complexity was already determined
+    complexity = ctx.get("task_complexity", "").lower()
+    if complexity in ["complex", "moderate", "simple"]:
+        return complexity
+
+    # Fall back to analysis from user message
+    user_message = ctx.get("user_message", "")
+    required_files = ctx.get("required_files", [])
+
+    # Check message length and keywords
+    message_lower = user_message.lower()
+    file_count = len(required_files) if isinstance(required_files, list) else 0
+
+    # Complex task indicators
+    complex_keywords = [
+        "refactor", "redesign", "architecture", "migrate", "implement",
+        "create", "build", "design", "system", "framework"
+    ]
+    has_complex_keyword = any(kw in message_lower for kw in complex_keywords)
+
+    # Simple task indicators
+    simple_keywords = [
+        "what is", "how do", "explain", "show me", "quick", "simple",
+        "trivial", "straightforward"
+    ]
+    has_simple_keyword = any(kw in message_lower for kw in simple_keywords)
+
+    # Determine complexity
+    if has_complex_keyword or file_count > 5 or len(message_lower) > 300:
+        return "complex"
+    elif has_simple_keyword and file_count <= 2 and len(message_lower) < 150:
+        return "simple"
+    else:
+        return "moderate"
+
+
+def has_pending_tool_calls(ctx: Dict[str, Any]) -> str:
+    """Check if there are pending tool calls to execute.
+
+    Args:
+        ctx: Workflow context with keys:
+            - tool_calls (list): Tool calls from agent response
+            - pending_tool_calls (list): Pending tool calls
+
+    Returns:
+        "has_tools" or "no_tools"
+    """
+    tool_calls = ctx.get("tool_calls", [])
+    pending = ctx.get("pending_tool_calls", [])
+
+    if tool_calls or pending:
+        return "has_tools"
+    return "no_tools"
+
+
+def can_continue_iteration(ctx: Dict[str, Any]) -> str:
+    """Check if workflow can continue with another iteration.
+
+    Args:
+        ctx: Workflow context with keys:
+            - iteration_count (int): Current iteration count
+            - max_iterations (int): Maximum allowed iterations
+
+    Returns:
+        "continue" or "max_reached"
+    """
+    iteration = ctx.get("iteration_count", 0)
+    max_iter = ctx.get("max_iterations", 50)
+
+    if iteration < max_iter:
+        return "continue"
+    return "max_reached"
+
+
+def update_conversation_with_tool_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Update conversation with tool results from execution.
+
+    Args:
+        ctx: Workflow context with tool execution results
+
+    Returns:
+        Updated conversation state
+    """
+    conversation_history = ctx.get("conversation_history", [])
+    content = ctx.get("content", "")
+    tool_calls = ctx.get("tool_calls", [])
+    tool_results = ctx.get("tool_results", [])
+
+    # Add assistant message with tool calls
+    if tool_calls:
+        conversation_history.append({
+            "role": "assistant",
+            "content": content,
+            "tool_calls": tool_calls,
+        })
+
+        # Add tool results
+        for result in tool_results:
+            conversation_history.append({
+                "role": "tool",
+                "content": str(result),
+            })
+
+    # Increment iteration count
+    iteration_count = ctx.get("iteration_count", 0) + 1
+
+    return {
+        "conversation_history": conversation_history,
+        "iteration_count": iteration_count,
+        "last_content": content,
+    }
+
+
+def format_coding_response(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Format final coding response for user.
+
+    Args:
+        ctx: Workflow context with all conversation data
+
+    Returns:
+        Formatted final response
+    """
+    content = ctx.get("content", "")
+    iteration_count = ctx.get("iteration_count", 0)
+    conversation_history = ctx.get("conversation_history", [])
+
+    # Extract files modified from tool calls
+    files_modified = []
+    for msg in conversation_history:
+        if msg.get("role") == "assistant" and "tool_calls" in msg:
+            for tool_call in msg.get("tool_calls", []):
+                if tool_call.get("name") in ["write", "edit", "write_file", "edit_files"]:
+                    args = tool_call.get("arguments", {})
+                    if "path" in args:
+                        files_modified.append(args["path"])
+
+    final_response = content
+    if not final_response:
+        final_response = "Task completed."
+
+    return {
+        "final_response": final_response,
+        "status": "completed",
+        "iterations": iteration_count,
+        "files_modified": files_modified,
+        "metadata": {
+            "total_iterations": iteration_count,
+            "files_touched": len(files_modified),
+        }
+    }
+
+
+# =============================================================================
 # Registry Exports
 # =============================================================================
 
 # Conditions available in YAML workflows
 CONDITIONS = {
+    # Original conditions
     "tests_passing": tests_passing,
     "code_quality_check": code_quality_check,
     "should_retry_implementation": should_retry_implementation,
@@ -453,16 +623,24 @@ CONDITIONS = {
     "tdd_cycle_status": tdd_cycle_status,
     "bugfix_priority": bugfix_priority,
     "should_continue_fixing": should_continue_fixing,
+    # Chat workflow conditions (Phase 2)
+    "chat_task_complexity": chat_task_complexity,
+    "has_pending_tool_calls": has_pending_tool_calls,
+    "can_continue_iteration": can_continue_iteration,
 }
 
 # Transforms available in YAML workflows
 TRANSFORMS = {
+    # Original transforms
     "merge_code_analysis": merge_code_analysis,
     "format_implementation_plan": format_implementation_plan,
+    # Chat workflow transforms (Phase 2)
+    "update_conversation_with_tool_results": update_conversation_with_tool_results,
+    "format_coding_response": format_coding_response,
 }
 
 __all__ = [
-    # Conditions
+    # Original Conditions
     "tests_passing",
     "code_quality_check",
     "should_retry_implementation",
@@ -472,9 +650,16 @@ __all__ = [
     "tdd_cycle_status",
     "bugfix_priority",
     "should_continue_fixing",
-    # Transforms
+    # Chat workflow conditions (Phase 2)
+    "chat_task_complexity",
+    "has_pending_tool_calls",
+    "can_continue_iteration",
+    # Original Transforms
     "merge_code_analysis",
     "format_implementation_plan",
+    # Chat workflow transforms (Phase 2)
+    "update_conversation_with_tool_results",
+    "format_coding_response",
     # Registries
     "CONDITIONS",
     "TRANSFORMS",

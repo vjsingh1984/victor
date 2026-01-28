@@ -19,7 +19,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.610422'
+    created_at: '2026-01-28T01:15:17.365069'
     version: 1
   security_expert:
     id: security_expert
@@ -40,7 +40,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.611348'
+    created_at: '2026-01-28T01:15:17.366684'
     version: 1
   mentor:
     id: mentor
@@ -61,7 +61,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.612266'
+    created_at: '2026-01-28T01:15:17.367510'
     version: 1
   custom_feedback_test:
     id: custom_feedback_test
@@ -82,7 +82,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.613683'
+    created_at: '2026-01-28T01:15:17.368595'
     version: 2
   custom_multi-user_test:
     id: custom_multi-user_test
@@ -103,7 +103,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.615690'
+    created_at: '2026-01-28T01:15:17.369940'
     version: 3
   custom_low_rated:
     id: custom_low_rated
@@ -122,7 +122,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.617587'
+    created_at: '2026-01-28T01:15:17.371572'
     version: 2
   custom_data_scientist:
     id: custom_data_scientist
@@ -140,14 +140,14 @@ personas:
       max_tool_calls: null
       preferred_tools:
       - train_model
-      - visualize
       - analyze_data
+      - visualize
       forbidden_tools: []
       response_length: long
       explanation_depth: detailed
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.619679'
+    created_at: '2026-01-28T01:15:17.373480'
     version: 1
   custom_devops_engineer:
     id: custom_devops_engineer
@@ -172,7 +172,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.622147'
+    created_at: '2026-01-28T01:15:17.375711'
     version: 1
   custom_testing_specialist:
     id: custom_testing_specialist
@@ -196,7 +196,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.625080'
+    created_at: '2026-01-28T01:15:17.378259'
     version: 1
   custom_persona_0:
     id: custom_persona_0
@@ -215,7 +215,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.628260'
+    created_at: '2026-01-28T01:15:17.381116'
     version: 1
   custom_persona_1:
     id: custom_persona_1
@@ -234,7 +234,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.631757'
+    created_at: '2026-01-28T01:15:17.384225'
     version: 1
   custom_persona_2:
     id: custom_persona_2
@@ -253,7 +253,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.635499'
+    created_at: '2026-01-28T01:15:17.387591'
     version: 1
   custom_persona_3:
     id: custom_persona_3
@@ -272,7 +272,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.639575'
+    created_at: '2026-01-28T01:15:17.391288'
     version: 1
   custom_persona_4:
     id: custom_persona_4
@@ -291,7 +291,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.643929'
+    created_at: '2026-01-28T01:15:17.395193'
     version: 1
   custom_persona_5:
     id: custom_persona_5
@@ -310,7 +310,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.648652'
+    created_at: '2026-01-28T01:15:17.399337'
     version: 1
   custom_persona_6:
     id: custom_persona_6
@@ -329,7 +329,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.653976'
+    created_at: '2026-01-28T01:15:17.403780'
     version: 1
   custom_persona_7:
     id: custom_persona_7
@@ -348,7 +348,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.659507'
+    created_at: '2026-01-28T01:15:17.408558'
     version: 1
   custom_persona_8:
     id: custom_persona_8
@@ -367,7 +367,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.665262'
+    created_at: '2026-01-28T01:15:17.413590'
     version: 1
   custom_persona_9:
     id: custom_persona_9
@@ -386,7 +386,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.671359'
+    created_at: '2026-01-28T01:15:17.418887'
     version: 1
   custom_persona_10:
     id: custom_persona_10
@@ -405,7 +405,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.677848'
+    created_at: '2026-01-28T01:15:17.424416'
     version: 1
   custom_persona_11:
     id: custom_persona_11
@@ -424,7 +424,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.684350'
+    created_at: '2026-01-28T01:15:17.430219'
     version: 1
   custom_persona_12:
     id: custom_persona_12
@@ -443,7 +443,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.691502'
+    created_at: '2026-01-28T01:15:17.436306'
     version: 1
   custom_persona_13:
     id: custom_persona_13
@@ -462,7 +462,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.698762'
+    created_at: '2026-01-28T01:15:17.442626'
     version: 1
   custom_persona_14:
     id: custom_persona_14
@@ -481,7 +481,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.706176'
+    created_at: '2026-01-28T01:15:17.449208'
     version: 1
   custom_persona_15:
     id: custom_persona_15
@@ -500,7 +500,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.714282'
+    created_at: '2026-01-28T01:15:17.456026'
     version: 1
   custom_persona_16:
     id: custom_persona_16
@@ -519,7 +519,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.722239'
+    created_at: '2026-01-28T01:15:17.463182'
     version: 1
   custom_persona_17:
     id: custom_persona_17
@@ -538,7 +538,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.730571'
+    created_at: '2026-01-28T01:15:17.470585'
     version: 1
   custom_persona_18:
     id: custom_persona_18
@@ -557,7 +557,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.739500'
+    created_at: '2026-01-28T01:15:17.478233'
     version: 1
   custom_persona_19:
     id: custom_persona_19
@@ -576,7 +576,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.748454'
+    created_at: '2026-01-28T01:15:17.486116'
     version: 1
   custom_persona_20:
     id: custom_persona_20
@@ -595,7 +595,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.758122'
+    created_at: '2026-01-28T01:15:17.494324'
     version: 1
   custom_persona_21:
     id: custom_persona_21
@@ -614,7 +614,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.767776'
+    created_at: '2026-01-28T01:15:17.502751'
     version: 1
   custom_persona_22:
     id: custom_persona_22
@@ -633,7 +633,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.777849'
+    created_at: '2026-01-28T01:15:17.511483'
     version: 1
   custom_persona_23:
     id: custom_persona_23
@@ -652,7 +652,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.788660'
+    created_at: '2026-01-28T01:15:17.520478'
     version: 1
   custom_persona_24:
     id: custom_persona_24
@@ -671,7 +671,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.799200'
+    created_at: '2026-01-28T01:15:17.529710'
     version: 1
   custom_persona_25:
     id: custom_persona_25
@@ -690,7 +690,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.809777'
+    created_at: '2026-01-28T01:15:17.539177'
     version: 1
   custom_persona_26:
     id: custom_persona_26
@@ -709,7 +709,7 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.821053'
+    created_at: '2026-01-28T01:15:17.549135'
     version: 1
   custom_persona_27:
     id: custom_persona_27
@@ -728,11 +728,27 @@ personas:
       explanation_depth: standard
     prompt_templates: null
     temperature: 0.7
-    created_at: '2026-01-27T05:52:55.832250'
+    created_at: '2026-01-28T01:15:17.559217'
     version: 1
-  custom_persona_28:
-    id: custom_persona_28
-    name: Persona_28
-    description: Persona 28
+  test_persona:
+    id: test_persona
+    name: Test Persona
+    description: A test persona
     personality: pragmatic
-    
+    communication_style: technical
+    expertise:
+    - coding
+    - testing
+    backstory: Test backstory
+    constraints:
+      max_tool_calls: 50
+      preferred_tools:
+      - read_file
+      - write_file
+      forbidden_tools: []
+      response_length: medium
+      explanation_depth: standard
+    prompt_templates: null
+    temperature: 0.7
+    created_at: '2026-01-28T01:15:17.580162'
+    version: 1

@@ -366,32 +366,54 @@ def zai_available() -> bool:
 async def ollama_provider() -> AsyncGenerator[OllamaProvider, None]:
     """Create Ollama provider for testing.
 
-    Uses fastest available models for speed:
-    - Ultra-fast (0.5B-3B): qwen2.5:0.5b, qwen2.5:1.5b, qwen2.5:3b, phi3:mini, gemma2:2b
-    - Fast (7B-8B): qwen2.5-coder:7b, phi3:3.8b, llama3.2:3b
-    - Balanced (14B): qwen2.5-coder:14b, phi3:14b
-    - Capable (20B+): gpt-oss-tools:20b-64K
+    Uses fast available models for reliability (skips ultra-fast models < 7B):
+    - Fast (7B-8B): qwen2.5-coder:7b, phi3:3.8b, llama3.1:8b - RECOMMENDED
+    - Balanced (14B): qwen2.5-coder:14b, deepseek-coder-v2:16b - BETTER
+    - Capable (20B+): gpt-oss-tools:20b-64K - BEST
 
-    To install faster models:
-      ollama pull qwen2.5:0.5b      # Ultra-fast, ~600MB
-      ollama pull phi3:mini          # Ultra-fast, ~2.3GB
-      ollama pull qwen2.5-coder:7b   # Fast for coding, ~4.7GB
+    NOTE: Ultra-fast models (0.5B-3B) are skipped because they:
+    - Hallucinate tools (confuse test names with tool names)
+    - Have poor tool understanding
+    - Produce unreliable results
+
+    To install recommended models:
+      ollama pull qwen2.5-coder:7b   # Fast for coding, ~4.7GB (RECOMMENDED)
+      ollama pull qwen2.5-coder:14b  # Balanced capability, ~9GB
     """
     if not is_ollama_running():
         pytest.skip("Ollama not available at localhost:11434")
 
-    # Try to find an available model (fastest first)
+    # Try to find an available model (skip ultra-fast models < 7B for reliability)
     model = None
     for candidate_model in PROVIDER_MODELS["ollama"]:
+        # Skip ultra-fast models (< 7B) - they hallucinate tools and are unreliable
+        if any(
+            skip in candidate_model.lower()
+            for skip in [
+                ":0.5b",
+                ":1b",
+                ":1.5b",
+                ":2b",
+                ":3b",
+                ":3.8b",
+                "llama3.2:latest",
+                "mistral:latest",
+                ":mini",
+                "phi3:mini",
+                "gemma2:2b",
+            ]
+        ):
+            continue
+
         if is_ollama_model_available(candidate_model):
             model = candidate_model
             break
 
     if not model:
         pytest.skip(
-            "No suitable Ollama model found. "
-            "Install a fast model: ollama pull qwen2.5:0.5b (600MB) "
-            "or ollama pull phi3:mini (2.3GB)"
+            "No suitable Ollama model found (7B+ required). "
+            "Install: ollama pull qwen2.5-coder:7b (4.7GB) "
+            "or ollama pull qwen2.5-coder:14b (9GB)"
         )
 
     provider = OllamaProvider(

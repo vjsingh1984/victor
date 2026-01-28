@@ -258,12 +258,12 @@ class SwitchCommand(BaseSlashCommand):
             model: Model name
         """
         try:
-            if ctx.agent and ctx.agent.switch_model(model):
+            if ctx.agent and hasattr(ctx.agent, 'switch_model') and ctx.agent.switch_model(model):
                 info = ctx.agent.get_current_provider_info()
                 ctx.console.print(
                     f"[green]✓[/] Switched to [cyan]{model}[/]\n"
-                    f"  [dim]Native tools: {info['native_tool_calls']}, "
-                    f"Thinking: {info['thinking_mode']}[/]"
+                    f"  [dim]Native tools: {info.get('native_tool_calls', 'N/A')}, "
+                    f"Thinking: {info.get('thinking_mode', 'N/A')}[/]"
                 )
             else:
                 ctx.console.print(f"[red]Failed to switch model to {model}[/]")
@@ -280,8 +280,12 @@ class SwitchCommand(BaseSlashCommand):
             model: Model name
         """
         try:
-            if ctx.agent.switch_provider(provider_name=provider, model=model):  # type: ignore[attr-defined,union-attr]
-                info = ctx.agent.get_current_provider_info()  # type: ignore[union-attr]
+            if not ctx.agent:
+                ctx.console.print("[red]No active agent[/]")
+                return
+
+            if hasattr(ctx.agent, 'switch_provider') and ctx.agent.switch_provider(provider_name=provider, model=model):
+                info = ctx.agent.get_current_provider_info()
                 ctx.console.print(
                     f"[green]✓[/] Switched to [cyan]{provider}:{model}[/]\n"
                     f"  [dim]Native tools: {info.get('native_tool_calls', 'N/A')}, "

@@ -440,7 +440,7 @@ class BedrockProvider(BaseProvider):
             metadata=None,
         )
 
-    async def stream(  # type: ignore[override]
+    async def stream(  # type: ignore[override,misc]
         self,
         messages: List[Message],
         *,

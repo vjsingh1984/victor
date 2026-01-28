@@ -181,7 +181,11 @@ class StreamingCoordinator:
                 if content:
                     contents.append(str(content))
             elif isinstance(chunk, str):
+                # Chunk is a string
                 contents.append(chunk)
+            else:
+                # Fallback for other types
+                contents.append(str(chunk))
 
         return "".join(contents)
 

@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set, TYPE_CHECKING
+from typing import AbstractSet, Any, Callable, Dict, FrozenSet, List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.tools.enums import AccessMode
@@ -125,9 +125,9 @@ class Role:
     """
 
     name: str
-    permissions: FrozenSet[Permission] = field(default_factory=frozenset)
-    allowed_categories: FrozenSet[str] = field(default_factory=frozenset)
-    denied_tools: FrozenSet[str] = field(default_factory=frozenset)
+    permissions: AbstractSet[Permission] = field(default_factory=frozenset)
+    allowed_categories: AbstractSet[str] = field(default_factory=frozenset)
+    denied_tools: AbstractSet[str] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
         """Validate and convert mutable sets to frozensets."""

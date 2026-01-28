@@ -475,12 +475,15 @@ class AgentBuilder:
         if self._container is None:
             return None
         try:
-            from victor.framework.service_provider import ToolConfiguratorService
             from typing import cast
+            from victor.framework.service_provider import ToolConfiguratorService
 
             # Get from container to ensure we get the singleton instance
-            service_impl = self._container.get(ToolConfiguratorService)
-            return cast(ToolConfiguratorService, service_impl)
+            # Use concrete class for container.get(), return as Protocol type
+            from victor.framework.tool_config import ToolConfigurator
+
+            service_impl = self._container.get(ToolConfigurator)
+            return cast(Optional["ToolConfiguratorService"], service_impl)
         except Exception as e:
             logger.debug(f"Could not get ToolConfigurator from container: {e}")
             return None
@@ -1175,7 +1178,7 @@ class AgentSession:
             except Exception as e:
                 logger.debug(f"on_turn_end hook error: {e}")
 
-        return result  # type: ignore[no-any-return]
+        return result
 
     async def stream(self, message: str) -> AsyncIterator[AgentExecutionEvent]:
         """Stream a response.

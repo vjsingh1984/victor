@@ -32,7 +32,7 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Coroutine, Dict, List, Optional, TYPE_CHECKING
 
 from victor.config.settings import load_settings
 
@@ -624,7 +624,7 @@ class VictorAgentAdapter:
 
 def create_victor_agent_callback(
     adapter: VictorAgentAdapter,
-) -> Callable[[BenchmarkTask, Path], AgenticExecutionTrace]:
+) -> Callable[[BenchmarkTask, Path], Coroutine[Any, Any, AgenticExecutionTrace]]:
     """Create an agent callback for AgenticBenchmarkRunner.
 
     Args:

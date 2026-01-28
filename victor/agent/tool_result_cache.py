@@ -364,22 +364,23 @@ class ToolResultCache:
                 query_text = self._create_query_text(tool_name, arguments)
                 embedding = await self.embedding_service.embed_text(query_text)
 
-                if embedding is None:
+                if embedding is not None:
+                    query_vec = self._normalize(np.array(embedding, dtype=np.float32))
+                    sim_threshold = threshold or SIMILARITY_THRESHOLD.get(tool_name, 0.90)
+
+                    # Search using FAISS or numpy fallback
+                    best_match = self._search_similar(query_vec, tool_name, sim_threshold)
+
+                    if best_match:
+                        best_match.touch()
+                        self._entries.move_to_end(best_match.args_hash)
+                        self.stats.hits += 1
+                        self.stats.tokens_saved += self._estimate_tokens(best_match.result)
+                        return best_match.result
+                else:
+                    # embedding is None
                     self.stats.misses += 1
-                    return None  # type: ignore[unreachable]
-
-                query_vec = self._normalize(np.array(embedding, dtype=np.float32))
-                sim_threshold = threshold or SIMILARITY_THRESHOLD.get(tool_name, 0.90)
-
-                # Search using FAISS or numpy fallback
-                best_match = self._search_similar(query_vec, tool_name, sim_threshold)
-
-                if best_match:
-                    best_match.touch()
-                    self._entries.move_to_end(best_match.args_hash)
-                    self.stats.hits += 1
-                    self.stats.tokens_saved += self._estimate_tokens(best_match.result)
-                    return best_match.result
+                    return None
 
             except Exception as e:
                 logger.debug(f"Cache lookup error: {e}")
@@ -453,7 +454,7 @@ class ToolResultCache:
         """
         ttl = TOOL_TTL.get(tool_name, 0)
         if ttl == 0:
-            return False  # type: ignore[unreachable]
+            return False
 
         try:
             # Generate embedding

@@ -327,7 +327,11 @@ class ApprovalsCommand(BaseSlashCommand):
             ctx.console.print("[dim]Available: suggest, auto, full-auto[/]")
             return
 
-        ctx.settings.approval_mode = mode
+        # Use getattr/setattr to handle dynamic attributes without type errors
+        if not hasattr(ctx.settings, 'approval_mode'):
+            object.__setattr__(ctx.settings, 'approval_mode', mode)
+        else:
+            setattr(ctx.settings, 'approval_mode', mode)
         ctx.console.print(f"[green]Approval mode set to:[/] {mode}")
 
         if mode == "full-auto":

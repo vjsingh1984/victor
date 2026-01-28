@@ -20,7 +20,7 @@ analysis, coverage tracking, and optimization recommendations.
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 from victor.observability.pipeline import (
     CoverageMetrics,

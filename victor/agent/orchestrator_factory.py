@@ -311,6 +311,7 @@ class OrchestratorFactory(ModeAwareMixin):
         from victor.agent.builders.session_services_builder import SessionServicesBuilder
         from victor.agent.builders.metrics_logging_builder import MetricsLoggingBuilder
         from victor.agent.builders.workflow_memory_builder import WorkflowMemoryBuilder
+        from victor.agent.builders.workflow_chat_builder import WorkflowChatBuilder
         from victor.agent.builders.intelligent_integration_builder import (
             IntelligentIntegrationBuilder,
         )
@@ -333,6 +334,7 @@ class OrchestratorFactory(ModeAwareMixin):
             SessionServicesBuilder,
             MetricsLoggingBuilder,
             WorkflowMemoryBuilder,
+            WorkflowChatBuilder,  # Phase 1: Domain-Agnostic Workflow Chat
             IntelligentIntegrationBuilder,
             ToolingBuilder,
             ConversationPipelineBuilder,
@@ -3092,7 +3094,7 @@ class OrchestratorFactory(ModeAwareMixin):
             if tools:
                 from victor.framework.tool_config import configure_tools
 
-                configure_tools(orchestrator, tools)
+                configure_tools(orchestrator, tools)  # type: ignore[arg-type]
 
             # Apply vertical configuration if specified
             vertical = kwargs.get("vertical")

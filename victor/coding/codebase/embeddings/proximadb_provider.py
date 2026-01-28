@@ -183,7 +183,10 @@ class ProximaDBProvider(BaseEmbeddingProvider):
                 self._started = True
                 # Access rest_url safely (db is not None here)
                 self._server_url = getattr(self._db, "rest_url", self._server_url)
-            print(f"Started embedded ProximaDB: {self._server_url}")
+                print(f"Started embedded ProximaDB: {self._server_url}")
+            else:
+                print("Failed to start embedded ProximaDB")
+                return
 
         except ImportError:
             # Fall back to checking for running server
@@ -607,13 +610,14 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             self._client = None
 
         # Stop embedded server if we started it
-        if self._db and self._started:
-            try:
-                await self._db.stop()
-            except Exception:
-                pass
+        if self._db is not None:
+            if self._started:
+                try:
+                    await self._db.stop()
+                except Exception:
+                    pass
+                self._started = False
             self._db = None
-            self._started = False
 
         self._initialized = False
 

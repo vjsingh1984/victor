@@ -36,15 +36,19 @@ if TYPE_CHECKING:
     from typing import Union
 
     try:
-        from victor.storage.embeddings.task_classifier import TaskType
+        from victor.storage.embeddings.task_classifier import TaskType as TaskTypeEnum
     except (ImportError, AttributeError):
-        TaskType = type(None) | object  # type: ignore[misc]
+        TaskTypeEnum: type | None = None  # type: ignore[misc]
     try:
-        from victor.storage.embeddings.intent_classifier import IntentType
+        from victor.storage.embeddings.intent_classifier import IntentType as IntentTypeEnum
     except (ImportError, AttributeError):
-        IntentType = type(None) | object  # type: ignore[misc]
+        IntentTypeEnum: type | None = None  # type: ignore[misc]
     from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.protocols.coordination import CoordinationSuggestion
+
+    # Type aliases for compatibility
+    TaskType = TaskTypeEnum
+    IntentType = IntentTypeEnum
 
 # Import protocols for type hints (available at runtime since protocols.py has no heavy deps)
 from victor.core.protocols import TaskClassifierProtocol, IntentClassifierProtocol

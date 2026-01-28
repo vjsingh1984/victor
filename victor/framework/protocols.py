@@ -891,3 +891,201 @@ def verify_protocol_conformance(obj: Any, protocol: type) -> Tuple[bool, List[st
                 missing.append(attr)
 
     return len(missing) == 0, missing
+
+
+# =============================================================================
+# Phase 1: Workflow Chat Protocols (Domain-Agnostic)
+# =============================================================================
+
+
+@runtime_checkable
+class ChatStateProtocol(Protocol):
+    """Protocol for chat workflow state (domain-agnostic).
+
+    Phase 1: Foundation - Domain-Agnostic Workflow Chat
+    This protocol defines the interface for chat state that can be
+    extended by verticals (e.g., CodingChatState) for domain-specific
+    state management.
+
+    The state is passed between workflow nodes and maintains the
+    conversation history, iteration count, and metadata.
+
+    Attributes:
+        messages: List of conversation messages
+        iteration_count: Current iteration number
+
+    Methods:
+        add_message: Add a message to the conversation
+        increment_iteration: Increment the iteration counter
+        set_metadata: Set metadata key-value pair
+        get_metadata: Get metadata value by key
+    """
+
+    @property
+    def messages(self) -> List[Dict[str, Any]]:
+        """Get the conversation messages.
+
+        Returns:
+            List of message dictionaries with role and content
+        """
+        ...
+
+    @property
+    def iteration_count(self) -> int:
+        """Get the current iteration count.
+
+        Returns:
+            Number of iterations that have been executed
+        """
+        ...
+
+    def add_message(
+        self, role: str, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None
+    ) -> None:
+        """Add a message to the conversation history."""
+        ...
+
+    def increment_iteration(self) -> None:
+        """Increment the iteration counter."""
+        ...
+
+    def set_metadata(self, key: str, value: Any) -> None:
+        """Set metadata key-value pair."""
+        ...
+
+    def get_metadata(self, key: str, default: Any = None) -> Any:
+        """Get metadata value by key."""
+        ...
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert state to dictionary for serialization."""
+        ...
+
+
+@runtime_checkable
+class ChatResultProtocol(Protocol):
+    """Protocol for chat workflow execution results.
+
+    Phase 1: Foundation - Domain-Agnostic Workflow Chat
+    This protocol defines the interface for results returned from
+    workflow-based chat execution.
+
+    Attributes:
+        content: The final response content
+        iteration_count: Number of iterations executed
+        metadata: Additional metadata about the execution
+
+    Methods:
+        to_dict: Convert result to dictionary
+        get_summary: Get a summary of the execution
+    """
+
+    @property
+    def content(self) -> str:
+        """Get the final response content.
+
+        Returns:
+            String content of the response
+        """
+        ...
+
+    @property
+    def iteration_count(self) -> int:
+        """Get the number of iterations executed.
+
+        Returns:
+            Number of iterations
+        """
+        ...
+
+    @property
+    def metadata(self) -> Dict[str, Any]:
+        """Get execution metadata.
+
+        Returns:
+            Dictionary with metadata like tools_used, files_modified, etc.
+        """
+        ...
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert result to dictionary."""
+        ...
+
+    def get_summary(self) -> str:
+        """Get a summary of the execution.
+
+        Returns:
+            String summary with key statistics
+        """
+        ...
+
+
+@runtime_checkable
+class WorkflowChatProtocol(Protocol):
+    """Protocol for workflow-based chat execution.
+
+    Phase 1: Foundation - Domain-Agnostic Workflow Chat
+    This protocol defines the interface for domain-agnostic workflow-based
+    chat execution using StateGraph.
+
+    Implementations of this protocol should:
+    - Use workflow coordinator to load workflows
+    - Use graph coordinator to execute workflows
+    - Return results conforming to ChatResultProtocol
+    - Support streaming via AsyncIterator
+
+    Methods:
+        execute_chat_workflow: Execute a chat workflow
+        stream_chat_workflow: Stream chat workflow execution
+        list_workflows: List available workflows
+        get_workflow_info: Get information about a specific workflow
+    """
+
+    async def execute_chat_workflow(
+        self, workflow_name: str, initial_state: Dict[str, Any]
+    ) -> ChatResultProtocol:
+        """Execute chat workflow and return result.
+
+        Args:
+            workflow_name: Name of the workflow to execute
+            initial_state: Initial state for the workflow
+
+        Returns:
+            ChatResultProtocol with execution result
+        """
+        ...
+
+    async def stream_chat_workflow(
+        self, workflow_name: str, initial_state: Dict[str, Any]
+    ) -> AsyncIterator[ChatResultProtocol]:
+        """Stream chat workflow execution.
+
+        Yields intermediate results during execution.
+
+        Args:
+            workflow_name: Name of the workflow to execute
+            initial_state: Initial state for the workflow
+
+        Yields:
+            ChatResultProtocol with intermediate results
+        """
+        ...
+
+    def list_workflows(self) -> List[str]:
+        """List available chat workflows.
+
+        Returns:
+            List of workflow names
+        """
+        ...
+
+    def get_workflow_info(self, workflow_name: str) -> Dict[str, Any]:
+        """Get information about a workflow.
+
+        Args:
+            workflow_name: Name of the workflow
+
+        Returns:
+            Dictionary with workflow information (description, version, etc.)
+        """
+        ...

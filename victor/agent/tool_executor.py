@@ -850,10 +850,11 @@ class ToolExecutor:
                         )
                         self._track_error_category(error_info.category)
                         return result.output, False, error, retry_context.attempt - 1, error_info
-                else:
-                    # Raw result (for tools that don't return ToolResult)
-                    self.retry_strategy.on_success(retry_context)
-                    return result, True, None, retry_context.attempt - 1, None  # type: ignore[unreachable]
+
+                # Raw result (for tools that don't return ToolResult)
+                # Process the result normally
+                self.retry_strategy.on_success(retry_context)
+                return result, True, None, retry_context.attempt - 1, None
 
             except asyncio.TimeoutError as e:
                 # Handle timeout specifically

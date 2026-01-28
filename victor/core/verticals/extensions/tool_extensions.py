@@ -132,10 +132,7 @@ class ToolExtensions:
         """
         all_deps: Set[str] = set()
         for dep in self.tool_dependencies:
-            if isinstance(dep.depends_on, set):
-                all_deps.update(dep.depends_on)
-            else:
-                all_deps.update(dep.depends_on)
+            all_deps.update(dep.depends_on)
         return all_deps
 
     def get_middleware_for_tool(self, tool_name: str) -> List[Any]:

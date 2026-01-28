@@ -499,6 +499,26 @@ class CodingAssistant(VerticalBase):
         return handlers
 
     @classmethod
+    def get_workflow_provider(cls) -> Optional[Any]:
+        """Get coding chat workflow provider (cached).
+
+        Custom implementation for Coding vertical with CodingChatWorkflowProvider.
+        Auto-generated getter would try to import from victor.coding.workflows
+        with class name CodingWorkflowProvider, but we use a custom location.
+
+        Returns:
+            CodingChatWorkflowProvider instance
+        """
+
+        def _create() -> Optional[Any]:
+            from victor.coding.chat_workflow_provider import CodingChatWorkflowProvider
+
+            return CodingChatWorkflowProvider()
+
+        result = cls._get_cached_extension("workflow_provider", _create)
+        return result
+
+    @classmethod
     def get_capability_configs(cls) -> Dict[str, Any]:
         """Get coding capability configurations for centralized storage.
 

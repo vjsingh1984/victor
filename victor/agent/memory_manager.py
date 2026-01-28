@@ -340,9 +340,12 @@ class SessionRecoveryManager:
                     self._memory_manager.session_id = session_id
                     logger.info(f"Recovered session {session_id[:8]}... via direct recovery")
                     return True
-                else:
-                    logger.warning(f"Session {session_id} not found")
-                    return False
+
+                logger.warning(f"Session {session_id} not found")
+                return False
+            else:
+                logger.warning("Conversation store not available")
+                return False
         except Exception as e:
             logger.warning(f"Failed to recover session {session_id}: {e}")
             return False

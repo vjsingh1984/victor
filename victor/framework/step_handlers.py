@@ -405,7 +405,13 @@ class BaseStepHandler(ABC):
     - _do_apply() method
 
     Optionally override:
+    - is_independent property (default: False)
     - _get_step_details() to provide additional status details
+
+    Handler Independence:
+        Independent handlers can run in parallel with each other.
+        Dependent handlers must run sequentially after all independent handlers.
+        By default, handlers are dependent (is_independent=False).
     """
 
     @property
@@ -419,6 +425,19 @@ class BaseStepHandler(ABC):
     def order(self) -> int:
         """Get the execution order (lower runs first)."""
         ...
+
+    @property
+    def is_independent(self) -> bool:
+        """Check if this handler can run independently in parallel.
+
+        Independent handlers don't depend on state modifications from other
+        handlers and can safely execute in parallel. By default, handlers
+        are dependent to ensure safety.
+
+        Returns:
+            True if handler is independent, False otherwise
+        """
+        return False
 
     def apply(
         self,
@@ -514,6 +533,9 @@ class ToolStepHandler(BaseStepHandler):
 
     Applies the tool filter from the vertical, canonicalizing
     tool names and enabling them on the orchestrator.
+
+    This handler is independent because it only modifies the tool list
+    in context and doesn't depend on state from other handlers.
     """
 
     @property
@@ -523,6 +545,11 @@ class ToolStepHandler(BaseStepHandler):
     @property
     def order(self) -> int:
         return 10
+
+    @property
+    def is_independent(self) -> bool:
+        """Tool application can run in parallel with other independent handlers."""
+        return True
 
     def _do_apply(
         self,
@@ -588,6 +615,9 @@ class PromptStepHandler(BaseStepHandler):
 
     Applies the system prompt from the vertical and merges
     task hints from prompt contributors.
+
+    This handler is independent because it only modifies the prompt
+    in context and doesn't depend on state from other handlers.
     """
 
     @property
@@ -597,6 +627,11 @@ class PromptStepHandler(BaseStepHandler):
     @property
     def order(self) -> int:
         return 20
+
+    @property
+    def is_independent(self) -> bool:
+        """Prompt application can run in parallel with other independent handlers."""
+        return True
 
     def _do_apply(
         self,
@@ -713,6 +748,9 @@ class SafetyStepHandler(BaseStepHandler):
 
     Collects safety patterns from all safety extensions and
     applies them to the orchestrator.
+
+    This handler is independent because it only modifies safety patterns
+    in context and doesn't depend on state from other handlers.
     """
 
     @property
@@ -722,6 +760,11 @@ class SafetyStepHandler(BaseStepHandler):
     @property
     def order(self) -> int:
         return 30
+
+    @property
+    def is_independent(self) -> bool:
+        """Safety pattern application can run in parallel with other independent handlers."""
+        return True
 
     def _do_apply(
         self,

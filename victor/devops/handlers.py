@@ -55,6 +55,8 @@ from victor.framework.workflows.base_handler import BaseHandler
 from victor.framework.handler_registry import handler_decorator
 
 if TYPE_CHECKING:
+    import mlflow
+    from mlflow.tracking import MlflowClient
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
     from victor.workflows.executor import WorkflowContext
@@ -320,8 +322,15 @@ class MLOpsHandler(BaseHandler):
     ) -> Dict[str, Any]:
         """Synchronous MLOps execution."""
         try:
-            import mlflow  # type: ignore[import]
-            from mlflow.tracking import MlflowClient  # type: ignore[import]
+            # Runtime import for mlflow (optional dependency)
+            try:
+                import mlflow
+                from mlflow.tracking import MlflowClient
+            except ImportError as e:
+                return {
+                    "success": False,
+                    "error": f"MLflow not installed. Install with: pip install mlflow. Error: {e}",
+                }
 
             mlflow.set_tracking_uri(self.tracking_uri)
             client = MlflowClient()
@@ -344,11 +353,6 @@ class MLOpsHandler(BaseHandler):
                     "error": f"Unknown operation: {operation}. Use: register, log_experiment, serve, compare, promote, list_models",
                 }
 
-        except ImportError as e:
-            return {
-                "success": False,
-                "error": f"MLflow not installed. Install with: pip install mlflow. Error: {e}",
-            }
         except Exception as e:
             return {
                 "success": False,
@@ -511,7 +515,7 @@ __all__ = [
 ]
 
 # Handler registry for tests and programmatic access
-HANDLERS: Dict[str, type[object]] = {  # type: ignore[dict-item]
+HANDLERS: Dict[str, type[object]] = {
     "container_ops": ContainerOpsHandler,
     "terraform_apply": TerraformHandler,
     "mlops": MLOpsHandler,

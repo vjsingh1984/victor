@@ -590,17 +590,21 @@ class TestMemory:
         - Skipped if Ollama is not available (@requires_ollama)
         - Skips on timeout if commodity hardware is too slow
 
-        Uses a small local model (gemma2:2b) for fast execution.
+        Uses a fast local model (qwen2.5-coder:7b) for reliable execution.
         Per-iteration timeout (15s) ensures graceful skip on slow hardware.
         """
         from victor.providers.ollama_provider import OllamaProvider
         from victor.agent.orchestrator_factory import OrchestratorFactory
         from victor.config.settings import Settings
 
-        # Create real provider with small model for speed
+        # Use qwen2.5-coder:7b (4.7GB, reliable and fast)
+        # Note: gemma2:2b is not available, using qwen2.5-coder:7b instead
+        model = "qwen2.5-coder:7b"
+
+        # Create real provider with fast model for reliability
         provider = OllamaProvider(
             base_url="http://localhost:11434",
-            model="gemma2:2b",  # Small model for faster execution
+            model=model,
         )
 
         try:
@@ -614,7 +618,7 @@ class TestMemory:
             factory = OrchestratorFactory(
                 settings=settings,
                 provider=provider,
-                model="gemma2:2b",
+                model=model,
                 temperature=0.7,
                 max_tokens=512,  # Shorter responses for speed
             )
@@ -656,7 +660,7 @@ class TestMemory:
                     benchmark_suite.results[-1].metadata["final_memory_mb"] = final_memory
                     benchmark_suite.results[-1].metadata["memory_growth_mb"] = memory_growth
                     benchmark_suite.results[-1].metadata["iterations"] = 10
-                    benchmark_suite.results[-1].metadata["model"] = "gemma2:2b"
+                    benchmark_suite.results[-1].metadata["model"] = model
                     benchmark_suite.results[-1].metadata["tool_selection"] = "keyword"
 
                 # Memory growth threshold set to 500 MB for 10 iterations with real LLM

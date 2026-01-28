@@ -28,7 +28,7 @@ Install libclang with: pip install libclang
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from ..types import ExtractedSymbol
 from .base import BaseLanguageProcessor
@@ -166,31 +166,27 @@ class CppExtractor(BaseLanguageProcessor):
         if not self.is_available():
             return []
 
+        # is_available() ensures self._index is not None, use cast for mypy
+        index = cast(Any, self._index)
+
         symbols: List[ExtractedSymbol] = []
 
-        if self._index is None:
-            return symbols
+        # Parse options
+        args = ["-x", "c++" if language == "cpp" else "c"]
 
-        try:  # type: ignore[unreachable]
-            # Parse options
-            args = ["-x", "c++" if language == "cpp" else "c"]
+        # Parse the code
+        tu = index.parse(
+            str(file_path),
+            args=args,
+            unsaved_files=[(str(file_path), code)],
+            options=(
+                cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
+                | cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
+            ),
+        )
 
-            # Parse the code
-            tu = self._index.parse(
-                str(file_path),
-                args=args,
-                unsaved_files=[(str(file_path), code)],
-                options=(
-                    cindex.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
-                    | cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
-                ),
-            )
-
-            # Extract symbols from AST
-            self._extract_from_cursor(tu.cursor, file_path, symbols, str(file_path))
-
-        except Exception as e:
-            logger.debug(f"libclang parsing error: {e}")
+        # Extract symbols from AST
+        self._extract_from_cursor(tu.cursor, file_path, symbols, str(file_path))
 
         return symbols
 
@@ -248,26 +244,23 @@ class CppExtractor(BaseLanguageProcessor):
         if not self.is_available():
             return self._ts_extractor.has_syntax_errors(code, language)
 
-        if self._index is None:
-            return False
+        # is_available() ensures self._index is not None, use cast for mypy
+        index = cast(Any, self._index)
 
-        try:  # type: ignore[unreachable]
-            args = ["-x", "c++" if language == "cpp" else "c"]
+        args = ["-x", "c++" if language == "cpp" else "c"]
 
-            tu = self._index.parse(
-                "temp.cpp" if language == "cpp" else "temp.c",
-                args=args,
-                unsaved_files=[("temp.cpp" if language == "cpp" else "temp.c", code)],
-            )
+        tu = index.parse(
+            "temp.cpp" if language == "cpp" else "temp.c",
+            args=args,
+            unsaved_files=[("temp.cpp" if language == "cpp" else "temp.c", code)],
+        )
 
-            # Check for errors in diagnostics
-            for diag in tu.diagnostics:
-                if diag.severity >= cindex.Diagnostic.Error:
-                    return True
+        # Check for errors in diagnostics
+        for diag in tu.diagnostics:
+            if diag.severity >= cindex.Diagnostic.Error:
+                return True
 
-            return False
-        except Exception:
-            return True
+        return False
 
     def get_diagnostics(
         self,
@@ -288,15 +281,15 @@ class CppExtractor(BaseLanguageProcessor):
         if not self.is_available():
             return self._ts_extractor.get_error_locations(code, language)
 
-        if self._index is None:
-            return []
+        # is_available() ensures self._index is not None, use cast for mypy
+        index = cast(Any, self._index)
 
-        diagnostics = []
+        diagnostics: List[Dict[str, Any]] = []
 
         try:
             args = ["-x", "c++" if language == "cpp" else "c"]
 
-            tu = self._index.parse(
+            tu = index.parse(
                 str(file_path),
                 args=args,
                 unsaved_files=[(str(file_path), code)],

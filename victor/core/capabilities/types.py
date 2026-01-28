@@ -145,7 +145,7 @@ class CapabilityDefinition:
             return True
 
         try:
-            import jsonschema
+            import jsonschema  # type: ignore[import-untyped]
 
             jsonschema.validate(instance=config, schema=self.config_schema)
             return True

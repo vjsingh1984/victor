@@ -146,7 +146,7 @@ class ToolPlanner:
     # =====================================================================
 
     def filter_tools_by_intent(
-        self, tools: List[Any], current_intent: Optional["ActionIntent"] = None
+        self, tools: List[Any], current_intent: Optional["ActionIntent"] = None, use_metadata: bool = False
     ) -> List[Any]:
         """Filter tools based on detected user intent.
 
@@ -156,12 +156,14 @@ class ToolPlanner:
         - WRITE_ALLOWED: No restrictions
         - AMBIGUOUS: No restrictions (relies on prompt guard)
 
-        The blocked tools are defined in action_authorizer.INTENT_BLOCKED_TOOLS,
-        which is the single source of truth for tool filtering.
+        Phase 5 (Metadata-Based Authorization):
+        When use_metadata=True, uses ToolAuthMetadataRegistry instead of hard-coded lists.
+        This is the future direction and will become the default in Phase 7.
 
         Args:
             tools: List of tool definitions (ToolDefinition objects or dicts)
             current_intent: The detected user intent (if None, no filtering)
+            use_metadata: If True, use metadata-based authorization (Phase 5)
 
         Returns:
             Filtered list of tools, excluding blocked tools for current intent
@@ -169,9 +171,16 @@ class ToolPlanner:
         if current_intent is None:
             return tools
 
-        from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS
+        # Phase 5: Use metadata-based authorization if requested
+        if use_metadata:
+            from victor.agent.action_authorizer import get_metadata_blocked_tools
 
-        blocked_tools = INTENT_BLOCKED_TOOLS.get(current_intent, frozenset())
+            blocked_tools = get_metadata_blocked_tools(current_intent)
+        else:
+            # Legacy approach: hard-coded tool lists
+            from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS
+
+            blocked_tools = INTENT_BLOCKED_TOOLS.get(current_intent, frozenset())
         if not blocked_tools:
             return tools
 

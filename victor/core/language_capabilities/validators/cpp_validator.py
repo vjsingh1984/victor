@@ -147,7 +147,8 @@ class CppValidator:
         issues: List[ValidationIssue] = []
         warnings: List[ValidationIssue] = []
 
-        if self._index is None:
+        # Check if libclang is available
+        if not LIBCLANG_AVAILABLE or self._index is None or cindex is None:
             # Fallback to basic validation if libclang not available
             return CodeValidationResult(
                 is_valid=False,
@@ -164,85 +165,67 @@ class CppValidator:
                 ],
             )
 
-        try:
-            # Parse options
-            args = ["-x", "c++" if language == "cpp" else "c"]
+        # Parse options - use c++ for cpp, c for c
+        if language == "cpp":
+            args = ["-x", "c++"]
+        else:
+            args = ["-x", "c"]
 
-            # Parse the code
-            tu = self._index.parse(
-                str(file_path),
-                args=args,
-                unsaved_files=[(str(file_path), code)],
+        # Parse the code
+        tu = self._index.parse(
+            str(file_path),
+            args=args,
+            unsaved_files=[(str(file_path), code)],
+        )
+
+        # Map clang severity to our severity
+        severity_map = {
+            cindex.Diagnostic.Ignored: ValidationSeverity.INFO,
+            cindex.Diagnostic.Note: ValidationSeverity.INFO,
+            cindex.Diagnostic.Warning: ValidationSeverity.WARNING,
+            cindex.Diagnostic.Error: ValidationSeverity.ERROR,
+            cindex.Diagnostic.Fatal: ValidationSeverity.ERROR,
+        }
+
+        has_errors = False
+
+        for diag in tu.diagnostics:
+            severity = severity_map.get(diag.severity, ValidationSeverity.WARNING)
+
+            issue = ValidationIssue(
+                line=diag.location.line,
+                column=diag.location.column,
+                message=diag.spelling,
+                severity=severity,
+                source="libclang",
             )
 
-            # Map clang severity to our severity
-            severity_map = {
-                cindex.Diagnostic.Ignored: ValidationSeverity.INFO,
-                cindex.Diagnostic.Note: ValidationSeverity.INFO,
-                cindex.Diagnostic.Warning: ValidationSeverity.WARNING,
-                cindex.Diagnostic.Error: ValidationSeverity.ERROR,
-                cindex.Diagnostic.Fatal: ValidationSeverity.ERROR,
-            }
+            if severity == ValidationSeverity.ERROR:
+                issues.append(issue)
+                has_errors = True
+            elif severity == ValidationSeverity.WARNING:
+                warnings.append(issue)
 
-            has_errors = False
-
-            for diag in tu.diagnostics:
-                severity = severity_map.get(diag.severity, ValidationSeverity.WARNING)
-
-                issue = ValidationIssue(
-                    line=diag.location.line,
-                    column=diag.location.column,
-                    message=diag.spelling,
-                    severity=severity,
-                    source="libclang",
-                )
-
-                if severity == ValidationSeverity.ERROR:
-                    issues.append(issue)
-                    has_errors = True
-                elif severity == ValidationSeverity.WARNING:
-                    warnings.append(issue)
-
-            if has_errors:
-                logger.debug(
-                    f"{language.upper()} syntax validation failed for {file_path}: "
-                    f"{len(issues)} errors"
-                )
-                return CodeValidationResult(
-                    is_valid=False,
-                    language=language,
-                    validators_used=["libclang"],
-                    issues=issues,
-                    warnings=warnings,
-                )
-
-            logger.debug(f"{language.upper()} syntax validation passed for {file_path}")
-            return CodeValidationResult(
-                is_valid=True,
-                language=language,
-                validators_used=["libclang"],
-                warnings=warnings,
+        if has_errors:
+            logger.debug(
+                f"{language.upper()} syntax validation failed for {file_path}: "
+                f"{len(issues)} errors"
             )
-
-        except Exception as e:
-            logger.debug(f"{language.upper()} parsing error for {file_path}: {e}")
-
-            issues.append(
-                ValidationIssue(
-                    line=1,
-                    column=0,
-                    message=str(e),
-                    severity=ValidationSeverity.ERROR,
-                    source="libclang",
-                )
-            )
-
             return CodeValidationResult(
                 is_valid=False,
                 language=language,
                 validators_used=["libclang"],
                 issues=issues,
+                warnings=warnings,
             )
+
+        logger.debug(f"{language.upper()} syntax validation passed for {file_path}")
+        return CodeValidationResult(
+            is_valid=True,
+            language=language,
+            validators_used=["libclang"],
+            warnings=warnings,
+        )
 
     def has_errors(self, code: str, language: str = "cpp") -> bool:
         """Check if C/C++ code has syntax errors.
@@ -256,24 +239,29 @@ class CppValidator:
         """
         if not self.is_available():
             return self._ts_validator.has_errors(code, language)
-        elif self._index is None:
+
+        # Check if libclang is available
+        if not LIBCLANG_AVAILABLE or self._index is None or cindex is None:
             # Fallback to tree-sitter validation
             return self._ts_validator.has_errors(code, language)
 
-        try:
-            args = ["-x", "c++" if language == "cpp" else "c"]
+        # Build args based on language
+        if language == "cpp":
+            args = ["-x", "c++"]
+            temp_file = "temp.cpp"
+        else:
+            args = ["-x", "c"]
+            temp_file = "temp.c"
 
-            tu = self._index.parse(
-                "temp.cpp" if language == "cpp" else "temp.c",
-                args=args,
-                unsaved_files=[("temp.cpp" if language == "cpp" else "temp.c", code)],
-            )
+        tu = self._index.parse(
+            temp_file,
+            args=args,
+            unsaved_files=[(temp_file, code)],
+        )
 
-            # Check for errors in diagnostics
-            for diag in tu.diagnostics:
-                if diag.severity >= cindex.Diagnostic.Error:
-                    return True
+        # Check for errors in diagnostics
+        for diag in tu.diagnostics:
+            if diag.severity >= cindex.Diagnostic.Error:
+                return True
 
-            return False
-        except Exception:
-            return True
+        return False

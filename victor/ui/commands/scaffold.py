@@ -173,6 +173,36 @@ def new_vertical(
         "-s",
         help="Include service_provider.py for DI container registration",
     ),
+    with_tests: bool = typer.Option(
+        False,
+        "--with-tests",
+        "-t",
+        help="Generate test files (tests/test_assistant.py, tests/conftest.py)",
+    ),
+    with_packaging: bool = typer.Option(
+        False,
+        "--with-packaging",
+        "-p",
+        help="Generate pyproject.toml for packaging as external vertical",
+    ),
+    with_docs: bool = typer.Option(
+        False,
+        "--with-docs",
+        "-D",
+        help="Generate README.md documentation",
+    ),
+    with_workflows: bool = typer.Option(
+        False,
+        "--with-workflows",
+        "-w",
+        help="Generate example workflow template",
+    ),
+    with_all: bool = typer.Option(
+        False,
+        "--with-all",
+        "-a",
+        help="Generate all optional components (tests, packaging, docs, workflows)",
+    ),
     force: bool = typer.Option(
         False,
         "--force",
@@ -196,10 +226,18 @@ def new_vertical(
     - mode_config.py - Mode configurations and tool budgets
     - service_provider.py - DI container registration (optional)
 
+    Optional components (use flags to enable):
+    - tests/ - Test files (test_assistant.py, conftest.py)
+    - pyproject.toml - Packaging configuration for external vertical
+    - README.md - Documentation
+    - workflows/ - Example workflow template
+
     Examples:
         victor vertical create security --description "Security analysis assistant"
         victor vertical create analytics -d "Data analytics" --service-provider
-        victor vertical create ml --dry-run
+        victor vertical create ml --with-tests --with-packaging
+        victor vertical create research --with-all
+        victor vertical create infra --dry-run
     """
     # Check for Jinja2
     if Environment is None:
@@ -250,7 +288,14 @@ def new_vertical(
         "description": description,
     }
 
-    # Files to generate
+    # Handle --with-all flag
+    if with_all:
+        with_tests = True
+        with_packaging = True
+        with_docs = True
+        with_workflows = True
+
+    # Core files to generate (always created)
     files_to_create = [
         ("__init__.py.j2", "__init__.py"),
         ("assistant.py.j2", "assistant.py"),
@@ -259,8 +304,22 @@ def new_vertical(
         ("mode_config.py.j2", "mode_config.py"),
     ]
 
+    # Optional files
     if service_provider:
         files_to_create.append(("service_provider.py.j2", "service_provider.py"))
+
+    if with_tests:
+        files_to_create.append(("tests/test_assistant.py.j2", "tests/test_assistant.py"))
+        files_to_create.append(("tests/conftest.py.j2", "tests/conftest.py"))
+
+    if with_packaging:
+        files_to_create.append(("pyproject.toml.j2", "pyproject.toml"))
+
+    if with_docs:
+        files_to_create.append(("README.md.j2", "README.md"))
+
+    if with_workflows:
+        files_to_create.append(("workflows/example.yaml.j2", "workflows/example.yaml"))
 
     # Display header
     console.print()
@@ -301,8 +360,8 @@ def new_vertical(
                 )
                 console.print()
         else:
-            # Create directory if it doesn't exist
-            vertical_dir.mkdir(parents=True, exist_ok=True)
+            # Create directory and parent directories if they don't exist
+            output_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Write the file
             output_path.write_text(content, encoding="utf-8")
@@ -316,12 +375,33 @@ def new_vertical(
         console.print("[bold]Next steps:[/]")
         console.print(f"  1. Review and customize the files in victor/{name}/")
         console.print(f"  2. Add {name}-specific tools to get_tools() in assistant.py")
-        console.print(f"  3. Define safety patterns in safety.py")
-        console.print(f"  4. Customize task type hints in prompts.py")
-        console.print(f"  5. Add mode configurations in mode_config.py")
+
+        if with_tests:
+            console.print(f"  3. Define safety patterns in safety.py")
+            console.print(f"  4. Customize task type hints in prompts.py")
+            console.print(f"  5. Add mode configurations in mode_config.py")
+            console.print(f"  6. Run tests: pytest tests/")
+        else:
+            console.print(f"  3. Define safety patterns in safety.py")
+            console.print(f"  4. Customize task type hints in prompts.py")
+            console.print(f"  5. Add mode configurations in mode_config.py")
+
+        if with_packaging:
+            console.print(f"  7. Review pyproject.toml for packaging configuration")
+            console.print(f"  8. Build package: python -m build")
+
+        if with_docs:
+            console.print(f"  9. Customize README.md with your vertical details")
+
+        if with_workflows:
+            console.print(f"  10. Review and customize workflows/example.yaml")
+
         console.print()
         console.print("[dim]To use your new vertical:[/]")
         console.print(f"    from victor.{name} import {to_class_name(name)}Assistant")
+        console.print()
+        console.print("[dim]Or with the CLI:[/]")
+        console.print(f"    victor chat --vertical {name}")
         console.print()
     else:
         console.print()

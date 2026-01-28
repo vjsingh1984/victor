@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 try:
-    import lancedb  # type: ignore[attr-defined]
+    import lancedb  # type: ignore[import-untyped]
 
     LANCEDB_AVAILABLE = True
 except ImportError:
@@ -222,17 +222,18 @@ class LanceDBProvider(BaseEmbeddingProvider):
         import shutil
 
         # Close existing connection
-        if self.db:
+        if self.db is not None:
+            db_to_close = self.db
+            self.db = None
             try:
-                del self.db
+                del db_to_close
             except Exception:
                 pass
-            self.db = None
         self.table = None
 
         # Remove corrupted database files
         db_pattern = f"{table_name}.*"
-        removed_files = []
+        removed_files: List[str] = []
         for file in persist_dir.glob(db_pattern):
             try:
                 if file.is_file():
@@ -470,6 +471,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             return 0
 
         # Count documents before deletion
+        count_before = 0
         try:
             count_before = self.table.count_rows()
         except (AttributeError, RuntimeError, ValueError):
@@ -477,9 +479,10 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Delete documents with matching file_path
         # LanceDB uses SQL-like predicates
-        self.table.delete(f"file_path = '{file_path}'")
+        self.table.delete(f"file_path = '{file_path}'")  # type: ignore[attr-defined]
 
         # Count documents after deletion
+        count_after = 0
         try:
             count_after = self.table.count_rows()
         except (AttributeError, RuntimeError, ValueError):
@@ -496,7 +499,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         table_name = self.config.extra_config.get("table_name", "embeddings")
         if self.db is None:
             return
-        if table_name in self.db.list_tables().tables:  # type: ignore[unreachable]
+        if table_name in self.db.list_tables().tables:  # type: ignore[attr-defined]
             self.db.drop_table(table_name)
 
         self.table = None

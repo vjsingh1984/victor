@@ -170,7 +170,7 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
             # Catch-all for truly unexpected errors
             raise self._handle_error(e, self.name)
 
-    async def stream(
+    async def stream(  # type: ignore[override,misc]
         self,
         messages: List[Message],
         *,
@@ -179,7 +179,7 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Anthropic with tool-use support."""
         try:
             # Separate system messages

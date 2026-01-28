@@ -1,0 +1,259 @@
+# {{ name_class }}Assistant
+
+{{ description }}
+
+## Overview
+
+`{{ name_class }}Assistant` is a Victor AI vertical specialized in {{ name_title }} tasks. It provides domain-specific tools, safety patterns, and workflow configurations for {{ name }} operations.
+
+## Features
+
+- **Domain-Specific Tools**: Specialized tools for {{ name }} operations
+- **Safety Patterns**: Built-in safety validation for dangerous operations
+- **Mode Configurations**: Optimized settings for BUILD, PLAN, and EXPLORE modes
+- **Workflow Integration**: Seamless integration with Victor's workflow engine
+- **Extensible Architecture**: Easy to customize and extend
+
+## Installation
+
+### As Part of Victor (Built-in)
+
+If you're developing this vertical within the Victor repository:
+
+```bash
+# The vertical is already available in victor/{{ name }}/
+# No additional installation needed
+```
+
+### As External Vertical
+
+If you're packaging this as an external vertical:
+
+```bash
+# Install from local source
+pip install -e .
+
+# Install from Git repository
+pip install git+https://github.com/yourusername/victor-{{ name }}.git
+```
+
+## Usage
+
+### Basic Usage
+
+```python
+from victor.{{ name }} import {{ name_class }}Assistant
+
+# Get vertical configuration
+config = {{ name_class }}Assistant.get_config()
+
+# Get available tools
+tools = {{ name_class }}Assistant.get_tools()
+
+# Get system prompt
+prompt = {{ name_class }}Assistant.get_system_prompt()
+```
+
+### Using with Victor CLI
+
+```bash
+# Use the {{ name }} vertical in Victor CLI
+victor chat --vertical {{ name }}
+
+# With specific mode
+victor chat --vertical {{ name }} --mode plan
+
+# Interactive mode
+victor --vertical {{ name }}
+```
+
+### Using with Victor API
+
+```python
+from victor.orchestrator import AgentOrchestrator
+from victor.{{ name }} import {{ name_class }}Assistant
+
+# Create orchestrator with {{ name }} vertical
+orchestrator = AgentOrchestrator(
+    vertical={{ name_class }}Assistant,
+    provider="anthropic",
+    model="claude-sonnet-4-5",
+)
+
+# Run a task
+result = await orchestrator.process_task(
+    "Your {{ name }} task here"
+)
+```
+
+## Architecture
+
+### Components
+
+- **`assistant.py`**: Main vertical class inheriting from `VerticalBase`
+- **`safety.py`**: Safety patterns for dangerous operations
+- **`prompts.py`**: Task type hints and system prompt sections
+- **`mode_config.py`**: Mode configurations and tool budgets
+- **`service_provider.py`**: Dependency injection container registration
+
+### Extension System
+
+The vertical integrates with Victor through extensions:
+
+```python
+from victor.{{ name }} import {{ name_class }}Assistant
+
+extensions = {{ name_class }}Assistant.get_extensions()
+# Returns list of extensions that integrate with framework
+```
+
+## Configuration
+
+### Mode-Specific Settings
+
+```python
+# BUILD mode (default)
+config = {{ name_class }}Assistant.get_config()["modes"]["build"]
+# Higher tool budget, standard exploration
+
+# PLAN mode
+config = {{ name_class }}Assistant.get_config()["modes"]["plan"]
+# Higher exploration, more tools allowed
+
+# EXPLORE mode
+config = {{ name_class }}Assistant.get_config()["modes"]["explore"]
+# Maximum exploration, no edits
+```
+
+### Tool Budgets
+
+Tool budgets control how many tools of each cost tier can be used:
+
+```python
+budget = config["tool_budget"]
+# {"low": 10, "medium": 5, "high": 2}
+```
+
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest tests/
+
+# Run with coverage
+pytest --cov=victor.{{ name }} tests/
+
+# Run specific test file
+pytest tests/test_assistant.py -v
+```
+
+### Code Quality
+
+```bash
+# Format code
+black victor/{{ name }}/ tests/
+
+# Lint code
+ruff check victor/{{ name }}/ tests/
+
+# Type checking
+mypy victor/{{ name }}/
+```
+
+### Adding New Tools
+
+1. Create tool file in `victor/{{ name }}/tools/`:
+```python
+from victor.tools.base import BaseTool
+
+class My{{ name_class }}Tool(BaseTool):
+    name = "my_{{ name }}_tool"
+    description = "Description of what this tool does"
+
+    def execute(self, **kwargs):
+        # Tool implementation
+        return {"result": "..."}
+```
+
+2. Register tool in `assistant.py`:
+```python
+def get_tools(cls) -> list[BaseTool]:
+    return [
+        My{{ name_class }}Tool(),
+        # ... other tools
+    ]
+```
+
+## Examples
+
+### Example 1: Basic {{ name_title }} Task
+
+```python
+from victor.{{ name }} import {{ name_class }}Assistant
+
+# Create vertical instance
+vertical = {{ name_class }}Assistant()
+
+# Process a simple task
+result = vertical.process("Example {{ name }} task")
+```
+
+### Example 2: Using with Custom Configuration
+
+```python
+from victor.{{ name }} import {{ name_class }}Assistant
+
+# Get base config
+config = {{ name_class }}Assistant.get_config()
+
+# Customize for your use case
+config["modes"]["build"]["tool_budget"]["high"] = 5
+
+# Use custom configuration
+vertical = {{ name_class }}Assistant(config=config)
+```
+
+### Example 3: Integrating Custom Safety Patterns
+
+```python
+from victor.{{ name }}.safety import {{ name_class }}SafetyExtension
+
+# Create custom safety pattern
+class CustomSafetyPattern:
+    def validate(self, operation: dict) -> tuple[bool, str]:
+        # Your validation logic
+        return True, "Operation is safe"
+
+# Register with vertical
+# (See safety.py for implementation details)
+```
+
+## Contributing
+
+Contributions to the {{ name_class }}Assistant vertical are welcome!
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Add tests for new functionality
+5. Run tests and ensure they pass
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
+
+## Support
+
+- **Issues**: Report bugs and request features via [GitHub Issues](https://github.com/yourusername/victor-{{ name }}/issues)
+- **Documentation**: See [Victor Documentation](https://github.com/anthropics/victor) for framework details
+- **Discussions**: Join the [Victor Community](https://github.com/anthropics/victor/discussions)
+
+## Acknowledgments
+
+- Built with [Victor AI Framework](https://github.com/anthropics/victor)
+- Inspired by the need for domain-specific AI assistants

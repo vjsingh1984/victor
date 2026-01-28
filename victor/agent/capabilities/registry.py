@@ -37,11 +37,18 @@ from typing import Any, Dict, Optional, Union, cast
 from victor.agent.capabilities.base import CapabilitySpec
 
 # Import entry_points function (avoid name conflicts)
+importlib_metadata: Any | None = None
 try:
-    import importlib.metadata as importlib_metadata_module_module
+    import importlib.metadata as importlib_metadata_pkg
+    importlib_metadata = importlib_metadata_pkg
 except ImportError:
-    # Python < 3.8
-    import importlib_metadata_module as importlib_metadata_module_module
+    # Python < 3.8 - use stub package if available
+    try:
+        import importlib_metadata as importlib_metadata_fallback
+        importlib_metadata = importlib_metadata_fallback
+    except ImportError:
+        # Create a minimal stub for type checking
+        pass  # importlib_metadata remains None
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +114,13 @@ class DynamicCapabilityRegistry:
             This ensures the registry remains functional even if some plugins fail.
         """
         try:
-            eps = importlib_metadata_module.entry_points()
+            if importlib_metadata is None:
+                logger.debug("importlib_metadata not available")
+                self._entry_points_loaded = False
+                return
+
+            assert importlib_metadata is not None  # For type narrowing
+            eps = importlib_metadata.entry_points()
             # Python 3.10+ uses select() method, older versions have different API
             if hasattr(eps, "select"):
                 capability_eps = eps.select(group="victor.capabilities")

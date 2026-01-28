@@ -33,6 +33,7 @@ Package Structure:
     mode_config.py      - Mode configurations and tool budgets
     tool_dependencies.py - Code tool dependency graph
     service_provider.py - DI service registration
+    chat_workflow_provider.py - Chat workflow provider (Phase 2)
     workflows/          - Coding-specific workflows
 
 Usage:
@@ -59,6 +60,12 @@ from victor.coding.capabilities import (
     get_coding_capabilities,
     create_coding_capability_loader,
 )
+from victor.coding.chat_workflow_provider import (
+    CodingChatWorkflowProvider,
+    get_chat_workflow_provider,
+)
+# Temporarily commented out - depends on untracked file being worked on by another agent
+# from victor.coding.chat_state import CodingChatState
 
 # Import canonical tool dependency provider instead of deprecated class
 from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
@@ -132,4 +139,9 @@ __all__ = [
     "CodingCapabilityProvider",
     "get_coding_capabilities",
     "create_coding_capability_loader",
+    # Phase 2 - Chat Workflow Provider
+    "CodingChatWorkflowProvider",
+    "get_chat_workflow_provider",
+    # Phase 3 - Coding Chat State (temporarily disabled - depends on untracked file)
+    # "CodingChatState",
 ]

@@ -949,10 +949,8 @@ class VerticalExtensionLoader(ABC):
         if use_cache and cache_key in cls._extensions_cache:
             # Handle both ExtensionCacheEntry (new) and raw VerticalExtensions (old for compatibility)
             cached = cls._extensions_cache[cache_key]
-            if isinstance(cached, ExtensionCacheEntry):
-                result: Any = cached.value
-            else:
-                result = cached
+            # Extract value from cache entry or use cached value directly
+            result: Any = cached.value if isinstance(cached, ExtensionCacheEntry) else cached
             # Type: ignore because we're handling cached values that may be Any
             return cast("VerticalExtensions", result)
 

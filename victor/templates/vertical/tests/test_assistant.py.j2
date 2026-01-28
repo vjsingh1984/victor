@@ -1,0 +1,102 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Tests for {{ name_class }}Assistant vertical."""
+
+import pytest
+
+from victor.{{ name }}.assistant import {{ name_class }}Assistant
+from victor.core.verticals import VerticalBase
+
+
+class Test{{ name_class }}Assistant:
+    """Test suite for {{ name_class }}Assistant vertical."""
+
+    def test_vertical_inheritance(self) -> None:
+        """Test that {{ name_class }}Assistant inherits from VerticalBase."""
+        assert issubclass({{ name_class }}Assistant, VerticalBase)
+
+    def test_vertical_name(self) -> None:
+        """Test that vertical name is correctly defined."""
+        assert {{ name_class }}Assistant.name == "{{ name }}"
+
+    def test_vertical_description(self) -> None:
+        """Test that vertical description is available."""
+        assert {{ name_class }}Assistant.description is not None
+        assert isinstance({{ name_class }}Assistant.description, str)
+        assert len({{ name_class }}Assistant.description) > 0
+
+    def test_get_tools_returns_list(self) -> None:
+        """Test that get_tools returns a list of tools."""
+        tools = {{ name_class }}Assistant.get_tools()
+        assert isinstance(tools, list)
+        # All tools should have a name attribute
+        for tool in tools:
+            assert hasattr(tool, "name")
+
+    def test_get_system_prompt_returns_str(self) -> None:
+        """Test that get_system_prompt returns a string."""
+        prompt = {{ name_class }}Assistant.get_system_prompt()
+        assert isinstance(prompt, str)
+        assert len(prompt) > 0
+
+    def test_get_config(self) -> None:
+        """Test that get_config returns a valid configuration."""
+        config = {{ name_class }}Assistant.get_config()
+        assert config is not None
+        assert isinstance(config, dict)
+
+    def test_get_extensions(self) -> None:
+        """Test that get_extensions returns extension list."""
+        extensions = {{ name_class }}Assistant.get_extensions()
+        assert isinstance(extensions, list)
+        # Each extension should have an apply method
+        for ext in extensions:
+            assert hasattr(ext, "apply")
+
+    @pytest.mark.parametrize("mode", ["build", "plan", "explore"])
+    def test_mode_configurations(self, mode: str) -> None:
+        """Test that vertical supports different modes."""
+        config = {{ name_class }}Assistant.get_config()
+        # Check if mode-specific configuration exists
+        assert "modes" in config or mode in config
+
+
+class Test{{ name_class }}VerticalIntegration:
+    """Integration tests for {{ name_class }}Assistant vertical."""
+
+    def test_vertical_can_be_instantiated(self) -> None:
+        """Test that vertical can be instantiated."""
+        try:
+            vertical = {{ name_class }}Assistant()
+            assert vertical is not None
+        except Exception as e:
+            pytest.fail(f"Failed to instantiate vertical: {e}")
+
+    def test_vertical_registration(self) -> None:
+        """Test that vertical is registered in VerticalRegistry."""
+        from victor.core.verticals import VerticalRegistry
+
+        registered = VerticalRegistry.list_all()
+        vertical_names = [name for name, _ in registered]
+        assert "{{ name }}" in vertical_names
+
+    def test_extension_application(self) -> None:
+        """Test that extensions can be applied to orchestrator."""
+        from victor.orchestrator import AgentOrchestrator
+
+        # Create a minimal orchestrator for testing
+        # Note: This may require mocking dependencies
+        extensions = {{ name_class }}Assistant.get_extensions()
+        assert len(extensions) > 0

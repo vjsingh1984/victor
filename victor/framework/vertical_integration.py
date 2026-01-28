@@ -1417,16 +1417,13 @@ class VerticalIntegrationPipeline:
         """Classify handlers into independent and dependent groups (Phase 2.2).
 
         Independent handlers can run in parallel (no shared state):
-        - ToolStepHandler: Reads vertical only
-        - PromptStepHandler: Reads vertical only
-        - SafetyStepHandler: Reads vertical only
+        - Handlers with is_independent=True (ToolStepHandler, PromptStepHandler, SafetyStepHandler)
 
         Dependent handlers must run sequentially:
-        - ConfigStepHandler: Depends on tools, prompts
-        - MiddlewareStepHandler: Depends on config
-        - ExtensionsStepHandler: Depends on all
-        - FrameworkStepHandler: Depends on all
-        - ContextStepHandler: Must run last
+        - Handlers with is_independent=False (ConfigStepHandler, MiddlewareStepHandler, etc.)
+
+        This uses the declarative is_independent property instead of brittle
+        string matching, making the system more extensible and type-safe.
 
         Args:
             handlers: List of step handlers
@@ -1438,17 +1435,10 @@ class VerticalIntegrationPipeline:
         dependent = []
 
         for handler in handlers:
-            handler_type = type(handler).__name__
-
-            # Independent handlers (read-only, no side effects)
-            if handler_type in [
-                "ToolStepHandler",
-                "PromptStepHandler",
-                "SafetyStepHandler",
-            ]:
+            # Use declarative property instead of string matching
+            if handler.is_independent:
                 independent.append(handler)
             else:
-                # Dependent handlers (have side effects or dependencies)
                 dependent.append(handler)
 
         return independent, dependent

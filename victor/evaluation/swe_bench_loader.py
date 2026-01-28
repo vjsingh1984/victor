@@ -396,7 +396,7 @@ class SWEBenchLoader:
 
         with open(output_path, "w") as f:
             for task in tasks:
-                data = {
+                data: dict[str, Any] = {
                     "instance_id": task.task_id,
                     "repo": task.repo,
                     "base_commit": task.base_commit,
@@ -485,7 +485,8 @@ class SWEBenchWorkspaceManager:
             await self._clone_repo(task, repo_dir)
 
         # Checkout to base commit
-        await self._checkout_commit(repo_dir, task.base_commit)
+        if task.base_commit:
+            await self._checkout_commit(repo_dir, task.base_commit)
 
         # Write test file if provided
         if task.test_code:
@@ -664,7 +665,7 @@ class SWEBenchWorkspaceManager:
             # Run indexer on the repo with embeddings enabled for semantic search
             from victor.coding.codebase.indexer import CodebaseIndex
 
-            indexer = CodebaseIndex(cache_path, use_embeddings=True)
+            indexer = CodebaseIndex(str(cache_path), use_embeddings=True)
             await indexer.index_codebase()
 
             # Mark as indexed

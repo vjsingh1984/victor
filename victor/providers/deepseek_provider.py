@@ -200,7 +200,7 @@ class DeepSeekProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
-    async def stream(
+    async def stream(  # type: ignore[override,misc]
         self,
         messages: List[Message],
         *,
@@ -209,7 +209,7 @@ class DeepSeekProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from DeepSeek.
 
         Args:

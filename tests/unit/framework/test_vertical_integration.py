@@ -1646,12 +1646,14 @@ class TestParallelExecution:
         """Test that handlers are correctly classified."""
         pipeline = VerticalIntegrationPipeline()
 
-        # Mock handlers
+        # Mock handlers with is_independent property
         independent_handler = MagicMock()
         independent_handler.__class__.__name__ = "ToolStepHandler"
+        independent_handler.is_independent = True
 
         dependent_handler = MagicMock()
         dependent_handler.__class__.__name__ = "ConfigStepHandler"
+        dependent_handler.is_independent = False
 
         handlers = [independent_handler, dependent_handler]
         independent, dependent = pipeline._classify_handlers(handlers)

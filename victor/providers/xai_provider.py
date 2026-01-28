@@ -231,7 +231,7 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                 raw_error=e,
             )
 
-    async def stream(
+    async def stream(  # type: ignore[override,misc]
         self,
         messages: List[Message],
         *,
@@ -240,7 +240,7 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from xAI with tool call accumulation.
 
         Args:

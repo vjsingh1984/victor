@@ -729,11 +729,14 @@ def render_workflow(
         )
 
         try:
-            from victor.workflows.hitl import HITLNode  # type: ignore[import-not-found]
+            from victor.workflows.hitl import HITLNode
 
             has_hitl = True
         except ImportError:
-            HITLNode = None
+            # Create a dummy HITLNode type for type checking
+            class HITLNode:  # type: ignore
+                pass
+
             has_hitl = False
 
         console.print(f"\n[bold cyan]Workflow:[/] {workflow.name}")
@@ -1237,6 +1240,7 @@ def list_presets(
         get_agent_preset,
         get_workflow_preset,
         WorkflowPreset,
+        AgentPreset,
     )
 
     preset_type = preset_type.lower()
@@ -1261,42 +1265,46 @@ def list_presets(
         if category:
             # Filter by category
             preset_names = list_workflow_presets()
-            workflow_presets = []
+            category_presets: list[WorkflowPreset] = []
             for preset_name in preset_names:
-                preset = get_workflow_preset(preset_name)
-                if preset and preset.category == category:
-                    workflow_presets.append(preset)
+                workflow_preset = get_workflow_preset(preset_name)
+                if workflow_preset and getattr(workflow_preset, 'category', None) == category:
+                    category_presets.append(workflow_preset)
 
-            if not workflow_presets:
+            if not category_presets:
                 console.print(f"[bold red]Error:[/] No presets found for category: {category}")
                 # Get available categories
                 all_presets = [get_workflow_preset(n) for n in preset_names]
-                available_categories = set(p.category for p in all_presets if p)
+                available_categories = set(getattr(p, 'category', None) for p in all_presets if p)
                 if available_categories:
                     console.print(f"Available: {', '.join(sorted(available_categories))}")
                 raise typer.Exit(1)
 
-            for preset in sorted(category_presets, key=lambda x: x.name):
-                console.print(f"  • [cyan]{preset.name}[/]: {preset.description}")
-                console.print(
-                    f"    [dim]Complexity: {preset.complexity}, "  # type: ignore[attr-defined]
-                    f"~{preset.estimated_duration_minutes}min[/]"  # type: ignore[attr-defined]
-                )
+            for workflow_preset in sorted(category_presets, key=lambda x: x.name):
+                console.print(f"  • [cyan]{workflow_preset.name}[/]: {workflow_preset.description}")
+                complexity = getattr(workflow_preset, 'complexity', None)
+                duration = getattr(workflow_preset, 'estimated_duration_minutes', None)
+                if complexity is not None and duration is not None:
+                    console.print(
+                        f"    [dim]Complexity: {complexity}, "
+                        f"~{duration}min[/]"
+                    )
         else:
             # Show all by category
             preset_names = list_workflow_presets()
             by_category: dict[str, list[WorkflowPreset]] = {}
             for preset_name in preset_names:
-                preset = get_workflow_preset(preset_name)
-                if preset:
-                    if preset.category not in by_category:
-                        by_category[preset.category] = []
-                    by_category[preset.category].append(preset)
+                workflow_preset = get_workflow_preset(preset_name)
+                if workflow_preset:
+                    cat = getattr(workflow_preset, 'category', 'uncategorized')
+                    if cat not in by_category:
+                        by_category[cat] = []
+                    by_category[cat].append(workflow_preset)
 
             for cat, category_presets in sorted(by_category.items()):
                 console.print(f"  [bold]{cat.title()}[/]")
-                for preset in sorted(category_presets, key=lambda x: x.name):
-                    console.print(f"    • [cyan]{preset.name}[/]: {preset.description}")
+                for workflow_preset in sorted(category_presets, key=lambda x: x.name):
+                    console.print(f"    • [cyan]{workflow_preset.name}[/]: {workflow_preset.description}")
 
                 console.print()
 

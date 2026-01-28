@@ -462,6 +462,16 @@ class BaselineValidator:
         self.timeout_per_test = timeout_per_test
         self.parallel_tests = parallel_tests
 
+        # Language mapping for test runners
+        self.lang_map = {
+            "python": Language.PYTHON,
+            "javascript": Language.JAVASCRIPT,
+            "typescript": Language.TYPESCRIPT,
+            "go": Language.GO,
+            "rust": Language.RUST,
+            "java": Language.JAVA,
+        }
+
         if use_cache and cache is None:
             self.cache = BaselineCache()
 

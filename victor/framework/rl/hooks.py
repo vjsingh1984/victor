@@ -57,6 +57,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -365,38 +366,33 @@ class RLHookRegistry:
             from victor.core.events.backends import get_observability_bus
 
             observability_bus = get_observability_bus()
-            if observability_bus is None:
-                return  # type: ignore[unreachable]
+            if observability_bus is not None:
+                # Convert RLEvent to MessagingEvent format
+                import json
+                from datetime import datetime, timezone
 
-            # Convert RLEvent to MessagingEvent format
-            import json
-            from datetime import datetime, timezone
+                # Build event data
+                event_data = {
+                    "type": f"rl.{event.type.value}",
+                    "timestamp": event.timestamp.isoformat(),
+                    "provider": event.provider,
+                    "model": event.model,
+                    "success": event.success,
+                    "quality_score": event.quality_score,
+                    "task_type": event.task_type,
+                    "threshold_value": event.threshold_value,
+                    "was_exploration": event.was_exploration,
+                    "epsilon_value": event.epsilon_value,
+                    "metadata": event.metadata or {},
+                }
 
-            # Build event data
-            event_data = {
-                "type": f"rl.{event.type.value}",
-                "timestamp": event.timestamp.isoformat(),
-                "provider": event.provider,
-                "model": event.model,
-                "success": event.success,
-                "quality_score": event.quality_score,
-                "task_type": event.task_type,
-                "threshold_value": event.threshold_value,
-                "was_exploration": event.was_exploration,
-                "epsilon_value": event.epsilon_value,
-                "metadata": event.metadata or {},
-            }
-
-            # Emit to observability bus (async emit is handled internally)
-            observability_bus.emit(
-                topic=f"rl.{event.type.value}",
-                data=event_data,
-                metadata={
-                    "source": "rl_hooks",
-                    "event_type": str(event.type),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                },
-            )
+                # Emit to observability bus (fire and forget)
+                asyncio.create_task(
+                    observability_bus.emit(
+                        topic=f"rl.{event.type.value}",
+                        data=event_data,
+                    )
+                )
 
         except Exception as e:
             # Don't fail if observability bus is not available

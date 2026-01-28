@@ -1378,6 +1378,40 @@ class Settings(BaseSettings):
     rl_exploration_rate: float = 0.3  # Initial exploration rate (epsilon-greedy)
 
     # ==========================================================================
+    # Workflow Chat Configuration (Phase 1: Domain-Agnostic Workflow Chat)
+    # ==========================================================================
+    # Workflow-based chat execution using framework workflow engine.
+    # When enabled, chat is executed through StateGraph workflows instead of
+    # the legacy ChatCoordinator. This provides domain-agnostic execution,
+    # better observability, and cleaner separation of concerns.
+    #
+    # Feature Flags:
+    #   - VICTOR_USE_WORKFLOW_CHAT=true: Enable workflow-based chat (experimental)
+    #   - VICTOR_WORKFLOW_MAX_ITERATIONS=50: Maximum agentic loop iterations
+    #   - VICTOR_WORKFLOW_CHECKPOINTS_ENABLED=true: Enable state checkpointing
+    #   - VICTOR_WORKFLOW_TIMEOUT_SECONDS=300: Execution timeout
+    #
+    # Migration Plan:
+    #   Phase 1 (Current): Foundation - Framework executes workflows with zero domain knowledge
+    #   Phase 2: Vertical chat workflows defined in YAML (coding_chat, devops_chat, etc.)
+    #   Phase 3: Domain logic extracted from ChatCoordinator to verticals
+    #   Phase 4: Vertical integration via step handlers
+    #   Phase 5: Tool metadata system (replace hard-coded tool lists)
+    #   Phase 6: Migration and testing (100% backward compatibility)
+    #   Phase 7: Cleanup and deprecation (legacy path removed)
+    #
+    # Progress: Phase 1 implementation complete, pending Phase 2+ completion
+    use_workflow_chat: bool = False  # Enable workflow-based chat (experimental)
+    workflow_max_iterations: int = 50  # Maximum agentic loop iterations in workflows
+    workflow_checkpoints_enabled: bool = True  # Enable state checkpointing for recovery
+    workflow_timeout_seconds: int = 300  # Workflow execution timeout
+
+    # Phase 5: Metadata-based tool authorization
+    # Replaces hard-coded tool lists (WRITE_TOOLS, READ_ONLY_TOOLS, etc.)
+    # with ToolAuthMetadataRegistry for dynamic authorization
+    use_metadata_authorization: bool = False  # Enable metadata-based tool authorization (experimental)
+
+    # ==========================================================================
     # Event System Configuration (Canonical core/events)
     # ==========================================================================
     # Centralized configuration for the unified event system.

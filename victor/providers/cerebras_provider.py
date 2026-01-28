@@ -486,7 +486,7 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
-    async def stream(  # type: ignore[override]
+    async def stream(  # type: ignore[override,misc]
         self,
         messages: List[Message],
         *,

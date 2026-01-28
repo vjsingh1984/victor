@@ -733,11 +733,19 @@ class AgentOrchestrator(
         self._coordinator_adapter.send_rl_reward_signal(session)
 
     def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
-        """Extract file paths mentioned in user prompt for task completion tracking."""
+        """Extract file paths mentioned in user prompt for task completion tracking.
+
+        DEPRECATED (Phase 3): This method is domain-specific and will be removed.
+        Use CodingChatState.extract_requirements_from_message() instead when working with chat workflows.
+        """
         return self._task_analyzer.extract_required_files_from_prompt(user_message)
 
     def _extract_required_outputs_from_prompt(self, user_message: str) -> List[str]:
-        """Extract output requirements from user prompt."""
+        """Extract output requirements from user prompt.
+
+        DEPRECATED (Phase 3): This method is domain-specific and will be removed.
+        Use CodingChatState.extract_requirements_from_message() instead when working with chat workflows.
+        """
         return self._task_analyzer.extract_required_outputs_from_prompt(user_message)
 
     # =====================================================================
@@ -954,47 +962,75 @@ class AgentOrchestrator(
 
     @property
     def _read_files_session(self) -> Set[str]:
-        """Files read during this session for task completion detection."""
+        """Files read during this session for task completion detection.
+
+        DEPRECATED (Phase 3): This property is coding-specific and will be removed.
+        Use CodingChatState.get_read_files() instead when working with chat workflows.
+        """
         if self._session_state is None:
             return set()
         return self._session_state.execution_state.read_files_session
 
     @property
     def _required_files(self) -> List[str]:
-        """Required files extracted from user prompts."""
+        """Required files extracted from user prompts.
+
+        DEPRECATED (Phase 3): This property is coding-specific and will be removed.
+        Use CodingChatState.required_files instead when working with chat workflows.
+        """
         if self._session_state is None:
             return []
         return self._session_state.execution_state.required_files
 
     @_required_files.setter
     def _required_files(self, value: List[str]) -> None:
-        """Set required files list."""
+        """Set required files list.
+
+        DEPRECATED (Phase 3): This property is coding-specific and will be removed.
+        Use CodingChatState.set_required_files() instead when working with chat workflows.
+        """
         if self._session_state is not None:
             self._session_state.execution_state.required_files = list(value)
 
     @property
     def _required_outputs(self) -> List[str]:
-        """Required outputs extracted from user prompts."""
+        """Required outputs extracted from user prompts.
+
+        DEPRECATED (Phase 3): This property is coding-specific and will be removed.
+        Use CodingChatState.required_outputs instead when working with chat workflows.
+        """
         if self._session_state is None:
             return []
         return self._session_state.execution_state.required_outputs
 
     @_required_outputs.setter
     def _required_outputs(self, value: List[str]) -> None:
-        """Set required outputs list."""
+        """Set required outputs list.
+
+        DEPRECATED (Phase 3): This property is coding-specific and will be removed.
+        Use CodingChatState.set_required_outputs() instead when working with chat workflows.
+        """
         if self._session_state is not None:
             self._session_state.execution_state.required_outputs = list(value)
 
     @property
     def _all_files_read_nudge_sent(self) -> bool:
-        """Whether we've sent a nudge that all required files are read."""
+        """Whether we've sent a nudge that all required files are read.
+
+        DEPRECATED (Phase 3): This property is coding-specific and will be removed.
+        Use CodingChatState.all_files_read_nudge_sent instead when working with chat workflows.
+        """
         if self._session_state is None:
             return False
         return self._session_state.session_flags.all_files_read_nudge_sent
 
     @_all_files_read_nudge_sent.setter
     def _all_files_read_nudge_sent(self, value: bool) -> None:
-        """Set all files read nudge flag."""
+        """Set all files read nudge flag.
+
+        DEPRECATED (Phase 3): This property is coding-specific and will be removed.
+        Use CodingChatState.mark_nudge_sent() instead when working with chat workflows.
+        """
         if self._session_state is not None:
             self._session_state.session_flags.all_files_read_nudge_sent = value
 

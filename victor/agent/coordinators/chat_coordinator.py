@@ -229,17 +229,24 @@ class ChatCoordinator:
         orch._current_stream_context = stream_ctx
 
         # Extract required files and outputs from user prompt for task completion tracking
-        orch._required_files = self._extract_required_files_from_prompt(user_message)
-        orch._required_outputs = self._extract_required_outputs_from_prompt(user_message)
+        # Phase 3 Note: This logic is domain-specific and will be moved to CodingChatState
+        # For now, keep existing behavior but document the coupling
+        required_files = self._extract_required_files_from_prompt(user_message)
+        required_outputs = self._extract_required_outputs_from_prompt(user_message)
+
+        # Set orchestrator state (legacy - to be removed in Phase 7)
+        orch._required_files = required_files
+        orch._required_outputs = required_outputs
         orch._read_files_session.clear()
         orch._all_files_read_nudge_sent = False
+
         logger.debug(
-            f"Task requirements extracted - files: {orch._required_files}, "
-            f"outputs: {orch._required_outputs}"
+            f"Task requirements extracted - files: {required_files}, "
+            f"outputs: {required_outputs}"
         )
 
         # Emit task requirements extracted event
-        if orch._required_files or orch._required_outputs:
+        if required_files or required_outputs:
             from victor.core.events import get_observability_bus
 
             event_bus = get_observability_bus()
@@ -248,10 +255,10 @@ class ChatCoordinator:
                 event_bus.emit(
                     topic="state.task.requirements_extracted",
                     data={
-                        "required_files": orch._required_files,
-                        "required_outputs": orch._required_outputs,
-                        "file_count": len(orch._required_files),
-                        "output_count": len(orch._required_outputs),
+                        "required_files": required_files,
+                        "required_outputs": required_outputs,
+                        "file_count": len(required_files),
+                        "output_count": len(required_outputs),
                         "category": "state",
                     },
                 )
@@ -1239,10 +1246,23 @@ class ChatCoordinator:
             List of required file paths mentioned in the message
 
         Note:
+            DEPRECATED (Phase 3): This method is domain-specific and will be removed.
+            Use CodingChatState.extract_requirements_from_message() instead.
+            File path extraction should be handled by workflows, not framework.
+
             PromptRequirements extracts counts, not actual file paths.
             This method returns empty list since file path extraction
             is not implemented. Use requirements.file_count for budgeting.
         """
+        # Phase 3: Domain-specific logic - should move to vertical
+        import warnings
+        warnings.warn(
+            "_extract_required_files_from_prompt is deprecated and will be removed in Phase 7. "
+            "Use CodingChatState.extract_requirements_from_message() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
         extract_prompt_requirements(user_message)
@@ -1260,10 +1280,23 @@ class ChatCoordinator:
             List of required outputs mentioned in the message
 
         Note:
+            DEPRECATED (Phase 3): This method is domain-specific and will be removed.
+            Use CodingChatState.extract_requirements_from_message() instead.
+            Output path extraction should be handled by workflows, not framework.
+
             PromptRequirements extracts counts, not actual output paths.
             This method returns empty list since output path extraction
             is not implemented. Use requirements for budgeting only.
         """
+        # Phase 3: Domain-specific logic - should move to vertical
+        import warnings
+        warnings.warn(
+            "_extract_required_outputs_from_prompt is deprecated and will be removed in Phase 7. "
+            "Use CodingChatState.extract_requirements_from_message() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 
         extract_prompt_requirements(user_message)

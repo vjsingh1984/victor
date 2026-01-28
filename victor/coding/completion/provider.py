@@ -241,6 +241,9 @@ class CachingCompletionProvider(BaseCompletionProvider):
                 timestamp, completion_list = cached
                 if time.time() - timestamp < self._cache_ttl:
                     return completion_list
+                # Cache expired
+                del self._cache[key]
+            # Invalid cache entry format
             del self._cache[key]
         return None
 

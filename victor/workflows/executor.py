@@ -491,7 +491,7 @@ class WorkflowExecutor:
             # Use the orchestrator directly if it has the required interface
             # SubAgentOrchestrator will adapt to the orchestrator protocol
             # Type ignore: orchestrator is WorkflowAgentProtocol but SubAgentOrchestrator accepts AgentOrchestrator
-            self._sub_agents = SubAgentOrchestrator(self.orchestrator)
+            self._sub_agents = SubAgentOrchestrator(self.orchestrator)  # type: ignore[arg-type]
         return self._sub_agents
 
     @property
@@ -1503,7 +1503,8 @@ class WorkflowExecutor:
                     # Treat as literal value if not found in context
                     params[param_name] = context_key
             else:
-                params[param_name] = context_key
+                # Non-string context_key, use as-is
+                params[param_name] = context_key  # type: ignore[unreachable]
         return params
 
     async def _execute_chain_handler(

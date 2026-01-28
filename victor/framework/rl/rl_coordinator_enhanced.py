@@ -556,8 +556,9 @@ class ExplorationStrategyImpl:
         elif self.strategy == ExplorationStrategy.ENTROPY_BONUS:
             return self._entropy_bonus(q_values, available_actions)
         else:
-            # Fallback for unknown strategies
-            return self._epsilon_greedy(q_values, available_actions)
+            # Fallback for unknown strategies (should never happen with Enum)
+            # This is kept for defensive programming and future extensibility
+            return self._epsilon_greedy(q_values, available_actions)  # type: ignore[unreachable]
 
     def _epsilon_greedy(self, q_values: Dict[Any, float], available_actions: List[Any]) -> Any:
         """Epsilon-greedy action selection."""

@@ -1315,14 +1315,15 @@ class ToolPipeline:
         for i, tc in enumerate(tool_calls):
             # Skip invalid structures - let execute_tool_calls handle them
             if not isinstance(tc, dict):
-                unique_calls.append(tc)  # type: ignore[unreachable]
+                # Preserve invalid calls as-is for proper error handling
+                unique_calls.append(tc)  # type: ignore[list-item]
                 continue
 
             tool_name = tc.get("name", "")
             raw_args = tc.get("arguments", {})
 
             # Normalize arguments for signature comparison
-            if isinstance(raw_args, str):  # type: ignore[unreachable]
+            if isinstance(raw_args, str):
                 try:
                     raw_args = json.loads(raw_args)
                 except Exception:
@@ -1442,14 +1443,16 @@ class ToolPipeline:
             raw_args: Dict[str, Any] = {}
             if isinstance(tool_call, dict):
                 tool_name = tool_call.get("name", "")
-                raw_args = tool_call.get("arguments", {})
-                if isinstance(raw_args, str):  # type: ignore[unreachable]
+                args_value = tool_call.get("arguments", {})
+                if isinstance(args_value, str):
                     try:
-                        raw_args = json.loads(raw_args)
+                        raw_args = json.loads(args_value)
                     except Exception:
-                        raw_args = {"value": raw_args}
-                elif raw_args is None:
-                    raw_args = {}  # type: ignore[unreachable]
+                        raw_args = {"value": args_value}
+                elif args_value is None:
+                    raw_args = {}
+                else:
+                    raw_args = args_value
                 signature = self._get_call_signature(tool_name, raw_args)
                 results_by_signature[signature] = call_result
 
@@ -2054,11 +2057,11 @@ class ToolPipeline:
                     from victor.agent.cache.tool_cache_manager import ToolCacheManager
                     from victor.agent.cache.tool_cache_manager import CacheNamespace
 
-                    # Check if tool_cache is a ToolCacheManager
-                    if isinstance(self.tool_cache, ToolCacheManager):  # type: ignore[unreachable]
+                    # Check if tool_cache has set_tool_result method (duck typing)
+                    if hasattr(self.tool_cache, "set_tool_result"):
                         # Update the cached entry with file dependencies
                         self._get_call_signature(tool_name, normalized_args)
-                        await self.tool_cache.set_tool_result(
+                        await self.tool_cache.set_tool_result(  # type: ignore[attr-defined]
                             tool_name=tool_name,
                             args=normalized_args,
                             result=call_result.result,

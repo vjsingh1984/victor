@@ -39,10 +39,12 @@ from victor.framework.adaptation.types import (
 )
 
 if TYPE_CHECKING:
+    from typing import Any as RunnableType
     try:
-        from langchain_core.runnables import Runnable
+        from langchain_core.runnables import Runnable as RunnableImport
+        RunnableType = RunnableImport  # type: ignore[misc, assignment]
     except ImportError:
-        Runnable = object
+        pass  # RunnableType will remain as Any
 
 logger = logging.getLogger(__name__)
 

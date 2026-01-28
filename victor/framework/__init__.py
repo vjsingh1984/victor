@@ -59,6 +59,8 @@ from typing import Any
 from victor.framework.agent import Agent, ChatSession
 from victor.framework.config import AgentConfig
 from victor.framework.protocols import (
+    ChatResultProtocol,
+    ChatStateProtocol,
     ChunkType,
     ConversationStateProtocol,
     MessagesProtocol,
@@ -69,6 +71,7 @@ from victor.framework.protocols import (
     SystemPromptProtocol,
     ToolsProtocol,
     verify_protocol_conformance,
+    WorkflowChatProtocol,
 )
 from victor.framework.errors import (
     AgentError,
@@ -441,6 +444,18 @@ _LAZY_MODULES = {
     "VerticalExtractor": "victor.framework.vertical_extractor",
     "VerticalGenerator": "victor.framework.vertical_extractor",
     "migrate_vertical_to_template": "victor.framework.vertical_extractor",
+    # Workflow Chat (Phase 1 - Domain-Agnostic Workflow Chat)
+    "ChatResultProtocol": "victor.framework.protocols.workflow_chat",
+    "ChatStateProtocol": "victor.framework.protocols.workflow_chat",
+    "WorkflowChatProtocol": "victor.framework.protocols.workflow_chat",
+    "WorkflowChatExecutorProtocol": "victor.framework.protocols.workflow_chat",
+    "MutableChatState": "victor.framework.protocols.chat_state",
+    "ChatResult": "victor.framework.protocols.chat_state",
+    "WorkflowOrchestrator": "victor.framework.workflow_orchestrator",
+    "WorkflowChatCoordinator": "victor.framework.coordinators.workflow_chat_coordinator",
+    "ChatExecutionEvent": "victor.framework.coordinators.workflow_chat_coordinator",
+    "ChatEventType": "victor.framework.coordinators.workflow_chat_coordinator",
+    "ChatExecutionConfig": "victor.framework.coordinators.workflow_chat_coordinator",
 }
 
 __all__ = (
@@ -487,6 +502,10 @@ __all__ = (
         "OrchestratorStreamChunk",
         "ChunkType",
         "verify_protocol_conformance",
+        # Protocols (Phase 1 - Workflow Chat)
+        "ChatStateProtocol",
+        "ChatResultProtocol",
+        "WorkflowChatProtocol",
         # Events
         "EventType",
         "content_event",
@@ -573,6 +592,18 @@ __all__ = (
         "VerticalExtractor",
         "VerticalGenerator",
         "migrate_vertical_to_template",
+        # Workflow Chat (Phase 1)
+        "ChatResultProtocol",
+        "ChatStateProtocol",
+        "WorkflowChatProtocol",
+        "WorkflowChatExecutorProtocol",
+        "MutableChatState",
+        "ChatResult",
+        "WorkflowOrchestrator",
+        "WorkflowChatCoordinator",
+        "ChatExecutionEvent",
+        "ChatEventType",
+        "ChatExecutionConfig",
     ]
     + list(_LAZY_MODULES.keys())  # All lazy-loaded exports
     + ["discover"]  # Capability discovery function

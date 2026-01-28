@@ -50,6 +50,15 @@ from victor.tools.metadata import (
     ToolMetadataRegistry,
 )
 
+# Re-export authorization metadata classes (Phase 5)
+from victor.tools.auth_metadata import (
+    ToolAuthMetadata,
+    ToolAuthMetadataRegistry,
+    ToolSafety,
+    get_tool_auth_metadata_registry,
+    register_tool_auth_metadata,
+)
+
 # Re-export registry classes from registry.py
 from victor.tools.registry import (
     Hook,
@@ -133,6 +142,12 @@ __all__ = [
     # Metadata
     "ToolMetadata",
     "ToolMetadataRegistry",
+    # Authorization Metadata (Phase 5)
+    "ToolAuthMetadata",
+    "ToolAuthMetadataRegistry",
+    "ToolSafety",
+    "get_tool_auth_metadata_registry",
+    "register_tool_auth_metadata",
     # Registry
     "ToolRegistry",
     "Hook",

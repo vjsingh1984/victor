@@ -185,25 +185,21 @@ class WorkflowStepHandler(BaseStepHandler):
         workflow_provider = None
 
         if isinstance(vertical, WorkflowProviderProtocol):
-            workflow_provider = vertical
+            workflow_provider = vertical  # type: ignore[unreachable]
         elif hasattr(vertical, "get_workflow_provider"):
             workflow_provider = vertical.get_workflow_provider()
         elif isinstance(vertical, type) and hasattr(vertical, "get_workflows"):
             workflow_provider = vertical
 
-        if workflow_provider is None:
-            return
+        if workflow_provider is not None:
+            # Get workflows from provider
+            workflows = workflow_provider.get_workflows()
+            if workflows:
+                workflow_count = len(workflows)
+                result.workflows_count = workflow_count
 
-        # Get workflows from provider
-        workflows = workflow_provider.get_workflows()
-        if not workflows:
-            return
-
-        workflow_count = len(workflows)
-        result.workflows_count = workflow_count
-
-        # Store in context
-        context.apply_workflows(workflows)
+                # Store in context
+                context.apply_workflows(workflows)
 
         # Register with workflow registry
         try:
@@ -223,7 +219,7 @@ class WorkflowStepHandler(BaseStepHandler):
         # Register workflow triggers
         try:
             trigger_registry = self._trigger_registry or get_trigger_registry()
-            if hasattr(workflow_provider, "get_auto_workflows"):
+            if workflow_provider is not None and hasattr(workflow_provider, "get_auto_workflows"):
                 auto_workflows = workflow_provider.get_auto_workflows()
                 if auto_workflows:
                     trigger_registry.register_from_vertical(vertical.name, auto_workflows)
@@ -590,10 +586,16 @@ class CapabilityProviderStepHandler(BaseStepHandler):
                 for cap in provider.get_capabilities():
                     if hasattr(cap, "name") and hasattr(cap, "handler"):
                         cap_type = getattr(cap, "capability_type", None)
+                        from victor.framework.protocols import CapabilityType
+
+                        # Ensure capability_type is a CapabilityType enum
+                        if cap_type is None or not isinstance(cap_type, CapabilityType):
+                            cap_type = CapabilityType.TOOL
+
                         loader.register_capability(
                             name=cap.name,
                             handler=cap.handler,
-                            capability_type=cap_type if cap_type is not None else "custom",
+                            capability_type=cap_type,
                             version=getattr(cap, "version", "1.0"),
                         )
 

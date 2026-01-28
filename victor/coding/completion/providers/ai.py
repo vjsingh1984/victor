@@ -260,7 +260,9 @@ class AICompletionProvider(StreamingCompletionProvider):
             logger.warning(f"AI inline completion failed: {e}")
             return InlineCompletionList(items=[])
 
-    async def stream_inline_completion(self, params: InlineCompletionParams) -> AsyncIterator[str]:
+    async def stream_inline_completion(  # type: ignore[override, misc]
+        self, params: InlineCompletionParams
+    ) -> AsyncIterator[str]:
         """Stream inline completion tokens.
 
         Args:
@@ -269,33 +271,29 @@ class AICompletionProvider(StreamingCompletionProvider):
         Yields:
             Completion tokens as they're generated
         """
-        from typing import AsyncIterator
 
         provider = self._get_provider()
-        if provider is None:
-            return
+        if provider is not None:
+            try:
+                # Build FIM prompt
+                prompt = self._build_fim_prompt(
+                    prefix=params.prefix,
+                    suffix=params.suffix,
+                    max_lines=self._max_context_lines,
+                )
 
-        try:
-            # Build FIM prompt
-            prompt = self._build_fim_prompt(
-                prefix=params.prefix,
-                suffix=params.suffix,
-                max_lines=self._max_context_lines,
-            )
+                # Stream completion
+                async for chunk in provider.stream_chat(
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=params.max_tokens,
+                    temperature=params.temperature,
+                    stop=params.stop_sequences or ["```", ""],
+                ):
+                    if chunk.content:
+                        yield chunk.content
 
-            # Stream completion
-            async for chunk in provider.stream_chat(
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=params.max_tokens,
-                temperature=params.temperature,
-                stop=params.stop_sequences or ["```", "<|endoftext|>"],
-            ):
-                if chunk.content:
-                    yield chunk.content
-
-        except Exception as e:
-            logger.warning(f"AI streaming completion failed: {e}")
-
+            except Exception as e:
+                logger.warning(f"AI streaming completion failed: {e}")
     def _build_fim_prompt(
         self,
         prefix: str,
