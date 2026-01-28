@@ -237,7 +237,7 @@ class VertexAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Vertex AI."""
         try:
             headers = await self._get_auth_headers()

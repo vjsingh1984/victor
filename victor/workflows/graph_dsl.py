@@ -154,10 +154,10 @@ class State(ABC):
         """
         if is_dataclass(self):
             return {f.name: getattr(self, f.name) for f in fields(self)}
-        return self.__dict__.copy()  # type: ignore[attr-defined]
+        return self.__dict__.copy()
 
     @classmethod
-    def from_dict(cls: Type[S], data: Dict[str, Any]) -> S:  # type: ignore[unreachable]
+    def from_dict(cls: Type[S], data: Dict[str, Any]) -> S:
         """Create state from dictionary.
 
         Args:
@@ -170,9 +170,9 @@ class State(ABC):
             field_names = {f.name for f in fields(cls)}
             filtered = {k: v for k, v in data.items() if k in field_names}
             return cls(**filtered)
-        instance = object.__new__(cls)  # type: ignore[unreachable]
+        instance = object.__new__(cls)
         instance.__dict__.update(data)
-        return instance  # type: ignore[unreachable]
+        return instance
 
     def copy(self: S) -> S:
         """Create a shallow copy of the state.

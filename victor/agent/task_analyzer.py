@@ -38,11 +38,11 @@ if TYPE_CHECKING:
     try:
         from victor.storage.embeddings.task_classifier import TaskType as TaskTypeEnum
     except (ImportError, AttributeError):
-        TaskTypeEnum: type | None = None  # type: ignore[misc, no-redef]
+        TaskTypeEnum: type | None = None  # type: ignore[no-redef]
     try:
         from victor.storage.embeddings.intent_classifier import IntentType as IntentTypeEnum
     except (ImportError, AttributeError):
-        IntentTypeEnum: type | None = None  # type: ignore[misc, no-redef]
+        IntentTypeEnum: type | None = None  # type: ignore[no-redef]
     from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.protocols.coordination import CoordinationSuggestion
 

@@ -545,11 +545,11 @@ class LearningCommand(BaseSlashCommand):
                         if hasattr(learner, "get_exploration_rate")
                         else getattr(learner, "_exploration_rate", 0.1)
                     )
-                    from victor.rl.strategies import SelectionStrategy
+                    from victor.rl.strategies import SelectionStrategy as RLSelectionStrategy  # type: ignore[import-not-found]
 
                     strategy_func = getattr(learner, "get_strategy", lambda s=None: None)
                     strategy_result = strategy_func(learner)
-                    strategy: SelectionStrategy | None = strategy_result if isinstance(strategy_result, SelectionStrategy) else getattr(learner, "_strategy", None)
+                    strategy: RLSelectionStrategy | None = strategy_result if isinstance(strategy_result, RLSelectionStrategy) else getattr(learner, "_strategy", None)
                     content += f"\n  Strategy: {strategy.value if strategy else 'epsilon_greedy'}\n"
                     content += f"  Exploration Rate: {exploration:.2f}\n"
         except Exception as e:

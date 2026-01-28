@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 # Optional Docker SDK import
 try:
     import docker as docker_mod  # type: ignore[import-not-found]
-    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound  # type: ignore[import-not-found]
+    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound
     from docker.models.containers import Container  # type: ignore[import-not-found]
 
     DOCKER_AVAILABLE = True

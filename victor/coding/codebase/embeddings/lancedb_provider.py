@@ -331,9 +331,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if self.table is None:
             if self.db is None:
                 raise RuntimeError("Database not initialized")
-            self.table = self.db.create_table(table_name, data=[document])  # type: ignore[attr-defined]
+            self.table = self.db.create_table(table_name, data=[document])
         else:
-            self.table.add([document])  # type: ignore[attr-defined]
+            self.table.add([document])
 
     async def index_documents(self, documents: List[Dict[str, Any]]) -> None:
         """Index multiple documents in batch.

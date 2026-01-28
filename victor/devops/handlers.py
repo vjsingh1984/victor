@@ -324,8 +324,8 @@ class MLOpsHandler(BaseHandler):
         try:
             # Runtime import for mlflow (optional dependency)
             try:
-                import mlflow
-                from mlflow.tracking import MlflowClient
+                import mlflow  # type: ignore[import-not-found]
+                from mlflow.tracking import MlflowClient  # type: ignore[import-not-found]
             except ImportError as e:
                 return {
                     "success": False,

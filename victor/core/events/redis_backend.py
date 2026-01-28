@@ -217,7 +217,7 @@ class RedisEventBackend:
             return
 
         try:
-            self._redis = await aioredis.from_url(  # type: ignore[no-any-return]
+            self._redis = await aioredis.from_url(
                 self._redis_url,
                 decode_responses=True,
             )

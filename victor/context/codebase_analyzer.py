@@ -2253,7 +2253,7 @@ async def generate_victor_md_from_index(
             )
 
         # Show top 3 largest files
-        top_files_list = loc.get("top_files", [])
+        top_files_list: list[tuple[str, int]] = loc.get("top_files", [])
         if top_files_list:
             # Slice the list to ensure we get a list of tuples
             top_files: list[tuple[str, int]] = top_files_list[:3] if isinstance(top_files_list, list) else []

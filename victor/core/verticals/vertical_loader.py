@@ -308,7 +308,7 @@ class VerticalLoader:
 
         module = importlib.import_module(module_name)
         result = getattr(module, attr_name)
-        return result  # type: ignore[no-any-return]
+        return result
 
     def discover_tools(
         self,

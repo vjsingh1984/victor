@@ -397,15 +397,14 @@ class TestYAMLExport:
     def test_export_valid_workflow(self, client, sample_workflow_graph):
         """Test exporting a valid workflow to YAML."""
         with patch("tools.workflow_editor.backend.api.graph_to_definition") as mock_convert:
-            # Create a proper mock with the attributes the code accesses
-            from tools.workflow_editor.backend.api import WorkflowNode
-
-            mock_node = WorkflowNode(
-                id="test_node",
-                type="agent",
-                name="Test Agent",
-                config={"role": "assistant", "goal": "Test goal"},
-            )
+            # Create a mock node with to_dict() method (victor.workflows.definition.WorkflowNode)
+            mock_node = MagicMock()
+            mock_node.to_dict.return_value = {
+                "id": "test_node",
+                "name": "Test Agent",
+                "type": "agent",
+                "next_nodes": [],
+            }
 
             mock_def = MagicMock()
             mock_def.name = "test_workflow"

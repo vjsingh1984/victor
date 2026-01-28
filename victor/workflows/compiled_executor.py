@@ -114,7 +114,7 @@ class CompiledWorkflowExecutor:
         """
         if hasattr(compiled_graph, "stream"):
             # stream() is an async generator, not a coroutine, so don't await it
-            stream_result = compiled_graph.stream(initial_state, thread_id=thread_id)  # type: ignore[attr-defined]
+            stream_result = compiled_graph.stream(initial_state, thread_id=thread_id)
             async for event in stream_result:
                 yield event
 

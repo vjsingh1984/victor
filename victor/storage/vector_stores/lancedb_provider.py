@@ -244,7 +244,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         # Close existing connection
         if self.db:
             try:
-                del self.db  # type: ignore[unreachable]
+                del self.db
             except Exception:
                 pass
             self.db = None
@@ -489,7 +489,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Delete documents with matching file_path
         # LanceDB uses SQL-like predicates
-        table = self._ensure_table()  # type: ignore[unreachable]
+        table = self._ensure_table()
         table.delete(f"file_path = '{file_path}'")
 
         # Count documents after deletion
@@ -526,7 +526,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         count = 0
         if self.table is not None:
             try:
-                count = self.table.count_rows()  # type: ignore[unreachable]
+                count = self.table.count_rows()
             except (AttributeError, RuntimeError, ValueError):
                 count = 0
 

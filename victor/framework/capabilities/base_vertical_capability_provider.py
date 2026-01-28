@@ -432,7 +432,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
             logger.warning(f"Get function '{definition.get_fn}' not found for capability '{name}'")
             return None
 
-        return get_fn(orchestrator)  # type: ignore[no-any-return]
+        return get_fn(orchestrator)
 
     def get_default_config(self, name: str) -> Dict[str, Any]:
         """Get default configuration for a capability.

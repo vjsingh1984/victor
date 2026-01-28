@@ -482,7 +482,9 @@ async def scaffold(
         interpolation_vars = variables or {}
 
         # Create all files
-        for file_path, content_key in template_info["files"]:
+        for file_spec, content_key in template_info["files"]:
+            # file_spec is a string path or Path object
+            file_path = file_spec if isinstance(file_spec, Path) else Path(file_spec)
             # Interpolate variables in file path
             try:
                 interpolated_path = file_path.format(**interpolation_vars)
@@ -600,13 +602,13 @@ async def scaffold(
         if not path:
             return {"success": False, "error": "Add operation requires 'path' parameter"}
 
-        file_path: Path = Path(path)  # type: ignore[assignment]
+        add_file_path: Path = Path(path)
 
         # Create parent directories
-        file_path.parent.mkdir(parents=True, exist_ok=True)
+        add_file_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            file_path.write_text(content)
+            add_file_path.write_text(content)
             return {
                 "success": True,
                 "operation": "add",

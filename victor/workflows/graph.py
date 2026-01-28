@@ -103,7 +103,7 @@ class WorkflowNode:
         """
         result = self.handler(state, context)
         if isinstance(result, Awaitable):
-            return await result  # type: ignore[no-any-return]
+            return await result
         return result
 
 

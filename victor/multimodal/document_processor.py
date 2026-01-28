@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 # Optional dependencies with graceful fallback
 try:
-    import PyPDF2  # type: ignore[import-not-found]
+    import PyPDF2  # type: ignore[import]
 
     PYPDF2_AVAILABLE = True
 except ImportError:

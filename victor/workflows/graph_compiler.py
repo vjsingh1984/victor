@@ -430,7 +430,7 @@ class WorkflowGraphCompiler(Generic[S]):
 
             # Convert result back to dict
             if hasattr(result, "to_dict"):
-                return result.to_dict()  # type: ignore[no-any-return]
+                return result.to_dict()
             elif hasattr(result, "__dataclass_fields__"):
                 # Dataclass - convert to dict
                 from dataclasses import asdict
@@ -440,7 +440,7 @@ class WorkflowGraphCompiler(Generic[S]):
                 return result
             else:
                 # Unknown type, return as-is
-                return result  # type: ignore[no-any-return]
+                return result
 
         return state_converting_wrapper
 
@@ -742,7 +742,7 @@ def compile_workflow_graph(
     """
     compiler: Any = WorkflowGraphCompiler(config)
     result = compiler.compile(graph)
-    return result  # type: ignore[no-any-return]
+    return result
 
 
 def compile_workflow_definition(

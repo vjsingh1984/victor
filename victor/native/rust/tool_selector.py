@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 # Try to import Rust implementation
 try:
-    import victor_native  # type: ignore[import]
+    import victor_native  # type: ignore[import-not-found]
 
     _RUST_AVAILABLE = True
     logger.info("Rust tool selector accelerator loaded")

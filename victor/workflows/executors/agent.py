@@ -207,7 +207,7 @@ class AgentNodeExecutor:
         result = role_map[role]
         # The role_map values are already SubAgentRole enum members
         # But mypy can't infer this, so we use a type ignore
-        return result  # type: ignore[no-any-return]
+        return result
 
     def _substitute_context(self, template: str, context: Dict[str, Any]) -> str:
         """Substitute context variables in template string.

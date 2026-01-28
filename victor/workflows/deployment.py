@@ -1107,7 +1107,7 @@ class KubernetesDeploymentHandler(DeploymentHandler):
 
         logger.debug(f"Executing node {node.id} in pod {self.pod_name}")
 
-        from kubernetes.stream import stream  # type: ignore[import]
+        from kubernetes.stream import stream  # type: ignore[import-not-found]
 
         api = self._get_api()
 
@@ -1186,7 +1186,7 @@ class ECSDeploymentHandler(DeploymentHandler):
         """Get or create boto3 ECS client."""
         if self._ecs_client is None:
             try:
-                import boto3  # type: ignore[import]
+                import boto3  # type: ignore[import-untyped]
 
                 self._ecs_client = boto3.client("ecs")
             except ImportError:

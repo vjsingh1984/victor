@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from victor.observability.emitters.base import IStateEventEmitter
 from victor.core.events import ObservabilityBus, SyncEventWrapper
@@ -138,7 +138,7 @@ class StateEventEmitter(IStateEventEmitter):
         data: Optional[Dict[str, Any]] = None,
         *,
         topic: Optional[str] = None,
-    ) -> None:  # type: ignore[override]
+    ) -> None:
         """Emit a state event synchronously (for gradual migration).
 
         This method wraps the async emit_async() method using emit_event_sync()

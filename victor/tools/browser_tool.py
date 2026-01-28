@@ -707,14 +707,14 @@ class BrowserTool:
                     error="Page not available",
                 )
 
-            if selector:
+            if selector:  # type: ignore[unreachable]
                 await self._page.wait_for_selector(
                     selector,
                     state=state,
                     timeout=timeout or self.config.element_timeout,
                 )
             else:
-                await self._page.wait_for_load_state("networkidle")
+                await self._page.wait_for_load_state("networkidle")  # type: ignore[unreachable]
 
             duration = int((datetime.now() - start).total_seconds() * 1000)
 
@@ -784,7 +784,7 @@ class BrowserTool:
                     error="Page not available",
                 )
 
-            result = await self._page.evaluate(script)
+            result = await self._page.evaluate(script)  # type: ignore[unreachable]
 
             duration = int((datetime.now() - start).total_seconds() * 1000)
 
@@ -835,11 +835,11 @@ class BrowserTool:
     async def close(self) -> None:
         """Close browser and cleanup."""
         if self._browser:
-            await self._browser.close()
+            await self._browser.close()  # type: ignore[unreachable]
             self._browser = None
 
         if self._playwright:
-            await self._playwright.stop()
+            await self._playwright.stop()  # type: ignore[unreachable]
             self._playwright = None
 
         self._page = None

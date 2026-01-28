@@ -15,14 +15,14 @@
 """OpenTelemetry setup and configuration."""
 
 try:
-    from opentelemetry import trace, metrics  # type: ignore[import-untyped]
-    from opentelemetry.sdk.trace import TracerProvider as _TracerProvider  # type: ignore[import-untyped]
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor  # type: ignore[import-untyped]
-    from opentelemetry.sdk.metrics import MeterProvider as _MeterProvider  # type: ignore[import-untyped]
-    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader as _PeriodicExportingMetricReader  # type: ignore[import-untyped]
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as _OTLPSpanExporter  # type: ignore[import-not-found]
-    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter as _OTLPMetricExporter  # type: ignore[import-not-found]
-    from opentelemetry.sdk.resources import Resource as _Resource  # type: ignore[import-untyped]
+    from opentelemetry import trace, metrics  # type: ignore[import]
+    from opentelemetry.sdk.trace import TracerProvider as _TracerProvider  # type: ignore[import]
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor  # type: ignore[import]
+    from opentelemetry.sdk.metrics import MeterProvider as _MeterProvider  # type: ignore[import]
+    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader as _PeriodicExportingMetricReader  # type: ignore[import]
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as _OTLPSpanExporter  # type: ignore[import]
+    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter as _OTLPMetricExporter  # type: ignore[import]
+    from opentelemetry.sdk.resources import Resource as _Resource  # type: ignore[import]
 
     TracerProvider = _TracerProvider
     BatchSpanProcessor = _BatchSpanProcessor

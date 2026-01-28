@@ -165,6 +165,10 @@ class CppValidator:
                 ],
             )
 
+        # Type narrowing: self._index and cindex are not None here
+        assert self._index is not None
+        assert cindex is not None
+
         # Parse options - use c++ for cpp, c for c
         if language == "cpp":
             args = ["-x", "c++"]
@@ -244,6 +248,10 @@ class CppValidator:
         if not LIBCLANG_AVAILABLE or self._index is None:
             # Fallback to tree-sitter validation
             return self._ts_validator.has_errors(code, language)
+
+        # Type narrowing: self._index and cindex are not None here
+        assert self._index is not None
+        assert cindex is not None
 
         # Build args based on language
         if language == "cpp":

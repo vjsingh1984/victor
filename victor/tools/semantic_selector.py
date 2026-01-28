@@ -1282,7 +1282,7 @@ class SemanticToolSelector:
         # Defensive: Check tools is actually a ToolRegistry
         from victor.tools.registry import ToolRegistry
 
-        if not isinstance(tools, ToolRegistry):  # type: ignore[unreachable]
+        if not isinstance(tools, ToolRegistry):
             logger.warning(
                 f"_get_cost_penalty expected ToolRegistry, got {type(tools).__name__}. "
                 "Skipping cost penalty calculation."
@@ -1468,7 +1468,7 @@ class SemanticToolSelector:
         # Defensive: Check tools is actually a ToolRegistry
         from victor.tools.registry import ToolRegistry
 
-        if not isinstance(tools, ToolRegistry):  # type: ignore[unreachable]
+        if not isinstance(tools, ToolRegistry):
             logger.warning(
                 f"_generate_cost_warnings expected ToolRegistry, got {type(tools).__name__}. "
                 "Skipping cost warning generation."

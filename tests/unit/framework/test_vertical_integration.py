@@ -1158,19 +1158,20 @@ class TestVerticalIntegrationCaching:
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
         # Generate cache key for MockVertical
-        cache_key = pipeline._generate_cache_key(MockVertical)
+        cache_key = pipeline._cache_service.generate_key(MockVertical, config_overrides=None)
 
         assert cache_key is not None
         assert isinstance(cache_key, str)
-        # Updated to v7 after adding config_overrides to cache key
-        assert cache_key.startswith("v7_") or cache_key.startswith("v8_") or cache_key.startswith("v9_") or cache_key.startswith("v10_") or cache_key.startswith("v11_")
-        assert "mock_vertical" in cache_key
+        # New cache uses SHA256 hash (64 hex characters)
+        assert len(cache_key) == 64
+        # SHA256 hex string only contains hex characters
+        assert all(c in "0123456789abcdef" for c in cache_key)
 
     def test_cache_key_includes_vertical_name(self):
         """Test that cache key includes vertical name."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
-        key1 = pipeline._cache_service.generate_key(MockVertical)
+        key1 = pipeline._cache_service.generate_key(MockVertical, config_overrides=None)
 
         # Create a different vertical
         class DifferentVertical:
@@ -1196,7 +1197,7 @@ class TestVerticalIntegrationCaching:
             def get_extensions(cls):
                 return None
 
-        key2 = pipeline._cache_service.generate_key(DifferentVertical)
+        key2 = pipeline._cache_service.generate_key(DifferentVertical, config_overrides=None)
 
         # Keys should be different
         assert key1 != key2
@@ -1261,91 +1262,22 @@ class TestVerticalIntegrationCaching:
         # Apply vertical
         result = pipeline.apply(orchestrator, MockVertical)
 
-        # Check that cache has the entry
-        cache_key = pipeline._generate_cache_key(MockVertical)
-        assert cache_key in pipeline._cache
-
-        # Load from cache
-        cached_result = pipeline._load_from_cache(cache_key)
+        # Check that cache has the entry (by trying to get it)
+        cached_result = pipeline._cache_service.get(MockVertical, config_overrides=None)
 
         assert cached_result is not None
         assert isinstance(cached_result, type(result))
         assert cached_result.vertical_name == result.vertical_name
 
-    def test_cache_invalidates_on_source_change(self):
-        """Test that cache invalidates when source file changes."""
-        import tempfile
-        import inspect
-        import sys
-        from pathlib import Path
+    def test_cache_key_based_on_module_and_class(self):
+        """Test that cache keys are based on module and class name."""
+        pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
-        # Create a mock vertical with a temporary source file
-        temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False)
-        temp_file.write(
-            """
-class TempVertical:
-    name = "temp_vertical"
+        # Generate keys for the same class multiple times
+        keys = [pipeline._cache_service.generate_key(MockVertical, config_overrides=None) for _ in range(5)]
 
-    @classmethod
-    def get_config(cls):
-        return None
-
-    @classmethod
-    def get_tools(cls):
-        return []
-
-    @classmethod
-    def get_system_prompt(cls):
-        return ""
-
-    @classmethod
-    def get_stages(cls):
-        return {}
-
-    @classmethod
-    def get_extensions(cls):
-        return None
-"""
-        )
-        temp_file.close()
-
-        try:
-            # Import the temporary vertical
-            import importlib.util
-
-            spec = importlib.util.spec_from_file_location("temp_vertical", temp_file.name)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-
-            # Add to sys.modules so it can be found by inspect
-            sys.modules["temp_vertical"] = module
-
-            TempVertical = module.TempVertical
-
-            pipeline = VerticalIntegrationPipeline(enable_cache=True)
-
-            # First cache key
-            key1 = pipeline._generate_cache_key(TempVertical)
-
-            # Modify the file
-            import time
-
-            time.sleep(0.1)  # Ensure different mtime
-            with open(temp_file.name, "a") as f:
-                f.write("\n# Modified\n")
-
-            # Second cache key should be different
-            key2 = pipeline._generate_cache_key(TempVertical)
-
-            assert key1 != key2, "Cache key should change after source modification"
-
-        finally:
-            # Cleanup
-            import os
-
-            if "temp_vertical" in sys.modules:
-                del sys.modules["temp_vertical"]
-            os.unlink(temp_file.name)
+        # All keys should be identical
+        assert all(k == keys[0] for k in keys), "Cache keys should be stable for the same class"
 
     def test_cache_handles_missing_file(self):
         """Test that cache handles missing source files gracefully."""
@@ -1356,7 +1288,7 @@ class TempVertical:
             name = "bad_vertical"
 
         # Should return None or raise a handled error
-        cache_key = pipeline._generate_cache_key(BadVertical)
+        cache_key = pipeline._cache_service.generate_key(BadVertical, config_overrides=None)
 
         # Either returns None or a valid key (but shouldn't crash)
         assert cache_key is None or isinstance(cache_key, str)
@@ -1368,27 +1300,29 @@ class TempVertical:
 
         # Populate cache
         pipeline.apply(orchestrator, MockVertical)
-        cache_key = pipeline._generate_cache_key(MockVertical)
 
-        assert cache_key in pipeline._cache
+        # Verify cache has entry
+        cached_result = pipeline._cache_service.get(MockVertical, config_overrides=None)
+        assert cached_result is not None
 
         # Clear cache
-        pipeline._cache.clear()
+        pipeline._cache_service.clear()
 
         # Should be empty now
-        assert cache_key not in pipeline._cache or len(pipeline._cache) == 0
+        cached_result = pipeline._cache_service.get(MockVertical, config_overrides=None)
+        assert cached_result is None
 
     def test_cache_key_includes_config_overrides(self):
         """Test that cache keys are different with different config_overrides."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
         # Generate cache key without config_overrides
-        key1 = pipeline._generate_cache_key(MockVertical, config_overrides=None)
+        key1 = pipeline._cache_service.generate_key(MockVertical, config_overrides=None)
 
         # Generate cache key with different config_overrides
-        key2 = pipeline._generate_cache_key(MockVertical, config_overrides={"tool_budget": 30})
-        key3 = pipeline._generate_cache_key(MockVertical, config_overrides={"tool_budget": 50})
-        key4 = pipeline._generate_cache_key(MockVertical, config_overrides={"max_tokens": 1000})
+        key2 = pipeline._cache_service.generate_key(MockVertical, config_overrides={"tool_budget": 30})
+        key3 = pipeline._cache_service.generate_key(MockVertical, config_overrides={"tool_budget": 50})
+        key4 = pipeline._cache_service.generate_key(MockVertical, config_overrides={"max_tokens": 1000})
 
         # All keys should be different
         assert key1 != key2, "Cache key should change with config_overrides"
@@ -1396,10 +1330,10 @@ class TempVertical:
         assert key2 != key4, "Cache key should change with different override keys"
 
         # Same config_overrides should produce same key (order-independent)
-        key5 = pipeline._generate_cache_key(
+        key5 = pipeline._cache_service.generate_key(
             MockVertical, config_overrides={"tool_budget": 30, "max_tokens": 1000}
         )
-        key6 = pipeline._generate_cache_key(
+        key6 = pipeline._cache_service.generate_key(
             MockVertical, config_overrides={"max_tokens": 1000, "tool_budget": 30}
         )
         assert key5 == key6, "Cache key should be order-independent for dict keys"
@@ -1416,7 +1350,7 @@ class TestCachingPerformance:
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
         # Clear cache first
-        pipeline._cache = {}
+        pipeline._cache_service.clear()
 
         # Time first application (cold start)
         start = time.perf_counter()
@@ -1446,14 +1380,14 @@ class TestCachingPerformance:
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
         orchestrator = MockOrchestrator()
 
-        # Get baseline memory
-        baseline_size = sys.getsizeof(pipeline._cache)
+        # Get baseline memory (cache service's internal cache)
+        baseline_size = sys.getsizeof(pipeline._cache_service._cache)
 
         # Apply vertical (populates cache)
         pipeline.apply(orchestrator, MockVertical)
 
         # Check cache size after
-        cache_size = sys.getsizeof(pipeline._cache)
+        cache_size = sys.getsizeof(pipeline._cache_service._cache)
 
         # Cache overhead should be reasonable (< 10MB for a single entry)
         # Note: This is a rough check, actual memory usage depends on the IntegrationResult
@@ -1493,23 +1427,30 @@ class TestCachingEdgeCases:
         """Test cache behavior when integration returns None."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
-        # Try to load from empty cache
-        result = pipeline._load_from_cache("nonexistent_key")
+        # Try to load from empty cache (non-existent vertical)
+        result = pipeline._cache_service.get(MockVertical, config_overrides=None)
         assert result is None
 
-    def test_cache_corruption_handling(self):
-        """Test that cache handles corrupted data gracefully."""
-        pipeline = VerticalIntegrationPipeline(enable_cache=True)
+    def test_cache_disabled_operations(self):
+        """Test that cache handles operations gracefully when cache disabled."""
+        # Create pipeline with cache disabled
+        pipeline = VerticalIntegrationPipeline(enable_cache=False)
 
-        # Corrupt the cache with invalid data
-        pipeline._cache["corrupted_key"] = b"invalid_pickle_data"
+        # Cache operations should handle gracefully when disabled
+        result = pipeline._cache_service.get(MockVertical, config_overrides=None)
+        assert result is None  # Should return None when cache disabled
 
-        # Should handle corruption gracefully
-        result = pipeline._load_from_cache("corrupted_key")
+        # Set operation should not raise when cache disabled
+        # (it just returns early due to enable_cache=False)
+        pipeline._cache_service.set(
+            MockVertical,
+            config_overrides=None,
+            result=None,  # Result doesn't matter when cache disabled
+        )
+
+        # Get should still return None when cache disabled
+        result = pipeline._cache_service.get(MockVertical, config_overrides=None)
         assert result is None
-
-        # Corrupted entry should be removed
-        assert "corrupted_key" not in pipeline._cache
 
     def test_cache_with_multiple_verticals(self):
         """Test cache with multiple different verticals."""
@@ -1571,12 +1512,15 @@ class TestCachingEdgeCases:
         assert result1.success is True
         assert result2.success is True
 
-        # Cache should have entries for both
-        assert len(pipeline._cache) >= 2
+        # Cache should have entries for both (verify by getting them)
+        cached1 = pipeline._cache_service.get(Vertical1, config_overrides=None)
+        cached2 = pipeline._cache_service.get(Vertical2, config_overrides=None)
+        assert cached1 is not None
+        assert cached2 is not None
 
         # Verify cache keys are different
-        key1 = pipeline._generate_cache_key(Vertical1)
-        key2 = pipeline._generate_cache_key(Vertical2)
+        key1 = pipeline._cache_service.generate_key(Vertical1, config_overrides=None)
+        key2 = pipeline._cache_service.generate_key(Vertical2, config_overrides=None)
         assert key1 != key2
 
     def test_cache_key_stability(self):
@@ -1584,7 +1528,7 @@ class TestCachingEdgeCases:
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
         # Generate key multiple times
-        keys = [pipeline._generate_cache_key(MockVertical) for _ in range(10)]
+        keys = [pipeline._cache_service.generate_key(MockVertical, config_overrides=None) for _ in range(10)]
 
         # All keys should be identical
         assert len(set(keys)) == 1, "Cache keys should be stable"
@@ -1622,10 +1566,10 @@ class TestCachingIntegration:
         # Get initial cache key
         from victor.coding import CodingAssistant
 
-        key1 = pipeline._generate_cache_key(CodingAssistant)
+        key1 = pipeline._cache_service.generate_key(CodingAssistant, config_overrides=None)
 
         # The key should be stable
-        key2 = pipeline._generate_cache_key(CodingAssistant)
+        key2 = pipeline._cache_service.generate_key(CodingAssistant, config_overrides=None)
         assert key1 == key2
 
         # In production, if the CodingAssistant source file changed,

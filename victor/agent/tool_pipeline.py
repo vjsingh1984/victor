@@ -1316,7 +1316,7 @@ class ToolPipeline:
             # Skip invalid structures - let execute_tool_calls handle them
             if not isinstance(tc, dict):
                 # Preserve invalid calls as-is for proper error handling
-                unique_calls.append(tc)  # type: ignore[list-item]
+                unique_calls.append(tc)
                 continue
 
             tool_name = tc.get("name", "")

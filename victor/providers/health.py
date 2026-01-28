@@ -440,7 +440,7 @@ class ProviderHealthChecker:
 
         # Run checks in parallel
         tasks = [self.check_provider(name, provider) for name, provider in providers.items()]
-        results = await asyncio.gather(*tasks, return_exceptions=True)  # type: ignore[list-item]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Build report
         report = ProviderHealthReport()

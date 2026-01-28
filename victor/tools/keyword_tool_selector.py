@@ -317,8 +317,14 @@ class KeywordToolSelector:
         Returns:
             Relevance score from 0.0 (not relevant) to 1.0 (highly relevant)
         """
-        # Get tool definition
-        tool_def = self.tools.get_tool(tool_name)
+        # Get tool definition from all tools
+        all_tools = list(self.tools.list_tools())
+        tool_def = None
+        for tool in all_tools:
+            if tool.name == tool_name:
+                tool_def = tool
+                break
+
         if not tool_def:
             return 0.0
 

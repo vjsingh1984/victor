@@ -508,9 +508,11 @@ def create_tracking_state(orchestrator: "AgentOrchestrator") -> TrackingState:
         ),
         final_summary_requested=getattr(orchestrator, "_final_summary_requested", False),
         force_finalize=getattr(orchestrator, "_force_finalize", False),
-        required_files=set(getattr(orchestrator, "_required_files", [])),
+        # Note: _required_files and _required_outputs removed in v0.5.1
+        # Domain-specific extraction now handled by workflows and vertical-specific state
+        required_files=set(),  # Empty - domain-specific logic moved to workflows
         read_files_session=getattr(orchestrator, "_read_files_session", set()),
-        required_outputs=set(getattr(orchestrator, "_required_outputs", [])),
+        required_outputs=set(),  # Empty - domain-specific logic moved to workflows
     )
 
 

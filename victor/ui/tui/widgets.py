@@ -187,7 +187,7 @@ class StatusBar(Static):
         self.model = model
         provider_label = self.query_one(".provider-info")
         provider_label.update(
-            Text.assemble(  # type: ignore[attr-defined]
+            Text.assemble(
                 ("Victor ", "bold #7cb7ff"),
                 "| ",
                 (f"{self.provider}", ""),

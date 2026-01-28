@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from victor.observability.emitters.base import IModelEventEmitter
 from victor.core.events import ObservabilityBus, SyncEventWrapper

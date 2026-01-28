@@ -140,7 +140,7 @@ async def docker(
         return {"success": False, "error": "Docker CLI not found. Please install Docker."}
 
     if options is None:
-        options = {}  # type: ignore[unreachable]
+        options = {}
 
     operation = operation.lower()
 

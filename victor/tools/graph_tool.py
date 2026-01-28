@@ -1144,7 +1144,7 @@ async def _load_graph(graph_store: GraphStoreProtocol) -> GraphAnalyzer:
     priority=Priority.HIGH,
     access_mode=AccessMode.READONLY,
     danger_level=DangerLevel.SAFE,
-    execution_category="read_only",  # type: ignore[arg-type]
+    execution_category="read_only",
     keywords=[
         # Graph operations
         "graph",
@@ -1350,7 +1350,7 @@ async def graph(
 
                 # Get project root (current working directory or from context)
                 project_root = Path.cwd()
-                indexer = CodebaseIndex(str(project_root))  # type: ignore[arg-type]
+                indexer = CodebaseIndex(str(project_root))
 
                 # Check if we should do full or incremental index
                 if not indexer._is_indexed:
@@ -1736,8 +1736,21 @@ async def graph(
                 effective_granularity, weighted_edges
             )
             # Reuse existing node->module map and edge counts
-            # node_to_module_2 already defined above
-            # module_edge_counts_c already defined above
+            node_to_module_2: Dict[str, Optional[str]] = {}
+            module_edge_counts_2: Dict[str, Dict[str, int]] = {}
+            for node_id, module_name in module_to_nodes.items():
+                node_to_module_2[node_id] = module_name
+                if module_name and module_name not in module_edge_counts_2:
+                    module_edge_counts_2[module_name] = {
+                        "calls_in": 0,
+                        "calls_out": 0,
+                        "refs_in": 0,
+                        "refs_out": 0,
+                        "imports": 0,
+                        "inherits": 0,
+                        "implements": 0,
+                        "composed_of": 0,
+                    }
 
             # Continue processing
             for src_id, edges in analyzer.outgoing.items():
@@ -1773,7 +1786,7 @@ async def graph(
                 _in_edges = sum(incoming_modules.get(module_name, {}).values() or [0])  # noqa: F841
                 out_edges = sum(outgoing_modules.get(module_name, {}).values() or [0])
                 # Merge aggregated counts with aggregate totals
-                edge_counts = module_edge_counts_2.get(module_name, {}).copy()  # type: ignore[assignment]  # type: ignore[assignment]
+                edge_counts = module_edge_counts_2.get(module_name, {}).copy()  # type: ignore[arg-type]
                 edge_counts["imports"] = out_edges  # keep imports total
                 edge_counts.setdefault("calls_in", 0)
                 edge_counts.setdefault("calls_out", 0)

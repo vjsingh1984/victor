@@ -54,6 +54,7 @@ from typing import TYPE_CHECKING, Any
 from victor.framework.step_handlers import BaseStepHandler
 
 if TYPE_CHECKING:
+    from victor.core.verticals.context import VerticalContext
     from victor.core.verticals.base import VerticalBase
     from victor.framework.vertical_integration import IntegrationResult
     from victor.agent.orchestrator import AgentOrchestrator

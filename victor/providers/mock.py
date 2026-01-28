@@ -193,7 +193,7 @@ class MockProvider(BaseProvider):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream mock chat completion.
 
         Args:
