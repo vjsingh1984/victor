@@ -479,10 +479,8 @@ class AgentBuilder:
             from victor.framework.service_provider import ToolConfiguratorService
 
             # Get from container to ensure we get the singleton instance
-            # Use concrete class for container.get(), return as Protocol type
-            from victor.framework.tool_config import ToolConfigurator
-
-            service_impl = self._container.get(ToolConfigurator)
+            # Use protocol type for container.get() (service registered with protocol type)
+            service_impl = self._container.get(ToolConfiguratorService)
             return cast(Optional["ToolConfiguratorService"], service_impl)
         except Exception as e:
             logger.debug(f"Could not get ToolConfigurator from container: {e}")
