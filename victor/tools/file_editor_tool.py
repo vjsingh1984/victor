@@ -333,7 +333,7 @@ async def edit(
         }
 
     # Allow callers (models) to pass ops as a JSON string; normalize to list[dict[str, Any]]
-    if isinstance(ops, str):
+    if isinstance(ops, str):  # type: ignore[unreachable]
         import json
 
         def _fix_json_control_chars(json_str: str) -> str:
@@ -384,7 +384,7 @@ async def edit(
 
         # Try to parse the JSON, with recovery for common issues
         try:
-            ops = json.loads(ops)
+            ops = json.loads(ops)  # type: ignore[unreachable]
         except json.JSONDecodeError as exc:
             # Try to provide helpful error message and recovery hints
             error_context = ""
@@ -434,7 +434,7 @@ async def edit(
 
     # Validate operations
     for i, op in enumerate(ops):
-        if not isinstance(op, dict):
+        if not isinstance(op, dict):  # type: ignore[unreachable]
             return {
                 "success": False,
                 "error": f"Operation {i} must be a dictionary, got {type(op).__name__}",
@@ -787,7 +787,7 @@ async def edit(
         if success:
             # Commit the change group for undo/redo
             tracker.commit_change_group()
-            result = {
+            result: Dict[str, Any] = {  # type: ignore[assignment]
                 "success": True,
                 "operations_queued": operations_queued,
                 "operations_applied": operations_queued,
@@ -797,11 +797,11 @@ async def edit(
             }
             # Include validation info if there were warnings/errors
             if validation_errors:
-                result["validation_errors"] = validation_errors
-                result["message"] += f" Note: {len(validation_errors)} syntax issues detected."
+                result["validation_errors"] = validation_errors  # type: ignore[index]
+                result["message"] += f" Note: {len(validation_errors)} syntax issues detected."  # type: ignore[index]
             if validation_warnings:
-                result["validation_warnings"] = validation_warnings
-            return result
+                result["validation_warnings"] = validation_warnings  # type: ignore[index]
+            return result  # type: ignore[return-value]
         else:
             # Clear change group on failure
             if hasattr(tracker, "_current_group"):

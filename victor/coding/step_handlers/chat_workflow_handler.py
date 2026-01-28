@@ -100,10 +100,10 @@ class ChatWorkflowStepHandler(BaseStepHandler):
         """
         return 65  # After framework (60), before context (100)
 
-    def _do_apply(
+    def _do_apply(  # type: ignore[override]
         self,
         orchestrator: "AgentOrchestrator",
-        vertical: "VerticalBase",
+        vertical: type["VerticalBase"],  # type: ignore[override]
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:

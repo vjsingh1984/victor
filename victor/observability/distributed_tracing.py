@@ -72,14 +72,23 @@ from typing import (
 )
 
 if TYPE_CHECKING:
+    # Import opentelemetry types if available
+    _trace: Any | None = None
+    _Status: Any | None = None
+    _StatusCode: Any | None = None
+    _Span: Any | None = None
+
     try:
-        from opentelemetry import trace
-        from opentelemetry.trace import Span, Status, StatusCode
+        from opentelemetry import trace as _trace
+        from opentelemetry.trace import Status as _Status, StatusCode as _StatusCode
+        from opentelemetry.trace import Span as _Span
     except ImportError:
-        trace = None  # type: ignore[assignment]
-        Span = None  # type: ignore[assignment]
-        Status = None  # type: ignore[assignment]
-        StatusCode = None  # type: ignore[assignment]
+        pass
+
+    trace = _trace
+    Status = _Status
+    StatusCode = _StatusCode
+    Span = _Span
 
 logger = logging.getLogger(__name__)
 

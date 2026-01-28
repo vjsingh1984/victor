@@ -234,13 +234,15 @@ class ModelEventEmitter(IModelEventEmitter):
             **metadata: Additional metadata
         """
         self.emit(
-            topic="model.request",
-            data={
-                "provider": provider,
-                "model": model,
-                "prompt_tokens": prompt_tokens,
-                **metadata,
-            },
+            event=MessagingEvent(
+                topic="model.request",
+                data={
+                    "provider": provider,
+                    "model": model,
+                    "prompt_tokens": prompt_tokens,
+                    **metadata,
+                },
+            )
         )
 
     async def model_response_async(
@@ -302,16 +304,18 @@ class ModelEventEmitter(IModelEventEmitter):
         total_tokens = prompt_tokens + completion_tokens
 
         self.emit(
-            topic="model.response",
-            data={
-                "provider": provider,
-                "model": model,
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "total_tokens": total_tokens,
-                "latency_ms": latency_ms,
-                **metadata,
-            },
+            event=MessagingEvent(
+                topic="model.response",
+                data={
+                    "provider": provider,
+                    "model": model,
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": total_tokens,
+                    "latency_ms": latency_ms,
+                    **metadata,
+                },
+            )
         )
 
     async def model_streaming_delta_async(
@@ -363,14 +367,16 @@ class ModelEventEmitter(IModelEventEmitter):
             **metadata: Additional metadata
         """
         self.emit(
-            topic="model.streaming_delta",
-            data={
-                "provider": provider,
-                "model": model,
-                "delta": delta[:500],  # Truncate for event
-                "delta_length": len(delta),
-                **metadata,
-            },
+            event=MessagingEvent(
+                topic="model.streaming_delta",
+                data={
+                    "provider": provider,
+                    "model": model,
+                    "delta": delta[:500],  # Truncate for event
+                    "delta_length": len(delta),
+                    **metadata,
+                },
+            )
         )
 
     async def model_error_async(
@@ -418,14 +424,16 @@ class ModelEventEmitter(IModelEventEmitter):
             **metadata: Additional metadata
         """
         self.emit(
-            topic="model.error",
-            data={
-                "provider": provider,
-                "model": model,
-                "error": str(error),
-                "error_type": type(error).__name__,
-                **metadata,
-            },
+            event=MessagingEvent(
+                topic="model.error",
+                data={
+                    "provider": provider,
+                    "model": model,
+                    "error": str(error),
+                    "error_type": type(error).__name__,
+                    **metadata,
+                },
+            )
         )
 
     def enable(self) -> None:

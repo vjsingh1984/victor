@@ -1282,7 +1282,7 @@ class SemanticToolSelector:
         # Defensive: Check tools is actually a ToolRegistry
         from victor.tools.registry import ToolRegistry
 
-        if not isinstance(tools, ToolRegistry):
+        if not isinstance(tools, ToolRegistry):  # type: ignore[unreachable]
             logger.warning(
                 f"_get_cost_penalty expected ToolRegistry, got {type(tools).__name__}. "
                 "Skipping cost penalty calculation."
@@ -1468,7 +1468,7 @@ class SemanticToolSelector:
         # Defensive: Check tools is actually a ToolRegistry
         from victor.tools.registry import ToolRegistry
 
-        if not isinstance(tools, ToolRegistry):
+        if not isinstance(tools, ToolRegistry):  # type: ignore[unreachable]
             logger.warning(
                 f"_generate_cost_warnings expected ToolRegistry, got {type(tools).__name__}. "
                 "Skipping cost warning generation."
@@ -1913,7 +1913,7 @@ class SemanticToolSelector:
         if cache_key in self._query_embedding_cache:
             # Move to end (mark as recently used)
             self._query_embedding_cache.move_to_end(cache_key)
-            return self._query_embedding_cache[cache_key]
+            return self._query_embedding_cache[cache_key]  # type: ignore[return-value]
 
         # Cache miss - generate embedding
         if self.embedding_provider == "sentence-transformers":
@@ -2020,7 +2020,8 @@ class SemanticToolSelector:
                 # Fallback to individual generation
                 for idx, text in zip(uncached_indices, uncached_texts):
                     emb = await self._get_embedding(text)
-                    embeddings[idx] = emb
+                    if emb is not None:  # type: ignore[unreachable]
+                        embeddings[idx] = emb
 
         return embeddings
 

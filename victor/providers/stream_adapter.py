@@ -229,7 +229,7 @@ class OpenAIAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.OPENAI
 
-    async def adapt_stream(
+    async def adapt_stream(  # type: ignore[override,misc]
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -281,7 +281,7 @@ class AnthropicAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.ANTHROPIC
 
-    async def adapt_stream(
+    async def adapt_stream(  # type: ignore[override,misc]
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -325,7 +325,7 @@ class GoogleAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.GOOGLE
 
-    async def adapt_stream(
+    async def adapt_stream(  # type: ignore[override,misc]
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -377,7 +377,7 @@ class OllamaAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.OLLAMA
 
-    async def adapt_stream(
+    async def adapt_stream(  # type: ignore[override,misc]
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -438,7 +438,7 @@ class LMStudioAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.LMSTUDIO
 
-    async def adapt_stream(
+    async def adapt_stream(  # type: ignore[override,misc]
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -470,7 +470,7 @@ class VLLMAdapter(BaseSDKAdapter):
     def sdk_type(self) -> SDKType:
         return SDKType.VLLM
 
-    async def adapt_stream(
+    async def adapt_stream(  # type: ignore[override,misc]
         self,
         raw_stream: AsyncIterator[Any],
         **kwargs: Any,
@@ -670,7 +670,7 @@ class UnifiedStreamAdapter:
         try:
             # Get the raw stream from the provider
             # Note: provider.stream() returns an async generator, not a coroutine
-            raw_stream = self._provider.stream(
+            raw_stream_gen = self._provider.stream(
                 messages,
                 model=model,
                 temperature=temperature,
@@ -680,7 +680,7 @@ class UnifiedStreamAdapter:
             )
 
             first_chunk = True
-            async for chunk in raw_stream:
+            async for chunk in raw_stream_gen:  # type: ignore[attr-defined]
                 if metrics:
                     if first_chunk:
                         metrics.first_token_time = time.time()

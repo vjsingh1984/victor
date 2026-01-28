@@ -547,10 +547,14 @@ class LearningCommand(BaseSlashCommand):
                     )
                     from victor.rl.strategies import SelectionStrategy as RLSelectionStrategy  # type: ignore[import-not-found]
 
-                    strategy_func = getattr(learner, "get_strategy", lambda s=None: None)
+                    # Define proper type for lambda
+                    def get_default_strategy(s: Any = None) -> Any:  # noqa: ARG001
+                        return None
+
+                    strategy_func = getattr(learner, "get_strategy", get_default_strategy)
                     strategy_result = strategy_func(learner)
-                    strategy: RLSelectionStrategy | None = strategy_result if isinstance(strategy_result, RLSelectionStrategy) else getattr(learner, "_strategy", None)
-                    content += f"\n  Strategy: {strategy.value if strategy else 'epsilon_greedy'}\n"
+                    final_strategy = strategy_result if isinstance(strategy_result, RLSelectionStrategy) else getattr(learner, "_strategy", None)
+                    content += f"\n  Strategy: {final_strategy.value if final_strategy else 'epsilon_greedy'}\n"
                     content += f"  Exploration Rate: {exploration:.2f}\n"
         except Exception as e:
             logger.debug(f"Could not get model selector stats: {e}")

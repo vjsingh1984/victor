@@ -203,11 +203,13 @@ class LifecycleEventEmitter(ILifecycleEventEmitter):
             **metadata: Additional metadata
         """
         self.emit(
-            topic="lifecycle.session.start",
-            data={
-                "session_id": session_id,
-                **metadata,
-            },
+            event=MessagingEvent(
+                topic="lifecycle.session.start",
+                data={
+                    "session_id": session_id,
+                    **metadata,
+                },
+            )
         )
 
     async def session_end_async(
@@ -249,12 +251,14 @@ class LifecycleEventEmitter(ILifecycleEventEmitter):
             **metadata: Additional metadata
         """
         self.emit(
-            topic="lifecycle.session.end",
-            data={
-                "session_id": session_id,
-                "duration_ms": duration_ms,
-                **metadata,
-            },
+            event=MessagingEvent(
+                topic="lifecycle.session.end",
+                data={
+                    "session_id": session_id,
+                    "duration_ms": duration_ms,
+                    **metadata,
+                },
+            )
         )
 
     @contextmanager

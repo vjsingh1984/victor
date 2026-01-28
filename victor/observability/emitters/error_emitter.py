@@ -136,7 +136,7 @@ class ErrorEventEmitter(IErrorEventEmitter):
 
     def emit(
         self,
-        event_or_topic: Union[MessagingEvent, str] = None,
+        event_or_topic: Union[MessagingEvent, str] | None = None,
         data: Optional[Dict[str, Any]] = None,
         *,
         topic: Optional[str] = None,

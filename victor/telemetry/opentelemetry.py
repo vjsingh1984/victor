@@ -15,14 +15,27 @@
 """OpenTelemetry setup and configuration."""
 
 try:
-    from opentelemetry import trace, metrics  # type: ignore[import]
-    from opentelemetry.sdk.trace import TracerProvider as _TracerProvider  # type: ignore[import]
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor  # type: ignore[import]
-    from opentelemetry.sdk.metrics import MeterProvider as _MeterProvider  # type: ignore[import]
-    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader as _PeriodicExportingMetricReader  # type: ignore[import]
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as _OTLPSpanExporter  # type: ignore[import]
-    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter as _OTLPMetricExporter  # type: ignore[import]
-    from opentelemetry.sdk.resources import Resource as _Resource  # type: ignore[import]
+    from opentelemetry import trace, metrics
+    from opentelemetry.sdk.trace import TracerProvider as _TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor
+    from opentelemetry.sdk.metrics import MeterProvider as _MeterProvider
+    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader as _PeriodicExportingMetricReader
+    from opentelemetry.sdk.resources import Resource as _Resource
+
+    # Optional exporters that may not be installed
+    try:
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # type: ignore[import-not-found]
+            OTLPSpanExporter as _OTLPSpanExporter,
+        )
+    except ImportError:
+        _OTLPSpanExporter = None  # type: ignore[assignment]
+
+    try:
+        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (  # type: ignore[import-not-found]
+            OTLPMetricExporter as _OTLPMetricExporter,
+        )
+    except ImportError:
+        _OTLPMetricExporter = None  # type: ignore[assignment]
 
     TracerProvider = _TracerProvider
     BatchSpanProcessor = _BatchSpanProcessor

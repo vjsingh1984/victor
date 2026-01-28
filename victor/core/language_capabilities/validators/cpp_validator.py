@@ -166,8 +166,8 @@ class CppValidator:
             )
 
         # Type narrowing: self._index and cindex are not None here
-        assert self._index is not None
-        assert cindex is not None
+        assert self._index is not None  # type: ignore[unreachable]
+        assert cindex is not None  # type: ignore[unreachable]
 
         # Parse options - use c++ for cpp, c for c
         if language == "cpp":
@@ -250,8 +250,8 @@ class CppValidator:
             return self._ts_validator.has_errors(code, language)
 
         # Type narrowing: self._index and cindex are not None here
-        assert self._index is not None
-        assert cindex is not None
+        assert self._index is not None  # type: ignore[unreachable]
+        assert cindex is not None  # type: ignore[unreachable]
 
         # Build args based on language
         if language == "cpp":

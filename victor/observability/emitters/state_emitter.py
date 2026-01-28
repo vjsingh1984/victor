@@ -219,7 +219,7 @@ class StateEventEmitter(IStateEventEmitter):
             **metadata: Additional metadata
         """
         self.emit(
-            MessagingEvent(
+            event=MessagingEvent(
                 topic="state.transition",
                 data={
                     "old_stage": old_stage,
@@ -227,7 +227,7 @@ class StateEventEmitter(IStateEventEmitter):
                     "confidence": confidence,
                     **metadata,
                 },
-            )  # type: ignore[arg-type,call-arg]
+            )
         )
 
     def enable(self) -> None:

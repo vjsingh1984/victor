@@ -118,7 +118,7 @@ class PostgresService(ServiceLifecycle):
 
         # Use asyncpg if available
         try:
-            import asyncpg  # type: ignore[import]
+            import asyncpg  # type: ignore[import-untyped]
 
             pool = await asyncpg.create_pool(
                 host=config.config.get("host", "localhost"),
@@ -369,7 +369,7 @@ class SQLiteService(ServiceLifecycle):
         logger.info(f"Initializing SQLite service: {config.name} at {db_path}")
 
         try:
-            import aiosqlite  # type: ignore[import-not-found]
+            import aiosqlite  # type: ignore[import-untyped]
 
             # Expand path and ensure parent directory exists
             db_path = Path(db_path).expanduser()

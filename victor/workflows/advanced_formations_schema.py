@@ -338,7 +338,7 @@ def validate_dynamic_config(config: DynamicFormationConfig) -> List[str]:
 
     # Validate switching rules
     for i, rule in enumerate(config.switching_rules):
-        if not isinstance(rule, dict):  # type: ignore[unreachable]
+        if not isinstance(rule, dict):
             errors.append(f"switching_rules[{i}] must be a dictionary")
             continue
 
@@ -405,7 +405,7 @@ def validate_adaptive_config(config: AdaptiveFormationConfig) -> List[str]:
                     f"Must be one of: {valid_formations}"
                 )
 
-            if not isinstance(weights, dict):  # type: ignore[unreachable]
+            if not isinstance(weights, dict):
                 errors.append(f"scoring_weights['{formation}'] must be a dictionary")
                 continue
 
@@ -413,7 +413,7 @@ def validate_adaptive_config(config: AdaptiveFormationConfig) -> List[str]:
                 if not isinstance(weight, (int, float)):  # type: ignore[unreachable]
                     errors.append(
                         f"scoring_weights['{formation}']['{criterion}'] " f"must be a number"
-                    )  # type: ignore[misc]
+                    )
 
     return errors
 

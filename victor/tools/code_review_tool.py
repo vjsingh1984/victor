@@ -324,10 +324,10 @@ async def code_review(
         except json.JSONDecodeError:
             # Not a JSON string, treat as single aspect
             aspects = [aspects]
-
-    # Ensure aspects is a list
-    if not isinstance(aspects, list):
-        aspects = [aspects]
+    else:
+        # Ensure aspects is a list
+        if not isinstance(aspects, list):  # type: ignore[unreachable]
+            aspects = [aspects]
 
     # Validate aspects
     valid_aspects = {"security", "complexity", "best_practices", "documentation", "all"}
@@ -348,7 +348,7 @@ async def code_review(
 
         try:
             languages = json.loads(languages)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError:  # type: ignore[unreachable]
             languages = [languages]
 
     path_obj = Path(path)
