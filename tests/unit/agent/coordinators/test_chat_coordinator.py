@@ -654,22 +654,6 @@ class TestChatCoordinatorHelperMethods:
         assert result["needs_execution"] is False
         assert result["coarse_task_type"] == "default"
 
-    def test_extract_required_files_from_prompt(self, coordinator: ChatCoordinator):
-        """Test extraction of required files (returns empty list as per implementation)."""
-        # Execute
-        files = coordinator._extract_required_files_from_prompt("Fix file.py and test.py")
-
-        # Assert - implementation returns empty list
-        assert files == []
-
-    def test_extract_required_outputs_from_prompt(self, coordinator: ChatCoordinator):
-        """Test extraction of required outputs (returns empty list as per implementation)."""
-        # Execute
-        outputs = coordinator._extract_required_outputs_from_prompt("Generate output.txt")
-
-        # Assert - implementation returns empty list
-        assert outputs == []
-
     def test_get_max_context_chars(self, coordinator: ChatCoordinator, mock_orchestrator: Mock):
         """Test getting max context characters."""
         # Execute

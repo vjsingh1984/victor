@@ -18,15 +18,12 @@ This module provides reusable mixins for reducing boilerplate in the
 AgentOrchestrator class by automating common patterns:
 - ComponentAccessorMixin: Automatic component access via __getattr__
 - StateDelegationMixin: Automatic state property delegation
-- LegacyAPIMixin: Deprecated methods for backward compatibility
 """
 
 from victor.agent.mixins.component_accessor import ComponentAccessorMixin
-from victor.agent.mixins.legacy_api import LegacyAPIMixin
 from victor.agent.mixins.state_delegation import StateDelegationMixin
 
 __all__ = [
     "ComponentAccessorMixin",
     "StateDelegationMixin",
-    "LegacyAPIMixin",
 ]
