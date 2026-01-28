@@ -43,33 +43,31 @@ if TYPE_CHECKING:
 _DEFAULT_ALLOW_MODIFICATIONS: bool = False
 _DEFAULT_MAX_ROWS: int = 100
 
-# Legacy session-level connection cache (use _get_connection_pool() for DI support)
-_connections: Dict[str, Any] = {}
-
 
 def _get_connection_pool(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Get the connection pool, preferring DI-injected cache if available.
+    """Get the connection pool from DI-injected cache.
 
     Args:
-        exec_ctx: Execution context that may contain cache_manager
+        exec_ctx: Execution context with cache_manager
 
     Returns:
-        Connection pool dict-like object
+        Dict with connection_pool key, or empty dict if not available
+
+    Note:
+        Global _connections removed in v0.5.1.
+        All database operations require DI with cache_manager.
     """
-    # Try to get from execution context (DI pattern)
     if exec_ctx is not None:
         # Check for ToolExecutionContext with cache_manager
         from victor.tools.context import ToolExecutionContext
 
         if isinstance(exec_ctx, ToolExecutionContext):
             if exec_ctx.cache_manager is not None:
-                # Convert to dict
                 return {
                     "connection_pool": exec_ctx.connection_pool,
                     "cache_manager": exec_ctx.cache_manager,
                 }
         elif isinstance(exec_ctx, dict):
-            # Legacy dict context - check for cache_manager
             cache_manager = exec_ctx.get("cache_manager")
             if cache_manager is not None:
                 return {
@@ -77,8 +75,8 @@ def _get_connection_pool(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str,
                     "cache_manager": cache_manager,
                 }
 
-    # Fallback to global cache for backward compatibility
-    return _connections
+    # No DI available - return empty connection pool
+    return {"connection_pool": {}}
 
 
 # Dangerous SQL patterns that should be blocked
@@ -99,8 +97,14 @@ DANGEROUS_PATTERNS = [
 async def _connect_sqlite(
     database: str, connection_pool: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Connect to SQLite database."""
-    pool = connection_pool if connection_pool is not None else _connections
+    """Connect to SQLite database.
+
+    Args:
+        database: Database path or ':memory:' for in-memory
+        connection_pool: Extracted connection pool dict (not wrapper)
+    """
+    # connection_pool is already extracted from wrapper by caller
+    pool = connection_pool if connection_pool is not None else {}
     try:
         conn = sqlite3.connect(database)
         conn.row_factory = sqlite3.Row  # Enable column names
@@ -119,8 +123,14 @@ async def _connect_sqlite(
 async def _connect_postgresql(
     kwargs: Dict[str, Any], connection_pool: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Connect to PostgreSQL database."""
-    pool = connection_pool if connection_pool is not None else _connections
+    """Connect to PostgreSQL database.
+
+    Args:
+        kwargs: Connection parameters (host, port, database, username, password)
+        connection_pool: Extracted connection pool dict (not wrapper)
+    """
+    # connection_pool is already extracted from wrapper by caller
+    pool = connection_pool if connection_pool is not None else {}
     try:
         import psycopg2  # type: ignore[import-untyped]
 
@@ -152,8 +162,14 @@ async def _connect_postgresql(
 async def _connect_mysql(
     kwargs: Dict[str, Any], connection_pool: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Connect to MySQL database."""
-    pool = connection_pool if connection_pool is not None else _connections
+    """Connect to MySQL database.
+
+    Args:
+        kwargs: Connection parameters (host, port, database, username, password)
+        connection_pool: Extracted connection pool dict (not wrapper)
+    """
+    # connection_pool is already extracted from wrapper by caller
+    pool = connection_pool if connection_pool is not None else {}
     try:
         import mysql.connector  # type: ignore
 
@@ -185,8 +201,14 @@ async def _connect_mysql(
 async def _connect_sqlserver(
     kwargs: Dict[str, Any], connection_pool: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Connect to SQL Server database."""
-    pool = connection_pool if connection_pool is not None else _connections
+    """Connect to SQL Server database.
+
+    Args:
+        kwargs: Connection parameters (host, database, username, password)
+        connection_pool: Extracted connection pool dict (not wrapper)
+    """
+    # connection_pool is already extracted from wrapper by caller
+    pool = connection_pool if connection_pool is not None else {}
     try:
         import pyodbc  # type: ignore
 
@@ -263,8 +285,17 @@ async def _do_query(
     allow_modifications: Optional[bool] = None,
     connection_pool: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Internal query handler."""
-    pool = connection_pool if connection_pool is not None else _connections
+    """Internal query handler.
+
+    Args:
+        connection_id: Database connection identifier
+        sql: SQL query to execute
+        limit: Maximum rows to return
+        allow_modifications: Allow modification statements
+        connection_pool: Extracted connection pool dict (not wrapper)
+    """
+    # connection_pool is already extracted from wrapper by caller
+    pool = connection_pool if connection_pool is not None else {}
     if not connection_id or connection_id not in pool:
         return {
             "success": False,
@@ -331,8 +362,14 @@ async def _do_query(
 async def _do_tables(
     connection_id: str, connection_pool: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Internal list tables handler."""
-    pool = connection_pool if connection_pool is not None else _connections
+    """Internal list tables handler.
+
+    Args:
+        connection_id: Database connection identifier
+        connection_pool: Extracted connection pool dict (not wrapper)
+    """
+    # connection_pool is already extracted from wrapper by caller
+    pool = connection_pool if connection_pool is not None else {}
     if not connection_id or connection_id not in pool:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
@@ -364,8 +401,15 @@ async def _do_tables(
 async def _do_describe(
     connection_id: str, table: str, connection_pool: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Internal describe table handler."""
-    pool = connection_pool if connection_pool is not None else _connections
+    """Internal describe table handler.
+
+    Args:
+        connection_id: Database connection identifier
+        table: Table name to describe
+        connection_pool: Extracted connection pool dict (not wrapper)
+    """
+    # connection_pool is already extracted from wrapper by caller
+    pool = connection_pool if connection_pool is not None else {}
     if not connection_id or connection_id not in pool:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
@@ -428,8 +472,14 @@ async def _do_describe(
 async def _do_schema(
     connection_id: str, connection_pool: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Internal get schema handler."""
-    pool = connection_pool if connection_pool is not None else _connections
+    """Internal get schema handler.
+
+    Args:
+        connection_id: Database connection identifier
+        connection_pool: Extracted connection pool dict (not wrapper)
+    """
+    # connection_pool is already extracted from wrapper by caller
+    pool = connection_pool if connection_pool is not None else {}
     if not connection_id or connection_id not in pool:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
@@ -456,8 +506,14 @@ async def _do_schema(
 async def _do_disconnect(
     connection_id: str, connection_pool: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Internal disconnect handler."""
-    pool = connection_pool if connection_pool is not None else _connections
+    """Internal disconnect handler.
+
+    Args:
+        connection_id: Database connection identifier
+        connection_pool: Extracted connection pool dict (not wrapper)
+    """
+    # connection_pool is already extracted from wrapper by caller
+    pool = connection_pool if connection_pool is not None else {}
     if not connection_id or connection_id not in pool:
         return {"success": False, "error": "Invalid or missing connection_id"}
 
@@ -547,7 +603,9 @@ async def database(
     action_lower = action.lower().strip()
 
     # Get connection pool using DI-aware accessor
-    pool = _get_connection_pool(_exec_ctx)
+    pool_wrapper = _get_connection_pool(_exec_ctx)
+    # Extract actual pool from wrapper dict
+    pool = pool_wrapper.get("connection_pool", {}) if pool_wrapper else {}
 
     if action_lower == "connect":
         if not database:

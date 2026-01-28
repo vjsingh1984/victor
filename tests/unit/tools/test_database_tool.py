@@ -21,10 +21,63 @@ import os
 from victor.tools.database_tool import (
     database,
     DANGEROUS_PATTERNS,
-    _connections,
     _DEFAULT_ALLOW_MODIFICATIONS,
     _DEFAULT_MAX_ROWS,
 )
+
+
+# =============================================================================
+# TEST FIXTURES - DI Setup for Database Tests
+# =============================================================================
+
+# Test connection pool (replaces removed global _connections)
+# Note: Global _connections removed in v0.5.1
+# Tests use DI mock via mock_database_di fixture below
+_test_connections: dict = {}
+
+
+@pytest.fixture(autouse=True)
+def mock_database_di(monkeypatch):
+    """Mock _get_connection_pool to use test connections.
+
+    This fixture provides DI for database operations during testing.
+    The mock is automatically undone when the test completes.
+
+    Note: Global _connections removed in v0.5.1 - all database operations
+    require DI with cache_manager/connection_pool.
+    """
+    import victor.tools.database_tool as db_module
+
+    def mock_get_pool(exec_ctx):
+        """Mock that provides test connections via DI pattern."""
+        if exec_ctx is not None:
+            # Try normal DI path first
+            from victor.tools.context import ToolExecutionContext
+
+            if isinstance(exec_ctx, ToolExecutionContext):
+                if exec_ctx.cache_manager is not None:
+                    return {
+                        "connection_pool": exec_ctx.connection_pool,
+                        "cache_manager": exec_ctx.cache_manager,
+                    }
+            elif isinstance(exec_ctx, dict):
+                cache_manager = exec_ctx.get("cache_manager")
+                if cache_manager is not None:
+                    return {
+                        "connection_pool": cache_manager.connection_pool,
+                        "cache_manager": cache_manager,
+                    }
+
+        # Fallback to test pool for testing
+        return {"connection_pool": _test_connections}
+
+    # Apply monkeypatch for this test
+    monkeypatch.setattr(db_module, "_get_connection_pool", mock_get_pool)
+
+    yield
+
+    # Cleanup - clear connections (monkeypatch auto-undone by pytest)
+    _test_connections.clear()
 
 
 class TestDatabaseConstants:
@@ -92,7 +145,7 @@ class TestDatabaseQuery:
         conn_id = result["connection_id"]
 
         # Create test table
-        _connections[conn_id].execute(
+        _test_connections[conn_id].execute(
             """
             CREATE TABLE users (
                 id INTEGER PRIMARY KEY,
@@ -101,13 +154,13 @@ class TestDatabaseQuery:
             )
         """
         )
-        _connections[conn_id].execute(
+        _test_connections[conn_id].execute(
             "INSERT INTO users (name, email) VALUES ('Alice', 'alice@test.com')"
         )
-        _connections[conn_id].execute(
+        _test_connections[conn_id].execute(
             "INSERT INTO users (name, email) VALUES ('Bob', 'bob@test.com')"
         )
-        _connections[conn_id].commit()
+        _test_connections[conn_id].commit()
 
         yield conn_id
 
@@ -201,9 +254,9 @@ class TestDatabaseTables:
         conn_id = result["connection_id"]
 
         # Create test tables
-        _connections[conn_id].execute("CREATE TABLE users (id INTEGER PRIMARY KEY)")
-        _connections[conn_id].execute("CREATE TABLE orders (id INTEGER PRIMARY KEY)")
-        _connections[conn_id].commit()
+        _test_connections[conn_id].execute("CREATE TABLE users (id INTEGER PRIMARY KEY)")
+        _test_connections[conn_id].execute("CREATE TABLE orders (id INTEGER PRIMARY KEY)")
+        _test_connections[conn_id].commit()
 
         yield conn_id
 
@@ -236,7 +289,7 @@ class TestDatabaseDescribe:
         result = await database(action="connect", database=":memory:")
         conn_id = result["connection_id"]
 
-        _connections[conn_id].execute(
+        _test_connections[conn_id].execute(
             """
             CREATE TABLE users (
                 id INTEGER PRIMARY KEY,
@@ -246,7 +299,7 @@ class TestDatabaseDescribe:
             )
         """
         )
-        _connections[conn_id].commit()
+        _test_connections[conn_id].commit()
 
         yield conn_id
 
@@ -291,11 +344,11 @@ class TestDatabaseSchema:
         result = await database(action="connect", database=":memory:")
         conn_id = result["connection_id"]
 
-        _connections[conn_id].execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
-        _connections[conn_id].execute(
+        _test_connections[conn_id].execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
+        _test_connections[conn_id].execute(
             "CREATE TABLE orders (id INTEGER PRIMARY KEY, user_id INTEGER)"
         )
-        _connections[conn_id].commit()
+        _test_connections[conn_id].commit()
 
         yield conn_id
 
@@ -337,6 +390,9 @@ class TestDatabaseDisconnect:
     @pytest.mark.asyncio
     async def test_disconnect_success(self):
         """Test successful disconnect."""
+        # Note: _connections removed from database_tool in v0.5.1
+        # Test connections now managed by mock_database_di fixture
+
         conn_result = await database(action="connect", database=":memory:")
         assert conn_result["success"] is True
         conn_id = conn_result["connection_id"]
@@ -345,7 +401,7 @@ class TestDatabaseDisconnect:
         assert result["success"] is True
         assert "Disconnected" in result["message"]
 
-        assert conn_id not in _connections
+        assert conn_id not in _test_connections
 
 
 class TestDangerousPatterns:
