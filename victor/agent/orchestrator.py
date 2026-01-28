@@ -577,6 +577,7 @@ class AgentOrchestrator(
         self._state_coordinator: Optional["StateCoordinator"]
         self._session_state: Optional["SessionStateManager"]
         self._vertical_context: "VerticalContext"
+        self._middleware_coordinator: Optional["MiddlewareCoordinator"]
 
         # Lazy-initialized attributes
         self._intelligent_pipeline_enabled: bool = False
@@ -819,6 +820,21 @@ class AgentOrchestrator(
     def code_correction_middleware(self) -> Optional[Any]:
         """Code correction middleware for automatic validation/fixing."""
         return self._code_correction_middleware
+
+    # =====================================================================
+    # Middleware Coordinator - Vertical middleware management
+    # =====================================================================
+
+    @property
+    def middleware_coordinator(self) -> Optional["MiddlewareCoordinator"]:
+        """Middleware coordinator for vertical middleware management (lazy initialization)."""
+        # Lazy initialization: create on first access
+        if self._middleware_coordinator is None:
+            from victor.agent.coordinators.middleware_coordinator import MiddlewareCoordinator
+
+            self._middleware_coordinator = MiddlewareCoordinator()
+            logger.debug("MiddlewareCoordinator lazy-initialized")
+        return self._middleware_coordinator
 
     # =====================================================================
     # State Coordinator - Unified state management
@@ -2972,7 +2988,7 @@ class AgentOrchestrator(
         for tool_call in tool_calls:
             # Validate tool call structure
             if not isinstance(tool_call, dict):
-                self.console.print(
+                self.console.print(  # type: ignore[unreachable]
                     f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping invalid tool call (not a dict): {tool_call}[/]"
                 )
                 continue

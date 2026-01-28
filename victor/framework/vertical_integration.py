@@ -860,7 +860,7 @@ class VerticalIntegrationPipeline:
 
         # Check cache for pre-computed integration (Phase 1: Caching)
         if self._enable_cache:
-            cache_key = self._generate_cache_key(vertical_class)
+            cache_key = self._generate_cache_key(vertical_class, config_overrides)
             if cache_key:
                 cached_result = self._load_from_cache(cache_key)
                 if cached_result:
@@ -956,24 +956,29 @@ class VerticalIntegrationPipeline:
 
         # Save to cache (Phase 1: Caching)
         if self._enable_cache and result.success:
-            cache_key = self._generate_cache_key(vertical_class)
+            cache_key = self._generate_cache_key(vertical_class, config_overrides)
             if cache_key:
                 self._save_to_cache(cache_key, result)
 
         return result
 
-    def _generate_cache_key(self, vertical: Type["VerticalBase"]) -> Optional[str]:
+    def _generate_cache_key(
+        self, vertical: Type["VerticalBase"], config_overrides: Optional[Dict[str, Any]] = None
+    ) -> Optional[str]:
         """Generate stable cache key from vertical signature.
 
         The key is based on:
         1. Vertical name
         2. Source code hash (for inline changes)
         3. File modification time (for file changes)
+        4. Configuration overrides (for different configs of same vertical)
 
-        This ensures cache invalidation when vertical code changes.
+        This ensures cache invalidation when vertical code changes or
+        different config_overrides are applied.
 
         Args:
             vertical: Vertical class
+            config_overrides: Optional configuration overrides to include in cache key
 
         Returns:
             Cache key string, or None if generation fails
@@ -995,11 +1000,11 @@ class VerticalIntegrationPipeline:
                             source_file = Path(module.__file__)
                         else:
                             # Fallback to class-based key
-                            return self._generate_class_based_key(vertical)
+                            return self._generate_class_based_key(vertical, config_overrides)
                     else:
-                        return self._generate_class_based_key(vertical)
+                        return self._generate_class_based_key(vertical, config_overrides)
                 else:
-                    return self._generate_class_based_key(vertical)
+                    return self._generate_class_based_key(vertical, config_overrides)
 
             source_hash = self._hash_source_file(source_file)
 
@@ -1015,17 +1020,24 @@ class VerticalIntegrationPipeline:
                 yaml_hash = self._hash_yaml_config(yaml_path)
                 key_parts.append(f"yaml={yaml_hash}")
 
+            # Include config_overrides hash if provided (Phase 1 fix)
+            if config_overrides:
+                overrides_hash = self._hash_dict(config_overrides)
+                key_parts.append(f"overrides={overrides_hash}")
+
             key_string = "|".join(key_parts)
             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
 
-            # Version bump to v5 to indicate YAML-aware caching
-            return f"v5_{vertical.name}_{full_hash[:16]}"
+            # Version bump to v7 to indicate config_overrides-aware caching
+            return f"v7_{vertical.name}_{full_hash[:16]}"
 
         except Exception as e:
             logger.warning(f"Failed to generate cache key: {e}")
             return None
 
-    def _generate_class_based_key(self, vertical: Type["VerticalBase"]) -> Optional[str]:
+    def _generate_class_based_key(
+        self, vertical: Type["VerticalBase"], config_overrides: Optional[Dict[str, Any]] = None
+    ) -> Optional[str]:
         """Generate cache key from class properties when source file unavailable.
 
         This is a fallback for dynamically loaded classes or built-in classes.
@@ -1033,6 +1045,7 @@ class VerticalIntegrationPipeline:
 
         Args:
             vertical: Vertical class
+            config_overrides: Optional configuration overrides to include in cache key
 
         Returns:
             Cache key string
@@ -1076,10 +1089,15 @@ class VerticalIntegrationPipeline:
                                 yaml_hash = self._hash_yaml_config(yaml_path)
                                 key_parts.append(f"yaml={yaml_hash}")
 
+                            # Include config_overrides hash if provided (Phase 1 fix)
+                            if config_overrides:
+                                overrides_hash = self._hash_dict(config_overrides)
+                                key_parts.append(f"overrides={overrides_hash}")
+
                             key_string = "|".join(key_parts)
                             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
-                            # Version bump to v6 to indicate YAML-aware caching
-                            return f"v6_{vertical.name}_{full_hash[:16]}"
+                            # Version bump to v8 to indicate config_overrides-aware caching
+                            return f"v8_{vertical.name}_{full_hash[:16]}"
                     except Exception:
                         pass  # Fall back to id-based key
 
@@ -1089,13 +1107,28 @@ class VerticalIntegrationPipeline:
                 f"id={id(vertical)}",
                 f"module={vertical.__module__}",
             ]
+
+            # Include config_overrides hash if provided (Phase 1 fix)
+            if config_overrides:
+                overrides_hash = self._hash_dict(config_overrides)
+                key_parts.append(f"overrides={overrides_hash}")
+
             key_string = "|".join(key_parts)
             full_hash = hashlib.sha256(key_string.encode()).hexdigest()
-            return f"v3_{vertical.name}_{full_hash[:16]}"
+            return f"v9_{vertical.name}_{full_hash[:16]}"
 
         except Exception:
-            # Ultimate fallback
-            return f"v4_{vertical.name}_{id(vertical)}"
+            # Ultimate fallback with config_overrides
+            try:
+                key_parts = [f"vertical={vertical.name}", f"id={id(vertical)}"]
+                if config_overrides:
+                    overrides_hash = self._hash_dict(config_overrides)
+                    key_parts.append(f"overrides={overrides_hash}")
+                key_string = "|".join(key_parts)
+                full_hash = hashlib.sha256(key_string.encode()).hexdigest()
+                return f"v10_{vertical.name}_{full_hash[:16]}"
+            except Exception:
+                return f"v11_{vertical.name}_{id(vertical)}"
 
     def _hash_source_file(self, source_file: Path) -> str:
         """Hash source file content and metadata.
@@ -1120,6 +1153,24 @@ class VerticalIntegrationPipeline:
         except Exception as e:
             logger.warning(f"Failed to hash source file {source_file}: {e}")
             return f"unknown_{hash(source_file)}"
+
+    def _hash_dict(self, data: Dict[str, Any]) -> str:
+        """Hash dictionary for config overrides.
+
+        Args:
+            data: Dictionary to hash
+
+        Returns:
+            Hex digest hash of sorted dictionary items
+        """
+        try:
+            # Sort keys for stable hash regardless of dict ordering
+            # Use JSON for consistent serialization
+            sorted_json = json.dumps(data, sort_keys=True)
+            return hashlib.sha256(sorted_json.encode()).hexdigest()[:16]
+        except Exception as e:
+            logger.warning(f"Failed to hash dict: {e}")
+            return f"unknown_{hash(str(data))}"
 
     def _find_yaml_config(self, vertical: Type["VerticalBase"]) -> Optional[Path]:
         """Find YAML config file for a vertical.
@@ -1260,6 +1311,7 @@ class VerticalIntegrationPipeline:
         self,
         orchestrator: Any,
         vertical: Union[Type["VerticalBase"], str],
+        config_overrides: Optional[Dict[str, Any]] = None,
     ) -> IntegrationResult:
         """Apply vertical integration asynchronously (Phase 2.1).
 
@@ -1269,6 +1321,7 @@ class VerticalIntegrationPipeline:
         Args:
             orchestrator: Orchestrator instance
             vertical: Vertical class or name string
+            config_overrides: Optional configuration overrides
 
         Returns:
             IntegrationResult with status and metadata
@@ -1287,7 +1340,7 @@ class VerticalIntegrationPipeline:
 
         # Check cache first (Phase 1)
         if self._enable_cache:
-            cache_key = self._generate_cache_key(vertical_cls)
+            cache_key = self._generate_cache_key(vertical_cls, config_overrides)
             if cache_key:
                 cached_result = self._load_from_cache(cache_key)
                 if cached_result:
@@ -1354,7 +1407,7 @@ class VerticalIntegrationPipeline:
 
         # Cache result (Phase 1)
         if self._enable_cache and result.success:
-            cache_key = self._generate_cache_key(vertical_cls)
+            cache_key = self._generate_cache_key(vertical_cls, config_overrides)
             if cache_key:
                 self._save_to_cache(cache_key, result)
 

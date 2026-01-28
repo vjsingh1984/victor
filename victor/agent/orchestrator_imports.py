@@ -74,6 +74,9 @@ from victor.agent.coordinators.metrics_coordinator import (
 from victor.agent.coordinators.response_coordinator import (
     ResponseCoordinator,
 )
+from victor.agent.coordinators.middleware_coordinator import (
+    MiddlewareCoordinator,
+)
 from victor.agent.coordinators.state_coordinator import (
     StateCoordinator,
     StateScope,
@@ -102,6 +105,7 @@ __all__ = [
     "EvaluationCoordinator",
     "MetricsCoordinator",
     "ResponseCoordinator",
+    "MiddlewareCoordinator",
     "StateCoordinator",
     "StateScope",
     "WorkflowCoordinator",

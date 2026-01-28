@@ -1124,19 +1124,15 @@ class FrameworkStepHandler(BaseStepHandler):
             # Vertical itself is a workflow provider (class-level check)
             workflow_provider = vertical
 
-        if workflow_provider is None:
-            return
+        if workflow_provider is not None:
+            # Get workflows from provider
+            workflows = workflow_provider.get_workflows()
+            if workflows:
+                workflow_count = len(workflows)
+                result.workflows_count = workflow_count
 
-        # Get workflows from provider
-        workflows = workflow_provider.get_workflows()
-        if not workflows:
-            return
-
-        workflow_count = len(workflows)
-        result.workflows_count = workflow_count
-
-        # Store in context
-        context.apply_workflows(workflows)
+                # Store in context
+                context.apply_workflows(workflows)
 
         # Register with workflow registry if available
         try:
@@ -1508,7 +1504,7 @@ class FrameworkStepHandler(BaseStepHandler):
                         loader.register_capability(
                             name=cap.name,
                             handler=cap.handler,
-                            capability_type=cap_type if cap_type is not None else "custom",
+                            capability_type=cap_type if cap_type is not None else "custom",  # type: ignore[arg-type]
                             version=getattr(cap, "version", "1.0"),
                         )
 
@@ -1951,7 +1947,34 @@ class ExtensionsStepHandler(BaseStepHandler):
             context: "VerticalContext",
             result: "IntegrationResult",
         ) -> None:
-            self._middleware_handler.apply_middleware(orchestrator, middleware, context, result)
+            # Check for middleware_profile first (profile-based configuration)
+            profile_name = getattr(extensions, "middleware_profile", None)
+            middleware_overrides = getattr(extensions, "middleware_overrides", None)
+
+            if profile_name is not None:
+                # Load middleware from profile
+                from victor.framework.middleware_profiles.profiles import MiddlewareProfiles
+
+                profile_method = getattr(MiddlewareProfiles, f"{profile_name}_profile", None)
+                if profile_method is None:
+                    result.add_warning(f"Unknown middleware profile: {profile_name}")
+                    # Fall back to direct middleware list
+                    self._middleware_handler.apply_middleware(orchestrator, middleware, context, result)
+                    return
+
+                profile = profile_method()
+                combined_middleware = list(profile.middlewares)
+
+                # Apply overrides if present
+                if middleware_overrides:
+                    # For now, just append overrides (future: implement merge logic)
+                    combined_middleware.extend(middleware_overrides)
+
+                self._middleware_handler.apply_middleware(orchestrator, combined_middleware, context, result)
+                logger.debug(f"Applied middleware profile '{profile_name}' with {len(combined_middleware)} middleware")
+            else:
+                # Use direct middleware list (backward compatible)
+                self._middleware_handler.apply_middleware(orchestrator, middleware, context, result)
 
         def handle_safety(
             orchestrator: Any,
@@ -2089,12 +2112,11 @@ class ExtensionsStepHandler(BaseStepHandler):
         new extension types to be added without modifying this method.
         """
         extensions = vertical.get_extensions()
-        if extensions is None:
+        if extensions is not None:
+            # OCP: Apply all registered extension handlers
+            self._extension_registry.apply_all(orchestrator, extensions, context, result)
+        else:
             logger.debug("No extensions available for vertical")
-            return
-
-        # OCP: Apply all registered extension handlers
-        self._extension_registry.apply_all(orchestrator, extensions, context, result)
 
     def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
         """Return extension application details."""

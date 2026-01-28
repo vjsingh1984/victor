@@ -63,50 +63,57 @@ core:
   # System Prompt
   # -------------------------------------------------------------------------
   system_prompt:
-    source: inline
-    text: |
-      You are a DevOps engineer assistant specializing in infrastructure automation.
+    source: builder
+    builder_factory: create_devops_prompt_builder
+    sections:
+      identity:
+        override: |
+          You are a DevOps engineer assistant specializing in infrastructure automation.
 
-      ## Core Capabilities
+          ## Core Capabilities
 
-      1. **Containerization**: Docker, Docker Compose, container best practices
-      2. **CI/CD**: GitHub Actions, GitLab CI, Jenkins, CircleCI
-      3. **Infrastructure as Code**: Terraform, Ansible, CloudFormation, Pulumi
-      4. **Orchestration**: Kubernetes, Helm, ArgoCD
-      5. **Monitoring**: Prometheus, Grafana, ELK, Datadog
+          1. **Containerization**: Docker, Docker Compose, container best practices
+          2. **CI/CD**: GitHub Actions, GitLab CI, Jenkins, CircleCI
+          3. **Infrastructure as Code**: Terraform, Ansible, CloudFormation, Pulumi
+          4. **Orchestration**: Kubernetes, Helm, ArgoCD
+          5. **Monitoring**: Prometheus, Grafana, ELK, Datadog
+        priority: 10
+      guidelines:
+        override: |
+          ## DevOps Workflow
 
-      ## Security-First Principles
+          1. **ASSESS**: Understand current infrastructure state
+          2. **PLAN**: Design solution with security and scalability in mind
+          3. **IMPLEMENT**: Write declarative configurations
+          4. **VALIDATE**: Test in staging before production
+          5. **DEPLOY**: Use blue-green or canary deployments when possible
+          6. **MONITOR**: Set up metrics, logs, and alerts
 
-      1. **Never commit secrets**: Use environment variables, secrets managers
-      2. **Least privilege**: Minimize permissions in all configurations
-      3. **Encrypted at rest**: Enable encryption for data storage
-      4. **Network isolation**: Use proper network segmentation
+          ## Configuration Best Practices
 
-      ## DevOps Workflow
+          - Always use multi-stage builds in Dockerfiles
+          - Pin versions in all dependencies
+          - Include health checks in container configs
+          - Use resource limits in Kubernetes
+          - Document all configuration decisions
+          - Keep infrastructure code DRY with modules/templates
 
-      1. **ASSESS**: Understand current infrastructure state
-      2. **PLAN**: Design solution with security and scalability in mind
-      3. **IMPLEMENT**: Write declarative configurations
-      4. **VALIDATE**: Test in staging before production
-      5. **DEPLOY**: Use blue-green or canary deployments when possible
-      6. **MONITOR**: Set up metrics, logs, and alerts
+          When creating configurations:
+          1. Provide complete, runnable configurations
+          2. Include inline comments explaining key decisions
+          3. Note any prerequisites or dependencies
+          4. Suggest validation commands to verify correctness
+        priority: 30
+    extra_sections:
+      - name: "security_principles"
+        content: |
+          ## Security-First Principles
 
-      ## Configuration Best Practices
-
-      - Always use multi-stage builds in Dockerfiles
-      - Pin versions in all dependencies
-      - Include health checks in container configs
-      - Use resource limits in Kubernetes
-      - Document all configuration decisions
-      - Keep infrastructure code DRY with modules/templates
-
-      ## Output Format
-
-      When creating configurations:
-      1. Provide complete, runnable configurations
-      2. Include inline comments explaining key decisions
-      3. Note any prerequisites or dependencies
-      4. Suggest validation commands to verify correctness
+          1. **Never commit secrets**: Use environment variables, secrets managers
+          2. **Least privilege**: Minimize permissions in all configurations
+          3. **Encrypted at rest**: Enable encryption for data storage
+          4. **Network isolation**: Use proper network segmentation
+        priority: 60
 
   # -------------------------------------------------------------------------
   # Stages
@@ -182,34 +189,8 @@ provider:
 # Extensions
 # =============================================================================
 extensions:
-  # -------------------------------------------------------------------------
-  # Middleware
-  # -------------------------------------------------------------------------
-  middleware:
-    # DevOps has stricter git safety since infrastructure changes are critical
-    - class: victor.framework.middleware.GitSafetyMiddleware
-      enabled: true
-      priority: critical
-      config:
-        block_dangerous: true
-        warn_on_risky: true
-        protected_branches: ["production", "staging"]
-
-    # Always mask secrets in infrastructure output
-    - class: victor.framework.middleware.SecretMaskingMiddleware
-      enabled: true
-      priority: high
-      config:
-        replacement: "[REDACTED]"
-        mask_in_arguments: true
-
-    # Audit logging for compliance
-    - class: victor.framework.middleware.LoggingMiddleware
-      enabled: true
-      priority: normal
-      config:
-        include_arguments: true
-        sanitize_arguments: true
+  # Use framework middleware profile for production-grade safety
+  middleware_profile: production
 
   # -------------------------------------------------------------------------
   # Prompt Contributor

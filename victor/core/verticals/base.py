@@ -477,6 +477,7 @@ class VerticalBase(
         Supports multiple prompt formats:
         - source: inline, text: "..."
         - source: file, path: "prompt.txt"
+        - source: builder, builder_factory: create_coding_prompt_builder
         - Simple string value
 
         Returns:
@@ -509,6 +510,70 @@ class VerticalBase(
                         prompt_path = yaml_path.parent / prompt_config.get("path", "")
                         if prompt_path.exists():
                             return cast("str | None", prompt_path.read_text())
+
+                    if source == "builder":
+                        # Use PromptBuilder factory function
+                        from victor.framework.prompt_builder import PromptBuilder
+
+                        builder_factory_name = prompt_config.get("builder_factory")
+                        if builder_factory_name:
+                            # Import the builder factory function
+                            # Factory functions are in victor.framework.prompt_builder module
+                            import victor.framework.prompt_builder as pb_module
+
+                            builder_factory = getattr(pb_module, builder_factory_name, None)
+                            if builder_factory is None:
+                                raise ValueError(
+                                    f"Unknown builder factory: {builder_factory_name}. "
+                                    f"Available: create_coding_prompt_builder, "
+                                    f"create_devops_prompt_builder, create_research_prompt_builder, "
+                                    f"create_data_analysis_prompt_builder"
+                                )
+
+                            builder = builder_factory()
+
+                            # Apply section overrides if present
+                            sections = prompt_config.get("sections", {})
+                            for section_name, section_config in sections.items():
+                                if isinstance(section_config, str):
+                                    # Simple string override
+                                    builder.add_section(
+                                        section_name,
+                                        section_config,
+                                        priority=prompt_config.get("priorities", {}).get(section_name, 50)
+                                    )
+                                elif isinstance(section_config, dict):
+                                    # Detailed section override
+                                    override_text = section_config.get("override")
+                                    if override_text:
+                                        builder.add_section(
+                                            section_name,
+                                            override_text,
+                                            priority=section_config.get("priority", 50)
+                                        )
+
+                                    # Support for file-based sections
+                                    file_path = section_config.get("file")
+                                    if file_path:
+                                        section_file_path = yaml_path.parent / file_path
+                                        if section_file_path.exists():
+                                            builder.add_section(
+                                                section_name,
+                                                section_file_path.read_text(),
+                                                priority=section_config.get("priority", 50)
+                                            )
+
+                            # Add extra sections if present
+                            extra_sections = prompt_config.get("extra_sections", [])
+                            for extra_section in extra_sections:
+                                section_name = extra_section.get("name")
+                                content = extra_section.get("content")
+                                priority = extra_section.get("priority", 50)
+                                if section_name and content:
+                                    builder.add_section(section_name, content, priority)
+
+                            # Build and return the prompt
+                            return builder.build()
 
                     if source == "template":
                         # Template-based prompts require the template class
@@ -1622,20 +1687,17 @@ class VerticalRegistry:
             # Try to call the abstract methods to ensure they're implemented
             # These are classmethods so we can call them on the class
             tools = vertical_class.get_tools()
-            if not isinstance(tools, list):
-                logger.warning(
-                    f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
-                    f"get_tools() must return a list. Skipping."
-                )
-                return False
+            # Note: tools type is List per VerticalBase protocol
+        except NotImplementedError:
+            logger.warning(
+                f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
+                f"has unimplemented abstract methods. Skipping."
+            )
+            return False
 
+        try:
             prompt = vertical_class.get_system_prompt()
-            if not isinstance(prompt, str):
-                logger.warning(
-                    f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
-                    f"get_system_prompt() must return a string. Skipping."
-                )
-                return False
+            # Note: prompt type is str per VerticalBase protocol
         except NotImplementedError:
             logger.warning(
                 f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
