@@ -32,10 +32,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import traceback
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 from victor.observability.emitters.base import IErrorEventEmitter
 from victor.core.events import ObservabilityBus, SyncEventWrapper
+from victor.core.events.protocols import MessagingEvent
 
 logger = logging.getLogger(__name__)
 
@@ -135,30 +136,43 @@ class ErrorEventEmitter(IErrorEventEmitter):
 
     def emit(
         self,
-        event_or_topic: Union[MessagingEvent, str],
+        event_or_topic: Union[MessagingEvent, str] = None,
         data: Optional[Dict[str, Any]] = None,
+        *,
+        topic: Optional[str] = None,
     ) -> None:
         """Emit an error event synchronously (for gradual migration).
 
         Args:
             event_or_topic: Either a MessagingEvent object or a topic string (for backward compatibility)
-            data: Event data (required if topic is a string, ignored if event_or_topic is a MessagingEvent)
+            data: Event data (used with topic string or keyword arguments)
+            topic: Alternative keyword argument for topic (supports emit(topic=..., data=...))
         """
-        # Support both old signature (topic, data) and new signature (MessagingEvent)
-        if isinstance(event_or_topic, str):
-            # Old signature: emit(topic, data)
-            topic = event_or_topic
+        # Support multiple calling patterns:
+        # 1. emit(MessagingEvent)
+        # 2. emit(topic, data)
+        # 3. emit(topic=..., data=...)
+        if topic is not None:
+            # Keyword argument form: emit(topic=..., data=...)
+            final_topic = topic
             event_data = data or {}
-            event = MessagingEvent(topic=topic, data=event_data)
+        elif isinstance(event_or_topic, str):
+            # Positional form: emit(topic, data)
+            final_topic = event_or_topic
+            event_data = data or {}
+        elif event_or_topic is None:
+            # No arguments provided (shouldn't happen, but handle gracefully)
+            logger.warning("emit() called with no arguments")
+            return
         else:
-            # New signature: emit(MessagingEvent)
+            # MessagingEvent form: emit(MessagingEvent)
             event = event_or_topic
-            topic = event.topic
+            final_topic = event.topic
             event_data = event.data
 
         try:
             # For backward compatibility, convert to topic/data format
-            self._event_bus.emit(topic, event_data)  # type: ignore[attr-defined]
+            self._event_bus.emit(final_topic, event_data)  # type: ignore[attr-defined]
         except Exception as e:
             logger.debug(f"Failed to emit error event: {e}")
 
@@ -169,7 +183,7 @@ class ErrorEventEmitter(IErrorEventEmitter):
             if bus:
                 emit_event_sync(
                     bus,
-                    topic=topic,
+                    topic=final_topic,
                     data=event_data,
                     source="ErrorEventEmitter",
                 )

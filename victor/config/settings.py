@@ -1400,8 +1400,8 @@ class Settings(BaseSettings):
     #   Phase 6: Migration and testing (100% backward compatibility)
     #   Phase 7: Cleanup and deprecation (legacy path removed)
     #
-    # Progress: Phase 1 implementation complete, pending Phase 2+ completion
-    use_workflow_chat: bool = False  # Enable workflow-based chat (experimental)
+    # Status: All 7 phases complete, production-ready
+    use_workflow_chat: bool = True  # Enable workflow-based chat (default as of v0.5.0)
     workflow_max_iterations: int = 50  # Maximum agentic loop iterations in workflows
     workflow_checkpoints_enabled: bool = True  # Enable state checkpointing for recovery
     workflow_timeout_seconds: int = 300  # Workflow execution timeout
@@ -1409,7 +1409,7 @@ class Settings(BaseSettings):
     # Phase 5: Metadata-based tool authorization
     # Replaces hard-coded tool lists (WRITE_TOOLS, READ_ONLY_TOOLS, etc.)
     # with ToolAuthMetadataRegistry for dynamic authorization
-    use_metadata_authorization: bool = False  # Enable metadata-based tool authorization (experimental)
+    use_metadata_authorization: bool = True  # Enable metadata-based tool authorization (default as of v0.5.0)
 
     # ==========================================================================
     # Event System Configuration (Canonical core/events)

@@ -369,6 +369,7 @@ class OrchestratorFactory(ModeAwareMixin):
         orchestrator._factory = self
 
         orchestrator.settings = settings
+        orchestrator._settings = settings  # Alias for internal use
         orchestrator.temperature = temperature
         orchestrator.max_tokens = max_tokens
         orchestrator.console = console or Console()
