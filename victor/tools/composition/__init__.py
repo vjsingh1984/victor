@@ -51,7 +51,7 @@ Example:
     ... )
 """
 
-# Re-export LCEL-style composition classes from runnable.py (backward compatibility)
+# Re-export LCEL-style composition classes from runnable.py (public API)
 from victor.tools.composition.runnable import (
     Runnable,
     RunnableConfig,

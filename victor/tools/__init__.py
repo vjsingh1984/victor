@@ -12,20 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tool framework - backward compatible re-exports.
+"""Tool framework - public API exports.
 
-This module provides backward compatibility by re-exporting all classes
-from their new locations. Existing code can still import from victor.tools.base
-or from victor.tools directly without any changes.
+This module provides the canonical public API for the tools framework
+by re-exporting commonly used classes from their respective modules.
 
-New structure:
+Canonical import pattern:
+    from victor.tools import BaseTool, ToolRegistry, ToolResult
+
+Internal structure:
 - victor/tools/base.py - BaseTool, ToolResult, and supporting classes
 - victor/tools/enums.py - All enum classes
 - victor/tools/metadata.py - ToolMetadata and ToolMetadataRegistry
 - victor/tools/registry.py - ToolRegistry, Hook, HookError
+- victor/tools/context.py - ToolExecutionContext and permissions
 """
 
-# Re-export everything from base.py for backward compatibility
+# Re-export core tool classes for public API
 from victor.tools.base import (
     BaseTool,
     ToolConfig,
