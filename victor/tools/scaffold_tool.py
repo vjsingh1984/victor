@@ -484,10 +484,12 @@ async def scaffold(
         # Create all files
         for file_spec, content_key in template_info["files"]:
             # file_spec is a string path or Path object
-            file_path = file_spec if isinstance(file_spec, Path) else Path(file_spec)
+            file_path = file_spec if isinstance(file_spec, Path) else Path(file_spec)  # type: ignore[unreachable]
             # Interpolate variables in file path
             try:
-                interpolated_path = file_path.format(**interpolation_vars)
+                # Convert Path to string for formatting, then back to Path
+                path_str = str(file_path)
+                interpolated_path = Path(path_str.format(**interpolation_vars))
             except KeyError as e:
                 return {
                     "success": False,
