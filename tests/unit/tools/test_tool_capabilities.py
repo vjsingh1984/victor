@@ -337,12 +337,20 @@ class TestCapabilityRegistryExtended:
 
 
 class TestBackwardCompatibility:
-    """Test backward compatibility with existing 18 capabilities."""
+    """Test backward compatibility with existing capabilities."""
 
     def test_existing_capabilities_unchanged(self):
-        """Test that original 18 capabilities remain unchanged."""
-        # Original capabilities from the first implementation
-        original_capabilities = [
+        """Test that core capabilities remain unchanged.
+
+        Note: Backward compatibility aliases DOCKER, DEPENDENCY, and BROWSER
+        were removed in v0.5.1. Use canonical capabilities:
+        - DOCKER → CONTAINERIZATION
+        - DEPENDENCY → DEPENDENCY_MGMT
+        - BROWSER → BROWSER_AUTOMATION
+        """
+        # Core capabilities from the original implementation
+        # (backward compatibility aliases removed in v0.5.1)
+        core_capabilities = [
             "FILE_READ",
             "FILE_WRITE",
             "FILE_MANAGEMENT",
@@ -353,19 +361,19 @@ class TestBackwardCompatibility:
             "WEB_SEARCH",
             "VERSION_CONTROL",
             "DATABASE",
-            "DOCKER",
+            "CONTAINERIZATION",  # Canonical (was DOCKER)
             "CI_CD",
             "TESTING",
             "DOCUMENTATION",
-            "DEPENDENCY",
+            "DEPENDENCY_MGMT",  # Canonical (was DEPENDENCY)
             "BASH",
-            "BROWSER",
+            "BROWSER_AUTOMATION",  # Canonical (was BROWSER)
             "CACHE",
             "BATCH",
             "AUDIT",
         ]
 
-        for cap_name in original_capabilities:
+        for cap_name in core_capabilities:
             assert hasattr(ToolCapability, cap_name), f"Missing {cap_name}"
 
     def test_no_duplicate_capability_values(self):

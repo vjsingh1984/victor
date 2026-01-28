@@ -146,7 +146,6 @@ class ToolCapability(Enum):
 
     # === INFRASTRUCTURE ===
     CONTAINERIZATION = "containerization"
-    DOCKER = "docker"  # Backward compatibility alias
     CLOUD_INFRA = "cloud_infra"
     CI_CD = "ci_cd"
     DATABASE = "database"
@@ -156,13 +155,11 @@ class ToolCapability(Enum):
     TESTING = "testing"
     DOCUMENTATION = "documentation"
     DEPENDENCY_MGMT = "dependency_mgmt"
-    DEPENDENCY = "dependency"  # Backward compatibility alias
     SCAFFOLDING = "scaffolding"
 
     # === EXECUTION ===
     CODE_EXECUTION = "code_execution"
     BROWSER_AUTOMATION = "browser_automation"
-    BROWSER = "browser"  # Backward compatibility alias
     BASH = "bash"
 
     # === COMMUNICATION ===

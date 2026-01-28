@@ -144,13 +144,6 @@ BUILTIN_CAPABILITIES = [
         conflicts=[],
     ),
     CapabilityDefinition(
-        name=ToolCapability.DOCKER,
-        description="Docker container management (backward compatibility alias)",
-        tools=["docker_tool"],
-        dependencies=[],
-        conflicts=[],
-    ),
-    CapabilityDefinition(
         name=ToolCapability.CLOUD_INFRA,
         description="Terraform, CloudFormation, cloud infrastructure operations",
         tools=["iac_scanner_tool"],
@@ -203,13 +196,6 @@ BUILTIN_CAPABILITIES = [
         conflicts=[],
     ),
     CapabilityDefinition(
-        name=ToolCapability.DEPENDENCY,
-        description="Dependency management and analysis (backward compatibility alias)",
-        tools=["dependency_tool"],
-        dependencies=[ToolCapability.FILE_READ],
-        conflicts=[],
-    ),
-    CapabilityDefinition(
         name=ToolCapability.SCAFFOLDING,
         description="Project scaffolding and template generation",
         tools=["scaffold_tool"],
@@ -229,13 +215,6 @@ BUILTIN_CAPABILITIES = [
     CapabilityDefinition(
         name=ToolCapability.BROWSER_AUTOMATION,
         description="Browser control and web automation",
-        tools=["browser_tool"],
-        dependencies=[],
-        conflicts=[],
-    ),
-    CapabilityDefinition(
-        name=ToolCapability.BROWSER,
-        description="Browser automation and control (backward compatibility alias)",
         tools=["browser_tool"],
         dependencies=[],
         conflicts=[],
