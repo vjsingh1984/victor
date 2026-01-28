@@ -244,7 +244,7 @@ class TestToolRegistry:
         """Test creating a ToolRegistry."""
         registry = ToolRegistry()
 
-        assert len(registry._tools) == 0
+        assert len(registry._items) == 0
         assert len(registry._before_hooks) == 0
         assert len(registry._after_hooks) == 0
 
@@ -255,8 +255,8 @@ class TestToolRegistry:
 
         registry.register(tool)
 
-        assert "test_tool" in registry._tools
-        assert registry._tools["test_tool"] == tool
+        assert "test_tool" in registry._items
+        assert registry._items["test_tool"] == tool
 
     def test_register_invalid_type(self):
         """Test registering invalid type raises error."""
@@ -271,10 +271,10 @@ class TestToolRegistry:
         tool = ConcreteTool()
 
         registry.register(tool)
-        assert "test_tool" in registry._tools
+        assert "test_tool" in registry._items
 
         registry.unregister("test_tool")
-        assert "test_tool" not in registry._tools
+        assert "test_tool" not in registry._items
 
     def test_unregister_nonexistent(self):
         """Test unregistering non-existent tool doesn't error."""

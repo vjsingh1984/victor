@@ -177,7 +177,7 @@ class CapabilityDiscovery:
                 from victor.tools.shared_registry import SharedToolRegistry  # type: ignore[import-not-found]
 
                 registry = SharedToolRegistry.get_instance()
-                return list(registry._tools.keys())
+                return list(registry._items.keys())
             except Exception:
                 return []
 

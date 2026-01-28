@@ -99,16 +99,6 @@ class ToolRegistry(BaseRegistry[str, Any]):
         }
         self._schema_cache_lock = threading.RLock()
 
-    @property
-    def _tools(self) -> Dict[str, Any]:
-        """Alias for _items to maintain backward compatibility."""
-        return self._items
-
-    @_tools.setter
-    def _tools(self, value: Dict[str, Any]) -> None:
-        """Setter for _tools alias."""
-        self._items = value
-
     def _invalidate_schema_cache(self) -> None:
         """Invalidate the schema cache.
 
@@ -283,7 +273,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         Returns:
             True if tool exists and was enabled, False otherwise
         """
-        if name in self._tools:
+        if name in self._items:
             self._tool_enabled[name] = True
             # Invalidate schema cache after enabling
             self._invalidate_schema_cache()
@@ -299,7 +289,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         Returns:
             True if tool exists and was disabled, False otherwise
         """
-        if name in self._tools:
+        if name in self._items:
             self._tool_enabled[name] = False
             # Invalidate schema cache after disabling
             self._invalidate_schema_cache()
@@ -325,7 +315,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         changed = False
         for name, enabled in tool_states.items():
-            if name in self._tools:
+            if name in self._items:
                 self._tool_enabled[name] = enabled
                 changed = True
 
@@ -363,9 +353,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         if only_enabled:
             return [
-                tool for name, tool in self._tools.items() if self._tool_enabled.get(name, False)
+                tool for name, tool in self._items.items() if self._tool_enabled.get(name, False)
             ]
-        return list(self._tools.values())
+        return list(self._items.values())
 
     def get_tool_schemas(self, only_enabled: bool = True) -> List[Dict[str, Any]]:
         """Get JSON schemas for all tools with caching.
@@ -385,11 +375,11 @@ class ToolRegistry(BaseRegistry[str, Any]):
             if only_enabled:
                 current_tool_names = tuple(
                     sorted(
-                        name for name in self._tools.keys() if self._tool_enabled.get(name, False)
+                        name for name in self._items.keys() if self._tool_enabled.get(name, False)
                     )
                 )
             else:
-                current_tool_names = tuple(sorted(self._tools.keys()))
+                current_tool_names = tuple(sorted(self._items.keys()))
 
             # Check cache
             cache_entry = self._schema_cache.get(only_enabled)
@@ -403,11 +393,11 @@ class ToolRegistry(BaseRegistry[str, Any]):
             if only_enabled:
                 schemas = [
                     tool.to_json_schema()
-                    for name, tool in self._tools.items()
+                    for name, tool in self._items.items()
                     if self._tool_enabled.get(name, False)
                 ]
             else:
-                schemas = [tool.to_json_schema() for tool in self._tools.values()]
+                schemas = [tool.to_json_schema() for tool in self._items.values()]
 
             # Update cache
             self._schema_cache[only_enabled] = (current_tool_names, schemas)

@@ -292,7 +292,7 @@ class TestToolRegistry:
         registry.register(tool)
 
         # Tool should be registered
-        assert "test_tool" in registry._tools or len(registry._tools) > 0
+        assert "test_tool" in registry._items or len(registry._items) > 0
 
     def test_tool_registry_get_tool(self):
         """Test getting a tool from registry."""
@@ -311,7 +311,7 @@ class TestToolRegistry:
 
         # Should be able to retrieve tool
         retrieved = registry.get("test_tool")
-        assert retrieved is not None or len(registry._tools) > 0
+        assert retrieved is not None or len(registry._items) > 0
 
     def test_tool_registry_list_tools(self):
         """Test listing all tools."""
@@ -321,7 +321,7 @@ class TestToolRegistry:
         tools = (
             registry.list_tools()
             if hasattr(registry, "list_tools")
-            else list(registry._tools.values())
+            else list(registry._items.values())
         )
         assert isinstance(tools, (list, dict))
 
