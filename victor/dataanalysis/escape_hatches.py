@@ -246,34 +246,191 @@ def aggregate_model_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # =============================================================================
+# Chat Workflow Escape Hatches
+# =============================================================================
+
+
+def analysis_type_check(ctx: Dict[str, Any]) -> str:
+    """Determine analysis type for workflow routing.
+
+    Args:
+        ctx: Workflow context with keys:
+            - analysis_type (str): Type from understand_request
+            - user_message (str): Original user message
+
+    Returns:
+        "exploratory", "statistical", "visualization", or "ml_insights"
+    """
+    analysis_type = ctx.get("analysis_type", "").lower()
+
+    if analysis_type in ["exploratory", "explore", "eda"]:
+        return "exploratory"
+
+    if analysis_type in ["statistical", "statistics", "test", "hypothesis"]:
+        return "statistical"
+
+    if analysis_type in ["visualization", "visualize", "chart", "plot", "graph"]:
+        return "visualization"
+
+    if analysis_type in ["ml", "machine learning", "predict", "forecast"]:
+        return "ml_insights"
+
+    return "exploratory"
+
+
+def can_continue_analysis_iteration(ctx: Dict[str, Any]) -> str:
+    """Check if workflow can continue with another iteration.
+
+    Args:
+        ctx: Workflow context with keys:
+            - iteration_count (int): Current iteration count
+            - max_iterations (int): Maximum allowed iterations
+
+    Returns:
+        "continue" or "max_reached"
+    """
+    iteration = ctx.get("iteration_count", 0)
+    max_iter = ctx.get("max_iterations", 50)
+
+    if iteration < max_iter:
+        return "continue"
+    return "max_reached"
+
+
+def has_pending_tool_calls(ctx: Dict[str, Any]) -> str:
+    """Check if there are pending tool calls to execute.
+
+    Args:
+        ctx: Workflow context with keys:
+            - tool_calls (list): Tool calls from agent response
+            - pending_tool_calls (list): Pending tool calls
+
+    Returns:
+        "has_tools" or "no_tools"
+    """
+    tool_calls = ctx.get("tool_calls", [])
+    pending = ctx.get("pending_tool_calls", [])
+
+    if tool_calls or pending:
+        return "has_tools"
+    return "no_tools"
+
+
+def update_analysis_conversation(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Update conversation with tool results from execution.
+
+    Args:
+        ctx: Workflow context with tool execution results
+
+    Returns:
+        Updated conversation state
+    """
+    conversation_history = ctx.get("conversation_history", [])
+    content = ctx.get("content", "")
+    tool_calls = ctx.get("tool_calls", [])
+    tool_results = ctx.get("tool_results", [])
+
+    # Add assistant message with tool calls
+    if tool_calls:
+        conversation_history.append({
+            "role": "assistant",
+            "content": content,
+            "tool_calls": tool_calls,
+        })
+
+        # Add tool results
+        for result in tool_results:
+            conversation_history.append({
+                "role": "tool",
+                "content": str(result),
+            })
+
+    # Increment iteration count
+    iteration_count = ctx.get("iteration_count", 0) + 1
+
+    return {
+        "conversation_history": conversation_history,
+        "iteration_count": iteration_count,
+        "last_content": content,
+    }
+
+
+def finalize_analysis_chat(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Format final data analysis chat response for user.
+
+    Args:
+        ctx: Workflow context with all conversation data
+
+    Returns:
+        Formatted final response
+    """
+    content = ctx.get("content", "")
+    iteration_count = ctx.get("iteration_count", 0)
+    insights = ctx.get("insights", [])
+    recommendations = ctx.get("recommendations", [])
+
+    final_response = content
+    if not final_response:
+        final_response = "Data analysis completed."
+
+    return {
+        "final_response": final_response,
+        "status": "completed",
+        "iterations": iteration_count,
+        "analysis_summary": {
+            "insights_count": len(insights),
+            "recommendations_count": len(recommendations),
+        },
+        "insights": insights,
+        "recommendations": recommendations,
+    }
+
+
+# =============================================================================
 # Registry Exports
 # =============================================================================
 
 # Conditions available in YAML workflows
 CONDITIONS = {
+    # Original conditions
     "should_retry_cleaning": should_retry_cleaning,
     "should_tune_more": should_tune_more,
     "quality_threshold": quality_threshold,
     "model_selection_criteria": model_selection_criteria,
     "analysis_confidence": analysis_confidence,
+    # Chat workflow conditions
+    "analysis_type_check": analysis_type_check,
+    "can_continue_analysis_iteration": can_continue_analysis_iteration,
+    "has_pending_tool_calls": has_pending_tool_calls,
 }
 
 # Transforms available in YAML workflows
 TRANSFORMS = {
+    # Original transforms
     "merge_parallel_stats": merge_parallel_stats,
     "aggregate_model_results": aggregate_model_results,
+    # Chat workflow transforms
+    "update_analysis_conversation": update_analysis_conversation,
+    "finalize_analysis_chat": finalize_analysis_chat,
 }
 
 __all__ = [
-    # Conditions
+    # Original Conditions
     "should_retry_cleaning",
     "should_tune_more",
     "quality_threshold",
     "model_selection_criteria",
     "analysis_confidence",
-    # Transforms
+    # Chat workflow conditions
+    "analysis_type_check",
+    "can_continue_analysis_iteration",
+    "has_pending_tool_calls",
+    # Original Transforms
     "merge_parallel_stats",
     "aggregate_model_results",
+    # Chat workflow transforms
+    "update_analysis_conversation",
+    "finalize_analysis_chat",
     # Registries
     "CONDITIONS",
     "TRANSFORMS",

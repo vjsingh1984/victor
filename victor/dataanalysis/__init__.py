@@ -11,10 +11,11 @@ This vertical provides:
 """
 
 from victor.dataanalysis.assistant import DataAnalysisAssistant
-from victor.dataanalysis.prompts import DataAnalysisPromptContributor
-from victor.dataanalysis.mode_config import DataAnalysisModeConfigProvider
-from victor.dataanalysis.safety import DataAnalysisSafetyExtension
 from victor.dataanalysis.capabilities import DataAnalysisCapabilityProvider
+from victor.dataanalysis.chat_workflow_provider import DataAnalysisChatWorkflowProvider
+from victor.dataanalysis.mode_config import DataAnalysisModeConfigProvider
+from victor.dataanalysis.prompts import DataAnalysisPromptContributor
+from victor.dataanalysis.safety import DataAnalysisSafetyExtension
 
 # Import canonical tool dependency provider instead of deprecated class
 from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
@@ -62,4 +63,5 @@ __all__ = [
     "DataAnalysisSafetyExtension",
     "DataAnalysisCapabilityProvider",
     "DataAnalysisToolDependencyProvider",  # Now uses canonical provider
+    "DataAnalysisChatWorkflowProvider",  # Chat workflow provider
 ]

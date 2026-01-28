@@ -1,0 +1,162 @@
+# Data Analysis Chat Workflow
+# This workflow defines agentic chat for Data Analysis tasks
+
+workflows:
+  data_analysis_chat:
+    description: "Agentic chat workflow for data analysis operations"
+    version: "1.0"
+
+    # StateGraph schema for type safety
+    state_schema:
+      type: object
+      properties:
+        user_message: {type: string}
+        conversation_history: {type: array}
+        iteration_count: {type: integer, default: 0}
+        max_iterations: {type: integer, default: 50}
+        analysis_type: {type: string}
+        data_sources: {type: array}
+        insights: {type: array}
+        pending_tool_calls: {type: array}
+        completed_tool_results: {type: array}
+
+    nodes:
+      # Node 1: Understand analysis request
+      - id: understand_request
+        type: agent
+        role: data_analyst
+        goal: "Understand the data analysis request and extract requirements"
+        tools: [read, ls, code_search]
+        output:
+          analysis_type: "string"
+          data_sources: "array"
+          analysis_depth: "string"
+        next: [check_analysis_type]
+
+      # Node 2: Check analysis type
+      - id: check_analysis_type
+        type: condition
+        condition: "analysis_type_check"
+        branches:
+          "exploratory": exploratory_analysis
+          "statistical": statistical_analysis
+          "visualization": create_visualization
+          "ml_insights": ml_analysis
+
+      # Node 3: Exploratory data analysis
+      - id: exploratory_analysis
+        type: agent
+        role: data_analyst
+        goal: "Perform exploratory data analysis and summarize findings"
+        tools: [read, ls, shell, code_search]
+        output:
+          data_summary: "object"
+          key_findings: "array"
+          data_quality: "string"
+        next: [generate_insights]
+
+      # Node 4: Statistical analysis
+      - id: statistical_analysis
+        type: agent
+        role: statistician
+        goal: "Perform statistical tests and analysis"
+        tools: [read, shell, code_search]
+        output:
+          statistical_tests: "array"
+          significance_results: "object"
+          conclusions: "array"
+        next: [generate_insights]
+
+      # Node 5: Create visualization
+      - id: create_visualization
+        type: agent
+        role: data_visualizer
+        goal: "Create data visualizations and charts"
+        tools: [write, shell, read]
+        output:
+          visualization_code: "string"
+          chart_files: "array"
+          insights: "array"
+        next: [generate_insights]
+
+      # Node 6: Machine learning insights
+      - id: ml_analysis
+        type: agent
+        role: ml_engineer
+        goal: "Generate ML-based insights and predictions"
+        tools: [read, shell, code_search]
+        output:
+          model_insights: "array"
+          predictions: "object"
+          feature_importance: "array"
+        next: [generate_insights]
+
+      # Node 7: Generate insights
+      - id: generate_insights
+        type: agent
+        role: analyst
+        goal: "Synthesize findings into actionable insights"
+        tools: [read, code_search]
+        output:
+          insights: "array"
+          recommendations: "array"
+          confidence_level: "string"
+        next: [check_for_more_analysis]
+
+      # Node 8: Check if more analysis needed
+      - id: check_for_more_analysis
+        type: condition
+        condition: "can_continue_analysis_iteration"
+        branches:
+          "continue": generate_response
+          "max_reached": finalize_analysis
+
+      # Node 9: Generate response
+      - id: generate_response
+        type: agent
+        role: writer
+        goal: "Generate data analysis response with findings"
+        tools: [write, edit]
+        output:
+          content: "string"
+          tool_calls: "list"
+        next: [check_for_tool_calls]
+
+      # Node 10: Check for tool calls
+      - id: check_for_tool_calls
+        type: condition
+        condition: "has_pending_tool_calls"
+        branches:
+          "has_tools": execute_tools
+          "no_tools": update_conversation
+
+      # Node 11: Execute tools
+      - id: execute_tools
+        type: tool_execution
+        tools: "{{tool_calls}}"
+        next: [update_conversation]
+
+      # Node 12: Update conversation
+      - id: update_conversation
+        type: transform
+        transform: update_analysis_conversation
+        output:
+          iteration_count: "{{iteration_count + 1}}"
+        next: [generate_insights]
+
+      # Node 13: Finalize and report
+      - id: finalize_analysis
+        type: transform
+        transform: finalize_analysis_chat
+        output:
+          final_response: "string"
+          analysis_summary: "object"
+          insights: "array"
+          recommendations: "array"
+        next: [__end__]
+
+    # Default values
+    defaults:
+      max_iterations: 50
+      analysis_depth: "standard"
+      analysis_type: "exploratory"
