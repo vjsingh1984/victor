@@ -81,6 +81,10 @@ from victor.framework.protocols import (
 from victor.providers.base import CompletionResponse, StreamChunk
 
 if TYPE_CHECKING:
+    # Framework layer imports agent-layer coordinator because WorkflowOrchestrator
+    # (framework) delegates to WorkflowCoordinator (agent) for workflow execution.
+    # This is acceptable because WorkflowOrchestrator is a facade that coordinates
+    # between framework and agent layers without containing domain logic.
     from victor.agent.coordinators.workflow_coordinator import WorkflowCoordinator
     from victor.framework.coordinators.graph_coordinator import GraphExecutionCoordinator
 

@@ -335,7 +335,7 @@ def configure_performance_benchmarking(
 @capability(
     name="benchmark_swe_bench",
     capability_type=CapabilityType.MODE,
-    version="0.5.0",
+    version=VERSION,
     description="SWE-bench task execution configuration",
 )
 def swe_bench_capability(
@@ -359,7 +359,7 @@ def swe_bench_capability(
 @capability(
     name="benchmark_passk",
     capability_type=CapabilityType.MODE,
-    version="0.5.0",
+    version=VERSION,
     description="Pass@k evaluation configuration for code generation",
     getter="get_passk_config",
 )
@@ -384,7 +384,7 @@ def passk_capability(
 @capability(
     name="benchmark_metrics",
     capability_type=CapabilityType.TOOL,
-    version="0.5.0",
+    version=VERSION,
     description="Metrics collection during benchmark execution",
     getter="get_metrics_config",
 )
@@ -409,7 +409,7 @@ def metrics_capability(
 @capability(
     name="benchmark_test_generation",
     capability_type=CapabilityType.TOOL,
-    version="0.5.0",
+    version=VERSION,
     description="Test generation configuration for benchmark tasks",
 )
 def test_generation_capability(
@@ -433,7 +433,7 @@ def test_generation_capability(
 @capability(
     name="benchmark_code_quality",
     capability_type=CapabilityType.SAFETY,
-    version="0.5.0",
+    version=VERSION,
     description="Code quality checks for generated code",
 )
 def code_quality_capability(
@@ -457,7 +457,7 @@ def code_quality_capability(
 @capability(
     name="benchmark_performance",
     capability_type=CapabilityType.TOOL,
-    version="0.5.0",
+    version=VERSION,
     description="Performance benchmarking configuration",
 )
 def performance_capability(
@@ -524,39 +524,39 @@ class BenchmarkCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
             "swe_bench_execution": CapabilityMetadata(
                 name="swe_bench_execution",
                 description="SWE-bench task execution configuration",
-                version="0.5.0",
+                version=VERSION,
                 tags=["swe-bench", "issue-resolution", "patch-generation"],
             ),
             "passk_evaluation": CapabilityMetadata(
                 name="passk_evaluation",
                 description="Pass@k evaluation for code generation benchmarks",
-                version="0.5.0",
+                version=VERSION,
                 dependencies=["metrics_collection"],
                 tags=["passk", "human-eval", "mbpp", "code-generation"],
             ),
             "metrics_collection": CapabilityMetadata(
                 name="metrics_collection",
                 description="Metrics collection during benchmark execution",
-                version="0.5.0",
+                version=VERSION,
                 tags=["metrics", "observability", "tracking"],
             ),
             "test_generation": CapabilityMetadata(
                 name="test_generation",
                 description="Test generation configuration for benchmark tasks",
-                version="0.5.0",
+                version=VERSION,
                 tags=["testing", "test-generation", "coverage"],
             ),
             "code_quality_checks": CapabilityMetadata(
                 name="code_quality_checks",
                 description="Code quality checks for generated code",
-                version="0.5.0",
+                version=VERSION,
                 dependencies=["test_generation"],
                 tags=["quality", "linting", "formatting", "type-checking"],
             ),
             "performance_benchmarking": CapabilityMetadata(
                 name="performance_benchmarking",
                 description="Performance benchmarking configuration",
-                version="0.5.0",
+                version=VERSION,
                 dependencies=["metrics_collection"],
                 tags=["performance", "profiling", "latency", "throughput"],
             ),
@@ -699,7 +699,7 @@ CAPABILITIES: List[CapabilityEntry] = [
         capability=OrchestratorCapability(
             name="benchmark_swe_bench",
             capability_type=CapabilityType.MODE,
-            version="0.5.0",
+            version=VERSION,
             setter="configure_swe_bench_execution",
             description="SWE-bench task execution configuration",
         ),
@@ -709,7 +709,7 @@ CAPABILITIES: List[CapabilityEntry] = [
         capability=OrchestratorCapability(
             name="benchmark_passk",
             capability_type=CapabilityType.MODE,
-            version="0.5.0",
+            version=VERSION,
             setter="configure_passk_evaluation",
             getter="get_passk_config",
             description="Pass@k evaluation configuration for code generation",
@@ -721,7 +721,7 @@ CAPABILITIES: List[CapabilityEntry] = [
         capability=OrchestratorCapability(
             name="benchmark_metrics",
             capability_type=CapabilityType.TOOL,
-            version="0.5.0",
+            version=VERSION,
             setter="configure_metrics_collection",
             getter="get_metrics_config",
             description="Metrics collection during benchmark execution",
@@ -733,7 +733,7 @@ CAPABILITIES: List[CapabilityEntry] = [
         capability=OrchestratorCapability(
             name="benchmark_test_generation",
             capability_type=CapabilityType.TOOL,
-            version="0.5.0",
+            version=VERSION,
             setter="configure_test_generation",
             description="Test generation configuration for benchmark tasks",
         ),
@@ -743,7 +743,7 @@ CAPABILITIES: List[CapabilityEntry] = [
         capability=OrchestratorCapability(
             name="benchmark_code_quality",
             capability_type=CapabilityType.SAFETY,
-            version="0.5.0",
+            version=VERSION,
             setter="configure_code_quality_checks",
             description="Code quality checks for generated code",
         ),
@@ -753,7 +753,7 @@ CAPABILITIES: List[CapabilityEntry] = [
         capability=OrchestratorCapability(
             name="benchmark_performance",
             capability_type=CapabilityType.TOOL,
-            version="0.5.0",
+            version=VERSION,
             setter="configure_performance_benchmarking",
             description="Performance benchmarking configuration",
         ),

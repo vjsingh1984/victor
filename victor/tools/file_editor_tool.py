@@ -235,6 +235,9 @@ async def edit(
         In EXPLORE/PLAN modes, edits are restricted to .victor/sandbox/.
         Use /mode build to enable unrestricted file edits.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     # =============================================================================
     # MALFORMED CALL RECOVERY
     # =============================================================================
