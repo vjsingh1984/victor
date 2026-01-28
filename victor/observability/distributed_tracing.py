@@ -73,19 +73,17 @@ from typing import (
 
 if TYPE_CHECKING:
     # Import opentelemetry types if available
-    _trace: Any | None = None
-    _Status: Any | None = None
-    _StatusCode: Any | None = None
-    _Span: Any | None = None
-
     try:
-        from opentelemetry import trace as _trace
-        from opentelemetry.trace import Status as _Status, StatusCode as _StatusCode
-        from opentelemetry.trace import Span as _Span
+        from opentelemetry.trace import Status as _Status, StatusCode as _StatusCode, Span as _Span
     except ImportError:
-        pass
+        _Status = Any  # type: ignore[misc]
+        _StatusCode = Any  # type: ignore[misc]
 
-    trace = _trace
+        # Create a stub type for Span when not available
+        class _Span:  # type: ignore[no-redef]
+            """Stub Span class for type checking when opentelemetry is not installed."""
+
+    # Re-export with clearer names
     Status = _Status
     StatusCode = _StatusCode
     Span = _Span

@@ -28,14 +28,14 @@ try:
             OTLPSpanExporter as _OTLPSpanExporter,
         )
     except ImportError:
-        _OTLPSpanExporter = None  # type: ignore[assignment]
+        _OTLPSpanExporter = None
 
     try:
         from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (  # type: ignore[import-not-found]
             OTLPMetricExporter as _OTLPMetricExporter,
         )
     except ImportError:
-        _OTLPMetricExporter = None  # type: ignore[assignment]
+        _OTLPMetricExporter = None
 
     TracerProvider = _TracerProvider
     BatchSpanProcessor = _BatchSpanProcessor
