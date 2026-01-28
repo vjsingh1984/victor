@@ -9,6 +9,8 @@ inheriting from all possible protocol interfaces.
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from victor.config.settings import VERSION
+
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
 
@@ -58,7 +60,7 @@ class ResearchAssistant(VerticalBase):
 
     name = "research"
     description = "Web research, fact-checking, literature synthesis, and report generation"
-    version = "0.5.0"
+    version = VERSION  # Centralized version from settings.py
 
     @classmethod
     def get_tools(cls) -> List[str]:

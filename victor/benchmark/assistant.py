@@ -21,6 +21,7 @@ inheriting from all possible protocol interfaces.
 
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, cast
 
+from victor.config.settings import VERSION
 from victor.core.vertical_types import StageDefinition
 from victor.core.verticals.base import VerticalBase, VerticalConfig
 from victor.tools.tool_names import ToolNames
@@ -74,7 +75,7 @@ class BenchmarkVertical(VerticalBase):
     # Metadata (inherited from VerticalMetadataProvider)
     name: ClassVar[str] = "benchmark"
     description: ClassVar[str] = "AI coding benchmark evaluation and performance testing"
-    version: ClassVar[str] = "0.5.0"
+    version: ClassVar[str] = VERSION  # Centralized version from settings.py
 
     # Benchmark-specific stages
     STAGE_UNDERSTANDING = "UNDERSTANDING"
