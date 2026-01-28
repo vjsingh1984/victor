@@ -487,42 +487,6 @@ class ToolCacheManager:
         return self.get_namespace("binary_handlers")
 
 
-# =========================================================================
-# Singleton for backward compatibility
-# =========================================================================
-
-_default_manager: Optional[ToolCacheManager] = None
-_manager_lock = threading.Lock()
-
-
-def get_tool_cache_manager() -> ToolCacheManager:
-    """Get or create the default tool cache manager.
-
-    This provides backward compatibility for code that doesn't
-    use DI yet. Prefer injecting ToolCacheManager directly.
-
-    Returns:
-        Default ToolCacheManager instance
-    """
-    global _default_manager
-    with _manager_lock:
-        if _default_manager is None:
-            _default_manager = ToolCacheManager()
-        return _default_manager
-
-
-def reset_tool_cache_manager() -> None:
-    """Reset the default tool cache manager.
-
-    Useful for testing to ensure clean state between tests.
-    """
-    global _default_manager
-    with _manager_lock:
-        if _default_manager is not None:
-            _default_manager.clear_all()
-        _default_manager = None
-
-
 __all__ = [
     # Main class
     "ToolCacheManager",

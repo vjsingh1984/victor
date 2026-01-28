@@ -327,22 +327,22 @@ class ToolExecutionContext:
     def get_cache(self, namespace: str) -> "ICacheNamespace":
         """Get a namespaced cache.
 
-        Uses injected cache_manager if available, otherwise falls back
-        to global cache manager.
+        Uses injected cache_manager if available.
+
+        Note: The global singleton fallback was removed in v0.5.1.
+        Use dependency injection to provide cache_manager.
 
         Args:
             namespace: Cache namespace name (e.g., "code_search_index")
 
         Returns:
-            ICacheNamespace for the requested namespace
+            ICacheNamespace for the requested namespace, or None if not available
         """
         if self.cache_manager is not None:
             return self.cache_manager.get_namespace(namespace)
 
-        # Fallback to global cache manager
-        from victor.tools.cache_manager import get_tool_cache_manager
-
-        return get_tool_cache_manager().get_namespace(namespace)
+        # No fallback - caller must inject cache_manager
+        return None
 
     def get_path_resolver(self) -> Any:
         """Get the path resolver.
