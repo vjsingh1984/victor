@@ -669,7 +669,8 @@ class UnifiedStreamAdapter:
 
         try:
             # Get the raw stream from the provider
-            raw_stream = await self._provider.stream(
+            # Note: provider.stream() returns an async generator, not a coroutine
+            raw_stream = self._provider.stream(
                 messages,
                 model=model,
                 temperature=temperature,
