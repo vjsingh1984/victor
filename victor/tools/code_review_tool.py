@@ -312,16 +312,26 @@ async def code_review(
     if not path:
         return {"success": False, "error": "Missing required parameter: path"}
 
-    # Handle aspects parameter (can be list or JSON string)
+    # Handle aspects parameter (can be list, JSON string, or single string)
     if aspects is None:
         aspects = ["all"]
     elif isinstance(aspects, str):
-        # Single aspect as string
-        aspects = [aspects]  # type: ignore[unreachable]
+        # Try to parse as JSON string, otherwise treat as single aspect
+        import json
+
+        try:
+            aspects = json.loads(aspects)
+        except json.JSONDecodeError:
+            # Not a JSON string, treat as single aspect
+            aspects = [aspects]
+
+    # Ensure aspects is a list
+    if not isinstance(aspects, list):
+        aspects = [aspects]
 
     # Validate aspects
     valid_aspects = {"security", "complexity", "best_practices", "documentation", "all"}
-    invalid = [a for a in aspects if a not in valid_aspects]  # type: ignore[unreachable]
+    invalid = [a for a in aspects if a not in valid_aspects]
     if invalid:
         return {
             "success": False,
