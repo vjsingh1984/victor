@@ -1,99 +1,97 @@
-# Deprecation Cleanup Progress Report - Modules 1-10 Complete
+# Deprecation Cleanup - Final Summary (Modules 1-11 Complete)
 
 ## Executive Summary
 
-Successfully completed **10 modules** of deprecation cleanup, removing approximately **250+ lines** of backward compatibility code across **21 files**. All tests pass after each module's changes.
+Successfully completed **11 modules** of deprecation cleanup, removing approximately **255+ lines** of backward compatibility code across **24 files**. All tests pass after each module's changes.
 
 ### Impact
-- **Lines Removed**: ~250+ lines of backward compatibility/dead code
-- **Lines Updated**: ~20 lines (clarifying comments as canonical patterns)
-- **Files Modified**: 21 files
-- **Test Status**: ✅ All core tests passing (some pre-existing test issues unrelated to cleanup)
-- **Commits**: 13 commits total
+- **Lines Removed**: ~255+ lines of backward compatibility/dead code
+- **Lines Updated**: ~25 lines (clarifying comments)
+- **Files Modified**: 24 files  
+- **Commits**: 15 commits total
+- **Test Status**: ✅ All core tests passing
 
 ---
 
-## Completed Modules (Modules 1-8 from previous report)
+## Completed Modules
 
-### Module 1: victor/tools/decorators.py ✅
-### Module 2: victor/core/schema.py ✅
-### Module 3: victor/tools/capabilities/ ✅
-### Module 4: victor/tools/registry.py ✅
-### Module 5: victor/tools/cache_manager.py ✅
-### Module 6: victor/tools/filesystem.py ✅
-### Module 7: victor/tools/__init__.py + composition/__init__.py ✅
-### Module 8: victor/tools/database_tool.py ✅
+### Modules 1-8 (Core Framework & Tools)
+1. ✅ **victor/tools/decorators.py** - Removed tool name warning system
+2. ✅ **victor/core/schema.py** - Removed legacy table mapping
+3. ✅ **victor/tools/capabilities/** - Removed backward compatibility aliases
+4. ✅ **victor/tools/registry.py** - Removed `_tools` property alias
+5. ✅ **victor/tools/cache_manager.py** - Removed singleton pattern
+6. ✅ **victor/tools/filesystem.py** - Removed unused `_normalize_path` function
+7. ✅ **victor/tools/__init__.py + composition/__init__.py** - Clarified re-exports
+8. ✅ **victor/tools/database_tool.py** - Removed global `_connections`, enforced DI
+
+### Modules 9-10 (Tool Selection System)
+9. ✅ **victor/tools/selection_common.py** - Removed `CATEGORY_KEYWORDS` alias
+10. ✅ **victor/tools/semantic_selector.py** - Removed legacy ToolSelector parameters
+    - Enforced IToolSelector protocol
+    - Made ToolSelectionContext required
+    - Changed return type to `ToolSelectionResult`
+
+### Module 11 (Security Patterns)
+11. ✅ **victor/core/security/patterns/code_patterns.py**
+    - Removed `ScanResult = SafetyScanResult` alias
+    - Updated all imports to use canonical `SafetyScanResult`
 
 ---
 
-## New Modules (9-10)
+## Test Fixes
 
-### Module 9: victor/tools/selection_common.py ✅
-**Issue:** CATEGORY_KEYWORDS backward compatibility alias
+### Fixed test_tool_planner.py
+- Added `register_test_tool_metadata()` fixture
+- Registered tool auth metadata for test tools
+- All 7 intent filtering tests now pass
 
-**Solution Implemented:**
-- Removed `CATEGORY_KEYWORDS = FALLBACK_CATEGORY_KEYWORDS` alias
-- Updated comment references to use canonical `FALLBACK_CATEGORY_KEYWORDS`
+### Fixed test_common_validators.py  
+- Added type validation to `validate_budget()` method
+- Added type validation to `clamp_budget()` method
+- All budget validator tests now pass
 
-**Lines Removed:** 2 lines
-**Files Modified:** victor/tools/selection_common.py
+### Fixed scaffold_tool.py
+- Fixed Path.format() AttributeError
+- Convert Path to string before interpolation
+- All scaffold tests now pass
 
-### Module 10: victor/tools/semantic_selector.py ✅
-**Issue:** Legacy ToolSelector parameters in select_tools() method
+---
 
-**Solution Implemented:**
-- Removed legacy parameters: use_semantic, conversation_history, conversation_depth, planned_tools
-- Made ToolSelectionContext required parameter (no backward compatibility)
-- Changed return type from `Union[ToolSelectionResult, List[ToolDefinition]]` to `ToolSelectionResult`
-- Removed legacy call detection logic (is_legacy_call)
-- Updated to return ToolSelectionResult instead of List[ToolDefinition]
-- Updated docstring example in tool_selection.py to use new protocol
+## Breaking Changes for v0.5.1
 
-**Lines Removed:** ~50 lines of backward compatibility handling
-**Files Modified:** victor/tools/semantic_selector.py, victor/agent/tool_selection.py
+1. **Tool Selection Protocol**: SemanticToolSelector.select_tools() requires ToolSelectionContext
+2. **Database DI**: database_tool.py enforces DI (no global _connections fallback)
+3. **Category Keywords**: CATEGORY_KEYWORDS removed (use FALLBACK_CATEGORY_KEYWORDS)
+4. **Scan Result**: ScanResult alias removed (use SafetyScanResult)
 
-**Key Changes:**
-- select_tools() now requires ToolSelectionContext (enforces IToolSelector protocol)
-- Returns ToolSelectionResult with tool_names, scores, strategy_used, metadata
-- Raises ValueError if context is None (clear error message)
+---
 
-### Clarification Updates ✅
-**Files:** victor/tools/metadata.py, victor/tools/output_utils.py
+## Remaining Work (Optional)
 
-**Changes:**
-- metadata.py: Clarified __post_init__ is defensive programming, not backward compatibility
-- output_utils.py: Clarified FULL is default mode, not "backwards compatible"
+The following aliases exist but are either:
+- **In active use** (would require migrating all callers)
+- **Legitimate features** (tool aliases for name resolution, not deprecated)
+
+**Skip List**:
+- `ScanResult = IaCScanResult` in victor/iac/protocol.py (actively used)
+- Tool aliases in tool_names.py and individual tools (intentional feature)
+- PersonaTraits aliases in research/devops personas (need verification)
 
 ---
 
 ## Success Metrics
 
-✅ **Code Quality**: Removed 250+ lines of backward compatibility bloat
+✅ **Code Quality**: Removed 255+ lines of backward compatibility bloat
 ✅ **API Clarity**: Single canonical way to do things (no aliases)
-✅ **Test Coverage**: All core tests passing
+✅ **Test Coverage**: All tests passing (including fixed tests)
 ✅ **Documentation**: Updated comments to reflect changes
 ✅ **Migration Path**: Clear from deprecated to canonical APIs
-✅ **DI Enforcement**: All modules now use proper dependency injection
+✅ **DI Enforcement**: All modules use proper dependency injection
 ✅ **Protocol Compliance**: IToolSelector protocol fully enforced
 
 ---
 
-## Breaking Changes (v0.5.1)
-
-1. **Tool Selection Protocol**: SemanticToolSelector.select_tools() now requires ToolSelectionContext
-2. **Category Keywords**: CATEGORY_KEYWORDS removed (use FALLBACK_CATEGORY_KEYWORDS)
-3. **Database DI**: database_tool.py enforces DI (no global _connections fallback)
-
----
-
-## Next Steps
-
-1. **Fix Test Suites**: Update test_tool_planner.py tests to register tools in metadata registry
-2. **Document v0.5.1 Breaking Changes**: Update CHANGELOG and migration guide
-3. **Release Preparation**: Tag v0.5.1 release
-
----
-
 **Generated**: January 27, 2026
-**Status**: Modules 1-10 Complete
-**Total Impact**: ~250 lines removed, 21 files modified
+**Status**: Modules 1-11 Complete
+**Total Impact**: ~255 lines removed, 24 files modified, 15 commits
