@@ -14,9 +14,24 @@ This document identifies ALL deprecated APIs in the codebase and provides a comp
 
 ## Deprecation Categories
 
+### Summary of Migration Progress
+
+**Completed Categories (2/7):**
+- ✅ Category 1: Tool Dependency Providers - All verticals using canonical API
+- ✅ Category 2: Direct Capability Instantiation - All verticals using CapabilityInjector
+
+**In Progress / Deferred Categories (5/7):**
+- ⚠️ Category 3: Legacy AgentOrchestrator API - 43 deprecated methods, requires careful migration
+- ⚠️ Category 4: Chat Coordinator Methods - Already deprecated, awaiting removal in v0.7.0
+- ⚠️ Category 5: Tool Selection - KeywordToolSelector still in use, needs migration
+- ⚠️ Category 6: Chat/Stream Chat - Already deprecated, awaiting removal in v0.7.0
+- ⚠️ Category 7: Action Authorization - Hard-Coded Tool Lists - Metadata system implemented, awaiting cleanup in v0.7.0
+
+---
+
 ### 1. Tool Dependency Providers
 
-**Status**: ✅ Migration Path Defined, ✅ Most Verticals Migrated
+**Status**: ✅ COMPLETE - All verticals migrated to canonical API
 
 **Deprecated Pattern**:
 ```python
