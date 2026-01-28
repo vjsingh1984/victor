@@ -158,30 +158,8 @@ class Tables:
     UI_FAILED_CALL = "ui_failed_call"  # Failed tool call signatures
 
     # ===========================================
-    # LEGACY TABLE MAPPINGS (for migration)
+    # LEARNER IDENTIFIERS
     # ===========================================
-    # Maps old table names to new names for migration scripts
-
-    @classmethod
-    def get_legacy_mapping(cls) -> Dict[str, str]:
-        """Get mapping from legacy table names to new names.
-
-        This mapping is for reference only - data migration from legacy tables
-        is not supported. Delete old databases and reinitialize instead.
-
-        Returns:
-            Dict mapping old_name -> new_name
-        """
-        return {
-            # Graph (legacy -> new)
-            "nodes": cls.GRAPH_NODE,
-            "edges": cls.GRAPH_EDGE,
-            "file_mtimes": cls.GRAPH_FILE_MTIME,
-            # Mode learning (legacy -> new)
-            "q_values": cls.RL_MODE_Q,
-            "task_stats": cls.RL_MODE_TASK,
-            "transition_history": cls.RL_MODE_HISTORY,
-        }
 
 
 class LearnerID:
