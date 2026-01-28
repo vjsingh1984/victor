@@ -71,6 +71,16 @@ from victor.rag.advanced_rag import (
     RerankStrategy,
 )
 
+# Import canonical tool dependency provider
+from victor.rag.tool_dependencies import (
+    RAGToolDependencyProvider,
+    RAG_COMPOSED_PATTERNS,
+    get_rag_tool_graph,
+    reset_rag_tool_graph,
+    get_composed_pattern,
+    list_composed_patterns,
+)
+
 __all__ = [
     # Main vertical
     "RAGAssistant",
@@ -100,4 +110,11 @@ __all__ = [
     "SearchResult",
     "SearchStrategy",
     "RerankStrategy",
+    # Tool Dependencies
+    "RAGToolDependencyProvider",
+    "RAG_COMPOSED_PATTERNS",
+    "get_rag_tool_graph",
+    "reset_rag_tool_graph",
+    "get_composed_pattern",
+    "list_composed_patterns",
 ]

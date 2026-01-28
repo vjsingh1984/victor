@@ -16,7 +16,16 @@ from victor.devops.chat_workflow_provider import DevOpsChatWorkflowProvider
 from victor.devops.mode_config import DevOpsModeConfigProvider
 from victor.devops.prompts import DevOpsPromptContributor
 from victor.devops.safety import DevOpsSafetyExtension
-from victor.devops.tool_dependencies import DevOpsToolDependencyProvider
+
+# Import canonical tool dependency provider from tool_dependencies module
+from victor.devops.tool_dependencies import (
+    DevOpsToolDependencyProvider,
+    DEVOPS_COMPOSED_PATTERNS,
+    get_devops_tool_graph,
+    reset_devops_tool_graph,
+    get_devops_composed_pattern,
+    list_devops_composed_patterns,
+)
 
 # Import lazy initializer for eliminating import side-effects
 from victor.framework.lazy_initializer import get_initializer_for_vertical
@@ -59,4 +68,10 @@ __all__ = [
     "DevOpsToolDependencyProvider",
     "DevOpsCapabilityProvider",
     "DevOpsChatWorkflowProvider",
+    # Tool Dependencies
+    "DEVOPS_COMPOSED_PATTERNS",
+    "get_devops_tool_graph",
+    "reset_devops_tool_graph",
+    "get_devops_composed_pattern",
+    "list_devops_composed_patterns",
 ]
