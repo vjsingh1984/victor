@@ -114,7 +114,7 @@ class HandlerConfig:
     config: Dict[str, Any] = dataclass_field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> HandlerConfig:
+    def from_dict(cls, data: Dict[str, Any] | str) -> HandlerConfig:
         """Create from YAML dict."""
         # Support both 'type' field and direct handler specification
         if isinstance(data, str):

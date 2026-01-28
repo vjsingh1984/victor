@@ -53,7 +53,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 if TYPE_CHECKING:
-    from victor.coordination.formations.base import TeamContext
+    from victor.coordination.formations.base import TeamContext, BaseFormationStrategy
     from victor.teams.types import AgentMessage, MemberResult, TeamFormation, MessageType
 
 logger = logging.getLogger(__name__)

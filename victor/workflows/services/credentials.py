@@ -1532,7 +1532,7 @@ class SystemAuthenticator:
     ) -> bool:
         """Verify NTLM credentials using pyspnego (cross-platform)."""
         try:
-            import spnego  # type: ignore[import-not-found]
+            import spnego  # type: ignore[import]
 
             # Create NTLM context for validation
             ctx = spnego.client(
@@ -1591,7 +1591,7 @@ class SystemAuthenticator:
 
         # Try pyspnego
         try:
-            import spnego  # type: ignore[import-not-found]
+            import spnego  # type: ignore[import]
 
             ctx = spnego.client(service="host", hostname="localhost", protocol="ntlm")
             token = ctx.step()
@@ -1666,7 +1666,7 @@ class SystemAuthenticator:
             User info dict or None
         """
         try:
-            import ldap3  # type: ignore[import-untyped]
+            import ldap3  # type: ignore[import]
 
             server = ldap3.Server(domain, use_ssl=True)
             conn = ldap3.Connection(server, auto_bind=True)
@@ -1815,7 +1815,7 @@ class SystemAuthenticator:
         # Windows: Check for logged-in user
         if platform.system() == "Windows":
             try:
-                import win32api  # type: ignore[import-untyped]
+                import win32api  # type: ignore[import]
 
                 user = win32api.GetUserName()
                 domain = win32api.GetDomainName()

@@ -43,7 +43,7 @@ _NATIVE_AVAILABLE = False
 _PatternMatcher = None
 
 try:
-    import victor_native as _native  # type: ignore[import-untyped]
+    import victor_native as _native  # type: ignore[import]
 
     _PatternMatcher = _native.PatternMatcher
     _NATIVE_AVAILABLE = True

@@ -691,20 +691,16 @@ class ValidationPipeline:
                 result.duration_seconds = time.time() - start_time
                 return result
 
-            if action == ValidationAction.RETRY:
-                if not context.can_retry():  # type: ignore[unreachable]
-                    result.add_error(
-                        "",
-                        "Maximum retries exceeded",
-                        code="max_retries_exceeded",
-                    )
-                    result.duration_seconds = time.time() - start_time
-                    return result
-                continue
-
-            # Unknown action
-            result.duration_seconds = time.time() - start_time
-            return result
+            # ValidationAction.RETRY
+            if not context.can_retry():
+                result.add_error(
+                    "",
+                    "Maximum retries exceeded",
+                    code="max_retries_exceeded",
+                )
+                result.duration_seconds = time.time() - start_time
+                return result
+            continue
 
     def _validate(self, context: ValidationContext) -> ValidationResult:
         """Internal validation method.

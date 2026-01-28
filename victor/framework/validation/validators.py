@@ -1077,11 +1077,8 @@ class CompositeValidator(BaseValidator):
             return self._any_logic(results)
         elif self._logic == CompositeLogic.NONE:
             return self._none_logic(results)
-        elif self._logic == CompositeLogic.ONE:
+        else:  # CompositeLogic.ONE
             return self._one_logic(results)
-        else:
-            # Default to ALL
-            return self._all_logic(results)
 
     def _all_logic(self, results: List[ValidationResult]) -> ValidationResult:
         """ALL logic: All validators must pass."""
@@ -1274,7 +1271,7 @@ class TransformingValidator(BaseValidator):
         if value is None:
             from victor.framework.validation.pipeline import ValidationResult
 
-            return ValidationResult(is_valid=True)  # type: ignore[no-any-return]
+            return ValidationResult(is_valid=True)
 
         # Transform the value
         try:
@@ -1287,7 +1284,7 @@ class TransformingValidator(BaseValidator):
                 result,
                 f"Transform failed: {e}",
             )
-            return result  # type: ignore[no-any-return]
+            return result
 
         # Create a copy of data with transformed value
         if path:

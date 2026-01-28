@@ -6,7 +6,7 @@ source of truth for streaming response handling across all CLI modes.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator
 
 from victor.agent.response_sanitizer import StreamingContentFilter
 from victor.ui.rendering.protocol import StreamRenderer

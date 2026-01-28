@@ -31,10 +31,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 from victor.observability.emitters.base import IStateEventEmitter
 from victor.core.events import ObservabilityBus, SyncEventWrapper
+
+if TYPE_CHECKING:
+    from victor.core.events import MessagingEvent
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +134,10 @@ class StateEventEmitter(IStateEventEmitter):
 
     def emit(
         self,
-        event: "MessagingEvent",
+        event: Union["MessagingEvent", str],
+        data: Optional[Dict[str, Any]] = None,
+        *,
+        topic: Optional[str] = None,
     ) -> None:  # type: ignore[override]
         """Emit a state event synchronously (for gradual migration).
 
@@ -139,18 +145,31 @@ class StateEventEmitter(IStateEventEmitter):
         to avoid asyncio.run() errors in running event loops.
 
         Args:
-            topic: Event topic (e.g., "state.transition")
-            data: Event payload
+            event: Either a MessagingEvent object or a topic string (for backward compatibility)
+            data: Event data (used with topic string or keyword arguments)
+            topic: Alternative keyword argument for topic (supports emit(topic=..., data=...))
         """
         try:
             from victor.core.events.emit_helper import emit_event_sync
+
+            # Support both MessagingEvent and backward-compatible (topic, data) form
+            if topic is not None:
+                final_topic = topic
+                event_data = data or {}
+            elif isinstance(event, str):
+                final_topic = event
+                event_data = data or {}
+            else:
+                # MessagingEvent form
+                final_topic = event.topic if hasattr(event, 'topic') else "state.transition"
+                event_data = event.data if hasattr(event, 'data') else {}
 
             bus = self._get_bus()
             if bus:
                 emit_event_sync(
                     bus,
-                    topic=topic,
-                    data=data,
+                    topic=final_topic,
+                    data=event_data,
                     source="StateEventEmitter",
                 )
         except Exception as e:

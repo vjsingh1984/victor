@@ -196,7 +196,12 @@ class TestVerificationResult:
         # Default max is 3
         feedback = result.generate_feedback_prompt(max_issues=2)
         # Should only include 2 file references (grouped together)
-        assert feedback.count("file") < 5
+        # Check that file2.py, file3.py, file4.py are NOT in feedback (only 0 and 1 should be)
+        assert "file0.py" in feedback
+        assert "file1.py" in feedback
+        assert "file2.py" not in feedback
+        assert "file3.py" not in feedback
+        assert "file4.py" not in feedback
 
     def test_generate_feedback_prompt_prioritizes_severity(self):
         """Should include critical issues first."""

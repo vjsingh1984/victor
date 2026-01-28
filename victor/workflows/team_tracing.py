@@ -326,7 +326,7 @@ class TeamTracer:
         # Try to import OpenTelemetry
         if enabled:
             try:
-                from opentelemetry import trace  # type: ignore[import-untyped]
+                from opentelemetry import trace  # type: ignore[import]
 
                 self._otel_available = True
                 self._otel_tracer = trace.get_tracer(__name__)
@@ -398,8 +398,8 @@ class TeamTracer:
         # Use OpenTelemetry if available
         if self._otel_available and self._otel_tracer:
             try:
-                from opentelemetry import trace  # type: ignore[import-untyped]
-                from opentelemetry.trace import Status, StatusCode  # type: ignore[import-untyped]
+                from opentelemetry import trace  # type: ignore[import]
+                from opentelemetry.trace import Status, StatusCode  # type: ignore[import]
 
                 # Start OpenTelemetry span
                 if parent_span and hasattr(parent_span, "_otel_span"):

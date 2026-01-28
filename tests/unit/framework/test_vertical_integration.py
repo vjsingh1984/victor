@@ -1170,7 +1170,7 @@ class TestVerticalIntegrationCaching:
         """Test that cache key includes vertical name."""
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
-        key1 = pipeline._generate_cache_key(MockVertical)
+        key1 = pipeline._cache_service.generate_key(MockVertical)
 
         # Create a different vertical
         class DifferentVertical:
@@ -1196,7 +1196,7 @@ class TestVerticalIntegrationCaching:
             def get_extensions(cls):
                 return None
 
-        key2 = pipeline._generate_cache_key(DifferentVertical)
+        key2 = pipeline._cache_service.generate_key(DifferentVertical)
 
         # Keys should be different
         assert key1 != key2

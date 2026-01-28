@@ -138,7 +138,7 @@ class PIIScrubber:
                         )
                         for v in value
                     ]
-                )  # type: ignore[list-item]
+                )
             else:
                 result[key] = value
         return result
@@ -230,7 +230,7 @@ class LogEncryptor:
         self._fernet = None
 
         try:
-            from cryptography.fernet import Fernet  # type: ignore[import-untyped]
+            from cryptography.fernet import Fernet  # type: ignore[import]
 
             if key:
                 self._fernet = Fernet(key)

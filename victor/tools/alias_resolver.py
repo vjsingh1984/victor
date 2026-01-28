@@ -48,7 +48,7 @@ class ToolAliasResolver:
 
     _instance: Optional["ToolAliasResolver"] = None
 
-    def __init__(self) -> None:  # type: ignore[annotation-unchecked]
+    def __init__(self) -> None:
         self._aliases: Dict[str, ToolAlias] = {}
         self._reverse_map: Dict[str, str] = {}
 
@@ -64,7 +64,7 @@ class ToolAliasResolver:
         return cls._instance
 
     @classmethod
-    def reset_instance(cls) -> None:  # type: ignore[annotation-unchecked]
+    def reset_instance(cls) -> None:
         """Reset the singleton instance.
 
         Useful for testing to ensure a clean state between tests.

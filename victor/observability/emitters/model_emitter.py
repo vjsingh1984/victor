@@ -31,10 +31,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 from victor.observability.emitters.base import IModelEventEmitter
 from victor.core.events import ObservabilityBus, SyncEventWrapper
+
+if TYPE_CHECKING:
+    from victor.core.events import MessagingEvent
 
 logger = logging.getLogger(__name__)
 
@@ -133,30 +136,55 @@ class ModelEventEmitter(IModelEventEmitter):
 
     def emit(
         self,
-        event: MessagingEvent,
+        event: Union["MessagingEvent", str],
+        data: Optional[Dict[str, Any]] = None,
+        *,
+        topic: Optional[str] = None,
     ) -> None:
         """Emit a model event synchronously (for gradual migration).
 
         Args:
-            event: The model event to emit
+            event: Either a MessagingEvent object or a topic string (for backward compatibility)
+            data: Event data (used with topic string or keyword arguments)
+            topic: Alternative keyword argument for topic (supports emit(topic=..., data=...))
         """
         try:
+            # Support both MessagingEvent and backward-compatible (topic, data) form
+            if topic is not None:
+                final_topic = topic
+                event_data = data or {}
+            elif isinstance(event, str):
+                final_topic = event
+                event_data = data or {}
+            else:
+                # MessagingEvent form
+                final_topic = event.topic if hasattr(event, 'topic') else "model.request"
+                event_data = event.data if hasattr(event, 'data') else {}
+
             # For backward compatibility, convert to topic/data format
-            self._event_bus.emit(event.topic, event.data)  # type: ignore[attr-defined]
+            self._event_bus.emit(final_topic, event_data)  # type: ignore[attr-defined]
         except Exception as e:
             logger.debug(f"Failed to emit model event: {e}")
 
-    def emit_safe(self, event: MessagingEvent) -> bool:
+    def emit_safe(
+        self,
+        event: Union["MessagingEvent", str],
+        data: Optional[Dict[str, Any]] = None,
+        *,
+        topic: Optional[str] = None,
+    ) -> bool:
         """Safely emit a model event, catching any exceptions.
 
         Args:
-            event: The event to emit
+            event: Either a MessagingEvent object or a topic string (for backward compatibility)
+            data: Event data (used with topic string or keyword arguments)
+            topic: Alternative keyword argument for topic (supports emit(topic=..., data=...))
 
         Returns:
             True if emission succeeded, False otherwise
         """
         try:
-            self.emit(topic=event.topic, data=event.data)
+            self.emit(event, data, topic=topic)
             return True
         except Exception as e:
             logger.debug(f"Failed to emit model event safely: {e}")

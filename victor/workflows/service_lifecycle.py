@@ -118,7 +118,7 @@ class PostgresService(ServiceLifecycle):
 
         # Use asyncpg if available
         try:
-            import asyncpg  # type: ignore[import-not-found]
+            import asyncpg  # type: ignore[import-untyped]
 
             pool = await asyncpg.create_pool(
                 host=config.config.get("host", "localhost"),

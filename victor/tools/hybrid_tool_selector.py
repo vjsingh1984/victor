@@ -38,6 +38,7 @@ from victor.config.tool_selection_defaults import HybridSelectorDefaults
 
 if TYPE_CHECKING:
     from victor.agent.protocols import ToolSelectionContext, ToolSelectorFeatures
+    from victor.tools.selection.protocol import ToolSelectionStrategy
     from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
     from victor.protocols.tool_selector import IToolSelector
 

@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 try:
-    from victor_native import (  # type: ignore[import]
+    from victor_native import (  # type: ignore[import-not-found]
         apply_json_patch,
         json_deep_get,
         json_deep_set,

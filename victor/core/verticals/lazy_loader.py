@@ -106,7 +106,7 @@ class LazyVerticalProxy:
         """
         # Fast path: already loaded
         if self._loaded:
-            assert self._instance is not None  # type: ignore[unreachable]
+            assert self._instance is not None
             return self._instance
 
         # Slow path: need to load

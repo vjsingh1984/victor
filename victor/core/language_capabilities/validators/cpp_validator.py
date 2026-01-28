@@ -148,7 +148,7 @@ class CppValidator:
         warnings: List[ValidationIssue] = []
 
         # Check if libclang is available
-        if not LIBCLANG_AVAILABLE or self._index is None or cindex is None:
+        if not LIBCLANG_AVAILABLE or self._index is None:
             # Fallback to basic validation if libclang not available
             return CodeValidationResult(
                 is_valid=False,
@@ -241,7 +241,7 @@ class CppValidator:
             return self._ts_validator.has_errors(code, language)
 
         # Check if libclang is available
-        if not LIBCLANG_AVAILABLE or self._index is None or cindex is None:
+        if not LIBCLANG_AVAILABLE or self._index is None:
             # Fallback to tree-sitter validation
             return self._ts_validator.has_errors(code, language)
 

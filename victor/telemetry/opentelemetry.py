@@ -16,13 +16,21 @@
 
 try:
     from opentelemetry import trace, metrics  # type: ignore[import-untyped]
-    from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-untyped]
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor  # type: ignore[import-untyped]
-    from opentelemetry.sdk.metrics import MeterProvider  # type: ignore[import-untyped]
-    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader  # type: ignore[import-untyped]
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # type: ignore[import-untyped]
-    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter  # type: ignore[import-untyped]
-    from opentelemetry.sdk.resources import Resource  # type: ignore[import-untyped]
+    from opentelemetry.sdk.trace import TracerProvider as _TracerProvider  # type: ignore[import-untyped]
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor  # type: ignore[import-untyped]
+    from opentelemetry.sdk.metrics import MeterProvider as _MeterProvider  # type: ignore[import-untyped]
+    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader as _PeriodicExportingMetricReader  # type: ignore[import-untyped]
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as _OTLPSpanExporter  # type: ignore[import-not-found]
+    from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter as _OTLPMetricExporter  # type: ignore[import-not-found]
+    from opentelemetry.sdk.resources import Resource as _Resource  # type: ignore[import-untyped]
+
+    TracerProvider = _TracerProvider
+    BatchSpanProcessor = _BatchSpanProcessor
+    MeterProvider = _MeterProvider
+    PeriodicExportingMetricReader = _PeriodicExportingMetricReader
+    OTLPSpanExporter = _OTLPSpanExporter
+    OTLPMetricExporter = _OTLPMetricExporter
+    Resource = _Resource
 
     OPENTELEMETRY_AVAILABLE = True
 except ImportError:
@@ -30,31 +38,31 @@ except ImportError:
     OPENTELEMETRY_AVAILABLE = False
 
     # Create dummy objects to avoid import errors
-    class TracerProvider:
+    class TracerProvider:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             pass
 
-    class BatchSpanProcessor:
+    class BatchSpanProcessor:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             pass
 
-    class MeterProvider:
+    class MeterProvider:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             pass
 
-    class PeriodicExportingMetricReader:
+    class PeriodicExportingMetricReader:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             pass
 
-    class OTLPSpanExporter:
+    class OTLPSpanExporter:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             pass
 
-    class OTLPMetricExporter:
+    class OTLPMetricExporter:  # type: ignore[no-redef]
         def __init__(self, *args, **kwargs):
             pass
 
-    class Resource:
+    class Resource:  # type: ignore[no-redef]
         @staticmethod
         def create(*args, **kwargs):
             return {}
