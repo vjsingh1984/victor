@@ -25,10 +25,11 @@ The YAML-based approach provides:
 - Consistent schema validation via Pydantic
 - Automatic tool name canonicalization
 - Caching for performance
+- Auto-inference of vertical name from module path (no duplication)
 
 Use the canonical tool dependency provider:
     from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-    provider = create_vertical_tool_dependency_provider("dataanalysis")
+    provider = create_vertical_tool_dependency_provider()  # Auto-infers "dataanalysis"
 """
 
 from pathlib import Path
@@ -36,7 +37,8 @@ from pathlib import Path
 from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 
 # Create canonical provider for data analysis vertical
-DataAnalysisToolDependencyProvider = create_vertical_tool_dependency_provider("dataanalysis")
+# Vertical name is auto-inferred from module path (victor.dataanalysis.tool_dependencies -> dataanalysis)
+DataAnalysisToolDependencyProvider = create_vertical_tool_dependency_provider()
 
 __all__ = [
     "DataAnalysisToolDependencyProvider",

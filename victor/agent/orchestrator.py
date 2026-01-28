@@ -2797,12 +2797,31 @@ class AgentOrchestrator(
         3. Continues until model provides a final response (no tool calls)
         4. Ensures non-empty response on tool failures
 
+        Routing:
+            - If VICTOR_USE_WORKFLOW_CHAT=true: Routes to WorkflowOrchestrator
+            - Otherwise: Routes to legacy ChatCoordinator
+
         Args:
             user_message: User's message
 
         Returns:
             CompletionResponse from the model with complete response
         """
+        # Phase 1: Route to workflow orchestrator if feature flag enabled
+        if getattr(self._settings, "use_workflow_chat", False) and hasattr(
+            self, "_workflow_orchestrator"
+        ):
+            try:
+                return await self._workflow_orchestrator.chat(
+                    message=user_message,
+                    workflow="coding_chat",  # Default workflow - can be configured
+                )
+            except Exception as e:
+                # Fallback to legacy on error
+                logger.warning(f"Workflow chat failed, falling back to legacy: {e}")
+                return await self._chat_coordinator.chat(user_message)
+
+        # Legacy path via ChatCoordinator
         return await self._chat_coordinator.chat(user_message)
 
     # NOTE: Dead code removed - chat logic delegated to ChatCoordinator
@@ -2814,12 +2833,33 @@ class AgentOrchestrator(
 
         This method wraps the implementation to make phased refactors safer.
 
+        Routing:
+            - If VICTOR_USE_WORKFLOW_CHAT=true: Routes to WorkflowOrchestrator
+            - Otherwise: Routes to legacy ChatCoordinator
+
         Args:
             user_message: User's input message
 
         Returns:
             AsyncIterator yielding StreamChunk objects with incremental response
         """
+        # Phase 1: Route to workflow orchestrator if feature flag enabled
+        if getattr(self._settings, "use_workflow_chat", False) and hasattr(
+            self, "_workflow_orchestrator"
+        ):
+            try:
+                async for chunk in self._workflow_orchestrator.stream_chat(
+                    message=user_message,
+                    workflow="coding_chat",  # Default workflow - can be configured
+                ):
+                    yield chunk
+                return
+            except Exception as e:
+                # Fallback to legacy on error
+                logger.warning(f"Workflow streaming failed, falling back to legacy: {e}")
+                # Continue to legacy path
+
+        # Legacy path via ChatCoordinator
         async for chunk in self._chat_coordinator.stream_chat(user_message):
             yield chunk
 

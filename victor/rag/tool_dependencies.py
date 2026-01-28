@@ -21,6 +21,8 @@ while composed patterns remain in Python for complex logic.
 Uses canonical tool names from ToolNames to ensure consistent naming
 across RL Q-values, workflow patterns, and vertical configurations.
 
+Vertical name is auto-inferred from module path to eliminate duplication.
+
 Simplified Usage:
     - Use RAGToolDependencyProvider for vertical tool dependency management
     - Use RAG_COMPOSED_PATTERNS for pre-defined RAG workflow patterns
@@ -62,7 +64,8 @@ from victor.tools.tool_graph import ToolExecutionGraph
 # RAGToolDependencyProvider (canonical provider)
 # =============================================================================
 # Create canonical provider for RAG vertical
-RAGToolDependencyProvider = create_vertical_tool_dependency_provider("rag")
+# Vertical name is auto-inferred from module path (victor.rag.tool_dependencies -> rag)
+RAGToolDependencyProvider = create_vertical_tool_dependency_provider()
 
 
 # These represent higher-level operations composed of multiple tool calls

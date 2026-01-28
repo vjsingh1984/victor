@@ -1116,7 +1116,7 @@ class FrameworkStepHandler(BaseStepHandler):
 
         # First check if vertical implements WorkflowProviderProtocol
         if isinstance(vertical, WorkflowProviderProtocol):
-            workflow_provider = vertical
+            workflow_provider = vertical  # type: ignore[unreachable]
         # Fallback to hasattr() for legacy code (deprecated)
         elif hasattr(vertical, "get_workflow_provider"):
             workflow_provider = vertical.get_workflow_provider()
@@ -1134,57 +1134,57 @@ class FrameworkStepHandler(BaseStepHandler):
                 # Store in context
                 context.apply_workflows(workflows)
 
-        # Register with workflow registry if available
-        try:
-            # Phase 2 DI: Use injected registry or fall back to import
-            if self._workflow_registry is not None:
-                registry = self._workflow_registry
-            else:
-                from victor.workflows.registry import get_global_registry
+                # Register with workflow registry if available
+                try:
+                    # Phase 2 DI: Use injected registry or fall back to import
+                    if self._workflow_registry is not None:
+                        registry = self._workflow_registry
+                    else:
+                        from victor.workflows.registry import get_global_registry
 
-                registry = get_global_registry()
+                        registry = get_global_registry()
 
-            for name, workflow in workflows.items():
-                registry.register(
-                    f"{vertical.name}:{name}",
-                    workflow,
-                    replace=True,
-                )
-            result.add_info(
-                f"Registered {workflow_count} workflows: " f"{', '.join(workflows.keys())}"
-            )
-        except ImportError:
-            result.add_warning("Workflow registry not available")
-        except Exception as e:
-            result.add_warning(f"Could not register workflows: {e}")
-
-        # NEW: Register workflow triggers with global WorkflowTriggerRegistry
-        try:
-            # Phase 2 DI: Use injected registry or fall back to import
-            if self._trigger_registry is not None:
-                trigger_registry = self._trigger_registry
-            else:
-                from victor.workflows.trigger_registry import get_trigger_registry
-
-                trigger_registry = get_trigger_registry()
-
-            # Get auto_workflows from provider if available
-            if hasattr(workflow_provider, "get_auto_workflows"):
-                auto_workflows = workflow_provider.get_auto_workflows()
-                if auto_workflows:
-                    trigger_registry.register_from_vertical(vertical.name, auto_workflows)
-                    logger.debug(
-                        f"Registered {len(auto_workflows)} workflow triggers "
-                        f"for {vertical.name}"
+                    for name, workflow in workflows.items():
+                        registry.register(
+                            f"{vertical.name}:{name}",
+                            workflow,
+                            replace=True,
+                        )
+                    result.add_info(
+                        f"Registered {workflow_count} workflows: " f"{', '.join(workflows.keys())}"
                     )
-                    result.add_info(f"Registered {len(auto_workflows)} workflow triggers")
-        except ImportError:
-            # Trigger registry not available (optional dependency)
-            pass
-        except Exception as e:
-            result.add_warning(f"Could not register workflow triggers: {e}")
+                except ImportError:
+                    result.add_warning("Workflow registry not available")
+                except Exception as e:
+                    result.add_warning(f"Could not register workflows: {e}")
 
-        logger.debug(f"Applied {workflow_count} workflows from vertical")
+                # Register workflow triggers with global WorkflowTriggerRegistry
+                try:
+                    # Phase 2 DI: Use injected registry or fall back to import
+                    if self._trigger_registry is not None:
+                        trigger_registry = self._trigger_registry
+                    else:
+                        from victor.workflows.trigger_registry import get_trigger_registry
+
+                        trigger_registry = get_trigger_registry()
+
+                    # Get auto_workflows from provider if available
+                    if hasattr(workflow_provider, "get_auto_workflows"):
+                        auto_workflows = workflow_provider.get_auto_workflows()
+                        if auto_workflows:
+                            trigger_registry.register_from_vertical(vertical.name, auto_workflows)
+                            logger.debug(
+                                f"Registered {len(auto_workflows)} workflow triggers "
+                                f"for {vertical.name}"
+                            )
+                            result.add_info(f"Registered {len(auto_workflows)} workflow triggers")
+                except ImportError:
+                    # Trigger registry not available (optional dependency)
+                    pass
+                except Exception as e:
+                    result.add_warning(f"Could not register workflow triggers: {e}")
+
+                logger.debug(f"Applied {workflow_count} workflows from vertical")
 
     def apply_rl_config(
         self,
@@ -2116,7 +2116,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             # OCP: Apply all registered extension handlers
             self._extension_registry.apply_all(orchestrator, extensions, context, result)
         else:
-            logger.debug("No extensions available for vertical")
+            logger.debug("No extensions available for vertical")  # type: ignore[unreachable]
 
     def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
         """Return extension application details."""

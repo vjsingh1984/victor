@@ -25,14 +25,15 @@ The YAML-based approach provides:
 - Consistent schema validation via Pydantic
 - Automatic tool name canonicalization
 - Caching for performance
+- Auto-inference of vertical name from module path (no duplication)
 
 Recommended usage:
     from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
-    provider = create_vertical_tool_dependency_provider("coding")
+    provider = create_vertical_tool_dependency_provider()  # Auto-infers "coding"
 
 Backward compatibility:
     CodingToolDependencyProvider class is still available but deprecated.
-    Use create_vertical_tool_dependency_provider("coding") instead.
+    Use create_vertical_tool_dependency_provider() instead.
 """
 
 from __future__ import annotations
@@ -45,7 +46,8 @@ from victor.core.tool_dependency_loader import create_vertical_tool_dependency_p
 _YAML_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 
 # Create canonical provider for coding vertical
-CodingToolDependencyProvider = create_vertical_tool_dependency_provider("coding")
+# Vertical name is auto-inferred from module path (victor.coding.tool_dependencies -> coding)
+CodingToolDependencyProvider = create_vertical_tool_dependency_provider()
 
 __all__ = [
     "CodingToolDependencyProvider",

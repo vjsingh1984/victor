@@ -21,6 +21,8 @@ while composed patterns remain in Python for complex logic.
 Uses canonical tool names from ToolNames to ensure consistent naming
 across RL Q-values, workflow patterns, and vertical configurations.
 
+Vertical name is auto-inferred from module path to eliminate duplication.
+
 Simplified Usage:
     - Use DevOpsToolDependencyProvider for vertical tool dependency management
     - Use DEVOPS_COMPOSED_PATTERNS for pre-defined DevOps workflow patterns
@@ -65,7 +67,8 @@ if TYPE_CHECKING:
 # DevOpsToolDependencyProvider (canonical provider)
 # =============================================================================
 # Create canonical provider for DevOps vertical
-DevOpsToolDependencyProvider = create_vertical_tool_dependency_provider("devops")
+# Vertical name is auto-inferred from module path (victor.devops.tool_dependencies -> devops)
+DevOpsToolDependencyProvider = create_vertical_tool_dependency_provider()
 
 
 # These represent higher-level operations composed of multiple tool calls

@@ -639,7 +639,7 @@ _VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
 
 
 def create_vertical_tool_dependency_provider(
-    vertical: str,
+    vertical: Optional[str] = None,
     canonicalize: Optional[bool] = None,
 ) -> Union["YAMLToolDependencyProvider", EmptyToolDependencyProvider]:
     """Factory function to create tool dependency providers for verticals.
@@ -649,8 +649,24 @@ def create_vertical_tool_dependency_provider(
     need for individual wrapper classes like CodingToolDependencyProvider,
     DevOpsToolDependencyProvider, etc.
 
+    Auto-Inference (Recommended):
+        The vertical name is automatically inferred from the calling module path
+        when not provided. Supports both built-in and external verticals:
+
+        Built-in verticals (victor.*):
+            victor.coding.tool_dependencies → "coding"
+            victor.devops.tool_dependencies → "devops"
+
+        External verticals with packages:
+            my_company.security_analysis.tool_dependencies → "security_analysis"
+            external_package.research.tool_dependencies → "research"
+
+        External verticals (flat structure):
+            custom_security.tool_dependencies → "custom_security"
+
     Args:
-        vertical: Vertical name (coding, devops, research, rag, dataanalysis)
+        vertical: Vertical name (coding, devops, research, rag, dataanalysis, or custom).
+            If None, infers from calling module path using the patterns above.
         canonicalize: Whether to canonicalize tool names. If None, uses the
             vertical's default setting (some verticals disable canonicalization
             to preserve distinct tool names like 'grep' vs 'code_search').
@@ -659,17 +675,22 @@ def create_vertical_tool_dependency_provider(
         Configured YAMLToolDependencyProvider for the vertical
 
     Raises:
-        ValueError: If vertical is not recognized
+        ValueError: If vertical cannot be inferred or is not recognized
 
     Example:
-        # Create provider for coding vertical
+        # Built-in vertical - auto-infer from module path
+        # In victor/coding/tool_dependencies.py:
+        CodingToolDependencyProvider = create_vertical_tool_dependency_provider()
+
+        # External vertical - auto-infer from module path
+        # In my_company/security_analysis/tool_dependencies.py:
+        SecurityAnalysisToolDependencyProvider = create_vertical_tool_dependency_provider()
+
+        # Explicit vertical name (always works)
         provider = create_vertical_tool_dependency_provider("coding")
+
+        # Get tool dependencies
         deps = provider.get_dependencies()
-
-        # Create provider with explicit canonicalization setting
-        provider = create_vertical_tool_dependency_provider("devops", canonicalize=False)
-
-        # Get recommended sequence for edit task
         sequence = provider.get_recommended_sequence("edit")
 
     Note:
@@ -677,7 +698,43 @@ def create_vertical_tool_dependency_provider(
         The individual wrapper classes (e.g., CodingToolDependencyProvider) are
         maintained for backward compatibility but delegate to this factory internally.
     """
+    import inspect
     from victor.core.verticals.naming import get_vertical_module_name, normalize_vertical_name
+
+    # Infer vertical name from calling module if not provided
+    if vertical is None:
+        # Get the caller's frame
+        frame = inspect.currentframe()
+        if frame and frame.f_back:
+            caller_module = frame.f_back.f_globals.get("__name__", "")
+            # Extract vertical name from module path
+            # Supports both built-in and external verticals:
+            # - "victor.coding.tool_dependencies" -> "coding"
+            # - "my_company.security_analysis.tool_dependencies" -> "security_analysis"
+            # - "custom_security.tool_dependencies" -> "custom_security"
+            parts = caller_module.split(".")
+
+            # Try common patterns for tool_dependencies modules
+            # Pattern 1: victor.<vertical>.tool_dependencies (built-in verticals)
+            if len(parts) >= 3 and parts[0] == "victor" and parts[-1] == "tool_dependencies":
+                vertical = parts[1]
+            # Pattern 2: <anything>.<vertical>.tool_dependencies (external verticals with package)
+            elif len(parts) >= 3 and parts[-1] == "tool_dependencies":
+                vertical = parts[-2]
+            # Pattern 3: <vertical>.tool_dependencies (external verticals, flat structure)
+            elif len(parts) >= 2 and parts[-1] == "tool_dependencies":
+                vertical = parts[-2]
+            else:
+                raise ValueError(
+                    f"Could not infer vertical name from module: {caller_module}. "
+                    "Expected module name to end with '.tool_dependencies'. "
+                    "Please specify vertical explicitly: create_vertical_tool_dependency_provider('vertical_name')"
+                )
+        else:
+            raise ValueError(
+                "Could not infer vertical name from calling context. "
+                "Please specify vertical explicitly: create_vertical_tool_dependency_provider('vertical_name')"
+            )
 
     vertical = normalize_vertical_name(vertical)
 
