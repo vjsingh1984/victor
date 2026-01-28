@@ -23,6 +23,11 @@ from typing import List, Any
 
 from victor.agent.tool_planner import ToolPlanner
 from victor.config.settings import Settings
+from victor.tools.auth_metadata import (
+    ToolAuthMetadata,
+    ToolAuthMetadataRegistry,
+    ToolSafety,
+)
 
 
 @pytest.fixture
@@ -30,6 +35,65 @@ def mock_settings():
     """Create mock settings."""
     settings = Mock(spec=Settings)
     return settings
+
+
+@pytest.fixture(autouse=True)
+def register_test_tool_metadata():
+    """Register tool auth metadata for test tools.
+
+    This fixture ensures that test tools like 'write_file', 'read_file', etc.
+    have proper metadata registered for intent-based filtering tests.
+    """
+    registry = ToolAuthMetadataRegistry.get_instance()
+
+    # Register common test tools with appropriate metadata
+    test_tools_metadata = [
+        ToolAuthMetadata(
+            name="write_file",
+            categories=["file_ops", "write"],
+            capabilities=["file_write"],
+            safety=ToolSafety.REQUIRES_CONFIRMATION,
+            domain="coding",
+        ),
+        ToolAuthMetadata(
+            name="edit_files",
+            categories=["file_ops", "write", "refactor"],
+            capabilities=["file_write"],
+            safety=ToolSafety.REQUIRES_CONFIRMATION,
+            domain="coding",
+        ),
+        ToolAuthMetadata(
+            name="read_file",
+            categories=["file_ops", "read"],
+            capabilities=["file_read"],
+            safety=ToolSafety.SAFE,
+            domain="coding",
+        ),
+        ToolAuthMetadata(
+            name="list_directory",
+            categories=["file_ops", "read"],
+            capabilities=["file_read"],
+            safety=ToolSafety.SAFE,
+            domain="coding",
+        ),
+        ToolAuthMetadata(
+            name="execute_bash",
+            categories=["execution", "shell"],
+            capabilities=["shell", "execute"],
+            safety=ToolSafety.DESTRUCTIVE,
+            domain="coding",
+        ),
+    ]
+
+    # Register all test tools
+    for metadata in test_tools_metadata:
+        registry.register(metadata)
+
+    yield
+
+    # Cleanup: clear test tool metadata from registry
+    # Note: Registry doesn't have unregister(), so we just clear and re-register any existing tools
+    registry._metadata.clear()
 
 
 @pytest.fixture
