@@ -392,6 +392,7 @@ class TestInitializeOrchestrator:
             "SessionServicesBuilder",
             "MetricsLoggingBuilder",
             "WorkflowMemoryBuilder",
+            "WorkflowChatBuilder",  # Phase 1: Domain-Agnostic Workflow Chat
             "IntelligentIntegrationBuilder",
             "ToolingBuilder",
             "ConversationPipelineBuilder",
@@ -422,6 +423,7 @@ class TestInitializeOrchestrator:
             "SessionServicesBuilder",
             "MetricsLoggingBuilder",
             "WorkflowMemoryBuilder",
+            "WorkflowChatBuilder",  # Phase 1: Domain-Agnostic Workflow Chat
             "IntelligentIntegrationBuilder",
             "ToolingBuilder",
             "ConversationPipelineBuilder",
