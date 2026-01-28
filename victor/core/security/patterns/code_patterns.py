@@ -455,10 +455,6 @@ class SafetyScanResult:
             self.has_high = True
 
 
-# Backward compatibility alias
-ScanResult = SafetyScanResult
-
-
 class CodePatternScanner:
     """Scanner for git and code safety patterns.
 
