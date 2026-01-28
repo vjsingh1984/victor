@@ -76,22 +76,7 @@ def _auto_register_tool(tool_instance: BaseTool) -> None:
 
 logger = logging.getLogger(__name__)
 
-# Global flag to control deprecation warnings for legacy tool names
-_WARN_ON_LEGACY_NAMES = False
-
-
-def set_legacy_name_warnings(enabled: bool) -> None:
-    """Enable or disable warnings when legacy tool names are used.
-
-    Args:
-        enabled: If True, log warnings when tools are called with legacy names.
-                 Useful for identifying code that needs migration.
-    """
-    global _WARN_ON_LEGACY_NAMES
-    _WARN_ON_LEGACY_NAMES = enabled
-
-
-def resolve_tool_name(name: str, warn_on_legacy: bool = False) -> str:
+def resolve_tool_name(name: str) -> str:
     """Resolve a tool name to its canonical form.
 
     This provides centralized name resolution that can be used across the codebase.
@@ -99,7 +84,6 @@ def resolve_tool_name(name: str, warn_on_legacy: bool = False) -> str:
 
     Args:
         name: Tool name (canonical or legacy)
-        warn_on_legacy: If True, emit a warning when a legacy name is used
 
     Returns:
         Canonical tool name
@@ -111,17 +95,9 @@ def resolve_tool_name(name: str, warn_on_legacy: bool = False) -> str:
         "shell"
     """
     try:
-        from victor.tools.tool_names import get_canonical_name, TOOL_ALIASES
+        from victor.tools.tool_names import get_canonical_name
 
-        canonical = get_canonical_name(name)
-
-        # Check if this was a legacy name
-        if (warn_on_legacy or _WARN_ON_LEGACY_NAMES) and name in TOOL_ALIASES:
-            logger.warning(
-                f"Legacy tool name '{name}' used. Consider using canonical name '{canonical}' instead."
-            )
-
-        return canonical
+        return get_canonical_name(name)
     except ImportError:
         # tool_names module not available, return unchanged
         return name
