@@ -1,0 +1,141 @@
+# DevOps Chat Workflow
+# This workflow defines agentic chat for DevOps tasks
+
+workflows:
+  devops_chat:
+    description: "Agentic chat workflow for DevOps operations"
+    version: "1.0"
+
+    # StateGraph schema for type safety
+    state_schema:
+      type: object
+      properties:
+        user_message: {type: string}
+        conversation_history: {type: array}
+        iteration_count: {type: integer, default: 0}
+        max_iterations: {type: integer, default: 50}
+        deployment_target: {type: string}
+        environment: {type: string}
+        pending_tool_calls: {type: array}
+        completed_tool_results: {type: array}
+
+    nodes:
+      # Node 1: Understand DevOps request
+      - id: understand_request
+        type: agent
+        role: devops_analyzer
+        goal: "Understand the DevOps request and extract requirements"
+        tools: [read, bash]
+        output:
+          deployment_target: "string"
+          environment: "string"
+          operation_type: "string"
+        next: [check_infrastructure]
+
+      # Node 2: Check infrastructure state
+      - id: check_infrastructure
+        type: condition
+        condition: "operation_type_check"
+        branches:
+          "deployment": plan_deployment
+          "other": execute_operation
+
+      # Node 3: Plan deployment
+      - id: plan_deployment
+        type: agent
+        role: deployment_planner
+        goal: "Create deployment plan with rollback strategy"
+        tools: [read, bash]
+        next: [generate_deployment_script]
+
+      # Node 4: Generate deployment script
+      - id: generate_deployment_script
+        type: agent
+        role: devops_engineer
+        goal: "Generate deployment scripts (Docker, Kubernetes, etc.)"
+        tools: [write, edit_files, bash]
+        output:
+          deployment_script: "string"
+          rollback_script: "string"
+        next: [review_deployment]
+
+      # Node 5: Review deployment
+      - id: review_deployment
+        type: agent
+        role: senior_devops
+        goal: "Review deployment plan and scripts for safety"
+        tools: [read]
+        next: [confirm_deployment]
+
+      # Node 6: Confirm deployment
+      - id: confirm_deployment
+        type: condition
+        condition: "can_continue_devops_iteration"
+        branches:
+          "continue": execute_deployment
+          "max_reached": finalize_deployment
+
+      # Node 7: Execute deployment
+      - id: execute_deployment
+        type: agent
+        role: devops_engineer
+        goal: "Execute deployment with monitoring"
+        tools: [bash, write_files, kubectl]
+        output:
+          deployment_status: "string"
+          deployment_url: "string"
+        next: [check_deployment_status]
+
+      # Node 8: Check deployment status
+      - id: check_deployment_status
+        type: condition
+        condition: "deployment_success_check"
+        branches:
+          "success": finalize_deployment
+          "failed": rollback_deployment
+
+      # Node 9: Rollback deployment
+      - id: rollback_deployment
+        type: agent
+        role: devops_engineer
+        goal: "Rollback failed deployment"
+        tools: [bash, kubectl, write_files]
+        output:
+          rollback_status: "string"
+        next: [finalize_deployment]
+
+      # Node 10: Execute other DevOps operations
+      - id: execute_operation
+        type: agent
+        role: devops_engineer
+        goal: "Execute DevOps operation (monitoring, scaling, backup, etc.)"
+        tools: [bash, kubectl, write_files]
+        output:
+          operation_result: "string"
+        next: [verify_operation]
+
+      # Node 11: Verify operation
+      - id: verify_operation
+        type: agent
+        role: devops_analyzer
+        goal: "Verify operation was successful"
+        tools: [bash, read]
+        next: [finalize_deployment]
+
+      # Node 12: Finalize and report
+      - id: finalize_deployment
+        type: transform
+        transform: finalize_devops_chat
+        output:
+          final_response: "string"
+          deployment_details: "object"
+          operation_summary: "string"
+          status: "string"
+          iterations: "integer"
+        next: [__end__]
+
+    # Default values
+    defaults:
+      max_iterations: 50
+      environment: "production"
+      deployment_target: "kubernetes"

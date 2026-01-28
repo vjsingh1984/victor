@@ -318,11 +318,152 @@ def generate_deployment_summary(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # =============================================================================
+# Chat Workflow Escape Hatches (Phase 2)
+# =============================================================================
+
+
+def operation_type_check(ctx: Dict[str, Any]) -> str:
+    """Determine operation type for DevOps chat workflow routing.
+
+    Args:
+        ctx: Workflow context with keys:
+            - operation_type (str): Type from extract_requirements
+            - user_message (str): Original user message
+
+    Returns:
+        "deployment" or "other"
+    """
+    operation_type = ctx.get("operation_type", "").lower()
+
+    if operation_type in ["deployment", "deploy", "upgrade", "rollback"]:
+        return "deployment"
+
+    return "other"
+
+
+def deployment_success_check(ctx: Dict[str, Any]) -> str:
+    """Check if deployment was successful.
+
+    Args:
+        ctx: Workflow context with keys:
+            - deployment_status (str): Status from deployment execution
+            - error (str): Error message if any
+
+    Returns:
+        "success" or "failed"
+    """
+    deployment_status = ctx.get("deployment_status", "").lower()
+    error = ctx.get("error", "")
+
+    if deployment_status == "success" or (not error and deployment_status == "completed"):
+        return "success"
+
+    return "failed"
+
+
+def can_continue_devops_iteration(ctx: Dict[str, Any]) -> str:
+    """Check if workflow can continue with another iteration.
+
+    Args:
+        ctx: Workflow context with keys:
+            - iteration_count (int): Current iteration count
+            - max_iterations (int): Maximum allowed iterations
+
+    Returns:
+        "continue" or "max_reached"
+    """
+    iteration = ctx.get("iteration_count", 0)
+    max_iter = ctx.get("max_iterations", 50)
+
+    if iteration < max_iter:
+        return "continue"
+    return "max_reached"
+
+
+def update_devops_conversation(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Update conversation with tool results from execution.
+
+    Args:
+        ctx: Workflow context with tool execution results
+
+    Returns:
+        Updated conversation state
+    """
+    conversation_history = ctx.get("conversation_history", [])
+    content = ctx.get("content", "")
+    tool_calls = ctx.get("tool_calls", [])
+    tool_results = ctx.get("tool_results", [])
+
+    # Add assistant message with tool calls
+    if tool_calls:
+        conversation_history.append({
+            "role": "assistant",
+            "content": content,
+            "tool_calls": tool_calls,
+        })
+
+        # Add tool results
+        for result in tool_results:
+            conversation_history.append({
+                "role": "tool",
+                "content": str(result),
+            })
+
+    # Increment iteration count
+    iteration_count = ctx.get("iteration_count", 0) + 1
+
+    return {
+        "conversation_history": conversation_history,
+        "iteration_count": iteration_count,
+        "last_content": content,
+    }
+
+
+def finalize_devops_chat(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Format final DevOps chat response for user.
+
+    Args:
+        ctx: Workflow context with all conversation data
+
+    Returns:
+        Formatted final response
+    """
+    content = ctx.get("content", "")
+    iteration_count = ctx.get("iteration_count", 0)
+    conversation_history = ctx.get("conversation_history", [])
+
+    # Extract deployment details from context
+    deployment_target = ctx.get("deployment_target", "unknown")
+    environment = ctx.get("environment", "unknown")
+    operation_summary = ctx.get("operation_summary", "")
+
+    final_response = content
+    if not final_response:
+        final_response = "DevOps operation completed."
+
+    # Build deployment details
+    deployment_details = {
+        "target": deployment_target,
+        "environment": environment,
+        "summary": operation_summary,
+    }
+
+    return {
+        "final_response": final_response,
+        "status": "completed",
+        "iterations": iteration_count,
+        "deployment_details": deployment_details,
+        "operation_summary": operation_summary,
+    }
+
+
+# =============================================================================
 # Registry Exports
 # =============================================================================
 
 # Conditions available in YAML workflows
 CONDITIONS = {
+    # Original conditions
     "deployment_ready": deployment_ready,
     "health_check_status": health_check_status,
     "rollback_needed": rollback_needed,
@@ -330,16 +471,24 @@ CONDITIONS = {
     "infrastructure_drift": infrastructure_drift,
     "security_scan_verdict": security_scan_verdict,
     "pipeline_stage_gate": pipeline_stage_gate,
+    # Chat workflow conditions (Phase 2)
+    "operation_type_check": operation_type_check,
+    "deployment_success_check": deployment_success_check,
+    "can_continue_devops_iteration": can_continue_devops_iteration,
 }
 
 # Transforms available in YAML workflows
 TRANSFORMS = {
+    # Original transforms
     "merge_deployment_results": merge_deployment_results,
     "generate_deployment_summary": generate_deployment_summary,
+    # Chat workflow transforms (Phase 2)
+    "update_devops_conversation": update_devops_conversation,
+    "finalize_devops_chat": finalize_devops_chat,
 }
 
 __all__ = [
-    # Conditions
+    # Original Conditions
     "deployment_ready",
     "health_check_status",
     "rollback_needed",
@@ -347,9 +496,16 @@ __all__ = [
     "infrastructure_drift",
     "security_scan_verdict",
     "pipeline_stage_gate",
-    # Transforms
+    # Chat workflow conditions (Phase 2)
+    "operation_type_check",
+    "deployment_success_check",
+    "can_continue_devops_iteration",
+    # Original Transforms
     "merge_deployment_results",
     "generate_deployment_summary",
+    # Chat workflow transforms (Phase 2)
+    "update_devops_conversation",
+    "finalize_devops_chat",
     # Registries
     "CONDITIONS",
     "TRANSFORMS",

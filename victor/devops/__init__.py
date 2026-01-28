@@ -11,11 +11,12 @@ This vertical provides:
 """
 
 from victor.devops.assistant import DevOpsAssistant
-from victor.devops.prompts import DevOpsPromptContributor
+from victor.devops.capabilities import DevOpsCapabilityProvider
+from victor.devops.chat_workflow_provider import DevOpsChatWorkflowProvider
 from victor.devops.mode_config import DevOpsModeConfigProvider
+from victor.devops.prompts import DevOpsPromptContributor
 from victor.devops.safety import DevOpsSafetyExtension
 from victor.devops.tool_dependencies import DevOpsToolDependencyProvider
-from victor.devops.capabilities import DevOpsCapabilityProvider
 
 # Import lazy initializer for eliminating import side-effects
 from victor.framework.lazy_initializer import get_initializer_for_vertical
@@ -57,4 +58,5 @@ __all__ = [
     "DevOpsSafetyExtension",
     "DevOpsToolDependencyProvider",
     "DevOpsCapabilityProvider",
+    "DevOpsChatWorkflowProvider",
 ]
