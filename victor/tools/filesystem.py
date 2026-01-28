@@ -73,69 +73,6 @@ def reset_path_resolver() -> None:
 
 
 # ============================================================================
-# PATH NORMALIZATION
-# ============================================================================
-# LLMs sometimes use paths with redundant prefixes when working in subdirectories.
-# For example, when cwd is "investor_homelab/", they might use "investor_homelab/utils"
-# instead of just "utils". This helper delegates to PathResolver for consistency.
-
-
-def _normalize_path(path: str) -> Optional[str]:
-    """Normalize a path by stripping redundant directory prefixes.
-
-    When working in a subdirectory, LLMs sometimes include the directory name
-    in paths (e.g., "project/utils" when cwd is already "project/").
-    This function delegates to PathResolver for consistent normalization.
-
-    Args:
-        path: The original path that doesn't exist
-
-    Returns:
-        A normalized path if a valid one is found, None otherwise
-
-    Note:
-        This function is maintained for backward compatibility.
-        New code should use PathResolver directly.
-    """
-    if not path or path.startswith("/") or path.startswith("~"):
-        return None  # Absolute paths shouldn't be normalized
-
-    try:
-        resolver = get_path_resolver()
-        result = resolver.resolve(path, must_exist=True)
-
-        # If the path was normalized, return the relative path
-        if result.was_normalized:
-            # Return relative path string
-            try:
-                return str(result.resolved_path.relative_to(Path.cwd()))
-            except ValueError:
-                return str(result.resolved_path)
-
-        return None
-    except FileNotFoundError:
-        # Path doesn't exist even after normalization - try legacy fallback
-        # for cases where we just want a normalized path string (not validation)
-        cwd = Path.cwd()
-        cwd_name = cwd.name
-
-        # Check if path starts with cwd name (common pattern)
-        if path.startswith(f"{cwd_name}/"):
-            stripped = path[len(cwd_name) + 1 :]
-            if stripped and (cwd / stripped).exists():
-                return stripped
-
-        # Try stripping first path component
-        parts = Path(path).parts
-        if len(parts) > 1:
-            stripped = str(Path(*parts[1:]))
-            if (cwd / stripped).exists():
-                return stripped
-
-        return None
-
-
-# ============================================================================
 # SESSION-LEVEL FILE CONTENT CACHE (P3-2)
 # ============================================================================
 # Prevents redundant file reads within a session. Especially helpful for
