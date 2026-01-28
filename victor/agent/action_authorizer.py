@@ -57,95 +57,11 @@ class ActionIntent(Enum):
 
 
 # =============================================================================
-# Tool Categories for Intent-Based Filtering
+# Metadata-Based Authorization
 # =============================================================================
-# These constants define which tools are allowed/blocked for each intent.
-# Single source of truth for tool filtering - update here when adding new tools.
-
-# DEPRECATED (Phase 5): Hard-coded tool lists are being replaced with metadata-based
-# authorization. Use MetadataActionAuthorizer and ToolAuthMetadataRegistry instead.
-#
-# Migration Path:
-#   OLD: Hard-coded tool lists (WRITE_TOOLS, READ_ONLY_TOOLS, etc.)
-#   NEW: ToolAuthMetadata with capabilities, safety, and domain
-#
-# The hard-coded lists are maintained for backward compatibility but will be
-# removed in Phase 7. New tools should define ToolAuthMetadata instead of
-# adding to these lists.
-
-import warnings
-
-# Tools that modify files - blocked for DISPLAY_ONLY and READ_ONLY intents
-# IMPORTANT: Keep in sync with victor.agent.safety.WRITE_TOOL_NAMES
-# DEPRECATED: Use ToolAuthMetadataRegistry with "file_write" capability instead
-WRITE_TOOLS: frozenset[str] = frozenset(
-    {
-        # Direct file modifications
-        "write_file",  # filesystem.py
-        "edit_files",  # file_editor_tool.py
-        # Patch/diff application
-        "apply_patch",  # patch_tool.py
-        # Bash execution (can modify files)
-        "execute_bash",  # bash.py
-        # Git write operations
-        "git",  # git_tool.py (commit, push, etc.)
-        # Refactoring (modifies files)
-        "refactor_rename_symbol",
-        "refactor_extract_function",
-        "refactor_inline_variable",
-        "refactor_organize_imports",
-        "rename_symbol",
-        # Scaffolding (creates files)
-        "scaffold",
-        # Batch operations
-        "batch",
-    }
-)
-
-# Tools that are safe for all intents (read-only operations)
-# DEPRECATED: Use ToolAuthMetadata with safety=ToolSafety.SAFE instead
-READ_ONLY_TOOLS: frozenset[str] = frozenset(
-    {
-        "read_file",
-        "list_directory",
-        "code_search",
-        "semantic_code_search",
-        "grep_search",
-        "find_files",
-        "git_status",
-        "git_log",
-        "git_diff",
-        "analyze_code",
-        "analyze_docs",
-        "web_search",
-        "web_fetch",
-    }
-)
-
-# Tools blocked for READ_ONLY intent (no code generation at all)
-# DEPRECATED: Use ToolAuthMetadata with "code_generation" capability instead
-GENERATION_TOOLS: frozenset[str] = frozenset(
-    {
-        "generate_code",
-        "generate_docs",
-        "refactor_code",
-    }
-)
-
-# Mapping of intent to blocked tool sets
-# DEPRECATED (Phase 5): Use get_metadata_blocked_tools() instead
-# Will be removed in Phase 7
-INTENT_BLOCKED_TOOLS: dict[ActionIntent, frozenset[str]] = {
-    ActionIntent.DISPLAY_ONLY: WRITE_TOOLS,
-    ActionIntent.READ_ONLY: WRITE_TOOLS | GENERATION_TOOLS,
-    ActionIntent.WRITE_ALLOWED: frozenset(),  # No restrictions
-    ActionIntent.AMBIGUOUS: frozenset(),  # Rely on prompt guard
-}
-
-
-# =============================================================================
-# Metadata-Based Authorization (Phase 5)
-# =============================================================================
+# Hard-coded tool lists removed in v0.5.1
+# All tools now use ToolAuthMetadataRegistry for authorization
+# See victor/tools/auth_metadata.py for metadata definitions
 
 def get_metadata_blocked_tools(intent: ActionIntent) -> frozenset[str]:
     """Get blocked tools using metadata-based authorization.
@@ -160,61 +76,37 @@ def get_metadata_blocked_tools(intent: ActionIntent) -> frozenset[str]:
     Returns:
         Frozenset of tool names that are blocked for the intent
 
+    Raises:
+        ImportError: If MetadataActionAuthorizer is not available
+
     Example:
         blocked_tools = get_metadata_blocked_tools(ActionIntent.DISPLAY_ONLY)
         if "write_file" in blocked_tools:
             print("write_file is blocked for DISPLAY_ONLY intent")
     """
-    try:
-        from victor.agent.metadata_authorizer import MetadataActionAuthorizer
+    from victor.agent.metadata_authorizer import MetadataActionAuthorizer
 
-        authorizer = MetadataActionAuthorizer()
-        blocked_tools = authorizer.get_blocked_tools(intent)
-        return frozenset(blocked_tools)
-    except ImportError:
-        # Metadata authorizer not available, fall back to hard-coded lists
-        logger.warning(
-            "MetadataActionAuthorizer not available, using hard-coded tool lists. "
-            "This will be removed in Phase 7."
-        )
-        return INTENT_BLOCKED_TOOLS.get(intent, frozenset())
+    authorizer = MetadataActionAuthorizer()
+    blocked_tools = authorizer.get_blocked_tools(intent)
+    return frozenset(blocked_tools)
 
 
-def get_blocked_tools_for_intent(
-    intent: ActionIntent, use_metadata: bool = False
-) -> frozenset[str]:
-    """Get blocked tools for an intent (legacy or metadata-based).
+def get_blocked_tools_for_intent(intent: ActionIntent) -> frozenset[str]:
+    """Get blocked tools for an intent using metadata-based authorization.
 
-    This function provides a migration path from hard-coded lists to
-    metadata-based authorization.
+    This is the canonical function for getting blocked tools.
+    Hard-coded tool lists have been removed in v0.5.1.
 
     Args:
         intent: User intent (ActionIntent enum)
-        use_metadata: If True, use metadata-based authorization;
-                     If False, use hard-coded lists (default for backward compatibility)
 
     Returns:
         Frozenset of tool names that are blocked for the intent
 
     Example:
-        # Legacy approach (hard-coded lists)
-        blocked = get_blocked_tools_for_intent(intent)
-
-        # New approach (metadata-based)
-        blocked = get_blocked_tools_for_intent(intent, use_metadata=True)
+        blocked = get_blocked_tools_for_intent(ActionIntent.DISPLAY_ONLY)
     """
-    if use_metadata:
-        return get_metadata_blocked_tools(intent)
-    else:
-        # Emit deprecation warning for hard-coded lists
-        warnings.warn(
-            "Using hard-coded tool lists (WRITE_TOOLS, etc.) is deprecated "
-            "and will be removed in Phase 7. Use use_metadata=True or "
-            "define ToolAuthMetadata for your tools instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return INTENT_BLOCKED_TOOLS.get(intent, frozenset())
+    return get_metadata_blocked_tools(intent)
 
 
 @dataclass
