@@ -67,11 +67,9 @@ from victor.core.verticals.protocols.providers import (
 # Phase 2.1: Protocol auto-registration decorator
 from victor.core.verticals.protocol_decorators import register_protocols
 
-# Phase 3: Import framework capabilities
-from victor.framework.capabilities import (
-    FileOperationsCapability,
-    PromptContributionCapability,
-)
+# Phase 3: Import framework capabilities (removed direct instantiation - use CapabilityInjector)
+# NOTE: Capabilities now obtained via get_capability_injector() in methods that need them
+# This follows the canonical pattern for capability access per DEPRECATION_MIGRATION_PLAN.md
 
 
 @register_protocols
@@ -135,15 +133,6 @@ class CodingAssistant(VerticalBase):
         "Software development assistant for code exploration, writing, and refactoring"
     )
     version: ClassVar[str] = "2.0.0"
-
-    # =========================================================================
-    # Phase 3: Framework Capabilities
-    # =========================================================================
-    # Framework prompt contributions (common hints like read_first, verify_changes)
-    _prompt_contrib = PromptContributionCapability()
-
-    # Framework file operations (read, write, edit, grep)
-    _file_ops = FileOperationsCapability()
 
     # =========================================================================
     # Extension Caching

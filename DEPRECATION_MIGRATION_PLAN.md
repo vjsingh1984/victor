@@ -64,7 +64,7 @@ grep -r "ToolDependencyProvider" victor/ --include="*.py" | grep -v "canonical\|
 
 ### 2. Direct Capability Instantiation
 
-**Status**: ⚠️ Migration Helpers Available, Partially Migrated
+**Status**: ✅ COMPLETE - All verticals migrated to CapabilityInjector pattern
 
 **Deprecated Pattern**:
 ```python
@@ -72,8 +72,7 @@ grep -r "ToolDependencyProvider" victor/ --include="*.py" | grep -v "canonical\|
 from victor.framework.capabilities import FileOperationsCapability
 
 class MyVertical(VerticalBase):
-    def __init__(self):
-        self._file_ops = FileOperationsCapability()
+    _file_ops = FileOperationsCapability()  # Class-level instantiation
 ```
 
 **Canonical API**:
@@ -90,22 +89,22 @@ class MyVertical(VerticalBase):
 ```
 
 **Files Using Deprecated Pattern**:
-- [ ] victor/coding/assistant.py - Check for direct instantiation
-- [ ] victor/devops/assistant.py - Check for direct instantiation
-- [ ] victor/research/assistant.py - ✅ Using injector
-- [ ] victor/dataanalysis/assistant.py - Check for direct instantiation
-- [ ] victor/rag/assistant.py - Check for direct instantiation
-- [ ] victor/security_analysis/assistant.py - Check for direct instantiation
+- [x] victor/coding/assistant.py - ✅ MIGRATED (removed class-level instantiation)
+- [x] victor/devops/assistant.py - ✅ No direct instantiation
+- [x] victor/research/assistant.py - ✅ Already using injector
+- [x] victor/dataanalysis/assistant.py - ✅ No direct instantiation
+- [x] victor/rag/assistant.py - ✅ No direct instantiation
+- [x] victor/security_analysis/assistant.py - ✅ No direct instantiation
 
 **Migration Steps**:
-1. Remove direct `FileOperationsCapability()` instantiation
-2. Use `get_capability_injector().get_file_operations_capability()`
-3. Apply `@deprecated_direct_instantiation` decorator during migration
+1. [x] Remove direct `FileOperationsCapability()` instantiation - DONE
+2. [x] Use `get_capability_injector().get_file_operations_capability()` - DONE (ResearchAssistant pattern)
+3. [ ] Apply `@deprecated_direct_instantiation` decorator to framework capabilities (v0.7.0)
 
 **Action Items**:
-1. [ ] Audit all verticals for direct capability instantiation
-2. [ ] Migrate all verticals to use CapabilityInjector
-3. [ ] Add `@deprecated_direct_instantiation` to framework capabilities
+1. [x] Audit all verticals for direct capability instantiation - COMPLETE
+2. [x] Migrate all verticals to use CapabilityInjector - COMPLETE
+3. [ ] Add `@deprecated_direct_instantiation` to framework capabilities (v0.7.0)
 4. [ ] Remove victor/core/verticals/capability_migration.py helpers (v0.7.0)
 
 ---
