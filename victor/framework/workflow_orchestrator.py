@@ -73,8 +73,11 @@ from typing import (
     Optional,
 )
 
-from victor.framework.protocols import ChatResultProtocol
-from victor.framework.protocols.chat_state import ChatResult, MutableChatState
+from victor.framework.protocols import (
+    ChatResultProtocol,
+    ChatResult,
+    MutableChatState,
+)
 from victor.providers.base import CompletionResponse, StreamChunk
 
 if TYPE_CHECKING:

@@ -771,6 +771,7 @@ class VerticalIntegrationPipeline:
         enable_cache: bool = True,
         cache_ttl: int = 3600,
         parallel_enabled: bool = False,
+        cache_service: Optional["VerticalIntegrationCache"] = None,
     ):
         """Initialize the pipeline.
 
@@ -783,6 +784,7 @@ class VerticalIntegrationPipeline:
             enable_cache: If True, enable configuration caching (default: True)
             cache_ttl: Cache time-to-live in seconds (default: 3600 = 1 hour)
             parallel_enabled: If True, enable parallel execution (Phase 2.2, default: False)
+            cache_service: Optional VerticalIntegrationCache service for SRP compliance
         """
         self._strict_mode: bool = strict_mode
         self._pre_hooks: List[Callable[[Any, type[Any]], None]] = (
@@ -796,8 +798,19 @@ class VerticalIntegrationPipeline:
         self._cache_ttl = cache_ttl
         self._parallel_enabled = parallel_enabled
 
-        # Initialize cache (eagerly, to avoid attribute errors in tests)
-        self._cache: Dict[str, bytes] = {}
+        # Initialize cache service (injected or created)
+        if cache_service is not None:
+            self._cache_service = cache_service
+        elif enable_cache:
+            # Import here to avoid circular dependency
+            from victor.core.cache import VerticalIntegrationCache
+
+            self._cache_service = VerticalIntegrationCache(ttl=cache_ttl, enable_cache=True)
+        else:
+            # Create disabled cache service for consistency
+            from victor.core.cache import VerticalIntegrationCache
+
+            self._cache_service = VerticalIntegrationCache(ttl=cache_ttl, enable_cache=False)
 
         # Initialize step handler registry
         self._step_registry: Optional["StepHandlerRegistry"] = None
@@ -858,22 +871,18 @@ class VerticalIntegrationPipeline:
 
         result.vertical_name = vertical_class.name
 
-        # Check cache for pre-computed integration (Phase 1: Caching)
+        # Check cache for pre-computed integration (Phase 1: Caching with SRP compliance)
         if self._enable_cache:
-            cache_key = self._generate_cache_key(vertical_class, config_overrides)
-            if cache_key:
-                cached_result = self._load_from_cache(cache_key)
-                if cached_result:
-                    logger.debug(
-                        f"Cache HIT for vertical '{vertical_class.name}' "
-                        f"(key: {cache_key[:16]}...)"
-                    )
-                    return cached_result
-                else:
-                    logger.debug(
-                        f"Cache MISS for vertical '{vertical_class.name}' "
-                        f"(key: {cache_key[:16]}...)"
-                    )
+            cached_result = self._cache_service.get(vertical_class, config_overrides)
+            if cached_result is not None:
+                logger.debug(
+                    f"Cache HIT for vertical '{vertical_class.name}'"
+                )
+                return cached_result
+            else:
+                logger.debug(
+                    f"Cache MISS for vertical '{vertical_class.name}'"
+                )
 
         # Run pre-hooks
         for hook in self._pre_hooks:
@@ -954,358 +963,11 @@ class VerticalIntegrationPipeline:
         # Note: result.persist() available for opt-in audit logging
         # Not called automatically to avoid duplication with EventBus
 
-        # Save to cache (Phase 1: Caching)
+        # Save to cache (Phase 1: Caching with SRP compliance)
         if self._enable_cache and result.success:
-            cache_key = self._generate_cache_key(vertical_class, config_overrides)
-            if cache_key:
-                self._save_to_cache(cache_key, result)
+            self._cache_service.set(vertical_class, config_overrides, result)
 
         return result
-
-    def _generate_cache_key(
-        self, vertical: Type["VerticalBase"], config_overrides: Optional[Dict[str, Any]] = None
-    ) -> Optional[str]:
-        """Generate stable cache key from vertical signature.
-
-        The key is based on:
-        1. Vertical name
-        2. Source code hash (for inline changes)
-        3. File modification time (for file changes)
-        4. Configuration overrides (for different configs of same vertical)
-
-        This ensures cache invalidation when vertical code changes or
-        different config_overrides are applied.
-
-        Args:
-            vertical: Vertical class
-            config_overrides: Optional configuration overrides to include in cache key
-
-        Returns:
-            Cache key string, or None if generation fails
-        """
-        try:
-            # Try to get source file via inspect.getfile()
-            # This works for normally imported modules
-            try:
-                source_file = Path(inspect.getfile(vertical))
-            except (TypeError, OSError):
-                # For dynamically loaded modules, try module.__file__
-                if hasattr(vertical, "__module__"):
-                    import sys
-
-                    module_name = vertical.__module__
-                    if module_name in sys.modules:
-                        module = sys.modules[module_name]
-                        if hasattr(module, "__file__") and module.__file__:
-                            source_file = Path(module.__file__)
-                        else:
-                            # Fallback to class-based key
-                            return self._generate_class_based_key(vertical, config_overrides)
-                    else:
-                        return self._generate_class_based_key(vertical, config_overrides)
-                else:
-                    return self._generate_class_based_key(vertical, config_overrides)
-
-            source_hash = self._hash_source_file(source_file)
-
-            # Combine into key
-            key_parts = [
-                f"vertical={vertical.name}",
-                f"source={source_hash}",
-            ]
-
-            # Include YAML config hash if available (Phase 2.3 fix)
-            yaml_path = self._find_yaml_config(vertical)
-            if yaml_path:
-                yaml_hash = self._hash_yaml_config(yaml_path)
-                key_parts.append(f"yaml={yaml_hash}")
-
-            # Include config_overrides hash if provided (Phase 1 fix)
-            if config_overrides:
-                overrides_hash = self._hash_dict(config_overrides)
-                key_parts.append(f"overrides={overrides_hash}")
-
-            key_string = "|".join(key_parts)
-            full_hash = hashlib.sha256(key_string.encode()).hexdigest()
-
-            # Version bump to v7 to indicate config_overrides-aware caching
-            return f"v7_{vertical.name}_{full_hash[:16]}"
-
-        except Exception as e:
-            logger.warning(f"Failed to generate cache key: {e}")
-            return None
-
-    def _generate_class_based_key(
-        self, vertical: Type["VerticalBase"], config_overrides: Optional[Dict[str, Any]] = None
-    ) -> Optional[str]:
-        """Generate cache key from class properties when source file unavailable.
-
-        This is a fallback for dynamically loaded classes or built-in classes.
-        It attempts to include file hash if the module has a __file__ attribute.
-
-        Args:
-            vertical: Vertical class
-            config_overrides: Optional configuration overrides to include in cache key
-
-        Returns:
-            Cache key string
-        """
-        try:
-            # First, try to get file hash from module
-            if hasattr(vertical, "__module__"):
-                import sys
-
-                module_name = vertical.__module__
-
-                # Try to get module from sys.modules first
-                module = sys.modules.get(module_name)
-
-                # If not in sys.modules, try to get module via inspect
-                if not module:
-                    try:
-                        import inspect
-
-                        # Get module from class using inspect
-                        module = inspect.getmodule(vertical)
-                    except Exception:
-                        pass
-
-                # If we have a module with __file__, use it for hashing
-                if module and hasattr(module, "__file__") and module.__file__:
-                    try:
-                        source_file = Path(module.__file__)
-                        if source_file.exists():
-                            file_hash = self._hash_source_file(source_file)
-                            # Use file hash as primary key component
-                            key_parts = [
-                                f"vertical={vertical.name}",
-                                f"module={module_name}",
-                                f"file={file_hash}",
-                            ]
-
-                            # Include YAML config hash if available (Phase 2.3 fix)
-                            yaml_path = self._find_yaml_config(vertical)
-                            if yaml_path:
-                                yaml_hash = self._hash_yaml_config(yaml_path)
-                                key_parts.append(f"yaml={yaml_hash}")
-
-                            # Include config_overrides hash if provided (Phase 1 fix)
-                            if config_overrides:
-                                overrides_hash = self._hash_dict(config_overrides)
-                                key_parts.append(f"overrides={overrides_hash}")
-
-                            key_string = "|".join(key_parts)
-                            full_hash = hashlib.sha256(key_string.encode()).hexdigest()
-                            # Version bump to v8 to indicate config_overrides-aware caching
-                            return f"v8_{vertical.name}_{full_hash[:16]}"
-                    except Exception:
-                        pass  # Fall back to id-based key
-
-            # Fallback: use class id (won't detect file changes, but stable)
-            key_parts = [
-                f"vertical={vertical.name}",
-                f"id={id(vertical)}",
-                f"module={vertical.__module__}",
-            ]
-
-            # Include config_overrides hash if provided (Phase 1 fix)
-            if config_overrides:
-                overrides_hash = self._hash_dict(config_overrides)
-                key_parts.append(f"overrides={overrides_hash}")
-
-            key_string = "|".join(key_parts)
-            full_hash = hashlib.sha256(key_string.encode()).hexdigest()
-            return f"v9_{vertical.name}_{full_hash[:16]}"
-
-        except Exception:
-            # Ultimate fallback with config_overrides
-            try:
-                key_parts = [f"vertical={vertical.name}", f"id={id(vertical)}"]
-                if config_overrides:
-                    overrides_hash = self._hash_dict(config_overrides)
-                    key_parts.append(f"overrides={overrides_hash}")
-                key_string = "|".join(key_parts)
-                full_hash = hashlib.sha256(key_string.encode()).hexdigest()
-                return f"v10_{vertical.name}_{full_hash[:16]}"
-            except Exception:
-                return f"v11_{vertical.name}_{id(vertical)}"
-
-    def _hash_source_file(self, source_file: Path) -> str:
-        """Hash source file content and metadata.
-
-        Args:
-            source_file: Path to Python source file
-
-        Returns:
-            Hex digest hash combining content and mtime
-        """
-        try:
-            # File content hash (first 16 bytes for performance)
-            with open(source_file, "rb") as f:
-                content_hash = hashlib.sha256(f.read(16384)).hexdigest()[:16]
-
-            # Modification time (for file changes)
-            mtime = source_file.stat().st_mtime_ns
-            mtime_hash = hashlib.sha256(str(mtime).encode()).hexdigest()[:8]
-
-            return f"{content_hash}_{mtime_hash}"
-
-        except Exception as e:
-            logger.warning(f"Failed to hash source file {source_file}: {e}")
-            return f"unknown_{hash(source_file)}"
-
-    def _hash_dict(self, data: Dict[str, Any]) -> str:
-        """Hash dictionary for config overrides.
-
-        Args:
-            data: Dictionary to hash
-
-        Returns:
-            Hex digest hash of sorted dictionary items
-        """
-        try:
-            # Sort keys for stable hash regardless of dict ordering
-            # Use JSON for consistent serialization
-            sorted_json = json.dumps(data, sort_keys=True)
-            return hashlib.sha256(sorted_json.encode()).hexdigest()[:16]
-        except Exception as e:
-            logger.warning(f"Failed to hash dict: {e}")
-            return f"unknown_{hash(str(data))}"
-
-    def _find_yaml_config(self, vertical: Type["VerticalBase"]) -> Optional[Path]:
-        """Find YAML config file for a vertical.
-
-        Verticals can have their configuration in YAML files located in:
-        - {vertical_module}/config/vertical.yaml
-        - {vertical_dir}/vertical.yaml
-
-        Args:
-            vertical: Vertical class
-
-        Returns:
-            Path to YAML config file, or None if not found
-        """
-        try:
-            # Get module path
-            if hasattr(vertical, "__module__"):
-                import sys
-
-                module_name = vertical.__module__
-                module = sys.modules.get(module_name)
-
-                if module and hasattr(module, "__file__") and module.__file__:
-                    module_file = Path(module.__file__)
-                    module_dir = module_file.parent
-
-                    # Try config/vertical.yaml
-                    yaml_path = module_dir / "config" / "vertical.yaml"
-                    if yaml_path.exists():
-                        return yaml_path
-
-                    # Try vertical.yaml in same directory
-                    yaml_path = module_dir / "vertical.yaml"
-                    if yaml_path.exists():
-                        return yaml_path
-
-            # Try get_config_path() if vertical has it
-            if hasattr(vertical, "get_config_path"):
-                config_path = vertical.get_config_path()
-                if config_path and Path(config_path).exists():
-                    return Path(config_path)
-
-        except Exception as e:
-            logger.debug(f"Failed to find YAML config for {vertical.name}: {e}")
-
-        return None
-
-    def _hash_yaml_config(self, yaml_path: Path) -> str:
-        """Hash YAML config file.
-
-        Args:
-            yaml_path: Path to YAML config file
-
-        Returns:
-            Hex digest hash of the YAML file
-        """
-        try:
-            with open(yaml_path, "rb") as f:
-                content_hash = hashlib.sha256(f.read()).hexdigest()[:16]
-
-            mtime = yaml_path.stat().st_mtime_ns
-            mtime_hash = hashlib.sha256(str(mtime).encode()).hexdigest()[:8]
-
-            return f"{content_hash}_{mtime_hash}"
-
-        except Exception as e:
-            logger.warning(f"Failed to hash YAML config {yaml_path}: {e}")
-            return "unknown"
-
-    def _load_from_cache(self, cache_key: str) -> Optional["IntegrationResult"]:
-        """Load integration result from in-memory cache.
-
-        Args:
-            cache_key: Cache key
-
-        Returns:
-            Cached IntegrationResult or None
-        """
-        # Simple in-memory cache using JSON serialization
-        # Note: Uses to_dict()/from_dict() to avoid pickle issues with
-        # unpicklable middleware objects. The context is NOT cached.
-        cached_data = self._cache.get(cache_key)
-        if cached_data:
-            try:
-                result = IntegrationResult.from_dict(json.loads(cached_data))
-
-                # Log metrics
-                logger.debug(f"Loaded cached integration: {cache_key}")
-                return result
-
-            except (json.JSONDecodeError, TypeError, KeyError) as e:
-                logger.warning(f"Failed to load from cache: {e}")
-                # Clear corrupted cache entry
-                del self._cache[cache_key]
-
-        return None
-
-    def _save_to_cache(self, cache_key: str, result: "IntegrationResult") -> None:
-        """Save integration result to in-memory cache.
-
-        Uses JSON serialization via to_dict() to avoid pickle issues with
-        unpicklable middleware objects. Note: The VerticalContext is NOT
-        cached as it contains unpicklable references.
-
-        Args:
-            cache_key: Cache key
-            result: Integration result to cache
-        """
-        try:
-            # Serialize result using JSON (avoids pickle issues)
-            data = json.dumps(result.to_dict())
-
-            # Save to cache
-            if not hasattr(self, "_cache"):
-                object.__setattr__(self, "_cache", {})
-
-            dict_val = object.__getattribute__(self, "_cache")
-            dict_val[cache_key] = data
-
-            # Enforce TTL by storing timestamp
-            if not hasattr(self, "_cache_timestamps"):
-                self._cache_timestamps: Dict[str, float] = {}
-            # Use event loop time if available, otherwise use wall clock time
-            try:
-                self._cache_timestamps[cache_key] = asyncio.get_event_loop().time()
-            except RuntimeError:
-                # No event loop running, fall back to wall clock time
-                import time
-
-                self._cache_timestamps[cache_key] = time.time()
-
-            logger.debug(f"Cached integration result: {cache_key}")
-
-        except (TypeError, ValueError) as e:
-            logger.warning(f"Failed to save to cache: {e}")
 
     async def apply_async(
         self,
@@ -1338,22 +1000,18 @@ class VerticalIntegrationPipeline:
             result.add_error(f"Vertical not found: {vertical}")
             return result
 
-        # Check cache first (Phase 1)
+        # Check cache first (Phase 1: Caching with SRP compliance)
         if self._enable_cache:
-            cache_key = self._generate_cache_key(vertical_cls, config_overrides)
-            if cache_key:
-                cached_result = self._load_from_cache(cache_key)
-                if cached_result:
-                    logger.debug(
-                        f"Cache HIT for vertical '{vertical_cls.name}' "
-                        f"(key: {cache_key[:16]}...)"
-                    )
-                    return cached_result
-                else:
-                    logger.debug(
-                        f"Cache MISS for vertical '{vertical_cls.name}' "
-                        f"(key: {cache_key[:16]}...)"
-                    )
+            cached_result = self._cache_service.get(vertical_cls, config_overrides)
+            if cached_result is not None:
+                logger.debug(
+                    f"Cache HIT for vertical '{vertical_cls.name}'"
+                )
+                return cached_result
+            else:
+                logger.debug(
+                    f"Cache MISS for vertical '{vertical_cls.name}'"
+                )
 
         # Create context and result
         result = IntegrationResult(vertical_name=vertical_cls.name)
@@ -1405,11 +1063,9 @@ class VerticalIntegrationPipeline:
                         exc_info=True,
                     )
 
-        # Cache result (Phase 1)
+        # Cache result (Phase 1: Caching with SRP compliance)
         if self._enable_cache and result.success:
-            cache_key = self._generate_cache_key(vertical_cls, config_overrides)
-            if cache_key:
-                self._save_to_cache(cache_key, result)
+            self._cache_service.set(vertical_cls, config_overrides, result)
 
         return result
 

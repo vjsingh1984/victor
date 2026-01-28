@@ -60,6 +60,7 @@ import asyncio
 import json
 import logging
 import time
+import warnings
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, cast
 
@@ -2858,6 +2859,16 @@ class AgentOrchestrator(
                 return await self._chat_coordinator.chat(user_message)
 
         # Legacy path via ChatCoordinator
+        # Phase 7: Deprecation warning for legacy chat path
+        if not getattr(self._settings, "use_workflow_chat", False):
+            warnings.warn(
+                "Legacy chat path is deprecated. "
+                "Set VICTOR_USE_WORKFLOW_CHAT=true to use the new workflow-based chat. "
+                "Legacy chat will be removed in v1.0.0. "
+                "See PHASE7_COMPLETION_REPORT.md for migration guide.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         return await self._chat_coordinator.chat(user_message)
 
     # NOTE: Dead code removed - chat logic delegated to ChatCoordinator
@@ -2896,6 +2907,16 @@ class AgentOrchestrator(
                 # Continue to legacy path
 
         # Legacy path via ChatCoordinator
+        # Phase 7: Deprecation warning for legacy streaming path
+        if not getattr(self._settings, "use_workflow_chat", False):
+            warnings.warn(
+                "Legacy streaming path is deprecated. "
+                "Set VICTOR_USE_WORKFLOW_CHAT=true to use the new workflow-based chat. "
+                "Legacy streaming will be removed in v1.0.0. "
+                "See PHASE7_COMPLETION_REPORT.md for migration guide.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         async for chunk in self._chat_coordinator.stream_chat(user_message):
             yield chunk
 

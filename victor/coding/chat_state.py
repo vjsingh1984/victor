@@ -42,7 +42,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
-from victor.framework.protocols.chat_state import MutableChatState
+from victor.framework.protocols import MutableChatState
 
 logger = logging.getLogger(__name__)
 

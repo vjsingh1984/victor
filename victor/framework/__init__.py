@@ -59,11 +59,13 @@ from typing import Any
 from victor.framework.agent import Agent, ChatSession
 from victor.framework.config import AgentConfig
 from victor.framework.protocols import (
+    ChatResult,
     ChatResultProtocol,
     ChatStateProtocol,
     ChunkType,
     ConversationStateProtocol,
     MessagesProtocol,
+    MutableChatState,
     OrchestratorProtocol,
     OrchestratorStreamChunk,
     ProviderProtocol,
@@ -506,6 +508,9 @@ __all__ = (
         "ChatStateProtocol",
         "ChatResultProtocol",
         "WorkflowChatProtocol",
+        # Chat State Implementations (Phase 1)
+        "ChatResult",
+        "MutableChatState",
         # Events
         "EventType",
         "content_event",

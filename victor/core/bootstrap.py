@@ -263,6 +263,23 @@ def _register_core_services(container: ServiceContainer, settings: Settings) -> 
         ServiceLifetime.SINGLETON,
     )
 
+    # Vertical Integration Cache (SOLID improvement - SRP compliance)
+    try:
+        from victor.core.cache import VerticalIntegrationCache
+
+        container.register(
+            VerticalIntegrationCache,
+            lambda c: VerticalIntegrationCache(
+                ttl=getattr(settings, "vertical_cache_ttl", 3600),
+                enable_cache=getattr(settings, "vertical_cache_enabled", True),
+                max_size=getattr(settings, "vertical_cache_max_size", 100),
+            ),
+            ServiceLifetime.SINGLETON,
+        )
+        logger.debug("Registered vertical integration cache service")
+    except ImportError as e:
+        logger.warning(f"Failed to register vertical integration cache: {e}")
+
 
 def _register_registry_services(container: ServiceContainer, settings: Settings) -> None:
     """Register universal registry system for framework-wide entity management.

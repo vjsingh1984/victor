@@ -397,12 +397,17 @@ class BaseTool(ABC):
         return schema
 
     @abstractmethod
-    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(
+        self,
+        _exec_ctx: Optional[Dict[str, Any]] = None,
+        **kwargs: Any
+    ) -> ToolResult:
         """Execute the tool.
 
         Args:
             _exec_ctx: Framework execution context (reserved name to avoid collision
                       with tool parameters). Contains shared resources like code_manager.
+                      Optional for backward compatibility with tests.
             **kwargs: Tool parameters
 
         Returns:

@@ -32,23 +32,39 @@ Usage:
     )
 
     # Use in VerticalIntegrationPipeline
-    result, hit = cache.get_or_compute(vertical_class, config_overrides, compute_func)
+    result = cache.get(vertical_class, config_overrides)
+    if result is None:
+        result = compute_integration()
+        cache.set(vertical_class, config_overrides, result)
 """
 
 import hashlib
 import json
 import logging
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple, Type, TYPE_CHECKING
-
-from victor.core.cache.semantic_cache import SemanticCache
-from victor.core.cache.config import CacheConfig
+from typing import Any, Dict, Optional, Tuple, Type, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.vertical_integration import IntegrationResult
 
 logger = logging.getLogger(__name__)
+
+
+class _CacheEntry:
+    """Internal cache entry with TTL support."""
+
+    __slots__ = ["value", "expires_at"]
+
+    def __init__(self, value: Any, ttl: int):
+        self.value = value
+        self.expires_at = time.time() + ttl
+
+    def is_expired(self) -> bool:
+        """Check if entry has expired."""
+        return time.time() > self.expires_at
 
 
 class VerticalIntegrationCache:
@@ -64,33 +80,29 @@ class VerticalIntegrationCache:
     Args:
         ttl: Cache time-to-live in seconds (default: 3600 = 1 hour)
         enable_cache: Whether caching is enabled (default: True)
-        cache_dir: Optional directory for persistent cache (default: None = in-memory only)
+        max_size: Maximum number of cache entries (default: 100)
     """
 
     def __init__(
         self,
         ttl: int = 3600,
         enable_cache: bool = True,
-        cache_dir: Optional[Path] = None,
+        max_size: int = 100,
     ):
         """Initialize vertical integration cache.
 
         Args:
             ttl: Time-to-live for cache entries in seconds
             enable_cache: Whether caching is enabled
-            cache_dir: Optional directory for persistent cache (for multi-process scenarios)
+            max_size: Maximum number of cache entries (default: 100)
         """
         self._enable_cache = enable_cache
         self._ttl = ttl
+        self._max_size = max_size
 
-        # Create backing cache
-        self._cache = SemanticCache(
-            cache_name="vertical_integration",
-            max_size=100,  # Typical: < 20 verticals in most applications
-            ttl=ttl,
-            persistent=cache_dir is not None,
-            cache_dir=cache_dir or None,
-        )
+        # Thread-safe in-memory cache
+        self._cache: Dict[str, _CacheEntry] = {}
+        self._lock = threading.RLock()
 
         # Statistics
         self._hits = 0
@@ -142,24 +154,37 @@ class VerticalIntegrationCache:
 
         try:
             key = self.generate_key(vertical_class, config_overrides)
-            cached = self._cache.get(key)
 
-            if cached is not None:
-                # Check if cache is still valid (not expired)
-                # SemanticCache handles TTL automatically
-                self._hits += 1
+            with self._lock:
+                entry = self._cache.get(key)
+
+                if entry is not None:
+                    # Check if cache entry has expired
+                    if entry.is_expired():
+                        # Remove expired entry
+                        del self._cache[key]
+                        self._misses += 1
+                        logger.debug(
+                            f"Cache EXPIRED for {vertical_class.__name__}: "
+                            f"key={key[:8]}... (hits={self._hits}, misses={self._misses})"
+                        )
+                        return None
+
+                    # Cache hit
+                    self._hits += 1
+                    logger.debug(
+                        f"Cache HIT for {vertical_class.__name__}: "
+                        f"key={key[:8]}... (hits={self._hits}, misses={self._misses})"
+                    )
+                    return entry.value
+
+                # Cache miss
+                self._misses += 1
                 logger.debug(
-                    f"Cache HIT for {vertical_class.__name__}: "
+                    f"Cache MISS for {vertical_class.__name__}: "
                     f"key={key[:8]}... (hits={self._hits}, misses={self._misses})"
                 )
-                return cached
-
-            self._misses += 1
-            logger.debug(
-                f"Cache MISS for {vertical_class.__name__}: "
-                f"key={key[:8]}... (hits={self._hits}, misses={self._misses})"
-            )
-            return None
+                return None
 
         except Exception as e:
             logger.warning(f"Cache get failed for {vertical_class.__name__}: {e}")
@@ -184,17 +209,28 @@ class VerticalIntegrationCache:
 
         try:
             key = self.generate_key(vertical_class, config_overrides)
-            self._cache.set(key, result)
-            logger.debug(
-                f"Cached {vertical_class.__name__}: "
-                f"key={key[:8]}... (TTL={self._ttl}s)"
-            )
+
+            with self._lock:
+                # Enforce max size by evicting oldest entry if needed
+                if len(self._cache) >= self._max_size and key not in self._cache:
+                    # Remove first (oldest) entry
+                    oldest_key = next(iter(self._cache))
+                    del self._cache[oldest_key]
+                    logger.debug(f"Cache evicted oldest entry (max_size={self._max_size})")
+
+                # Store new entry
+                self._cache[key] = _CacheEntry(result, self._ttl)
+                logger.debug(
+                    f"Cached {vertical_class.__name__}: "
+                    f"key={key[:8]}... (TTL={self._ttl}s)"
+                )
         except Exception as e:
             logger.warning(f"Cache set failed for {vertical_class.__name__}: {e}")
 
     def clear(self) -> None:
         """Clear all cached integration results."""
-        self._cache.clear()
+        with self._lock:
+            self._cache.clear()
         self._hits = 0
         self._misses = 0
         logger.info("Vertical integration cache cleared")
@@ -232,7 +268,7 @@ class VerticalIntegrationCache:
 def create_vertical_integration_cache(
     ttl: int = 3600,
     enable_cache: bool = True,
-    cache_dir: Optional[Path] = None,
+    max_size: int = 100,
 ) -> VerticalIntegrationCache:
     """Factory function to create VerticalIntegrationCache.
 
@@ -241,7 +277,7 @@ def create_vertical_integration_cache(
     Args:
         ttl: Cache time-to-live in seconds (default: 3600)
         enable_cache: Whether caching is enabled (default: True)
-        cache_dir: Optional directory for persistent cache
+        max_size: Maximum number of cache entries (default: 100)
 
     Returns:
         Configured VerticalIntegrationCache instance
@@ -249,5 +285,5 @@ def create_vertical_integration_cache(
     return VerticalIntegrationCache(
         ttl=ttl,
         enable_cache=enable_cache,
-        cache_dir=cache_dir,
+        max_size=max_size,
     )

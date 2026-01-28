@@ -19,7 +19,7 @@ audit logging, compliance checking, and report generation.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from victor.core.security.audit import (
     AuditManager,
@@ -168,7 +168,11 @@ Actions:
             ],
         )
 
-    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(
+        self,
+        _exec_ctx: Optional[Dict[str, Any]] = None,
+        **kwargs: Any
+    ) -> ToolResult:
         """Execute audit action."""
         action = kwargs.get("action", "summary")
         framework_str = kwargs.get("framework")
