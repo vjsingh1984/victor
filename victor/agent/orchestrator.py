@@ -119,7 +119,6 @@ from victor.agent.orchestrator_imports import (
     ConversationStateMachine,
     ConversationStage,
     ActionIntent,
-    INTENT_BLOCKED_TOOLS,
     get_task_type_hint,
     SystemPromptBuilder,
     SearchRoute,

@@ -150,7 +150,6 @@ __all__ = [
     "ConversationStateMachine",
     "ConversationStage",
     "ActionIntent",
-    "INTENT_BLOCKED_TOOLS",
     "get_task_type_hint",
     "SystemPromptBuilder",
     "SearchRoute",
@@ -376,7 +375,7 @@ from victor.config.model_capabilities import ToolCallingMatrix
 
 from victor.agent.conversation_state import ConversationStateMachine
 from victor.agent.conversation_state import ConversationStage  # noqa: F401
-from victor.agent.action_authorizer import ActionIntent, INTENT_BLOCKED_TOOLS
+from victor.agent.action_authorizer import ActionIntent
 from victor.agent.prompt_builder import get_task_type_hint, SystemPromptBuilder
 from victor.agent.search_router import SearchRoute, SearchType
 from victor.framework.task import TaskComplexity, DEFAULT_BUDGETS
