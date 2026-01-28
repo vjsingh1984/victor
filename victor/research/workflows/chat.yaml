@@ -1,0 +1,195 @@
+# Research Chat Workflow
+# This workflow defines agentic chat for Research tasks
+
+workflows:
+  research_chat:
+    description: "Agentic chat workflow for research operations"
+    version: "1.0"
+
+    # StateGraph schema for type safety
+    state_schema:
+      type: object
+      properties:
+        user_message: {type: string}
+        conversation_history: {type: array}
+        iteration_count: {type: integer, default: 0}
+        max_iterations: {type: integer, default: 50}
+        research_query: {type: string}
+        research_type: {type: string}
+        sources_found: {type: array}
+        pending_tool_calls: {type: array}
+        completed_tool_results: {type: array}
+
+    nodes:
+      # Node 1: Understand research request
+      - id: understand_request
+        type: agent
+        role: research_analyzer
+        goal: "Understand the research request and extract requirements"
+        tools: [web_search, read]
+        output:
+          research_query: "string"
+          research_type: "string"
+          search_depth: "string"
+        next: [check_research_type]
+
+      # Node 2: Check research type
+      - id: check_research_type
+        type: condition
+        condition: "research_type_check"
+        branches:
+          "quick": quick_search
+          "deep": deep_research_plan
+          "fact_check": fact_check_search
+
+      # Node 3: Quick search for simple queries
+      - id: quick_search
+        type: agent
+        role: researcher
+        goal: "Perform quick web search for immediate answers"
+        tools: [web_search, web_fetch]
+        output:
+          search_results: "array"
+          answer_found: "boolean"
+        next: [check_answer_quality]
+
+      # Node 4: Plan deep research
+      - id: deep_research_plan
+        type: agent
+        role: research_planner
+        goal: "Create comprehensive research plan with multiple sources"
+        tools: [web_search, read]
+        output:
+          search_plan: "array"
+          source_types: "array"
+        next: [execute_parallel_search]
+
+      # Node 5: Fact check search
+      - id: fact_check_search
+        type: agent
+        role: fact_checker
+        goal: "Verify claims with multiple credible sources"
+        tools: [web_search, web_fetch]
+        output:
+          verification_results: "array"
+          claim_status: "string"
+        next: [verify_sources]
+
+      # Node 6: Execute parallel search (deep research)
+      - id: execute_parallel_search
+        type: agent
+        role: researcher
+        goal: "Execute parallel search across multiple source types"
+        tools: [web_search, web_fetch, read]
+        output:
+          sources: "array"
+          total_sources: "integer"
+        next: [evaluate_sources]
+
+      # Node 7: Evaluate source quality
+      - id: evaluate_sources
+        type: agent
+        role: analyst
+        goal: "Evaluate source credibility and relevance"
+        tools: [read]
+        output:
+          validated_sources: "array"
+          quality_score: "number"
+        next: [check_source_coverage]
+
+      # Node 8: Check answer quality (quick search)
+      - id: check_answer_quality
+        type: condition
+        condition: "answer_quality_check"
+        branches:
+          "sufficient": synthesize_findings
+          "insufficient": deep_research_plan
+
+      # Node 9: Check source coverage
+      - id: check_source_coverage
+        type: condition
+        condition: "source_coverage_check"
+        branches:
+          "adequate": synthesize_findings
+          "inadequate": execute_parallel_search
+
+      # Node 10: Verify sources (fact check)
+      - id: verify_sources
+        type: agent
+        role: analyst
+        goal: "Cross-verify information across multiple sources"
+        tools: [web_search, web_fetch]
+        output:
+          verification_status: "string"
+          confidence_level: "string"
+        next: [synthesize_findings]
+
+      # Node 11: Synthesize findings
+      - id: synthesize_findings
+        type: agent
+        role: analyst
+        goal: "Synthesize research findings into coherent response"
+        tools: [web_search, web_fetch, read]
+        output:
+          synthesis: "string"
+          key_points: "array"
+          citations: "array"
+        next: [check_for_more_info]
+
+      # Node 12: Check if more information needed
+      - id: check_for_more_info
+        type: condition
+        condition: "can_continue_research_iteration"
+        branches:
+          "continue": generate_response
+          "max_reached": finalize_research
+
+      # Node 13: Generate response
+      - id: generate_response
+        type: agent
+        role: writer
+        goal: "Generate research response with sources"
+        tools: [write, edit]
+        output:
+          content: "string"
+          tool_calls: "list"
+        next: [check_for_tool_calls]
+
+      # Node 14: Check for tool calls
+      - id: check_for_tool_calls
+        type: condition
+        condition: "has_pending_tool_calls"
+        branches:
+          "has_tools": execute_tools
+          "no_tools": update_conversation
+
+      # Node 15: Execute tools
+      - id: execute_tools
+        type: tool_execution
+        tools: "{{tool_calls}}"
+        next: [update_conversation]
+
+      # Node 16: Update conversation
+      - id: update_conversation
+        type: transform
+        transform: update_research_conversation
+        output:
+          iteration_count: "{{iteration_count + 1}}"
+        next: [synthesize_findings]
+
+      # Node 17: Finalize and report
+      - id: finalize_research
+        type: transform
+        transform: finalize_research_chat
+        output:
+          final_response: "string"
+          research_summary: "object"
+          sources: "array"
+          citations: "array"
+        next: [__end__]
+
+    # Default values
+    defaults:
+      max_iterations: 50
+      search_depth: "standard"
+      research_type: "general"

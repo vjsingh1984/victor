@@ -369,7 +369,7 @@ class StreamingChatHandler:
         """Handle an empty response from the model.
 
         Tracks consecutive empty responses and takes action based on context.
-        - First 2 attempts: Encourage tool use with stronger language
+        - First 2 attempts: Just track, no action (returns None)
         - 3rd attempt: Force summary to prevent infinite loops
 
         Args:
@@ -378,38 +378,16 @@ class StreamingChatHandler:
         Returns:
             IterationResult if action needed, None otherwise
         """
-        consecutive_empty = ctx.record_empty_response()
+        threshold_exceeded = ctx.record_empty_response()
 
-        # Early attempts (1-2): Strongly encourage tool use
-        if consecutive_empty <= 2:
-            logger.warning(
-                f"Model returned empty response (attempt {consecutive_empty}/3). "
-                "Encouraging tool use with stronger guidance."
-            )
-            result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
-
-            # Add increasingly strong encouragement
-            if consecutive_empty == 1:
-                encouragement = (
-                    "IMPORTANT: You must use tools to answer this question. "
-                    "Your previous response was empty. Please call the appropriate tool(s) "
-                    "to gather information, then provide a response based on the actual tool output."
-                )
-            else:  # consecutive_empty == 2
-                encouragement = (
-                    "CRITICAL: You returned an empty response AGAIN. "
-                    "You MUST use tools to complete this task. "
-                    "Do not provide a text response without first calling tools. "
-                    "Select and execute the appropriate tool(s) now."
-                )
-
-            self.message_adder.add_message("user", encouragement)
-            return result
+        # Early attempts (1-2): Just track, don't take action yet
+        if not threshold_exceeded:
+            return None
 
         # Third attempt: Force summary to prevent infinite loop
         logger.warning(
-            f"Model stuck with {consecutive_empty} consecutive "
-            "empty responses - forcing summary after tool use encouragement failed"
+            f"Model stuck with {ctx.consecutive_empty_responses} consecutive "
+            "empty responses - forcing summary"
         )
         result = IterationResult(action=IterationAction.YIELD_AND_CONTINUE)
         result.add_chunk(

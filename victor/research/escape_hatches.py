@@ -323,36 +323,234 @@ def format_bibliography(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # =============================================================================
+# Chat Workflow Escape Hatches
+# =============================================================================
+
+
+def research_type_check(ctx: Dict[str, Any]) -> str:
+    """Determine research type for workflow routing.
+
+    Args:
+        ctx: Workflow context with keys:
+            - research_type (str): Type from understand_request
+            - user_message (str): Original user message
+
+    Returns:
+        "quick", "deep", or "fact_check"
+    """
+    research_type = ctx.get("research_type", "").lower()
+
+    if research_type in ["quick", "simple", "basic"]:
+        return "quick"
+
+    if research_type in ["fact", "verify", "check", "confirm"]:
+        return "fact_check"
+
+    return "deep"
+
+
+def answer_quality_check(ctx: Dict[str, Any]) -> str:
+    """Check if answer quality is sufficient.
+
+    Args:
+        ctx: Workflow context with keys:
+            - answer_found (bool): Whether answer was found
+            - confidence_level (str): Confidence in answer
+            - search_results (list): Search results
+
+    Returns:
+        "sufficient" or "insufficient"
+    """
+    answer_found = ctx.get("answer_found", False)
+    confidence = ctx.get("confidence_level", "").lower()
+
+    if answer_found and confidence in ["high", "very_high"]:
+        return "sufficient"
+
+    return "insufficient"
+
+
+def source_coverage_chat_check(ctx: Dict[str, Any]) -> str:
+    """Check if source coverage is adequate for chat workflow.
+
+    Args:
+        ctx: Workflow context with keys:
+            - validated_sources (list): Validated sources
+            - quality_score (float): Average quality score
+
+    Returns:
+        "adequate" or "inadequate"
+    """
+    sources = ctx.get("validated_sources", [])
+    quality_score = ctx.get("quality_score", 0)
+
+    if len(sources) >= 3 and quality_score >= 0.6:
+        return "adequate"
+
+    return "inadequate"
+
+
+def can_continue_research_iteration(ctx: Dict[str, Any]) -> str:
+    """Check if workflow can continue with another iteration.
+
+    Args:
+        ctx: Workflow context with keys:
+            - iteration_count (int): Current iteration count
+            - max_iterations (int): Maximum allowed iterations
+
+    Returns:
+        "continue" or "max_reached"
+    """
+    iteration = ctx.get("iteration_count", 0)
+    max_iter = ctx.get("max_iterations", 50)
+
+    if iteration < max_iter:
+        return "continue"
+    return "max_reached"
+
+
+def has_pending_tool_calls(ctx: Dict[str, Any]) -> str:
+    """Check if there are pending tool calls to execute.
+
+    Args:
+        ctx: Workflow context with keys:
+            - tool_calls (list): Tool calls from agent response
+            - pending_tool_calls (list): Pending tool calls
+
+    Returns:
+        "has_tools" or "no_tools"
+    """
+    tool_calls = ctx.get("tool_calls", [])
+    pending = ctx.get("pending_tool_calls", [])
+
+    if tool_calls or pending:
+        return "has_tools"
+    return "no_tools"
+
+
+def update_research_conversation(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Update conversation with tool results from execution.
+
+    Args:
+        ctx: Workflow context with tool execution results
+
+    Returns:
+        Updated conversation state
+    """
+    conversation_history = ctx.get("conversation_history", [])
+    content = ctx.get("content", "")
+    tool_calls = ctx.get("tool_calls", [])
+    tool_results = ctx.get("tool_results", [])
+
+    # Add assistant message with tool calls
+    if tool_calls:
+        conversation_history.append({
+            "role": "assistant",
+            "content": content,
+            "tool_calls": tool_calls,
+        })
+
+        # Add tool results
+        for result in tool_results:
+            conversation_history.append({
+                "role": "tool",
+                "content": str(result),
+            })
+
+    # Increment iteration count
+    iteration_count = ctx.get("iteration_count", 0) + 1
+
+    return {
+        "conversation_history": conversation_history,
+        "iteration_count": iteration_count,
+        "last_content": content,
+    }
+
+
+def finalize_research_chat(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Format final research chat response for user.
+
+    Args:
+        ctx: Workflow context with all conversation data
+
+    Returns:
+        Formatted final response
+    """
+    content = ctx.get("content", "")
+    iteration_count = ctx.get("iteration_count", 0)
+    synthesis = ctx.get("synthesis", "")
+    key_points = ctx.get("key_points", [])
+    citations = ctx.get("citations", [])
+
+    final_response = content
+    if not final_response:
+        final_response = synthesis if synthesis else "Research completed."
+
+    return {
+        "final_response": final_response,
+        "status": "completed",
+        "iterations": iteration_count,
+        "research_summary": {
+            "synthesis": synthesis,
+            "key_points": key_points,
+            "sources_count": len(citations),
+        },
+        "sources": citations,
+        "citations": citations,
+    }
+
+
+# =============================================================================
 # Registry Exports
 # =============================================================================
 
 # Conditions available in YAML workflows
 CONDITIONS = {
+    # Original conditions
     "source_coverage_check": source_coverage_check,
     "should_search_more": should_search_more,
     "source_credibility_check": source_credibility_check,
     "fact_verdict": fact_verdict,
     "literature_relevance": literature_relevance,
     "competitive_threat_level": competitive_threat_level,
+    # Chat workflow conditions
+    "research_type_check": research_type_check,
+    "answer_quality_check": answer_quality_check,
+    "source_coverage_chat_check": source_coverage_chat_check,
+    "can_continue_research_iteration": can_continue_research_iteration,
+    "has_pending_tool_calls": has_pending_tool_calls,
 }
 
 # Transforms available in YAML workflows
 TRANSFORMS = {
+    # Original transforms
     "merge_search_results": merge_search_results,
     "format_bibliography": format_bibliography,
+    # Chat workflow transforms
+    "update_research_conversation": update_research_conversation,
+    "finalize_research_chat": finalize_research_chat,
 }
 
 __all__ = [
-    # Conditions
+    # Original Conditions
     "source_coverage_check",
     "should_search_more",
     "source_credibility_check",
     "fact_verdict",
     "literature_relevance",
     "competitive_threat_level",
-    # Transforms
+    # Chat workflow conditions
+    "research_type_check",
+    "answer_quality_check",
+    "source_coverage_chat_check",
+    "can_continue_research_iteration",
+    "has_pending_tool_calls",
+    # Original Transforms
     "merge_search_results",
     "format_bibliography",
+    # Chat workflow transforms
+    "update_research_conversation",
+    "finalize_research_chat",
     # Registries
     "CONDITIONS",
     "TRANSFORMS",
