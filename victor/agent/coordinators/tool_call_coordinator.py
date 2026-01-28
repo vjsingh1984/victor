@@ -149,7 +149,14 @@ class ToolCallCoordinator(IToolCallCoordinator):
             errors.append("Tool call missing name")
             return errors
 
-        # Validate tool name format
+        # Validate tool name format with sanitizer (backward compatibility)
+        if self._sanitizer and hasattr(self._sanitizer, "is_valid_tool_name"):
+            try:
+                if not self._sanitizer.is_valid_tool_name(tool_call.name):
+                    errors.append("Invalid tool name")
+            except Exception:
+                pass  # Fall through to registry check
+
         # Check tool availability
         if not self._is_tool_enabled(tool_call.name):
             errors.append(f"Tool '{tool_call.name}' is not available")
@@ -169,6 +176,14 @@ class ToolCallCoordinator(IToolCallCoordinator):
         Returns:
             True if tool is enabled
         """
+        # Use sanitizer if available (backward compatibility)
+        if self._sanitizer and hasattr(self._sanitizer, "is_valid_tool_name"):
+            try:
+                if not self._sanitizer.is_valid_tool_name(tool_name):
+                    return False
+            except Exception:
+                pass  # Fall through to registry check
+
         # Delegate to tool registry
         try:
             result = self._tool_registry.is_available(tool_name)

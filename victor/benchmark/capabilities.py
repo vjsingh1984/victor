@@ -43,6 +43,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, cast
 
+from victor.config.settings import VERSION
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
