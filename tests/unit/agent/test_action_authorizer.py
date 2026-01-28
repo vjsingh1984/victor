@@ -827,48 +827,8 @@ class TestPatternCompilationErrors:
         assert result.intent == ActionIntent.DISPLAY_ONLY
 
 
-class TestToolCategories:
-    """Tests for tool category constants."""
-
-    def test_write_tools_constant(self):
-        """Test WRITE_TOOLS constant contains expected tools."""
-        from victor.agent.action_authorizer import WRITE_TOOLS
-
-        assert "write_file" in WRITE_TOOLS
-        assert "edit_files" in WRITE_TOOLS
-        assert "execute_bash" in WRITE_TOOLS
-        assert "git" in WRITE_TOOLS
-        assert isinstance(WRITE_TOOLS, frozenset)
-
-    def test_read_only_tools_constant(self):
-        """Test READ_ONLY_TOOLS constant contains expected tools."""
-        from victor.agent.action_authorizer import READ_ONLY_TOOLS
-
-        assert "read_file" in READ_ONLY_TOOLS
-        assert "list_directory" in READ_ONLY_TOOLS
-        assert "code_search" in READ_ONLY_TOOLS
-        assert isinstance(READ_ONLY_TOOLS, frozenset)
-
-    def test_generation_tools_constant(self):
-        """Test GENERATION_TOOLS constant contains expected tools."""
-        from victor.agent.action_authorizer import GENERATION_TOOLS
-
-        assert "generate_code" in GENERATION_TOOLS
-        assert "generate_docs" in GENERATION_TOOLS
-        assert isinstance(GENERATION_TOOLS, frozenset)
-
-    def test_intent_blocked_tools_mapping(self):
-        """Test INTENT_BLOCKED_TOOLS mapping is correct."""
-        from victor.agent.action_authorizer import (
-            INTENT_BLOCKED_TOOLS,
-            WRITE_TOOLS,
-            GENERATION_TOOLS,
-        )
-
-        assert INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY] == WRITE_TOOLS
-        assert INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY] == WRITE_TOOLS | GENERATION_TOOLS
-        assert INTENT_BLOCKED_TOOLS[ActionIntent.WRITE_ALLOWED] == frozenset()
-        assert INTENT_BLOCKED_TOOLS[ActionIntent.AMBIGUOUS] == frozenset()
+# TestToolCategories removed - constants replaced with metadata-based authorization in v0.5.1
+# See victor/tools/auth_metadata.py for tool metadata definitions
 
 
 class TestIsWriteAuthorizedMethod:
@@ -963,43 +923,9 @@ class TestIntentClassificationDataclass:
 class TestSecurityCriticalPaths:
     """Security-critical tests for action authorization."""
 
-    def test_write_tools_blocked_by_default(self):
-        """Test that write tools are blocked by default (secure by default)."""
-        from victor.agent.action_authorizer import (
-            WRITE_TOOLS,
-            READ_ONLY_TOOLS,
-            INTENT_BLOCKED_TOOLS,
-        )
-
-        # Verify WRITE_TOOLS contains all dangerous tools
-        assert "write_file" in WRITE_TOOLS
-        assert "execute_bash" in WRITE_TOOLS
-        assert "git" in WRITE_TOOLS
-        assert "apply_patch" in WRITE_TOOLS
-
-        # Verify these are blocked for DISPLAY_ONLY intent
-        display_blocked = INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY]
-        assert "write_file" in display_blocked
-        assert "execute_bash" in display_blocked
-
-        # Verify write tools are not in read-only tools
-        assert WRITE_TOOLS.isdisjoint(READ_ONLY_TOOLS)
-
-    def test_generation_tools_blocked_for_read_only(self):
-        """Test that code generation is blocked for read-only intent."""
-        from victor.agent.action_authorizer import (
-            GENERATION_TOOLS,
-            INTENT_BLOCKED_TOOLS,
-        )
-
-        # Verify generation tools are defined
-        assert "generate_code" in GENERATION_TOOLS
-        assert "generate_docs" in GENERATION_TOOLS
-
-        # Verify they're blocked for READ_ONLY
-        read_blocked = INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY]
-        assert "generate_code" in read_blocked
-        assert "generate_docs" in read_blocked
+    # test_write_tools_blocked_by_default and test_generation_tools_blocked_for_read_only removed
+    # Hard-coded tool lists replaced with metadata-based authorization in v0.5.1
+    # See victor/tools/auth_metadata.py for tool metadata definitions
 
     def test_safe_by_default_intent(self):
         """Test that default intent is DISPLAY_ONLY (safe by default)."""
@@ -1103,21 +1029,8 @@ class TestSecurityCriticalPaths:
             # Safe actions should be a set
             assert isinstance(SAFE_ACTIONS[intent], set)
 
-    def test_read_only_most_restrictive(self):
-        """Test that READ_ONLY is most restrictive intent."""
-        from victor.agent.action_authorizer import (
-            INTENT_BLOCKED_TOOLS,
-            WRITE_TOOLS,
-            GENERATION_TOOLS,
-        )
-
-        # READ_ONLY should block both write and generation tools
-        read_blocked = INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY]
-        display_blocked = INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY]
-
-        # READ_ONLY blocks more tools than DISPLAY_ONLY
-        assert len(read_blocked) >= len(display_blocked)
-        assert GENERATION_TOOLS.issubset(read_blocked)
+    # test_read_only_most_restrictive removed - references INTENT_BLOCKED_TOOLS
+    # Hard-coded tool lists replaced with metadata-based authorization in v0.5.1
 
     def test_prompt_guards_exist_for_restrictive_intents(self):
         """Test that restrictive intents have prompt guards."""
