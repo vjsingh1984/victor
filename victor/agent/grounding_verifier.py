@@ -776,7 +776,8 @@ class GroundingVerificationResult:
             files = [f"'{i.reference}'" for i in file_issues]
             feedback_parts.append(
                 f"- File(s) not found: {', '.join(files)}. "
-                "Use read_file or list_directory to verify paths before referencing."
+                "Use read_file or list_directory to verify paths before referencing. "
+                "IMPORTANT: Always use FULL paths from project root (e.g., 'victor/framework/file.py' not 'framework/file.py')."
             )
 
         if symbol_issues:
@@ -785,6 +786,28 @@ class GroundingVerificationResult:
                 f"- Symbol(s) not found: {', '.join(symbols)}. "
                 "Use code_search to find actual function/class names in the codebase."
             )
+
+        # Handle PATH_INVALID issues (ambiguous paths) explicitly
+        path_issues = [i for i in sorted_issues if i.issue_type == IssueType.PATH_INVALID]
+        if path_issues:
+            paths = [f"'{i.reference}'" for i in path_issues[:3]]
+            suggestions = []
+            for issue in path_issues[:3]:
+                if issue.suggestion:
+                    suggestions.append(issue.suggestion)
+
+            if suggestions:
+                feedback_parts.append(
+                    f"- Ambiguous path(s): {', '.join(paths)}. "
+                    f"{' '.join(suggestions[:2])}. "
+                    "REQUIREMENT: Use the EXACT full path shown in tool output, including all directory prefixes."
+                )
+            else:
+                feedback_parts.append(
+                    f"- Ambiguous path(s): {', '.join(paths)}. "
+                    "Use FULL paths from project root (include all directories like 'victor/'). "
+                    "Check tool output for exact paths."
+                )
 
         if code_issues:
             refs = [i.reference for i in code_issues][:2]
@@ -1211,13 +1234,15 @@ class GroundingVerifier:
                         result.unverified_references.append(path)
                 else:
                     # Multiple matches and a partial path was given - ambiguous
+                    # Build suggestion with emphasis on using full paths
+                    matches_str = ", ".join(partial_matches[:3])
                     result.add_issue(
                         GroundingIssue(
                             issue_type=IssueType.PATH_INVALID,
                             severity=IssueSeverity.LOW,
                             description=f"Path '{path}' is ambiguous",
                             reference=path,
-                            suggestion=f"Could be: {', '.join(partial_matches[:3])}",
+                            suggestion=f"Use exact path: {matches_str}",
                         )
                     )
                     result.unverified_references.append(path)

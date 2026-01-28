@@ -79,11 +79,11 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
                 else:
                     candidates = [base_url]
             else:
-                candidates = [str(base_url)]  # type: ignore
+                candidates = [str(base_url)]  # type: ignore[unreachable]
 
         if not candidates:
             # This should be unreachable due to previous logic
-            candidates = ["http://localhost:11434"]  # type: ignore
+            candidates = ["http://localhost:11434"]
 
         # Pick first candidate (blindly)
         chosen_base = candidates[0]
@@ -252,7 +252,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
                 else:
                     candidates = [base_url]
             else:
-                candidates = [str(base_url)]
+                candidates = [str(base_url)]  # type: ignore[unreachable]
 
         for url in candidates:
             try:
@@ -412,7 +412,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
-    async def stream(
+    async def stream(  # type: ignore[override,misc]
         self,
         messages: List[Message],
         *,
@@ -421,7 +421,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 4096,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Ollama.
 
         Args:
