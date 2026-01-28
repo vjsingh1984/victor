@@ -135,16 +135,30 @@ class ErrorEventEmitter(IErrorEventEmitter):
 
     def emit(
         self,
-        event: MessagingEvent,
+        event_or_topic: Union[MessagingEvent, str],
+        data: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Emit an error event synchronously (for gradual migration).
 
         Args:
-            event: The error event to emit
+            event_or_topic: Either a MessagingEvent object or a topic string (for backward compatibility)
+            data: Event data (required if topic is a string, ignored if event_or_topic is a MessagingEvent)
         """
+        # Support both old signature (topic, data) and new signature (MessagingEvent)
+        if isinstance(event_or_topic, str):
+            # Old signature: emit(topic, data)
+            topic = event_or_topic
+            event_data = data or {}
+            event = MessagingEvent(topic=topic, data=event_data)
+        else:
+            # New signature: emit(MessagingEvent)
+            event = event_or_topic
+            topic = event.topic
+            event_data = event.data
+
         try:
             # For backward compatibility, convert to topic/data format
-            self._event_bus.emit(event.topic, event.data)  # type: ignore[attr-defined]
+            self._event_bus.emit(topic, event_data)  # type: ignore[attr-defined]
         except Exception as e:
             logger.debug(f"Failed to emit error event: {e}")
 
@@ -156,7 +170,7 @@ class ErrorEventEmitter(IErrorEventEmitter):
                 emit_event_sync(
                     bus,
                     topic=topic,
-                    data=data,
+                    data=event_data,
                     source="ErrorEventEmitter",
                 )
         except Exception as e:
