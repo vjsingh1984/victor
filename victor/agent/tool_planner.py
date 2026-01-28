@@ -171,16 +171,10 @@ class ToolPlanner:
         if current_intent is None:
             return tools
 
-        # Phase 5: Use metadata-based authorization if requested
-        if use_metadata:
-            from victor.agent.action_authorizer import get_metadata_blocked_tools
+        # Use metadata-based authorization (Phase 5)
+        from victor.agent.action_authorizer import get_metadata_blocked_tools
 
-            blocked_tools = get_metadata_blocked_tools(current_intent)
-        else:
-            # Legacy approach: hard-coded tool lists
-            from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS
-
-            blocked_tools = INTENT_BLOCKED_TOOLS.get(current_intent, frozenset())
+        blocked_tools = get_metadata_blocked_tools(current_intent)
         if not blocked_tools:
             return tools
 
