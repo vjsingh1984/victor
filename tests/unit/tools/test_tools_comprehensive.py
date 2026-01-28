@@ -844,14 +844,9 @@ class TestToolDecorators:
         result = resolve_tool_name("my_custom_tool")
         assert result == "my_custom_tool"
 
-    def test_set_legacy_name_warnings(self):
-        """Test setting legacy name warnings."""
-        from victor.tools.decorators import set_legacy_name_warnings
-
-        # Should not raise
-        set_legacy_name_warnings(False)
-        set_legacy_name_warnings(True)
-        set_legacy_name_warnings(False)  # Reset
+    # NOTE: test_set_legacy_name_warnings removed in v0.5.1
+    # The set_legacy_name_warnings function was removed as part of backward compatibility cleanup
+    # Tool name warnings are no longer supported - use canonical names only
 
     def test_tool_decorator_creates_tool_class(self):
         """Test @tool decorator creates a valid tool wrapper."""
