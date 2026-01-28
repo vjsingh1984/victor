@@ -658,12 +658,16 @@ class ToolSelector(ModeAwareMixin):
     self.exploration_multiplier, etc.).
 
     Example:
+        from victor.protocols.tool_selector import ToolSelectionContext
+
         selector = ToolSelector(
             tools=tool_registry,
             semantic_selector=semantic_selector,
             model="qwen2.5-coder:7b",
         )
-        tools = await selector.select_tools(user_message, use_semantic=True)
+        context = ToolSelectionContext(tools=tool_registry)
+        result = await selector.select_tools(user_message, context=context)
+        selected_tools = result.tool_names
     """
 
     def __init__(

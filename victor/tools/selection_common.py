@@ -61,9 +61,6 @@ FALLBACK_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
     "web": {"web", "http", "api", "fetch", "url", "search"},
 }
 
-# Alias for backward compatibility
-CATEGORY_KEYWORDS = FALLBACK_CATEGORY_KEYWORDS
-
 
 # ============================================================================
 # Tool Discovery Functions
@@ -214,7 +211,7 @@ def detect_categories_from_message(message: str) -> Set[str]:
     """Detect relevant tool categories from keywords in a message.
 
     Uses registry-based detection with decorator-driven keywords when available,
-    falling back to static CATEGORY_KEYWORDS if registry is empty.
+    falling back to static FALLBACK_CATEGORY_KEYWORDS if registry is empty.
 
     Args:
         message: User message text to analyze

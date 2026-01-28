@@ -2548,65 +2548,33 @@ class SemanticToolSelector:
         limit: int = 10,
         min_score: float = 0.0,
         context: Optional[ToolSelectionContext] = None,
-        # Legacy ToolSelector parameters (for backward compatibility with orchestrator)
-        use_semantic: bool = True,
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
-        conversation_depth: int = 0,
-        planned_tools: Optional[Any] = None,
-    ) -> Union[ToolSelectionResult, List[ToolDefinition]]:
-        """Select relevant tools for a task (IToolSelector protocol + legacy support).
-
-        This method handles TWO calling conventions:
-        1. IToolSelector protocol (new): select_tools(task, limit, min_score, context) -> ToolSelectionResult
-        2. Legacy ToolSelector (old): select_tools(prompt, use_semantic, conversation_history, ...) -> List[ToolDefinition]
+    ) -> ToolSelectionResult:
+        """Select relevant tools for a task (IToolSelector protocol).
 
         Args:
             task: Task description or query to match tools against
             limit: Maximum number of tools to return
             min_score: Minimum relevance score threshold (0.0-1.0)
-            context: Optional additional context for selection (new protocol)
-            use_semantic: Whether to use semantic selection (legacy, ignored - always semantic)
-            conversation_history: Conversation history (legacy)
-            conversation_depth: Conversation depth (legacy, unused)
-            planned_tools: Planned tools (legacy, unused)
+            context: ToolSelectionContext with additional metadata (required)
 
         Returns:
-            ToolSelectionResult (new protocol) or List[ToolDefinition] (legacy)
+            ToolSelectionResult with selected tools
+
+        Raises:
+            RuntimeError: If selector not initialized with tools
+
+        Note:
+            Legacy ToolSelector parameters removed in v0.5.1.
+            All callers must use ToolSelectionContext protocol.
         """
-        # Detect legacy call from AgentOrchestrator
-        # Legacy call has: use_semantic, conversation_history as kwargs, context=None
-        # New protocol has: limit, min_score, context with context.metadata['tools']
-        is_legacy_call = context is None
-
-        # Legacy calling convention from AgentOrchestrator
-        # Expected: select_tools(user_message, use_semantic=..., conversation_history=..., conversation_depth=...)
-        if is_legacy_call:
-            # Use stored tools registry from initialize_tool_embeddings()
-            tools_registry = self._tools_registry
-            if not tools_registry:
-                raise RuntimeError(
-                    "SemanticToolSelector not initialized. Call initialize_tool_embeddings(tools) first."
-                )
-
-            # task is actually user_message in legacy call
-            user_message = task
-            # use_semantic is ignored - we always use semantic selection in SemanticToolSelector
-            # conversation_history should be a list of dicts
-            conv_history = conversation_history if isinstance(conversation_history, list) else None
-
-            # Use existing semantic selection method
-            tools = await self.select_relevant_tools_with_context(
-                user_message=user_message,
-                tools=tools_registry,
-                conversation_history=conv_history,
-                max_tools=10,  # Default max tools for legacy call
+        # Validate context is provided (required in v0.5.1)
+        if context is None:
+            raise ValueError(
+                "ToolSelectionContext is required. "
+                "Use ToolSelectionContext(tools=registry, ...) to provide context."
             )
 
-            # Legacy: Return List[ToolDefinition] directly
-            return tools
-
-        # New IToolSelector protocol calling convention
-        # Map IToolSelector protocol to existing method
+        # IToolSelector protocol calling convention
         tools_registry = context.metadata.get("tools") if context and context.metadata else None
 
         # Validate that tools_registry is actually a ToolRegistry (not ToolPipeline or other types)
@@ -2642,11 +2610,19 @@ class SemanticToolSelector:
             similarity_threshold=min_score,
         )
 
-        # For now, return the tools directly (ToolDefinition objects)
-        # This maintains backward compatibility with chat_coordinator which expects List[ToolDefinition]
-        # NOTE: Refactor to return ToolSelectionResult for better error handling and metadata
-        # Deferred: Requires updating all callers in chat_coordinator, agent_loop, and tool_pipeline
-        return tools
+        # Convert List[ToolDefinition] to ToolSelectionResult (IToolSelector protocol)
+        from victor.protocols.tool_selector import ToolSelectionResult
+
+        return ToolSelectionResult(
+            tool_names=[tool.name for tool in tools],
+            scores={tool.name: min_score for tool in tools},  # Approximate scores
+            strategy_used=self.strategy,
+            metadata={
+                "total_candidates": len(tools),
+                "threshold": min_score,
+                "limit": limit,
+            },
+        )
 
     async def get_tool_score(
         self,

@@ -81,7 +81,11 @@ class ToolMetadata:
     execution_category: Optional["ExecutionCategory"] = None  # Default: READ_ONLY when None
 
     def __post_init__(self) -> None:
-        """Apply defaults for None values to support backward compatibility."""
+        """Apply defaults for None values (defensive programming).
+
+        This ensures tool metadata is always in a valid state, even when
+        optional fields are not explicitly provided.
+        """
         if self.priority is None:
             self.priority = Priority.MEDIUM
         if self.access_mode is None:

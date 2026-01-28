@@ -45,7 +45,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 class OutputMode(str, Enum):
     """Output mode for tool responses.
 
-    FULL: Return complete output (default, backwards compatible)
+    FULL: Return complete output (default mode)
     SUMMARY: Return counts/stats only
     COMPACT: Return compressed format (e.g., paths only)
     MATCHES: Return only matching lines with context
