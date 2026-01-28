@@ -169,9 +169,7 @@ Actions:
         )
 
     async def execute(
-        self,
-        _exec_ctx: Optional[Dict[str, Any]] = None,
-        **kwargs: Any
+        self, _exec_ctx: Optional[Dict[str, Any]] = None, **kwargs: Any
     ) -> ToolResult:
         """Execute audit action."""
         action = kwargs.get("action", "summary")

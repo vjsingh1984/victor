@@ -497,7 +497,9 @@ async def docs(
                             item["node"], format  # Already a FunctionDef AST node
                         )
                     else:
-                        docstring = _generate_class_docstring(item["node"], format)  # Already a ClassDef AST node
+                        docstring = _generate_class_docstring(
+                            item["node"], format
+                        )  # Already a ClassDef AST node
 
                     insert_line = item["line"]
                     def_line = lines[insert_line - 1]

@@ -1316,7 +1316,7 @@ class ToolPipeline:
             # Skip invalid structures - let execute_tool_calls handle them
             if not isinstance(tc, dict):
                 # Preserve invalid calls as-is for proper error handling
-                unique_calls.append(tc)
+                unique_calls.append(tc)  # type: ignore[unreachable]
                 continue
 
             tool_name = tc.get("name", "")
@@ -1699,7 +1699,7 @@ class ToolPipeline:
         """
         # Validate structure
         if not isinstance(tool_call, dict):
-            return ToolCallResult(
+            return ToolCallResult(  # type: ignore[unreachable]
                 tool_name="unknown",
                 arguments={},
                 success=False,
@@ -2061,7 +2061,7 @@ class ToolPipeline:
                     if hasattr(self.tool_cache, "set_tool_result"):
                         # Update the cached entry with file dependencies
                         self._get_call_signature(tool_name, normalized_args)
-                        await self.tool_cache.set_tool_result(  # type: ignore[attr-defined]
+                        await self.tool_cache.set_tool_result(
                             tool_name=tool_name,
                             args=normalized_args,
                             result=call_result.result,

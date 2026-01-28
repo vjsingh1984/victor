@@ -553,7 +553,11 @@ class LearningCommand(BaseSlashCommand):
 
                     strategy_func = getattr(learner, "get_strategy", get_default_strategy)
                     strategy_result = strategy_func(learner)
-                    final_strategy = strategy_result if isinstance(strategy_result, RLSelectionStrategy) else getattr(learner, "_strategy", None)
+                    final_strategy = (
+                        strategy_result
+                        if isinstance(strategy_result, RLSelectionStrategy)
+                        else getattr(learner, "_strategy", None)
+                    )
                     content += f"\n  Strategy: {final_strategy.value if final_strategy else 'epsilon_greedy'}\n"
                     content += f"  Exploration Rate: {exploration:.2f}\n"
         except Exception as e:

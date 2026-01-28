@@ -236,6 +236,7 @@ async def edit(
         Use /mode build to enable unrestricted file edits.
     """
     import logging
+
     logger = logging.getLogger(__name__)
 
     # =============================================================================
@@ -334,7 +335,7 @@ async def edit(
 
     # Allow callers (models) to pass ops as a JSON string; normalize to list[dict[str, Any]]
     if isinstance(ops, str):  # type: ignore[unreachable]
-        import json
+        import json  # type: ignore[unreachable]
 
         def _fix_json_control_chars(json_str: str) -> str:
             """Fix raw control characters inside JSON strings.
@@ -384,7 +385,7 @@ async def edit(
 
         # Try to parse the JSON, with recovery for common issues
         try:
-            ops = json.loads(ops)  # type: ignore[unreachable]
+            ops = json.loads(ops)
         except json.JSONDecodeError as exc:
             # Try to provide helpful error message and recovery hints
             error_context = ""
@@ -434,8 +435,8 @@ async def edit(
 
     # Validate operations
     for i, op in enumerate(ops):
-        if not isinstance(op, dict):  # type: ignore[unreachable]
-            return {
+        if not isinstance(op, dict):
+            return {  # type: ignore[unreachable]
                 "success": False,
                 "error": f"Operation {i} must be a dictionary, got {type(op).__name__}",
             }
@@ -787,7 +788,7 @@ async def edit(
         if success:
             # Commit the change group for undo/redo
             tracker.commit_change_group()
-            result: Dict[str, Any] = {  # type: ignore[assignment]
+            commit_result: Dict[str, Any] = {
                 "success": True,
                 "operations_queued": operations_queued,
                 "operations_applied": operations_queued,
@@ -797,11 +798,11 @@ async def edit(
             }
             # Include validation info if there were warnings/errors
             if validation_errors:
-                result["validation_errors"] = validation_errors  # type: ignore[index]
-                result["message"] += f" Note: {len(validation_errors)} syntax issues detected."  # type: ignore[index]
+                commit_result["validation_errors"] = validation_errors
+                commit_result["message"] += f" Note: {len(validation_errors)} syntax issues detected."
             if validation_warnings:
-                result["validation_warnings"] = validation_warnings  # type: ignore[index]
-            return result  # type: ignore[return-value]
+                commit_result["validation_warnings"] = validation_warnings
+            return commit_result
         else:
             # Clear change group on failure
             if hasattr(tracker, "_current_group"):

@@ -288,7 +288,8 @@ class SwitchingFormation:
             List of member results
         """
         # TODO: Implement formation registry/factory
-        from victor.coordination.formations import get_formation
+        # Use local get_formation function
+        from . import get_formation
 
         results = []
         execution_context = {
@@ -335,7 +336,7 @@ class SwitchingFormation:
                 )
 
             # Get current formation strategy
-            strategy = get_formation(self.current_formation)
+            strategy = get_formation(self.current_formation.value)  # type: ignore[misc]
 
             # Prepare context with current execution state
             enhanced_context = context
@@ -602,9 +603,6 @@ class NegotiationFormation:
         # Request proposals from each agent
         for agent in agents:
             try:
-                import time
-
-                time.time()
                 response = await asyncio.wait_for(
                     agent.execute(
                         AgentMessage(
@@ -811,7 +809,7 @@ Format your response as a JSON object:
         # Use local get_formation function
         from . import get_formation
 
-        strategy = get_formation(formation)
+        strategy = get_formation(formation.value)  # type: ignore[misc]
         return await strategy.execute(agents, context, task)
 
     def get_negotiation_history(self) -> List[NegotiationResult]:
@@ -1255,7 +1253,7 @@ Rationale: [your reasoning]
         # Use local get_formation function
         from . import get_formation
 
-        strategy = get_formation(formation)
+        strategy = get_formation(formation.value)  # type: ignore[misc]
         return await strategy.execute(agents, context, task)
 
     def _map_choice_to_formation(self, choice: Optional[str]) -> "TeamFormation":

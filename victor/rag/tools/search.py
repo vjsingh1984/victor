@@ -71,7 +71,7 @@ class RAGSearchTool(BaseTool):
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any],
+        _exec_ctx: Dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> ToolResult:
         """Execute search query.

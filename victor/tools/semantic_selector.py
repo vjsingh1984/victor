@@ -1282,8 +1282,8 @@ class SemanticToolSelector:
         # Defensive: Check tools is actually a ToolRegistry
         from victor.tools.registry import ToolRegistry
 
-        if not isinstance(tools, ToolRegistry):  # type: ignore[unreachable]
-            logger.warning(
+        if not isinstance(tools, ToolRegistry):
+            logger.warning(  # type: ignore[unreachable]
                 f"_get_cost_penalty expected ToolRegistry, got {type(tools).__name__}. "
                 "Skipping cost penalty calculation."
             )
@@ -1468,8 +1468,8 @@ class SemanticToolSelector:
         # Defensive: Check tools is actually a ToolRegistry
         from victor.tools.registry import ToolRegistry
 
-        if not isinstance(tools, ToolRegistry):  # type: ignore[unreachable]
-            logger.warning(
+        if not isinstance(tools, ToolRegistry):
+            logger.warning(  # type: ignore[unreachable]
                 f"_generate_cost_warnings expected ToolRegistry, got {type(tools).__name__}. "
                 "Skipping cost warning generation."
             )
@@ -1969,7 +1969,7 @@ class SemanticToolSelector:
         if not texts:
             return []
 
-        embeddings = []
+        embeddings: List[np.ndarray | None] = []
         uncached_indices = []
         uncached_texts = []
 
@@ -2020,10 +2020,11 @@ class SemanticToolSelector:
                 # Fallback to individual generation
                 for idx, text in zip(uncached_indices, uncached_texts):
                     emb = await self._get_embedding(text)
-                    if emb is not None:  # type: ignore[unreachable]
+                    if emb is not None:
                         embeddings[idx] = emb
 
-        return embeddings
+        # Filter out None values and return only valid embeddings
+        return [e for e in embeddings if e is not None]
 
     async def _get_api_embedding(self, text: str) -> np.ndarray:
         """Get embedding from Ollama/vLLM/LMStudio API.

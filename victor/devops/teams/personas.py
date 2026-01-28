@@ -267,10 +267,6 @@ class DevOpsPersonaTraits:
         )
 
 
-# Backward compatibility alias
-PersonaTraits = DevOpsPersonaTraits
-
-
 @dataclass
 class DevOpsPersona:
     """Complete persona definition for a DevOps role.
@@ -294,7 +290,7 @@ class DevOpsPersona:
     role: str
     expertise: List[DevOpsExpertiseCategory]
     secondary_expertise: List[DevOpsExpertiseCategory] = field(default_factory=list)
-    traits: PersonaTraits = field(default_factory=PersonaTraits)
+    traits: DevOpsPersonaTraits = field(default_factory=DevOpsPersonaTraits)
     strengths: List[str] = field(default_factory=list)
     approach: str = ""
     communication_patterns: List[str] = field(default_factory=list)
@@ -383,7 +379,7 @@ DEVOPS_PERSONAS: Dict[str, DevOpsPersona] = {
             DevOpsExpertiseCategory.DISASTER_RECOVERY,
             DevOpsExpertiseCategory.CAPACITY_PLANNING,
         ],
-        traits=PersonaTraits(
+        traits=DevOpsPersonaTraits(
             communication_style=DevOpsCommunicationStyle.PRAGMATIC,
             decision_style=DevOpsDecisionStyle.STABILITY_FOCUSED,
             automation_focus=0.7,
@@ -423,7 +419,7 @@ DEVOPS_PERSONAS: Dict[str, DevOpsPersona] = {
             DevOpsExpertiseCategory.RELEASE_MANAGEMENT,
             DevOpsExpertiseCategory.INFRASTRUCTURE_AS_CODE,
         ],
-        traits=PersonaTraits(
+        traits=DevOpsPersonaTraits(
             communication_style=DevOpsCommunicationStyle.OPERATIONAL,
             decision_style=DevOpsDecisionStyle.AUTOMATION_FIRST,
             automation_focus=0.95,
@@ -463,7 +459,7 @@ DEVOPS_PERSONAS: Dict[str, DevOpsPersona] = {
             DevOpsExpertiseCategory.SECRETS_MANAGEMENT,
             DevOpsExpertiseCategory.INFRASTRUCTURE_AS_CODE,
         ],
-        traits=PersonaTraits(
+        traits=DevOpsPersonaTraits(
             communication_style=DevOpsCommunicationStyle.DIRECT,
             decision_style=DevOpsDecisionStyle.SECURITY_FIRST,
             automation_focus=0.8,
@@ -504,7 +500,7 @@ DEVOPS_PERSONAS: Dict[str, DevOpsPersona] = {
             DevOpsExpertiseCategory.INCIDENT_RESPONSE,
             DevOpsExpertiseCategory.PERFORMANCE_TUNING,
         ],
-        traits=PersonaTraits(
+        traits=DevOpsPersonaTraits(
             communication_style=DevOpsCommunicationStyle.ANALYTICAL,
             decision_style=DevOpsDecisionStyle.ITERATIVE,
             automation_focus=0.7,
@@ -544,7 +540,7 @@ DEVOPS_PERSONAS: Dict[str, DevOpsPersona] = {
             DevOpsExpertiseCategory.NETWORKING,
             DevOpsExpertiseCategory.HIGH_AVAILABILITY,
         ],
-        traits=PersonaTraits(
+        traits=DevOpsPersonaTraits(
             communication_style=DevOpsCommunicationStyle.PRAGMATIC,
             decision_style=DevOpsDecisionStyle.AUTOMATION_FIRST,
             automation_focus=0.9,
@@ -584,7 +580,7 @@ DEVOPS_PERSONAS: Dict[str, DevOpsPersona] = {
             DevOpsExpertiseCategory.PIPELINE_AUTOMATION,
             DevOpsExpertiseCategory.COMPLIANCE,
         ],
-        traits=PersonaTraits(
+        traits=DevOpsPersonaTraits(
             communication_style=DevOpsCommunicationStyle.DOCUMENTATION_FOCUSED,
             decision_style=DevOpsDecisionStyle.STABILITY_FOCUSED,
             automation_focus=0.85,
@@ -792,7 +788,6 @@ __all__ = [
     "DevOpsCommunicationStyle",
     "DevOpsDecisionStyle",
     "DevOpsPersonaTraits",
-    "PersonaTraits",  # Backward compatibility alias for DevOpsPersonaTraits
     "DevOpsPersona",
     # Pre-defined personas
     "DEVOPS_PERSONAS",

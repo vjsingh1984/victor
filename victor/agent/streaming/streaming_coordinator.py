@@ -180,7 +180,7 @@ class StreamingCoordinator:
                 content = chunk.get("content", "")
                 if content:
                     contents.append(str(content))
-            elif isinstance(chunk, str):
+            elif isinstance(chunk, str):  # type: ignore[unreachable]
                 # Chunk is a string
                 contents.append(chunk)
             else:

@@ -122,9 +122,7 @@ class ToolAuthMetadata:
         # Validate domain is known
         valid_domains = {"coding", "devops", "rag", "dataanalysis", "research", "generic"}
         if self.domain not in valid_domains:
-            logger.warning(
-                f"Unknown domain '{self.domain}'. Expected one of {valid_domains}"
-            )
+            logger.warning(f"Unknown domain '{self.domain}'. Expected one of {valid_domains}")
 
     def has_capability(self, capability: str) -> bool:
         """Check if tool has a specific capability.
@@ -403,9 +401,7 @@ class ToolAuthMetadataRegistry:
                 "total_categories": len(self._categories),
                 "total_capabilities": len(self._capabilities),
                 "total_domains": len(self._domains),
-                "tools_by_domain": {
-                    domain: len(tools) for domain, tools in self._domains.items()
-                },
+                "tools_by_domain": {domain: len(tools) for domain, tools in self._domains.items()},
             }
 
     def clear(self) -> None:

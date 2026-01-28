@@ -103,7 +103,7 @@ except ImportError:
 
 # Touch ID / biometric auth on macOS
 try:
-    import LocalAuthentication  # pyobjc on macOS  # type: ignore[import-not-found]
+    import LocalAuthentication  # type: ignore
 
     BIOMETRIC_AVAILABLE = platform.system() == "Darwin"
 except ImportError:
@@ -1532,7 +1532,7 @@ class SystemAuthenticator:
     ) -> bool:
         """Verify NTLM credentials using pyspnego (cross-platform)."""
         try:
-            import spnego  # type: ignore[import]
+            import spnego
 
             # Create NTLM context for validation
             ctx = spnego.client(
@@ -1591,7 +1591,7 @@ class SystemAuthenticator:
 
         # Try pyspnego
         try:
-            import spnego  # type: ignore[import]
+            import spnego
 
             ctx = spnego.client(service="host", hostname="localhost", protocol="ntlm")
             token = ctx.step()
@@ -1666,7 +1666,7 @@ class SystemAuthenticator:
             User info dict or None
         """
         try:
-            import ldap3  # type: ignore[import]
+            import ldap3
 
             server = ldap3.Server(domain, use_ssl=True)
             conn = ldap3.Connection(server, auto_bind=True)
@@ -1815,7 +1815,7 @@ class SystemAuthenticator:
         # Windows: Check for logged-in user
         if platform.system() == "Windows":
             try:
-                import win32api  # type: ignore[import]
+                import win32api
 
                 user = win32api.GetUserName()
                 domain = win32api.GetDomainName()
@@ -1922,7 +1922,7 @@ class AWSCredentials:
     def to_boto3_session(self) -> Any:
         """Create boto3 session from these credentials."""
         try:
-            import boto3
+            import boto3  # type: ignore[import-untyped]
 
             return boto3.Session(
                 aws_access_key_id=self.access_key_id,

@@ -280,10 +280,6 @@ class DataAnalysisPersonaTraits:
         )
 
 
-# Backward compatibility alias
-PersonaTraits = DataAnalysisPersonaTraits
-
-
 @dataclass
 class DataAnalysisPersona:
     """Complete persona definition for a data analysis role.
@@ -307,7 +303,7 @@ class DataAnalysisPersona:
     role: str
     expertise: List[ExpertiseCategory]
     secondary_expertise: List[ExpertiseCategory] = field(default_factory=list)
-    traits: PersonaTraits = field(default_factory=PersonaTraits)
+    traits: DataAnalysisPersonaTraits = field(default_factory=DataAnalysisPersonaTraits)
     strengths: List[str] = field(default_factory=list)
     approach: str = ""
     communication_patterns: List[str] = field(default_factory=list)
@@ -395,7 +391,7 @@ DATA_ANALYSIS_PERSONAS: Dict[str, DataAnalysisPersona] = {
             ExpertiseCategory.DATA_VALIDATION,
             ExpertiseCategory.SCHEMA_INFERENCE,
         ],
-        traits=PersonaTraits(
+        traits=DataAnalysisPersonaTraits(
             communication_style=CommunicationStyle.METHODOLOGICAL,
             decision_style=DecisionStyle.CONSERVATIVE,
             quantitative_focus=0.7,
@@ -437,7 +433,7 @@ DATA_ANALYSIS_PERSONAS: Dict[str, DataAnalysisPersona] = {
             ExpertiseCategory.EXPERIMENTAL_DESIGN,
             ExpertiseCategory.BAYESIAN,
         ],
-        traits=PersonaTraits(
+        traits=DataAnalysisPersonaTraits(
             communication_style=CommunicationStyle.ANALYTICAL,
             decision_style=DecisionStyle.RIGOROUS,
             quantitative_focus=0.95,
@@ -479,7 +475,7 @@ DATA_ANALYSIS_PERSONAS: Dict[str, DataAnalysisPersona] = {
             ExpertiseCategory.MODEL_EVALUATION,
             ExpertiseCategory.HYPERPARAMETER_TUNING,
         ],
-        traits=PersonaTraits(
+        traits=DataAnalysisPersonaTraits(
             communication_style=CommunicationStyle.ANALYTICAL,
             decision_style=DecisionStyle.EXPERIMENTAL,
             quantitative_focus=0.9,
@@ -521,7 +517,7 @@ DATA_ANALYSIS_PERSONAS: Dict[str, DataAnalysisPersona] = {
             ExpertiseCategory.INFOGRAPHICS,
             ExpertiseCategory.BUSINESS_ANALYSIS,
         ],
-        traits=PersonaTraits(
+        traits=DataAnalysisPersonaTraits(
             communication_style=CommunicationStyle.VISUAL,
             decision_style=DecisionStyle.PRAGMATIC,
             quantitative_focus=0.6,
@@ -563,7 +559,7 @@ DATA_ANALYSIS_PERSONAS: Dict[str, DataAnalysisPersona] = {
             ExpertiseCategory.IMPUTATION,
             ExpertiseCategory.DATA_VALIDATION,
         ],
-        traits=PersonaTraits(
+        traits=DataAnalysisPersonaTraits(
             communication_style=CommunicationStyle.DETAILED,
             decision_style=DecisionStyle.CONSERVATIVE,
             quantitative_focus=0.8,
@@ -605,7 +601,7 @@ DATA_ANALYSIS_PERSONAS: Dict[str, DataAnalysisPersona] = {
             ExpertiseCategory.REPORTING,
             ExpertiseCategory.DATA_STORYTELLING,
         ],
-        traits=PersonaTraits(
+        traits=DataAnalysisPersonaTraits(
             communication_style=CommunicationStyle.EXECUTIVE,
             decision_style=DecisionStyle.PRAGMATIC,
             quantitative_focus=0.7,
@@ -813,7 +809,6 @@ __all__ = [
     "CommunicationStyle",
     "DecisionStyle",
     "DataAnalysisPersonaTraits",
-    "PersonaTraits",  # Backward compatibility alias for DataAnalysisPersonaTraits
     "DataAnalysisPersona",
     # Pre-defined personas
     "DATA_ANALYSIS_PERSONAS",

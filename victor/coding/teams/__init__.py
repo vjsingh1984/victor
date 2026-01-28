@@ -69,7 +69,6 @@ from victor.coding.teams.personas import (
     CommunicationStyle,
     DecisionStyle,
     CodingPersonaTraits,
-    PersonaTraits,  # Backward compatibility alias
     CodingPersona,
     # Pre-defined personas
     CODING_PERSONAS,
@@ -106,7 +105,6 @@ __all__ = [
     "CommunicationStyle",
     "DecisionStyle",
     "CodingPersonaTraits",
-    "PersonaTraits",  # Backward compatibility alias
     "CodingPersona",
     # Pre-defined personas
     "CODING_PERSONAS",

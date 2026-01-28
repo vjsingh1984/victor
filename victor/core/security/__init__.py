@@ -91,9 +91,6 @@ from victor.core.security.protocol import (
     Vulnerability,
     SecurityScanResult,
     SecurityPolicy,
-    # Backward compatibility aliases
-    Severity,
-    Dependency,
 )
 
 # Import authorization for enhanced RBAC + ABAC
@@ -197,12 +194,10 @@ __all__ = [
     "DEFAULT_COMPLIANCE_RULES",
     # Protocol (CVE types)
     "CVESeverity",
-    "Severity",  # Alias for backward compatibility
     "VulnerabilityStatus",
     "CVSSMetrics",
     "CVE",
     "SecurityDependency",
-    "Dependency",  # Alias for backward compatibility
     "Vulnerability",
     "SecurityScanResult",
     "SecurityPolicy",

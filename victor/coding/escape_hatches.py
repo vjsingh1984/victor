@@ -470,15 +470,29 @@ def chat_task_complexity(ctx: Dict[str, Any]) -> str:
 
     # Complex task indicators
     complex_keywords = [
-        "refactor", "redesign", "architecture", "migrate", "implement",
-        "create", "build", "design", "system", "framework"
+        "refactor",
+        "redesign",
+        "architecture",
+        "migrate",
+        "implement",
+        "create",
+        "build",
+        "design",
+        "system",
+        "framework",
     ]
     has_complex_keyword = any(kw in message_lower for kw in complex_keywords)
 
     # Simple task indicators
     simple_keywords = [
-        "what is", "how do", "explain", "show me", "quick", "simple",
-        "trivial", "straightforward"
+        "what is",
+        "how do",
+        "explain",
+        "show me",
+        "quick",
+        "simple",
+        "trivial",
+        "straightforward",
     ]
     has_simple_keyword = any(kw in message_lower for kw in simple_keywords)
 
@@ -545,18 +559,22 @@ def update_conversation_with_tool_results(ctx: Dict[str, Any]) -> Dict[str, Any]
 
     # Add assistant message with tool calls
     if tool_calls:
-        conversation_history.append({
-            "role": "assistant",
-            "content": content,
-            "tool_calls": tool_calls,
-        })
+        conversation_history.append(
+            {
+                "role": "assistant",
+                "content": content,
+                "tool_calls": tool_calls,
+            }
+        )
 
         # Add tool results
         for result in tool_results:
-            conversation_history.append({
-                "role": "tool",
-                "content": str(result),
-            })
+            conversation_history.append(
+                {
+                    "role": "tool",
+                    "content": str(result),
+                }
+            )
 
     # Increment iteration count
     iteration_count = ctx.get("iteration_count", 0) + 1
@@ -603,7 +621,7 @@ def format_coding_response(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "metadata": {
             "total_iterations": iteration_count,
             "files_touched": len(files_modified),
-        }
+        },
     }
 
 

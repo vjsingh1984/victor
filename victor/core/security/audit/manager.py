@@ -35,7 +35,7 @@ from .protocol import (
     AuditReport,
     ComplianceFramework,
     RetentionPolicy,
-    Severity,
+    AuditSeverity,
 )
 
 logger = logging.getLogger(__name__)
@@ -168,7 +168,7 @@ class AuditManager:
         action: str,
         details: dict[str, Any] | None = None,
         resource: str | None = None,
-        severity: Severity = Severity.INFO,
+        severity: AuditSeverity = AuditSeverity.INFO,
     ) -> None:
         """Synchronous wrapper for logging audit events.
 
@@ -215,7 +215,7 @@ class AuditManager:
         event_type: AuditEventType,
         action: str,
         resource: str | None = None,
-        severity: Severity = Severity.INFO,
+        severity: AuditSeverity = AuditSeverity.INFO,
         outcome: str = "success",
         metadata: dict[str, Any] | None = None,
         actor: str | None = None,
@@ -328,7 +328,7 @@ class AuditManager:
             event_type=event_type,
             action=f"Executed tool: {tool_name}",
             resource=tool_name,
-            severity=Severity.INFO if outcome == "success" else Severity.WARNING,
+            severity=AuditSeverity.INFO if outcome == "success" else AuditSeverity.WARNING,
             outcome=outcome,
             metadata=metadata,
         )
@@ -352,7 +352,7 @@ class AuditManager:
             event_type=event_type,
             action=message,
             resource=resource,
-            severity=Severity.WARNING,
+            severity=AuditSeverity.WARNING,
             metadata=metadata,
         )
 

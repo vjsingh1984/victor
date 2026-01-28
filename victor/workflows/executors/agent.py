@@ -20,7 +20,7 @@ Executes agent nodes by spawning sub-agents with role-specific configurations.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Match, cast
+from typing import TYPE_CHECKING, Any, Dict, Match, Optional, cast
 
 if TYPE_CHECKING:
     from victor.agent.subagents.base import SubAgentRole
@@ -75,7 +75,7 @@ class AgentNodeExecutor:
             Exception: If agent execution fails
         """
         from victor.agent.subagents.orchestrator import SubAgentOrchestrator
-        from victor.agent.subagents.roles import SubAgentRole
+        from victor.agent.subagents.roles import SubAgentRole  # type: ignore[import-not-found]
 
         logger.info(f"Executing agent node: {node.id} with role: {node.role}")
 
@@ -235,7 +235,7 @@ class AgentNodeExecutor:
 
                     return json.dumps(value)
                     # Handle primitive values
-                    return str(value)
+                    return str(value)  # type: ignore[unreachable]
             # Keep original if not found
             return cast(str, match.group(0))
 

@@ -444,18 +444,22 @@ def update_research_conversation(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     # Add assistant message with tool calls
     if tool_calls:
-        conversation_history.append({
-            "role": "assistant",
-            "content": content,
-            "tool_calls": tool_calls,
-        })
+        conversation_history.append(
+            {
+                "role": "assistant",
+                "content": content,
+                "tool_calls": tool_calls,
+            }
+        )
 
         # Add tool results
         for result in tool_results:
-            conversation_history.append({
-                "role": "tool",
-                "content": str(result),
-            })
+            conversation_history.append(
+                {
+                    "role": "tool",
+                    "content": str(result),
+                }
+            )
 
     # Increment iteration count
     iteration_count = ctx.get("iteration_count", 0) + 1

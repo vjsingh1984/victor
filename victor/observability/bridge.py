@@ -35,8 +35,11 @@ from __future__ import annotations
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 from contextlib import contextmanager
+
+if TYPE_CHECKING:
+    from victor.observability.exporters import JsonLineExporter
 
 from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 from victor.observability.emitters import (
@@ -95,7 +98,7 @@ class ObservabilityBridge:
         self._error_emitter = error_emitter or ErrorEventEmitter(bus=bus)  # type: ignore[abstract]
 
         self._event_bus = bus
-        self._jsonl_exporter: Optional[JsonLineExporter] = None  # type: ignore[name-defined]
+        self._jsonl_exporter: Optional["JsonLineExporter"] = None
 
         self._enabled = True
         self._session_start_time: Optional[float] = None

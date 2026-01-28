@@ -396,18 +396,22 @@ def update_devops_conversation(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
     # Add assistant message with tool calls
     if tool_calls:
-        conversation_history.append({
-            "role": "assistant",
-            "content": content,
-            "tool_calls": tool_calls,
-        })
+        conversation_history.append(
+            {
+                "role": "assistant",
+                "content": content,
+                "tool_calls": tool_calls,
+            }
+        )
 
         # Add tool results
         for result in tool_results:
-            conversation_history.append({
-                "role": "tool",
-                "content": str(result),
-            })
+            conversation_history.append(
+                {
+                    "role": "tool",
+                    "content": str(result),
+                }
+            )
 
     # Increment iteration count
     iteration_count = ctx.get("iteration_count", 0) + 1
@@ -430,7 +434,7 @@ def finalize_devops_chat(ctx: Dict[str, Any]) -> Dict[str, Any]:
     """
     content = ctx.get("content", "")
     iteration_count = ctx.get("iteration_count", 0)
-    conversation_history = ctx.get("conversation_history", [])
+    ctx.get("conversation_history", [])
 
     # Extract deployment details from context
     deployment_target = ctx.get("deployment_target", "unknown")

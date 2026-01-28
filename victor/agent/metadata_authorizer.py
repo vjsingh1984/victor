@@ -80,9 +80,7 @@ class MetadataActionAuthorizer:
         blocked_tools = authorizer.get_blocked_tools(ActionIntent.DISPLAY_ONLY)
     """
 
-    def __init__(
-        self, metadata_registry: Optional[ToolAuthMetadataRegistry] = None
-    ):
+    def __init__(self, metadata_registry: Optional[ToolAuthMetadataRegistry] = None):
         """Initialize the authorizer.
 
         Args:
@@ -93,9 +91,7 @@ class MetadataActionAuthorizer:
         )
         self._cache: dict[tuple[str, str], bool] = {}
 
-    def authorize_tool(
-        self, tool_name: str, intent: "ActionIntent"
-    ) -> bool:
+    def authorize_tool(self, tool_name: str, intent: "ActionIntent") -> bool:
         """Check if a tool is authorized for a given intent.
 
         Authorization is based on tool metadata:
@@ -121,9 +117,7 @@ class MetadataActionAuthorizer:
 
         # If no metadata, default to allowed (backward compatibility)
         if metadata is None:
-            logger.debug(
-                f"No metadata for tool '{tool_name}', defaulting to allowed"
-            )
+            logger.debug(f"No metadata for tool '{tool_name}', defaulting to allowed")
             return True
 
         # Check based on safety level
@@ -153,9 +147,7 @@ class MetadataActionAuthorizer:
                 return False
 
             # READ_ONLY intent also blocks code generation
-            if intent_str == "read_only" and metadata.has_capability(
-                "code_generation"
-            ):
+            if intent_str == "read_only" and metadata.has_capability("code_generation"):
                 logger.debug(
                     f"Tool '{tool_name}' has code_generation capability and is not allowed for READ_ONLY intent"
                 )
@@ -210,9 +202,7 @@ class MetadataActionAuthorizer:
 
         return authorized_tools
 
-    def filter_tools(
-        self, tools: List[str], intent: "ActionIntent"
-    ) -> List[str]:
+    def filter_tools(self, tools: List[str], intent: "ActionIntent") -> List[str]:
         """Filter a list of tools to only authorized ones.
 
         Args:
@@ -325,9 +315,7 @@ def get_metadata_authorizer() -> MetadataActionAuthorizer:
     return MetadataActionAuthorizer()
 
 
-def authorize_with_metadata(
-    tool_name: str, intent: "ActionIntent"
-) -> bool:
+def authorize_with_metadata(tool_name: str, intent: "ActionIntent") -> bool:
     """Authorize a tool using metadata.
 
     Convenience function for quick authorization checks.

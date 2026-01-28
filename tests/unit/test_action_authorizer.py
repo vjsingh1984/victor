@@ -828,7 +828,9 @@ class TestPatternCompilationErrors:
         assert result.intent == ActionIntent.DISPLAY_ONLY
 
 
-@pytest.mark.skip(reason="Tool category constants (WRITE_TOOLS, READ_ONLY_TOOLS, GENERATION_TOOLS, INTENT_BLOCKED_TOOLS) removed in favor of metadata-based authorization")
+@pytest.mark.skip(
+    reason="Tool category constants (WRITE_TOOLS, READ_ONLY_TOOLS, GENERATION_TOOLS, INTENT_BLOCKED_TOOLS) removed in favor of metadata-based authorization"
+)
 class TestToolCategories:
     """Tests for tool category constants."""
 

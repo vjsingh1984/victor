@@ -100,7 +100,7 @@ def _detect_best_backend() -> "RenderBackend":
         return RenderBackend.D2
     try:
         import matplotlib
-        import networkx
+        import networkx  # type: ignore[import-untyped]
 
         return RenderBackend.MATPLOTLIB
     except ImportError:
@@ -912,7 +912,7 @@ class WorkflowVisualizer:
 
         matplotlib.use("Agg")  # Non-interactive backend
         import matplotlib.pyplot as plt
-        import networkx as nx
+        import networkx  # type: ignore[import-untyped] as nx
 
         # Build networkx graph
         G = nx.DiGraph()
@@ -1172,7 +1172,7 @@ def _has_matplotlib() -> bool:
     """Check if matplotlib is available."""
     try:
         import matplotlib
-        import networkx
+        import networkx  # type: ignore[import-untyped]
 
         return True
     except ImportError:

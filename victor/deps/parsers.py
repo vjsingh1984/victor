@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     try:
-        import tomllib  # type: ignore[import-not-found]
+        import tomllib  # type: ignore[import-untyped]
     except ImportError:
         pass
 
@@ -167,10 +167,10 @@ class PyprojectParser(BaseDependencyParser):
     def parse(self, path: Path) -> tuple[list[Dependency], list[Dependency]]:
         """Parse pyproject.toml file."""
         try:
-            import tomllib  # type: ignore[import-not-found]
+            import tomllib  # type: ignore[import-untyped]
         except ImportError:
             try:
-                import tomli as tomllib  # type: ignore[import-not-found]
+                import tomli as tomllib  # type: ignore[import-untyped]
             except ImportError:
                 logger.error("Neither tomllib nor tomli available")
                 return [], []
@@ -373,10 +373,10 @@ class CargoTomlParser(BaseDependencyParser):
     def parse(self, path: Path) -> tuple[list[Dependency], list[Dependency]]:
         """Parse Cargo.toml file."""
         try:
-            import tomllib  # type: ignore[import-not-found]
+            import tomllib  # type: ignore[import-untyped]
         except ImportError:
             try:
-                import tomli as tomllib  # type: ignore[import-not-found]
+                import tomli as tomllib  # type: ignore[import-untyped]
             except ImportError:
                 logger.error("Neither tomllib nor tomli available")
                 return [], []

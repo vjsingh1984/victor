@@ -164,6 +164,7 @@ from victor.core.verticals.mutable_context import MutableVerticalContext
 if TYPE_CHECKING:
     from victor.framework.step_handlers import StepHandlerRegistry
     from victor.core.verticals.base import VerticalBase
+    from victor.core.cache import VerticalIntegrationCache
 
 # Import protocols for runtime isinstance checks
 
@@ -875,14 +876,10 @@ class VerticalIntegrationPipeline:
         if self._enable_cache:
             cached_result = self._cache_service.get(vertical_class, config_overrides)
             if cached_result is not None:
-                logger.debug(
-                    f"Cache HIT for vertical '{vertical_class.name}'"
-                )
+                logger.debug(f"Cache HIT for vertical '{vertical_class.name}'")
                 return cached_result
             else:
-                logger.debug(
-                    f"Cache MISS for vertical '{vertical_class.name}'"
-                )
+                logger.debug(f"Cache MISS for vertical '{vertical_class.name}'")
 
         # Run pre-hooks
         for hook in self._pre_hooks:
@@ -1004,14 +1001,10 @@ class VerticalIntegrationPipeline:
         if self._enable_cache:
             cached_result = self._cache_service.get(vertical_cls, config_overrides)
             if cached_result is not None:
-                logger.debug(
-                    f"Cache HIT for vertical '{vertical_cls.name}'"
-                )
+                logger.debug(f"Cache HIT for vertical '{vertical_cls.name}'")
                 return cached_result
             else:
-                logger.debug(
-                    f"Cache MISS for vertical '{vertical_cls.name}'"
-                )
+                logger.debug(f"Cache MISS for vertical '{vertical_cls.name}'")
 
         # Create context and result
         result = IntegrationResult(vertical_name=vertical_cls.name)

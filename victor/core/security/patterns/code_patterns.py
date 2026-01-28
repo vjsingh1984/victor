@@ -529,31 +529,31 @@ class CodePatternScanner:
             (re.compile(p.pattern, re.IGNORECASE), p) for p in self._file_patterns
         ]
 
-    def scan_command(self, command: str) -> ScanResult:
+    def scan_command(self, command: str) -> SafetyScanResult:
         """Scan a command for dangerous patterns.
 
         Args:
             command: Shell command to scan
 
         Returns:
-            ScanResult with matched patterns
+            SafetyScanResult with matched patterns
         """
-        result = ScanResult()
+        result = SafetyScanResult()
         for regex, pattern in self._compiled_patterns:
             if regex.search(command):
                 result.add_match(pattern)
         return result
 
-    def scan_commands(self, commands: List[str]) -> ScanResult:
+    def scan_commands(self, commands: List[str]) -> SafetyScanResult:
         """Scan multiple commands for dangerous patterns.
 
         Args:
             commands: List of shell commands
 
         Returns:
-            Combined ScanResult
+            Combined SafetyScanResult
         """
-        result = ScanResult()
+        result = SafetyScanResult()
         for command in commands:
             for regex, pattern in self._compiled_patterns:
                 if regex.search(command):
@@ -574,16 +574,16 @@ class CodePatternScanner:
                 return True
         return False
 
-    def scan_file_path(self, path: str) -> ScanResult:
+    def scan_file_path(self, path: str) -> SafetyScanResult:
         """Scan a file path for sensitive patterns.
 
         Args:
             path: File path to scan
 
         Returns:
-            ScanResult with matched patterns
+            SafetyScanResult with matched patterns
         """
-        result = ScanResult()
+        result = SafetyScanResult()
         for regex, pattern in self._compiled_file_patterns:
             if regex.search(path):
                 result.add_match(pattern)
@@ -685,7 +685,7 @@ __all__ = [
     "SHELL_INJECTION_PATTERNS",
     "SENSITIVE_FILE_PATTERNS",
     # Classes
-    "ScanResult",
+    "SafetyScanResult",
     "CodePatternScanner",
     # Functions
     "scan_command",

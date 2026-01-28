@@ -994,7 +994,7 @@ class KubernetesDeploymentHandler(DeploymentHandler):
         """Get or create Kubernetes CoreV1Api client."""
         if self._core_v1 is None:
             try:
-                from kubernetes import client, config as k8s_config  # type: ignore[import]
+                from kubernetes import client, config as k8s_config  # type: ignore[import-not-found]
 
                 # Try in-cluster config first, fall back to kubeconfig
                 try:

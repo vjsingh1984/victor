@@ -226,7 +226,7 @@ class TeamNodeRunner:
                     member_results = result.get("member_results", {})
                 else:
                     # TeamResult object
-                    final_output = getattr(result, "final_output", "")
+                    final_output = getattr(result, "final_output", "")  # type: ignore[unreachable]
                     metadata = getattr(result, "metadata", {})
                     iterations = metadata.get("iterations", 0) if metadata else 0
                     success = getattr(result, "success", True)

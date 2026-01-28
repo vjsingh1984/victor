@@ -373,7 +373,7 @@ class BrowserTool:
                     error="Page not available",
                 )
 
-            self._state.url = self._page.url
+            self._state.url = self._page.url  # type: ignore[unreachable]
             self._state.title = await self._page.title()
             self._state.page_count += 1
             self._state.action_count = 0  # Reset per-page counter
@@ -714,7 +714,7 @@ class BrowserTool:
                     timeout=timeout or self.config.element_timeout,
                 )
             else:
-                await self._page.wait_for_load_state("networkidle")  # type: ignore[unreachable]
+                await self._page.wait_for_load_state("networkidle")
 
             duration = int((datetime.now() - start).total_seconds() * 1000)
 

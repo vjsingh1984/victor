@@ -230,7 +230,7 @@ class LogEncryptor:
         self._fernet = None
 
         try:
-            from cryptography.fernet import Fernet  # type: ignore[import]
+            from cryptography.fernet import Fernet
 
             if key:
                 self._fernet = Fernet(key)

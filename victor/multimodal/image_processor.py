@@ -43,7 +43,7 @@ except ImportError:
     logger.warning("PIL/Pillow not available. Install with: pip install Pillow")
 
 try:
-    import cv2  # type: ignore[import-not-found]
+    import cv2
 
     OPENCV_AVAILABLE = True
 except ImportError:
@@ -51,7 +51,7 @@ except ImportError:
     logger.warning("OpenCV not available. Install with: pip install opencv-python")
 
 try:
-    import pytesseract  # type: ignore[import-not-found]
+    import pytesseract  # type: ignore[import-untyped]
 
     TESSERACT_AVAILABLE = True
 except ImportError:

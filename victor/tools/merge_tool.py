@@ -141,9 +141,7 @@ class MergeConflictTool(BaseTool):
         )
 
     async def execute(
-        self,
-        _exec_ctx: Optional[Dict[str, Any]] = None,
-        **kwargs: Any
+        self, _exec_ctx: Optional[Dict[str, Any]] = None, **kwargs: Any
     ) -> ToolResult:
         """Execute merge conflict action."""
         action = kwargs.get("action", "detect")

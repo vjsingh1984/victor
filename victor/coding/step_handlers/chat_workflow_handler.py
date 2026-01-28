@@ -100,10 +100,10 @@ class ChatWorkflowStepHandler(BaseStepHandler):
         """
         return 65  # After framework (60), before context (100)
 
-    def _do_apply(  # type: ignore[override]
+    def _do_apply(
         self,
         orchestrator: "AgentOrchestrator",
-        vertical: type["VerticalBase"],  # type: ignore[override]
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -132,7 +132,7 @@ class ChatWorkflowStepHandler(BaseStepHandler):
 
             # Get all workflows from the provider
             workflows = provider.get_workflows()
-            workflow_count = len(workflows)
+            len(workflows)
 
             # Register each workflow
             registered = 0

@@ -25,7 +25,7 @@ import re
 from typing import Dict, List, Optional, Set
 
 from victor.native.observability import InstrumentedAccelerator
-from victor.native.protocols import Symbol, SymbolType
+from victor.native.protocols import NativeSymbol, SymbolType
 
 
 # Standard library modules (Python 3.10+)
@@ -259,7 +259,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
     def get_version(self) -> Optional[str]:
         return self._version
 
-    def extract_functions(self, source: str, lang: str) -> List[Symbol]:
+    def extract_functions(self, source: str, lang: str) -> List[NativeSymbol]:
         """Extract function definitions from source."""
         with self._timed_call("extract_functions", lang=lang):
             if lang == "python":
@@ -268,7 +268,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
             # Currently supported: Python. See tree-sitter language registry for additions.
             return []
 
-    def extract_classes(self, source: str, lang: str) -> List[Symbol]:
+    def extract_classes(self, source: str, lang: str) -> List[NativeSymbol]:
         """Extract class definitions from source."""
         with self._timed_call("extract_classes", lang=lang):
             if lang == "python":
@@ -298,7 +298,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
             top_level = name.split(".")[0]
             return top_level in STDLIB_MODULES
 
-    def _extract_python_functions(self, source: str) -> List[Symbol]:
+    def _extract_python_functions(self, source: str) -> List[NativeSymbol]:
         """Extract functions from Python source using ast."""
         try:
             tree = ast.parse(source)
@@ -323,7 +323,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
                 signature = self._build_function_signature(node)
 
                 symbols.append(
-                    Symbol(
+                    NativeSymbol(
                         name=node.name,
                         type=SymbolType.FUNCTION,
                         line=node.lineno,
@@ -337,7 +337,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
 
         return symbols
 
-    def _extract_python_classes(self, source: str) -> List[Symbol]:
+    def _extract_python_classes(self, source: str) -> List[NativeSymbol]:
         """Extract classes from Python source using ast."""
         try:
             tree = ast.parse(source)
@@ -364,7 +364,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
                 signature += ":"
 
                 symbols.append(
-                    Symbol(
+                    NativeSymbol(
                         name=node.name,
                         type=SymbolType.CLASS,
                         line=node.lineno,

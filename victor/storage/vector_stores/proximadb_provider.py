@@ -583,7 +583,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # Stop embedded server if we started it
         if self._db and self._started:  # type: ignore[unreachable]
-            try:
+            try:  # type: ignore[unreachable]
                 await self._db.stop()
             except Exception:
                 pass

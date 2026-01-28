@@ -352,8 +352,8 @@ class ToolBudgetValidator:
         result = ValidationResult()
         result.context["budget"] = budget
 
-        # Type check
-        if not isinstance(budget, int):
+        # Type check (runtime validation for defensive programming)
+        if not isinstance(budget, int):  # type: ignore[unreachable]
             result.add_error(
                 f"Budget must be an integer, got {type(budget).__name__}: {budget!r}"
             )
@@ -362,9 +362,11 @@ class ToolBudgetValidator:
         # Range check
         if budget < self._min_budget:
             result.add_error(f"Budget ({budget}) is below minimum ({self._min_budget})")
+            return result
 
         if budget > self._max_budget:
             result.add_error(f"Budget ({budget}) exceeds maximum ({self._max_budget})")
+            return result
 
         # Recommendation check (warning only)
         if budget < self._recommended_min:
@@ -427,7 +429,7 @@ class ToolBudgetValidator:
             Budget clamped to [min_budget, max_budget], or recommended_min if invalid type
         """
         # Handle invalid types by returning recommended minimum
-        if not isinstance(budget, (int, float)):
+        if not isinstance(budget, (int, float)):  # type: ignore[unreachable]
             return self._recommended_min
 
         # Clamp to valid range

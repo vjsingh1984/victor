@@ -443,7 +443,7 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int = 2048,
         tools: Optional[List[ToolDefinition]] = None,
         **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]:  # type: ignore[override]
+    ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from llama.cpp server.
 
         Args:

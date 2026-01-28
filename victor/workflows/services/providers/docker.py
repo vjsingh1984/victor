@@ -45,16 +45,16 @@ from victor.workflows.services.definition import (
 from victor.workflows.services.providers.base import BaseServiceProvider
 
 if TYPE_CHECKING:
-    import docker  # type: ignore[import-not-found]
-    from docker.models.containers import Container  # type: ignore[import-not-found]
+    import docker
+    from docker.models.containers import Container
 
 logger = logging.getLogger(__name__)
 
 # Optional Docker SDK import
 try:
     import docker as docker_mod  # type: ignore[import-not-found]
-    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound
-    from docker.models.containers import Container  # type: ignore[import-not-found]
+    from docker.errors import APIError, ContainerError, ImageNotFound, NotFound  # type: ignore[import-not-found]
+    from docker.models.containers import Container
 
     DOCKER_AVAILABLE = True
 except ImportError:

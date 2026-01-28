@@ -132,8 +132,45 @@ class VerticalIntegrationCache:
             sorted_items = sorted(config_overrides.items())
             key_parts.append(json.dumps(sorted_items, sort_keys=True))
 
+        # Include YAML config file hash if available
+        yaml_hash = self._get_yaml_config_hash(vertical_class)
+        if yaml_hash:
+            key_parts.append(yaml_hash)
+
         key_string = ":".join(key_parts)
         return hashlib.sha256(key_string.encode()).hexdigest()
+
+    def _get_yaml_config_hash(self, vertical_class: Type) -> Optional[str]:
+        """Get hash of YAML config file if it exists.
+
+        Args:
+            vertical_class: The vertical class
+
+        Returns:
+            SHA256 hash of YAML file content, or None if file doesn't exist
+        """
+        import hashlib
+        from pathlib import Path
+
+        try:
+            # Get YAML config path from vertical class
+            yaml_path = None
+            if hasattr(vertical_class, "_get_yaml_config_path"):
+                yaml_path = vertical_class._get_yaml_config_path()
+
+            # If _get_yaml_config_path returns None, try get_config_path
+            if not yaml_path and hasattr(vertical_class, "get_config_path"):
+                yaml_path = vertical_class.get_config_path()
+
+            if yaml_path and Path(yaml_path).exists():
+                # Read and hash YAML file content
+                with open(yaml_path, "rb") as f:
+                    content = f.read()
+                return hashlib.sha256(content).hexdigest()
+        except Exception:
+            pass
+
+        return None
 
     def get(
         self,
@@ -221,8 +258,7 @@ class VerticalIntegrationCache:
                 # Store new entry
                 self._cache[key] = _CacheEntry(result, self._ttl)
                 logger.debug(
-                    f"Cached {vertical_class.__name__}: "
-                    f"key={key[:8]}... (TTL={self._ttl}s)"
+                    f"Cached {vertical_class.__name__}: " f"key={key[:8]}... (TTL={self._ttl}s)"
                 )
         except Exception as e:
             logger.warning(f"Cache set failed for {vertical_class.__name__}: {e}")
@@ -261,7 +297,9 @@ class VerticalIntegrationCache:
         """
         # This would require iterating over all keys, which is inefficient
         # For now, recommend clearing entire cache or implementing prefix search
-        logger.info(f"Invalidation requested for {vertical_class.__name__} (consider using clear() instead)")
+        logger.info(
+            f"Invalidation requested for {vertical_class.__name__} (consider using clear() instead)"
+        )
         self.clear()
 
 

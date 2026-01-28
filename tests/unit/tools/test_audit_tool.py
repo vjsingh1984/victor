@@ -30,7 +30,7 @@ from victor.core.security.audit import (
     ComplianceFramework,
     ComplianceRule,
     ComplianceViolation,
-    Severity,
+    AuditSeverity,
 )
 
 
@@ -60,7 +60,7 @@ def sample_event():
         event_id="evt_001",
         event_type=AuditEventType.FILE_READ,
         timestamp=datetime(2025, 1, 1, 12, 0, 0),
-        severity=Severity.INFO,
+        severity=AuditSeverity.INFO,
         actor="system",
         action="Read file src/main.py",
         resource="src/main.py",
@@ -637,7 +637,7 @@ class TestFormatMethods:
                 event_id=f"evt_{i}",
                 event_type=AuditEventType.FILE_READ,
                 timestamp=datetime(2025, 1, 1, 12, 0, 0),
-                severity=Severity.INFO,
+                severity=AuditSeverity.INFO,
                 actor="system",
                 action=f"Action {i}",
             )

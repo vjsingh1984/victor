@@ -640,7 +640,7 @@ class WorkflowDefinitionCompiler:
                     result = await result
                 if isinstance(result, dict):
                     return {**state, **result}
-                return state
+                return state  # type: ignore[unreachable]
 
             return transform_exec
 

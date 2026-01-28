@@ -436,7 +436,7 @@ class MCPClient:
 
             # Write asynchronously using run_in_executor to avoid blocking
             if self.process.stdin is None:
-                logger.error("Process stdin is None")
+                logger.error("Process stdin is None")  # type: ignore[unreachable]
                 return None
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(
@@ -670,7 +670,7 @@ class MCPClient:
             await asyncio.sleep(self._health_check_interval)
 
             if not self._running:
-                break
+                break  # type: ignore[unreachable]
 
             healthy = await self.ping()
 

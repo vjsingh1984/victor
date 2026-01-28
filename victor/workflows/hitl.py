@@ -887,7 +887,7 @@ class DefaultHITLHandler:
         elif request.hitl_type == HITLNodeType.REVIEW:
             return await self._handle_review(request)
         else:
-            return HITLResponse(
+            return HITLResponse(  # type: ignore[unreachable]
                 request_id=request.request_id,
                 status=HITLStatus.REJECTED,
                 approved=False,

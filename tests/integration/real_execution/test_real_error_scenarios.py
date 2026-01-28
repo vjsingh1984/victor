@@ -238,9 +238,9 @@ async def test_invalid_syntax_error_recovery(ollama_provider, ollama_model_name,
         "permission" in content_lower,  # Permission issue
     ]
 
-    assert any(success_indicators), (
-        f"Response should mention syntax issue OR file access restriction: {response.content[:200]}"
-    )
+    assert any(
+        success_indicators
+    ), f"Response should mention syntax issue OR file access restriction: {response.content[:200]}"
 
     print(f"✓ Syntax error response received: {response.content[:200]}...")
 

@@ -158,11 +158,20 @@ class ModelEventEmitter(IModelEventEmitter):
                 event_data = data or {}
             else:
                 # MessagingEvent form
-                final_topic = event.topic if hasattr(event, 'topic') else "model.request"
-                event_data = event.data if hasattr(event, 'data') else {}
+                final_topic = event.topic if hasattr(event, "topic") else "model.request"
+                event_data = event.data if hasattr(event, "data") else {}
 
             # For backward compatibility, convert to topic/data format
-            self._event_bus.emit(final_topic, event_data)  # type: ignore[attr-defined]
+            from victor.core.events.emit_helper import emit_event_sync
+
+            bus = self._get_bus()
+            if bus:
+                emit_event_sync(
+                    bus,
+                    topic=final_topic,
+                    data=event_data,
+                    source="ModelEventEmitter",
+                )
         except Exception as e:
             logger.debug(f"Failed to emit model event: {e}")
 

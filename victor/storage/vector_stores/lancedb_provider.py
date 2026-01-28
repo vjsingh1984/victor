@@ -243,8 +243,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         # Close existing connection
         if self.db:
-            try:
-                del self.db  # type: ignore[unreachable]
+            try:  # type: ignore[unreachable]
+                del self.db
             except Exception:
                 pass
             self.db = None
@@ -482,8 +482,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
             return 0
 
         # Count documents before deletion
-        try:
-            count_before = self.table.count_rows()  # type: ignore[unreachable]
+        try:  # type: ignore[unreachable]
+            count_before = self.table.count_rows()
         except (AttributeError, RuntimeError, ValueError):
             count_before = 0
 
@@ -525,8 +525,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         count = 0
         if self.table is not None:
-            try:
-                count = self.table.count_rows()  # type: ignore[unreachable]
+            try:  # type: ignore[unreachable]
+                count = self.table.count_rows()
             except (AttributeError, RuntimeError, ValueError):
                 count = 0
 

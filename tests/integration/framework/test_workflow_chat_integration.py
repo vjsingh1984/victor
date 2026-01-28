@@ -49,7 +49,7 @@ class TestWorkflowChatIntegration:
         assert final_state["iteration_count"] >= 1
         assert "final_response" in final_state
 
-        print(f"\nEnd-to-End Workflow Execution:")
+        print("\nEnd-to-End Workflow Execution:")
         print(f"  Iterations: {final_state['iteration_count']}")
         print(f"  Messages: {len(final_state['messages'])}")
         print(f"  Response: {final_state['final_response'][:100]}...")
@@ -87,7 +87,7 @@ class TestWorkflowChatIntegration:
         assert restored_state.messages == state.messages
         assert restored_state.iteration_count == state.iteration_count
 
-        print(f"\nMulti-Turn Conversation:")
+        print("\nMulti-Turn Conversation:")
         print(f"  Total messages: {len(state.messages)}")
         print(f"  Iterations: {state.iteration_count}")
 
@@ -101,7 +101,7 @@ class TestWorkflowChatIntegration:
             "metadata": {
                 "files_modified": ["main.py"],
                 "tools_used": ["read", "edit"],
-            }
+            },
         }
 
         # Workflow implementation result
@@ -111,18 +111,21 @@ class TestWorkflowChatIntegration:
             metadata={
                 "files_modified": ["main.py"],
                 "tools_used": ["read", "edit"],
-            }
+            },
         )
 
         # Verify equivalence
         assert legacy_result["content"] == workflow_result.content
         assert legacy_result["iteration_count"] == workflow_result.iteration_count
-        assert legacy_result["metadata"]["files_modified"] == workflow_result.metadata["files_modified"]
+        assert (
+            legacy_result["metadata"]["files_modified"]
+            == workflow_result.metadata["files_modified"]
+        )
 
-        print(f"\nWorkflow vs Legacy Parity:")
-        print(f"  Content matches: ✓")
-        print(f"  Iterations match: ✓")
-        print(f"  Metadata matches: ✓")
+        print("\nWorkflow vs Legacy Parity:")
+        print("  Content matches: ✓")
+        print("  Iterations match: ✓")
+        print("  Metadata matches: ✓")
 
     @pytest.mark.asyncio
     async def test_workflow_error_handling(self, auto_mock_docker_for_orchestrator):
@@ -140,10 +143,13 @@ class TestWorkflowChatIntegration:
         final_state = await self._simulate_workflow_with_error(initial_state)
 
         # Verify error was handled gracefully
-        assert "error" in final_state or final_state["iteration_count"] <= final_state["max_iterations"]
+        assert (
+            "error" in final_state
+            or final_state["iteration_count"] <= final_state["max_iterations"]
+        )
 
-        print(f"\nWorkflow Error Handling:")
-        print(f"  Error handled gracefully: ✓")
+        print("\nWorkflow Error Handling:")
+        print("  Error handled gracefully: ✓")
         print(f"  Final iteration: {final_state['iteration_count']}")
 
     @pytest.mark.asyncio
@@ -167,9 +173,7 @@ class TestWorkflowChatIntegration:
             }
 
         # Execute 10 concurrent workflows
-        results = await asyncio.gather(
-            *[execute_workflow(i) for i in range(10)]
-        )
+        results = await asyncio.gather(*[execute_workflow(i) for i in range(10)])
 
         # Verify all workflows completed
         assert len(results) == 10
@@ -177,9 +181,9 @@ class TestWorkflowChatIntegration:
             assert result["iteration_count"] >= 1
             assert len(result["messages"]) == 1
 
-        print(f"\nConcurrent Workflow Execution:")
+        print("\nConcurrent Workflow Execution:")
         print(f"  Concurrent workflows: {len(results)}")
-        print(f"  All completed successfully: ✓")
+        print("  All completed successfully: ✓")
 
     @pytest.mark.asyncio
     async def test_workflow_checkpoint_recovery(self, auto_mock_docker_for_orchestrator):
@@ -208,10 +212,10 @@ class TestWorkflowChatIntegration:
         assert recovered_state.iteration_count == 6
         assert len(recovered_state.messages) == 8  # 2 user + 6 assistant
 
-        print(f"\nWorkflow Checkpoint Recovery:")
-        print(f"  Checkpoint iteration: 5")
+        print("\nWorkflow Checkpoint Recovery:")
+        print("  Checkpoint iteration: 5")
         print(f"  Recovered iteration: {recovered_state.iteration_count}")
-        print(f"  Recovery successful: ✓")
+        print("  Recovery successful: ✓")
 
     async def _simulate_workflow_execution(self, initial_state: Dict[str, Any]) -> Dict[str, Any]:
         """Simulate workflow execution for testing."""
@@ -255,7 +259,11 @@ class TestProtocolConformance:
 
     def test_chat_state_protocol_conformance(self):
         """Verify MutableChatState conforms to ChatStateProtocol."""
-        from victor.framework.protocols import MutableChatState, ChatStateProtocol, verify_protocol_conformance
+        from victor.framework.protocols import (
+            MutableChatState,
+            ChatStateProtocol,
+            verify_protocol_conformance,
+        )
 
         state = MutableChatState()
 
@@ -271,19 +279,19 @@ class TestProtocolConformance:
         state.set_metadata("key", "value")
         assert state.get_metadata("key") == "value"
 
-        print(f"\nChatStateProtocol Conformance:")
-        print(f"  All required methods: ✓")
-        print(f"  Methods functional: ✓")
+        print("\nChatStateProtocol Conformance:")
+        print("  All required methods: ✓")
+        print("  Methods functional: ✓")
 
     def test_chat_result_protocol_conformance(self):
         """Verify ChatResult conforms to ChatResultProtocol."""
-        from victor.framework.protocols import ChatResult, ChatResultProtocol, verify_protocol_conformance
-
-        result = ChatResult(
-            content="Test response",
-            iteration_count=1,
-            metadata={"test": True}
+        from victor.framework.protocols import (
+            ChatResult,
+            ChatResultProtocol,
+            verify_protocol_conformance,
         )
+
+        result = ChatResult(content="Test response", iteration_count=1, metadata={"test": True})
 
         conforms, missing = verify_protocol_conformance(result, ChatResultProtocol)
 
@@ -294,9 +302,9 @@ class TestProtocolConformance:
         assert result.iteration_count == 1
         assert result.metadata["test"] is True
 
-        print(f"\nChatResultProtocol Conformance:")
-        print(f"  All required properties: ✓")
-        print(f"  Properties functional: ✓")
+        print("\nChatResultProtocol Conformance:")
+        print("  All required properties: ✓")
+        print("  Properties functional: ✓")
 
     @pytest.mark.asyncio
     async def test_workflow_chat_protocol_conformance(self):
@@ -305,12 +313,16 @@ class TestProtocolConformance:
 
         # Create mock workflow executor
         class MockWorkflowExecutor:
-            async def execute_chat_workflow(self, workflow_name: str, initial_state: Dict[str, Any]):
+            async def execute_chat_workflow(
+                self, workflow_name: str, initial_state: Dict[str, Any]
+            ):
                 from victor.framework.protocols import ChatResult
+
                 return ChatResult(content="Test", iteration_count=1)
 
             async def stream_chat_workflow(self, workflow_name: str, initial_state: Dict[str, Any]):
                 from victor.framework.protocols import ChatResult
+
                 yield ChatResult(content="Test", iteration_count=1)
 
             def list_workflows(self):
@@ -332,9 +344,9 @@ class TestProtocolConformance:
         info = executor.get_workflow_info("workflow1")
         assert info["name"] == "workflow1"
 
-        print(f"\nWorkflowChatProtocol Conformance:")
-        print(f"  All required methods: ✓")
-        print(f"  Methods functional: ✓")
+        print("\nWorkflowChatProtocol Conformance:")
+        print("  All required methods: ✓")
+        print("  Methods functional: ✓")
 
 
 @pytest.mark.integration
@@ -371,10 +383,10 @@ class TestStateSerialization:
         assert restored_state.iteration_count == state.iteration_count
         assert restored_state.get_metadata("task") == "greeting"
 
-        print(f"\nMutableChatState Serialization:")
-        print(f"  Serialization: ✓")
-        print(f"  Deserialization: ✓")
-        print(f"  Data integrity: ✓")
+        print("\nMutableChatState Serialization:")
+        print("  Serialization: ✓")
+        print("  Deserialization: ✓")
+        print("  Data integrity: ✓")
 
     def test_chat_result_serialization(self):
         """Test ChatResult can be serialized and deserialized."""
@@ -384,7 +396,7 @@ class TestStateSerialization:
         result = ChatResult(
             content="Success!",
             iteration_count=5,
-            metadata={"files": ["main.py"], "tools": ["read", "write"]}
+            metadata={"files": ["main.py"], "tools": ["read", "write"]},
         )
 
         # Serialize
@@ -395,9 +407,9 @@ class TestStateSerialization:
         assert result_dict["iteration_count"] == 5
         assert result_dict["metadata"]["files"] == ["main.py"]
 
-        print(f"\nChatResult Serialization:")
-        print(f"  Serialization: ✓")
-        print(f"  Data integrity: ✓")
+        print("\nChatResult Serialization:")
+        print("  Serialization: ✓")
+        print("  Data integrity: ✓")
 
     def test_empty_state_serialization(self):
         """Test empty state can be serialized and deserialized."""
@@ -418,5 +430,5 @@ class TestStateSerialization:
         # Note: get_metadata() requires a key argument, so we check metadata dict directly
         assert len(restored_state._metadata) == 0
 
-        print(f"\nEmpty State Serialization:")
-        print(f"  Empty state handling: ✓")
+        print("\nEmpty State Serialization:")
+        print("  Empty state handling: ✓")

@@ -272,14 +272,14 @@ class CascadingInvalidator:
             cache = cast(Optional["WorkflowCache"], cache_or_graph)
         elif cache_or_graph is None and isinstance(graph, DependencyGraph):
             # This branch should be unreachable for similar reasons
-            dep_graph = graph
+            dep_graph = graph  # type: ignore[unreachable]
         else:
             # This should be unreachable due to previous logic
             raise TypeError("CascadingInvalidator requires a DependencyGraph and optional cache")
 
         if dep_graph is None:
             # This should be unreachable due to previous logic
-            dep_graph = DependencyGraph()
+            dep_graph = DependencyGraph()  # type: ignore[unreachable]
 
         self.dependency_graph = dep_graph
         self.cache = cache  # Optional cache for convenience methods

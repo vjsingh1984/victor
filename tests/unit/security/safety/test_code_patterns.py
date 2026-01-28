@@ -24,7 +24,7 @@ from victor.core.security.patterns.code_patterns import (
     PACKAGE_MANAGER_PATTERNS,
     BUILD_DEPLOY_PATTERNS,
     SENSITIVE_FILE_PATTERNS,
-    ScanResult,
+    SafetyScanResult,
     scan_command,
     is_sensitive_file,
     get_all_patterns,
@@ -64,12 +64,12 @@ class TestPatternLists:
             assert pattern.category, "Category should not be empty"
 
 
-class TestScanResult:
-    """Tests for ScanResult dataclass."""
+class TestSafetyScanResult:
+    """Tests for SafetyScanResult dataclass."""
 
     def test_empty_result(self):
-        """Empty ScanResult should have correct defaults."""
-        result = ScanResult()
+        """Empty SafetyScanResult should have correct defaults."""
+        result = SafetyScanResult()
         assert result.matches == []
         assert result.risk_summary == {}
         assert result.has_critical is False
@@ -77,7 +77,7 @@ class TestScanResult:
 
     def test_add_match_high(self):
         """Adding HIGH match should update has_high."""
-        result = ScanResult()
+        result = SafetyScanResult()
         result.add_match(GIT_PATTERNS[0])  # First git pattern is HIGH
         assert result.has_high is True
         assert len(result.matches) == 1
@@ -93,7 +93,7 @@ class TestScanResult:
                 break
 
         if critical_pattern:
-            result = ScanResult()
+            result = SafetyScanResult()
             result.add_match(critical_pattern)
             assert result.has_critical is True
 
@@ -186,7 +186,7 @@ class TestCodePatternScanner:
         assert scanner.is_sensitive_file("package.json") is False
 
     def test_scan_file_path(self):
-        """scan_file_path should return ScanResult."""
+        """scan_file_path should return SafetyScanResult."""
         scanner = CodePatternScanner()
         result = scanner.scan_file_path(".env")
         assert len(result.matches) > 0

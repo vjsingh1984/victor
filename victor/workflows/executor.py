@@ -1668,7 +1668,7 @@ class WorkflowExecutor:
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return
+                return  # type: ignore[unreachable]
 
             # Quality based on success and speed
             quality = 0.9 if success else 0.3
@@ -1712,7 +1712,7 @@ class WorkflowExecutor:
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return
+                return  # type: ignore[unreachable]
 
             # Quality based on success and efficiency
             quality = 0.8 if success else 0.2

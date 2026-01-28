@@ -26,20 +26,16 @@ from victor.framework.protocols import (
     MessagesProtocol,
     StreamingProtocol,
     CapabilityRegistryProtocol,
-
     # Implementations
     ChatResult,
     MutableChatState,
-
     # Types and enums
     ChunkType,
     OrchestratorStreamChunk,
     CapabilityType,
     OrchestratorCapability,
-
     # Utilities
     verify_protocol_conformance,
-
     # Exceptions
     IncompatibleVersionError,
 )
@@ -71,7 +67,7 @@ class TestProtocolsPackageStructure:
         assert hasattr(ChatResultProtocol, "__protocol_attrs__")
         assert hasattr(WorkflowChatProtocol, "__protocol_attrs__")
 
-        print(f"\n✓ All protocols importable")
+        print("\n✓ All protocols importable")
 
     def test_all_implementations_importable(self):
         """Verify all implementations can be imported."""
@@ -81,7 +77,7 @@ class TestProtocolsPackageStructure:
         assert isinstance(ChatResult("test", 1), ChatResult)
         assert isinstance(MutableChatState(), MutableChatState)
 
-        print(f"\n✓ All implementations importable")
+        print("\n✓ All implementations importable")
 
     def test_all_types_importable(self):
         """Verify all types and enums can be imported."""
@@ -101,7 +97,7 @@ class TestProtocolsPackageStructure:
         with pytest.raises(IncompatibleVersionError):
             raise IncompatibleVersionError("test", "1.0", "0.5")
 
-        print(f"\n✓ All types importable")
+        print("\n✓ All types importable")
 
     def test_direct_module_imports(self):
         """Verify direct imports from specific modules work."""
@@ -117,7 +113,7 @@ class TestProtocolsPackageStructure:
         assert ChatStateProtocol is CSP
         assert OrchestratorProtocol is OP
 
-        print(f"\n✓ Direct module imports work")
+        print("\n✓ Direct module imports work")
 
 
 @pytest.mark.unit
@@ -132,7 +128,7 @@ class TestMutableChatState:
         assert state.iteration_count == 0
         assert state.get_metadata("any_key") is None
 
-        print(f"\n✓ Initial state is empty")
+        print("\n✓ Initial state is empty")
 
     def test_add_message(self):
         """Test adding messages to state."""
@@ -147,22 +143,20 @@ class TestMutableChatState:
         assert state.messages[1]["role"] == "assistant"
         assert state.messages[1]["content"] == "Hi there!"
 
-        print(f"\n✓ Messages added correctly")
+        print("\n✓ Messages added correctly")
 
     def test_add_message_with_tool_calls(self):
         """Test adding messages with tool calls."""
         state = MutableChatState()
 
-        tool_calls = [
-            {"name": "read_file", "arguments": {"path": "main.py"}}
-        ]
+        tool_calls = [{"name": "read_file", "arguments": {"path": "main.py"}}]
         state.add_message("assistant", "Reading file", tool_calls=tool_calls)
 
         assert len(state.messages) == 1
         assert "tool_calls" in state.messages[0]
         assert state.messages[0]["tool_calls"] == tool_calls
 
-        print(f"\n✓ Tool calls stored correctly")
+        print("\n✓ Tool calls stored correctly")
 
     def test_increment_iteration(self):
         """Test incrementing iteration count."""
@@ -177,7 +171,7 @@ class TestMutableChatState:
         state.increment_iteration()
         assert state.iteration_count == 3
 
-        print(f"\n✓ Iteration count increments correctly")
+        print("\n✓ Iteration count increments correctly")
 
     def test_metadata_operations(self):
         """Test metadata get/set operations."""
@@ -197,7 +191,7 @@ class TestMutableChatState:
         assert state.get_metadata("nonexistent", "default") == "default"
         assert state.get_metadata("nonexistent") is None
 
-        print(f"\n✓ Metadata operations work correctly")
+        print("\n✓ Metadata operations work correctly")
 
     def test_to_dict(self):
         """Test serializing state to dictionary."""
@@ -215,17 +209,17 @@ class TestMutableChatState:
         assert state_dict["iteration_count"] == 1
         assert state_dict["metadata"]["key"] == "value"
 
-        print(f"\n✓ State serializes to dict correctly")
+        print("\n✓ State serializes to dict correctly")
 
     def test_from_dict(self):
         """Test creating state from dictionary."""
         state_dict = {
             "messages": [
                 {"role": "user", "content": "Test"},
-                {"role": "assistant", "content": "Response"}
+                {"role": "assistant", "content": "Response"},
             ],
             "iteration_count": 2,
-            "metadata": {"key": "value"}
+            "metadata": {"key": "value"},
         }
 
         state = MutableChatState.from_dict(state_dict)
@@ -234,7 +228,7 @@ class TestMutableChatState:
         assert state.iteration_count == 2
         assert state.get_metadata("key") == "value"
 
-        print(f"\n✓ State deserializes from dict correctly")
+        print("\n✓ State deserializes from dict correctly")
 
     def test_serialization_roundtrip(self):
         """Test serialization and deserialization roundtrip."""
@@ -255,7 +249,7 @@ class TestMutableChatState:
         assert restored.iteration_count == original.iteration_count
         assert restored.get_metadata("test") == original.get_metadata("test")
 
-        print(f"\n✓ Serialization roundtrip preserves data")
+        print("\n✓ Serialization roundtrip preserves data")
 
     def test_clear_state(self):
         """Test clearing state."""
@@ -272,7 +266,7 @@ class TestMutableChatState:
         assert state.iteration_count == 0
         assert state.get_metadata("key") is None
 
-        print(f"\n✓ State clears correctly")
+        print("\n✓ State clears correctly")
 
     def test_repr(self):
         """Test string representation."""
@@ -287,7 +281,7 @@ class TestMutableChatState:
         assert "iteration=0" in repr_str
         assert "metadata_keys" in repr_str
 
-        print(f"\n✓ String representation works")
+        print("\n✓ String representation works")
 
 
 @pytest.mark.unit
@@ -296,25 +290,17 @@ class TestChatResult:
 
     def test_create_result(self):
         """Test creating a chat result."""
-        result = ChatResult(
-            content="Success!",
-            iteration_count=3,
-            metadata={"files": ["main.py"]}
-        )
+        result = ChatResult(content="Success!", iteration_count=3, metadata={"files": ["main.py"]})
 
         assert result.content == "Success!"
         assert result.iteration_count == 3
         assert result.metadata["files"] == ["main.py"]
 
-        print(f"\n✓ ChatResult created correctly")
+        print("\n✓ ChatResult created correctly")
 
     def test_to_dict(self):
         """Test serializing result to dictionary."""
-        result = ChatResult(
-            content="Test",
-            iteration_count=1,
-            metadata={"key": "value"}
-        )
+        result = ChatResult(content="Test", iteration_count=1, metadata={"key": "value"})
 
         result_dict = result.to_dict()
 
@@ -322,15 +308,11 @@ class TestChatResult:
         assert result_dict["iteration_count"] == 1
         assert result_dict["metadata"]["key"] == "value"
 
-        print(f"\n✓ ChatResult serializes correctly")
+        print("\n✓ ChatResult serializes correctly")
 
     def test_get_summary(self):
         """Test getting result summary."""
-        result = ChatResult(
-            content="x" * 100,
-            iteration_count=5,
-            metadata={"key": "value"}
-        )
+        result = ChatResult(content="x" * 100, iteration_count=5, metadata={"key": "value"})
 
         summary = result.get_summary()
 
@@ -338,7 +320,7 @@ class TestChatResult:
         assert "content_length=100" in summary
         assert "metadata_keys" in summary
 
-        print(f"\n✓ ChatResult summary works")
+        print("\n✓ ChatResult summary works")
 
     def test_immutable(self):
         """Test ChatResult is immutable (frozen dataclass)."""
@@ -348,7 +330,7 @@ class TestChatResult:
         with pytest.raises(Exception):  # FrozenInstanceError
             result.content = "Modified"
 
-        print(f"\n✓ ChatResult is immutable")
+        print("\n✓ ChatResult is immutable")
 
 
 @pytest.mark.unit
@@ -358,16 +340,14 @@ class TestOrchestratorStreamChunk:
     def test_create_content_chunk(self):
         """Test creating a content chunk."""
         chunk = OrchestratorStreamChunk(
-            chunk_type=ChunkType.CONTENT,
-            content="Hello",
-            is_final=False
+            chunk_type=ChunkType.CONTENT, content="Hello", is_final=False
         )
 
         assert chunk.chunk_type == ChunkType.CONTENT
         assert chunk.content == "Hello"
         assert chunk.is_final is False
 
-        print(f"\n✓ Content chunk created correctly")
+        print("\n✓ Content chunk created correctly")
 
     def test_create_tool_call_chunk(self):
         """Test creating a tool call chunk."""
@@ -375,7 +355,7 @@ class TestOrchestratorStreamChunk:
             chunk_type=ChunkType.TOOL_CALL,
             tool_name="read_file",
             tool_id="123",
-            tool_arguments={"path": "main.py"}
+            tool_arguments={"path": "main.py"},
         )
 
         assert chunk.chunk_type == ChunkType.TOOL_CALL
@@ -383,21 +363,19 @@ class TestOrchestratorStreamChunk:
         assert chunk.tool_id == "123"
         assert chunk.tool_arguments["path"] == "main.py"
 
-        print(f"\n✓ Tool call chunk created correctly")
+        print("\n✓ Tool call chunk created correctly")
 
     def test_create_stage_change_chunk(self):
         """Test creating a stage change chunk."""
         chunk = OrchestratorStreamChunk(
-            chunk_type=ChunkType.STAGE_CHANGE,
-            old_stage="READING",
-            new_stage="EXECUTING"
+            chunk_type=ChunkType.STAGE_CHANGE, old_stage="READING", new_stage="EXECUTING"
         )
 
         assert chunk.chunk_type == ChunkType.STAGE_CHANGE
         assert chunk.old_stage == "READING"
         assert chunk.new_stage == "EXECUTING"
 
-        print(f"\n✓ Stage change chunk created correctly")
+        print("\n✓ Stage change chunk created correctly")
 
 
 @pytest.mark.unit
@@ -411,7 +389,7 @@ class TestOrchestratorCapability:
             capability_type=CapabilityType.TOOL,
             version="1.0",
             setter="set_test",
-            description="Test capability"
+            description="Test capability",
         )
 
         assert cap.name == "test_capability"
@@ -419,25 +397,19 @@ class TestOrchestratorCapability:
         assert cap.version == "1.0"
         assert cap.setter == "set_test"
 
-        print(f"\n✓ Capability created correctly")
+        print("\n✓ Capability created correctly")
 
     def test_capability_requires_accessor(self):
         """Test capability must have at least one accessor."""
         with pytest.raises(ValueError):
-            OrchestratorCapability(
-                name="invalid",
-                capability_type=CapabilityType.TOOL
-            )
+            OrchestratorCapability(name="invalid", capability_type=CapabilityType.TOOL)
 
-        print(f"\n✓ Capability validation works")
+        print("\n✓ Capability validation works")
 
     def test_version_compatibility(self):
         """Test version compatibility checking."""
         cap = OrchestratorCapability(
-            name="test",
-            capability_type=CapabilityType.TOOL,
-            version="2.1",
-            setter="set_test"
+            name="test", capability_type=CapabilityType.TOOL, version="2.1", setter="set_test"
         )
 
         # Compatible versions
@@ -449,7 +421,7 @@ class TestOrchestratorCapability:
         assert cap.is_compatible_with("2.2") is False
         assert cap.is_compatible_with("3.0") is False
 
-        print(f"\n✓ Version compatibility checking works")
+        print("\n✓ Version compatibility checking works")
 
     def test_version_validation(self):
         """Test version format validation."""
@@ -457,10 +429,7 @@ class TestOrchestratorCapability:
         valid_versions = ["1.0", "2.1", "10.20", "1.0.0", "2.1.3"]
         for version in valid_versions:
             cap = OrchestratorCapability(
-                name="test",
-                capability_type=CapabilityType.TOOL,
-                version=version,
-                setter="set_test"
+                name="test", capability_type=CapabilityType.TOOL, version=version, setter="set_test"
             )
             assert cap.version == version
 
@@ -472,10 +441,10 @@ class TestOrchestratorCapability:
                     name="test",
                     capability_type=CapabilityType.TOOL,
                     version=version,
-                    setter="set_test"
+                    setter="set_test",
                 )
 
-        print(f"\n✓ Version validation works")
+        print("\n✓ Version validation works")
 
 
 @pytest.mark.unit
@@ -492,7 +461,7 @@ class TestProtocolVerification:
         assert conforms is True
         assert len(missing) == 0
 
-        print(f"\n✓ Protocol verification passes for conforming object")
+        print("\n✓ Protocol verification passes for conforming object")
 
     def test_verify_protocol_conformance_failure(self):
         """Test verifying non-conforming object."""
@@ -504,15 +473,14 @@ class TestProtocolVerification:
         assert conforms is False
         assert len(missing) > 0
 
-        print(f"\n✓ Protocol verification fails for non-conforming object")
+        print("\n✓ Protocol verification fails for non-conforming object")
 
     def test_verify_custom_protocol(self):
         """Test verifying custom protocol."""
         from typing import Protocol
 
         class CustomProtocol(Protocol):
-            def custom_method(self) -> str:
-                ...
+            def custom_method(self) -> str: ...
 
         class ConformingImplementation:
             def custom_method(self) -> str:
@@ -522,18 +490,14 @@ class TestProtocolVerification:
             pass
 
         # Conforming
-        conforms, missing = verify_protocol_conformance(
-            ConformingImplementation(),
-            CustomProtocol
-        )
+        conforms, missing = verify_protocol_conformance(ConformingImplementation(), CustomProtocol)
         assert conforms is True
 
         # Non-conforming
         conforms, missing = verify_protocol_conformance(
-            NonConformingImplementation(),
-            CustomProtocol
+            NonConformingImplementation(), CustomProtocol
         )
         assert conforms is False
         assert "custom_method" in missing
 
-        print(f"\n✓ Custom protocol verification works")
+        print("\n✓ Custom protocol verification works")

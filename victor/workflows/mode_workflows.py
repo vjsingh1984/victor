@@ -102,7 +102,7 @@ class ModeWorkflowProvider(WorkflowProviderProtocol):
             elif isinstance(loaded, dict):
                 self._workflows = loaded
             else:
-                self._workflows = {}
+                self._workflows = {}  # type: ignore[unreachable]
 
             logger.debug(f"Loaded {len(self._workflows) if self._workflows else 0} mode workflows")
             return self._workflows if self._workflows is not None else {}

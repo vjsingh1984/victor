@@ -71,7 +71,7 @@ from victor.providers.circuit_breaker import (
 # Resilient Provider (Circuit Breaker + Retry + Fallback)
 # From: victor/providers/resilience.py
 # =============================================================================
-from victor.providers.resilience import (  # type: ignore[attr-defined]
+from victor.providers.resilience import (
     CircuitBreakerConfig,
     CircuitBreakerState,
     CircuitOpenError,

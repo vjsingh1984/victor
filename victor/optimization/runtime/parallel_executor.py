@@ -629,13 +629,13 @@ class AdaptiveParallelExecutor(ParallelExecutor):
             if isinstance(task, tuple) and len(task) == 2:
                 priority, task_input = task
                 if (
-                    isinstance(priority, int)
+                    isinstance(priority, int)  # type: ignore[unreachable]
                     and isinstance(task_input, tuple)  # type: ignore[unreachable]
                     and len(task_input) == 2
                     and callable(task_input[0])
-                    and isinstance(task_input[1], dict)  # type: ignore[unreachable]
+                    and isinstance(task_input[1], dict)
                 ):
-                    heappush(priority_queue, TaskWithPriority(priority, task_id, task_input))
+                    heappush(priority_queue, TaskWithPriority(priority, task_id, task_input))  # type: ignore[unreachable]
                 else:
                     # Priority queue with task function (not dict format)
                     heappush(
@@ -643,7 +643,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
                         TaskWithPriority(
                             priority if isinstance(priority, int) else 0, task_id, task_input  # type: ignore[arg-type]
                         ),
-                    )  # type: ignore[unreachable]
+                    )
             else:
                 # Default priority
                 heappush(priority_queue, TaskWithPriority(0, task_id, task))

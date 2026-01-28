@@ -40,7 +40,7 @@ class RAGListTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.FREE
 
-    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
         """List all documents.
 
         Returns:
@@ -164,7 +164,7 @@ class RAGDeleteTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.LOW
 
-    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
         """Delete a document.
 
         Args:
@@ -229,7 +229,7 @@ class RAGStatsTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.FREE
 
-    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
         """Get store statistics.
 
         Returns:

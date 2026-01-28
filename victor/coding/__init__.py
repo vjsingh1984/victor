@@ -64,6 +64,7 @@ from victor.coding.chat_workflow_provider import (
     CodingChatWorkflowProvider,
     get_chat_workflow_provider,
 )
+
 # Temporarily commented out - depends on untracked file being worked on by another agent
 # from victor.coding.chat_state import CodingChatState
 

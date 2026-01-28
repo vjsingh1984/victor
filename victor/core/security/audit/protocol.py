@@ -89,10 +89,6 @@ class AuditSeverity(str, Enum):
     CRITICAL = "critical"
 
 
-# Backward compatibility alias
-Severity = AuditSeverity
-
-
 class ComplianceFramework(str, Enum):
     """Supported compliance frameworks."""
 

@@ -1409,7 +1409,9 @@ class Settings(BaseSettings):
     # Phase 5: Metadata-based tool authorization
     # Replaces hard-coded tool lists (WRITE_TOOLS, READ_ONLY_TOOLS, etc.)
     # with ToolAuthMetadataRegistry for dynamic authorization
-    use_metadata_authorization: bool = True  # Enable metadata-based tool authorization (default as of v0.5.0)
+    use_metadata_authorization: bool = (
+        True  # Enable metadata-based tool authorization (default as of v0.5.0)
+    )
 
     # ==========================================================================
     # Event System Configuration (Canonical core/events)

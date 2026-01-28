@@ -695,7 +695,3 @@ def get_store() -> ConversationPersistence:
     if _store is None:
         _store = ConversationPersistence()
     return _store
-
-
-# Backward compatibility alias
-ConversationStore = ConversationPersistence

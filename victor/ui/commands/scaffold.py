@@ -241,7 +241,7 @@ def new_vertical(
     """
     # Check for Jinja2
     if Environment is None:
-        console.print(
+        console.print(  # type: ignore[unreachable]
             "[red]Error: Jinja2 is required for scaffolding. "
             "Install it with: pip install jinja2[/]"
         )

@@ -379,7 +379,7 @@ class ToolResultCache:
                         return best_match.result
                 else:
                     # embedding is None
-                    self.stats.misses += 1
+                    self.stats.misses += 1  # type: ignore[unreachable]
                     return None
 
             except Exception as e:
@@ -462,7 +462,7 @@ class ToolResultCache:
             embedding = await self.embedding_service.embed_text(query_text)
 
             if embedding is None:
-                return False
+                return False  # type: ignore[unreachable]
 
             embedding_array = np.array(embedding, dtype=np.float32)
             self._ensure_faiss_index(len(embedding_array))

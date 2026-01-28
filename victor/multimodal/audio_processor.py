@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 # Optional dependencies with graceful fallback
 try:
-    import whisper  # type: ignore[import-not-found]
+    import whisper  # type: ignore[import-untyped]
 
     WHISPER_AVAILABLE = True
 except ImportError:
@@ -40,7 +40,7 @@ except ImportError:
     logger.warning("Whisper not available. Install with: pip install openai-whisper")
 
 try:
-    from pydub import AudioSegment  # type: ignore[import-not-found]
+    from pydub import AudioSegment  # type: ignore[import-untyped]
 
     PYDUB_AVAILABLE = True
 except ImportError:
@@ -48,7 +48,7 @@ except ImportError:
     logger.warning("pydub not available. Install with: pip install pydub")
 
 try:
-    import moviepy.editor as mp  # type: ignore[import-not-found]
+    import moviepy.editor as mp  # type: ignore[import-untyped]
 
     MOVIEPY_AVAILABLE = True
 except ImportError:

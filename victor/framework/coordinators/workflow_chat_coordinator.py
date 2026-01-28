@@ -489,9 +489,7 @@ class WorkflowChatCoordinator:
         """
         if session_id in self._sessions:
             self._sessions[session_id]["messages"] = final_state.get("messages", [])
-            self._sessions[session_id]["iteration_count"] = final_state.get(
-                "iteration_count", 0
-            )
+            self._sessions[session_id]["iteration_count"] = final_state.get("iteration_count", 0)
             self._sessions[session_id]["metadata"] = final_state.get("metadata", {})
 
     def _get_workflow(self, workflow_name: str) -> Dict[str, Any]:
@@ -510,8 +508,7 @@ class WorkflowChatCoordinator:
         if workflow is None:
             available = list(self._workflow_registry._workflows.keys())
             raise ValueError(
-                f"Workflow '{workflow_name}' not found. "
-                f"Available workflows: {available}"
+                f"Workflow '{workflow_name}' not found. " f"Available workflows: {available}"
             )
         return workflow
 

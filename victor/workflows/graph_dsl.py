@@ -153,7 +153,7 @@ class State(ABC):
             Dictionary representation of state
         """
         if is_dataclass(self):
-            return {f.name: getattr(self, f.name) for f in fields(self)}
+            return {f.name: getattr(self, f.name) for f in fields(self)}  # type: ignore[unreachable]
         return self.__dict__.copy()
 
     @classmethod
@@ -167,7 +167,7 @@ class State(ABC):
             New state instance
         """
         if is_dataclass(cls):
-            field_names = {f.name for f in fields(cls)}
+            field_names = {f.name for f in fields(cls)}  # type: ignore[unreachable]
             filtered = {k: v for k, v in data.items() if k in field_names}
             return cls(**filtered)
         instance = object.__new__(cls)

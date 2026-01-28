@@ -290,6 +290,7 @@ if TYPE_CHECKING:
     from victor.agent.safety import SafetyChecker
     from victor.agent.auto_commit import AutoCommitter
     from victor.agent.conversation_manager import ConversationManager
+    from victor.agent.coordinators.middleware_coordinator import MiddlewareCoordinator
 
 # Tools with progressive parameters - different params = progress, not a loop
 # Format: tool_name -> list of param names that indicate progress

@@ -40,11 +40,13 @@ from victor.agent.capabilities.base import CapabilitySpec
 importlib_metadata: Any | None = None
 try:
     import importlib.metadata as importlib_metadata_pkg
+
     importlib_metadata = importlib_metadata_pkg
 except ImportError:
     # Python < 3.8 - use stub package if available
     try:
         import importlib_metadata as importlib_metadata_fallback
+
         importlib_metadata = importlib_metadata_fallback
     except ImportError:
         # Create a minimal stub for type checking

@@ -138,7 +138,9 @@ class TestCodingVerticalMigration:
     have been defined but not yet integrated into CodingAssistant.
     """
 
-    @pytest.mark.skip(reason="Phase 3 migration: FileOperationsCapability not yet integrated into CodingAssistant")
+    @pytest.mark.skip(
+        reason="Phase 3 migration: FileOperationsCapability not yet integrated into CodingAssistant"
+    )
     def test_coding_vertical_uses_framework_file_ops(self):
         """Test that CodingVertical uses FileOperationsCapability."""
         from victor.coding import CodingAssistant
@@ -147,7 +149,9 @@ class TestCodingVerticalMigration:
         assert hasattr(CodingAssistant, "_file_ops")
         assert isinstance(CodingAssistant._file_ops, FileOperationsCapability)
 
-    @pytest.mark.skip(reason="Phase 3 migration: PromptContributionCapability not yet integrated into CodingAssistant")
+    @pytest.mark.skip(
+        reason="Phase 3 migration: PromptContributionCapability not yet integrated into CodingAssistant"
+    )
     def test_coding_vertical_uses_framework_prompt_contrib(self):
         """Test that CodingVertical uses PromptContributionCapability."""
         from victor.coding import CodingAssistant
@@ -156,7 +160,9 @@ class TestCodingVerticalMigration:
         assert hasattr(CodingAssistant, "_prompt_contrib")
         assert isinstance(CodingAssistant._prompt_contrib, PromptContributionCapability)
 
-    @pytest.mark.skip(reason="Phase 3 migration: Framework tools not yet integrated into CodingAssistant.get_tools()")
+    @pytest.mark.skip(
+        reason="Phase 3 migration: Framework tools not yet integrated into CodingAssistant.get_tools()"
+    )
     def test_coding_tools_include_framework_tools(self):
         """Test that CodingVertical.get_tools includes framework tools."""
         from victor.coding import CodingAssistant
@@ -169,7 +175,9 @@ class TestCodingVerticalMigration:
         assert "edit" in tools
         assert "grep" in tools
 
-    @pytest.mark.skip(reason="Phase 3 migration: Vertical-specific tools not yet integrated via framework")
+    @pytest.mark.skip(
+        reason="Phase 3 migration: Vertical-specific tools not yet integrated via framework"
+    )
     def test_coding_tools_include_vertical_specific_tools(self):
         """Test that CodingVertical.get_tools includes vertical-specific tools."""
         from victor.coding import CodingAssistant

@@ -33,7 +33,7 @@ from .protocol import (
     AuditEvent,
     AuditEventType,
     AuditLoggerProtocol,
-    Severity,
+    AuditSeverity,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ class FileAuditLogger(AuditLoggerProtocol):
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         event_types: list[AuditEventType] | None = None,
-        severity: Severity | None = None,
+        severity: AuditSeverity | None = None,
         actor: str | None = None,
         limit: int = 100,
     ) -> list[AuditEvent]:
@@ -244,7 +244,7 @@ def create_event(
     event_type: AuditEventType,
     action: str,
     actor: str | None = None,
-    severity: Severity = Severity.INFO,
+    severity: AuditSeverity = AuditSeverity.INFO,
     resource: str | None = None,
     outcome: str = "success",
     metadata: dict[str, Any] | None = None,

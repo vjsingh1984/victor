@@ -25,7 +25,7 @@ from unittest.mock import patch
 
 from victor.framework.rl.base import RLOutcome
 from victor.framework.rl.coordinator import RLCoordinator
-from victor.framework.rl.learners.mode_transition import ModeTransitionLearner, AgentMode
+from victor.framework.rl.learners.mode_transition import ModeTransitionLearner, RLAgentMode
 from victor.core.database import reset_database, get_database
 from victor.core.schema import Tables
 
@@ -339,11 +339,11 @@ class TestModeTransitionLearner:
 
     def test_valid_transitions(self, learner: ModeTransitionLearner) -> None:
         """Test valid transition definitions."""
-        assert AgentMode.PLAN in learner.VALID_TRANSITIONS[AgentMode.EXPLORE]
-        assert AgentMode.BUILD in learner.VALID_TRANSITIONS[AgentMode.PLAN]
-        assert AgentMode.REVIEW in learner.VALID_TRANSITIONS[AgentMode.BUILD]
-        assert AgentMode.COMPLETE in learner.VALID_TRANSITIONS[AgentMode.REVIEW]
-        assert len(learner.VALID_TRANSITIONS[AgentMode.COMPLETE]) == 0
+        assert RLAgentMode.PLAN in learner.VALID_TRANSITIONS[RLAgentMode.EXPLORE]
+        assert RLAgentMode.BUILD in learner.VALID_TRANSITIONS[RLAgentMode.PLAN]
+        assert RLAgentMode.REVIEW in learner.VALID_TRANSITIONS[RLAgentMode.BUILD]
+        assert RLAgentMode.COMPLETE in learner.VALID_TRANSITIONS[RLAgentMode.REVIEW]
+        assert len(learner.VALID_TRANSITIONS[RLAgentMode.COMPLETE]) == 0
 
     def test_export_metrics(self, learner: ModeTransitionLearner) -> None:
         """Test metrics export."""

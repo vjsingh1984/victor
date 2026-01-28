@@ -25,7 +25,7 @@ from typing import Optional
 from victor.core.security.protocol import (
     SecurityPolicy,
     SecurityScanResult,
-    Severity,
+    CVECVESeverity,
 )
 from victor.security_analysis.tools.scanner import get_scanner
 
@@ -150,7 +150,7 @@ class SecurityManager:
         lines.append(f"Total vulnerabilities: {result.total_vulnerabilities}")
         lines.append("")
 
-        # Severity breakdown
+        # CVESeverity breakdown
         lines.append("SEVERITY BREAKDOWN")
         lines.append("-" * 40)
         lines.append(f"  Critical: {result.critical_count}")
@@ -172,7 +172,7 @@ class SecurityManager:
             lines.append("")
 
         # Vulnerabilities by severity
-        for severity in [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]:
+        for severity in [CVESeverity.CRITICAL, CVESeverity.HIGH, CVESeverity.MEDIUM, CVESeverity.LOW]:
             vulns = result.get_by_severity(severity)
             if vulns:
                 lines.append(f"{severity.value.upper()} VULNERABILITIES")
@@ -237,7 +237,7 @@ class SecurityManager:
             lines.append("## Vulnerabilities")
             lines.append("")
 
-            for severity in [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]:
+            for severity in [CVESeverity.CRITICAL, CVESeverity.HIGH, CVESeverity.MEDIUM, CVESeverity.LOW]:
                 vulns = result.get_by_severity(severity)
                 if vulns:
                     lines.append(f"### {severity.value.capitalize()}")

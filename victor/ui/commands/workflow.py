@@ -1268,7 +1268,7 @@ def list_presets(
             category_presets: list[WorkflowPreset] = []
             for preset_name in preset_names:
                 workflow_preset = get_workflow_preset(preset_name)
-                if workflow_preset and getattr(workflow_preset, 'category', None) == category:
+                if workflow_preset and getattr(workflow_preset, "category", None) == category:
                     category_presets.append(workflow_preset)
 
             if not category_presets:
@@ -1277,23 +1277,22 @@ def list_presets(
                 all_presets = [get_workflow_preset(n) for n in preset_names]
                 available_categories_set: set[str] = set()
                 for p in all_presets:
-                    if p and hasattr(p, 'category'):
-                        cat = getattr(p, 'category', None)
+                    if p and hasattr(p, "category"):
+                        cat = getattr(p, "category", None)
                         if cat is not None:
                             available_categories_set.add(cat)
                 if available_categories_set:
                     console.print(f"Available: {', '.join(sorted(available_categories_set))}")
                 raise typer.Exit(1)
 
-            for workflow_preset in sorted(category_presets, key=lambda x: x.name if hasattr(x, 'name') else ''):
+            for workflow_preset in sorted(
+                category_presets, key=lambda x: x.name if hasattr(x, "name") else ""
+            ):
                 console.print(f"  • [cyan]{workflow_preset.name}[/]: {workflow_preset.description}")
-                complexity = getattr(workflow_preset, 'complexity', None)
-                duration = getattr(workflow_preset, 'estimated_duration_minutes', None)
+                complexity = getattr(workflow_preset, "complexity", None)
+                duration = getattr(workflow_preset, "estimated_duration_minutes", None)
                 if complexity is not None and duration is not None:
-                    console.print(
-                        f"    [dim]Complexity: {complexity}, "
-                        f"~{duration}min[/]"
-                    )
+                    console.print(f"    [dim]Complexity: {complexity}, " f"~{duration}min[/]")
         else:
             # Show all by category
             preset_names = list_workflow_presets()
@@ -1301,9 +1300,9 @@ def list_presets(
             for preset_name in preset_names:
                 workflow_preset = get_workflow_preset(preset_name)
                 if workflow_preset:
-                    cat = getattr(workflow_preset, 'category', 'uncategorized')
+                    cat = getattr(workflow_preset, "category", "uncategorized")
                     if cat is None:
-                        cat = 'uncategorized'
+                        cat = "uncategorized"
                     if cat not in by_category:
                         by_category[cat] = []
                     by_category[cat].append(workflow_preset)
@@ -1311,7 +1310,9 @@ def list_presets(
             for cat, category_presets in sorted(by_category.items()):
                 console.print(f"  [bold]{cat.title()}[/]")
                 for workflow_preset in sorted(category_presets, key=lambda x: x.name):
-                    console.print(f"    • [cyan]{workflow_preset.name}[/]: {workflow_preset.description}")
+                    console.print(
+                        f"    • [cyan]{workflow_preset.name}[/]: {workflow_preset.description}"
+                    )
 
                 console.print()
 

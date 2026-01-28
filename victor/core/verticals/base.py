@@ -540,7 +540,9 @@ class VerticalBase(
                                     builder.add_section(
                                         section_name,
                                         section_config,
-                                        priority=prompt_config.get("priorities", {}).get(section_name, 50)
+                                        priority=prompt_config.get("priorities", {}).get(
+                                            section_name, 50
+                                        ),
                                     )
                                 elif isinstance(section_config, dict):
                                     # Detailed section override
@@ -549,7 +551,7 @@ class VerticalBase(
                                         builder.add_section(
                                             section_name,
                                             override_text,
-                                            priority=section_config.get("priority", 50)
+                                            priority=section_config.get("priority", 50),
                                         )
 
                                     # Support for file-based sections
@@ -560,7 +562,7 @@ class VerticalBase(
                                             builder.add_section(
                                                 section_name,
                                                 section_file_path.read_text(),
-                                                priority=section_config.get("priority", 50)
+                                                priority=section_config.get("priority", 50),
                                             )
 
                             # Add extra sections if present
@@ -1686,7 +1688,7 @@ class VerticalRegistry:
         try:
             # Try to call the abstract methods to ensure they're implemented
             # These are classmethods so we can call them on the class
-            tools = vertical_class.get_tools()
+            vertical_class.get_tools()
             # Note: tools type is List per VerticalBase protocol
         except NotImplementedError:
             logger.warning(
@@ -1696,7 +1698,7 @@ class VerticalRegistry:
             return False
 
         try:
-            prompt = vertical_class.get_system_prompt()
+            vertical_class.get_system_prompt()
             # Note: prompt type is str per VerticalBase protocol
         except NotImplementedError:
             logger.warning(

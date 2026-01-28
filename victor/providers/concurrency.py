@@ -519,7 +519,10 @@ class RequestQueue:
             except RuntimeError as e:
                 # "no running event loop" errors - suppress log flooding
                 error_str = str(e).lower()
-                if "no running event loop" in error_str or "there is no current event loop" in error_str:
+                if (
+                    "no running event loop" in error_str
+                    or "there is no current event loop" in error_str
+                ):
                     # Event loop closed - worker should exit gracefully
                     logger.debug(f"{worker_name}: Event loop closed, exiting worker loop")
                 else:

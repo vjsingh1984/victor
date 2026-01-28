@@ -269,7 +269,7 @@ class TeamCommunicationProtocol:
                     )
                 )
 
-            return response  # type: ignore[no-any-return]
+            return response
 
         except asyncio.TimeoutError:
             logger.warning(f"Request from {sender_id} to {recipient_id} timed out")
@@ -1144,7 +1144,7 @@ class NegotiationFramework:
             return await self._ranked_choice_negotiation(proposal_objs, topic, context)
         else:
             # Default to voting
-            return await self._voting_negotiation(proposal_objs, topic, context)
+            return await self._voting_negotiation(proposal_objs, topic, context)  # type: ignore[unreachable]
 
     async def _voting_negotiation(
         self,

@@ -369,7 +369,7 @@ class SQLiteService(ServiceLifecycle):
         logger.info(f"Initializing SQLite service: {config.name} at {db_path}")
 
         try:
-            import aiosqlite  # type: ignore[import-untyped]
+            import aiosqlite
 
             # Expand path and ensure parent directory exists
             db_path = Path(db_path).expanduser()

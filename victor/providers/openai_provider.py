@@ -198,7 +198,7 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             # Catch-all for truly unexpected errors
             raise self._handle_error(e, self.name)
 
-    async def stream(  # type: ignore[override]
+    async def stream(  # type: ignore[override,misc]
         self,
         messages: List[Message],
         *,

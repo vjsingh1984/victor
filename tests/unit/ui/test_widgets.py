@@ -15,7 +15,7 @@ from rich.markdown import Markdown
 
 from victor.ui.tui.widgets import (
     StreamingMessageBlock,
-    EnhancedConversationLog,
+    VirtualScrollContainer,
     ToolCallWidget,
 )
 
@@ -38,8 +38,8 @@ def streaming_message():
 
 @pytest.fixture
 def conversation_log():
-    """Create an EnhancedConversationLog for testing."""
-    log = EnhancedConversationLog()
+    """Create a VirtualScrollContainer for testing."""
+    log = VirtualScrollContainer()
     log._streaming_message = None
     log._last_scroll_time = 0
     log._scroll_throttle_ms = 50
@@ -201,7 +201,7 @@ class TestMarkdownDebounce:
 
 
 class TestScrollThrottle:
-    """Test scroll throttling in EnhancedConversationLog."""
+    """Test scroll throttling in VirtualScrollContainer."""
 
     def test_initial_state(self, conversation_log):
         """Test that initial state has correct scroll tracking."""
@@ -934,7 +934,7 @@ class TestPhase2Regression:
 
     def test_phase1_virtual_scrolling_still_works(self):
         """Test that virtual scrolling from Phase 1 still works."""
-        log = EnhancedConversationLog()
+        log = VirtualScrollContainer()
         assert hasattr(log, "VIRTUAL_SCROLL_THRESHOLD")
         assert log.VIRTUAL_SCROLL_THRESHOLD == 100
         assert hasattr(log, "BUFFER_SIZE")

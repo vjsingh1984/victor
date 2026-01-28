@@ -477,25 +477,43 @@ class TestMemoryHealthCheck:
     @pytest.mark.asyncio
     async def test_memory_healthy(self):
         """Test healthy memory usage."""
-        check = MemoryHealthCheck(
-            warning_threshold_mb=10000,
-            critical_threshold_mb=20000,
-        )
-        health = await check.check()
+        # Mock psutil to return low memory usage
+        import unittest.mock
+        mock_process = unittest.mock.MagicMock()
+        mock_memory_info = unittest.mock.MagicMock()
+        mock_memory_info.rss = 500 * 1024 * 1024  # 500 MB
+        mock_process.memory_info.return_value = mock_memory_info
 
-        # Unless running on a very memory-constrained system
-        assert health.status in (HealthStatus.HEALTHY, HealthStatus.UNKNOWN)
+        with unittest.mock.patch("psutil.Process", return_value=mock_process):
+            check = MemoryHealthCheck(
+                warning_threshold_mb=10000,
+                critical_threshold_mb=20000,
+            )
+            health = await check.check()
+
+        # Should be HEALTHY with mocked 500MB usage
+        assert health.status == HealthStatus.HEALTHY
 
     @pytest.mark.asyncio
     async def test_memory_details_included(self):
         """Test memory details are included."""
-        check = MemoryHealthCheck()
-        health = await check.check()
+        # Mock psutil to return moderate memory usage
+        import unittest.mock
+        mock_process = unittest.mock.MagicMock()
+        mock_memory_info = unittest.mock.MagicMock()
+        mock_memory_info.rss = 1500 * 1024 * 1024  # 1500 MB
+        mock_process.memory_info.return_value = mock_memory_info
 
-        if health.status != HealthStatus.UNKNOWN:
-            assert "rss_mb" in health.details
-            assert health.details["warning_threshold_mb"] == 1000
-            assert health.details["critical_threshold_mb"] == 2000
+        with unittest.mock.patch("psutil.Process", return_value=mock_process):
+            check = MemoryHealthCheck()  # Uses default thresholds (1000/2000)
+            health = await check.check()
+
+        # Should be DEGRADED with mocked 1500MB usage
+        assert health.status == HealthStatus.DEGRADED
+        assert "rss_mb" in health.details
+        assert health.details["rss_mb"] == 1500.0
+        assert health.details["warning_threshold_mb"] == 1000
+        assert health.details["critical_threshold_mb"] == 2000
 
 
 # =============================================================================

@@ -48,7 +48,7 @@ from victor.providers.concurrency import (
     TokenBucketRateLimiter,
 )
 from victor.providers.resilience import (
-    CircuitBreaker,
+    ProviderCircuitBreaker,
     CircuitBreakerConfig,
     CircuitOpenError,
     CircuitState,
@@ -293,7 +293,7 @@ class TestCircuitBreaker:
             success_threshold=2,
             timeout_seconds=0.1,
         )
-        return CircuitBreaker("test", config)
+        return ProviderCircuitBreaker("test", config)
 
     @pytest.mark.asyncio
     async def test_circuit_closed_success(self, circuit):

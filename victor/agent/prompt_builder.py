@@ -133,34 +133,15 @@ DO NOT re-read the full file without parameters - you will get the same truncate
 DO NOT assume content is missing - use offset/search to access additional sections.
 """.strip()
 
-# DEPRECATED: Task-type-specific prompt hints
-# These hints are now maintained in vertical prompt contributors:
+# Task-type-specific prompt hints are maintained in vertical prompt contributors:
 # - victor/coding/prompts.py (CodingPromptContributor)
 # - victor/devops/prompts.py (DevOpsPromptContributor)
 # - victor/research/prompts.py (ResearchPromptContributor)
 # - victor/dataanalysis/prompts.py (DataAnalysisPromptContributor)
-#
-# This dict is kept for backward compatibility only. New code should use
-# prompt contributors via the vertical's PromptContributorProtocol.
-#
-# Each hint includes a completion signal instruction for deterministic task
-# completion detection. Uses underscore-prefixed markers (e.g., _DONE_)
-# to distinguish from natural language.
-#
-# Migration: Use get_task_type_hint(task_type, prompt_contributors=[...])
-# with the appropriate vertical contributor for full task hint support.
-_DEPRECATED_TASK_TYPE_HINTS: dict[str, str] = {
-    # Framework-level defaults (not vertical-specific)
-    # These are minimal fallbacks when no vertical contributor is available
-}
-
-
 def get_task_type_hint(task_type: str, prompt_contributors: Optional[list[Any]] = None) -> str:
     """Get prompt hint for a specific task type.
 
-    This function supports vertical prompt contributors. It gets hints from:
-    1. Vertical prompt contributors (if provided) - canonical source
-    2. _DEPRECATED_TASK_TYPE_HINTS (fallback, deprecated)
+    This function supports vertical prompt contributors for task-specific hints.
 
     For new code, always pass prompt_contributors from the vertical.
 
@@ -171,7 +152,7 @@ def get_task_type_hint(task_type: str, prompt_contributors: Optional[list[Any]] 
     Returns:
         Task-specific prompt hint or empty string if not found
     """
-    # Try vertical contributors first (canonical source)
+    # Try vertical contributors (canonical source)
     if prompt_contributors:
         for contributor in sorted(prompt_contributors, key=lambda c: c.get_priority()):
             hints = contributor.get_task_type_hints()
@@ -191,36 +172,8 @@ def get_task_type_hint(task_type: str, prompt_contributors: Optional[list[Any]] 
                 )
                 return str(hint_text)
 
-    # Fallback to deprecated hints (should be empty, but kept for safety)
-    hint = _DEPRECATED_TASK_TYPE_HINTS.get(task_type.lower(), "")
-    if hint:
-        import warnings
-
-        warnings.warn(
-            f"Using deprecated TASK_TYPE_HINTS for '{task_type}'. "
-            "Pass prompt_contributors for vertical-specific hints.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        logger.debug("Applied deprecated task hint for task_type=%s", task_type)
-    return str(hint)
-
-
-# Backward compatibility alias - deprecated
-def __getattr__(name: str) -> Any:
-    """Provide backward compatibility for TASK_TYPE_HINTS access."""
-    if name == "TASK_TYPE_HINTS":
-        import warnings
-
-        warnings.warn(
-            "TASK_TYPE_HINTS is deprecated. Task hints are now in vertical prompt "
-            "contributors (e.g., CodingPromptContributor, DevOpsPromptContributor). "
-            "Use get_task_type_hint(task_type, prompt_contributors=[...]) instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return _DEPRECATED_TASK_TYPE_HINTS
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    # No hint found
+    return ""
 
 
 # Models with known good native tool calling support

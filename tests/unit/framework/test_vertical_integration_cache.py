@@ -212,9 +212,9 @@ class TestPipelineCacheKeyIncludesYAML:
 
     def test_cache_key_includes_yaml_hash(self, tmp_path, monkeypatch):
         """Cache key should include YAML config hash."""
-        from unittest.mock import MagicMock, patch
         from victor.framework.vertical_integration import VerticalIntegrationPipeline
         from victor.core.verticals.base import VerticalBase
+        from victor.core.cache import VerticalIntegrationCache
 
         # Create a mock vertical with a config path
         class MockVertical(VerticalBase):
@@ -230,37 +230,63 @@ class TestPipelineCacheKeyIncludesYAML:
         yaml_file = config_dir / "vertical.yaml"
         yaml_file.write_text("name: test\nversion: 1.0\n")
 
-        pipeline = VerticalIntegrationPipeline()
+        pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
-        with patch.object(pipeline, "_find_yaml_config") as mock_find:
-            mock_find.return_value = yaml_file
+        # Get the cache service
+        cache_service = pipeline._cache_service
+        assert isinstance(cache_service, VerticalIntegrationCache)
 
-            # Generate cache key
-            key1 = pipeline._generate_cache_key(MockVertical)
+        # Generate cache keys with different YAML content
+        key1 = cache_service.generate_key(MockVertical, {})
 
-            # Modify YAML
-            yaml_file.write_text("name: test\nversion: 2.0\n")
+        # Modify YAML
+        yaml_file.write_text("name: test\nversion: 2.0\n")
 
-            # Generate new cache key
-            key2 = pipeline._generate_cache_key(MockVertical)
+        # Generate new cache key
+        key2 = cache_service.generate_key(MockVertical, {})
 
-            # Keys should be different because YAML changed
-            assert key1 != key2, "Cache key should change when YAML config changes"
+        # Keys should be different because YAML changed
+        assert key1 != key2, "Cache key should change when YAML config changes"
 
     def test_yaml_change_invalidates_cache(self, tmp_path):
         """Changing YAML config should invalidate cache."""
-        from unittest.mock import MagicMock, patch
         from victor.framework.vertical_integration import VerticalIntegrationPipeline
         from victor.core.verticals.base import VerticalBase
+        from victor.core.cache import VerticalIntegrationCache
 
-        # Create a mock vertical
+        # Create a mock vertical with a config path
         class MockVertical(VerticalBase):
             name = "test_vertical"
+
+            @classmethod
+            def get_config_path(cls):
+                return tmp_path / "config" / "vertical.yaml"
+
+        # Create the config directory and file
+        config_dir = tmp_path / "config"
+        config_dir.mkdir(parents=True)
+        yaml_file = config_dir / "vertical.yaml"
+        yaml_file.write_text("name: test\nversion: 1.0\n")
 
         # Create pipeline
         pipeline = VerticalIntegrationPipeline(enable_cache=True)
 
-        # If YAML hashing is implemented, changing YAML should change the cache key
-        # This is a placeholder test that verifies the method exists
-        assert hasattr(pipeline, "_generate_cache_key")
-        assert hasattr(pipeline, "_hash_source_file")
+        # Get the cache service
+        cache_service = pipeline._cache_service
+        assert isinstance(cache_service, VerticalIntegrationCache)
+
+        # Generate initial cache key
+        key1 = cache_service.generate_key(MockVertical, {})
+
+        # Modify YAML
+        yaml_file.write_text("name: test\nversion: 2.0\n")
+
+        # Generate new cache key
+        key2 = cache_service.generate_key(MockVertical, {})
+
+        # Keys should be different because YAML changed
+        assert key1 != key2, "Cache key should change when YAML config changes"
+
+        # Verify cache service has the generate_key method
+        assert hasattr(cache_service, "generate_key")
+        assert hasattr(cache_service, "_get_yaml_config_hash")

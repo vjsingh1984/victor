@@ -161,8 +161,8 @@ class StateEventEmitter(IStateEventEmitter):
                 event_data = data or {}
             else:
                 # MessagingEvent form
-                final_topic = event.topic if hasattr(event, 'topic') else "state.transition"
-                event_data = event.data if hasattr(event, 'data') else {}
+                final_topic = event.topic if hasattr(event, "topic") else "state.transition"
+                event_data = event.data if hasattr(event, "data") else {}
 
             bus = self._get_bus()
             if bus:

@@ -74,19 +74,17 @@ from typing import (
 if TYPE_CHECKING:
     # Import opentelemetry types if available
     try:
-        from opentelemetry.trace import Status as _Status, StatusCode as _StatusCode, Span as _Span
+        from opentelemetry.trace import Status as Status, StatusCode as StatusCode, Span as Span  # noqa: F401
     except ImportError:
-        _Status = Any  # type: ignore[misc]
-        _StatusCode = Any  # type: ignore[misc]
+        # Create stub types when opentelemetry is not available
+        class Status:  # type: ignore[no-redef]
+            """Stub Status class for type checking when opentelemetry is not installed."""
 
-        # Create a stub type for Span when not available
-        class _Span:  # type: ignore[no-redef]
+        class StatusCode:  # type: ignore[no-redef]
+            """Stub StatusCode class for type checking when opentelemetry is not installed."""
+
+        class Span:  # type: ignore[no-redef]
             """Stub Span class for type checking when opentelemetry is not installed."""
-
-    # Re-export with clearer names
-    Status = _Status
-    StatusCode = _StatusCode
-    Span = _Span
 
 logger = logging.getLogger(__name__)
 
@@ -351,7 +349,7 @@ class DistributedTracer:
             context=ctx,
             kind=kind,
             attributes=attributes or {},
-        )  # type: ignore[abstract,call-arg]
+        )  # type: ignore[abstract]
 
         # Set as current context
         _trace_context.set(ctx)
@@ -594,7 +592,7 @@ class Span:  # type: ignore[no-redef]
         Returns:
             Self
         """
-        return self  # type: ignore[return-value]
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit span context.

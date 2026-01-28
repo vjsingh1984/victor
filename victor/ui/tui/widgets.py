@@ -1718,7 +1718,3 @@ class VirtualScrollContainer(VerticalScroll):
             return self.scroll_y >= self.max_scroll_y - 1
         except Exception:
             return True
-
-
-# Backward compatibility alias
-EnhancedConversationLog = VirtualScrollContainer

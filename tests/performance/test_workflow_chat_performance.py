@@ -49,7 +49,7 @@ class TestWorkflowChatPerformance:
         avg_latency = statistics.mean(latencies)
         median_latency = statistics.median(latencies)
 
-        print(f"\nLegacy Chat Latency:")
+        print("\nLegacy Chat Latency:")
         print(f"  Average: {avg_latency:.2f}ms")
         print(f"  Median: {median_latency:.2f}ms")
         print(f"  Min: {min(latencies):.2f}ms")
@@ -78,7 +78,7 @@ class TestWorkflowChatPerformance:
         avg_latency = statistics.mean(latencies)
         median_latency = statistics.median(latencies)
 
-        print(f"\nWorkflow Chat Latency:")
+        print("\nWorkflow Chat Latency:")
         print(f"  Average: {avg_latency:.2f}ms")
         print(f"  Median: {median_latency:.2f}ms")
         print(f"  Min: {min(latencies):.2f}ms")
@@ -95,12 +95,12 @@ class TestWorkflowChatPerformance:
         await self.test_workflow_chat_latency(auto_mock_docker_for_orchestrator)
 
         # Calculate performance difference
-        if hasattr(self, 'legacy_avg_latency') and hasattr(self, 'workflow_avg_latency'):
+        if hasattr(self, "legacy_avg_latency") and hasattr(self, "workflow_avg_latency"):
             performance_diff = (
                 (self.workflow_avg_latency - self.legacy_avg_latency) / self.legacy_avg_latency
             ) * 100
 
-            print(f"\nPerformance Comparison:")
+            print("\nPerformance Comparison:")
             print(f"  Legacy: {self.legacy_avg_latency:.2f}ms")
             print(f"  Workflow: {self.workflow_avg_latency:.2f}ms")
             print(f"  Difference: {performance_diff:+.2f}%")
@@ -139,7 +139,7 @@ class TestWorkflowChatPerformance:
 
         avg_latency = statistics.mean(latencies)
 
-        print(f"\nState Serialization Performance:")
+        print("\nState Serialization Performance:")
         print(f"  Average: {avg_latency:.2f}ms")
         print(f"  Median: {statistics.median(latencies):.2f}ms")
 
@@ -170,9 +170,7 @@ class TestWorkflowChatPerformance:
         num_sessions = 100
         start_time = time.perf_counter()
 
-        results = await asyncio.gather(
-            *[simulate_session(i) for i in range(num_sessions)]
-        )
+        results = await asyncio.gather(*[simulate_session(i) for i in range(num_sessions)])
 
         end_time = time.perf_counter()
         total_duration = (end_time - start_time) * 1000
@@ -213,15 +211,15 @@ class TestWorkflowChatPerformance:
         final_count = len(gc.get_objects())
         object_diff = final_count - initial_count
 
-        print(f"\nMemory Efficiency:")
+        print("\nMemory Efficiency:")
         print(f"  Initial objects: {initial_count}")
         print(f"  Final objects: {final_count}")
         print(f"  Object difference: {object_diff}")
 
         # Assert no significant memory leak (< 10% increase)
-        assert object_diff < (initial_count * 0.1), (
-            f"Potential memory leak detected: {object_diff} objects remaining"
-        )
+        assert object_diff < (
+            initial_count * 0.1
+        ), f"Potential memory leak detected: {object_diff} objects remaining"
 
     async def _simulate_legacy_chat(self):
         """Simulate legacy chat operation for benchmarking."""
@@ -255,13 +253,15 @@ class TestWorkflowChatMemoryProfiling:
         populated_size = sys.getsizeof(state)
         size_per_message = (populated_size - empty_size) / 100
 
-        print(f"\nState Object Memory Footprint:")
+        print("\nState Object Memory Footprint:")
         print(f"  Empty state: {empty_size} bytes")
         print(f"  With 100 messages: {populated_size} bytes")
         print(f"  Size per message: {size_per_message:.2f} bytes")
 
         # Assert reasonable memory usage (< 1KB per message)
-        assert size_per_message < 1024, f"State objects too large: {size_per_message:.2f} bytes per message"
+        assert (
+            size_per_message < 1024
+        ), f"State objects too large: {size_per_message:.2f} bytes per message"
 
     @pytest.mark.asyncio
     async def test_chat_result_size(self):
@@ -271,15 +271,11 @@ class TestWorkflowChatMemoryProfiling:
 
         # Create result with large content
         content = "x" * 10000  # 10KB response
-        result = ChatResult(
-            content=content,
-            iteration_count=10,
-            metadata={"key": "value" * 100}
-        )
+        result = ChatResult(content=content, iteration_count=10, metadata={"key": "value" * 100})
 
         result_size = sys.getsizeof(result)
 
-        print(f"\nChatResult Memory Footprint:")
+        print("\nChatResult Memory Footprint:")
         print(f"  Result size: {result_size} bytes")
         print(f"  Content size: {len(content)} bytes")
 
@@ -312,7 +308,7 @@ class TestWorkflowChatScalability:
         restored_state = MutableChatState.from_dict(state_dict)
         deserialize_time = (time.perf_counter() - start_time) * 1000
 
-        print(f"\nLarge Conversation Handling (1000 messages):")
+        print("\nLarge Conversation Handling (1000 messages):")
         print(f"  Serialize time: {serialize_time:.2f}ms")
         print(f"  Deserialize time: {deserialize_time:.2f}ms")
         print(f"  Total: {serialize_time + deserialize_time:.2f}ms")
@@ -339,9 +335,11 @@ class TestWorkflowChatScalability:
         total_time = (time.perf_counter() - start_time) * 1000
         avg_update_time = total_time / 3000  # 3 operations per iteration
 
-        print(f"\nRapid State Updates (3000 operations):")
+        print("\nRapid State Updates (3000 operations):")
         print(f"  Total time: {total_time:.2f}ms")
         print(f"  Average per operation: {avg_update_time:.4f}ms")
 
         # Assert fast updates (< 0.1ms per operation)
-        assert avg_update_time < 0.1, f"State updates too slow: {avg_update_time:.4f}ms per operation"
+        assert (
+            avg_update_time < 0.1
+        ), f"State updates too slow: {avg_update_time:.4f}ms per operation"

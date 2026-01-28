@@ -127,7 +127,7 @@ class EventFileWatcher(Static):
                         )
 
                         # Emit to EventBus
-                        await event_bus.emit(event.topic, event.data)  # type: ignore[arg-type]
+                        await event_bus.emit(event.topic, event.data)
                         events_loaded += 1
                         logger.debug(
                             f"[EventFileWatcher] Line {idx}: PUBLISHED to EventBus (total: {events_loaded})"

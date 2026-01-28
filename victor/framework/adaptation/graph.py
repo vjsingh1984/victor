@@ -40,8 +40,10 @@ from victor.framework.adaptation.types import (
 
 if TYPE_CHECKING:
     from typing import Any as RunnableType
+
     try:
         from langchain_core.runnables import Runnable as RunnableImport  # type: ignore[import-not-found]
+
         RunnableType = RunnableImport  # type: ignore[misc]
     except ImportError:
         pass  # RunnableType will remain as Any
@@ -90,7 +92,7 @@ class AdaptableGraph:
 
     def __init__(
         self,
-        graph: "Runnable",
+        graph: "RunnableType",
         config: Optional[AdaptationConfig] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ):
@@ -116,7 +118,7 @@ class AdaptableGraph:
         self._circuit_open_until: Optional[datetime] = None
 
     @property
-    def graph(self) -> "Runnable":
+    def graph(self) -> "RunnableType":
         """Get the underlying compiled graph."""
         return self._graph
 

@@ -283,10 +283,6 @@ class ProviderCircuitBreaker:
         }
 
 
-# Backward compatibility alias
-CircuitBreaker = ProviderCircuitBreaker
-
-
 @dataclass
 class ProviderRetryConfig:
     """Configuration for provider retry strategy.

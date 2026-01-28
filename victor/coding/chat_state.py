@@ -250,10 +250,13 @@ class CodingChatState(MutableChatState):
             logger.debug(f"Extracted {requirements.output_count} required outputs")
 
         # Update metadata with requirement info
-        self.set_metadata("requirements_extracted", {
-            "file_count": getattr(requirements, "file_count", 0),
-            "output_count": getattr(requirements, "output_count", 0),
-        })
+        self.set_metadata(
+            "requirements_extracted",
+            {
+                "file_count": getattr(requirements, "file_count", 0),
+                "output_count": getattr(requirements, "output_count", 0),
+            },
+        )
 
     # ========================================================================
     # State Management
@@ -266,12 +269,14 @@ class CodingChatState(MutableChatState):
             Dictionary representation of state
         """
         base_dict = super().to_dict()
-        base_dict.update({
-            "required_files": self._required_files.copy(),
-            "required_outputs": self._required_outputs.copy(),
-            "read_files_session": sorted(self._read_files_session),
-            "all_files_read_nudge_sent": self._all_files_read_nudge_sent,
-        })
+        base_dict.update(
+            {
+                "required_files": self._required_files.copy(),
+                "required_outputs": self._required_outputs.copy(),
+                "read_files_session": sorted(self._read_files_session),
+                "all_files_read_nudge_sent": self._all_files_read_nudge_sent,
+            }
+        )
         return base_dict
 
     @classmethod

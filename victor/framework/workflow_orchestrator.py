@@ -296,19 +296,17 @@ class WorkflowOrchestrator:
                     if content:
                         yield StreamChunk(
                             content=content,
-                            role="assistant",
-                            finish_reason=None,
-                            index=0,
                         )
 
                 elif event.event_type == "error":
-                    error_msg = event.data.get("error", "Unknown error") if event.data else "Unknown error"
+                    error_msg = (
+                        event.data.get("error", "Unknown error") if event.data else "Unknown error"
+                    )
                     logger.error(f"Workflow streaming error: {error_msg}")
                     yield StreamChunk(
                         content=f"\n[Error: {error_msg}]",
-                        role="assistant",
-                        finish_reason="error",
-                        index=0,
+                        stop_reason="error",
+                        is_final=True,
                     )
 
             # Final update
@@ -381,7 +379,7 @@ class WorkflowOrchestrator:
             "user_message": message,
             "messages": session_state.messages.copy(),
             "iteration_count": session_state.iteration_count,
-            "metadata": session_state.metadata.copy(),
+            "metadata": session_state._metadata.copy(),
             **kwargs,
         }
 
@@ -400,8 +398,7 @@ class WorkflowOrchestrator:
         if not self._workflow_coordinator.has_workflow(workflow_name):
             available = self.get_available_workflows()
             raise ValueError(
-                f"Workflow '{workflow_name}' not found. "
-                f"Available workflows: {available}"
+                f"Workflow '{workflow_name}' not found. " f"Available workflows: {available}"
             )
 
         # Get workflow from registry
@@ -416,7 +413,7 @@ class WorkflowOrchestrator:
 
             # Create a simple engine for compilation
             engine = WorkflowEngine()
-            workflow.compiled_graph = engine.compile_workflow(workflow)
+            workflow.compiled_graph = engine.compile_workflow_graph(workflow)
 
         return workflow
 

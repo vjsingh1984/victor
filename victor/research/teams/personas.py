@@ -291,10 +291,6 @@ class ResearchPersonaTraits:
         )
 
 
-# Backward compatibility alias
-PersonaTraits = ResearchPersonaTraits
-
-
 @dataclass
 class ResearchPersona:
     """Complete persona definition for a research role.
@@ -318,7 +314,7 @@ class ResearchPersona:
     role: str
     expertise: List[ResearchExpertiseCategory]
     secondary_expertise: List[ResearchExpertiseCategory] = field(default_factory=list)
-    traits: PersonaTraits = field(default_factory=PersonaTraits)
+    traits: ResearchPersonaTraits = field(default_factory=ResearchPersonaTraits)
     strengths: List[str] = field(default_factory=list)
     approach: str = ""
     communication_patterns: List[str] = field(default_factory=list)
@@ -406,7 +402,7 @@ RESEARCH_PERSONAS: Dict[str, ResearchPersona] = {
             ResearchExpertiseCategory.SOURCE_CRITICISM,
             ResearchExpertiseCategory.EVIDENCE_EVALUATION,
         ],
-        traits=PersonaTraits(
+        traits=ResearchPersonaTraits(
             communication_style=ResearchCommunicationStyle.ANALYTICAL,
             decision_style=ResearchDecisionStyle.COMPREHENSIVE,
             source_rigor=0.7,
@@ -450,7 +446,7 @@ RESEARCH_PERSONAS: Dict[str, ResearchPersona] = {
             ResearchExpertiseCategory.BIBLIOGRAPHY,
             ResearchExpertiseCategory.METADATA_ANALYSIS,
         ],
-        traits=PersonaTraits(
+        traits=ResearchPersonaTraits(
             communication_style=ResearchCommunicationStyle.ACADEMIC,
             decision_style=ResearchDecisionStyle.METHODOLOGICAL,
             source_rigor=0.95,
@@ -495,7 +491,7 @@ RESEARCH_PERSONAS: Dict[str, ResearchPersona] = {
             ResearchExpertiseCategory.SOURCE_CRITICISM,
             ResearchExpertiseCategory.CRITICAL_ANALYSIS,
         ],
-        traits=PersonaTraits(
+        traits=ResearchPersonaTraits(
             communication_style=ResearchCommunicationStyle.JOURNALISTIC,
             decision_style=ResearchDecisionStyle.SKEPTICAL,
             source_rigor=0.9,
@@ -539,7 +535,7 @@ RESEARCH_PERSONAS: Dict[str, ResearchPersona] = {
             ResearchExpertiseCategory.TECHNICAL_WRITING,
             ResearchExpertiseCategory.EXECUTIVE_SUMMARIES,
         ],
-        traits=PersonaTraits(
+        traits=ResearchPersonaTraits(
             communication_style=ResearchCommunicationStyle.DETAILED,
             decision_style=ResearchDecisionStyle.EVIDENCE_BASED,
             source_rigor=0.6,
@@ -583,7 +579,7 @@ RESEARCH_PERSONAS: Dict[str, ResearchPersona] = {
             ResearchExpertiseCategory.INDUSTRY_ANALYSIS,
             ResearchExpertiseCategory.RESEARCH_DESIGN,
         ],
-        traits=PersonaTraits(
+        traits=ResearchPersonaTraits(
             communication_style=ResearchCommunicationStyle.STRATEGIC,
             decision_style=ResearchDecisionStyle.PRAGMATIC,
             source_rigor=0.6,
@@ -627,7 +623,7 @@ RESEARCH_PERSONAS: Dict[str, ResearchPersona] = {
             ResearchExpertiseCategory.ACADEMIC_WRITING,
             ResearchExpertiseCategory.LITERATURE_REVIEW,
         ],
-        traits=PersonaTraits(
+        traits=ResearchPersonaTraits(
             communication_style=ResearchCommunicationStyle.ACADEMIC,
             decision_style=ResearchDecisionStyle.METHODOLOGICAL,
             source_rigor=0.85,
@@ -775,7 +771,6 @@ __all__ = [
     "ResearchCommunicationStyle",
     "ResearchDecisionStyle",
     "ResearchPersonaTraits",
-    "PersonaTraits",  # Backward compatibility alias for ResearchPersonaTraits
     "ResearchPersona",
     # Pre-defined personas
     "RESEARCH_PERSONAS",

@@ -63,6 +63,7 @@ class ActionIntent(Enum):
 # All tools now use ToolAuthMetadataRegistry for authorization
 # See victor/tools/auth_metadata.py for metadata definitions
 
+
 def get_metadata_blocked_tools(intent: ActionIntent) -> frozenset[str]:
     """Get blocked tools using metadata-based authorization.
 

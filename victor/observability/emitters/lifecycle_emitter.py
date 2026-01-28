@@ -39,7 +39,7 @@ from victor.observability.emitters.base import ILifecycleEventEmitter
 from victor.core.events import ObservabilityBus, SyncEventWrapper
 
 if TYPE_CHECKING:
-    from victor.core.events.protocols import MessagingEvent
+    from victor.core.events import MessagingEvent
 
 logger = logging.getLogger(__name__)
 
@@ -161,11 +161,19 @@ class LifecycleEventEmitter(ILifecycleEventEmitter):
                 event_data = data or {}
             else:
                 # MessagingEvent form
-                final_topic = event.topic if hasattr(event, 'topic') else "lifecycle.session.start"
-                event_data = event.data if hasattr(event, 'data') else {}
+                final_topic = event.topic if hasattr(event, "topic") else "lifecycle.session.start"
+                event_data = event.data if hasattr(event, "data") else {}
 
             # For backward compatibility, convert to topic/data format
-            self._event_bus.emit(final_topic, event_data)  # type: ignore[attr-defined]
+            bus = self._get_bus()
+            if bus:
+                from victor.core.events.emit_helper import emit_event_sync
+                emit_event_sync(
+                    bus,
+                    topic=final_topic,
+                    data=event_data,
+                    source="LifecycleEventEmitter",
+                )
         except Exception as e:
             logger.debug(f"Failed to emit lifecycle event: {e}")
 

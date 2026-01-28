@@ -73,7 +73,7 @@ class WorkflowServiceProvider:
 
     Transient Services (created on each request):
         - WorkflowCompiler: Compiles YAML to executable graphs
-        - WorkflowExecutor: Executes compiled workflow graphs
+        - CompiledWorkflowExecutor: Executes compiled workflow graphs
 
     Attributes:
         _settings: Application settings for service configuration
@@ -191,7 +191,7 @@ class WorkflowServiceProvider:
         """
         # Import concrete implementations for registration
         from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
-        from victor.workflows.compiled_executor import WorkflowExecutor
+        from victor.workflows.compiled_executor import CompiledWorkflowExecutor
 
         # WorkflowCompilerImpl - concrete implementation for DI container
         container.register(
@@ -200,9 +200,9 @@ class WorkflowServiceProvider:
             ServiceLifetime.TRANSIENT,
         )
 
-        # WorkflowExecutor - executes compiled workflow graphs
+        # CompiledWorkflowExecutor - executes compiled workflow graphs
         container.register(
-            WorkflowExecutor,
+            CompiledWorkflowExecutor,
             lambda c: self._create_workflow_executor(),
             ServiceLifetime.TRANSIENT,
         )
@@ -411,9 +411,9 @@ class WorkflowServiceProvider:
         return compiler_impl
 
     def _create_workflow_executor(self) -> Any:
-        """Create WorkflowExecutor instance.
+        """Create CompiledWorkflowExecutor instance.
 
-        The WorkflowExecutor is responsible for:
+        The CompiledWorkflowExecutor is responsible for:
         - Executing compiled graphs
         - Managing execution context
         - Streaming execution events
@@ -422,15 +422,15 @@ class WorkflowServiceProvider:
         This is a pure executor - NO compilation logic (SRP compliance).
 
         Returns:
-            WorkflowExecutor instance
+            CompiledWorkflowExecutor instance
         """
-        from victor.workflows.compiled_executor import WorkflowExecutor
+        from victor.workflows.compiled_executor import CompiledWorkflowExecutor
         from victor.workflows.orchestrator_pool import OrchestratorPool
 
         # Get dependencies from DI container (use actual type, not string)
         orchestrator_pool = self.container.get(OrchestratorPool)
 
-        executor = WorkflowExecutor(
+        executor = CompiledWorkflowExecutor(
             orchestrator_pool=orchestrator_pool,
         )
 

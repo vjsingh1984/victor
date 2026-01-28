@@ -19,7 +19,9 @@ try:
     from opentelemetry.sdk.trace import TracerProvider as _TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor
     from opentelemetry.sdk.metrics import MeterProvider as _MeterProvider
-    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader as _PeriodicExportingMetricReader
+    from opentelemetry.sdk.metrics.export import (
+        PeriodicExportingMetricReader as _PeriodicExportingMetricReader,
+    )
     from opentelemetry.sdk.resources import Resource as _Resource
 
     # Optional exporters that may not be installed

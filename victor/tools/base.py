@@ -398,9 +398,7 @@ class BaseTool(ABC):
 
     @abstractmethod
     async def execute(
-        self,
-        _exec_ctx: Optional[Dict[str, Any]] = None,
-        **kwargs: Any
+        self, _exec_ctx: Optional[Dict[str, Any]] = None, **kwargs: Any
     ) -> ToolResult:
         """Execute the tool.
 

@@ -494,7 +494,4 @@ __all__ = [
     "CacheNamespace",
     "GenericCacheEntry",
     "CacheStats",
-    # Factory functions
-    "get_tool_cache_manager",
-    "reset_tool_cache_manager",
 ]

@@ -198,7 +198,7 @@ class TaskCoordinator:
 
         # Update reminder manager with task complexity and hint
         if self._reminder_manager is not None:
-            from victor.framework.enrichment.strategies import get_complexity_hint
+            from victor.framework.enrichment.strategies import get_complexity_hint  # type: ignore[unreachable]
 
             self._reminder_manager.update_state(
                 task_complexity=task_classification.complexity.value,

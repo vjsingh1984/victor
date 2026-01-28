@@ -65,10 +65,6 @@ class CVESeverity(Enum):
             return cls.CRITICAL
 
 
-# Backward compatibility alias
-Severity = CVESeverity
-
-
 class VulnerabilityStatus(Enum):
     """Status of a vulnerability finding."""
 
@@ -101,7 +97,7 @@ class CVE:
 
     cve_id: str  # e.g., "CVE-2021-44228"
     description: str
-    severity: Severity
+    severity: CVESeverity
     cvss: Optional[CVSSMetrics] = None
     published_date: Optional[datetime] = None
     modified_date: Optional[datetime] = None
@@ -137,16 +133,12 @@ class SecurityDependency:
         return f"pkg:{self.ecosystem}/{self.name}@{self.version}"
 
 
-# Backward compatibility alias
-Dependency = SecurityDependency
-
-
 @dataclass
 class Vulnerability:
     """A vulnerability finding in a dependency."""
 
     cve: CVE
-    dependency: Dependency
+    dependency: SecurityDependency
     fixed_version: Optional[str] = None  # Version that fixes the vulnerability
     status: VulnerabilityStatus = VulnerabilityStatus.OPEN
     notes: str = ""
@@ -168,7 +160,7 @@ class Vulnerability:
 class SecurityScanResult:
     """Result of a security scan."""
 
-    dependencies: list[Dependency] = field(default_factory=list)
+    dependencies: list[SecurityDependency] = field(default_factory=list)
     vulnerabilities: list[Vulnerability] = field(default_factory=list)
     scan_timestamp: datetime = field(default_factory=datetime.now)
     scan_duration_ms: float = 0.0
@@ -193,24 +185,24 @@ class SecurityScanResult:
     @property
     def critical_count(self) -> int:
         """Number of critical severity vulnerabilities."""
-        return sum(1 for v in self.vulnerabilities if v.cve.severity == Severity.CRITICAL)
+        return sum(1 for v in self.vulnerabilities if v.cve.severity == CVESeverity.CRITICAL)
 
     @property
     def high_count(self) -> int:
         """Number of high severity vulnerabilities."""
-        return sum(1 for v in self.vulnerabilities if v.cve.severity == Severity.HIGH)
+        return sum(1 for v in self.vulnerabilities if v.cve.severity == CVESeverity.HIGH)
 
     @property
     def medium_count(self) -> int:
         """Number of medium severity vulnerabilities."""
-        return sum(1 for v in self.vulnerabilities if v.cve.severity == Severity.MEDIUM)
+        return sum(1 for v in self.vulnerabilities if v.cve.severity == CVESeverity.MEDIUM)
 
     @property
     def low_count(self) -> int:
         """Number of low severity vulnerabilities."""
-        return sum(1 for v in self.vulnerabilities if v.cve.severity == Severity.LOW)
+        return sum(1 for v in self.vulnerabilities if v.cve.severity == CVESeverity.LOW)
 
-    def get_by_severity(self, severity: Severity) -> list[Vulnerability]:
+    def get_by_severity(self, severity: CVESeverity) -> list[Vulnerability]:
         """Get vulnerabilities by severity.
 
         Args:
@@ -267,10 +259,10 @@ class SecurityPolicy:
             and v.dependency.name not in self.ignored_dependencies
         ]
 
-        critical = sum(1 for v in active_vulns if v.cve.severity == Severity.CRITICAL)
-        high = sum(1 for v in active_vulns if v.cve.severity == Severity.HIGH)
-        medium = sum(1 for v in active_vulns if v.cve.severity == Severity.MEDIUM)
-        low = sum(1 for v in active_vulns if v.cve.severity == Severity.LOW)
+        critical = sum(1 for v in active_vulns if v.cve.severity == CVESeverity.CRITICAL)
+        high = sum(1 for v in active_vulns if v.cve.severity == CVESeverity.HIGH)
+        medium = sum(1 for v in active_vulns if v.cve.severity == CVESeverity.MEDIUM)
+        low = sum(1 for v in active_vulns if v.cve.severity == CVESeverity.LOW)
 
         if self.fail_on_critical and critical > 0:
             failures.append(f"Found {critical} critical vulnerabilities")

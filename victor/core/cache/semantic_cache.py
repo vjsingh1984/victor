@@ -452,7 +452,7 @@ class SemanticCache:
                 for key, entry in batch:
                     # Skip entries without embeddings
                     if entry.embedding is None:
-                        continue
+                        continue  # type: ignore[unreachable]
 
                     # Skip expired entries
                     if entry.is_expired():

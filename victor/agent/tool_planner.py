@@ -146,7 +146,10 @@ class ToolPlanner:
     # =====================================================================
 
     def filter_tools_by_intent(
-        self, tools: List[Any], current_intent: Optional["ActionIntent"] = None, use_metadata: bool = False
+        self,
+        tools: List[Any],
+        current_intent: Optional["ActionIntent"] = None,
+        use_metadata: bool = False,
     ) -> List[Any]:
         """Filter tools based on detected user intent.
 

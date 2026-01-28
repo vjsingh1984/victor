@@ -138,10 +138,6 @@ def get_write_tool_names() -> Set[str]:
     return registry_tools | set(_STATIC_WRITE_TOOL_NAMES)
 
 
-# Backward compatibility alias - prefer get_write_tool_names() for dynamic lookup
-WRITE_TOOL_NAMES = _STATIC_WRITE_TOOL_NAMES
-
-
 # Numeric ordering for risk level comparisons
 _RISK_ORDER = {
     OperationalRiskLevel.SAFE: 0,

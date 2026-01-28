@@ -56,10 +56,6 @@ class RLAgentMode(Enum):
     COMPLETE = "complete"
 
 
-# Backward compatibility alias
-AgentMode = RLAgentMode
-
-
 class ModeTransitionLearner(BaseLearner):
     """Learn optimal mode transitions using Q-learning.
 
@@ -87,11 +83,11 @@ class ModeTransitionLearner(BaseLearner):
 
     # Valid mode transitions
     VALID_TRANSITIONS = {
-        AgentMode.EXPLORE: [AgentMode.PLAN, AgentMode.BUILD, AgentMode.COMPLETE],
-        AgentMode.PLAN: [AgentMode.BUILD, AgentMode.EXPLORE, AgentMode.COMPLETE],
-        AgentMode.BUILD: [AgentMode.REVIEW, AgentMode.EXPLORE, AgentMode.COMPLETE],
-        AgentMode.REVIEW: [AgentMode.BUILD, AgentMode.COMPLETE],
-        AgentMode.COMPLETE: [],
+        RLAgentMode.EXPLORE: [RLAgentMode.PLAN, RLAgentMode.BUILD, RLAgentMode.COMPLETE],
+        RLAgentMode.PLAN: [RLAgentMode.BUILD, RLAgentMode.EXPLORE, RLAgentMode.COMPLETE],
+        RLAgentMode.BUILD: [RLAgentMode.REVIEW, RLAgentMode.EXPLORE, RLAgentMode.COMPLETE],
+        RLAgentMode.REVIEW: [RLAgentMode.BUILD, RLAgentMode.COMPLETE],
+        RLAgentMode.COMPLETE: [],
     }
 
     def __init__(
@@ -591,8 +587,8 @@ class ModeTransitionLearner(BaseLearner):
         to_mode_val = outcome.metadata.get("to_mode", "explore")
         if isinstance(from_mode_val, str) and isinstance(to_mode_val, str):
             try:
-                from_mode_enum = AgentMode(from_mode_val)
-                to_mode_enum = AgentMode(to_mode_val)
+                from_mode_enum = RLAgentMode(from_mode_val)
+                to_mode_enum = RLAgentMode(to_mode_val)
                 valid = to_mode_enum in self.VALID_TRANSITIONS.get(from_mode_enum, [])
                 reward += 0.1 * (1.0 if valid else -1.0)
             except (ValueError, KeyError):

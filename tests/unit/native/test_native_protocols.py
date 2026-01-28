@@ -17,7 +17,7 @@
 import pytest
 
 from victor.native.protocols import (
-    Symbol,
+    NativeSymbol,
     SymbolType,
     ChunkInfo,
     CoercedValue,
@@ -31,11 +31,11 @@ from victor.native.protocols import (
 
 
 class TestSymbol:
-    """Tests for the Symbol dataclass."""
+    """Tests for the NativeSymbol dataclass."""
 
     def test_create_function_symbol(self):
         """Test creating a function symbol."""
-        symbol = Symbol(
+        symbol = NativeSymbol(
             name="my_function",
             type=SymbolType.FUNCTION,
             line=10,
@@ -51,7 +51,7 @@ class TestSymbol:
 
     def test_create_private_symbol(self):
         """Test creating a private symbol."""
-        symbol = Symbol(
+        symbol = NativeSymbol(
             name="_private",
             type=SymbolType.FUNCTION,
             line=1,
@@ -62,14 +62,14 @@ class TestSymbol:
 
     def test_symbol_is_frozen(self):
         """Test that Symbol is immutable."""
-        symbol = Symbol(name="test", type=SymbolType.FUNCTION, line=1, end_line=1)
+        symbol = NativeSymbol(name="test", type=SymbolType.FUNCTION, line=1, end_line=1)
         with pytest.raises(AttributeError):
             symbol.name = "changed"
 
     def test_symbol_hash(self):
-        """Test that Symbol is hashable."""
-        symbol1 = Symbol(name="func", type=SymbolType.FUNCTION, line=1, end_line=5)
-        symbol2 = Symbol(name="func", type=SymbolType.FUNCTION, line=1, end_line=5)
+        """Test that NativeSymbol is hashable."""
+        symbol1 = NativeSymbol(name="func", type=SymbolType.FUNCTION, line=1, end_line=5)
+        symbol2 = NativeSymbol(name="func", type=SymbolType.FUNCTION, line=1, end_line=5)
 
         # Same name/type/line should have same hash
         assert hash(symbol1) == hash(symbol2)
@@ -80,7 +80,7 @@ class TestSymbol:
 
     def test_symbol_with_decorators(self):
         """Test symbol with decorators."""
-        symbol = Symbol(
+        symbol = NativeSymbol(
             name="decorated_func",
             type=SymbolType.FUNCTION,
             line=1,
@@ -92,7 +92,7 @@ class TestSymbol:
 
     def test_symbol_with_parent(self):
         """Test method symbol with parent class."""
-        symbol = Symbol(
+        symbol = NativeSymbol(
             name="method",
             type=SymbolType.METHOD,
             line=5,

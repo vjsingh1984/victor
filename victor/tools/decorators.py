@@ -76,6 +76,7 @@ def _auto_register_tool(tool_instance: BaseTool) -> None:
 
 logger = logging.getLogger(__name__)
 
+
 def resolve_tool_name(name: str) -> str:
     """Resolve a tool name to its canonical form.
 
@@ -352,7 +353,7 @@ def tool(
         # Mark as tool for dynamic discovery
         wrapper._is_tool = True  # type: ignore[attr-defined]
         # We will attach a class to the wrapper that is the actual tool
-        wrapper.Tool = _create_tool_class(
+        wrapper.Tool = _create_tool_class(  # type: ignore[attr-defined]
             fn,
             cost_tier=cost_tier,
             metadata_params=metadata_params,

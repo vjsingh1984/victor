@@ -853,7 +853,7 @@ class ToolExecutor:
 
                 # Raw result (for tools that don't return ToolResult)
                 # Process the result normally
-                self.retry_strategy.on_success(retry_context)
+                self.retry_strategy.on_success(retry_context)  # type: ignore[unreachable]
                 return result, True, None, retry_context.attempt - 1, None
 
             except asyncio.TimeoutError as e:

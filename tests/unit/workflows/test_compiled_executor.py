@@ -20,7 +20,6 @@ from typing import Any, Dict, AsyncIterator
 from victor.workflows.compiled_executor import (
     CompiledWorkflowExecutor,
     ExecutionResult,
-    WorkflowExecutor,
 )
 
 
@@ -263,17 +262,3 @@ class TestExecutionResult:
         assert result.metrics is result.metrics
 
 
-class TestBackwardCompatibility:
-    """Test backward compatibility aliases."""
-
-    def test_workflow_executor_alias(self):
-        """Test WorkflowExecutor is an alias for CompiledWorkflowExecutor."""
-        assert WorkflowExecutor is CompiledWorkflowExecutor
-
-    def test_workflow_executor_can_be_instantiated(self):
-        """Test that WorkflowExecutor alias can be instantiated."""
-        pool = MockOrchestratorPool()
-        executor = WorkflowExecutor(pool)
-
-        assert isinstance(executor, CompiledWorkflowExecutor)
-        assert executor._orchestrator_pool == pool

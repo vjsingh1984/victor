@@ -2002,7 +2002,9 @@ class ExtensionsStepHandler(BaseStepHandler):
                 if profile_method is None:
                     result.add_warning(f"Unknown middleware profile: {profile_name}")
                     # Fall back to direct middleware list
-                    self._middleware_handler.apply_middleware(orchestrator, middleware, context, result)
+                    self._middleware_handler.apply_middleware(
+                        orchestrator, middleware, context, result
+                    )
                     return
 
                 profile = profile_method()
@@ -2013,8 +2015,12 @@ class ExtensionsStepHandler(BaseStepHandler):
                     # For now, just append overrides (future: implement merge logic)
                     combined_middleware.extend(middleware_overrides)
 
-                self._middleware_handler.apply_middleware(orchestrator, combined_middleware, context, result)
-                logger.debug(f"Applied middleware profile '{profile_name}' with {len(combined_middleware)} middleware")
+                self._middleware_handler.apply_middleware(
+                    orchestrator, combined_middleware, context, result
+                )
+                logger.debug(
+                    f"Applied middleware profile '{profile_name}' with {len(combined_middleware)} middleware"
+                )
             else:
                 # Use direct middleware list (backward compatible)
                 self._middleware_handler.apply_middleware(orchestrator, middleware, context, result)

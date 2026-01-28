@@ -255,10 +255,6 @@ class CodingPersonaTraits:
         )
 
 
-# Backward compatibility alias
-PersonaTraits = CodingPersonaTraits
-
-
 @dataclass
 class CodingPersona:
     """Complete persona definition for a coding role.
@@ -282,7 +278,7 @@ class CodingPersona:
     role: str
     expertise: List[ExpertiseCategory]
     secondary_expertise: List[ExpertiseCategory] = field(default_factory=list)
-    traits: PersonaTraits = field(default_factory=PersonaTraits)
+    traits: CodingPersonaTraits = field(default_factory=CodingPersonaTraits)
     strengths: List[str] = field(default_factory=list)
     approach: str = ""
     communication_patterns: List[str] = field(default_factory=list)
@@ -370,7 +366,7 @@ CODING_PERSONAS: Dict[str, CodingPersona] = {
             ExpertiseCategory.ARCHITECTURE,
             ExpertiseCategory.DOCUMENTATION,
         ],
-        traits=PersonaTraits(
+        traits=CodingPersonaTraits(
             communication_style=CommunicationStyle.ANALYTICAL,
             decision_style=DecisionStyle.PRAGMATIC,
             attention_to_detail=0.9,
@@ -408,7 +404,7 @@ CODING_PERSONAS: Dict[str, CodingPersona] = {
             ExpertiseCategory.PATTERN_RECOGNITION,
             ExpertiseCategory.API_DESIGN,
         ],
-        traits=PersonaTraits(
+        traits=CodingPersonaTraits(
             communication_style=CommunicationStyle.ASSERTIVE,
             decision_style=DecisionStyle.CONSERVATIVE,
             attention_to_detail=0.95,
@@ -442,7 +438,7 @@ CODING_PERSONAS: Dict[str, CodingPersona] = {
             ExpertiseCategory.PATTERN_RECOGNITION,
             ExpertiseCategory.DEPENDENCY_ANALYSIS,
         ],
-        traits=PersonaTraits(
+        traits=CodingPersonaTraits(
             communication_style=CommunicationStyle.DETAILED,
             decision_style=DecisionStyle.PRAGMATIC,
             attention_to_detail=0.8,
@@ -475,7 +471,7 @@ CODING_PERSONAS: Dict[str, CodingPersona] = {
             ExpertiseCategory.TESTING,
             ExpertiseCategory.CODE_ANALYSIS,
         ],
-        traits=PersonaTraits(
+        traits=CodingPersonaTraits(
             communication_style=CommunicationStyle.ANALYTICAL,
             decision_style=DecisionStyle.ITERATIVE,
             attention_to_detail=0.85,
@@ -509,7 +505,7 @@ CODING_PERSONAS: Dict[str, CodingPersona] = {
             ExpertiseCategory.TESTING,
             ExpertiseCategory.DOCUMENTATION,
         ],
-        traits=PersonaTraits(
+        traits=CodingPersonaTraits(
             communication_style=CommunicationStyle.CONCISE,
             decision_style=DecisionStyle.PERFECTIONIST,
             attention_to_detail=0.9,
@@ -542,7 +538,7 @@ CODING_PERSONAS: Dict[str, CodingPersona] = {
             ExpertiseCategory.TESTING,
             ExpertiseCategory.PATTERN_RECOGNITION,
         ],
-        traits=PersonaTraits(
+        traits=CodingPersonaTraits(
             communication_style=CommunicationStyle.ANALYTICAL,
             decision_style=DecisionStyle.ITERATIVE,
             attention_to_detail=0.95,
@@ -576,7 +572,7 @@ CODING_PERSONAS: Dict[str, CodingPersona] = {
             ExpertiseCategory.SECURITY,
             ExpertiseCategory.PATTERN_RECOGNITION,
         ],
-        traits=PersonaTraits(
+        traits=CodingPersonaTraits(
             communication_style=CommunicationStyle.SUPPORTIVE,
             decision_style=DecisionStyle.PERFECTIONIST,
             attention_to_detail=0.9,
@@ -609,7 +605,7 @@ CODING_PERSONAS: Dict[str, CodingPersona] = {
             ExpertiseCategory.DEBUGGING,
             ExpertiseCategory.DOCUMENTATION,
         ],
-        traits=PersonaTraits(
+        traits=CodingPersonaTraits(
             communication_style=CommunicationStyle.DETAILED,
             decision_style=DecisionStyle.PRAGMATIC,
             attention_to_detail=0.85,
@@ -830,7 +826,6 @@ __all__ = [
     "CommunicationStyle",
     "DecisionStyle",
     "CodingPersonaTraits",
-    "PersonaTraits",  # Backward compatibility alias for CodingPersonaTraits
     "CodingPersona",
     # Pre-defined personas
     "CODING_PERSONAS",

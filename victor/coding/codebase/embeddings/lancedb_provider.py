@@ -370,9 +370,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if self.table is None:
             if self.db is None:
                 raise RuntimeError("Database not initialized")
-            self.table = self.db.create_table(table_name, data=lance_docs)  # type: ignore[attr-defined, unreachable]
+            self.table = self.db.create_table(table_name, data=lance_docs)
         else:
-            self.table.add(lance_docs)  # type: ignore[attr-defined, unreachable]
+            self.table.add(lance_docs)
 
     async def search_similar(
         self,
@@ -400,10 +400,10 @@ class LanceDBProvider(BaseEmbeddingProvider):
             return []
 
         # Generate query embedding
-        query_embedding = await self.embed_text(query)  # type: ignore[attr-defined, unreachable]
+        query_embedding = await self.embed_text(query)
 
         # Search in LanceDB
-        results = self.table.search(query_embedding).limit(limit)  # type: ignore[unreachable]
+        results = self.table.search(query_embedding).limit(limit)
 
         # Apply metadata filters if provided
         if filter_metadata:
@@ -450,7 +450,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if self.table is None:
             return
 
-        self.table.delete(f"id = '{doc_id}'")  # type: ignore[attr-defined, unreachable]
+        self.table.delete(f"id = '{doc_id}'")
 
     async def delete_by_file(self, file_path: str) -> int:
         """Delete all documents from a specific file.
@@ -471,20 +471,20 @@ class LanceDBProvider(BaseEmbeddingProvider):
             return 0
 
         # Count documents before deletion
-        count_before = 0
+        count_before = 0  # type: ignore[unreachable]
         try:
-            count_before = self.table.count_rows()  # type: ignore[unreachable]
+            count_before = self.table.count_rows()
         except (AttributeError, RuntimeError, ValueError):
             count_before = 0
 
         # Delete documents with matching file_path
         # LanceDB uses SQL-like predicates
-        self.table.delete(f"file_path = '{file_path}'")  # type: ignore[attr-defined, unreachable]
+        self.table.delete(f"file_path = '{file_path}'")
 
         # Count documents after deletion
         count_after = 0
         try:
-            count_after = self.table.count_rows()  # type: ignore[unreachable]
+            count_after = self.table.count_rows()
         except (AttributeError, RuntimeError, ValueError):
             count_after = 0
 
@@ -499,8 +499,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
         table_name = self.config.extra_config.get("table_name", "embeddings")
         if self.db is None:
             return
-        if table_name in self.db.list_tables().tables:  # type: ignore[attr-defined, unreachable]
-            self.db.drop_table(table_name)  # type: ignore[unreachable]
+        if table_name in self.db.list_tables().tables:
+            self.db.drop_table(table_name)
 
         self.table = None
         print("🗑️  Cleared index")
@@ -516,8 +516,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
 
         count = 0
         if self.table is not None:
-            try:
-                count = self.table.count_rows()  # type: ignore[unreachable]
+            try:  # type: ignore[unreachable]
+                count = self.table.count_rows()
             except (AttributeError, RuntimeError, ValueError):
                 count = 0
 

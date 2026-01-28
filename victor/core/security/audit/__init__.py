@@ -71,7 +71,6 @@ from victor.core.security.audit.protocol import (
     ComplianceViolation,
     DEFAULT_COMPLIANCE_RULES,
     RetentionPolicy,
-    Severity,
 )
 from victor.core.security.audit.checker import DefaultComplianceChecker, get_compliance_summary
 from victor.core.security.audit.logger import FileAuditLogger, create_event
@@ -86,7 +85,6 @@ __all__ = [
     # Data classes
     "AuditEventType",
     "AuditSeverity",
-    "Severity",  # Backward compatibility alias
     "ComplianceFramework",
     "AuditEvent",
     "ComplianceRule",

@@ -258,12 +258,12 @@ class SwitchCommand(BaseSlashCommand):
             model: Model name
         """
         try:
-            if ctx.agent and hasattr(ctx.agent, 'switch_model') and ctx.agent.switch_model(model):
+            if ctx.agent and hasattr(ctx.agent, "switch_model") and ctx.agent.switch_model(model):
                 # Check if agent has get_current_provider_info method
-                if hasattr(ctx.agent, 'get_current_provider_info'):
+                if hasattr(ctx.agent, "get_current_provider_info"):
                     info = ctx.agent.get_current_provider_info()
                 else:
-                    info = {'native_tool_calls': 'N/A', 'thinking_mode': 'N/A'}
+                    info = {"native_tool_calls": "N/A", "thinking_mode": "N/A"}
                 ctx.console.print(
                     f"[green]✓[/] Switched to [cyan]{model}[/]\n"
                     f"  [dim]Native tools: {info.get('native_tool_calls', 'N/A')}, "
@@ -288,12 +288,14 @@ class SwitchCommand(BaseSlashCommand):
                 ctx.console.print("[red]No active agent[/]")
                 return
 
-            if hasattr(ctx.agent, 'switch_provider') and ctx.agent.switch_provider(provider_name=provider, model=model):
+            if hasattr(ctx.agent, "switch_provider") and ctx.agent.switch_provider(
+                provider_name=provider, model=model
+            ):
                 # Check if agent has get_current_provider_info method
-                if hasattr(ctx.agent, 'get_current_provider_info'):
+                if hasattr(ctx.agent, "get_current_provider_info"):
                     info = ctx.agent.get_current_provider_info()
                 else:
-                    info = {'native_tool_calls': 'N/A', 'thinking_mode': 'N/A'}
+                    info = {"native_tool_calls": "N/A", "thinking_mode": "N/A"}
                 ctx.console.print(
                     f"[green]✓[/] Switched to [cyan]{provider}:{model}[/]\n"
                     f"  [dim]Native tools: {info.get('native_tool_calls', 'N/A')}, "

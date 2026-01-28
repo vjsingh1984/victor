@@ -179,7 +179,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
             self._db = EmbeddedProximaDB(config=config)
             if self._db is not None:
-                await self._db.start()
+                await self._db.start()  # type: ignore[unreachable]
                 self._started = True
                 # Access rest_url safely (db is not None here)
                 self._server_url = getattr(self._db, "rest_url", self._server_url)
@@ -611,7 +611,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # Stop embedded server if we started it
         if self._db is not None:
-            if self._started:
+            if self._started:  # type: ignore[unreachable]
                 try:
                     await self._db.stop()
                 except Exception:

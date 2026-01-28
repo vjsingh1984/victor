@@ -89,10 +89,6 @@ class NativeSymbol:
         return hash((self.name, self.type, self.line, self.parent))
 
 
-# Backward compatibility alias
-Symbol = NativeSymbol
-
-
 @dataclass
 class ChunkInfo:
     """Information about a text chunk.
@@ -195,7 +191,7 @@ class SymbolExtractorProtocol(NativeAcceleratorProtocol, Protocol):
     Hot path: Called for every file during indexing.
     """
 
-    def extract_functions(self, source: str, lang: str) -> List[Symbol]:
+    def extract_functions(self, source: str, lang: str) -> List[NativeSymbol]:
         """Extract function definitions from source.
 
         Args:
@@ -203,11 +199,11 @@ class SymbolExtractorProtocol(NativeAcceleratorProtocol, Protocol):
             lang: Language identifier ("python", "javascript", etc.)
 
         Returns:
-            List of Symbol objects for functions
+            List of NativeSymbol objects for functions
         """
         ...
 
-    def extract_classes(self, source: str, lang: str) -> List[Symbol]:
+    def extract_classes(self, source: str, lang: str) -> List[NativeSymbol]:
         """Extract class definitions from source.
 
         Args:
@@ -215,7 +211,7 @@ class SymbolExtractorProtocol(NativeAcceleratorProtocol, Protocol):
             lang: Language identifier
 
         Returns:
-            List of Symbol objects for classes (with methods as children)
+            List of NativeSymbol objects for classes (with methods as children)
         """
         ...
 

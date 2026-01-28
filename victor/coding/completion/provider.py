@@ -238,7 +238,7 @@ class CachingCompletionProvider(BaseCompletionProvider):
         if key in self._cache:
             cached = self._cache[key]
             if isinstance(cached, tuple) and len(cached) >= 2:
-                timestamp, completion_list = cached[0], cached[1]
+                timestamp, completion_list = cached[0], cached[1]  # type: ignore[unreachable]
                 if time.time() - timestamp < self._cache_ttl:
                     return completion_list
                 # Cache expired

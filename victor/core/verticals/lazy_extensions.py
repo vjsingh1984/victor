@@ -156,7 +156,7 @@ class LazyVerticalExtensions:
         with self._load_lock:
             # Double-check: another thread may have loaded it
             if self._loaded:
-                if self._extensions is not None:
+                if self._extensions is not None:  # type: ignore[unreachable]
                     return self._extensions
                 # Should never happen, but handle gracefully
                 raise RuntimeError("Extension loading failed: _extensions is None")

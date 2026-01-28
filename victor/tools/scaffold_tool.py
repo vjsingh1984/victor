@@ -483,13 +483,13 @@ async def scaffold(
 
         # Create all files
         for file_spec, content_key in template_info["files"]:
-            # file_spec is a string path or Path object
-            file_path = file_spec if isinstance(file_spec, Path) else Path(file_spec)  # type: ignore[unreachable]
+            # file_spec is a string path
+            file_path_str: str = file_spec if isinstance(file_spec, str) else str(file_spec)
             # Interpolate variables in file path
             try:
-                # Convert Path to string for formatting, then back to Path
-                path_str = str(file_path)
-                interpolated_path = Path(path_str.format(**interpolation_vars))
+                # Format the string path with variables
+                interpolated_path_str = file_path_str.format(**interpolation_vars)
+                interpolated_path = Path(interpolated_path_str)
             except KeyError as e:
                 return {
                     "success": False,
@@ -520,7 +520,7 @@ async def scaffold(
                 full_path.write_text(file_content)
                 created_files.append(str(interpolated_path))
             except Exception as e:
-                logger.error("Failed to create %s: %s", file_path, e)
+                logger.error("Failed to create %s: %s", interpolated_path, e)
 
         # Determine next steps
         next_steps = [f"cd {name}"]
@@ -671,10 +671,12 @@ async def scaffold(
         created_files = []
 
         # Create all files with variable interpolation
-        for file_path, content_key in template_info["files"]:
+        for file_spec, content_key in template_info["files"]:
             # Interpolate variables in file path
             try:
-                interpolated_path = file_path.format(**variables)
+                file_path_str = file_spec if isinstance(file_spec, str) else str(file_spec)
+                interpolated_path_str = file_path_str.format(**variables)
+                interpolated_path = Path(interpolated_path_str)
             except KeyError as e:
                 return {
                     "success": False,
@@ -705,7 +707,7 @@ async def scaffold(
                 full_path.write_text(file_content)
                 created_files.append(str(interpolated_path))
             except Exception as e:
-                logger.error("Failed to create %s: %s", file_path, e)
+                logger.error("Failed to create %s: %s", interpolated_path, e)
                 return {
                     "success": False,
                     "error": f"Failed to create file {interpolated_path}: {e}",

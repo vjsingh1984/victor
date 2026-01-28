@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from victor.security_analysis.tools.cve_database_impl import BaseCVEDatabase
 
 from victor.core.security.protocol import (
-    Dependency,
+    SecurityDependency,
     SecurityScanResult,
     Vulnerability,
     VulnerabilityStatus,
@@ -52,7 +52,7 @@ class DependencyParser(Protocol):
         """Glob patterns for files this parser handles."""
         ...
 
-    def parse(self, file_path: Path) -> list[Dependency]:
+    def parse(self, file_path: Path) -> list[SecurityDependency]:
         """Parse a dependency file."""
         ...
 
@@ -78,7 +78,7 @@ class BaseSecurityDependencyParser(ABC):
         ...
 
     @abstractmethod
-    def parse(self, file_path: Path) -> list[Dependency]:
+    def parse(self, file_path: Path) -> list[SecurityDependency]:
         """Parse a dependency file."""
         ...
 
@@ -105,7 +105,7 @@ class PythonDependencyParser(BaseDependencyParser):
             "pyproject.toml",
         ]
 
-    def parse(self, file_path: Path) -> list[Dependency]:
+    def parse(self, file_path: Path) -> list[SecurityDependency]:
         """Parse Python dependency files."""
         name = file_path.name
 
@@ -137,7 +137,7 @@ class PythonDependencyParser(BaseDependencyParser):
                         # Clean version (remove extras like [security])
                         version = version.split("[")[0].split(";")[0].strip()
                         deps.append(
-                            Dependency(
+                            SecurityDependency(
                                 name=name.lower(),
                                 version=version,
                                 ecosystem=self.ecosystem,
@@ -149,7 +149,7 @@ class PythonDependencyParser(BaseDependencyParser):
                         name = line.split("[")[0].split(";")[0].strip()
                         if name:
                             deps.append(
-                                Dependency(
+                                SecurityDependency(
                                     name=name.lower(),
                                     version="*",
                                     ecosystem=self.ecosystem,
@@ -188,7 +188,7 @@ class PythonDependencyParser(BaseDependencyParser):
 
     def _parse_poetry_lock(self, file_path: Path) -> list[Dependency]:
         """Parse poetry.lock format."""
-        deps: list[Dependency] = []
+        deps: list[SecurityDependency] = []
         try:
             import tomllib  # type: ignore[import-not-found]
         except ImportError:
@@ -222,7 +222,7 @@ class PythonDependencyParser(BaseDependencyParser):
 
     def _parse_pyproject(self, file_path: Path) -> list[Dependency]:
         """Parse pyproject.toml for dependencies."""
-        deps: list[Dependency] = []
+        deps: list[SecurityDependency] = []
         try:
             import tomllib
         except ImportError:
@@ -283,7 +283,7 @@ class NodeDependencyParser(BaseDependencyParser):
     def file_patterns(self) -> list[str]:
         return ["package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"]
 
-    def parse(self, file_path: Path) -> list[Dependency]:
+    def parse(self, file_path: Path) -> list[SecurityDependency]:
         """Parse Node.js dependency files."""
         name = file_path.name
 
@@ -373,7 +373,7 @@ class RustDependencyParser(BaseDependencyParser):
     def file_patterns(self) -> list[str]:
         return ["Cargo.toml", "Cargo.lock"]
 
-    def parse(self, file_path: Path) -> list[Dependency]:
+    def parse(self, file_path: Path) -> list[SecurityDependency]:
         """Parse Rust dependency files."""
         if file_path.name == "Cargo.lock":
             return self._parse_cargo_lock(file_path)
@@ -381,7 +381,7 @@ class RustDependencyParser(BaseDependencyParser):
 
     def _parse_cargo_toml(self, file_path: Path) -> list[Dependency]:
         """Parse Cargo.toml."""
-        deps: list[Dependency] = []
+        deps: list[SecurityDependency] = []
         try:
             import tomllib
         except ImportError:
@@ -421,7 +421,7 @@ class RustDependencyParser(BaseDependencyParser):
 
     def _parse_cargo_lock(self, file_path: Path) -> list[Dependency]:
         """Parse Cargo.lock."""
-        deps: list[Dependency] = []
+        deps: list[SecurityDependency] = []
         try:
             import tomllib
         except ImportError:
@@ -463,7 +463,7 @@ class GoDependencyParser(BaseDependencyParser):
     def file_patterns(self) -> list[str]:
         return ["go.mod", "go.sum"]
 
-    def parse(self, file_path: Path) -> list[Dependency]:
+    def parse(self, file_path: Path) -> list[SecurityDependency]:
         """Parse Go dependency files."""
         if file_path.name == "go.sum":
             return self._parse_go_sum(file_path)
@@ -490,7 +490,7 @@ class GoDependencyParser(BaseDependencyParser):
                         parts = line[8:].strip().split()
                         if len(parts) >= 2:
                             deps.append(
-                                Dependency(
+                                SecurityDependency(
                                     name=parts[0],
                                     version=parts[1].lstrip("v"),
                                     ecosystem=self.ecosystem,
@@ -502,7 +502,7 @@ class GoDependencyParser(BaseDependencyParser):
                         parts = line.split()
                         if len(parts) >= 2 and not parts[0].startswith("//"):
                             deps.append(
-                                Dependency(
+                                SecurityDependency(
                                     name=parts[0],
                                     version=parts[1].lstrip("v"),
                                     ecosystem=self.ecosystem,
@@ -532,7 +532,7 @@ class GoDependencyParser(BaseDependencyParser):
                         if key not in seen:
                             seen.add(key)
                             deps.append(
-                                Dependency(
+                                SecurityDependency(
                                     name=name,
                                     version=version,
                                     ecosystem=self.ecosystem,

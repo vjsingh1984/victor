@@ -328,10 +328,10 @@ class ApprovalsCommand(BaseSlashCommand):
             return
 
         # Use getattr/setattr to handle dynamic attributes without type errors
-        if not hasattr(ctx.settings, 'approval_mode'):
-            object.__setattr__(ctx.settings, 'approval_mode', mode)
+        if not hasattr(ctx.settings, "approval_mode"):
+            object.__setattr__(ctx.settings, "approval_mode", mode)
         else:
-            setattr(ctx.settings, 'approval_mode', mode)
+            setattr(ctx.settings, "approval_mode", mode)
         ctx.console.print(f"[green]Approval mode set to:[/] {mode}")
 
         if mode == "full-auto":

@@ -621,7 +621,6 @@ from victor.dataanalysis.teams.personas import (
     CommunicationStyle,
     DecisionStyle,
     DataAnalysisPersonaTraits,
-    PersonaTraits,  # Backward compatibility alias
     DataAnalysisPersona,
     # Pre-defined personas
     DATA_ANALYSIS_PERSONAS,
@@ -659,7 +658,6 @@ __all__ = [
     "CommunicationStyle",
     "DecisionStyle",
     "DataAnalysisPersonaTraits",
-    "PersonaTraits",  # Backward compatibility alias
     "DataAnalysisPersona",
     # Pre-defined personas
     "DATA_ANALYSIS_PERSONAS",

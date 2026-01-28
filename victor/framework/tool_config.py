@@ -229,7 +229,7 @@ class ToolConfigurator:
         elif isinstance(tools, (list, set)):
             enabled_tools = set(tools)
         else:
-            enabled_tools = set()
+            enabled_tools = set()  # type: ignore[unreachable]
 
         return self._apply_tools(orchestrator, enabled_tools, mode)
 
