@@ -423,7 +423,7 @@ class CQRSEventAdapter:
             cqrs_event = self._convert_to_cqrs_event(event)
             if cqrs_event and self._event_dispatcher:
                 if hasattr(self._event_dispatcher, "dispatch"):
-                    self._event_dispatcher.dispatch(cqrs_event)
+                    self._event_dispatcher.dispatch(cqrs_event)  # type: ignore[unused-coroutine]
                     # If dispatch returns a coroutine, we can't await it in sync context
                     # The dispatcher should handle this internally
                     # Just count it as bridged

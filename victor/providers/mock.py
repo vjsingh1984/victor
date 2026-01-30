@@ -184,7 +184,7 @@ class MockProvider(BaseProvider):
             metadata={"mock": True, "call_number": self._call_count},
         )
 
-    async def stream(
+    async def stream(  # type: ignore[override,misc]
         self,
         messages: List[Message],
         *,

@@ -250,7 +250,7 @@ class PipelineManager:
             return {"error": "No baseline coverage found", "current": current.to_dict()}
 
         # Compare
-        comparison = {
+        comparison: dict[str, Any] = {
             "current": current.to_dict(),
             "baseline": baseline.to_dict(),
             "line_coverage_delta": current.line_coverage - baseline.line_coverage,

@@ -343,13 +343,13 @@ class DistributedTracer:
             ctx = TraceContext()
 
         # Create span
-        span: Span | NoOpSpan = Span(
+        span: Span | NoOpSpan = Span(  # type: ignore[call-arg,abstract]
             tracer=self,
             name=name,
             context=ctx,
             kind=kind,
             attributes=attributes or {},
-        )  # type: ignore[abstract]
+        )
 
         # Set as current context
         _trace_context.set(ctx)
@@ -592,7 +592,7 @@ class Span:  # type: ignore[no-redef]
         Returns:
             Self
         """
-        return self
+        return self  # type: ignore[return-value]
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit span context.

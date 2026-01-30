@@ -662,7 +662,7 @@ class SkillDiscoveryEngine:
                     task_description=task,
                 )
 
-                result = self._tool_selector.select_tools(
+                result = await self._tool_selector.select_tools(
                     task,
                     limit=limit,
                     min_score=min_score,
@@ -684,7 +684,7 @@ class SkillDiscoveryEngine:
                     # result is ToolSelectionResult
                     tool_map = {t.name: t for t in available_tools}
                     matched_tools = [
-                        tool_map[name] for name in result if name in tool_map
+                        tool_map[name] for name in result.selected_tool_names if name in tool_map  # type: ignore[attr-defined]
                     ]
 
                 logger.info(f"Matched {len(matched_tools)} tools using selector")

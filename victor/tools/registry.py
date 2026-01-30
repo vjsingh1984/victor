@@ -233,7 +233,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
             def parameters(self) -> Dict[str, Any]:
                 return parameters
 
-            async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
+            async def execute(self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
                 # MCP tools are executed via mcp_call, not directly
                 return ToolResult(
                     success=False,

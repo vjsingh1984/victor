@@ -35,10 +35,7 @@ from rich.syntax import Syntax
 try:
     from jinja2 import Environment, FileSystemLoader, select_autoescape, TemplateNotFound
 except ImportError:
-    Environment = None  # type: ignore[assignment,misc]
-    FileSystemLoader = None  # type: ignore[assignment,misc]
-    select_autoescape = None
-    TemplateNotFound = Exception  # type: ignore[assignment,misc]
+    pass
 
 scaffold_app = typer.Typer(
     name="vertical",

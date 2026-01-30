@@ -22,7 +22,7 @@ import pytest
 from victor.protocols.grounding import (
     GroundingClaimType,
     GroundingClaim,
-    VerificationResult,
+    ClaimVerificationResult,
     AggregatedVerificationResult,
     IGroundingStrategy,
     FileExistenceStrategy,

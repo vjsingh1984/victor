@@ -772,10 +772,11 @@ class ExecutionTraceView(TimeOrderedTableView):
         super().__init__(*args, max_rows=max_rows, **kwargs)
         self._spans: list = []
 
-    def clear(self, columns: bool = ...) -> ExecutionTraceView:
+    def clear(self, columns: bool = False) -> ExecutionTraceView:
         """Clear all spans."""
         self._spans.clear()
         self.update_data([])  # type: ignore[attr-defined]
+        return self
 
     def on_mount(self) -> None:
         """Set up the table columns."""
@@ -838,10 +839,11 @@ class ToolCallHistoryView(TimeOrderedTableView):
         super().__init__(*args, max_rows=max_rows, **kwargs)
         self._tool_calls: list = []
 
-    def clear(self, columns: bool = ...) -> ToolCallHistoryView:
+    def clear(self, columns: bool = False) -> ToolCallHistoryView:
         """Clear all tool calls."""
         self._tool_calls.clear()
         self.update_data([])  # type: ignore[attr-defined]
+        return self
 
     def on_mount(self) -> None:
         """Set up the table columns."""
@@ -943,10 +945,11 @@ class StateTransitionView(TimeOrderedTableView):
         super().__init__(*args, max_rows=max_rows, enable_dedup=True, **kwargs)
         self._transitions: list = []
 
-    def clear(self, columns: bool = ...) -> StateTransitionView:
+    def clear(self, columns: bool = False) -> StateTransitionView:
         """Clear all transitions."""
         self._transitions.clear()
         self.update_data([])  # type: ignore[attr-defined]
+        return self
 
     def on_mount(self) -> None:
         """Set up the table columns."""

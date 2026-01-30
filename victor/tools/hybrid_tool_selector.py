@@ -517,9 +517,9 @@ class HybridToolSelector:
         return (semantic_weight * semantic_score) + (keyword_weight * keyword_score)
 
     @property
-    def strategy(self) -> ToolSelectionStrategy:
+    def strategy(self) -> str:
         """Get the selection strategy used by this selector."""
-        return ToolSelectionStrategy.HYBRID
+        return "hybrid"
 
     # =========================================================================
     # Helper Methods

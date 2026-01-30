@@ -258,7 +258,7 @@ class EmbeddingOpsAccelerator:
             cache_data = (
                 tuple(query)
                 + (float(len(embeddings)),)
-                + tuple(float(len(emb[0])) if emb else 0.0 for emb in embeddings[:5])
+                + tuple(float(len(emb[0])) if emb else 0.0 for emb in embeddings[:5])  # type: ignore[arg-type]
             )
             cache_key = hashlib.sha256(str(cache_data).encode()).hexdigest()
 

@@ -182,7 +182,7 @@ class ToolEventEmitter(IToolEventEmitter):
         Returns:
             True if emission succeeded
         """
-        return self.emit_async(
+        return await self.emit_async(
             topic="tool.start",
             data={
                 "tool_name": tool_name,

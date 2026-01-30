@@ -28,6 +28,7 @@ from victor.protocols.provider_adapter import (
 # Grounding
 from victor.protocols.grounding import (
     AggregatedVerificationResult,
+    ClaimVerificationResult,
     CompositeGroundingVerifier,
     ContentMatchStrategy,
     FileExistenceStrategy,
@@ -35,7 +36,6 @@ from victor.protocols.grounding import (
     GroundingClaimType,
     IGroundingStrategy,
     SymbolReferenceStrategy,
-    VerificationResult,
 )
 
 # Quality
@@ -331,7 +331,7 @@ __all__ = [
     "IGroundingStrategy",
     "GroundingClaimType",
     "GroundingClaim",
-    "VerificationResult",
+    "ClaimVerificationResult",
     "AggregatedVerificationResult",
     "FileExistenceStrategy",
     "SymbolReferenceStrategy",

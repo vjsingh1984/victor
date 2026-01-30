@@ -452,11 +452,12 @@ class ProviderHealthChecker:
                 continue
 
             # At this point, result must be a HealthCheckResult
-            report.results[result.provider_name] = result
+            result_checked: HealthCheckResult = result  # type: ignore[assignment]
+            report.results[result_checked.provider_name] = result_checked
 
-            if result.status == HealthStatus.HEALTHY:
+            if result_checked.status == HealthStatus.HEALTHY:
                 report.healthy_count += 1
-            elif result.status == HealthStatus.DEGRADED:
+            elif result_checked.status == HealthStatus.DEGRADED:
                 report.degraded_count += 1
             else:
                 report.unhealthy_count += 1

@@ -394,7 +394,7 @@ def instrumented_call(
 
     try:
         if use_native:
-            result = native_fn(*args, **kwargs)
+            result = native_fn(*args, **kwargs)  # type: ignore[misc]
         else:
             result = fallback_fn(*args, **kwargs)
         return result

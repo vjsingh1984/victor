@@ -50,7 +50,7 @@ class EventFileWatcher(Static):
         self._loaded_initial = False  # Track if initial load is done
         self._max_initial_load = 100  # Only load last 100 events at startup
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         """Start watching when widget is mounted."""
         logger.info(f"[EventFileWatcher] Mounting with file_path: {self._file_path}")
 
@@ -58,7 +58,7 @@ class EventFileWatcher(Static):
             # Load existing events if file exists
             if self._file_path.exists():
                 logger.info("[EventFileWatcher] File exists, loading historical events")
-                self._load_existing_events()
+                await self._load_existing_events()
             else:
                 logger.info("[EventFileWatcher] File does not exist yet, will wait for creation")
 
@@ -70,7 +70,7 @@ class EventFileWatcher(Static):
         """Stop watching when widget is unmounted."""
         self._stop_watching()
 
-    def _load_existing_events(self) -> None:
+    async def _load_existing_events(self) -> None:
         """Load the last 100 events from the JSONL file at startup.
 
         This loads only the most recent events for faster startup.

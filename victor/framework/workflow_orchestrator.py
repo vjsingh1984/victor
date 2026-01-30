@@ -291,7 +291,7 @@ class WorkflowOrchestrator:
                 # Convert workflow event to StreamChunk
                 if event.event_type == "node_complete":
                     node_output = event.state_snapshot
-                    content = node_output.get("content", "")
+                    content = node_output.get("content", "") if node_output else ""
 
                     if content:
                         yield StreamChunk(
@@ -402,7 +402,7 @@ class WorkflowOrchestrator:
             )
 
         # Get workflow from registry
-        from victor.workflows.base import get_global_registry
+        from victor.workflows.base import get_global_registry  # type: ignore[attr-defined]
 
         workflow_registry = get_global_registry()
         workflow = workflow_registry.get(workflow_name)
@@ -413,7 +413,7 @@ class WorkflowOrchestrator:
 
             # Create a simple engine for compilation
             engine = WorkflowEngine()
-            workflow.compiled_graph = engine.compile_workflow_graph(workflow)
+            workflow.compiled_graph = engine.compile_workflow_graph(workflow)  # type: ignore[attr-defined]
 
         return workflow
 

@@ -31,8 +31,8 @@ from typing import Any, Optional, Protocol, runtime_checkable
 
 from victor.core.security.protocol import (
     CVE,
+    CVESeverity,
     CVSSMetrics,
-    Severity,
 )
 
 logger = logging.getLogger(__name__)
@@ -278,7 +278,7 @@ class LocalCVECache:
         return CVE(
             cve_id=data["cve_id"],
             description=data["description"],
-            severity=Severity(data["severity"]),
+            severity=CVESeverity(data["severity"]),
             cvss=cvss,
             published_date=(
                 datetime.fromisoformat(data["published_date"])
@@ -435,7 +435,7 @@ class OSVDatabase(BaseCVEDatabase):
 
         # Parse CVSS
         cvss = None
-        severity = Severity.MEDIUM  # Default
+        severity = CVESeverity.MEDIUM  # Default
         for severity_entry in data.get("severity", []):
             if severity_entry.get("type") == "CVSS_V3":
                 score_str = severity_entry.get("score", "")
@@ -443,7 +443,7 @@ class OSVDatabase(BaseCVEDatabase):
                     # Parse CVSS vector to extract score
                     # For simplicity, use a lookup or calculation
                     cvss = CVSSMetrics(score=5.0, vector=score_str)
-                    severity = Severity.from_cvss(cvss.score)
+                    severity = CVESeverity.from_cvss(cvss.score)
                 except Exception:
                     pass
 

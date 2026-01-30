@@ -494,15 +494,17 @@ async def docs(
                 for item in items_to_document:
                     if item["type"] == "function":
                         docstring = _generate_function_docstring(
-                            item["node"], format  # Already a FunctionDef AST node
+                            item["node"], format  # type: ignore[arg-type]
                         )
                     else:
                         docstring = _generate_class_docstring(
-                            item["node"], format
-                        )  # Already a ClassDef AST node
+                            item["node"], format  # type: ignore[arg-type]
+                        )
 
                     insert_line = item["line"]
-                    def_line = lines[insert_line - 1]
+                    def_line = lines[int(insert_line) - 1]  # type: ignore[call-overload]
+                    if not isinstance(def_line, str):
+                        continue  # type: ignore[unreachable]
                     base_indent = len(def_line) - len(def_line.lstrip())
                     indent = " " * (base_indent + 4)
 
@@ -516,7 +518,7 @@ async def docs(
                     formatted_docstring.append(f'{indent}"""')
 
                     lines = (
-                        lines[: int(insert_line)] + formatted_docstring + lines[int(insert_line) :]
+                        lines[: int(insert_line)] + formatted_docstring + lines[int(insert_line) :]  # type: ignore[call-overload]
                     )
 
                 new_content = "\n".join(lines)
@@ -808,8 +810,8 @@ async def docs_coverage(
     if len(missing) > MAX_MISSING_ITEMS:
         missing_truncated.append(f"... and {len(missing) - MAX_MISSING_ITEMS} more items")
 
-    quality_truncated = quality_issues[:MAX_QUALITY_ISSUES] if check_quality else None
-    if check_quality and len(quality_issues) > MAX_QUALITY_ISSUES:
+    quality_truncated: list[str] | None = quality_issues[:MAX_QUALITY_ISSUES] if check_quality else None
+    if check_quality and quality_truncated is not None and len(quality_issues) > MAX_QUALITY_ISSUES:
         quality_truncated.append(f"... and {len(quality_issues) - MAX_QUALITY_ISSUES} more issues")
 
     return {

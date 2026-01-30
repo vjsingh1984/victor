@@ -101,10 +101,6 @@ class ClaimVerificationResult:
     reason: str = ""
 
 
-# Backward compatibility alias
-VerificationResult = ClaimVerificationResult
-
-
 @dataclass
 class AggregatedVerificationResult:
     """Aggregated result from multiple verification strategies.
@@ -124,7 +120,7 @@ class AggregatedVerificationResult:
     total_claims: int = 0
     verified_claims: int = 0
     failed_claims: int = 0
-    results: List[VerificationResult] = field(default_factory=list)
+    results: List[ClaimVerificationResult] = field(default_factory=list)
     strategy_scores: Dict[str, float] = field(default_factory=dict)
 
 
@@ -149,7 +145,7 @@ class IGroundingStrategy(Protocol):
         self,
         claim: GroundingClaim,
         context: Dict[str, Any],
-    ) -> VerificationResult:
+    ) -> ClaimVerificationResult:
         """Verify a claim against context.
 
         Args:
@@ -201,7 +197,7 @@ class FileExistenceStrategy(IGroundingStrategy):
         self,
         claim: GroundingClaim,
         context: Dict[str, Any],
-    ) -> VerificationResult:
+    ) -> ClaimVerificationResult:
         """Verify file existence claims."""
         project_root = context.get("project_root", self._project_root)
         if isinstance(project_root, str):
@@ -221,7 +217,7 @@ class FileExistenceStrategy(IGroundingStrategy):
             is_grounded = not exists
             reason = f"File {'does not exist' if not exists else 'exists'}: {claim.value}"
 
-        return VerificationResult(
+        return ClaimVerificationResult(
             is_grounded=is_grounded,
             confidence=0.95 if is_grounded else 0.0,
             claim=claim,
@@ -324,7 +320,7 @@ class SymbolReferenceStrategy(IGroundingStrategy):
         self,
         claim: GroundingClaim,
         context: Dict[str, Any],
-    ) -> VerificationResult:
+    ) -> ClaimVerificationResult:
         """Verify symbol existence claims."""
         symbol_table = context.get("symbol_table", self._symbol_table)
         symbol_name = claim.value
@@ -332,7 +328,7 @@ class SymbolReferenceStrategy(IGroundingStrategy):
         # Look up symbol
         found = symbol_name in symbol_table
 
-        return VerificationResult(
+        return ClaimVerificationResult(
             is_grounded=found,
             confidence=0.9 if found else 0.3,
             claim=claim,
@@ -389,13 +385,13 @@ class ContentMatchStrategy(IGroundingStrategy):
         self,
         claim: GroundingClaim,
         context: Dict[str, Any],
-    ) -> VerificationResult:
+    ) -> ClaimVerificationResult:
         """Verify content match claims."""
         expected_content = claim.value
         file_path = claim.context.get("file_path")
 
         if not file_path:
-            return VerificationResult(
+            return ClaimVerificationResult(
                 is_grounded=False,
                 confidence=0.0,
                 claim=claim,
@@ -409,7 +405,7 @@ class ContentMatchStrategy(IGroundingStrategy):
         full_path = project_root / file_path
 
         if not full_path.exists():
-            return VerificationResult(
+            return ClaimVerificationResult(
                 is_grounded=False,
                 confidence=0.0,
                 claim=claim,
@@ -424,7 +420,7 @@ class ContentMatchStrategy(IGroundingStrategy):
 
             is_match = normalized_expected in normalized_content
 
-            return VerificationResult(
+            return ClaimVerificationResult(
                 is_grounded=is_match,
                 confidence=0.95 if is_match else 0.1,
                 claim=claim,
@@ -432,7 +428,7 @@ class ContentMatchStrategy(IGroundingStrategy):
                 reason=f"Content {'matches' if is_match else 'does not match'} source file",
             )
         except Exception as e:
-            return VerificationResult(
+            return ClaimVerificationResult(
                 is_grounded=False,
                 confidence=0.0,
                 claim=claim,
@@ -586,7 +582,7 @@ class CompositeGroundingVerifier:
         self,
         claim: str,
         context: Dict[str, Any],
-    ) -> VerificationResult:
+    ) -> ClaimVerificationResult:
         """Verify a single claim string.
 
         Args:
@@ -599,7 +595,7 @@ class CompositeGroundingVerifier:
         result = await self.verify(claim, context)
         if result.results:
             return result.results[0]
-        return VerificationResult(
+        return ClaimVerificationResult(
             is_grounded=True,
             confidence=1.0,
             reason="No verifiable claims found",

@@ -480,7 +480,7 @@ class AgentBuilder:
 
             # Get from container to ensure we get the singleton instance
             # Use protocol type for container.get() (service registered with protocol type)
-            service_impl = self._container.get(ToolConfiguratorService)
+            service_impl = self._container.get(ToolConfiguratorService)  # type: ignore[type-abstract]
             return cast(Optional["ToolConfiguratorService"], service_impl)
         except Exception as e:
             logger.debug(f"Could not get ToolConfigurator from container: {e}")

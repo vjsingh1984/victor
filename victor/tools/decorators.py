@@ -224,7 +224,7 @@ def tool(
     execution_category: Optional[str] = None,
     # NEW: Availability check for optional tools requiring configuration
     availability_check: Optional[Callable[[], bool]] = None,
-) -> Union[Callable, Callable[[Callable], Callable]]:
+) -> Any:  # Union[Callable, FunctionTool, Callable[[Callable], Any]]
     """
     A decorator that converts a Python function into a Victor tool.
 
@@ -745,7 +745,7 @@ def _create_tool_class(
                 cost_tier=self._cost_tier,
             )
 
-        async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
+        async def execute(self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
             try:
                 # Check if the target function wants the framework execution context
                 # Note: We use _exec_ctx to avoid collision with tool parameters named 'context'
@@ -802,4 +802,4 @@ def _create_tool_class(
     # Create the tool instance and auto-register with global metadata registry
     tool_instance = FunctionTool(func)
     _auto_register_tool(tool_instance)
-    return tool_instance
+    return tool_instance  # type: ignore[return-value]

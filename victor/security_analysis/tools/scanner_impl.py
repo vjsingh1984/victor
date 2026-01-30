@@ -120,7 +120,7 @@ class PythonDependencyParser(BaseDependencyParser):
 
         return []
 
-    def _parse_requirements(self, file_path: Path) -> list[Dependency]:
+    def _parse_requirements(self, file_path: Path) -> list[SecurityDependency]:
         """Parse requirements.txt format."""
         deps = []
         try:
@@ -161,7 +161,7 @@ class PythonDependencyParser(BaseDependencyParser):
 
         return deps
 
-    def _parse_pipfile_lock(self, file_path: Path) -> list[Dependency]:
+    def _parse_pipfile_lock(self, file_path: Path) -> list[SecurityDependency]:
         """Parse Pipfile.lock format."""
         deps = []
         try:
@@ -173,7 +173,7 @@ class PythonDependencyParser(BaseDependencyParser):
                 for name, info in packages.items():
                     version = info.get("version", "").lstrip("=")
                     deps.append(
-                        Dependency(
+                        SecurityDependency(
                             name=name.lower(),
                             version=version,
                             ecosystem=self.ecosystem,
@@ -186,7 +186,7 @@ class PythonDependencyParser(BaseDependencyParser):
 
         return deps
 
-    def _parse_poetry_lock(self, file_path: Path) -> list[Dependency]:
+    def _parse_poetry_lock(self, file_path: Path) -> list[SecurityDependency]:
         """Parse poetry.lock format."""
         deps: list[SecurityDependency] = []
         try:
@@ -208,7 +208,7 @@ class PythonDependencyParser(BaseDependencyParser):
                 name = package.get("name", "")
                 version = package.get("version", "")
                 deps.append(
-                    Dependency(
+                    SecurityDependency(
                         name=name.lower(),
                         version=version,
                         ecosystem=self.ecosystem,
@@ -220,7 +220,7 @@ class PythonDependencyParser(BaseDependencyParser):
 
         return deps
 
-    def _parse_pyproject(self, file_path: Path) -> list[Dependency]:
+    def _parse_pyproject(self, file_path: Path) -> list[SecurityDependency]:
         """Parse pyproject.toml for dependencies."""
         deps: list[SecurityDependency] = []
         try:
@@ -243,7 +243,7 @@ class PythonDependencyParser(BaseDependencyParser):
                     name = match.group(1)
                     version = match.group(3) or "*"
                     deps.append(
-                        Dependency(
+                        SecurityDependency(
                             name=name.lower(),
                             version=version.split(";")[0].strip(),
                             ecosystem=self.ecosystem,
@@ -258,7 +258,7 @@ class PythonDependencyParser(BaseDependencyParser):
                     continue
                 version = spec if isinstance(spec, str) else spec.get("version", "*")
                 deps.append(
-                    Dependency(
+                    SecurityDependency(
                         name=name.lower(),
                         version=version.lstrip("^~"),
                         ecosystem=self.ecosystem,
@@ -294,7 +294,7 @@ class NodeDependencyParser(BaseDependencyParser):
 
         return []
 
-    def _parse_package_json(self, file_path: Path) -> list[Dependency]:
+    def _parse_package_json(self, file_path: Path) -> list[SecurityDependency]:
         """Parse package.json."""
         deps = []
         try:
@@ -307,7 +307,7 @@ class NodeDependencyParser(BaseDependencyParser):
                     # Clean version specifier
                     version = version.lstrip("^~>=<")
                     deps.append(
-                        Dependency(
+                        SecurityDependency(
                             name=name,
                             version=version,
                             ecosystem=self.ecosystem,
@@ -320,7 +320,7 @@ class NodeDependencyParser(BaseDependencyParser):
 
         return deps
 
-    def _parse_package_lock(self, file_path: Path) -> list[Dependency]:
+    def _parse_package_lock(self, file_path: Path) -> list[SecurityDependency]:
         """Parse package-lock.json."""
         deps = []
         try:
@@ -335,7 +335,7 @@ class NodeDependencyParser(BaseDependencyParser):
                 # Extract package name from path
                 name = pkg_path.split("node_modules/")[-1]
                 deps.append(
-                    Dependency(
+                    SecurityDependency(
                         name=name,
                         version=info["version"],
                         ecosystem=self.ecosystem,
@@ -348,7 +348,7 @@ class NodeDependencyParser(BaseDependencyParser):
             if not packages:
                 for name, info in data.get("dependencies", {}).items():
                     deps.append(
-                        Dependency(
+                        SecurityDependency(
                             name=name,
                             version=info.get("version", ""),
                             ecosystem=self.ecosystem,
@@ -379,7 +379,7 @@ class RustDependencyParser(BaseDependencyParser):
             return self._parse_cargo_lock(file_path)
         return self._parse_cargo_toml(file_path)
 
-    def _parse_cargo_toml(self, file_path: Path) -> list[Dependency]:
+    def _parse_cargo_toml(self, file_path: Path) -> list[SecurityDependency]:
         """Parse Cargo.toml."""
         deps: list[SecurityDependency] = []
         try:
@@ -405,7 +405,7 @@ class RustDependencyParser(BaseDependencyParser):
                         version = "*"
 
                     deps.append(
-                        Dependency(
+                        SecurityDependency(
                             name=name,
                             version=version.lstrip("^~"),
                             ecosystem=self.ecosystem,
@@ -419,7 +419,7 @@ class RustDependencyParser(BaseDependencyParser):
 
         return deps
 
-    def _parse_cargo_lock(self, file_path: Path) -> list[Dependency]:
+    def _parse_cargo_lock(self, file_path: Path) -> list[SecurityDependency]:
         """Parse Cargo.lock."""
         deps: list[SecurityDependency] = []
         try:
@@ -438,7 +438,7 @@ class RustDependencyParser(BaseDependencyParser):
                 name = package.get("name", "")
                 version = package.get("version", "")
                 deps.append(
-                    Dependency(
+                    SecurityDependency(
                         name=name,
                         version=version,
                         ecosystem=self.ecosystem,
@@ -469,7 +469,7 @@ class GoDependencyParser(BaseDependencyParser):
             return self._parse_go_sum(file_path)
         return self._parse_go_mod(file_path)
 
-    def _parse_go_mod(self, file_path: Path) -> list[Dependency]:
+    def _parse_go_mod(self, file_path: Path) -> list[SecurityDependency]:
         """Parse go.mod."""
         deps = []
         in_require = False
@@ -515,7 +515,7 @@ class GoDependencyParser(BaseDependencyParser):
 
         return deps
 
-    def _parse_go_sum(self, file_path: Path) -> list[Dependency]:
+    def _parse_go_sum(self, file_path: Path) -> list[SecurityDependency]:
         """Parse go.sum."""
         deps = []
         seen = set()

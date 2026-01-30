@@ -322,7 +322,7 @@ class MutableChatState(ChatStateProtocol):
             content: Message content
             tool_calls: Optional list of tool calls
         """
-        message = {
+        message: Dict[str, Any] = {
             "role": role,
             "content": content,
         }

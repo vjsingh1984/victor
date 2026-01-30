@@ -370,9 +370,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if self.table is None:
             if self.db is None:
                 raise RuntimeError("Database not initialized")
-            self.table = self.db.create_table(table_name, data=lance_docs)
+            self.table = self.db.create_table(table_name, data=lance_docs)  # type: ignore[unreachable]
         else:
-            self.table.add(lance_docs)
+            self.table.add(lance_docs)  # type: ignore[unreachable]
 
     async def search_similar(
         self,
@@ -400,10 +400,10 @@ class LanceDBProvider(BaseEmbeddingProvider):
             return []
 
         # Generate query embedding
-        query_embedding = await self.embed_text(query)
+        query_embedding = await self.embed_text(query)  # type: ignore[unreachable,unused-ignore]
 
         # Search in LanceDB
-        results = self.table.search(query_embedding).limit(limit)
+        results = self.table.search(query_embedding).limit(limit)  # type: ignore[unreachable,unused-ignore]
 
         # Apply metadata filters if provided
         if filter_metadata:
@@ -450,7 +450,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if self.table is None:
             return
 
-        self.table.delete(f"id = '{doc_id}'")
+        self.table.delete(f"id = '{doc_id}'")  # type: ignore[unreachable]
 
     async def delete_by_file(self, file_path: str) -> int:
         """Delete all documents from a specific file.
@@ -499,8 +499,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
         table_name = self.config.extra_config.get("table_name", "embeddings")
         if self.db is None:
             return
-        if table_name in self.db.list_tables().tables:
-            self.db.drop_table(table_name)
+        if table_name in self.db.list_tables().tables:  # type: ignore[unreachable,unused-ignore]
+            self.db.drop_table(table_name)  # type: ignore[unreachable,unused-ignore]
 
         self.table = None
         print("🗑️  Cleared index")

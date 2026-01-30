@@ -188,7 +188,8 @@ class CommandRegistry:
         count = 0
         try:
             package = importlib.import_module(package_path)
-            package_dir = Path(package.__file__).parent
+            package_file = getattr(package, '__file__', None)
+            package_dir = Path(package_file).parent if package_file else Path(package_path).parent
 
             for _, module_name, _ in pkgutil.iter_modules([str(package_dir)]):
                 if module_name.startswith("_"):
@@ -294,7 +295,7 @@ def command(
 
         # Add metadata property if not present
         if not hasattr(cls, "metadata") or not isinstance(getattr(cls, "metadata", None), property):
-            cls.metadata = property(lambda self: meta)
+            cls.metadata = property(lambda self: meta)  # type: ignore[attr-defined]
 
         # Register the command
         get_command_registry().register_class(cls)

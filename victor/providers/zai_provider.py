@@ -248,7 +248,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                 raw_error=e,
             )
 
-    async def stream(
+    async def stream(  # type: ignore[override,misc]
         self,
         messages: List[Message],
         *,

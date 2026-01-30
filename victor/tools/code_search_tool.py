@@ -35,7 +35,10 @@ def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> "ICacheNamesp
         if isinstance(exec_ctx, ToolExecutionContext):
             if exec_ctx.cache_manager is not None:
                 # Return the namespace's internal dict-like interface
-                return exec_ctx.index_cache
+                cache = exec_ctx.index_cache
+                if cache is not None:
+                    return cache
+                # Fall through to global cache
         elif isinstance(exec_ctx, dict):
             # Legacy dict context - check for cache_manager
             cache_manager = exec_ctx.get("cache_manager")

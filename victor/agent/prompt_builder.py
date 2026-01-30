@@ -39,6 +39,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Deprecated fallback task type hints (kept for backward compatibility)
+_DEPRECATED_TASK_TYPE_HINTS: Dict[str, str] = {}
+
 
 # Provider classifications
 CLOUD_PROVIDERS: Set[str] = {"anthropic", "openai", "google", "xai", "moonshot", "kimi", "deepseek"}

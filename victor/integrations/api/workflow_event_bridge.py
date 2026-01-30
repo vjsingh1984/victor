@@ -574,6 +574,6 @@ def workflow_stream_chunk_to_ws_event(
 
     # Add progress if available
     if chunk.progress is not None:
-        event_data["progress"] = chunk.progress
+        event_data["progress"] = str(chunk.progress)
 
     return event_data

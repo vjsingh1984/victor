@@ -29,7 +29,7 @@ Example usage:
 """
 
 try:
-    from victor_native import (  # type: ignore[import-untyped]
+    from victor_native import (  # type: ignore[import-not-found]
         CompiledRegexSet,
         MatchResult,
         compile_language_patterns,

@@ -39,7 +39,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     from victor.agent.action_authorizer import ActionIntent
@@ -278,7 +278,7 @@ class MetadataActionAuthorizer:
 
         total_tools = len(self._registry.list_all_tools())
 
-        summary = {
+        summary: Dict[str, Any] = {
             "total_tools": total_tools,
             "tools_by_safety": {},
             "blocked_tools_by_intent": {},

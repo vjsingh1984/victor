@@ -324,7 +324,7 @@ class ToolExecutionContext:
     # DI Accessors (with fallback to global state)
     # ==========================================================================
 
-    def get_cache(self, namespace: str) -> "ICacheNamespace":
+    def get_cache(self, namespace: str) -> "ICacheNamespace | None":
         """Get a namespaced cache.
 
         Uses injected cache_manager if available.
@@ -378,17 +378,17 @@ class ToolExecutionContext:
         return logging.getLogger(name)
 
     @property
-    def index_cache(self) -> "ICacheNamespace":
+    def index_cache(self) -> "ICacheNamespace | None":
         """Get code search index cache (convenience property)."""
         return self.get_cache("code_search_index")
 
     @property
-    def file_content_cache(self) -> "ICacheNamespace":
+    def file_content_cache(self) -> "ICacheNamespace | None":
         """Get file content cache (convenience property)."""
         return self.get_cache("file_content")
 
     @property
-    def connection_pool(self) -> "ICacheNamespace":
+    def connection_pool(self) -> "ICacheNamespace | None":
         """Get database connection pool (convenience property)."""
         return self.get_cache("database_connections")
 

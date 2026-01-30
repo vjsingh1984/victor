@@ -54,7 +54,7 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from threading import RLock
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -389,7 +389,7 @@ class ToolAuthMetadataRegistry:
         with self._lock:
             return sorted(self._domains.keys())
 
-    def get_metadata_summary(self) -> Dict[str, any]:
+    def get_metadata_summary(self) -> Dict[str, Any]:
         """Get summary of registered metadata.
 
         Returns:

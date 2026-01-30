@@ -29,7 +29,7 @@ from __future__ import annotations
 from typing import List, Optional, Tuple
 
 try:
-    import victor_native  # type: ignore[import-untyped]
+    import victor_native  # type: ignore[import-not-found]
 
     RUST_AVAILABLE = True
 except ImportError:

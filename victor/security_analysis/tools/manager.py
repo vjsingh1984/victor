@@ -23,9 +23,9 @@ from pathlib import Path
 from typing import Optional
 
 from victor.core.security.protocol import (
+    CVESeverity,
     SecurityPolicy,
     SecurityScanResult,
-    CVECVESeverity,
 )
 from victor.security_analysis.tools.scanner import get_scanner
 

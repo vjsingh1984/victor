@@ -20,14 +20,14 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
 
 from victor.protocols.grounding import (
-    GroundingClaimType,
-    GroundingClaim,
-    VerificationResult,
     AggregatedVerificationResult,
-    IGroundingStrategy,
-    FileExistenceStrategy,
-    SymbolReferenceStrategy,
+    ClaimVerificationResult,
     ContentMatchStrategy,
+    FileExistenceStrategy,
+    GroundingClaim,
+    GroundingClaimType,
+    IGroundingStrategy,
+    SymbolReferenceStrategy,
     CompositeGroundingVerifier,
 )
 
@@ -90,7 +90,7 @@ class TestGroundingClaim:
 # =============================================================================
 
 
-class TestVerificationResult:
+class TestClaimVerificationResult:
     """Tests for VerificationResult dataclass."""
 
     def test_creation_grounded(self):

@@ -912,7 +912,7 @@ class WorkflowVisualizer:
 
         matplotlib.use("Agg")  # Non-interactive backend
         import matplotlib.pyplot as plt
-        import networkx  # type: ignore[import-untyped] as nx
+        import networkx as nx
 
         # Build networkx graph
         G = nx.DiGraph()
@@ -1172,7 +1172,7 @@ def _has_matplotlib() -> bool:
     """Check if matplotlib is available."""
     try:
         import matplotlib
-        import networkx  # type: ignore[import-untyped]
+        import networkx
 
         return True
     except ImportError:

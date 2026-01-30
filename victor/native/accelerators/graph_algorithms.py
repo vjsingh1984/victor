@@ -113,7 +113,7 @@ def _get_graph_info(graph: Union[Graph, Any]) -> Dict[str, Any]:
         Dictionary with graph attributes
     """
     try:
-        import networkx as nx
+        import networkx as nx  # type: ignore[import-untyped]
 
         if isinstance(graph, (nx.DiGraph, nx.Graph)):
             # NetworkX graph

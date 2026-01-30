@@ -492,7 +492,7 @@ class WorkflowChatCoordinator:
             self._sessions[session_id]["iteration_count"] = final_state.get("iteration_count", 0)
             self._sessions[session_id]["metadata"] = final_state.get("metadata", {})
 
-    def _get_workflow(self, workflow_name: str) -> Dict[str, Any]:
+    def _get_workflow(self, workflow_name: str) -> Any:  # BaseWorkflow | Dict[str, Any]
         """Get workflow by name.
 
         Args:
