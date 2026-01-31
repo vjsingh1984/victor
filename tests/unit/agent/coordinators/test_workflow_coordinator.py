@@ -30,26 +30,19 @@ from unittest.mock import Mock, MagicMock, patch
 from typing import List, Dict, Any
 
 from victor.agent.coordinators.workflow_coordinator import WorkflowCoordinator
-from victor.workflows.base import BaseWorkflow, WorkflowRegistry
+from victor.workflows.definition import WorkflowDefinition, AgentNode
+from victor.workflows.registry import WorkflowRegistry
 
 
-class MockWorkflow(BaseWorkflow):
-    """Mock workflow for testing."""
-
-    def __init__(self, name: str, description: str = "Test workflow"):
-        self._name = name
-        self._description = description
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def description(self) -> str:
-        return self._description
-
-    async def run(self, context: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
-        return {"status": "success", "workflow": self._name}
+def make_workflow(name: str, description: str = "Test workflow") -> WorkflowDefinition:
+    """Create a minimal valid WorkflowDefinition for tests."""
+    node = AgentNode(id="start", name="start", goal="test")
+    return WorkflowDefinition(
+        name=name,
+        description=description,
+        nodes={"start": node},
+        start_node="start",
+    )
 
 
 class TestWorkflowCoordinator:
@@ -64,6 +57,8 @@ class TestWorkflowCoordinator:
         """Create mock workflow registry."""
         registry = Mock(spec=WorkflowRegistry)
         registry._workflows = {}
+        registry.list_workflows.side_effect = lambda: list(registry._workflows.keys())
+        registry.get.side_effect = lambda name: registry._workflows.get(name)
         return registry
 
     @pytest.fixture
@@ -112,68 +107,79 @@ class TestWorkflowCoordinator:
 
     # Test register_default_workflows
 
-    @patch("victor.workflows.discovery.register_builtin_workflows")
-    def test_register_default_workflows_calls_discovery(
+    @patch("victor.workflows.mode_workflows.get_mode_workflow_provider")
+    def test_register_default_workflows_calls_provider(
         self,
-        mock_register_builtin: Mock,
+        mock_get_provider: Mock,
         coordinator: WorkflowCoordinator,
     ):
-        """Test that register_default_workflows calls discovery function."""
-        # Setup
-        mock_register_builtin.return_value = 5
+        """Test that register_default_workflows loads mode workflows."""
+        provider = Mock()
+        provider.get_workflow_definitions.return_value = {
+            "explore": make_workflow("explore"),
+            "plan": make_workflow("plan"),
+        }
+        mock_get_provider.return_value = provider
 
         # Execute
         count = coordinator.register_default_workflows()
 
         # Assert
-        mock_register_builtin.assert_called_once_with(coordinator.workflow_registry)
-        assert count == 5
+        mock_get_provider.assert_called_once()
+        provider.get_workflow_definitions.assert_called_once()
+        assert count == 2
 
-    @patch("victor.workflows.discovery.register_builtin_workflows")
+    @patch("victor.workflows.mode_workflows.get_mode_workflow_provider")
     def test_register_default_workflows_returns_count(
         self,
-        mock_register_builtin: Mock,
+        mock_get_provider: Mock,
         coordinator: WorkflowCoordinator,
     ):
         """Test that register_default_workflows returns correct count."""
-        # Setup
-        mock_register_builtin.return_value = 10
+        provider = Mock()
+        provider.get_workflow_definitions.return_value = {
+            "explore": make_workflow("explore"),
+        }
+        mock_get_provider.return_value = provider
 
         # Execute
         count = coordinator.register_default_workflows()
 
         # Assert
-        assert count == 10
+        assert count == 1
 
-    @patch("victor.workflows.discovery.register_builtin_workflows")
+    @patch("victor.workflows.mode_workflows.get_mode_workflow_provider")
     def test_register_default_workflows_with_zero_workflows(
         self,
-        mock_register_builtin: Mock,
+        mock_get_provider: Mock,
         coordinator: WorkflowCoordinator,
     ):
         """Test register_default_workflows when no workflows found."""
-        # Setup
-        mock_register_builtin.return_value = 0
+        provider = Mock()
+        provider.get_workflow_definitions.return_value = {}
+        mock_get_provider.return_value = provider
 
         # Execute
         count = coordinator.register_default_workflows()
 
         # Assert
         assert count == 0
-        mock_register_builtin.assert_called_once()
+        mock_get_provider.assert_called_once()
+        provider.get_workflow_definitions.assert_called_once()
 
-    @patch("victor.workflows.discovery.register_builtin_workflows")
-    def test_register_default_workflows_with_discovery_error(
+    @patch("victor.workflows.mode_workflows.get_mode_workflow_provider")
+    def test_register_default_workflows_with_provider_error(
         self,
-        mock_register_builtin: Mock,
+        mock_get_provider: Mock,
         coordinator: WorkflowCoordinator,
     ):
-        """Test register_default_workflows when discovery raises error."""
-        # Setup
-        mock_register_builtin.side_effect = RuntimeError("Discovery failed")
+        """Test register_default_workflows when provider raises error."""
+        provider = Mock()
+        provider.get_workflow_definitions.side_effect = RuntimeError("Provider failed")
+        mock_get_provider.return_value = provider
 
         # Execute & Assert
-        with pytest.raises(RuntimeError, match="Discovery failed"):
+        with pytest.raises(RuntimeError, match="Provider failed"):
             coordinator.register_default_workflows()
 
     def test_register_default_workflows_with_real_registry(
@@ -417,7 +423,7 @@ class TestWorkflowCoordinator:
         assert count1 == 0
 
         # Register a workflow
-        workflow = MockWorkflow("test_workflow")
+        workflow = make_workflow("test_workflow")
         real_workflow_registry.register(workflow)
 
         # Count should increase
@@ -425,7 +431,7 @@ class TestWorkflowCoordinator:
         assert count2 == 1
 
         # Register another workflow
-        workflow2 = MockWorkflow("test_workflow_2")
+        workflow2 = make_workflow("test_workflow_2")
         real_workflow_registry.register(workflow2)
 
         # Count should increase again
@@ -458,7 +464,7 @@ class TestWorkflowCoordinatorIntegration:
         assert coordinator.has_workflow("test_workflow") is False
 
         # Register workflow
-        workflow = MockWorkflow("test_workflow", "A test workflow")
+        workflow = make_workflow("test_workflow", "A test workflow")
         workflow_registry.register(workflow)
 
         # Verify registration
@@ -471,7 +477,7 @@ class TestWorkflowCoordinatorIntegration:
     ):
         """Test registering and listing multiple workflows."""
         # Register multiple workflows
-        workflows = [MockWorkflow(f"workflow_{i}", f"Description {i}") for i in range(5)]
+        workflows = [make_workflow(f"workflow_{i}", f"Description {i}") for i in range(5)]
 
         for workflow in workflows:
             workflow_registry.register(workflow)
@@ -489,8 +495,8 @@ class TestWorkflowCoordinatorIntegration:
     ):
         """Test various workflow operations with real registry."""
         # Register workflows
-        workflow1 = MockWorkflow("workflow1", "First workflow")
-        workflow2 = MockWorkflow("workflow2", "Second workflow")
+        workflow1 = make_workflow("workflow1", "First workflow")
+        workflow2 = make_workflow("workflow2", "Second workflow")
         workflow_registry.register(workflow1)
         workflow_registry.register(workflow2)
 
@@ -517,6 +523,8 @@ class TestWorkflowCoordinatorEdgeCases:
         """Create mock workflow registry."""
         registry = Mock(spec=WorkflowRegistry)
         registry._workflows = {}
+        registry.list_workflows.side_effect = lambda: list(registry._workflows.keys())
+        registry.get.side_effect = lambda name: registry._workflows.get(name)
         return registry
 
     @pytest.fixture
@@ -592,26 +600,29 @@ class TestWorkflowCoordinatorEdgeCases:
         assert "workflow1" in workflows2
         assert "workflow2" not in workflows2
 
-    @patch("victor.workflows.discovery.register_builtin_workflows")
+    @patch("victor.workflows.mode_workflows.get_mode_workflow_provider")
     def test_register_default_workflows_multiple_calls(
         self,
-        mock_register_builtin: Mock,
+        mock_get_provider: Mock,
         coordinator: WorkflowCoordinator,
     ):
         """Test calling register_default_workflows multiple times."""
-        # Setup
-        mock_register_builtin.return_value = 5
+        provider = Mock()
+        provider.get_workflow_definitions.return_value = {
+            "explore": make_workflow("explore"),
+        }
+        mock_get_provider.return_value = provider
 
         # Execute
         count1 = coordinator.register_default_workflows()
         count2 = coordinator.register_default_workflows()
         count3 = coordinator.register_default_workflows()
 
-        # Assert - should call discovery each time
-        assert mock_register_builtin.call_count == 3
-        assert count1 == 5
-        assert count2 == 5
-        assert count3 == 5
+        # Assert - should call provider each time
+        assert mock_get_provider.call_count == 3
+        assert count1 == 1
+        assert count2 == 1
+        assert count3 == 1
 
     def test_has_workflow_with_empty_string(
         self, coordinator: WorkflowCoordinator, mock_workflow_registry: Mock
@@ -640,15 +651,16 @@ class TestWorkflowCoordinatorEdgeCases:
         assert workflows == []
         assert isinstance(workflows, list)
 
-    @patch("victor.workflows.discovery.register_builtin_workflows")
+    @patch("victor.workflows.mode_workflows.get_mode_workflow_provider")
     def test_register_default_workflows_with_exception_during_registration(
         self,
-        mock_register_builtin: Mock,
+        mock_get_provider: Mock,
         coordinator: WorkflowCoordinator,
     ):
         """Test register_default_workflows when registration raises exception."""
-        # Setup
-        mock_register_builtin.side_effect = ValueError("Registration error")
+        provider = Mock()
+        provider.get_workflow_definitions.side_effect = ValueError("Registration error")
+        mock_get_provider.return_value = provider
 
         # Execute & Assert
         with pytest.raises(ValueError, match="Registration error"):
@@ -657,15 +669,10 @@ class TestWorkflowCoordinatorEdgeCases:
     def test_workflow_coordinator_with_mocked_registry_property_access(
         self,
     ):
-        """Test WorkflowCoordinator when _workflows is accessed via property."""
-        # Create a mock registry where _workflows is a property
+        """Test WorkflowCoordinator with registry methods mocked."""
         registry = Mock(spec=WorkflowRegistry)
-        workflows_dict = {"workflow1": Mock()}
-
-        # Use PropertyMock for the _workflows attribute
-        from unittest.mock import PropertyMock
-
-        type(registry)._workflows = PropertyMock(return_value=workflows_dict)
+        registry.list_workflows.return_value = ["workflow1"]
+        registry.get.side_effect = lambda name: object() if name == "workflow1" else None
 
         # Create coordinator
         coordinator = WorkflowCoordinator(workflow_registry=registry)
@@ -678,7 +685,7 @@ class TestWorkflowCoordinatorEdgeCases:
 
 
 class TestWorkflowCoordinatorWithRealWorkflows:
-    """Test WorkflowCoordinator with real BaseWorkflow implementations."""
+    """Test WorkflowCoordinator with real WorkflowDefinition implementations."""
 
     @pytest.fixture
     def workflow_registry(self) -> WorkflowRegistry:
@@ -697,8 +704,8 @@ class TestWorkflowCoordinatorWithRealWorkflows:
     ):
         """Test coordinator with real workflow objects."""
         # Create and register real workflows
-        workflow1 = MockWorkflow("workflow1", "First workflow")
-        workflow2 = MockWorkflow("workflow2", "Second workflow")
+        workflow1 = make_workflow("workflow1", "First workflow")
+        workflow2 = make_workflow("workflow2", "Second workflow")
 
         workflow_registry.register(workflow1)
         workflow_registry.register(workflow2)
@@ -714,7 +721,7 @@ class TestWorkflowCoordinatorWithRealWorkflows:
     ):
         """Test that workflows can be accessed through coordinator's registry."""
         # Register workflow
-        workflow = MockWorkflow("test", "Test workflow")
+        workflow = make_workflow("test", "Test workflow")
         workflow_registry.register(workflow)
 
         # Access through coordinator
@@ -730,11 +737,11 @@ class TestWorkflowCoordinatorWithRealWorkflows:
     ):
         """Test that duplicate workflow registration raises error."""
         # Register first workflow
-        workflow1 = MockWorkflow("duplicate", "First")
+        workflow1 = make_workflow("duplicate", "First")
         workflow_registry.register(workflow1)
 
         # Try to register duplicate
-        workflow2 = MockWorkflow("duplicate", "Second")
+        workflow2 = make_workflow("duplicate", "Second")
 
         # Should raise ValueError
         with pytest.raises(ValueError, match="already registered"):
@@ -749,8 +756,8 @@ class TestWorkflowCoordinatorWithRealWorkflows:
     ):
         """Test coordinator when workflows are removed from registry."""
         # Register workflows
-        workflow1 = MockWorkflow("workflow1", "First")
-        workflow2 = MockWorkflow("workflow2", "Second")
+        workflow1 = make_workflow("workflow1", "First")
+        workflow2 = make_workflow("workflow2", "Second")
         workflow_registry.register(workflow1)
         workflow_registry.register(workflow2)
 
@@ -759,7 +766,8 @@ class TestWorkflowCoordinatorWithRealWorkflows:
 
         # Simulate removal by directly modifying registry
         # (In real scenario, registry would have a remove method)
-        del workflow_registry._workflows["workflow1"]
+        del workflow_registry._definitions["workflow1"]
+        workflow_registry._metadata.pop("workflow1", None)
 
         # Coordinator should reflect the change
         assert coordinator.get_workflow_count() == 1

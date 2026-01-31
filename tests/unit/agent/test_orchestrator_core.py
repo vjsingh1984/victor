@@ -344,7 +344,7 @@ class TestWorkflowRegistration:
     def test_workflow_registry_has_workflows(self, orchestrator):
         """Test _register_default_workflows adds workflows (covers line 568)."""
         # Workflows are registered during init, so check they exist
-        from victor.workflows.base import WorkflowRegistry
+        from victor.workflows.registry import WorkflowRegistry
 
         assert isinstance(orchestrator.workflow_registry, WorkflowRegistry)
 

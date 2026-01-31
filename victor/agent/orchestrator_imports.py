@@ -526,7 +526,7 @@ from victor.tools.progressive_registry import get_progressive_registry
 # =============================================================================
 
 from victor.storage.embeddings.intent_classifier import IntentClassifier, IntentType
-from victor.workflows.base import WorkflowRegistry
+from victor.workflows.registry import WorkflowRegistry
 from victor.workflows.discovery import register_builtin_workflows
 
 # =============================================================================

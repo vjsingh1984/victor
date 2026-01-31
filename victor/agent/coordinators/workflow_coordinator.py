@@ -25,7 +25,7 @@ import logging
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.workflows.base import WorkflowRegistry
+    from victor.workflows.registry import WorkflowRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -77,16 +77,25 @@ class WorkflowCoordinator:
     def register_default_workflows(self) -> int:
         """Register default workflows via dynamic discovery.
 
-        Uses DIP-compliant workflow discovery to avoid hardcoded imports.
-        Workflows are discovered from victor.workflows package automatically.
+        Registers core mode workflows (explore/plan/build) from YAML.
 
         Returns:
             Number of workflows registered
         """
-        from victor.workflows.discovery import register_builtin_workflows
+        from victor.workflows.mode_workflows import get_mode_workflow_provider
 
-        count = register_builtin_workflows(self._workflow_registry)
-        logger.debug(f"Registered {count} workflows via WorkflowCoordinator")
+        provider = get_mode_workflow_provider()
+        workflows = provider.get_workflow_definitions()
+
+        count = 0
+        for workflow in workflows.values():
+            try:
+                self._workflow_registry.register(workflow, replace=True)
+                count += 1
+            except Exception as e:
+                logger.debug(f"Failed to register mode workflow '{workflow.name}': {e}")
+
+        logger.debug(f"Registered {count} mode workflows via WorkflowCoordinator")
         return count
 
     def list_workflows(self) -> List[str]:
@@ -95,7 +104,7 @@ class WorkflowCoordinator:
         Returns:
             List of workflow names
         """
-        return list(self._workflow_registry._workflows.keys())
+        return self._workflow_registry.list_workflows()
 
     def has_workflow(self, name: str) -> bool:
         """Check if a workflow is registered.
@@ -106,7 +115,7 @@ class WorkflowCoordinator:
         Returns:
             True if workflow exists
         """
-        return name in self._workflow_registry._workflows
+        return self._workflow_registry.get(name) is not None
 
     def get_workflow_count(self) -> int:
         """Get the number of registered workflows.
@@ -114,4 +123,4 @@ class WorkflowCoordinator:
         Returns:
             Number of workflows
         """
-        return len(self._workflow_registry._workflows)
+        return len(self._workflow_registry.list_workflows())

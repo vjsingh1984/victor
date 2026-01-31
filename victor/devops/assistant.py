@@ -107,6 +107,13 @@ class DevOpsAssistant(VerticalBase):
         """Get the system prompt for DevOps tasks."""
         return cls._get_system_prompt()
 
+    @classmethod
+    def get_workflow_provider(cls) -> Optional[Any]:
+        """Get workflow provider for DevOps chat workflows."""
+        from victor.devops.chat_workflow_provider import DevOpsChatWorkflowProvider
+
+        return DevOpsChatWorkflowProvider()
+
     # =========================================================================
     # PromptBuilder Support (Phase 5)
     # =========================================================================

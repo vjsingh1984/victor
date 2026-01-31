@@ -401,19 +401,27 @@ class WorkflowOrchestrator:
                 f"Workflow '{workflow_name}' not found. " f"Available workflows: {available}"
             )
 
-        # Get workflow from registry
-        from victor.workflows.base import get_global_registry  # type: ignore[attr-defined]
-
-        workflow_registry = get_global_registry()
+        # Get workflow from coordinator-backed registry
+        workflow_registry = self._workflow_coordinator.workflow_registry
         workflow = workflow_registry.get(workflow_name)
+        if workflow is None:
+            available = self.get_available_workflows()
+            raise ValueError(
+                f"Workflow '{workflow_name}' not found. " f"Available workflows: {available}"
+            )
 
         # Compile the workflow if it doesn't have a compiled_graph
         if not hasattr(workflow, "compiled_graph") or workflow.compiled_graph is None:
-            from victor.framework.workflow_engine import WorkflowEngine
+            from victor.workflows.graph_compiler import compile_workflow_definition
 
-            # Create a simple engine for compilation
-            engine = WorkflowEngine()
-            workflow.compiled_graph = engine.compile_workflow_graph(workflow)  # type: ignore[attr-defined]
+            compiled = compile_workflow_definition(
+                workflow,
+                runner_registry=self._graph_coordinator.runner_registry,
+            )
+            try:
+                workflow.compiled_graph = compiled  # type: ignore[attr-defined]
+            except Exception:
+                pass
 
         return workflow
 

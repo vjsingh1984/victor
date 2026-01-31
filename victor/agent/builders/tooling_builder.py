@@ -17,6 +17,7 @@
 Part of HIGH-005: Initialization Complexity reduction.
 """
 
+import logging
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from victor.agent.builders.base import FactoryAwareBuilder
@@ -25,6 +26,8 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.orchestrator_factory import OrchestratorFactory
     from victor.providers.base import BaseProvider
+
+logger = logging.getLogger(__name__)
 
 
 class ToolingBuilder(FactoryAwareBuilder):
@@ -55,6 +58,26 @@ class ToolingBuilder(FactoryAwareBuilder):
         # Alias for backward compatibility - some code uses tool_registry instead of tools
         orchestrator.tool_registry = orchestrator.tools
         components["tool_registry"] = orchestrator.tools
+
+        # Configure workflow node runners if workflow chat is enabled
+        graph_coordinator = getattr(orchestrator, "_graph_coordinator", None)
+        if graph_coordinator is not None:
+            try:
+                from victor.framework.coordinators.graph_coordinator import (
+                    GraphExecutionCoordinator,
+                )
+                from victor.workflows.node_runners import NodeRunnerRegistry
+
+                if isinstance(graph_coordinator, GraphExecutionCoordinator):
+                    runner_registry = NodeRunnerRegistry.create_default(
+                        sub_agents=orchestrator.subagent_orchestrator,
+                        tool_registry=orchestrator.tools,
+                        orchestrator=orchestrator,
+                    )
+                    graph_coordinator.set_runner_registry(runner_registry)
+                    components["node_runner_registry"] = runner_registry
+            except Exception as e:
+                logger.warning(f"Failed to configure workflow node runners: {e}")
 
         # Configure ResponseCoordinator with tool_adapter and mode_coordinator (now available)
         orchestrator._response_coordinator._tool_adapter = orchestrator.tool_adapter

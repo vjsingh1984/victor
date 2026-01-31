@@ -767,6 +767,17 @@ def create_vertical_tool_dependency_provider(
 
     # Determine canonicalization setting
     if canonicalize is None:
+        # Try to read canonicalization override from YAML (if present)
+        try:
+            loader = ToolDependencyLoader(canonicalize=False)
+            spec = loader._load_and_validate(yaml_path)
+            if spec.canonicalize is not None:
+                canonicalize = spec.canonicalize
+        except Exception:
+            # Fall back to defaults if YAML cannot be read
+            pass
+
+    if canonicalize is None:
         canonicalize = _VERTICAL_CANONICALIZE_SETTINGS.get(vertical, True)
 
     return YAMLToolDependencyProvider(yaml_path, canonicalize=canonicalize)

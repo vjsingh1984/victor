@@ -15,9 +15,10 @@
 
 from typing import Any, Dict
 
+from dataclasses import asdict
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
-from victor.workflows.base import WorkflowRegistry
+from victor.workflows.registry import WorkflowRegistry
 
 
 @tool(
@@ -50,9 +51,18 @@ async def workflow(
         return {"error": f"Workflow '{workflow_name}' not found."}
 
     try:
-        # Pass the full context down to the workflow
-        result = await workflow.run(context, **workflow_args)
-        return result
+        # BaseWorkflow-style execution
+        if hasattr(workflow, "run") and callable(getattr(workflow, "run")):
+            result = await workflow.run(context, **workflow_args)
+            return result
+
+        # WorkflowDefinition execution via WorkflowEngine
+        from victor.framework.workflow_engine import WorkflowEngine
+
+        engine = WorkflowEngine()
+        initial_state = {**context, **workflow_args}
+        exec_result = await engine.execute_definition(workflow, initial_state=initial_state)
+        return asdict(exec_result)
     except Exception as e:
         return {
             "error": f"An unexpected error occurred while running workflow '{workflow_name}': {e}"

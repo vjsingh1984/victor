@@ -95,6 +95,11 @@ class GraphExecutionCoordinator:
         """
         self._runner_registry = registry
 
+    @property
+    def runner_registry(self) -> Optional["NodeRunnerRegistry"]:
+        """Expose the runner registry (if configured)."""
+        return self._runner_registry
+
     async def execute(
         self,
         graph: "CompiledGraph[Dict[str, Any]]",

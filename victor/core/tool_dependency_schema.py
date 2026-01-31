@@ -247,6 +247,7 @@ class ToolDependencySpec(BaseModel):
     Attributes:
         version: Schema version for compatibility checking.
         vertical: Name of the vertical this config applies to.
+        canonicalize: Whether to canonicalize tool names on load.
         transitions: Tool transition probability mappings.
         clusters: Groups of related tools.
         sequences: Named tool sequences for task types.
@@ -295,6 +296,11 @@ class ToolDependencySpec(BaseModel):
     vertical: str = Field(
         ...,
         description="Name of the vertical (coding, devops, rag, etc.)",
+    )
+    canonicalize: Optional[bool] = Field(
+        default=None,
+        description="Override tool name canonicalization (true/false). "
+        "If None, loader uses vertical defaults.",
     )
 
     # Transition probabilities: tool -> list of (next_tool, weight)

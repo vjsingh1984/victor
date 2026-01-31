@@ -91,11 +91,11 @@ class TestGroundingClaim:
 
 
 class TestClaimVerificationResult:
-    """Tests for VerificationResult dataclass."""
+    """Tests for ClaimVerificationResult dataclass."""
 
     def test_creation_grounded(self):
         """Test grounded verification result."""
-        result = VerificationResult(
+        result = ClaimVerificationResult(
             is_grounded=True,
             confidence=0.95,
         )
@@ -111,7 +111,7 @@ class TestClaimVerificationResult:
             claim_type=GroundingClaimType.FILE_EXISTS,
             value="missing.py",
         )
-        result = VerificationResult(
+        result = ClaimVerificationResult(
             is_grounded=False,
             confidence=0.0,
             claim=claim,
@@ -145,8 +145,8 @@ class TestAggregatedVerificationResult:
     def test_with_results(self):
         """Test with verification results."""
         results = [
-            VerificationResult(is_grounded=True, confidence=0.9),
-            VerificationResult(is_grounded=False, confidence=0.1),
+            ClaimVerificationResult(is_grounded=True, confidence=0.9),
+            ClaimVerificationResult(is_grounded=False, confidence=0.1),
         ]
         agg = AggregatedVerificationResult(
             is_grounded=True,
@@ -515,7 +515,7 @@ class TestCompositeGroundingVerifier:
         """Test verify_claim for single claim."""
         claim = "The file `src/module.py` contains the Handler class."
         result = await verifier.verify_claim(claim, {"project_root": temp_project})
-        assert isinstance(result, VerificationResult)
+        assert isinstance(result, ClaimVerificationResult)
 
     @pytest.mark.asyncio
     async def test_verify_claim_no_claims_found(self, verifier, temp_project):
@@ -562,7 +562,7 @@ class TestProtocolCompliance:
                 return [GroundingClaimType.UNKNOWN]
 
             async def verify(self, claim, context):
-                return VerificationResult(is_grounded=True, confidence=1.0)
+                return ClaimVerificationResult(is_grounded=True, confidence=1.0)
 
             def extract_claims(self, response, context):
                 return []

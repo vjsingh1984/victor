@@ -29,6 +29,7 @@
 
 version: "1.0"
 vertical: data_analysis
+canonicalize: false
 
 # Tool transition probabilities for data analysis workflows
 # Maps: current_tool -> list of (next_tool, probability)

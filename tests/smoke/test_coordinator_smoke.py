@@ -202,7 +202,7 @@ class TestCoordinatorSmokeTests:
 
     def test_workflow_coordinator_creation(self):
         """Test WorkflowCoordinator can be created."""
-        from victor.workflows.base import WorkflowRegistry
+        from victor.workflows.registry import WorkflowRegistry
 
         coordinator = WorkflowCoordinator(
             workflow_registry=WorkflowRegistry(),
@@ -213,7 +213,7 @@ class TestCoordinatorSmokeTests:
     @pytest.mark.asyncio
     async def test_workflow_coordinator_basic_compilation(self):
         """Test WorkflowCoordinator basic workflow compilation."""
-        from victor.workflows.base import WorkflowRegistry
+        from victor.workflows.registry import WorkflowRegistry
 
         coordinator = WorkflowCoordinator(
             workflow_registry=WorkflowRegistry(),

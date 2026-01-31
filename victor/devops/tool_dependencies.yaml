@@ -32,6 +32,7 @@
 
 version: "1.0"
 vertical: devops
+canonicalize: false
 
 # Tool transition probabilities: tool -> list of (next_tool, weight)
 # Higher weight = more likely useful transition

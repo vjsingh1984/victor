@@ -112,16 +112,21 @@ class ModeWorkflowProvider(WorkflowProviderProtocol):
             self._workflows = {}
             return self._workflows
 
-    def get_workflows(self) -> Dict[str, Type[Any]]:
-        """Get workflow classes for mode-based workflows.
+    def get_workflow_definitions(self) -> Dict[str, WorkflowDefinition]:
+        """Get workflow definitions for mode-based workflows.
 
         Returns:
             Dict mapping workflow names to WorkflowDefinition instances.
-            (Note: Returns WorkflowDefinition instances, not classes, for YAML workflows)
         """
-        workflows = self._load_workflows()
-        # Convert WorkflowDefinition to type for compatibility
-        return {k: type(v) for k, v in workflows.items()}
+        return self._load_workflows()
+
+    def get_workflows(self) -> Dict[str, WorkflowDefinition]:
+        """Get workflow definitions for mode-based workflows.
+
+        Returns:
+            Dict mapping workflow names to WorkflowDefinition instances.
+        """
+        return self.get_workflow_definitions()
 
     def get_auto_workflows(self) -> List[Any]:
         """Get automatically triggered workflows.

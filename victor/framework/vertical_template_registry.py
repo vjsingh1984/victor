@@ -427,6 +427,7 @@ class VerticalTemplateRegistry:
         """
         with self._lock:
             templates = list(self._templates.values())
+            template_names = list(self._templates.keys())
 
             categories: Dict[str, int] = {}
             for template in templates:
@@ -443,7 +444,7 @@ class VerticalTemplateRegistry:
                 "total_tools": tools_count,
                 "total_stages": stages_count,
                 "total_middleware": extensions_count,
-                "template_names": self.list_names(),
+                "template_names": template_names,
             }
 
     def validate_registry(self) -> List[str]:

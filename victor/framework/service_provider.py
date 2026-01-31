@@ -144,8 +144,8 @@ class AgentSessionService(Protocol):
 class WorkflowRegistryService(Protocol):
     """Protocol for workflow registry services."""
 
-    def register(self, name: str, workflow: Any, replace: bool = False) -> None:
-        """Register a workflow."""
+    def register(self, workflow: Any, replace: bool = False) -> None:
+        """Register a workflow definition."""
         ...
 
     def get(self, name: str) -> Any:

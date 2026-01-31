@@ -52,15 +52,12 @@ class ErrorRecoveryAction(Enum):
     ABORT = "abort"
 
 
-# Backward compatibility alias
-RecoveryAction = ErrorRecoveryAction
-
 
 @dataclass
 class RecoveryResult:
     """Result of attempting to recover from an error."""
 
-    action: RecoveryAction
+    action: ErrorRecoveryAction
     modified_args: Optional[Dict[str, Any]] = None
     fallback_tool: Optional[str] = None
     user_message: Optional[str] = None
@@ -72,9 +69,9 @@ class RecoveryResult:
     def should_retry(self) -> bool:
         """Check if action is a retry variant."""
         return self.action in (
-            RecoveryAction.RETRY,
-            RecoveryAction.RETRY_WITH_DEFAULTS,
-            RecoveryAction.RETRY_WITH_INFERRED,
+            ErrorRecoveryAction.RETRY,
+            ErrorRecoveryAction.RETRY_WITH_DEFAULTS,
+            ErrorRecoveryAction.RETRY_WITH_INFERRED,
         )
 
     @property
@@ -125,7 +122,7 @@ class ErrorRecoveryHandler(ABC):
         else:
             self._logger.warning(f"No handler could process error for {tool_name}: {error}")
             return RecoveryResult(
-                action=RecoveryAction.ABORT,
+                action=ErrorRecoveryAction.ABORT,
                 user_message=f"Unrecoverable error in {tool_name}: {error}",
             )
 
@@ -200,13 +197,13 @@ class MissingParameterHandler(ErrorRecoveryHandler):
                 f"Providing default value for missing param '{param_name}': {self.DEFAULTS[param_name]}"
             )
             return RecoveryResult(
-                action=RecoveryAction.RETRY_WITH_DEFAULTS,
+                action=ErrorRecoveryAction.RETRY_WITH_DEFAULTS,
                 modified_args={**args, param_name: self.DEFAULTS[param_name]},
                 user_message=f"Using default value for '{param_name}'",
             )
 
         return RecoveryResult(
-            action=RecoveryAction.SKIP,
+            action=ErrorRecoveryAction.SKIP,
             user_message=f"Cannot infer value for required parameter '{param_name}'",
         )
 
@@ -236,13 +233,13 @@ class ToolNotFoundHandler(ErrorRecoveryHandler):
             fallback = self.FALLBACKS[tool_name]
             self._logger.info(f"Falling back from {tool_name} to {fallback}")
             return RecoveryResult(
-                action=RecoveryAction.FALLBACK_TOOL,
+                action=ErrorRecoveryAction.FALLBACK_TOOL,
                 fallback_tool=fallback,
                 user_message=f"Tool '{tool_name}' not available, using '{fallback}' instead",
             )
 
         return RecoveryResult(
-            action=RecoveryAction.SKIP,
+            action=ErrorRecoveryAction.SKIP,
             user_message=f"Tool '{tool_name}' not found and no fallback available",
         )
 
@@ -268,7 +265,7 @@ class NetworkErrorHandler(ErrorRecoveryHandler):
 
     def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
         return RecoveryResult(
-            action=RecoveryAction.RETRY,
+            action=ErrorRecoveryAction.RETRY,
             max_retries=3,
             user_message="Network error, retrying...",
             metadata={"retry_delay_seconds": 1.0},
@@ -299,14 +296,14 @@ class FileNotFoundHandler(ErrorRecoveryHandler):
                 self._logger.info(f"Trying path variation: {variations[0]}")
                 path_key = "path" if "path" in args else "file_path"
                 return RecoveryResult(
-                    action=RecoveryAction.RETRY_WITH_INFERRED,
+                    action=ErrorRecoveryAction.RETRY_WITH_INFERRED,
                     modified_args={**args, path_key: variations[0]},
                     user_message=f"Trying alternate path: {variations[0]}",
                     metadata={"tried_variations": variations},
                 )
 
         return RecoveryResult(
-            action=RecoveryAction.SKIP,
+            action=ErrorRecoveryAction.SKIP,
             user_message="File not found and no alternatives discovered",
         )
 
@@ -357,7 +354,7 @@ class RateLimitHandler(ErrorRecoveryHandler):
             retry_after = float(match.group(1))
 
         return RecoveryResult(
-            action=RecoveryAction.RETRY,
+            action=ErrorRecoveryAction.RETRY,
             max_retries=3,
             user_message=f"Rate limited, waiting {retry_after}s...",
             metadata={"retry_delay_seconds": retry_after, "exponential_backoff": True},
@@ -381,7 +378,7 @@ class PermissionErrorHandler(ErrorRecoveryHandler):
     def handle(self, error: Exception, tool_name: str, args: Dict[str, Any]) -> RecoveryResult:
         # For permission errors, we typically can't recover automatically
         return RecoveryResult(
-            action=RecoveryAction.ASK_USER,
+            action=ErrorRecoveryAction.ASK_USER,
             user_message="Permission denied. Please check file permissions or run with elevated privileges.",
         )
 
@@ -415,13 +412,13 @@ class TypeErrorHandler(ErrorRecoveryHandler):
 
         if fixed:
             return RecoveryResult(
-                action=RecoveryAction.RETRY_WITH_INFERRED,
+                action=ErrorRecoveryAction.RETRY_WITH_INFERRED,
                 modified_args=modified_args,
                 user_message="Converted argument types",
             )
 
         return RecoveryResult(
-            action=RecoveryAction.SKIP,
+            action=ErrorRecoveryAction.SKIP,
             user_message=f"Type error in arguments: {error}",
         )
 

@@ -2750,11 +2750,7 @@ class AgentOrchestrator(
         )
 
     def _register_default_workflows(self) -> None:
-        """Register default workflows via dynamic discovery.
-
-        Uses DIP-compliant workflow discovery to avoid hardcoded imports.
-        Workflows are discovered from victor.workflows package automatically.
-        """
+        """Register default workflows (mode workflows from YAML)."""
         count = self._workflow_coordinator.register_default_workflows()
         logger.debug(f"Dynamically registered {count} workflows")
 

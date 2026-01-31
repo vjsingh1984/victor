@@ -108,8 +108,7 @@ class CodingAssistant(VerticalBase):
         - ServiceProvider: Provides coding-specific DI services
         - TieredToolConfigProvider: Provides tiered tool configuration
 
-        Note: WorkflowProvider is NOT registered as this vertical uses auto-generated
-        workflow provider getter without implementing the required get_workflows() method.
+        WorkflowProvider is provided via get_workflow_provider() using CodingChatWorkflowProvider.
 
     Example:
         from victor.coding import CodingAssistant

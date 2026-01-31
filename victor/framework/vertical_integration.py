@@ -877,7 +877,6 @@ class VerticalIntegrationPipeline:
             cached_result = self._cache_service.get(vertical_class, config_overrides)
             if cached_result is not None:
                 logger.debug(f"Cache HIT for vertical '{vertical_class.name}'")
-                return cached_result
             else:
                 logger.debug(f"Cache MISS for vertical '{vertical_class.name}'")
 
@@ -1002,7 +1001,6 @@ class VerticalIntegrationPipeline:
             cached_result = self._cache_service.get(vertical_cls, config_overrides)
             if cached_result is not None:
                 logger.debug(f"Cache HIT for vertical '{vertical_cls.name}'")
-                return cached_result
             else:
                 logger.debug(f"Cache MISS for vertical '{vertical_cls.name}'")
 

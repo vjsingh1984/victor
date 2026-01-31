@@ -21,6 +21,7 @@
 
 version: "1.0"
 vertical: rag
+canonicalize: true
 
 # Tool transition probabilities
 # Maps each tool to a list of likely next tools with probability weights

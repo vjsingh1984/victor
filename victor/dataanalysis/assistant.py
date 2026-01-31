@@ -94,6 +94,13 @@ class DataAnalysisAssistant(VerticalBase):
         """Get the system prompt for data analysis tasks."""
         return cls._get_system_prompt()
 
+    @classmethod
+    def get_workflow_provider(cls) -> Optional[Any]:
+        """Get workflow provider for data analysis chat workflows."""
+        from victor.dataanalysis.chat_workflow_provider import DataAnalysisChatWorkflowProvider
+
+        return DataAnalysisChatWorkflowProvider()
+
     # =========================================================================
     # PromptBuilder Support
     # =========================================================================

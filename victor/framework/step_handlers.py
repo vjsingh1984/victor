@@ -1187,12 +1187,26 @@ class FrameworkStepHandler(BaseStepHandler):
 
                         registry = get_global_registry()
 
+                    from dataclasses import replace
+
                     for name, workflow in workflows.items():
-                        registry.register(
-                            f"{vertical.name}:{name}",
-                            workflow,
-                            replace=True,
-                        )
+                        if isinstance(workflow, type):
+                            try:
+                                workflow = workflow()
+                            except Exception as e:
+                                result.add_warning(f"Could not instantiate workflow '{name}': {e}")
+                                continue
+                        namespaced = f"{vertical.name}:{name}"
+                        if getattr(workflow, "name", None) != namespaced:
+                            try:
+                                workflow = replace(workflow, name=namespaced)
+                            except Exception:
+                                # Fallback: mutate in place if dataclass replace fails
+                                try:
+                                    workflow.name = namespaced
+                                except Exception:
+                                    pass
+                        registry.register(workflow, replace=True)
                     result.add_info(
                         f"Registered {workflow_count} workflows: " f"{', '.join(workflows.keys())}"
                     )
@@ -1609,6 +1623,9 @@ class FrameworkStepHandler(BaseStepHandler):
             graph_registry.register_graph(vertical.name, graph)
             result.add_info(f"Registered tool graph for {vertical.name}")
             logger.debug(f"Registered tool graph for vertical={vertical.name}")
+            # Keep orchestrator tool_graph in sync if present
+            if hasattr(orchestrator, "tool_graph"):
+                orchestrator.tool_graph = graph
         except Exception as e:
             result.add_warning(f"Could not register tool graph: {e}")
 

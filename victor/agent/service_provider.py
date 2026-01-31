@@ -1117,7 +1117,7 @@ class OrchestratorServiceProvider:
 
     def _create_workflow_registry(self) -> Any:
         """Create WorkflowRegistry instance."""
-        from victor.workflows.base import WorkflowRegistry
+        from victor.workflows.registry import WorkflowRegistry
 
         return WorkflowRegistry()
 

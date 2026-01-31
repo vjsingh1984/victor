@@ -100,12 +100,12 @@ class TestGroundingClaim:
 # =============================================================================
 
 
-class TestVerificationResult:
-    """Tests for VerificationResult dataclass."""
+class TestClaimVerificationResult:
+    """Tests for ClaimVerificationResult dataclass."""
 
     def test_grounded_result(self):
         """Create grounded result."""
-        result = VerificationResult(
+        result = ClaimVerificationResult(
             is_grounded=True,
             confidence=0.95,
             reason="File exists",
@@ -115,7 +115,7 @@ class TestVerificationResult:
 
     def test_not_grounded_result(self):
         """Create not grounded result."""
-        result = VerificationResult(
+        result = ClaimVerificationResult(
             is_grounded=False,
             confidence=0.0,
             reason="File not found",
@@ -147,8 +147,8 @@ class TestAggregatedVerificationResult:
     def test_with_results(self):
         """Create result with verification results."""
         results = [
-            VerificationResult(is_grounded=True, confidence=0.9),
-            VerificationResult(is_grounded=False, confidence=0.1),
+            ClaimVerificationResult(is_grounded=True, confidence=0.9),
+            ClaimVerificationResult(is_grounded=False, confidence=0.1),
         ]
         result = AggregatedVerificationResult(
             is_grounded=False,
@@ -529,7 +529,7 @@ class TestCompositeGroundingVerifier:
     async def test_verify_claim(self, verifier):
         """verify_claim verifies a single claim string."""
         result = await verifier.verify_claim("The file main.py exists", {})
-        assert isinstance(result, VerificationResult)
+        assert isinstance(result, ClaimVerificationResult)
 
 
 # =============================================================================

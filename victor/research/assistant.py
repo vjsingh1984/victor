@@ -101,6 +101,13 @@ class ResearchAssistant(VerticalBase):
         """Get the system prompt for research tasks."""
         return cls._get_system_prompt()
 
+    @classmethod
+    def get_workflow_provider(cls) -> Optional[Any]:
+        """Get workflow provider for research chat workflows."""
+        from victor.research.chat_workflow_provider import ResearchChatWorkflowProvider
+
+        return ResearchChatWorkflowProvider()
+
     # =========================================================================
     # PromptBuilder Support (Phase 7)
     # =========================================================================

@@ -83,7 +83,7 @@ from typing import (
 if TYPE_CHECKING:
     from victor.framework.coordinators.graph_coordinator import GraphExecutionCoordinator
     from victor.framework.graph import CompiledGraph
-    from victor.workflows.base import WorkflowRegistry
+    from victor.workflows.registry import WorkflowRegistry
     from victor.framework.workflow_engine import WorkflowEvent
 
 logger = logging.getLogger(__name__)
@@ -227,11 +227,8 @@ class WorkflowChatCoordinator:
         # Get or create session
         session = self._get_or_create_session(session_id)
 
-        # Load workflow
-        workflow = self._get_workflow(workflow_name)
-        compiled_graph = workflow.get("compiled_graph")
-        if compiled_graph is None:
-            raise ValueError(f"Workflow '{workflow_name}' is not compiled")
+        # Load workflow + compiled graph
+        compiled_graph = self._get_compiled_graph(workflow_name)
 
         # Prepare initial state
         state = self._prepare_state(
@@ -333,11 +330,8 @@ class WorkflowChatCoordinator:
         # Get or create session
         session = self._get_or_create_session(session_id)
 
-        # Load workflow
-        workflow = self._get_workflow(workflow_name)
-        compiled_graph = workflow.get("compiled_graph")
-        if compiled_graph is None:
-            raise ValueError(f"Workflow '{workflow_name}' is not compiled")
+        # Load workflow + compiled graph
+        compiled_graph = self._get_compiled_graph(workflow_name)
 
         # Prepare initial state
         state = self._prepare_state(
@@ -492,25 +486,55 @@ class WorkflowChatCoordinator:
             self._sessions[session_id]["iteration_count"] = final_state.get("iteration_count", 0)
             self._sessions[session_id]["metadata"] = final_state.get("metadata", {})
 
-    def _get_workflow(self, workflow_name: str) -> Any:  # BaseWorkflow | Dict[str, Any]
+    def _get_workflow(self, workflow_name: str) -> Any:
         """Get workflow by name.
 
         Args:
             workflow_name: Name of the workflow
 
         Returns:
-            Workflow dictionary
+            Workflow definition or compiled workflow wrapper
 
         Raises:
             ValueError: If workflow not found
         """
         workflow = self._workflow_registry.get(workflow_name)
         if workflow is None:
-            available = list(self._workflow_registry._workflows.keys())
+            available = self._workflow_registry.list_workflows()
             raise ValueError(
                 f"Workflow '{workflow_name}' not found. " f"Available workflows: {available}"
             )
         return workflow
+
+    def _get_compiled_graph(self, workflow_name: str) -> "CompiledGraph":
+        """Get compiled graph for a workflow.
+
+        Compiles WorkflowDefinitions on-demand and caches compiled graphs
+        on the workflow instance when possible.
+        """
+        workflow = self._get_workflow(workflow_name)
+
+        # Legacy dict-based workflows
+        if isinstance(workflow, dict):
+            compiled = workflow.get("compiled_graph")
+            if compiled is None:
+                raise ValueError(f"Workflow '{workflow_name}' is not compiled")
+            return compiled
+
+        compiled_graph = getattr(workflow, "compiled_graph", None)
+        if compiled_graph is None:
+            from victor.workflows.graph_compiler import compile_workflow_definition
+
+            compiled_graph = compile_workflow_definition(
+                workflow,
+                runner_registry=self._graph_coordinator.runner_registry,
+            )
+            try:
+                workflow.compiled_graph = compiled_graph
+            except Exception:
+                pass
+
+        return compiled_graph
 
     def _emit_event(self, event: ChatExecutionEvent) -> None:
         """Emit event to all registered callbacks.

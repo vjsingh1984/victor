@@ -21,6 +21,7 @@
 
 version: "1.0"
 vertical: coding
+canonicalize: true
 
 # ============================================================================
 # Tool Transitions

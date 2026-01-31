@@ -127,9 +127,6 @@ class TrackerStopReason(Enum):
     MANUAL_STOP = "manual_stop"
 
 
-# Backward compatibility alias
-StopReason = TrackerStopReason
-
 
 # Tools that indicate research activity
 RESEARCH_TOOLS = frozenset({"web_search", "web_fetch", "tavily_search", "search_web", "fetch_url"})
@@ -191,7 +188,7 @@ class StopDecision:
     """Decision about whether to stop execution."""
 
     should_stop: bool
-    reason: StopReason = StopReason.NONE
+    reason: TrackerStopReason = StopReason.NONE
     hint: str = ""
     details: Dict[str, Any] = field(default_factory=dict)
     is_warning: bool = False
@@ -994,7 +991,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         if self._progress.forced_stop:
             return StopDecision(
                 should_stop=True,
-                reason=StopReason.MANUAL_STOP,
+                reason=TrackerStopReason.MANUAL_STOP,
                 hint=f"Manual stop: {self._progress.forced_stop}",
                 details=details,
             )
@@ -1014,7 +1011,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         if tool_calls >= hard_stop_threshold:
             return StopDecision(
                 should_stop=True,
-                reason=StopReason.TOOL_BUDGET,
+                reason=TrackerStopReason.TOOL_BUDGET,
                 hint=f"Tool budget exceeded ({tool_calls}/{tool_budget}, hard limit: {hard_stop_threshold})",
                 details=details,
             )
@@ -1031,7 +1028,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         if loop:
             return StopDecision(
                 should_stop=True,
-                reason=StopReason.LOOP_DETECTED,
+                reason=TrackerStopReason.LOOP_DETECTED,
                 hint=f"Loop detected: {loop}",
                 details=details,
             )
@@ -1040,7 +1037,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         if self._progress.iteration_count >= self._max_total_iterations:
             return StopDecision(
                 should_stop=True,
-                reason=StopReason.MAX_ITERATIONS,
+                reason=TrackerStopReason.MAX_ITERATIONS,
                 hint=f"Max iterations reached ({self._progress.iteration_count}/{self._max_total_iterations})",
                 details=details,
             )
@@ -1076,7 +1073,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
                 )
             return StopDecision(
                 should_stop=True,
-                reason=StopReason.MAX_ITERATIONS,
+                reason=TrackerStopReason.MAX_ITERATIONS,
                 hint=hint,
                 details=details,
             )
@@ -1384,7 +1381,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
             )
             return StopDecision(
                 should_stop=True,
-                reason=StopReason.GOAL_FORCING,
+                reason=TrackerStopReason.GOAL_FORCING,
                 hint=hint,
                 details=self._get_details(),
             )
@@ -1735,8 +1732,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
         """
         decision = self.should_stop()
         if decision.should_stop and decision.reason in (
-            StopReason.MAX_ITERATIONS,
-            StopReason.GOAL_FORCING,
+            TrackerStopReason.MAX_ITERATIONS,
+            TrackerStopReason.GOAL_FORCING,
         ):
             return True, decision.hint
         return False, None

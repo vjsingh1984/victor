@@ -999,7 +999,7 @@ class TestWorkflowCoordinator:
         from victor.agent.coordinators.workflow_coordinator import (
             WorkflowCoordinator,
         )
-        from victor.workflows.base import WorkflowRegistry
+        from victor.workflows.registry import WorkflowRegistry
 
         coordinator = WorkflowCoordinator(workflow_registry=WorkflowRegistry())
 
@@ -1026,7 +1026,7 @@ class TestWorkflowCoordinator:
         from victor.agent.coordinators.workflow_coordinator import (
             WorkflowCoordinator,
         )
-        from victor.workflows.base import WorkflowRegistry
+        from victor.workflows.registry import WorkflowRegistry
 
         coordinator = WorkflowCoordinator(workflow_registry=WorkflowRegistry())
 

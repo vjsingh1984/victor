@@ -1097,12 +1097,16 @@ class CodeExecutionManagerProtocol(Protocol):
 class WorkflowRegistryProtocol(Protocol):
     """Protocol for workflow registry."""
 
-    def register(self, workflow: Any) -> None:
-        """Register a workflow."""
+    def register(self, workflow: Any, *, replace: bool = False) -> None:
+        """Register a workflow definition."""
         ...
 
     def get(self, name: str) -> Optional[Any]:
         """Get a workflow by name."""
+        ...
+
+    def list_workflows(self) -> List[str]:
+        """List registered workflow names."""
         ...
 
 

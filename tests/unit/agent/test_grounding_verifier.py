@@ -22,9 +22,9 @@ import pytest
 from victor.agent.grounding_verifier import (
     GroundingIssue,
     GroundingVerifier,
+    GroundingVerificationResult,
     IssueSeverity,
     IssueType,
-    VerificationResult,
     VerifierConfig,
 )
 
@@ -46,12 +46,12 @@ class TestGroundingIssue:
         assert "nonexistent.py" in issue.description
 
 
-class TestVerificationResult:
-    """Tests for VerificationResult dataclass."""
+class TestGroundingVerificationResult:
+    """Tests for GroundingVerificationResult dataclass."""
 
     def test_add_issue_reduces_confidence(self):
         """Adding issues should reduce confidence."""
-        result = VerificationResult(is_grounded=True, confidence=1.0)
+        result = GroundingVerificationResult(is_grounded=True, confidence=1.0)
 
         result.add_issue(
             GroundingIssue(
@@ -67,8 +67,8 @@ class TestVerificationResult:
 
     def test_severity_affects_confidence_penalty(self):
         """Higher severity should reduce confidence more."""
-        result_low = VerificationResult(is_grounded=True, confidence=1.0)
-        result_high = VerificationResult(is_grounded=True, confidence=1.0)
+        result_low = GroundingVerificationResult(is_grounded=True, confidence=1.0)
+        result_high = GroundingVerificationResult(is_grounded=True, confidence=1.0)
 
         result_low.add_issue(
             GroundingIssue(
@@ -92,12 +92,12 @@ class TestVerificationResult:
 
     def test_generate_feedback_prompt_empty_issues(self):
         """Should return empty string when no issues."""
-        result = VerificationResult(is_grounded=True, confidence=1.0)
+        result = GroundingVerificationResult(is_grounded=True, confidence=1.0)
         assert result.generate_feedback_prompt() == ""
 
     def test_generate_feedback_prompt_file_not_found(self):
         """Should generate feedback for file not found issues."""
-        result = VerificationResult(is_grounded=False, confidence=0.5)
+        result = GroundingVerificationResult(is_grounded=False, confidence=0.5)
         result.add_issue(
             GroundingIssue(
                 issue_type=IssueType.FILE_NOT_FOUND,
@@ -114,7 +114,7 @@ class TestVerificationResult:
 
     def test_generate_feedback_prompt_symbol_not_found(self):
         """Should generate feedback for symbol not found issues."""
-        result = VerificationResult(is_grounded=False, confidence=0.5)
+        result = GroundingVerificationResult(is_grounded=False, confidence=0.5)
         result.add_issue(
             GroundingIssue(
                 issue_type=IssueType.SYMBOL_NOT_FOUND,
@@ -131,7 +131,7 @@ class TestVerificationResult:
 
     def test_generate_feedback_prompt_code_mismatch(self):
         """Should generate feedback for code mismatch issues."""
-        result = VerificationResult(is_grounded=False, confidence=0.5)
+        result = GroundingVerificationResult(is_grounded=False, confidence=0.5)
         result.add_issue(
             GroundingIssue(
                 issue_type=IssueType.CODE_MISMATCH,
@@ -148,7 +148,7 @@ class TestVerificationResult:
 
     def test_generate_feedback_prompt_fabricated_content(self):
         """Should generate feedback for fabricated content issues."""
-        result = VerificationResult(is_grounded=False, confidence=0.3)
+        result = GroundingVerificationResult(is_grounded=False, confidence=0.3)
         result.add_issue(
             GroundingIssue(
                 issue_type=IssueType.FABRICATED_CONTENT,
@@ -165,7 +165,7 @@ class TestVerificationResult:
 
     def test_generate_feedback_prompt_includes_suggestion(self):
         """Should include issue suggestions in feedback."""
-        result = VerificationResult(is_grounded=False, confidence=0.5)
+        result = GroundingVerificationResult(is_grounded=False, confidence=0.5)
         result.add_issue(
             GroundingIssue(
                 issue_type=IssueType.FILE_NOT_FOUND,
@@ -181,7 +181,7 @@ class TestVerificationResult:
 
     def test_generate_feedback_prompt_max_issues(self):
         """Should respect max_issues parameter."""
-        result = VerificationResult(is_grounded=False, confidence=0.1)
+        result = GroundingVerificationResult(is_grounded=False, confidence=0.1)
         # Add 5 issues
         for i in range(5):
             result.add_issue(
@@ -205,7 +205,7 @@ class TestVerificationResult:
 
     def test_generate_feedback_prompt_prioritizes_severity(self):
         """Should include critical issues first."""
-        result = VerificationResult(is_grounded=False, confidence=0.5)
+        result = GroundingVerificationResult(is_grounded=False, confidence=0.5)
         # Add low severity first
         result.add_issue(
             GroundingIssue(
