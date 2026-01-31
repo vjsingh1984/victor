@@ -7,7 +7,7 @@ tool execution failures gracefully.
 
 import pytest
 from victor.agent.error_recovery import (
-    RecoveryAction,
+    ErrorRecoveryAction,
     RecoveryResult,
     ErrorRecoveryHandler,
     MissingParameterHandler,
@@ -28,36 +28,36 @@ class TestRecoveryResult:
 
     def test_should_retry_true_for_retry_actions(self):
         """Test that retry variants return True for should_retry."""
-        result = RecoveryResult(action=RecoveryAction.RETRY)
+        result = RecoveryResult(action=ErrorRecoveryAction.RETRY)
         assert result.should_retry is True
 
-        result = RecoveryResult(action=RecoveryAction.RETRY_WITH_DEFAULTS)
+        result = RecoveryResult(action=ErrorRecoveryAction.RETRY_WITH_DEFAULTS)
         assert result.should_retry is True
 
-        result = RecoveryResult(action=RecoveryAction.RETRY_WITH_INFERRED)
+        result = RecoveryResult(action=ErrorRecoveryAction.RETRY_WITH_INFERRED)
         assert result.should_retry is True
 
     def test_should_retry_false_for_non_retry_actions(self):
         """Test that non-retry actions return False for should_retry."""
-        assert RecoveryResult(action=RecoveryAction.SKIP).should_retry is False
-        assert RecoveryResult(action=RecoveryAction.ABORT).should_retry is False
-        assert RecoveryResult(action=RecoveryAction.FALLBACK_TOOL).should_retry is False
-        assert RecoveryResult(action=RecoveryAction.ASK_USER).should_retry is False
+        assert RecoveryResult(action=ErrorRecoveryAction.SKIP).should_retry is False
+        assert RecoveryResult(action=ErrorRecoveryAction.ABORT).should_retry is False
+        assert RecoveryResult(action=ErrorRecoveryAction.FALLBACK_TOOL).should_retry is False
+        assert RecoveryResult(action=ErrorRecoveryAction.ASK_USER).should_retry is False
 
     def test_can_retry_with_retries_remaining(self):
         """Test can_retry when retries are remaining."""
-        result = RecoveryResult(action=RecoveryAction.RETRY, retry_count=0, max_retries=3)
+        result = RecoveryResult(action=ErrorRecoveryAction.RETRY, retry_count=0, max_retries=3)
         assert result.can_retry is True
 
-        result = RecoveryResult(action=RecoveryAction.RETRY, retry_count=2, max_retries=3)
+        result = RecoveryResult(action=ErrorRecoveryAction.RETRY, retry_count=2, max_retries=3)
         assert result.can_retry is True
 
     def test_can_retry_false_when_exhausted(self):
         """Test can_retry when retries are exhausted."""
-        result = RecoveryResult(action=RecoveryAction.RETRY, retry_count=3, max_retries=3)
+        result = RecoveryResult(action=ErrorRecoveryAction.RETRY, retry_count=3, max_retries=3)
         assert result.can_retry is False
 
-        result = RecoveryResult(action=RecoveryAction.RETRY, retry_count=5, max_retries=3)
+        result = RecoveryResult(action=ErrorRecoveryAction.RETRY, retry_count=5, max_retries=3)
         assert result.can_retry is False
 
 
@@ -93,7 +93,7 @@ class TestMissingParameterHandler:
         error = Exception("missing 1 required positional argument: 'file_path'")
         result = handler.handle(error, "read", {"content": "test"})
 
-        assert result.action == RecoveryAction.RETRY_WITH_DEFAULTS
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_DEFAULTS
         assert result.modified_args["file_path"] == "."
         assert result.modified_args["content"] == "test"
 
@@ -102,7 +102,7 @@ class TestMissingParameterHandler:
         error = Exception("missing required argument: path")
         result = handler.handle(error, "ls", {})
 
-        assert result.action == RecoveryAction.RETRY_WITH_DEFAULTS
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_DEFAULTS
         assert result.modified_args["path"] == "."
 
     def test_handle_provides_default_for_limit(self, handler):
@@ -110,7 +110,7 @@ class TestMissingParameterHandler:
         error = Exception("'limit' is a required property")
         result = handler.handle(error, "search", {"query": "test"})
 
-        assert result.action == RecoveryAction.RETRY_WITH_DEFAULTS
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_DEFAULTS
         assert result.modified_args["limit"] == 100
 
     def test_handle_skips_unknown_param(self, handler):
@@ -118,7 +118,7 @@ class TestMissingParameterHandler:
         error = Exception("missing 1 required positional argument: 'unknown_param'")
         result = handler.handle(error, "custom_tool", {})
 
-        assert result.action == RecoveryAction.SKIP
+        assert result.action == ErrorRecoveryAction.SKIP
         assert "unknown_param" in result.user_message
 
 
@@ -154,7 +154,7 @@ class TestToolNotFoundHandler:
         error = Exception("Tool 'symbol' not found")
         result = handler.handle(error, "symbol", {"symbol_name": "MyClass"})
 
-        assert result.action == RecoveryAction.FALLBACK_TOOL
+        assert result.action == ErrorRecoveryAction.FALLBACK_TOOL
         assert result.fallback_tool == "grep"
 
     def test_handle_provides_fallback_for_tree(self, handler):
@@ -162,7 +162,7 @@ class TestToolNotFoundHandler:
         error = Exception("Tool not found")
         result = handler.handle(error, "tree", {"path": "."})
 
-        assert result.action == RecoveryAction.FALLBACK_TOOL
+        assert result.action == ErrorRecoveryAction.FALLBACK_TOOL
         assert result.fallback_tool == "ls"
 
     def test_handle_skips_unknown_tool(self, handler):
@@ -170,7 +170,7 @@ class TestToolNotFoundHandler:
         error = Exception("Tool not found")
         result = handler.handle(error, "custom_tool", {})
 
-        assert result.action == RecoveryAction.SKIP
+        assert result.action == ErrorRecoveryAction.SKIP
         assert "no fallback" in result.user_message.lower()
 
 
@@ -216,7 +216,7 @@ class TestNetworkErrorHandler:
         error = Exception("Connection timeout")
         result = handler.handle(error, "web_fetch", {"url": "http://example.com"})
 
-        assert result.action == RecoveryAction.RETRY
+        assert result.action == ErrorRecoveryAction.RETRY
         assert result.max_retries == 3
         assert "retry" in result.user_message.lower()
 
@@ -258,7 +258,7 @@ class TestFileNotFoundHandler:
         error = Exception("File not found")
         result = handler.handle(error, "read", {"path": "./test.py"})
 
-        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_INFERRED
         assert result.modified_args["path"] == "test.py"
 
     def test_handle_tries_init_file(self, handler):
@@ -267,7 +267,7 @@ class TestFileNotFoundHandler:
         result = handler.handle(error, "read", {"path": "mymodule.py"})
 
         # Should try variations
-        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_INFERRED
         assert "tried_variations" in result.metadata
 
     def test_get_path_variations_removes_leading_dot(self, handler):
@@ -318,7 +318,7 @@ class TestRateLimitHandler:
         error = Exception("Rate limit exceeded")
         result = handler.handle(error, "web_search", {})
 
-        assert result.action == RecoveryAction.RETRY
+        assert result.action == ErrorRecoveryAction.RETRY
         assert result.max_retries == 3
         assert "retry_delay_seconds" in result.metadata
 
@@ -367,7 +367,7 @@ class TestPermissionErrorHandler:
         error = Exception("Permission denied")
         result = handler.handle(error, "write", {"path": "/etc/passwd"})
 
-        assert result.action == RecoveryAction.ASK_USER
+        assert result.action == ErrorRecoveryAction.ASK_USER
         assert "permission" in result.user_message.lower()
 
 
@@ -398,7 +398,7 @@ class TestTypeErrorHandler:
         error = TypeError("expected bool, got str")
         result = handler.handle(error, "search", {"recursive": "true"})
 
-        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_INFERRED
         assert result.modified_args["recursive"] is True
 
     def test_handle_converts_string_bool_false(self, handler):
@@ -406,7 +406,7 @@ class TestTypeErrorHandler:
         error = TypeError("expected bool")
         result = handler.handle(error, "search", {"recursive": "false"})
 
-        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_INFERRED
         assert result.modified_args["recursive"] is False
 
     def test_handle_converts_string_int(self, handler):
@@ -414,7 +414,7 @@ class TestTypeErrorHandler:
         error = TypeError("expected int")
         result = handler.handle(error, "read", {"limit": "100"})
 
-        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_INFERRED
         assert result.modified_args["limit"] == 100
 
     def test_handle_converts_string_float(self, handler):
@@ -422,7 +422,7 @@ class TestTypeErrorHandler:
         error = TypeError("expected float")
         result = handler.handle(error, "search", {"threshold": "0.5"})
 
-        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_INFERRED
         assert result.modified_args["threshold"] == 0.5
 
     def test_handle_skips_unconvertible(self, handler):
@@ -430,7 +430,7 @@ class TestTypeErrorHandler:
         error = TypeError("expected dict")
         result = handler.handle(error, "search", {"config": "not_a_dict"})
 
-        assert result.action == RecoveryAction.SKIP
+        assert result.action == ErrorRecoveryAction.SKIP
 
 
 class TestChainOfResponsibility:
@@ -445,7 +445,7 @@ class TestChainOfResponsibility:
         error = Exception("missing 1 required positional argument: 'path'")
         result = chain.process(error, "ls", {})
 
-        assert result.action == RecoveryAction.RETRY_WITH_DEFAULTS
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_DEFAULTS
         assert result.metadata.get("handler") == "MissingParameterHandler"
 
     def test_chain_handles_tool_not_found(self, chain):
@@ -453,7 +453,7 @@ class TestChainOfResponsibility:
         error = Exception("Tool 'symbol' not found")
         result = chain.process(error, "symbol", {})
 
-        assert result.action == RecoveryAction.FALLBACK_TOOL
+        assert result.action == ErrorRecoveryAction.FALLBACK_TOOL
         assert result.metadata.get("handler") == "ToolNotFoundHandler"
 
     def test_chain_handles_network_error(self, chain):
@@ -461,7 +461,7 @@ class TestChainOfResponsibility:
         error = Exception("Connection timeout")
         result = chain.process(error, "web_fetch", {})
 
-        assert result.action == RecoveryAction.RETRY
+        assert result.action == ErrorRecoveryAction.RETRY
         assert result.metadata.get("handler") == "NetworkErrorHandler"
 
     def test_chain_handles_file_not_found(self, chain):
@@ -469,7 +469,7 @@ class TestChainOfResponsibility:
         error = FileNotFoundError("test.py")
         result = chain.process(error, "read", {"path": "./test.py"})
 
-        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_INFERRED
         assert result.metadata.get("handler") == "FileNotFoundHandler"
 
     def test_chain_handles_rate_limit(self, chain):
@@ -477,7 +477,7 @@ class TestChainOfResponsibility:
         error = Exception("Rate limit exceeded")
         result = chain.process(error, "web_search", {})
 
-        assert result.action == RecoveryAction.RETRY
+        assert result.action == ErrorRecoveryAction.RETRY
         assert result.metadata.get("handler") == "RateLimitHandler"
 
     def test_chain_handles_permission_error(self, chain):
@@ -485,7 +485,7 @@ class TestChainOfResponsibility:
         error = PermissionError("Permission denied")
         result = chain.process(error, "write", {})
 
-        assert result.action == RecoveryAction.ASK_USER
+        assert result.action == ErrorRecoveryAction.ASK_USER
         assert result.metadata.get("handler") == "PermissionErrorHandler"
 
     def test_chain_handles_type_error(self, chain):
@@ -493,7 +493,7 @@ class TestChainOfResponsibility:
         error = TypeError("expected int")
         result = chain.process(error, "read", {"limit": "100"})
 
-        assert result.action == RecoveryAction.RETRY_WITH_INFERRED
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_INFERRED
         assert result.metadata.get("handler") == "TypeErrorHandler"
 
     def test_chain_aborts_unhandled_error(self, chain):
@@ -502,7 +502,7 @@ class TestChainOfResponsibility:
         error = Exception("Widget malfunction in flux capacitor")
         result = chain.process(error, "custom_tool", {})
 
-        assert result.action == RecoveryAction.ABORT
+        assert result.action == ErrorRecoveryAction.ABORT
 
     def test_chain_priority_missing_param_before_type(self, chain):
         """Test that missing parameter handler has priority over type handler."""
@@ -528,7 +528,7 @@ class TestConvenienceFunctions:
         error = Exception("missing 1 required positional argument: 'path'")
         result = recover_from_error(error, "ls", {})
 
-        assert result.action == RecoveryAction.RETRY_WITH_DEFAULTS
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_DEFAULTS
         assert result.modified_args["path"] == "."
 
 
@@ -541,7 +541,7 @@ class TestDeepSeekScenario:
         error = Exception("symbol() missing 1 required positional argument: 'file_path'")
         result = chain.process(error, "symbol", {"symbol_name": "SearchResult"})
 
-        assert result.action == RecoveryAction.RETRY_WITH_DEFAULTS
+        assert result.action == ErrorRecoveryAction.RETRY_WITH_DEFAULTS
         assert "file_path" in result.modified_args
         assert result.modified_args["file_path"] == "."
         assert result.modified_args["symbol_name"] == "SearchResult"
@@ -559,10 +559,10 @@ class TestDeepSeekScenario:
         error2 = FileNotFoundError("Symbol not found in .")
         result2 = chain.process(error2, "symbol", result1.modified_args)
         # Should try path variations or skip
-        assert result2.action in (RecoveryAction.RETRY_WITH_INFERRED, RecoveryAction.SKIP)
+        assert result2.action in (ErrorRecoveryAction.RETRY_WITH_INFERRED, ErrorRecoveryAction.SKIP)
 
         # Third error: tool not found (after all retries)
         error3 = Exception("Tool 'symbol' not found")
         result3 = chain.process(error3, "symbol", {})
-        assert result3.action == RecoveryAction.FALLBACK_TOOL
+        assert result3.action == ErrorRecoveryAction.FALLBACK_TOOL
         assert result3.fallback_tool == "grep"

@@ -188,7 +188,7 @@ class StopDecision:
     """Decision about whether to stop execution."""
 
     should_stop: bool
-    reason: TrackerStopReason = StopReason.NONE
+    reason: TrackerStopReason = TrackerStopReason.NONE
     hint: str = ""
     details: Dict[str, Any] = field(default_factory=dict)
     is_warning: bool = False

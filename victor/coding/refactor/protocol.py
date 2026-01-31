@@ -137,10 +137,6 @@ class RefactorSymbol:
         return self.name
 
 
-# Backward compatibility alias
-Symbol = RefactorSymbol
-
-
 @dataclass
 class CodeEdit:
     """A single edit to source code."""

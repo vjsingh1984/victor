@@ -63,8 +63,8 @@ from victor.coding.refactor.protocol import (
     RefactorScope,
     RefactorSuggestion,
     RefactorType,
+    RefactorSymbol,
     SourceLocation,
-    Symbol,
 )
 from victor.coding.refactor.analyzer import (
     BaseCodeAnalyzer,
@@ -99,8 +99,8 @@ __all__ = [
     "RefactorScope",
     "RefactorSuggestion",
     "RefactorType",
+    "RefactorSymbol",
     "SourceLocation",
-    "Symbol",
     # Analyzers
     "BaseCodeAnalyzer",
     "CodeAnalyzer",
