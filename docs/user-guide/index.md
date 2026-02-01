@@ -404,3 +404,8 @@ result = await team.run("Implement user registration feature")
 ---
 
 **Next**: [Basic Usage ->](../getting-started/first-run.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

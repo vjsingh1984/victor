@@ -510,3 +510,8 @@ To add new graph algorithms:
 ## License
 
 Apache License 2.0 - See LICENSE file for details.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

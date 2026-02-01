@@ -733,3 +733,8 @@ See complete examples:
 - [Workflow System](../user-guide/workflows.md)
 - [Creating Workflows](../tutorials/create-workflow.md)
 - [Compiler API](../reference/internals/workflows-api.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

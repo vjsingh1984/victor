@@ -525,3 +525,8 @@ victor chat --mode plan --vertical coding "Understand the caching system"
 - [Architecture Overview →](../../architecture/overview.md) - Stage architecture details
 - [Tool Catalog →](../../reference/tools/catalog.md) - Complete tool reference
 - [Contributing Guide →](../../contributing/index.md) - Framework entrypoints and structure
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 5 minutes

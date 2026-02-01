@@ -221,3 +221,8 @@ If you can't find something:
 *Transitioning to the new documentation structure*
 
 </div>
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

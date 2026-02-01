@@ -638,3 +638,8 @@ See the API documentation for complete details:
 ## Examples
 
 See `examples/workflows/execution_replay_demo.py` for complete examples.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

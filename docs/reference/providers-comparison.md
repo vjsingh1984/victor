@@ -135,3 +135,8 @@ victor chat --provider ollama --model llama3
 - [Provider Setup](../reference/providers/setup.md)
 - [Configuration Reference](configuration/index.md)
 - [Air-Gapped Mode](../guides/development/AIRGAPPED.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

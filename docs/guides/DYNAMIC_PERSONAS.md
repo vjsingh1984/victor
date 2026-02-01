@@ -697,3 +697,8 @@ pipeline = await orchestrator.chat(
 - [User Guide](../user-guide/index.md)
 - Persona Management (not yet published)
 - Persona Templates (not yet published)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

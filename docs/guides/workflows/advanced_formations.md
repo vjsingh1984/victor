@@ -673,3 +673,8 @@ result = await coordinator.execute_task(task, context)
 - [Workflow Configuration](../guides/workflow-development/dsl.md)
 - [Team YAML Schema](../teams/team_templates.md)
 - [Formation Strategies API](./ml_formation_selection.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 5 minutes

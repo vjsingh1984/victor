@@ -570,3 +570,8 @@ python -c "import victor; print(victor.__version__)"
 ---
 
 **Next**: [HTTP API →](http-api.md) | [MCP Server →](mcp-server.md) | [Python API →](python-api.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

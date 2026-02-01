@@ -81,3 +81,8 @@ Platforms:
 - Use `../API_KEYS_CONFIGURATION.md` for credential options.
 - If tool calling is inconsistent, try another model or switch to keyword tool selection.
 - For offline use, combine local models with `../embeddings/AIRGAPPED.md`.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

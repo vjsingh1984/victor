@@ -572,3 +572,8 @@ bus.subscribe(EventCategory.TOOL, on_tool_call)
 - [Tool Catalog](../reference/tools/catalog.md) - Full list of available tools
 - [Observability Guide](OBSERVABILITY.md) - Monitoring and logging
 - [Local Models Guide](development/local-models.md) - Using local LLM providers
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

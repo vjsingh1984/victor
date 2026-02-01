@@ -922,3 +922,8 @@ For more examples, see:
 - `docs/examples/external_vertical/` - Example external vertical
 
 Happy vertical building! 🏗️
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

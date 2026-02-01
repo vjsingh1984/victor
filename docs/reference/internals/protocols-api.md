@@ -1369,3 +1369,8 @@ class SecurityAwareQualityAssessor:
 - [Tool Development Guide](../../user-guide/tools.md)
 - [Team Coordination Guide](../../teams/collaboration.md)
 - [Vertical Development Guide](./VERTICAL_DEVELOPMENT_GUIDE.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

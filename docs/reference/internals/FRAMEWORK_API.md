@@ -498,3 +498,8 @@ await orchestrator.checkpoint_manager.save_checkpoint("checkpoint_1")
 - 🔧 [Tools](#tools-toolset)
 - 📊 [Events](#event-system)
 - 🎭 [State](#state-observation)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 5 minutes

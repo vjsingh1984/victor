@@ -213,3 +213,8 @@ Checkpoints are stored in `~/.victor/checkpoints/` and are automatically cleared
 - Pre-cache repositories with `victor benchmark setup`
 - Adjust `--timeout` based on model speed
 - Limit `--max-turns` to control token usage
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

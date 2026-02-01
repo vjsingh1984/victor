@@ -657,3 +657,8 @@ class ValidationIssue:
 
     def to_dict(self) -> Dict[str, Any]
 ```
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

@@ -571,3 +571,8 @@ Potential improvements for future versions:
 - [Tool Selection Architecture](../architecture/overview.md)
 - [Performance Best Practices](../performance/optimization_guide.md)
 - [Configuration Reference](../reference/configuration/index.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

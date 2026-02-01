@@ -37,3 +37,8 @@ embedding_model: BAAI/bge-small-en-v1.5
 - Offline use is possible with a local embedding model installed.
 - Cold starts are slower until embeddings are cached.
 - Quality depends on model choice and tool descriptions.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

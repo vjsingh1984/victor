@@ -406,3 +406,8 @@ class MyAccelerator(InstrumentedAccelerator):
 - [Observability Guide](../../observability/README.md) - Metrics and tracing
 - [Performance Benchmarks](../../performance/benchmark_results.md) - Detailed performance analysis
 - [Architecture Overview](../../architecture/overview.md) - Design patterns
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

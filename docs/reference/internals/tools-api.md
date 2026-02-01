@@ -1008,3 +1008,8 @@ async def code_metrics(
 - [victor/tools/decorators.py](/victor/tools/decorators.py) - @tool decorator
 - [victor/tools/enums.py](/victor/tools/enums.py) - CostTier, AccessMode, Priority enums
 - [victor/tools/metadata.py](/victor/tools/metadata.py) - ToolMetadata and registry
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

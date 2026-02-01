@@ -455,3 +455,8 @@ workflows:
 - **Integration**: `victor/workflows/advanced_formations.py` (AdaptiveFormation)
 - **Tests**: `tests/integration/workflows/test_ml_formation.py`
 - **scikit-learn Docs**: https://scikit-learn.org/stable/user_guide.html
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

@@ -1016,3 +1016,8 @@ victor chat --timeout 60
 ---
 
 **Next**: [Provider Comparison ->](comparison.md) | [Tool Catalog ->](../tools/catalog.md) | [Configuration ->](../configuration/index.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 11 minutes

@@ -311,3 +311,8 @@ victor keys --set anthropic
    ```
 4. **Use environment variables** in CI/CD pipelines
 5. **Set restrictive permissions** on key files: `chmod 600 ~/.victor/api_keys.yaml`
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 6 minutes

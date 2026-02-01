@@ -437,3 +437,8 @@ monthly_revenue_by_region = df.groupby('region')['revenue'].sum()
 # Save intermediate results for reproducibility
 df.to_parquet("cleaned_data.parquet")
 ```
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

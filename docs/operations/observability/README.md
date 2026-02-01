@@ -390,3 +390,8 @@ For issues and questions:
 ## License
 
 Apache License 2.0 - see LICENSE file for details
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

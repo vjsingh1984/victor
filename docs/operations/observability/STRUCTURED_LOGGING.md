@@ -485,3 +485,8 @@ See `examples/observability/` for complete examples:
 - `performance_logging.py`: Operation timing
 - `request_logging.py`: HTTP logging
 - `log_aggregation.py`: ELK/Loki integration
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

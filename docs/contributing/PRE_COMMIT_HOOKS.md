@@ -357,3 +357,8 @@ When adding new validation rules:
 - [Workflow Authoring Guide](../guides/workflow-development/dsl.md) - How to write workflows
 - [Pre-Commit Documentation](https://pre-commit.com/) - Official pre-commit documentation
 - [YAML Syntax Reference](https://yaml.org/spec/1.2/spec.html) - YAML specification
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

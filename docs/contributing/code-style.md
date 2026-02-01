@@ -573,3 +573,8 @@ except Exception as e:
 ---
 
 **Questions?** Open an issue on [GitHub](https://github.com/vijayksingh/victor/issues) or start a [discussion](https://github.com/vijayksingh/victor/discussions).
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

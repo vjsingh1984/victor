@@ -508,3 +508,8 @@ If you encounter issues with workflow validation:
    - Workflow YAML file
    - Steps to reproduce
    - Environment details (OS, Python version)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

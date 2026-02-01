@@ -1130,3 +1130,8 @@ The following APIs are deprecated and should be replaced:
 - [Multimodal Capabilities Guide](../guides/MULTIMODAL_CAPABILITIES.md)
 - [Dynamic Personas Guide](../guides/DYNAMIC_PERSONAS.md)
 - [Performance Tuning Guide](../guides/PERFORMANCE_TUNING.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

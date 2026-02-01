@@ -92,3 +92,8 @@ docker run --network host ghcr.io/vjsingh1984/victor:latest
 - [Installation](installation.md) - Other installation methods
 - [Local Models](local-models.md) - Ollama setup
 - [Configuration](./configuration.md) - Advanced configuration
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

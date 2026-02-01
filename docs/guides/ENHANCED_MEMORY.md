@@ -887,3 +887,8 @@ async def consolidation_workflow():
 - [Hierarchical Planning Guide](HIERARCHICAL_PLANNING.md)
 - [Dynamic Skills Guide](DYNAMIC_SKILLS.md)
 - [Memory System Architecture](../architecture/overview.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

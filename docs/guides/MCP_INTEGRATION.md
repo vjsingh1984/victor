@@ -434,3 +434,8 @@ bus.subscribe(EventCategory.TOOL, lambda e:
 - [Tool Catalog](../reference/tools/catalog.md) - Available Victor tools
 - [Observability Guide](OBSERVABILITY.md) - MCP event monitoring
 - [User Guide](../user-guide/index.md) - General usage
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

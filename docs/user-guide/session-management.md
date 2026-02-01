@@ -648,3 +648,8 @@ See also:
 - [CLI Reference](cli-reference.md) - All slash commands
 - [Provider Switching](../reference/providers/index.md) - Switching providers
 - [Architecture Overview](../architecture/overview.md) - Database design
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

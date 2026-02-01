@@ -124,3 +124,8 @@ victor "Run tests and summarize failures"
 ---
 
 **Next**: [Installation](installation.md) | [First Run](first-run.md) | [Local Models](local-models.md) | [Cloud Models](cloud-models.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

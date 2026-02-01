@@ -420,3 +420,8 @@ Learn more: [website]
 ---
 
 **End of Video Tutorial Script**
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 7 minutes

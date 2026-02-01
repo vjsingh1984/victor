@@ -238,3 +238,8 @@ fail_under = 80
 - [pytest.ini](../pytest.ini) - Default test configuration
 - [pytest-ci.ini](../pytest-ci.ini) - CI test configuration
 - [conftest.py](../tests/conftest.py) - Test fixtures and configuration
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

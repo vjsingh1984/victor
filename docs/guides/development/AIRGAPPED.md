@@ -21,3 +21,8 @@ Air-gapped mode runs Victor without external network calls by using local models
 ## Troubleshooting
 - Missing tools: try keyword or hybrid tool selection.
 - Tool calling format issues: see `TOOL_CALLING_FORMATS.md`.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

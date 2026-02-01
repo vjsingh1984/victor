@@ -274,3 +274,8 @@ For help:
 ## 📜 License
 
 Apache License 2.0 - see `LICENSE` in the repo root for details.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

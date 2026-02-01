@@ -436,3 +436,8 @@ matches = analyzer.analyze_code_accelerated(code, "python")
 - [Tier 1 Accelerators (AST, Embeddings)](./native_accelerators.md)
 - [Performance Optimization Guide](../../performance/optimization_guide.md)
 - [Rust Native Module Development](./RUST_MIGRATION_PLAN.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

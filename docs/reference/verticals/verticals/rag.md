@@ -396,3 +396,8 @@ victor/rag/
 - **Query latency**: Use appropriate top_k values
 - **Memory usage**: LanceDB is memory-efficient for most use cases
 - **Concurrent queries**: LanceDB handles concurrent reads well
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

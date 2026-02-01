@@ -1616,3 +1616,8 @@ from victor.agent.tool_calling.base import (
     ToolCallFormat,
 )
 ```
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

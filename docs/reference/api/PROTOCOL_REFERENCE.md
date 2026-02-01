@@ -1389,3 +1389,8 @@ class IBudgetManager(Protocol):
 - [API Reference](API_REFERENCE.md) - Main API documentation
 - [Provider Reference](PROVIDER_REFERENCE.md) - Provider details
 - [Configuration Reference](CONFIGURATION_REFERENCE.md) - Settings reference
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

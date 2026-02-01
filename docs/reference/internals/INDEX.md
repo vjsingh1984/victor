@@ -62,3 +62,8 @@ result = await executor.execute_tool(tool, arguments)
 *Developer documentation for Victor internals*
 
 </div>
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

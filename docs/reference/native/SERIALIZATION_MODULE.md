@@ -671,3 +671,8 @@ Apache License 2.0 - See LICENSE file for details
 - [Victor Native Extensions](../index.md)
 - [Performance Benchmarks](../performance/benchmark_results.md)
 - [API Documentation](https://victor-ai.dev/docs/api/serialization)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 5 minutes

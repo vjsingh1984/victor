@@ -310,3 +310,8 @@ class CustomTestSuite(SecurityTestSuite):
 - Verification: `verify_penetration_testing.py`
 - OWASP AI Top 10: https://owasp.org/www-project-top-ten-for-large-language-model-applications/
 - CVSS Calculator: https://www.first.org/cvss/calculator/3.1
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

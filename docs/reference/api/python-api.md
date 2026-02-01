@@ -928,3 +928,8 @@ result = await agent.run("Task")
 ---
 
 **Next**: [API Overview →](index.md) | [HTTP API →](http-api.md) | [MCP Server →](mcp-server.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

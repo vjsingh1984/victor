@@ -604,3 +604,8 @@ Use Airflow, Temporal.io, or AWS Step Functions when you need:
 - [YAML Workflow Architecture](workflow-development/dsl.md)
 
 *Last Updated: 2026-01-05*
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

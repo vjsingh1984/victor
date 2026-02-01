@@ -964,3 +964,8 @@ Migrating to step handlers provides significant benefits:
 - Check [Vertical Development Guide](../reference/internals/VERTICAL_DEVELOPMENT_GUIDE.md) for best practices
 
 **Questions?** See [Troubleshooting](step_handler_guide.md#troubleshooting) in the main guide
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

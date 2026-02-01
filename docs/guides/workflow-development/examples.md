@@ -284,3 +284,8 @@ class CompiledGraph(Generic[StateType]):
 | Breaking external integrations | Deprecation aliases + migration guide |
 | Performance regression | Benchmark before/after |
 | Test coverage gaps | Ensure 100% coverage on new code |
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

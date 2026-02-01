@@ -478,3 +478,8 @@ If wrong tools are being selected:
 ---
 
 **Next**: [CLI Reference](cli-reference.md) | [Session Management](session-management.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 8 minutes

@@ -57,3 +57,8 @@ Descriptions are truncated for brevity. Use `victor tools list` for full details
 | `test` | Runs tests using pytest and returns a structured summary of the results. This tool runs pytest on the specified path and captures the... |
 | `workflow` | Runs a pre-defined, multi-step workflow to automate a complex task. |
 | `write` | Write file. Creates parent dirs. Use edit_files for partial edits. |
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 5 minutes

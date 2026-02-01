@@ -58,3 +58,8 @@ victor --help
 - [Local Models](local-models.md) - Use Ollama for free, private AI
 - [Cloud Models](cloud-models.md) - Use Anthropic, OpenAI, etc.
 - [Configuration](./configuration.md) - Advanced configuration
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

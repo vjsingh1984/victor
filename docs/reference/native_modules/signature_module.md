@@ -579,3 +579,8 @@ maturin develop --release
 Apache License 2.0
 
 Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 6 minutes

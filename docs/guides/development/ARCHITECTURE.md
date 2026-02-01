@@ -21,3 +21,8 @@ Victor supports pluggable embedding providers for semantic tool selection and co
 - Local providers enable offline use when models are installed.
 - Latency and quality depend on model choice and hardware.
 - You can override providers per profile.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

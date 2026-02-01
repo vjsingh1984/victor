@@ -617,3 +617,8 @@ See complete example:
 - [Coordinator Recipes](../tutorials/coordinator_recipes.md)
 - [Migration Examples](../examples/migration_examples.md)
 - [Architecture](../architecture/overview.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

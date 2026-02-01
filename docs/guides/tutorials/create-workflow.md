@@ -1134,3 +1134,8 @@ Now that you understand Victor workflows, explore:
 - **Escape Hatches**: `victor/coding/escape_hatches.py`
 - **Example Workflows**: `victor/workflows/mode_workflows.yaml`
 - **API Reference**: [Workflows API](../reference/internals/workflows-api.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

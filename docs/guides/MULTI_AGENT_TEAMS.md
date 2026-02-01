@@ -449,3 +449,8 @@ bus.subscribe(EventCategory.LIFECYCLE, lambda e:
 - [Observability Guide](OBSERVABILITY.md) - Team event monitoring
 - [Workflow DSL Guide](workflow-development/dsl.md) - Team nodes in workflows
 - [User Guide](../user-guide/index.md) - General usage
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

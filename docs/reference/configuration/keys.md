@@ -396,3 +396,8 @@ This file is the single source of truth for what keys are supported.
 - [Configuration Reference](index.md)
 - Security Policy: `SECURITY.md` (repo root)
 - API Keys Registry: `victor/config/api_keys_registry.yaml`
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

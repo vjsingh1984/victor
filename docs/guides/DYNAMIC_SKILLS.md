@@ -793,3 +793,8 @@ async def adaptive_workflow(task):
 - [Hierarchical Planning Guide](HIERARCHICAL_PLANNING.md)
 - [Enhanced Memory Guide](ENHANCED_MEMORY.md)
 - [Tool System Documentation](../reference/tools/catalog.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

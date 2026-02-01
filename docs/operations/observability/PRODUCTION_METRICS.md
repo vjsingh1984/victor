@@ -726,3 +726,8 @@ spec:
 - [Structured Logging](STRUCTURED_LOGGING.md) - Logging setup
 - [Health Checks](HEALTH_CHECKS.md) - Health monitoring
 - [Prometheus Metrics](PROMETHEUS_METRICS.md) - Detailed Prometheus guide
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 7 minutes

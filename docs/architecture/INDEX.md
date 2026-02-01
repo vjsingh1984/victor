@@ -122,3 +122,8 @@ Guides for upgrading between versions.
 *System design and patterns*
 
 </div>
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

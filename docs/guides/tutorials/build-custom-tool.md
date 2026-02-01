@@ -842,3 +842,8 @@ For more examples, explore the existing tools in `victor/tools/` - they demonstr
 - Read the [Tool Selection Guide](../guides/development/TOOL_SELECTION.md)
 - Explore [Tool Calling Formats](../guides/development/TOOL_CALLING_FORMATS.md)
 - Learn about [Creating Verticals](../tutorials/vertical_creation_guide.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

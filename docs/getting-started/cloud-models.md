@@ -136,3 +136,8 @@ victor chat --provider anthropic --test
 - [First Run](first-run.md) - Get started
 - [Local Models](local-models.md) - Free, private AI
 - [Configuration](./configuration.md) - Advanced setup
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

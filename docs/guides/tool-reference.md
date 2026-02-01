@@ -107,3 +107,8 @@ Some tools support parameter escalation:
 
 - [Tool Catalog](../reference/tools/catalog.md) - Complete tool documentation
 - [Tool Calling Formats](development/TOOL_CALLING_FORMATS.md) - Provider formats
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

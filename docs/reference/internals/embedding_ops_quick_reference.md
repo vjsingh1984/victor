@@ -339,3 +339,8 @@ matrix = accelerator.similarity_matrix(
 - API documentation: `victor/native/accelerators/embedding_ops.py`
 - Test examples: `tests/integration/native/test_embedding_ops_accelerator.py`
 - Demo script: `examples/embedding_ops_demo.py`
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

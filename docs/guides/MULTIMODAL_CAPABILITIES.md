@@ -676,3 +676,8 @@ async def digitize_document(image_path):
 - [Provider Documentation](../reference/providers/index.md)
 - [Vision Agent API](../reference/api/index.md)
 - [Audio Agent API](../reference/api/index.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

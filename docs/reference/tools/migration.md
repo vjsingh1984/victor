@@ -24,3 +24,8 @@ async def my_tool(param: str) -> dict:
 - Both styles are supported during migration.
 - Keep tool docstrings concise; they become tool descriptions.
 - Regenerate the catalog after changes: `python scripts/generate_tool_catalog.py`
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

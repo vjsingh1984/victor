@@ -326,3 +326,8 @@ For more information, see the [Contributing Guide](../contributing/index.md).
 ---
 
 Back to [Documentation Home](../index.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

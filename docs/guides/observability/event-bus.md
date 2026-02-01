@@ -629,3 +629,8 @@ event = Event(
 - [Workflow Scheduler →](../workflow-development/scheduling.md) - Scheduled workflow monitoring
 - [Multi-Agent Teams →](../MULTI_AGENT_TEAMS.md) - Team coordination
 - [User Guide →](../../user-guide/index.md) - General usage
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

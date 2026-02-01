@@ -1117,3 +1117,8 @@ See [Migration Tool Guide](migration_tool_guide.md) for automated migration.
 3. Validate templates with `--validate` flag
 4. Check generated code for issues
 5. Consult Victor community resources
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 7 minutes

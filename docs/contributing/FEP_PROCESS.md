@@ -477,3 +477,8 @@ For questions about the FEP process:
 ---
 
 *This FEP process document is itself a Process FEP. Version: 1.0. Last updated: 2025-01-09*
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 9 minutes

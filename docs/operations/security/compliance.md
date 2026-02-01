@@ -72,3 +72,8 @@ Yes. Tools are gated by mode, configuration, and permissions.
 
 **How do we integrate with CI/CD?**
 Use the CLI in pipelines or run Victor as a service and call it via API.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

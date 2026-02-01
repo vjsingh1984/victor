@@ -434,3 +434,8 @@ async def on_invalidate(key: str, namespace: str):
 - [Semantic Caching](SEMANTIC_CACHING.md)
 - [Cache Invalidation](CACHE_INVALIDATION.md)
 - [Cache Analytics](CACHE_ANALYTICS.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

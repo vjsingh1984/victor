@@ -41,3 +41,8 @@ pytest tests/unit -v
 For contribution workflow, PR expectations, and governance, see the root guide:
 
 - Root CONTRIBUTING: `CONTRIBUTING.md`
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

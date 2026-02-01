@@ -1216,3 +1216,8 @@ async def call_llm(messages, model):
 - [Tool System API Reference](./tools-api.md)
 - [Workflow Engine API Reference](./workflows-api.md)
 - [Configuration Guide](../../getting-started/configuration.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

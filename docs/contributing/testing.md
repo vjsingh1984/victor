@@ -573,3 +573,8 @@ jobs:
 ---
 
 **Questions?** Check [existing tests](https://github.com/vijayksingh/victor/tree/main/tests) for examples or open a [discussion](https://github.com/vijayksingh/victor/discussions).
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

@@ -16,3 +16,8 @@ Tool calling depends on the provider and model. Some models return structured to
 ## References
 - `../embeddings/TOOL_CALLING_FORMATS.md`
 - `victor/config/tool_calling_models.yaml` (optional reference; may be outdated)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

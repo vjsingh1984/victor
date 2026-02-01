@@ -881,3 +881,8 @@ This is **not harmful duplication**—it's **good architecture** following indus
 ## Diagram
 
 See [Coordinators Architecture Diagram](diagrams/coordinators.mmd) for a visual representation of this architecture.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 8 minutes

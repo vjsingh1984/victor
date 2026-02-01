@@ -620,3 +620,8 @@ processor = AstProcessorAccelerator(max_cache_size=500)
 - [Native Extensions](../reference/internals/native_accelerators.md)
 - [Performance Optimization](../performance/optimization_guide.md)
 - [API Reference](../reference/api/index.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

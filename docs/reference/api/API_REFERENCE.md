@@ -1010,3 +1010,8 @@ class MyVertical(VerticalBase):
 - [Protocol Reference](PROTOCOL_REFERENCE.md) - Protocol interfaces
 - [Provider Reference](PROVIDER_REFERENCE.md) - LLM provider details
 - [Configuration Reference](CONFIGURATION_REFERENCE.md) - Settings and environment variables
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

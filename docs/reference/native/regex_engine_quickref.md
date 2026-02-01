@@ -263,3 +263,8 @@ python test_regex_engine.py
 For issues or questions:
 - Documentation: `/Users/vijaysingh/code/codingagent/docs/native/regex_engine.md`
 - Summary: `/Users/vijaysingh/code/codingagent/docs/native/REGEX_ENGINE_SUMMARY.md`
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

@@ -403,3 +403,8 @@ To contribute new templates:
 5. Update documentation
 
 See [Contributing Guide](../contributing/index.md) for details.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 5 minutes

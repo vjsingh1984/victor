@@ -209,3 +209,8 @@ victor config show            # Show configuration
 *Essential commands and patterns*
 
 </div>
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

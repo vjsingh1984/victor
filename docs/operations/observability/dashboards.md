@@ -802,3 +802,8 @@ For issues and questions:
 - 4 dashboards: Overview, Performance, Recursion, Members
 - 15+ alerting rules across 3 severity levels
 - Comprehensive documentation and examples
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 8 minutes

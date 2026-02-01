@@ -630,3 +630,8 @@ Before committing a step handler:
 ---
 
 *For detailed information, see the [Step Handler Guide](step_handler_guide.md)*
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

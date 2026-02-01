@@ -16,3 +16,8 @@ Local models vary in how they emit tool calls. Victor supports multiple formats 
 - Tools not triggering: switch to keyword tool selection or use a smaller tool set.
 - JSON tool calls in content: check logs for parse warnings and retry in non-streaming mode.
 - Air-gapped use: confirm web tools are disabled and the model is local.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

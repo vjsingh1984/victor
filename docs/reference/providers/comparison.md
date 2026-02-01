@@ -10,3 +10,8 @@ Short guidance for choosing models.
 ## Notes
 - Results depend on hardware, model settings, and task type.
 - Use local models for privacy and predictable cost.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

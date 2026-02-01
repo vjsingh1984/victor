@@ -730,3 +730,8 @@ These options are available for most commands:
 - [Tool Catalog](../reference/tools/catalog.md) - Available tools
 - [Provider Reference](../reference/providers/index.md) - Provider details
 - [Workflow DSL](../guides/workflow-development/dsl.md) - Workflow syntax
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 9 minutes

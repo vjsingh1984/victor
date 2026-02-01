@@ -473,3 +473,8 @@ create_workflow_from_preset(name: str, **kwargs) -> Optional[WorkflowDefinition]
 - [Multi-Agent Teams](../teams/collaboration.md)
 - [CLI Reference](../user-guide/cli-reference.md)
 - [Workflow Visualization](../workflow-diagrams/index.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 5 minutes

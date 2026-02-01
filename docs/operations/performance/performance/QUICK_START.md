@@ -210,3 +210,8 @@ warmer = PredictiveCacheWarmer(ngram_size=4)
 # Lower confidence threshold
 predictions = warmer.predict_next_queries(query, min_confidence=0.1)
 ```
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

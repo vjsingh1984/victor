@@ -476,3 +476,8 @@ except ImportError:
 - Integration Tests: `tests/integration/native/test_tool_selector_accelerator.py`
 - [Observability Guide](../../observability/README.md)
 - [Performance Benchmarks](../../performance/benchmark_results.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

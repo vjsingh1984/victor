@@ -371,3 +371,8 @@ agent = await Agent.create(
 - [Coordinator Separation](coordinator_separation.md) - Two-layer design
 - [Protocol Reference](PROTOCOLS_REFERENCE.md) - Protocol documentation
 - [Migration Guides](MIGRATION_GUIDES.md) - Upgrading guide
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

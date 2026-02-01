@@ -953,3 +953,8 @@ victor config show
 ---
 
 **Next**: [MCP Server →](mcp-server.md) | [Python API →](python-api.md) | [Configuration →](../configuration/index.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

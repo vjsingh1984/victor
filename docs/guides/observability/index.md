@@ -298,3 +298,8 @@ Potential enhancements:
 - [ ] Customizable column layouts
 - [ ] Event correlation across views
 - [ ] Historical event replay
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

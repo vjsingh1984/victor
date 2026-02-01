@@ -111,3 +111,8 @@ See [PRE_COMMIT_HOOKS.md](PRE_COMMIT_HOOKS.md) for complete documentation.
 - Runs only on changed workflow files
 
 Hooks are fast enough to not slow down development workflow.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

@@ -597,3 +597,8 @@ cache = MultiLevelCache(l1_ttl=600, l2_ttl=7200, l3_ttl=86400)
 - [Caching Strategy Guide](./caching_strategy.md)
 - [Tool Selection Cache Implementation](./tool_selection_cache_implementation.md)
 - [Optimization Guide](./optimization_guide.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 5 minutes

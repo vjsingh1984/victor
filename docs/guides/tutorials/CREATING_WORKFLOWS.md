@@ -858,3 +858,8 @@ For more examples, see:
 - `docs/guides/workflow-quickstart.md` - Workflow quickstart
 
 Happy workflow building! 🔄
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

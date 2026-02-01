@@ -499,3 +499,8 @@ See `examples/observability/` for complete examples:
 - `kubernetes_deployment.yml`: Full K8s deployment
 - `custom_health_checks.py`: Custom checks
 - `health_monitoring.py`: Monitoring setup
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

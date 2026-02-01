@@ -523,3 +523,8 @@ async def invalidate_and_rewarm(key: str, namespace: str):
 - [Cache Warming](CACHE_WARMING.md)
 - [Semantic Caching](SEMANTIC_CACHING.md)
 - [Cache Analytics](CACHE_ANALYTICS.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

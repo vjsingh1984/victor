@@ -585,3 +585,8 @@ if hit_rates[-1] < hit_rates[0] * 0.9:
 - [Cache Warming](CACHE_WARMING.md)
 - [Semantic Caching](SEMANTIC_CACHING.md)
 - [Cache Invalidation](CACHE_INVALIDATION.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

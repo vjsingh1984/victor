@@ -860,3 +860,8 @@ class CollaborationMixin:
 - [Workflow Examples](../workflows/COMMON_WORKFLOWS.md)
 - Negotiation Framework Tests: `tests/integration/teams/test_collaboration.py`
 - [Team Formations](../workflows/advanced_formations.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

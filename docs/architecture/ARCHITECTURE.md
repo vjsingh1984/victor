@@ -118,3 +118,8 @@ Victor employs a **two-layer coordinator architecture** that separates applicati
 - [Coordinator Architecture (Detailed)](coordinator_separation.md) - Complete explanation with examples
 - [Architecture Diagrams](diagrams/coordinators.mmd) - Visual representations
 - [Coordinator Quick Reference](coordinator_based_architecture.md) - Quick lookup guide
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

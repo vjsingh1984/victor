@@ -207,3 +207,8 @@ ls ~/.victor/logs/
 - [Installation](installation.md) - Install Victor
 - [First Run](first-run.md) - Get started
 - [Configuration](./configuration.md) - Advanced setup
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

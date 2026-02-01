@@ -579,3 +579,8 @@ print(f"Created: {checkpoint_id}")
 - [Agent and Workflow Presets](AGENT_AND_WORKFLOW_PRESETS.md)
 - [CLI Reference](../user-guide/cli-reference.md)
 - [Architecture Overview](../architecture/ARCHITECTURE.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

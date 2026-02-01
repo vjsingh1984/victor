@@ -203,3 +203,8 @@ For issues or questions:
 - **Configuration**: 1 YAML file
 - **Tests**: 1 test file (500 lines)
 - **Examples**: 1 example file
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

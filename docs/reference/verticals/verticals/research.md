@@ -438,3 +438,8 @@ Research reports follow this structure:
 - **Update findings when new information emerges**
 - **Respect copyright and fair use**
 - **Disclose potential conflicts of interest**
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

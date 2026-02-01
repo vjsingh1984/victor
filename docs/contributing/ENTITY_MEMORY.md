@@ -468,3 +468,8 @@ config.enable_code_aware_extraction = False
 - [Conversation Management](../user-guide/session-management.md)
 - [CLI Reference](../user-guide/cli-reference.md)
 - [Storage Architecture](../architecture/overview.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 4 minutes

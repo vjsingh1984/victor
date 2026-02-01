@@ -466,3 +466,8 @@ result = await orchestrator.run("Analyze this code")
 ---
 
 **Next**: [Workflow DSL Guide →](workflow-development/dsl.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

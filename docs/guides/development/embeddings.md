@@ -79,3 +79,8 @@ User Request → Embedding Provider → Vector Comparison → Tool Selection
 | Tools not triggering | Use `keyword` strategy |
 | Slow cold starts | Pre-cache embeddings |
 | Memory issues | Use smaller model (bge-small) |
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

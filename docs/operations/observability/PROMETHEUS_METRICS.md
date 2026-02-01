@@ -401,3 +401,8 @@ See `examples/observability/` for complete examples:
 - `custom_metrics.py`: Custom metric definitions
 - `grafana_dashboard.json`: Complete dashboard
 - `alerting_rules.yml`: Production alerting rules
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

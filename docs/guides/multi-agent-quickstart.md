@@ -127,3 +127,8 @@ research_team = TeamSpec(
 
 - [Multi-Agent Teams Guide](MULTI_AGENT_TEAMS.md) - Comprehensive guide
 - [Multi-Agent Teams](MULTI_AGENT_TEAMS.md) - Team patterns
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

@@ -868,3 +868,8 @@ For more examples, see:
 - `examples/custom_plugin.py` - Example custom tool
 
 Happy tool building! 🛠️
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

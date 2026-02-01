@@ -472,3 +472,8 @@ bus.subscribe(EventCategory.ERROR, lambda e:
 - [Observability →](observability/index.md) - Resilience event monitoring
 - [Provider Reference →](../reference/providers/index.md) - Provider configuration
 - [User Guide →](../user-guide/index.md) - General usage
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

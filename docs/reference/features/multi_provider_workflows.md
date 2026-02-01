@@ -547,3 +547,8 @@ python examples/multi_provider_workflow.py
 - [Workflow System](../user-guide/workflows.md)
 - [Settings Reference](../reference/configuration/index.md)
 - [Agent API](../reference/api/index.md)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

@@ -1022,3 +1022,8 @@ provider = optimizer.select_for_task(
 - [API Reference](API_REFERENCE.md) - Main API documentation
 - [Protocol Reference](PROTOCOL_REFERENCE.md) - Protocol interfaces
 - [Configuration Reference](CONFIGURATION_REFERENCE.md) - Settings reference
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 8 minutes

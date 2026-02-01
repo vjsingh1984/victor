@@ -446,3 +446,8 @@ For security vulnerabilities or concerns, please:
 4. Wait for confirmation before disclosing
 
 For non-security issues, use the GitHub issue tracker.
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 3 minutes

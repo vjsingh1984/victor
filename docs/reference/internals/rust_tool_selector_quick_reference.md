@@ -418,3 +418,8 @@ pip install maturin>=1.4
 - Added `filter_by_similarity_threshold()` for threshold-based filtering
 - All functions include comprehensive unit tests
 - 3-6x performance improvement over pure Python implementations
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 2 min

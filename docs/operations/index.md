@@ -22,3 +22,8 @@ Concise guidance for running Victor in production.
 
 - Security Policy: `SECURITY.md` (repo root)
 - Support: `SUPPORT.md` (repo root)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

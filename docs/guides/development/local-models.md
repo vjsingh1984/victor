@@ -62,3 +62,8 @@ victor chat --airgapped
 | Ollama        | `ollama serve`                                               | `ollama pull <model>` |
 | LM Studio     | Start in app                                                 | Download via GUI      |
 | vLLM          | `python -m vllm.entrypoints.openai.api_server --model <id>`  | Manual                |
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min

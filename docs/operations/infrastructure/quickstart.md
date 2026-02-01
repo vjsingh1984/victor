@@ -185,3 +185,8 @@ kubectl rollout undo deployment/victor-api -n victor
 - [Documentation](README.md)
 - [GitHub Issues](https://github.com/vijayksingh/victor/issues)
 - [Discussions](https://github.com/vijayksingh/victor/discussions)
+
+---
+
+**Last Updated:** February 01, 2026
+**Reading Time:** 1 min
