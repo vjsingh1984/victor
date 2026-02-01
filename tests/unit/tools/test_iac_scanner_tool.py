@@ -26,8 +26,8 @@ from victor.iac import (
     IaCFinding,
     IaCPlatform,
     IaCResource,
-    ScanResult,
-    Severity,
+    IaCScanResult,
+    IaCSeverity,
 )
 
 
@@ -47,7 +47,7 @@ def sample_finding():
     """Create sample IaC finding."""
     return IaCFinding(
         rule_id="TF001",
-        severity=Severity.HIGH,
+        severity=IaCSeverity.HIGH,
         category=Category.SECRETS,
         message="Hardcoded AWS access key detected",
         description="AWS access keys should not be hardcoded",
@@ -78,7 +78,7 @@ def sample_config():
 @pytest.fixture
 def sample_scan_result(sample_config, sample_finding):
     """Create sample scan result."""
-    return ScanResult(
+    return IaCScanResult(
         configs=[sample_config],
         findings=[sample_finding],
         files_scanned=5,
@@ -356,7 +356,7 @@ class TestScanAction:
         """Test scan output includes critical findings."""
         finding = IaCFinding(
             rule_id="CRIT001",
-            severity=Severity.CRITICAL,
+            severity=IaCSeverity.CRITICAL,
             category=Category.SECRETS,
             message="Exposed credentials",
             description="Critical security issue",
@@ -364,7 +364,7 @@ class TestScanAction:
             line_number=10,
             remediation="Remove credentials immediately",
         )
-        scan_result = ScanResult(
+        scan_result = IaCScanResult(
             configs=[],
             findings=[finding],
             files_scanned=1,
@@ -546,14 +546,14 @@ class TestFormatMethods:
             )
             for i, severity in enumerate(
                 [
-                    Severity.CRITICAL,
-                    Severity.HIGH,
-                    Severity.MEDIUM,
-                    Severity.LOW,
+                    IaCSeverity.CRITICAL,
+                    IaCSeverity.HIGH,
+                    IaCSeverity.MEDIUM,
+                    IaCSeverity.LOW,
                 ]
             )
         ]
-        scan_result = ScanResult(
+        scan_result = IaCScanResult(
             configs=[],
             findings=findings,
             files_scanned=1,
@@ -586,7 +586,7 @@ class TestFormatMethods:
         findings = [
             IaCFinding(
                 rule_id="RULE1",
-                severity=Severity.CRITICAL,
+                severity=IaCSeverity.CRITICAL,
                 category=Category.SECRETS,
                 message="Critical finding",
                 description="",
@@ -594,7 +594,7 @@ class TestFormatMethods:
             ),
             IaCFinding(
                 rule_id="RULE2",
-                severity=Severity.INFO,
+                severity=IaCSeverity.INFO,
                 category=Category.BEST_PRACTICE,
                 message="Info finding",
                 description="",
@@ -647,7 +647,7 @@ class TestIntegrationStyle:
         """Test Kubernetes-specific scan workflow."""
         k8s_finding = IaCFinding(
             rule_id="K8S001",
-            severity=Severity.HIGH,
+            severity=IaCSeverity.HIGH,
             category=Category.PERMISSIONS,
             message="Container running as root",
             description="Security best practice violation",
@@ -655,7 +655,7 @@ class TestIntegrationStyle:
             line_number=20,
             remediation="Set runAsNonRoot: true",
         )
-        scan_result = ScanResult(
+        scan_result = IaCScanResult(
             configs=[
                 IaCConfig(
                     platform=IaCPlatform.KUBERNETES,

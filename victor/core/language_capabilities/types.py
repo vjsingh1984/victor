@@ -336,7 +336,9 @@ class UnifiedLanguageCapability:
             return self.tree_sitter is not None
         elif method == ASTAccessMethod.LSP:
             return self.lsp is not None
-        return False
+        else:
+            # This should never happen if ASTAccessMethod is complete
+            return False
 
     def get_available_methods(self) -> list[ASTAccessMethod]:
         """Get all available methods for this language."""
