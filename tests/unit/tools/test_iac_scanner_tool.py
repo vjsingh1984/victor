@@ -19,7 +19,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from victor.tools.iac_scanner_tool import IaCScannerTool
-from victor.tools.base import CostTier
+from victor.tools.enums import CostTier
 from victor.iac import (
     Category,
     IaCConfig,

@@ -25,7 +25,7 @@ from victor.agent.tool_graph_builder import (
     ToolGraphConfig,
     GraphBuildResult,
 )
-from victor.tools.base import CostTier
+from victor.tools.enums import CostTier
 
 
 class TestToolGraphConfig:

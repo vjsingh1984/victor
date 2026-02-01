@@ -32,7 +32,9 @@ import numpy as np
 
 from victor.core.errors import FileError, ConfigurationError
 from victor.providers.base import ToolDefinition
-from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
+from victor.tools.registry import ToolRegistry
+from victor.tools.enums import CostTier
+from victor.tools.metadata_registry import ToolMetadataRegistry
 from victor.storage.embeddings.service import EmbeddingService
 from victor.agent.tool_sequence_tracker import ToolSequenceTracker, create_sequence_tracker
 from victor.protocols.tool_selector import (

@@ -47,7 +47,8 @@ from typing import Any, Optional
 from collections.abc import Callable
 
 from victor.framework.module_loader import DynamicModuleLoader
-from victor.tools.base import BaseTool, ToolRegistry
+from victor.tools.registry import ToolRegistry
+from victor.tools.base import BaseTool
 from victor.tools.plugin import PluginMetadata, ToolPlugin
 
 logger = logging.getLogger(__name__)

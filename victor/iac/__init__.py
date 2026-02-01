@@ -42,11 +42,11 @@ from .protocol import (
     IaCFinding,
     IaCPlatform,
     IaCResource,
+    IaCScanResult,
     IaCScannerProtocol,
+    IaCSeverity,
     ScanPolicy,
-    ScanResult,
     SecretPattern,
-    Severity,
 )
 from .scanners import (
     DockerComposeScanner,
@@ -64,12 +64,12 @@ __all__ = [
     "IaCScannerProtocol",
     # Data classes
     "IaCPlatform",
-    "Severity",
+    "IaCSeverity",
     "Category",
     "IaCResource",
     "IaCFinding",
     "IaCConfig",
-    "ScanResult",
+    "IaCScanResult",
     "ScanPolicy",
     "SecretPattern",
     # Scanners

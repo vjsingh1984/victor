@@ -33,9 +33,9 @@ from .protocol import (
     IaCConfig,
     IaCFinding,
     IaCPlatform,
+    IaCScanResult,
+    IaCSeverity,
     ScanPolicy,
-    ScanResult,
-    Severity,
 )
 from .scanners import get_all_scanners, get_scanner
 
@@ -85,7 +85,7 @@ class IaCManager:
         self,
         platforms: list[IaCPlatform] | None = None,
         policy: ScanPolicy | None = None,
-    ) -> ScanResult:
+    ) -> IaCScanResult:
         """Perform comprehensive IaC security scan.
 
         Args:
@@ -161,7 +161,7 @@ class IaCManager:
 
         duration_ms = int((time.time() - start_time) * 1000)
 
-        result = ScanResult(
+        result = IaCScanResult(
             configs=configs,
             findings=findings,
             files_scanned=files_scanned,
@@ -251,7 +251,7 @@ class IaCManager:
 
         return filtered
 
-    async def compare_scans(self, baseline: ScanResult | None = None) -> dict[str, Any]:
+    async def compare_scans(self, baseline: IaCScanResult | None = None) -> dict[str, Any]:
         """Compare current scan against baseline.
 
         Args:
@@ -333,7 +333,7 @@ class IaCManager:
             "risk_score": self._calculate_risk_score(result),
         }
 
-    def _calculate_risk_score(self, result: ScanResult) -> int:
+    def _calculate_risk_score(self, result: IaCScanResult) -> int:
         """Calculate overall risk score (0-100).
 
         Args:
@@ -391,7 +391,7 @@ class IaCManager:
 
         logger.info(f"Saved IaC scan policy to {self._policy_file}")
 
-    async def _save_findings(self, result: ScanResult) -> None:
+    async def _save_findings(self, result: IaCScanResult) -> None:
         """Save scan findings to history."""
         self._findings_history_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -423,7 +423,7 @@ class IaCManager:
         with open(self._findings_history_file, "w", encoding="utf-8") as f:
             json.dump(history, f, indent=2)
 
-    async def _load_previous_scan(self) -> ScanResult | None:
+    async def _load_previous_scan(self) -> IaCScanResult | None:
         """Load previous scan from history."""
         if not self._findings_history_file.exists():
             return None
@@ -434,9 +434,9 @@ class IaCManager:
                 if len(history) < 2:
                     return None
 
-                # Return second-to-last entry as a minimal ScanResult
+                # Return second-to-last entry as a minimal IaCScanResult
                 prev = history[-2]
-                return ScanResult(
+                return IaCScanResult(
                     configs=[],
                     findings=[],  # We don't store full findings
                     files_scanned=prev.get("files_scanned", 0),
@@ -452,7 +452,7 @@ class IaCManager:
             logger.warning(f"Failed to load previous scan: {e}")
             return None
 
-    async def should_fail_ci(self, result: ScanResult | None = None) -> tuple[bool, str]:
+    async def should_fail_ci(self, result: IaCScanResult | None = None) -> tuple[bool, str]:
         """Determine if CI should fail based on findings.
 
         Args:

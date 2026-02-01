@@ -28,9 +28,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from victor.tools.enums import (
+    CostTier,
+)
 from victor.tools.base import (
     BaseTool,
-    CostTier,
     ToolMetadata,
     ToolMetadataProvider,
     ToolMetadataRegistry,

@@ -178,7 +178,7 @@ def _rebuild_embeddings(targets: list[CacheType], progress_callback):
 
         if CacheType.TOOL in targets:
             import asyncio
-            from victor.tools.base import ToolRegistry
+            from victor.tools.registry import ToolRegistry
             from victor.tools.semantic_selector import SemanticToolSelector
             import importlib, inspect, os as tool_os
 

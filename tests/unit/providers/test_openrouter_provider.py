@@ -29,11 +29,13 @@ from unittest.mock import MagicMock, patch
 import httpx
 
 from victor.providers.openrouter_provider import OpenRouterProvider, OPENROUTER_MODELS
+from victor.core.errors import (
+    ProviderError,
+    ProviderTimeoutError,
+)
 from victor.providers.base import (
     Message,
     ToolDefinition,
-    ProviderError,
-    ProviderTimeoutError,
 )
 
 

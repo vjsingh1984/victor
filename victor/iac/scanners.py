@@ -33,8 +33,8 @@ from .protocol import (
     IaCPlatform,
     IaCResource,
     IaCScannerProtocol,
+    IaCSeverity,
     ScanPolicy,
-    Severity,
 )
 
 logger = logging.getLogger(__name__)
@@ -137,7 +137,7 @@ class TerraformScanner(IaCScannerProtocol):
             findings.append(
                 IaCFinding(
                     rule_id="TF-AWS-001",
-                    severity=Severity.HIGH,
+                    severity=IaCSeverity.HIGH,
                     category=Category.ENCRYPTION,
                     message="S3 bucket without server-side encryption",
                     description="S3 buckets should have encryption enabled",
@@ -152,7 +152,7 @@ class TerraformScanner(IaCScannerProtocol):
             findings.append(
                 IaCFinding(
                     rule_id="TF-AWS-002",
-                    severity=Severity.CRITICAL,
+                    severity=IaCSeverity.CRITICAL,
                     category=Category.PERMISSIONS,
                     message="S3 bucket with public read access",
                     description="Public S3 buckets can expose sensitive data",
@@ -167,7 +167,7 @@ class TerraformScanner(IaCScannerProtocol):
             findings.append(
                 IaCFinding(
                     rule_id="TF-AWS-003",
-                    severity=Severity.HIGH,
+                    severity=IaCSeverity.HIGH,
                     category=Category.NETWORK,
                     message="Security group allows traffic from all IPs (0.0.0.0/0)",
                     description="Overly permissive security groups increase attack surface",
@@ -182,7 +182,7 @@ class TerraformScanner(IaCScannerProtocol):
             findings.append(
                 IaCFinding(
                     rule_id="TF-AWS-004",
-                    severity=Severity.HIGH,
+                    severity=IaCSeverity.HIGH,
                     category=Category.ENCRYPTION,
                     message="RDS instance without storage encryption",
                     description="Database storage should be encrypted at rest",
@@ -197,7 +197,7 @@ class TerraformScanner(IaCScannerProtocol):
             findings.append(
                 IaCFinding(
                     rule_id="TF-AWS-005",
-                    severity=Severity.LOW,
+                    severity=IaCSeverity.LOW,
                     category=Category.LOGGING,
                     message="CloudWatch Log Group without retention policy",
                     description="Logs without retention can cause storage costs to grow",
@@ -211,7 +211,7 @@ class TerraformScanner(IaCScannerProtocol):
             findings.append(
                 IaCFinding(
                     rule_id="TF-AWS-006",
-                    severity=Severity.CRITICAL,
+                    severity=IaCSeverity.CRITICAL,
                     category=Category.PERMISSIONS,
                     message="IAM policy with wildcard action",
                     description="Wildcard actions grant excessive permissions",
@@ -285,7 +285,7 @@ class DockerScanner(IaCScannerProtocol):
             findings.append(
                 IaCFinding(
                     rule_id="DOCKER-001",
-                    severity=Severity.MEDIUM,
+                    severity=IaCSeverity.MEDIUM,
                     category=Category.PERMISSIONS,
                     message="Container runs as root user",
                     description="Running containers as root increases security risk",
@@ -300,7 +300,7 @@ class DockerScanner(IaCScannerProtocol):
             findings.append(
                 IaCFinding(
                     rule_id="DOCKER-002",
-                    severity=Severity.MEDIUM,
+                    severity=IaCSeverity.MEDIUM,
                     category=Category.BEST_PRACTICE,
                     message="Using 'latest' tag for base image",
                     description="Latest tag can lead to unpredictable builds",
@@ -314,7 +314,7 @@ class DockerScanner(IaCScannerProtocol):
             findings.append(
                 IaCFinding(
                     rule_id="DOCKER-003",
-                    severity=Severity.LOW,
+                    severity=IaCSeverity.LOW,
                     category=Category.BEST_PRACTICE,
                     message="Using ADD instead of COPY for local files",
                     description="COPY is preferred for simple file operations",
@@ -328,7 +328,7 @@ class DockerScanner(IaCScannerProtocol):
             findings.append(
                 IaCFinding(
                     rule_id="DOCKER-004",
-                    severity=Severity.LOW,
+                    severity=IaCSeverity.LOW,
                     category=Category.BEST_PRACTICE,
                     message="No HEALTHCHECK instruction",
                     description="Healthchecks help orchestrators manage containers",
@@ -346,7 +346,7 @@ class DockerScanner(IaCScannerProtocol):
                 findings.append(
                     IaCFinding(
                         rule_id="DOCKER-005",
-                        severity=Severity.HIGH,
+                        severity=IaCSeverity.HIGH,
                         category=Category.SECRETS,
                         message=f"Potential secret in ENV: {var_name}",
                         description="Secrets should not be hardcoded in Dockerfile",
@@ -362,7 +362,7 @@ class DockerScanner(IaCScannerProtocol):
             findings.append(
                 IaCFinding(
                     rule_id="DOCKER-006",
-                    severity=Severity.LOW,
+                    severity=IaCSeverity.LOW,
                     category=Category.BEST_PRACTICE,
                     message="apt-get without cleanup",
                     description="Apt cache should be cleaned to reduce image size",
@@ -463,7 +463,7 @@ class KubernetesScanner(IaCScannerProtocol):
                         findings.append(
                             IaCFinding(
                                 rule_id="K8S-001",
-                                severity=Severity.CRITICAL,
+                                severity=IaCSeverity.CRITICAL,
                                 category=Category.PERMISSIONS,
                                 message=f"Privileged container: {container.get('name')}",
                                 description="Privileged containers have full host access",
@@ -480,7 +480,7 @@ class KubernetesScanner(IaCScannerProtocol):
                         findings.append(
                             IaCFinding(
                                 rule_id="K8S-002",
-                                severity=Severity.MEDIUM,
+                                severity=IaCSeverity.MEDIUM,
                                 category=Category.PERMISSIONS,
                                 message=f"Container runs as root: {container.get('name')}",
                                 description="Running as root increases security risk",
@@ -499,7 +499,7 @@ class KubernetesScanner(IaCScannerProtocol):
                         findings.append(
                             IaCFinding(
                                 rule_id="K8S-003",
-                                severity=Severity.MEDIUM,
+                                severity=IaCSeverity.MEDIUM,
                                 category=Category.BEST_PRACTICE,
                                 message=f"No resource limits: {container.get('name')}",
                                 description="Containers without limits can consume excessive resources",
@@ -516,7 +516,7 @@ class KubernetesScanner(IaCScannerProtocol):
                         findings.append(
                             IaCFinding(
                                 rule_id="K8S-004",
-                                severity=Severity.MEDIUM,
+                                severity=IaCSeverity.MEDIUM,
                                 category=Category.BEST_PRACTICE,
                                 message=f"Image without specific tag: {image}",
                                 description="Using latest or untagged images is unpredictable",
@@ -532,7 +532,7 @@ class KubernetesScanner(IaCScannerProtocol):
                     findings.append(
                         IaCFinding(
                             rule_id="K8S-005",
-                            severity=Severity.HIGH,
+                            severity=IaCSeverity.HIGH,
                             category=Category.NETWORK,
                             message="Pod uses host network",
                             description="Host network bypasses network policies",
@@ -558,7 +558,7 @@ class KubernetesScanner(IaCScannerProtocol):
                         findings.append(
                             IaCFinding(
                                 rule_id="K8S-006",
-                                severity=Severity.MEDIUM,
+                                severity=IaCSeverity.MEDIUM,
                                 category=Category.NETWORK,
                                 message="LoadBalancer service without internal annotation",
                                 description="Consider if this service should be internal-only",
@@ -575,7 +575,7 @@ class KubernetesScanner(IaCScannerProtocol):
                     findings.append(
                         IaCFinding(
                             rule_id="K8S-007",
-                            severity=Severity.HIGH,
+                            severity=IaCSeverity.HIGH,
                             category=Category.SECRETS,
                             message="Secret contains unencrypted stringData",
                             description="Secrets in manifests should be externalized",
@@ -672,7 +672,7 @@ class DockerComposeScanner(IaCScannerProtocol):
                 findings.append(
                     IaCFinding(
                         rule_id="DC-001",
-                        severity=Severity.CRITICAL,
+                        severity=IaCSeverity.CRITICAL,
                         category=Category.PERMISSIONS,
                         message=f"Service {resource.name} runs privileged",
                         description="Privileged containers have full host access",
@@ -689,7 +689,7 @@ class DockerComposeScanner(IaCScannerProtocol):
                 findings.append(
                     IaCFinding(
                         rule_id="DC-002",
-                        severity=Severity.HIGH,
+                        severity=IaCSeverity.HIGH,
                         category=Category.NETWORK,
                         message=f"Service {resource.name} uses host network",
                         description="Host networking bypasses container isolation",
@@ -722,7 +722,7 @@ class DockerComposeScanner(IaCScannerProtocol):
                         findings.append(
                             IaCFinding(
                                 rule_id="DC-003",
-                                severity=Severity.HIGH,
+                                severity=IaCSeverity.HIGH,
                                 category=Category.SECRETS,
                                 message=f"Hardcoded secret in environment: {key}",
                                 description="Secrets should use environment substitution",
@@ -742,7 +742,7 @@ class DockerComposeScanner(IaCScannerProtocol):
                     findings.append(
                         IaCFinding(
                             rule_id="DC-004",
-                            severity=Severity.HIGH,
+                            severity=IaCSeverity.HIGH,
                             category=Category.NETWORK,
                             message=f"SSH port exposed on service {resource.name}",
                             description="SSH should not be exposed from containers",

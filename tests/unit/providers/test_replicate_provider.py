@@ -276,7 +276,8 @@ class TestReplicateProviderChat:
                     "error": "Model crashed",
                 }
 
-                from victor.providers.base import Message, ProviderError
+from victor.core.errors import ProviderError
+from victor.providers.base import Message
 
                 with pytest.raises(ProviderError) as exc_info:
                     await provider.chat(
@@ -294,7 +295,8 @@ class TestReplicateProviderChat:
         with patch.object(provider, "_create_prediction", new_callable=AsyncMock) as mock_create:
             mock_create.side_effect = httpx.TimeoutException("Timeout")
 
-            from victor.providers.base import Message, ProviderTimeoutError
+from victor.core.errors import ProviderTimeoutError
+from victor.providers.base import Message
 
             with pytest.raises(ProviderTimeoutError):
                 await provider.chat(

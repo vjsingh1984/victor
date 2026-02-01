@@ -381,7 +381,7 @@ class TestKeywordToolSelectorReadonlyCheck:
     @patch("victor.tools.metadata_registry.get_global_registry")
     def test_is_readonly_tool_true(self, mock_get_registry, selector):
         """Test _is_readonly_tool returns True for readonly tools."""
-        from victor.tools.base import AccessMode, ExecutionCategory
+        from victor.tools.enums import AccessMode, ExecutionCategory
 
         mock_entry = MagicMock()
         mock_entry.access_mode = AccessMode.READONLY
@@ -396,7 +396,7 @@ class TestKeywordToolSelectorReadonlyCheck:
     @patch("victor.tools.metadata_registry.get_global_registry")
     def test_is_readonly_tool_false(self, mock_get_registry, selector):
         """Test _is_readonly_tool returns False for write tools."""
-        from victor.tools.base import AccessMode, ExecutionCategory
+        from victor.tools.enums import AccessMode, ExecutionCategory
 
         mock_entry = MagicMock()
         mock_entry.access_mode = AccessMode.WRITE

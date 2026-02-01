@@ -49,35 +49,35 @@ class TestPermission:
 
     def test_from_access_mode_readonly(self):
         """Test conversion from READONLY AccessMode."""
-        from victor.tools.base import AccessMode
+        from victor.tools.enums import AccessMode
 
         perm = Permission.from_access_mode(AccessMode.READONLY)
         assert perm == Permission.READ
 
     def test_from_access_mode_write(self):
         """Test conversion from WRITE AccessMode."""
-        from victor.tools.base import AccessMode
+        from victor.tools.enums import AccessMode
 
         perm = Permission.from_access_mode(AccessMode.WRITE)
         assert perm == Permission.WRITE
 
     def test_from_access_mode_execute(self):
         """Test conversion from EXECUTE AccessMode."""
-        from victor.tools.base import AccessMode
+        from victor.tools.enums import AccessMode
 
         perm = Permission.from_access_mode(AccessMode.EXECUTE)
         assert perm == Permission.EXECUTE
 
     def test_from_access_mode_network(self):
         """Test conversion from NETWORK AccessMode."""
-        from victor.tools.base import AccessMode
+        from victor.tools.enums import AccessMode
 
         perm = Permission.from_access_mode(AccessMode.NETWORK)
         assert perm == Permission.NETWORK
 
     def test_from_access_mode_mixed(self):
         """Test conversion from MIXED AccessMode."""
-        from victor.tools.base import AccessMode
+        from victor.tools.enums import AccessMode
 
         perm = Permission.from_access_mode(AccessMode.MIXED)
         assert perm == Permission.ADMIN
@@ -340,7 +340,7 @@ class TestRBACManager:
 
     def test_check_tool_access_enabled(self):
         """Test tool access check when enabled."""
-        from victor.tools.base import AccessMode
+        from victor.tools.enums import AccessMode
 
         rbac = RBACManager()
         dev_role = rbac.get_role("developer")
@@ -352,14 +352,14 @@ class TestRBACManager:
 
     def test_check_tool_access_disabled(self):
         """Test tool access check when disabled."""
-        from victor.tools.base import AccessMode
+        from victor.tools.enums import AccessMode
 
         rbac = RBACManager(enabled=False)
         assert rbac.check_tool_access("anyone", "any_tool", "any_cat", AccessMode.MIXED)
 
     def test_check_current_user_tool_access(self):
         """Test tool access check for current user."""
-        from victor.tools.base import AccessMode
+        from victor.tools.enums import AccessMode
 
         rbac = RBACManager()
         admin_role = rbac.get_role("admin")
@@ -370,7 +370,7 @@ class TestRBACManager:
 
     def test_check_current_user_tool_access_no_user(self):
         """Test tool access check with no current user."""
-        from victor.tools.base import AccessMode
+        from victor.tools.enums import AccessMode
 
         rbac = RBACManager(allow_unknown_users=True)
         # No current user set
@@ -588,7 +588,7 @@ class TestGlobalFunctions:
 
     def test_get_permission_for_access_mode(self):
         """Test get_permission_for_access_mode function."""
-        from victor.tools.base import AccessMode
+        from victor.tools.enums import AccessMode
 
         assert get_permission_for_access_mode(AccessMode.READONLY) == Permission.READ
         assert get_permission_for_access_mode(AccessMode.WRITE) == Permission.WRITE

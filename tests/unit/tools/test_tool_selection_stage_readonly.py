@@ -19,12 +19,14 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 from victor.agent.conversation_state import ConversationStage, ConversationStateMachine
 from victor.agent.tool_selection import ToolSelector
-from victor.tools.base import (
+from victor.tools.enums import (
     AccessMode,
-    BaseTool,
     DangerLevel,
     ExecutionCategory,
     Priority,
+)
+from victor.tools.base import (
+    BaseTool,
     ToolMetadata,
     ToolResult,
 )

@@ -881,7 +881,7 @@ class TestToolEnums:
 
     def test_priority_levels(self):
         """Test Priority has all levels."""
-        from victor.tools.base import Priority
+        from victor.tools.enums import Priority
 
         assert hasattr(Priority, "LOW")
         assert hasattr(Priority, "MEDIUM")

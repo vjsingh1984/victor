@@ -25,9 +25,9 @@ from typing import Any
 from victor.iac import (
     IaCManager,
     IaCPlatform,
+    IaCScanResult,
+    IaCSeverity,
     ScanPolicy,
-    ScanResult,
-    Severity,
 )
 from victor.tools.base import (
     AccessMode,

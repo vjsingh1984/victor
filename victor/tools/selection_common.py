@@ -28,7 +28,7 @@ import logging
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

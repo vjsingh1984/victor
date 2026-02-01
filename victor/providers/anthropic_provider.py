@@ -27,13 +27,15 @@ logger = logging.getLogger(__name__)
 from victor.core.errors import (
     ProviderConnectionError as CoreProviderConnectionError,
 )
+from victor.core.errors import (
+    ProviderAuthError,
+    ProviderError,
+    ProviderRateLimitError,
+)
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderAuthError,
-    ProviderError,
-    ProviderRateLimitError,
     StreamChunk,
     ToolDefinition,
 )

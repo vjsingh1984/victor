@@ -30,7 +30,7 @@ from victor.tools.metadata_registry import (
 from victor.tools.enums import AccessMode, CostTier, DangerLevel, Priority
 
 
-from victor.tools.base import ExecutionCategory
+from victor.tools.enums import ExecutionCategory
 
 
 class MockTool:

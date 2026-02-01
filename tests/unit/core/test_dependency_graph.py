@@ -1,4 +1,4 @@
-from victor.tools.base import CostTier
+from victor.tools.enums import CostTier
 from victor.tools.dependency_graph import ToolDependencyGraph
 
 

@@ -19,12 +19,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 
 from victor.providers.xai_provider import XAIProvider
-from victor.providers.base import (
-    Message,
-    ToolDefinition,
+from victor.core.errors import (
     ProviderError,
     ProviderAuthError,
     ProviderRateLimitError,
+)
+from victor.providers.base import (
+    Message,
+    ToolDefinition,
 )
 
 

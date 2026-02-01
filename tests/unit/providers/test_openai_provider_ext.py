@@ -19,12 +19,14 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.providers.openai_provider import OpenAIProvider
-from victor.providers.base import (
-    Message,
-    ToolDefinition,
+from victor.core.errors import (
     ProviderError,
     ProviderAuthError,
     ProviderRateLimitError,
+)
+from victor.providers.base import (
+    Message,
+    ToolDefinition,
 )
 
 

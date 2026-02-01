@@ -42,12 +42,14 @@ from collections.abc import AsyncIterator
 
 import httpx
 
+from victor.core.errors import (
+    ProviderError,
+    ProviderTimeoutError,
+)
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderError,
-    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )

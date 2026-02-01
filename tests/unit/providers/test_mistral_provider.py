@@ -27,11 +27,13 @@ from unittest.mock import MagicMock, patch
 import httpx
 
 from victor.providers.mistral_provider import MistralProvider, MISTRAL_MODELS
+from victor.core.errors import (
+    ProviderError,
+    ProviderTimeoutError,
+)
 from victor.providers.base import (
     Message,
     ToolDefinition,
-    ProviderError,
-    ProviderTimeoutError,
 )
 
 

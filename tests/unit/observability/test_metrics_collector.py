@@ -25,7 +25,7 @@ from victor.agent.metrics_collector import (
     CostTracking,
 )
 from victor.agent.stream_handler import StreamMetrics
-from victor.tools.base import CostTier
+from victor.tools.enums import CostTier
 
 
 class TestMetricsCollectorConfig:

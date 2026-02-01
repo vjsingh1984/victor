@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from victor.providers.base import ToolDefinition
 from victor.protocols.tool_selector import ToolSelectionStrategy
-from victor.tools.base import ToolRegistry
+from victor.tools.registry import ToolRegistry
 from victor.tools.enums import AccessMode, ExecutionCategory
 from victor.tools.selection_common import get_tools_from_message
 from victor.tools.selection_filters import is_small_model

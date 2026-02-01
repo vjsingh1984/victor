@@ -18,10 +18,12 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.providers.base import (
-    Message,
+from victor.core.errors import (
     ProviderError,
     ProviderTimeoutError,
+)
+from victor.providers.base import (
+    Message,
     ToolDefinition,
 )
 from victor.providers.ollama_provider import OllamaProvider

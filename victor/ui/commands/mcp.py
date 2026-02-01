@@ -10,7 +10,7 @@ from typing import Optional
 from rich.console import Console
 
 from victor.integrations.mcp.server import MCPServer
-from victor.tools.base import ToolRegistry
+from victor.tools.registry import ToolRegistry
 from victor.ui.commands.utils import setup_logging
 
 mcp_app = typer.Typer(name="mcp", help="Run Victor as an MCP server.")

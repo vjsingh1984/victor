@@ -45,7 +45,7 @@ from victor.protocols.tool_selector import (
 )
 
 if TYPE_CHECKING:
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

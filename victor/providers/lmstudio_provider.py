@@ -35,11 +35,13 @@ from collections.abc import AsyncIterator
 
 import httpx
 
+from victor.core.errors import (
+    ProviderError,
+)
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderError,
     StreamChunk,
     ToolDefinition,
 )

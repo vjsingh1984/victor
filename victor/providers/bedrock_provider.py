@@ -41,12 +41,14 @@ import os
 from typing import Any, Optional
 from collections.abc import AsyncIterator
 
+from victor.core.errors import (
+    ProviderError,
+    ProviderTimeoutError,
+)
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderError,
-    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )

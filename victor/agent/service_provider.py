@@ -785,7 +785,7 @@ class OrchestratorServiceProvider:
     def _register_tool_registry(self, container: ServiceContainer) -> None:
         """Register ToolRegistry as singleton."""
         from victor.agent.protocols import ToolRegistryProtocol, ToolRegistrarProtocol
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         container.register(
             ToolRegistryProtocol,  # type: ignore[type-abstract]

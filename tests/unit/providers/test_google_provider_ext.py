@@ -18,9 +18,11 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.providers.google_provider import GoogleProvider, HAS_GOOGLE_GENAI
+from victor.core.errors import (
+    ProviderError,
+)
 from victor.providers.base import (
     Message,
-    ProviderError,
 )
 
 # Skip entire module if google-generativeai is not installed

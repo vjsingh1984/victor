@@ -23,11 +23,13 @@ from victor.providers.groq_provider import (
     GROQ_MODELS,
     DEFAULT_BASE_URL,
 )
+from victor.core.errors import (
+    ProviderError,
+    ProviderTimeoutError,
+)
 from victor.providers.base import (
     CompletionResponse,
     Message,
-    ProviderError,
-    ProviderTimeoutError,
     ToolDefinition,
 )
 

@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, patch
 from datetime import datetime
 
 from victor.tools.pipeline_tool import PipelineAnalyzerTool
-from victor.tools.base import CostTier
+from victor.tools.enums import CostTier
 from victor.observability.pipeline import (
     CoverageMetrics,
     PipelineAnalysisResult,
