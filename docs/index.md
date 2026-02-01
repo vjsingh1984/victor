@@ -11,25 +11,39 @@
 
 ---
 
-## Welcome
+## 🎯 Choose Your Journey
 
-Victor AI is an open-source AI coding assistant with multiple providers, tools, and domain verticals. This index points to the canonical docs and avoids version-specific counts that change over time.
+New to Victor? Choose a guided learning path tailored to your role and goals.
+
+| Journey | For | Time | Outcome |
+|---------|-----|------|---------|
+| [🚀 Beginner](./journeys/beginner.md) | New users | 30 min | Ready for daily use |
+| [💡 Intermediate](./journeys/intermediate.md) | Daily users | 80 min | Power user |
+| [👨‍💻 Developer](./journeys/developer.md) | Contributors | 2 hours | Active contributor |
+| [🔧 Operations](./journeys/operations.md) | DevOps/SRE | 80 min | Production deployment |
+| [🏗️ Advanced](./journeys/advanced.md) | Architects | 2.5 hours | System expert |
+
+→ [View All Journeys](./journeys/index.md)
 
 ---
 
-## Start Here
+## Quick Start
 
 | Document | Description | Reading Time |
 |----------|-------------|--------------|
 | [Getting Started](./getting-started/index.md) | Entry point for setup and first run | 10 min |
 | [Installation](./getting-started/installation.md) | Install via pip, pipx, or Docker | 5 min |
 | [First Run](./getting-started/first-run.md) | Initialize your environment | 3 min |
-| [Local Models](./getting-started/local-models.md) | Local model setup | 10 min |
-| [Cloud Models](./getting-started/cloud-models.md) | Cloud provider setup | 10 min |
 | [Configuration](./getting-started/configuration.md) | Profiles and settings | 10 min |
 | [User Guide](./user-guide/index.md) | Day-to-day usage | 30 min |
 | [FAQ](./user-guide/faq.md) | Frequently asked questions | 5 min |
 | [Troubleshooting](./getting-started/troubleshooting.md) | Common issues and fixes | 10 min |
+
+---
+
+## Welcome
+
+Victor AI is an open-source AI coding assistant with multiple providers, tools, and domain verticals. This index points to the canonical docs and avoids version-specific counts that change over time.
 
 ---
 
