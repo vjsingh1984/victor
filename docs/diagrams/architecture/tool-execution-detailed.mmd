@@ -1,0 +1,67 @@
+flowchart TB
+    Start([LLM Returns<br/>Tool Calls]) --> Validate
+
+    subgraph Validation["Validation Phase"]
+        Validate[Validate Tool Calls] --> Check1{Tools<br/>Exist?}
+        Check1 -->|No| Error1[❌ UnknownToolError]
+        Check1 -->|Yes| Check2{Parameters<br/>Valid?}
+        Check2 -->|No| Error2[❌ InvalidParametersError]
+        Check2 -->|Yes| Check3{User<br/>Authorized?}
+        Check3 -->|No| Error3[❌ UnauthorizedError]
+        Check3 -->|Yes| Prepare
+    end
+
+    subgraph Preparation["Preparation Phase"]
+        Prepare[Prepare Execution] --> Expand[Expand File Paths<br/>& Resolve Patterns]
+        Expand --> Sanitize[Sanitize Inputs<br/>& Prevent Injection]
+        Sanitize --> Batch[Batch Independent<br/>Tool Calls]
+        Batch --> Dependency[Resolve Dependencies<br/>& Build DAG]
+    end
+
+    subgraph Execution["Execution Phase"]
+        Dependency --> Parallel{Has<br/>Dependencies?}
+        Parallel -->|No| ParallelExec[Execute in Parallel<br/>(ThreadPoolExecutor)]
+        Parallel -->|Yes| Sequential[Execute in Order<br/>(Topological Sort)]
+        Sequential --> Execute
+        ParallelExec --> Execute[Execute Each Tool Call]
+
+        Execute --> Monitor{Monitor<br/>Execution}
+        Monitor -->|Running| Track[Track Progress<br/>& Update Metrics]
+        Monitor -->|Timeout| Timeout[⚠️ TimeoutError<br/>& Continue]
+        Monitor -->|Error| Error4[⚠️ ToolExecutionError<br/>& Collect Results]
+
+        Track --> Monitor
+        Timeout --> Collect
+        Error4 --> Collect
+    end
+
+    subgraph Processing["Processing Phase"]
+        Collect[Collect Results] --> Validate1{All<br/>Successful?}
+        Validate1 -->|No| Retry{Retry<br/>Possible?}
+        Retry -->|Yes| RetryExec[Retry Failed Calls<br/>(Exponential Backoff)]
+        Retry -->|No| HandleError
+        RetryExec --> Execute
+
+        Validate1 -->|Yes| Format[Format Outputs<br/>& Sanitize Results]
+        HandleError[Handle Partial Failure] --> Format
+        Format --> Cache
+    end
+
+    subgraph Completion["Completion Phase"]
+        Cache[Cache Results<br/>(If Enabled)] --> Track1[Update Tool<br/>Sequence Tracker]
+        Track1 --> Emit[Emit Events:<br/>ToolExecuted,<br/>ToolFailed]
+        Emit --> Return([✅ Return Tool Results<br/>to LLM])
+    end
+
+    Error1 --> End([End])
+    Error2 --> End
+    Error3 --> End
+    Return --> End
+
+    style Validation fill:#ffebee,stroke:#c62828,stroke-width:2px
+    style Preparation fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style Execution fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Processing fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Completion fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+
+    linkStyle default stroke:#37474f,stroke-width:2px

@@ -1,0 +1,68 @@
+graph TB
+    subgraph EntryPoints["Entry Points (pyproject.toml)"]
+        VerticalEntry["victor.verticals<br/>(External Verticals)"]
+        CapabilityEntry["victor.capabilities<br/>(External Capabilities)"]
+        ToolEntry["victor.tools<br/>(External Tools)"]
+    end
+
+    subgraph Verticals["Vertical System"]
+        VerticalBase[VerticalBase<br/>Abstract Class]
+        CodingVertical[CodingVertical]
+        DevOpsVertical[DevOpsVertical]
+        RAGVertical[RAGVertical]
+        DataVertical[DataAnalysisVertical]
+        ResearchVertical[ResearchVertical]
+        CustomVertical[CustomVertical<br/>(User-Defined)]
+    end
+
+    subgraph Capabilities["Capability System"]
+        CapabilityBase[CapabilityBase<br/>Abstract Class]
+        CodeGeneration[CodeGenerationCapability]
+        CodeRefactor[CodeRefactoringCapability]
+        Testing[TestingCapability]
+        CustomCapability[CustomCapability<br/>(User-Defined)]
+    end
+
+    subgraph Tools["Tool System"]
+        BaseTool[BaseTool<br/>Abstract Class]
+        FileTools[FileOperationTool]
+        GitTools[GitTool]
+        WebTools[WebSearchTool]
+        CustomTool[CustomTool<br/>(User-Defined)]
+    end
+
+    subgraph Registries["Registries"]
+        VerticalReg[VerticalRegistry]
+        CapabilityReg[CapabilityRegistry]
+        ToolReg[ToolRegistry]
+    end
+
+    subgraph Integration["Integration Points"]
+        StepHandlers[StepHandler System<br/>(Vertical Integration)]
+        ProviderRegistry[ProviderRegistry<br/>(21 Providers)]
+        EventBus[EventBus<br/>(Extension Events)]
+    end
+
+    EntryPoints --> Registries
+    VerticalBase --> Verticals
+    CapabilityBase --> Capabilities
+    BaseTool --> Tools
+
+    Verticals --> VerticalReg
+    Capabilities --> CapabilityReg
+    Tools --> ToolReg
+
+    Registries --> Integration
+    Integration --> StepHandlers
+
+    StepHandlers -.->|Extends| Verticals
+    ProviderRegistry -.->|Supports| Tools
+
+    style EntryPoints fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Verticals fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style Capabilities fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Tools fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    style Registries fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    style Integration fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+
+    linkStyle default stroke:#455a64,stroke-width:2px

@@ -1,0 +1,69 @@
+flowchart TB
+    Start([👨‍💻 New Contributor<br/>Ready to Help]) --> Step1
+
+    subgraph Setup["Step 1: Setup (15 min)"]
+        Step1[Fork & Clone Repository]
+        Step1 --> Install[Install Dependencies<br/>pip install -e .[dev]]
+        Install --> Configure[Configure Pre-commit Hooks<br/>pre-commit install]
+        Configure --> Verify[make test<br/>Verify All Tests Pass]
+    end
+
+    subgraph Choose["Step 2: Choose Contribution Type"]
+        Verify --> Choice{What Type of<br/>Contribution?}
+        Choice -->|Bug Fix| Bug[Fix Bug]
+        Choice -->|Feature| Feature[Add Feature]
+        Choice -->|Docs| Docs[Improve Docs]
+        Choice -->|Test| Test[Add Tests]
+        Choice -->|Refactor| Refactor[Refactor Code]
+    end
+
+    subgraph Development["Step 3: Development"]
+        Bug --> Branch[Create Feature Branch<br/>git checkout -b feature/xyz]
+        Feature --> Branch
+        Docs --> Branch
+        Test --> Branch
+        Refactor --> Branch
+
+        Branch --> Code[Write Code & Tests]
+        Code --> Lint[make lint<br/>Run Linters]
+        Lint --> TestLocal[make test<br/>Run All Tests]
+    end
+
+    subgraph Validation["Step 4: Validation"]
+        TestLocal --> Quality{Quality Checks}
+        Quality -->|Lint Error| FixLint[Fix Linting Issues]
+        Quality -->|Test Failure| FixTest[Fix Test Failures]
+        Quality -->|All Pass| Ready
+
+        FixLint --> Code
+        FixTest --> Code
+    end
+
+    subgraph Submit["Step 5: Submit PR"]
+        Ready[Commit Changes<br/>git commit -m 'feat: add X'] --> Push[Push to Fork<br/>git push origin feature/xyz]
+        Push --> CreatePR[Create Pull Request<br/>On GitHub]
+        CreatePR --> Fill[Fill PR Template<br/>- Description<br/>- Testing<br/>- Checklist]
+    end
+
+    subgraph Review["Step 6: Review & Merge"]
+        Fill --> CI[CI/CD Checks<br/>- Tests<br/>- Lint<br/>- Security Scan]
+        CI --> Checks{All Checks<br/>Pass?}
+        Checks -->|No| FixPR[Address Feedback<br/>& Update PR]
+        Checks -->|Yes| Review[Code Review<br/>by Maintainers]
+        Review --> Approved{Approved?}
+        Approved -->|No| FixPR
+        Approved -->|Yes| Merge[Merge PR<br/>& Delete Branch]
+        FixPR --> CI
+    end
+
+    Merge --> Celebrate([🎉 Contribution<br/>Merged!])
+
+    style Setup fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Choose fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style Development fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Validation fill:#ffebee,stroke:#c62828,stroke-width:2px
+    style Submit fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    style Review fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    style Celebrate fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px
+
+    linkStyle default stroke:#455a64,stroke-width:2px

@@ -1,0 +1,57 @@
+flowchart LR
+    Start([👤 New User<br/>Discovers Victor]) --> Step1
+
+    subgraph Install["Step 1: Installation (5 min)"]
+        Step1[Choose Installation Method]
+        Step1 --> Choice1{OS?}
+        Choice1 -->|macOS/Linux| Pip[pip install victor-ai]
+        Choice1 -->|Windows| PipW[pip install victor-ai]
+        Choice1 -->|Docker| Docker[docker pull victorai/victor]
+        Pip --> Validate
+        PipW --> Validate
+        Docker --> Validate
+        Validate[victor --version]
+    end
+
+    subgraph Configure["Step 2: Configuration (2 min)"]
+        Validate --> API[Set API Key<br/>export ANTHROPIC_API_KEY]
+        API --> Provider{Choose Provider}
+        Provider -->|Default| Anthropic[✅ Anthropic Claude]
+        Provider -->|Optional| Other[OpenAI, Google, Ollama, etc.]
+        Anthropic --> Verify
+        Other --> Verify
+        Verify[victor chat --provider <name>]
+    end
+
+    subgraph FirstRun["Step 3: First Run (3 min)"]
+        Verify --> Start1[victor chat]
+        Start1 --> Greet[Greeting Message<br/>Hello! How can I help you today?]
+        Greet --> Query[Ask First Question<br/>What can you do?]
+        Query --> Learn[Explore Capabilities<br/>- Code generation<br/>- Refactoring<br/>- Testing<br/>- And more!]
+    end
+
+    subgraph Basics["Step 4: Learn Basics (10 min)"]
+        Learn --> Read[Read Quick Start Guide]
+        Read --> Try1[Try Basic Commands<br/>- File operations<br/>- Git commands<br/>- Web search]
+        Try1 --> Practice[Practice with<br/>Simple Tasks]
+    end
+
+    subgraph NextSteps["Step 5: Next Steps"]
+        Practice --> Explore{What's Next?}
+        Explore -->|Daily Use| Daily[Read User Guide<br/>Try Workflows<br/>Customize Profiles]
+        Explore -->|Development| Dev[Read Contributing Guide<br/>Set Up Dev Environment<br/>Write Extensions]
+        Explore -->|Operations| Ops[Read Operations Guide<br/>Deploy Victor<br/>Configure Monitoring]
+    end
+
+    Daily --> Complete([✅ Ready for<br/>Daily Use])
+    Dev --> Complete
+    Ops --> Complete
+
+    style Install fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Configure fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style FirstRun fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Basics fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    style NextSteps fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    style Complete fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px
+
+    linkStyle default stroke:#455a64,stroke-width:2px
