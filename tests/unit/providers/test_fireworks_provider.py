@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
+from victor.core.errors import ProviderError, ProviderTimeoutError
+from victor.providers.base import Message
 from victor.providers.fireworks_provider import FireworksProvider, FIREWORKS_MODELS
 
 
@@ -376,9 +378,6 @@ class TestFireworksProviderChat:
         ) as mock_exec:
             mock_exec.side_effect = httpx.TimeoutException("Timeout")
 
-from victor.core.errors import ProviderTimeoutError
-from victor.providers.base import Message
-
             with pytest.raises(ProviderTimeoutError) as exc_info:
                 await provider.chat(
                     messages=[Message(role="user", content="Hello")],
@@ -402,9 +401,6 @@ from victor.providers.base import Message
             mock_exec.side_effect = httpx.HTTPStatusError(
                 "429", request=MagicMock(), response=mock_response
             )
-
-from victor.core.errors import ProviderError
-from victor.providers.base import Message
 
             with pytest.raises(ProviderError) as exc_info:
                 await provider.chat(

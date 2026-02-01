@@ -28,12 +28,14 @@ from victor.observability.pipeline import (
     PipelineManager,
     PipelinePlatform,
 )
-from victor.tools.base import (
+from victor.tools.enums import (
     AccessMode,
-    BaseTool,
     CostTier,
     DangerLevel,
     Priority,
+)
+from victor.tools.base import (
+    BaseTool,
     ToolMetadata,
     ToolResult,
 )

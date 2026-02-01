@@ -1782,9 +1782,7 @@ async def graph(
                 module_name_result: str | None = r.get("module")
                 if not module_name_result or _skip_path(module_name_result):
                     continue
-                _in_edges = sum(
-                    incoming_modules.get(module_name_result, {}).values() or [0]
-                )
+                _in_edges = sum(incoming_modules.get(module_name_result, {}).values() or [0])
                 out_edges = sum(outgoing_modules.get(module_name_result, {}).values() or [0])
                 # Merge aggregated counts with aggregate totals
                 edge_counts = module_edge_counts_2_a.get(module_name_result, {}).copy()
@@ -1887,9 +1885,7 @@ async def graph(
                 module_name_result_b: str | None = r.get("module")
                 if not module_name_result_b or _skip_path(module_name_result_b):
                     continue
-                _in_edges = sum(
-                    incoming_modules_b.get(module_name_result_b, {}).values() or [0]
-                )
+                _in_edges = sum(incoming_modules_b.get(module_name_result_b, {}).values() or [0])
                 out_edges = sum(outgoing_modules_b.get(module_name_result_b, {}).values() or [0])
                 edge_counts = module_edge_counts_2_b.get(module_name_result_b, {}).copy()
                 edge_counts["imports"] = out_edges

@@ -23,7 +23,6 @@ These tests verify:
 """
 
 
-
 class TestPromptBuilderTemplateExists:
     """Tests for PromptBuilderTemplate module existence."""
 

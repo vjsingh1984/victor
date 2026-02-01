@@ -3,7 +3,6 @@
 Tests the vertical templates implementing the Template Method pattern.
 """
 
-
 import pytest
 
 from victor.core.verticals import (

@@ -7,6 +7,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
+from victor.core.errors import ProviderError, ProviderTimeoutError
+from victor.providers.base import Message
+
+import pytest
+
 from victor.providers.huggingface_provider import HuggingFaceProvider, HUGGINGFACE_MODELS
 
 
@@ -313,9 +318,6 @@ class TestHuggingFaceProviderChat:
                 "503", request=MagicMock(), response=mock_response
             )
 
-from victor.core.errors import ProviderError
-from victor.providers.base import Message
-
             with pytest.raises(ProviderError) as exc_info:
                 await provider.chat(
                     messages=[Message(role="user", content="Hello")],
@@ -333,9 +335,6 @@ from victor.providers.base import Message
             provider, "_execute_with_circuit_breaker", new_callable=AsyncMock
         ) as mock_exec:
             mock_exec.side_effect = httpx.TimeoutException("Timeout")
-
-from victor.core.errors import ProviderTimeoutError
-from victor.providers.base import Message
 
             with pytest.raises(ProviderTimeoutError):
                 await provider.chat(

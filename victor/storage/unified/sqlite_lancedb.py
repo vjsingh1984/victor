@@ -94,7 +94,6 @@ class SqliteLanceDBStore:
         self.embedding_model = embedding_model
         self._extra_config = kwargs
 
-
         self._graph_store: Optional[GraphStoreProtocol] = None
         self._vector_store: Optional[Any] = None
         self._vector_table: Optional[Any] = None

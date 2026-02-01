@@ -29,12 +29,14 @@ from victor.iac import (
     IaCSeverity,
     ScanPolicy,
 )
-from victor.tools.base import (
+from victor.tools.enums import (
     AccessMode,
-    BaseTool,
     CostTier,
     DangerLevel,
     Priority,
+)
+from victor.tools.base import (
+    BaseTool,
     ToolMetadata,
     ToolResult,
 )
@@ -290,7 +292,7 @@ class IaCScannerTool(BaseTool):
 
         return "\n".join(lines)
 
-    def _format_scan_result(self, result: ScanResult) -> str:
+    def _format_scan_result(self, result: IaCScanResult) -> str:
         """Format full scan result."""
         lines = ["**IaC Security Scan Results**", ""]
 

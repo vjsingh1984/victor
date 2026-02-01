@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from victor.tools.base import CostTier
+from victor.tools.enums import CostTier
 
 
 @dataclass

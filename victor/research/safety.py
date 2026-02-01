@@ -4,7 +4,6 @@ This module delegates to the framework's safety patterns (victor.security.safety
 for source credibility and content warnings, extending with research-specific patterns.
 """
 
-
 from victor.core.verticals.protocols import SafetyExtensionProtocol
 from victor.core.security.patterns.types import SafetyPattern
 

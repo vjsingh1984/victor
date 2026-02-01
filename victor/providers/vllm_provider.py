@@ -48,12 +48,12 @@ import httpx
 
 from victor.core.errors import (
     ProviderError,
+    ProviderConnectionError,
 )
 from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderConnectionError,
     StreamChunk,
     ToolDefinition,
 )

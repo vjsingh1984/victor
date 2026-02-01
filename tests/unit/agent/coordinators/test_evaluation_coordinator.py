@@ -1058,7 +1058,6 @@ class TestEvaluationCoordinatorFlushAnalytics:
             enable_event_publishing=False,
         )
 
-
         results = await coordinator.flush_analytics()
 
         # Should complete quickly (< 1 second)

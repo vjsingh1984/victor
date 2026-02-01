@@ -1014,9 +1014,7 @@ class ContinuationStrategy:
         )
 
         # Budget/iteration thresholds (reserved for future use)
-        _budget_threshold = (
-            tool_budget // 4 if requires_continuation_support else tool_budget // 2
-        )
+        _budget_threshold = tool_budget // 4 if requires_continuation_support else tool_budget // 2
         max_iterations = unified_tracker_config.get("max_total_iterations", 50)
         _iteration_threshold = (
             max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2

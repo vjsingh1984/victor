@@ -23,7 +23,6 @@ from __future__ import annotations
 from typing import Any, Optional, Protocol, runtime_checkable
 
 
-
 # Test protocols
 @runtime_checkable
 class TestProtocol(Protocol):

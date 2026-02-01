@@ -25,7 +25,6 @@ The facade pattern provides:
 """
 
 
-
 class TestResilienceFacade:
     """Tests for resilience facade re-exports."""
 

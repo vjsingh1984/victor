@@ -28,7 +28,6 @@ Tests each team formation type with real production workflows:
 from __future__ import annotations
 
 
-
 from victor.workflows import load_workflow_from_file
 from victor.workflows.definition import TeamNodeWorkflow
 from victor.workflows.unified_compiler import UnifiedWorkflowCompiler

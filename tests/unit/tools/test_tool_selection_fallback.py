@@ -5,7 +5,6 @@ Tests verify that tool selection provides appropriate fallback behavior when
 semantic selection or keyword matching returns no results.
 """
 
-
 import pytest
 
 from victor.agent.orchestrator import AgentOrchestrator

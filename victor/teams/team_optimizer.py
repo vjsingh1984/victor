@@ -754,7 +754,6 @@ class TeamOptimizer:
         """
         import random
 
-
         # Random mutation type
         mutation_type = random.choice(
             ["add_member", "remove_member", "change_formation", "change_budget"]

@@ -110,9 +110,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
             self._schema_cache[True] = None
             self._schema_cache[False] = None
 
-    def _wrap_hook(
-        self, hook: Hook | Callable, critical: bool = False, name: str = ""
-    ) -> Hook:
+    def _wrap_hook(self, hook: Hook | Callable, critical: bool = False, name: str = "") -> Hook:
         """Wrap a callable into a Hook object if needed."""
         if isinstance(hook, Hook):
             return hook

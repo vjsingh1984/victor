@@ -23,7 +23,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 
-
 class TestRegistryProtocols:
     """Tests for registry service protocols."""
 

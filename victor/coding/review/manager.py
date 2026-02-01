@@ -407,7 +407,12 @@ class ReviewManager:
         threshold: ReviewSeverity,
     ) -> bool:
         """Check if severity meets threshold."""
-        order = [ReviewSeverity.HINT, ReviewSeverity.INFO, ReviewSeverity.WARNING, ReviewSeverity.ERROR]
+        order = [
+            ReviewSeverity.HINT,
+            ReviewSeverity.INFO,
+            ReviewSeverity.WARNING,
+            ReviewSeverity.ERROR,
+        ]
         return order.index(severity) >= order.index(threshold)
 
     def _severity_icon(self, severity: ReviewSeverity) -> str:

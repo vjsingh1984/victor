@@ -409,7 +409,9 @@ class TestReviewResult:
             Path("test.py"),
             findings=[
                 ReviewFinding("S1", "Style", ReviewSeverity.INFO, ReviewCategory.STYLE, loc),
-                ReviewFinding("SEC1", "Security", ReviewSeverity.ERROR, ReviewCategory.SECURITY, loc),
+                ReviewFinding(
+                    "SEC1", "Security", ReviewSeverity.ERROR, ReviewCategory.SECURITY, loc
+                ),
             ],
         )
         result = ReviewResult(file_reviews=[review])

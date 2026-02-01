@@ -30,8 +30,8 @@ from victor.providers.vllm_provider import (
 from victor.providers.base import (
     Message,
     ToolDefinition,
-    ProviderConnectionError,
 )
+from victor.core.errors import ProviderConnectionError
 
 
 # =============================================================================

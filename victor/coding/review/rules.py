@@ -244,7 +244,9 @@ DEFAULT_RULESETS: dict[str, ReviewRuleSet] = {
     "standard": ReviewRuleSet(
         name="standard",
         description="Standard ruleset for most projects",
-        rules=[r for r in DEFAULT_RULES if r.severity in (ReviewSeverity.ERROR, ReviewSeverity.WARNING)],
+        rules=[
+            r for r in DEFAULT_RULES if r.severity in (ReviewSeverity.ERROR, ReviewSeverity.WARNING)
+        ],
     ),
     "strict": ReviewRuleSet(
         name="strict",

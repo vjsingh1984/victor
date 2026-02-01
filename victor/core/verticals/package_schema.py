@@ -15,7 +15,6 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator
 
 
-
 class AuthorInfo(BaseModel):
     """Author information for a vertical package."""
 

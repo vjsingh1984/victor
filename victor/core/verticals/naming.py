@@ -21,7 +21,6 @@ accept legacy names while keeping canonical identifiers consistent.
 from __future__ import annotations
 
 
-
 _VERTICAL_NAME_ALIASES: dict[str, str] = {
     "dataanalysis": "data_analysis",
 }

@@ -22,7 +22,7 @@ from victor.coding.lsp.config import (
     get_server_for_file,
     get_language_id,
 )
-from victor.coding.lsp.client import (
+from victor.protocols.lsp_types import (
     Position,
     Range,
     Location,

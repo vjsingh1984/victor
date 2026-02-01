@@ -4,7 +4,6 @@ import os
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from victor.providers.ollama_provider import OllamaProvider
-from victor.core.errors import ProviderError, ProviderTimeoutError
 from victor.providers.base import Message, ToolDefinition
 
 

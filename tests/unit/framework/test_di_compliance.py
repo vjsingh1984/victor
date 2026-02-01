@@ -22,7 +22,6 @@ import ast
 import inspect
 
 
-
 class TestDICompliance:
     """Test dependency injection compliance in framework modules."""
 

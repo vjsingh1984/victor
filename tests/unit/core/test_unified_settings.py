@@ -8,7 +8,6 @@ Tests cover:
 - Integration with DI container
 """
 
-
 import pytest
 import yaml
 

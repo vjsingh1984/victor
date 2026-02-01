@@ -15,11 +15,15 @@
 """Tests for providers registry and base provider module."""
 
 import pytest
+from victor.core.errors import ProviderError, ProviderTimeoutError
+from victor.providers.base import Message
+
 
 from victor.core.errors import (
     ProviderError,
     ProviderTimeoutError,
     ProviderRateLimitError,
+    ProviderNotFoundError,
 )
 from victor.providers.base import (
     Message,
@@ -42,8 +46,6 @@ class TestProviderRegistry:
 
     def test_get_provider_ollama(self):
         """Test getting Ollama provider class."""
-from victor.core.errors import ProviderNotFoundError
-
         # Register ollama if not already registered
         try:
             from victor.providers.ollama_provider import OllamaProvider
@@ -61,8 +63,6 @@ from victor.core.errors import ProviderNotFoundError
 
     def test_get_provider_unknown(self):
         """Test getting unknown provider raises error."""
-from victor.core.errors import ProviderNotFoundError
-
         with pytest.raises(ProviderNotFoundError):
             ProviderRegistry.get("unknown_provider_xyz_12345")
 

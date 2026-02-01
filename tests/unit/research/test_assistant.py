@@ -27,7 +27,6 @@ Tests cover:
 from __future__ import annotations
 
 
-
 from victor.core.verticals.base import StageDefinition
 from victor.research.assistant import ResearchAssistant
 from victor.tools.tool_names import ToolNames

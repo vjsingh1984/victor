@@ -15,7 +15,6 @@
 """Integration tests for DIP-compliant vertical integration."""
 
 
-
 from victor.core.verticals.mutable_context import MutableVerticalContext
 
 

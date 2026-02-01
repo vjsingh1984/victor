@@ -716,9 +716,7 @@ def _ensure_vertical_activated(
             extensions = loader.get_extensions()
             if extensions:
 
-                def make_ext_factory(
-                    c: ServiceContainer, ext: Any = extensions
-                ) -> Any:
+                def make_ext_factory(c: ServiceContainer, ext: Any = extensions) -> Any:
                     return ext
 
                 container.register_or_replace(

@@ -935,7 +935,6 @@ class IndexedSymbol(BaseModel):
     composition: list[tuple[str, str]] = Field(default_factory=list)  # (owner, member) for has-a
 
 
-
 class FileMetadata(BaseModel):
     """Metadata about a source file."""
 
@@ -1830,7 +1829,9 @@ class CodebaseIndex:
     # Lines 866-1197 removed on 2025-12-11 during plugin architecture refactoring.
     # ========================================================================
 
-    def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> list[IndexedSymbol]:
+    def _extract_symbols_with_tree_sitter(
+        self, file_path: Path, language: str
+    ) -> list[IndexedSymbol]:
         """Extract lightweight symbol declarations for non-Python languages via tree-sitter."""
         query_defs = SYMBOL_QUERIES.get(language)
         if not query_defs:

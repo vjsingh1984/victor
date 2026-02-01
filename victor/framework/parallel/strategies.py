@@ -52,7 +52,6 @@ from typing import (
 )
 
 
-
 __all__ = [
     # Enums
     "JoinStrategy",

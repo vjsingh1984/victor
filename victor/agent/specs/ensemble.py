@@ -296,9 +296,7 @@ class Pipeline(Ensemble):
         if agent.system_prompt:
             prompt_parts.insert(0, agent.system_prompt)
 
-        _prompt = "\n\n".join(
-            prompt_parts
-        )
+        _prompt = "\n\n".join(prompt_parts)
 
         # NOTE: Ensemble requires orchestrator integration for parallel agent execution
         # Deferred: Ensemble feature pending multi-agent coordination refactor

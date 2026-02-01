@@ -270,9 +270,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         return str(base_url)
 
     @classmethod
-    async def _select_base_url_async(
-        cls, base_url: str | list[str] | None, timeout: int
-    ) -> str:
+    async def _select_base_url_async(cls, base_url: str | list[str] | None, timeout: int) -> str:
         """Async version of _select_base_url for non-blocking endpoint discovery.
 
         Priority:

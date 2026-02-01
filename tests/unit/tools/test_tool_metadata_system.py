@@ -35,9 +35,9 @@ from victor.tools.base import (
     BaseTool,
     ToolMetadata,
     ToolMetadataProvider,
-    ToolMetadataRegistry,
     ToolResult,
 )
+from victor.tools.metadata_registry import ToolMetadataRegistry
 from victor.tools.decorators import tool
 
 

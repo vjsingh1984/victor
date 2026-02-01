@@ -15,7 +15,6 @@ import time
 import pytest
 
 
-
 @pytest.mark.performance
 @pytest.mark.benchmark
 class TestWorkflowChatPerformance:

@@ -45,7 +45,6 @@ Usage:
 from __future__ import annotations
 
 
-
 class Tables:
     """Centralized table name constants.
 

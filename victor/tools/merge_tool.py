@@ -26,12 +26,14 @@ from victor.processing.merge import (
     MergeManager,
     ResolutionStrategy,
 )
-from victor.tools.base import (
+from victor.tools.enums import (
     AccessMode,
-    BaseTool,
     CostTier,
     DangerLevel,
     Priority,
+)
+from victor.tools.base import (
+    BaseTool,
     ToolMetadata,
     ToolResult,
 )

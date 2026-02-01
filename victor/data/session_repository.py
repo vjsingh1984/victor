@@ -33,7 +33,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 
-
 class SQLiteSessionRepository:
     """SQLite implementation of session repository.
 
