@@ -30,7 +30,7 @@ from victor.coding.refactor.protocol import (
     RefactorSuggestion,
     RefactorType,
     SourceLocation,
-    Symbol,
+    RefactorSymbol,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class CodeAnalyzer(Protocol):
         file_path: Path,
         line: int,
         column: int,
-    ) -> Optional[Symbol]:
+    ) -> Optional[RefactorSymbol]:
         """Find symbol at a specific location."""
         ...
 
@@ -63,7 +63,7 @@ class CodeAnalyzer(Protocol):
         self,
         source: str,
         file_path: Path,
-    ) -> list[Symbol]:
+    ) -> list[RefactorSymbol]:
         """Find all symbols in source code."""
         ...
 
@@ -98,7 +98,7 @@ class BaseCodeAnalyzer(ABC):
         file_path: Path,
         line: int,
         column: int,
-    ) -> Optional[Symbol]:
+    ) -> Optional[RefactorSymbol]:
         """Find symbol at a specific location."""
         ...
 
@@ -107,7 +107,7 @@ class BaseCodeAnalyzer(ABC):
         self,
         source: str,
         file_path: Path,
-    ) -> list[Symbol]:
+    ) -> list[RefactorSymbol]:
         """Find all symbols in source code."""
         ...
 
@@ -151,7 +151,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
         file_path: Path,
         line: int,
         column: int,
-    ) -> Optional[Symbol]:
+    ) -> Optional[RefactorSymbol]:
         """Find symbol at a specific location in Python code."""
         tree = self.parse(source, file_path)
         if tree is None:
@@ -174,7 +174,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
         self,
         source: str,
         file_path: Path,
-    ) -> list[Symbol]:
+    ) -> list[RefactorSymbol]:
         """Find all symbols in Python source."""
         tree = self.parse(source, file_path)
         if tree is None:
@@ -189,7 +189,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
         node: ast.AST,
         file_path: Path,
         scope: str,
-        symbols: list[Symbol],
+        symbols: list[RefactorSymbol],
     ) -> None:
         """Recursively collect symbols from AST."""
         if isinstance(node, ast.FunctionDef):
@@ -221,7 +221,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
             for alias in node.names:
                 name = alias.asname or alias.name
                 symbols.append(
-                    Symbol(
+                    RefactorSymbol(
                         name=name,
                         kind="import",
                         location=SourceLocation(
@@ -239,7 +239,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
             for alias in node.names:
                 name = alias.asname or alias.name
                 symbols.append(
-                    Symbol(
+                    RefactorSymbol(
                         name=name,
                         kind="import",
                         location=SourceLocation(
@@ -263,8 +263,8 @@ class PythonAnalyzer(BaseCodeAnalyzer):
         file_path: Path,
         scope: str,
         is_async: bool = False,
-    ) -> Symbol:
-        """Convert function node to Symbol."""
+    ) -> RefactorSymbol:
+        """Convert function node to RefactorSymbol."""
         modifiers = []
         if is_async or isinstance(node, ast.AsyncFunctionDef):
             modifiers.append("async")
@@ -287,7 +287,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
         # Get docstring
         docstring = ast.get_docstring(node)
 
-        return Symbol(
+        return RefactorSymbol(
             name=node.name,
             kind="function" if not scope or "." not in scope else "method",
             location=SourceLocation(
@@ -308,8 +308,8 @@ class PythonAnalyzer(BaseCodeAnalyzer):
         node: ast.ClassDef,
         file_path: Path,
         scope: str,
-    ) -> Symbol:
-        """Convert class node to Symbol."""
+    ) -> RefactorSymbol:
+        """Convert class node to RefactorSymbol."""
         docstring = ast.get_docstring(node)
 
         # Get base classes
@@ -320,7 +320,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
             elif isinstance(base, ast.Attribute):
                 bases.append(ast.unparse(base))
 
-        return Symbol(
+        return RefactorSymbol(
             name=node.name,
             kind="class",
             location=SourceLocation(
@@ -340,7 +340,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
         node: ast.Assign | ast.AnnAssign,
         file_path: Path,
         scope: str,
-    ) -> list[Symbol]:
+    ) -> list[RefactorSymbol]:
         """Convert assignment to Symbols."""
         symbols: list[RefactorSymbol] = []
 
@@ -348,7 +348,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
             if isinstance(node.target, ast.Name):
                 type_ann = ast.unparse(node.annotation) if node.annotation else None
                 symbols.append(
-                    Symbol(
+                    RefactorSymbol(
                         name=node.target.id,
                         kind="variable",
                         location=SourceLocation(
@@ -367,7 +367,7 @@ class PythonAnalyzer(BaseCodeAnalyzer):
             for target in node.targets:
                 if isinstance(target, ast.Name):
                     symbols.append(
-                        Symbol(
+                        RefactorSymbol(
                             name=target.id,
                             kind="variable",
                             location=SourceLocation(
@@ -387,14 +387,14 @@ class PythonAnalyzer(BaseCodeAnalyzer):
         self,
         node: ast.AST,
         file_path: Path,
-    ) -> Optional[Symbol]:
-        """Convert an AST node to a Symbol."""
+    ) -> Optional[RefactorSymbol]:
+        """Convert an AST node to a RefactorSymbol."""
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             return self._function_to_symbol(node, file_path, "")
         elif isinstance(node, ast.ClassDef):
             return self._class_to_symbol(node, file_path, "")
         elif isinstance(node, ast.Name):
-            return Symbol(
+            return RefactorSymbol(
                 name=node.id,
                 kind="reference",
                 location=SourceLocation(

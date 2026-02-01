@@ -29,7 +29,7 @@ from victor.coding.refactor.protocol import (
     RefactorSuggestion,
     RefactorType,
     SourceLocation,
-    Symbol,
+    RefactorSymbol,
 )
 
 
@@ -189,8 +189,8 @@ class TestSourceLocation:
 # =============================================================================
 
 
-class TestSymbol:
-    """Tests for Symbol dataclass."""
+class TestRefactorSymbol:
+    """Tests for RefactorSymbol dataclass."""
 
     @pytest.fixture
     def sample_location(self):
@@ -206,7 +206,7 @@ class TestSymbol:
     @pytest.fixture
     def sample_symbol(self, sample_location):
         """Create sample symbol."""
-        return Symbol(
+        return RefactorSymbol(
             name="my_function",
             kind="function",
             location=sample_location,
@@ -228,7 +228,7 @@ class TestSymbol:
 
     def test_qualified_name_without_scope(self, sample_location):
         """Test qualified name without scope."""
-        symbol = Symbol(name="global_func", kind="function", location=sample_location)
+        symbol = RefactorSymbol(name="global_func", kind="function", location=sample_location)
         assert symbol.qualified_name == "global_func"
 
     def test_modifiers(self, sample_symbol):
@@ -238,7 +238,7 @@ class TestSymbol:
 
     def test_references_default(self, sample_location):
         """Test references default to empty list."""
-        symbol = Symbol(name="test", kind="variable", location=sample_location)
+        symbol = RefactorSymbol(name="test", kind="variable", location=sample_location)
         assert symbol.references == []
 
 
