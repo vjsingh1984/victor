@@ -78,7 +78,7 @@ class TestBuiltinCategories:
         registry = get_category_registry()
         tools = registry.get_tools("git")
         assert "git" in tools
-        assert "pr" in tools  # git_status was removed, use 'pr' or 'commit_msg'
+        assert "git_status" in tools
 
     def test_is_builtin_category(self):
         """Should identify built-in categories."""
