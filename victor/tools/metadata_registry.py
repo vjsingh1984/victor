@@ -116,14 +116,8 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 from collections.abc import Callable, Iterator
 
-from victor.tools.base import (
-    AccessMode,
-    BaseTool,
-    CostTier,
-    DangerLevel,
-    ExecutionCategory,
-    Priority,
-)
+from victor.tools.base import BaseTool
+from victor.tools.enums import AccessMode, CostTier, DangerLevel, ExecutionCategory, Priority
 
 logger = logging.getLogger(__name__)
 
