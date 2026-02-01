@@ -54,7 +54,7 @@ def orchestrator_settings():
 @pytest.fixture
 def orchestrator(mock_provider, orchestrator_settings):
     """Create an orchestrator for testing."""
-    with patch("victor.agent.orchestrator.UsageLogger"):
+    with patch("victor.agent.orchestrator_imports.UsageLogger"):
         orchestrator = AgentOrchestrator(
             settings=orchestrator_settings,
             provider=mock_provider,
@@ -378,7 +378,7 @@ class TestToolCacheIntegration:
         orchestrator_settings.tool_cache_enabled = True
         orchestrator_settings.tool_cache_ttl = 300
 
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -605,7 +605,7 @@ class TestChatMethod:
 
         mock_provider.stream = mock_stream
 
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -639,7 +639,7 @@ class TestChatMethod:
 
         mock_provider.stream = mock_stream
 
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -673,7 +673,7 @@ class TestChatMethod:
 
         mock_provider.stream = mock_stream
 
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -741,7 +741,7 @@ class TestFromSettings:
         # Patch ProviderRegistry.create where it's imported in config_coordinator
         with patch("victor.providers.registry.ProviderRegistry.create") as mock_create:
             mock_create.return_value = mock_provider
-            with patch("victor.agent.orchestrator.UsageLogger"):
+            with patch("victor.agent.orchestrator_imports.UsageLogger"):
                 orch = await AgentOrchestrator.from_settings(
                     settings=orchestrator_settings, profile_name="default"
                 )
@@ -806,7 +806,7 @@ class TestToolConfiguration:
         """Test _load_tool_configurations with empty config."""
         orchestrator_settings.load_tool_config = MagicMock(return_value=None)
 
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -819,7 +819,7 @@ class TestToolConfiguration:
         """Test _load_tool_configurations handles exception (covers lines 950-951)."""
         orchestrator_settings.load_tool_config = MagicMock(side_effect=Exception("Config error"))
 
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             # Should not raise during init
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
@@ -902,7 +902,7 @@ class TestHandleToolCalls:
         self, mock_provider, orchestrator_settings
     ):
         """Test _handle_tool_calls with JSON string arguments (covers lines 1820-1827)."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -925,7 +925,7 @@ class TestHandleToolCalls:
     @pytest.mark.asyncio
     async def test_handle_tool_calls_none_arguments(self, mock_provider, orchestrator_settings):
         """Test _handle_tool_calls with None arguments returns error for missing required params."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -945,7 +945,7 @@ class TestHandleToolCalls:
         self, mock_provider, orchestrator_settings
     ):
         """Test _handle_tool_calls skips repeated failing calls (covers deduplication)."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -974,7 +974,7 @@ class TestHandleToolCalls:
     @pytest.mark.asyncio
     async def test_handle_tool_calls_success(self, mock_provider, orchestrator_settings):
         """Test _handle_tool_calls successful execution (covers lines 1912-1927)."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -999,7 +999,7 @@ class TestHandleToolCalls:
     @pytest.mark.asyncio
     async def test_handle_tool_calls_failure(self, mock_provider, orchestrator_settings):
         """Test _handle_tool_calls failed execution (covers pipeline failure tracking)."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1024,7 +1024,7 @@ class TestHandleToolCalls:
     @pytest.mark.asyncio
     async def test_handle_tool_calls_read_file_tracking(self, mock_provider, orchestrator_settings):
         """Test _handle_tool_calls tracks read_file paths (covers lines 1885-1886)."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1046,7 +1046,7 @@ class TestClassifyTaskKeywords:
 
     def test_action_task_create(self, mock_provider, orchestrator_settings):
         """Test detection of action task with 'create' keyword."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1059,7 +1059,7 @@ class TestClassifyTaskKeywords:
 
     def test_action_task_execute(self, mock_provider, orchestrator_settings):
         """Test detection of action task with execution keywords."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1072,7 +1072,7 @@ class TestClassifyTaskKeywords:
 
     def test_action_task_run(self, mock_provider, orchestrator_settings):
         """Test detection of action task with 'run' keyword."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1084,7 +1084,7 @@ class TestClassifyTaskKeywords:
 
     def test_analysis_task_analyze(self, mock_provider, orchestrator_settings):
         """Test detection of analysis task with 'analyze' keyword."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1096,7 +1096,7 @@ class TestClassifyTaskKeywords:
 
     def test_analysis_task_review(self, mock_provider, orchestrator_settings):
         """Test detection of analysis task with 'review' keyword."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1107,7 +1107,7 @@ class TestClassifyTaskKeywords:
 
     def test_analysis_task_question_pattern(self, mock_provider, orchestrator_settings):
         """Test detection of analysis task with question patterns."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1119,7 +1119,7 @@ class TestClassifyTaskKeywords:
 
     def test_default_task(self, mock_provider, orchestrator_settings):
         """Test default classification for generic messages."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1132,7 +1132,7 @@ class TestClassifyTaskKeywords:
 
     def test_position_based_precedence(self, mock_provider, orchestrator_settings):
         """Test that position-based priority determines task type when both present."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1155,7 +1155,7 @@ class TestClassifyTaskKeywords:
 
     def test_case_insensitive(self, mock_provider, orchestrator_settings):
         """Test that keyword detection is case insensitive."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1195,7 +1195,7 @@ class TestVerticalExtensionSupport:
             def get_applicable_tools(self):
                 return None
 
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1230,7 +1230,7 @@ class TestVerticalExtensionSupport:
             risk_level: str = "HIGH"
             category: str = "test"
 
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1269,7 +1269,7 @@ class TestVerticalExtensionSupport:
             def get_applicable_tools(self):
                 return None
 
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1560,7 +1560,7 @@ class TestRecoveryIntegration:
 
     def test_recovery_handler_initialization(self, mock_provider, orchestrator_settings):
         """Recovery handler is initialized when enabled."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1585,7 +1585,7 @@ class TestObservabilityIntegration:
 
     def test_observability_enabled_by_default(self, mock_provider, orchestrator_settings):
         """Observability is enabled by default."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1602,7 +1602,7 @@ class TestObservabilityIntegration:
             use_semantic_tool_selection=False,
             use_mcp_tools=False,
         )
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=settings,
                 provider=mock_provider,
@@ -1612,7 +1612,7 @@ class TestObservabilityIntegration:
 
     def test_on_tool_start_with_observability(self, mock_provider, orchestrator_settings):
         """Tool start emits observability event when enabled."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1627,7 +1627,7 @@ class TestObservabilityIntegration:
         """Tool complete emits observability event when enabled."""
         from victor.agent.tool_pipeline import ToolCallResult
 
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orch = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,
@@ -1956,7 +1956,7 @@ class TestSwitchProvider:
     @pytest.mark.asyncio
     async def test_switch_updates_provider_name(self, mock_provider, orchestrator_settings):
         """Successful switch updates provider_name."""
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orchestrator = AgentOrchestrator(
                 settings=orchestrator_settings,
                 provider=mock_provider,

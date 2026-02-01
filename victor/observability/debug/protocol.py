@@ -61,7 +61,6 @@ class DebugStopReason(Enum):
 
 
 # Backward compatibility alias
-StopReason = DebugStopReason
 
 
 @dataclass
@@ -214,7 +213,7 @@ class DebugSession:
     breakpoints: dict[str, list[Breakpoint]] = field(default_factory=dict)  # path -> breakpoints
     threads: list[Thread] = field(default_factory=list)
     current_thread_id: Optional[int] = None
-    stop_reason: Optional[StopReason] = None
+    stop_reason: Optional[DebugStopReason] = None
     exception_info: Optional[ExceptionInfo] = None
 
     # Capabilities (set by adapter)

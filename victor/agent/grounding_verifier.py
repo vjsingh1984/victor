@@ -849,7 +849,6 @@ class GroundingVerificationResult:
 
 
 # Backward compatibility alias
-VerificationResult = GroundingVerificationResult
 
 
 @dataclass
@@ -1154,7 +1153,7 @@ class GroundingVerifier:
         matches = self.SYMBOL_PATTERN.findall(response)
         return list(set(matches))
 
-    async def verify_file_paths(self, paths: list[str], result: VerificationResult) -> None:
+    async def verify_file_paths(self, paths: list[str], result: GroundingVerificationResult) -> None:
         """Verify file path references exist.
 
         Args:
@@ -1376,7 +1375,7 @@ class GroundingVerifier:
         self,
         snippets: list[dict[str, Any]],
         file_paths: list[str],
-        result: VerificationResult,
+        result: GroundingVerificationResult,
         is_code_generation: bool = False,
     ) -> None:
         """Verify code snippets match actual file content.
@@ -1550,7 +1549,7 @@ class GroundingVerifier:
         self,
         symbols: list[str],
         file_paths: list[str],
-        result: VerificationResult,
+        result: GroundingVerificationResult,
     ) -> None:
         """Verify symbol references exist in codebase.
 
@@ -1627,7 +1626,7 @@ class GroundingVerifier:
         self,
         response: str,
         context: Optional[dict[str, Any]] = None,
-    ) -> VerificationResult:
+    ) -> GroundingVerificationResult:
         """Verify a response for grounding.
 
         Args:
@@ -1635,9 +1634,9 @@ class GroundingVerifier:
             context: Optional context (e.g., which files were read)
 
         Returns:
-            VerificationResult with confidence and issues
+            GroundingVerificationResult with confidence and issues
         """
-        result = VerificationResult(
+        result = GroundingVerificationResult(
             is_grounded=True,
             confidence=1.0,
             metadata={"response_length": len(response)},

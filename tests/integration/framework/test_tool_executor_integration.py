@@ -41,7 +41,7 @@ def mock_provider():
 @pytest.fixture
 def orchestrator(settings, mock_provider):
     """Create orchestrator with mocked provider."""
-    with patch("victor.agent.orchestrator.UsageLogger"):
+    with patch("victor.agent.orchestrator_imports.UsageLogger"):
         orc = AgentOrchestrator(
             settings=settings,
             provider=mock_provider,
@@ -152,7 +152,7 @@ class TestToolExecutorCaching:
             tool_cache_enabled=True,
             tool_cache_allowlist=["read_file", "list_directory"],
         )
-        with patch("victor.agent.orchestrator.UsageLogger"):
+        with patch("victor.agent.orchestrator_imports.UsageLogger"):
             orc = AgentOrchestrator(
                 settings=settings,
                 provider=mock_provider,

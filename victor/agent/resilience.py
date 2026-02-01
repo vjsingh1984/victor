@@ -99,7 +99,7 @@ class CircuitStats:
 class MultiCircuitBreakerConfig:
     """Configuration for multi-circuit breaker.
 
-    This extends the canonical CircuitBreakerConfig with multi-circuit support.
+    This is the canonical circuit breaker configuration with multi-circuit support.
     Supports both `timeout_seconds` (canonical) and `recovery_timeout` (legacy).
 
     Attributes:
@@ -123,7 +123,6 @@ class MultiCircuitBreakerConfig:
 
 
 # Alias for backward compatibility
-CircuitBreakerConfig = MultiCircuitBreakerConfig
 
 
 class MultiCircuitBreaker:
@@ -139,13 +138,13 @@ class MultiCircuitBreaker:
     Supports multiple named circuits for different providers.
     """
 
-    def __init__(self, config: Optional[CircuitBreakerConfig] = None):
+    def __init__(self, config: Optional[MultiCircuitBreakerConfig] = None):
         """Initialize circuit breaker.
 
         Args:
             config: Circuit breaker configuration
         """
-        self.config = config or CircuitBreakerConfig()
+        self.config = config or MultiCircuitBreakerConfig()
         self._circuits: dict[str, CircuitStats] = defaultdict(CircuitStats)
         self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self._half_open_calls: dict[str, int] = defaultdict(int)

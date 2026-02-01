@@ -50,7 +50,7 @@ from victor.observability.debug.protocol import (
     Variable,
     Scope,
     Thread,
-    StopReason,
+    DebugStopReason,
 )
 from victor.observability.debug.adapter import (
     DebugAdapter,
@@ -68,7 +68,7 @@ __all__ = [
     "Variable",
     "Scope",
     "Thread",
-    "StopReason",
+    "DebugStopReason",
     # Adapter interface
     "DebugAdapter",
     "DebugAdapterCapabilities",
