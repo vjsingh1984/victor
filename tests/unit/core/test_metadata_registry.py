@@ -27,7 +27,7 @@ from victor.tools.metadata_registry import (
     ToolMetadataEntry,
     get_global_registry,
 )
-from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
+from victor.tools.enums import AccessMode, CostTier, DangerLevel, Priority
 
 
 from victor.tools.base import ExecutionCategory

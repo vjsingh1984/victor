@@ -1,0 +1,61 @@
+graph TB
+    subgraph Local["Local Deployment"]
+        LocalCLI[CLI/TUI<br/>pip install victor-ai]
+        LocalDocker[Docker<br/>docker run victor-ai]
+        LocalDev[Development<br/>pip install -e .[dev]]
+    end
+
+    subgraph Cloud["Cloud Deployment"]
+        subgraph AWS["AWS"]
+            Lambda[AWS Lambda<br/>Serverless]
+            ECS[Amazon ECS<br/>Container Service]
+            Bedrock[Bedrock<br/>Managed LLMs]
+        end
+
+        subgraph GCP["GCP"]
+            CloudRun[Cloud Run<br/>Serverless]
+            GKE[GKE<br/>Kubernetes]
+            Vertex[Vertex AI<br/>Managed LLMs]
+        end
+
+        subgraph Azure["Azure"]
+            Functions[Azure Functions<br/>Serverless]
+            AKS[AKS<br/>Kubernetes]
+            OpenAI[Azure OpenAI<br/>Managed LLMs]
+        end
+    end
+
+    subgraph Hybrid["Hybrid Deployment"]
+        subgraph Edge["Edge Computing"]
+            EdgeLocal[Local Processing<br/>Ollama, LMStudio]
+            EdgeCloud[Cloud Fallback<br/>When Local Fails]
+        end
+
+        subgraph MultiCloud["Multi-Cloud"]
+            Provider1[Provider 1<br/>e.g., Anthropic]
+            Provider2[Provider 2<br/>e.g., OpenAI]
+            Provider3[Provider 3<br/>e.g., Google]
+        end
+    end
+
+    subgraph Components["Shared Components"]
+        EventBus[EventBus<br/>Kafka, SQS, RabbitMQ]
+        VectorStore[Vector Store<br/>LanceDB, ChromaDB]
+        Cache[Cache Layer<br/>Redis, In-Memory]
+        Monitoring[Monitoring<br/>Prometheus, Grafana]
+    end
+
+    Local --> Components
+    Cloud --> Components
+    Hybrid --> Components
+
+    EdgeLocal -.->|Fallback| EdgeCloud
+    Provider1 -.->|Switch| Provider2
+    Provider2 -.->|Switch| Provider3
+
+    style Local fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Cloud fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style Hybrid fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Components fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+
+    linkStyle default stroke:#455a64,stroke-width:2px

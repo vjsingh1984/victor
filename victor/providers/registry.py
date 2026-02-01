@@ -17,7 +17,8 @@
 from typing import Any, Optional
 
 from victor.core.registry import BaseRegistry
-from victor.providers.base import BaseProvider, ProviderNotFoundError
+from victor.core.errors import ProviderNotFoundError
+from victor.providers.base import BaseProvider
 
 __all__ = ["ProviderRegistry", "ProviderNotFoundError"]
 

@@ -1,0 +1,50 @@
+sequenceDiagram
+    participant User as 👤 User
+    participant CLI as 🖥️ CLI/TUI
+    participant Orch as AgentOrchestrator
+    participant Chat as ChatCoordinator
+    participant Provider as ProviderCoordinator
+    participant Tool as ToolCoordinator
+    participant Context as ContextCoordinator
+    participant LLM as 🤖 LLM Provider
+
+    User->>CLI: victor chat "Help me refactor"
+    CLI->>Orch: chat(message, stream=False)
+
+    rect rgb(240, 248, 255)
+        Note over Orch,Context: Request Processing
+        Orch->>Chat: route_chat_request()
+        Chat->>Context: load_project_context()
+        Context-->>Chat: ProjectContext
+        Chat->>Prompt: build_system_prompt()
+        Prompt-->>Chat: SystemPrompt
+    end
+
+    rect rgb(255, 248, 220)
+        Note over Chat,LLM: LLM Interaction
+        Chat->>Provider: get_current_provider()
+        Provider-->>Chat: AnthropicProvider
+        Chat->>LLM: chat(messages, tools)
+
+        LLM-->>Chat: Response + tool_calls
+    end
+
+    rect rgb(240, 255, 240)
+        Note over Chat,Tool: Tool Execution
+        Chat->>Tool: execute_tools(tool_calls)
+        Tool->>Tool: validate_and_execute()
+        Tool-->>Chat: ToolCallResult[]
+    end
+
+    rect rgb(255, 240, 245)
+        Note over Chat,LLM: Response Processing
+        Chat->>LLM: chat(messages + tool_results)
+        LLM-->>Chat: Final Response
+        Chat->>Context: update_conversation_state()
+    end
+
+    Chat-->>Orch: response
+    Orch-->>CLI: response
+    CLI-->>User: ✅ Refactored code
+
+    Note over User,LLM: 💡 Provider switching preserves context<br/>through SessionCoordinator

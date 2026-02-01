@@ -1,0 +1,41 @@
+graph TB
+    subgraph Clients["Client Layer"]
+        CLI["CLI/TUI<br/>(victor, vic)"]
+        HTTP["HTTP API<br/>(IDE Integrations)"]
+        MCP["MCP Server<br/>(Language Servers)"]
+    end
+
+    subgraph AppLayer["Application Layer<br/>(Victor-Specific Logic)"]
+        ChatCoord["ChatCoordinator<br/>(Message handling)"]
+        ToolCoord["ToolCoordinator<br/>(Tool execution)"]
+        ContextCoord["ContextCoordinator<br/>(Context management)"]
+        ConfigCoord["ConfigCoordinator<br/>(Configuration)"]
+        PromptCoord["PromptCoordinator<br/>(Prompt building)"]
+        ProviderCoord["ProviderCoordinator<br/>(Provider switching)"]
+        SessionCoord["SessionCoordinator<br/>(Session state)"]
+        MetricsCoord["MetricsCoordinator<br/>(Telemetry)"]
+    end
+
+    subgraph FrameworkLayer["Framework Layer<br/>(Domain-Agnostic Infrastructure)"]
+        YAMLCoord["YAMLWorkflowCoordinator<br/>(YAML workflows)"]
+        GraphCoord["GraphExecutionCoordinator<br/>(StateGraph execution)"]
+        HITLCoord["HITLCoordinator<br/>(Human-in-the-loop)"]
+        CacheCoord["CacheCoordinator<br/>(Caching strategies)"]
+    end
+
+    subgraph CoreServices["Core Services"]
+        Container["ServiceContainer<br/>(DI: 55+ services)"]
+        EventBus["EventBus<br/>(5 backends)"]
+        Registry["ToolRegistry<br/>(55 tools)"]
+    end
+
+    Clients --> AppLayer
+    AppLayer --> FrameworkLayer
+    FrameworkLayer --> CoreServices
+
+    style AppLayer fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style FrameworkLayer fill:#fff4e1,stroke:#e65100,stroke-width:2px
+    style CoreServices fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    style Clients fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+
+    linkStyle 0,1,2,3,4,5,6,7,8 stroke:#1565c0,stroke-width:2px

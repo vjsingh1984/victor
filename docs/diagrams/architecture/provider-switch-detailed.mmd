@@ -1,0 +1,53 @@
+flowchart TB
+    Start([User Request<br/>switch_provider]) --> Init
+
+    subgraph Validation["Step 1: Validation"]
+        Init[Validate Provider] --> Check1{Is Valid<br/>Provider?}
+        Check1 -->|No| Error1[❌ Raise<br/>InvalidProviderError]
+        Check1 -->|Yes| Check2{Is Different<br/>from Current?}
+        Check2 -->|No| Error2[⚠️ Already Using<br/>This Provider]
+        Check2 -->|Yes| Save
+    end
+
+    subgraph ContextSave["Step 2: Context Preservation"]
+        Save[Save Current State] --> Capture[Capture:<br/>- Conversation History<br/>- Tool Results<br/>- Checkpoints<br/>- Session Metadata]
+        Capture --> Serialize[Serialize State]
+        Serialize --> Store[Store in<br/>SessionCoordinator]
+    end
+
+    subgraph ProviderSwitch["Step 3: Provider Switch"]
+        Store --> Create[Create New Provider<br/>Instance]
+        Create --> InitProvider[Initialize Provider<br/>- Load API Keys<br/>- Validate Access<br/>- Configure Options]
+        InitProvider --> Adapt{Tool Adapter<br/>Needed?}
+        Adapt -->|Yes| NewAdapter[Create Tool Adapter<br/>for New Provider]
+        Adapt -->|No| Update
+        NewAdapter --> Update
+    end
+
+    subgraph RestoreContext["Step 4: Context Restoration"]
+        Update[Update ProviderCoordinator] --> Load[Load Saved State]
+        Load --> Deserialize[Deserialize State]
+        Deserialize --> Merge[Merge Context<br/>with New Provider]
+        Merge --> Verify{Context<br/>Valid?}
+        Verify -->|No| Rollback[🔄 Rollback to<br/>Previous Provider]
+        Verify -->|Yes| Emit
+    end
+
+    subgraph Complete["Step 5: Completion"]
+        Emit[Emit Event:<br/>ProviderSwitched] --> Notify[Notify Coordinators:<br/>- ChatCoordinator<br/>- ToolCoordinator<br/>- ContextCoordinator]
+        Notify --> Cache[Update Tool Selection<br/>Cache]
+        Cache --> Success([✅ Provider Switched<br/>Context Preserved])
+    end
+
+    Error1 --> End([End])
+    Error2 --> End
+    Rollback --> End
+    Success --> End
+
+    style Validation fill:#ffebee,stroke:#c62828,stroke-width:2px
+    style ContextSave fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style ProviderSwitch fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style RestoreContext fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style Complete fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+
+    linkStyle default stroke:#37474f,stroke-width:2px

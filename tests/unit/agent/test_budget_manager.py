@@ -25,9 +25,9 @@ from victor.agent.protocols import (
     BudgetType,
     IBudgetManager,
 )
+from victor.agent.budget.tracker import BudgetState
 from victor.agent.budget_manager import (
     BudgetManager,
-    BudgetState,
     WRITE_TOOLS,
     is_write_tool,
 )

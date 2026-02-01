@@ -11,13 +11,8 @@ import pytest
 import json
 from unittest.mock import patch
 
-from victor.tools.base import (
-    BaseTool,
-    ToolResult,
-    ToolParameter,
-    CostTier,
-    Priority,
-)
+from victor.tools.base import BaseTool, ToolResult, ToolParameter
+from victor.tools.enums import CostTier, Priority
 from victor.tools.registry import ToolRegistry
 
 
