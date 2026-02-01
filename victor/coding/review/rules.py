@@ -437,7 +437,7 @@ class RuleRegistry:
         self,
         rule_id: str,
         enabled: Optional[bool] = None,
-        severity: Optional[Severity] = None,
+        severity: Optional[ReviewSeverity] = None,
         parameters: Optional[dict[str, Any]] = None,
     ) -> bool:
         """Configure an existing rule.

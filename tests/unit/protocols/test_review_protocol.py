@@ -27,8 +27,8 @@ from victor.coding.review.protocol import (
     ReviewResult,
     ReviewRule,
     ReviewRuleSet,
+    ReviewSeverity,
     SecurityIssue,
-    Severity,
     SourceLocation,
 )
 
@@ -38,24 +38,24 @@ from victor.coding.review.protocol import (
 # =============================================================================
 
 
-class TestSeverity:
-    """Tests for Severity enum."""
+class TestReviewSeverity:
+    """Tests for ReviewSeverity enum."""
 
     def test_error_severity(self):
         """Test error severity."""
-        assert Severity.ERROR.value == "error"
+        assert ReviewSeverity.ERROR.value == "error"
 
     def test_warning_severity(self):
         """Test warning severity."""
-        assert Severity.WARNING.value == "warning"
+        assert ReviewSeverity.WARNING.value == "warning"
 
     def test_info_severity(self):
         """Test info severity."""
-        assert Severity.INFO.value == "info"
+        assert ReviewSeverity.INFO.value == "info"
 
     def test_hint_severity(self):
         """Test hint severity."""
-        assert Severity.HINT.value == "hint"
+        assert ReviewSeverity.HINT.value == "hint"
 
 
 class TestReviewCategory:
@@ -141,7 +141,7 @@ class TestReviewFinding:
         return ReviewFinding(
             rule_id="STYLE001",
             message="Line too long",
-            severity=Severity.WARNING,
+            severity=ReviewSeverity.WARNING,
             category=ReviewCategory.STYLE,
             location=sample_location,
             code_snippet="very_long_line = 'test'",
@@ -153,7 +153,7 @@ class TestReviewFinding:
     def test_creation(self, sample_finding):
         """Test finding creation."""
         assert sample_finding.rule_id == "STYLE001"
-        assert sample_finding.severity == Severity.WARNING
+        assert sample_finding.severity == ReviewSeverity.WARNING
         assert sample_finding.category == ReviewCategory.STYLE
 
     def test_to_dict(self, sample_finding):
@@ -170,7 +170,7 @@ class TestReviewFinding:
         finding = ReviewFinding(
             rule_id="TEST",
             message="Test",
-            severity=Severity.INFO,
+            severity=ReviewSeverity.INFO,
             category=ReviewCategory.STYLE,
             location=sample_location,
         )
@@ -197,7 +197,7 @@ class TestReviewRule:
             category=ReviewCategory.STYLE,
         )
         assert rule.id == "STYLE001"
-        assert rule.severity == Severity.WARNING  # default
+        assert rule.severity == ReviewSeverity.WARNING  # default
         assert rule.enabled is True  # default
 
     def test_matches_tags_empty_filter(self):
@@ -312,10 +312,10 @@ class TestFileReview:
         """Create sample findings."""
         loc = SourceLocation(Path("test.py"), 10)
         return [
-            ReviewFinding("E1", "Error", Severity.ERROR, ReviewCategory.STYLE, loc),
-            ReviewFinding("W1", "Warning", Severity.WARNING, ReviewCategory.STYLE, loc),
-            ReviewFinding("W2", "Warning", Severity.WARNING, ReviewCategory.STYLE, loc),
-            ReviewFinding("I1", "Info", Severity.INFO, ReviewCategory.STYLE, loc),
+            ReviewFinding("E1", "Error", ReviewSeverity.ERROR, ReviewCategory.STYLE, loc),
+            ReviewFinding("W1", "Warning", ReviewSeverity.WARNING, ReviewCategory.STYLE, loc),
+            ReviewFinding("W2", "Warning", ReviewSeverity.WARNING, ReviewCategory.STYLE, loc),
+            ReviewFinding("I1", "Info", ReviewSeverity.INFO, ReviewCategory.STYLE, loc),
         ]
 
     def test_creation(self, sample_findings):
@@ -359,7 +359,7 @@ class TestReviewResult:
         return FileReview(
             file_path=Path("error.py"),
             findings=[
-                ReviewFinding("E1", "Error", Severity.ERROR, ReviewCategory.STYLE, loc),
+                ReviewFinding("E1", "Error", ReviewSeverity.ERROR, ReviewCategory.STYLE, loc),
             ],
         )
 
@@ -370,7 +370,7 @@ class TestReviewResult:
         return FileReview(
             file_path=Path("clean.py"),
             findings=[
-                ReviewFinding("I1", "Info", Severity.INFO, ReviewCategory.STYLE, loc),
+                ReviewFinding("I1", "Info", ReviewSeverity.INFO, ReviewCategory.STYLE, loc),
             ],
         )
 
@@ -395,8 +395,8 @@ class TestReviewResult:
         review = FileReview(
             Path("test.py"),
             findings=[
-                ReviewFinding("W1", "Warn", Severity.WARNING, ReviewCategory.STYLE, loc),
-                ReviewFinding("W2", "Warn", Severity.WARNING, ReviewCategory.STYLE, loc),
+                ReviewFinding("W1", "Warn", ReviewSeverity.WARNING, ReviewCategory.STYLE, loc),
+                ReviewFinding("W2", "Warn", ReviewSeverity.WARNING, ReviewCategory.STYLE, loc),
             ],
         )
         result = ReviewResult(file_reviews=[review])
@@ -408,8 +408,8 @@ class TestReviewResult:
         review = FileReview(
             Path("test.py"),
             findings=[
-                ReviewFinding("S1", "Style", Severity.INFO, ReviewCategory.STYLE, loc),
-                ReviewFinding("SEC1", "Security", Severity.ERROR, ReviewCategory.SECURITY, loc),
+                ReviewFinding("S1", "Style", ReviewSeverity.INFO, ReviewCategory.STYLE, loc),
+                ReviewFinding("SEC1", "Security", ReviewSeverity.ERROR, ReviewCategory.SECURITY, loc),
             ],
         )
         result = ReviewResult(file_reviews=[review])
@@ -423,12 +423,12 @@ class TestReviewResult:
         review = FileReview(
             Path("test.py"),
             findings=[
-                ReviewFinding("E1", "Error", Severity.ERROR, ReviewCategory.STYLE, loc),
-                ReviewFinding("W1", "Warn", Severity.WARNING, ReviewCategory.STYLE, loc),
+                ReviewFinding("E1", "Error", ReviewSeverity.ERROR, ReviewCategory.STYLE, loc),
+                ReviewFinding("W1", "Warn", ReviewSeverity.WARNING, ReviewCategory.STYLE, loc),
             ],
         )
         result = ReviewResult(file_reviews=[review])
-        errors = result.get_findings_by_severity(Severity.ERROR)
+        errors = result.get_findings_by_severity(ReviewSeverity.ERROR)
         assert len(errors) == 1
 
 
@@ -444,7 +444,7 @@ class TestReviewConfig:
         """Test default config values."""
         config = ReviewConfig()
         assert len(config.enabled_categories) == len(ReviewCategory)
-        assert config.min_severity == Severity.INFO
+        assert config.min_severity == ReviewSeverity.INFO
         assert config.fail_on_error is True
         assert config.fail_on_warning is False
         assert config.max_findings_per_file == 100
@@ -453,11 +453,11 @@ class TestReviewConfig:
         """Test custom config."""
         config = ReviewConfig(
             enabled_categories=[ReviewCategory.SECURITY],
-            min_severity=Severity.WARNING,
+            min_severity=ReviewSeverity.WARNING,
             fail_on_warning=True,
         )
         assert len(config.enabled_categories) == 1
-        assert config.min_severity == Severity.WARNING
+        assert config.min_severity == ReviewSeverity.WARNING
         assert config.fail_on_warning is True
 
 
@@ -500,7 +500,7 @@ class TestSecurityIssue:
         """Test security issue creation."""
         issue = SecurityIssue(
             vulnerability_type="sql_injection",
-            severity=Severity.ERROR,
+            severity=ReviewSeverity.ERROR,
             cwe_id="CWE-89",
             description="SQL injection vulnerability",
             remediation="Use parameterized queries",
@@ -514,7 +514,7 @@ class TestSecurityIssue:
         """Test default values."""
         issue = SecurityIssue(
             vulnerability_type="test",
-            severity=Severity.WARNING,
+            severity=ReviewSeverity.WARNING,
         )
         assert issue.cwe_id is None
         assert issue.description == ""

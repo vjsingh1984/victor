@@ -38,7 +38,7 @@ from victor.coding.review.protocol import (
     ReviewFinding,
     ReviewResult,
     ReviewRule,
-    Severity,
+    ReviewSeverity,
 )
 from victor.coding.review.rules import RuleRegistry, get_rule_registry
 
@@ -116,7 +116,7 @@ class ReviewManager:
                 ReviewFinding(
                     rule_id="internal-error",
                     message=f"Failed to read file: {e}",
-                    severity=Severity.ERROR,
+                    severity=ReviewSeverity.ERROR,
                     category=ReviewCategory.BEST_PRACTICES,
                     location=self._create_location(file_path, 1),
                 )
@@ -319,7 +319,7 @@ class ReviewManager:
         lines.append("")
 
         # Summary table
-        lines.append("| Severity | Count |")
+        lines.append("| ReviewSeverity | Count |")
         lines.append("|----------|-------|")
         lines.append(f"| :x: Errors | {result.total_errors} |")
         lines.append(f"| :warning: Warnings | {result.total_warnings} |")
@@ -403,29 +403,29 @@ class ReviewManager:
 
     def _severity_meets_threshold(
         self,
-        severity: Severity,
-        threshold: Severity,
+        severity: ReviewSeverity,
+        threshold: ReviewSeverity,
     ) -> bool:
         """Check if severity meets threshold."""
-        order = [Severity.HINT, Severity.INFO, Severity.WARNING, Severity.ERROR]
+        order = [ReviewSeverity.HINT, ReviewSeverity.INFO, ReviewSeverity.WARNING, ReviewSeverity.ERROR]
         return order.index(severity) >= order.index(threshold)
 
-    def _severity_icon(self, severity: Severity) -> str:
+    def _severity_icon(self, severity: ReviewSeverity) -> str:
         """Get text icon for severity."""
         return {
-            Severity.ERROR: "[E]",
-            Severity.WARNING: "[W]",
-            Severity.INFO: "[I]",
-            Severity.HINT: "[H]",
+            ReviewSeverity.ERROR: "[E]",
+            ReviewSeverity.WARNING: "[W]",
+            ReviewSeverity.INFO: "[I]",
+            ReviewSeverity.HINT: "[H]",
         }.get(severity, "[?]")
 
-    def _severity_emoji(self, severity: Severity) -> str:
+    def _severity_emoji(self, severity: ReviewSeverity) -> str:
         """Get emoji for severity."""
         return {
-            Severity.ERROR: ":x:",
-            Severity.WARNING: ":warning:",
-            Severity.INFO: ":information_source:",
-            Severity.HINT: ":bulb:",
+            ReviewSeverity.ERROR: ":x:",
+            ReviewSeverity.WARNING: ":warning:",
+            ReviewSeverity.INFO: ":information_source:",
+            ReviewSeverity.HINT: ":bulb:",
         }.get(severity, ":grey_question:")
 
     def _create_location(self, file_path: Path, line: int) -> Any:
