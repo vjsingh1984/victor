@@ -127,7 +127,7 @@ class ToolPlugin(ABC):
         """
         pass
 
-    def initialize(self) -> None:
+    def initialize(self) -> None:  # noqa: B027
         """Initialize plugin resources.
 
         Called once when the plugin is loaded. Use this to:
@@ -140,7 +140,7 @@ class ToolPlugin(ABC):
         """
         pass
 
-    def cleanup(self) -> None:
+    def cleanup(self) -> None:  # noqa: B027
         """Cleanup plugin resources.
 
         Called when the plugin is unloaded. Use this to:
@@ -153,7 +153,7 @@ class ToolPlugin(ABC):
         """
         pass
 
-    def on_tool_registered(self, tool: BaseTool) -> None:
+    def on_tool_registered(self, tool: BaseTool) -> None:  # noqa: B027
         """Called when a tool from this plugin is registered.
 
         Args:
@@ -163,7 +163,7 @@ class ToolPlugin(ABC):
         """
         pass
 
-    def on_tool_executed(self, tool_name: str, success: bool, result: Any) -> None:
+    def on_tool_executed(self, tool_name: str, success: bool, result: Any) -> None:  # noqa: B027
         """Called after a tool from this plugin is executed.
 
         Useful for logging, metrics, or plugin-specific handling.

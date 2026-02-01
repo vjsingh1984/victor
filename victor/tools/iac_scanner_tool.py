@@ -162,7 +162,7 @@ class IaCScannerTool(BaseTool):
             manager = IaCManager()
 
             # Build policy
-            policy = ScanPolicy(min_severity=Severity(min_severity_str))
+            policy = ScanPolicy(min_severity=IaCSeverity(min_severity_str))
 
             if action == "detect":
                 platforms = await manager.detect_platforms()

@@ -126,7 +126,7 @@ class BaseRetryStrategy(ABC):
         """
         pass
 
-    def on_retry(self, context: RetryContext) -> None:
+    def on_retry(self, context: RetryContext) -> None:  # noqa: B027
         """Hook called before each retry attempt.
 
         Override to add logging, metrics, or other side effects.
@@ -136,7 +136,7 @@ class BaseRetryStrategy(ABC):
         """
         pass
 
-    def on_success(self, context: RetryContext) -> None:
+    def on_success(self, context: RetryContext) -> None:  # noqa: B027
         """Hook called on successful completion.
 
         Args:
@@ -144,7 +144,7 @@ class BaseRetryStrategy(ABC):
         """
         pass
 
-    def on_failure(self, context: RetryContext) -> None:
+    def on_failure(self, context: RetryContext) -> None:  # noqa: B027
         """Hook called when all retries exhausted.
 
         Args:

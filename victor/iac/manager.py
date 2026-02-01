@@ -151,7 +151,7 @@ class IaCManager:
                     findings.append(
                         IaCFinding(
                             rule_id="SCAN-ERROR",
-                            severity=IaCIaCSeverity.INFO,
+                            severity=IaCSeverity.INFO,
                             category=Category.BEST_PRACTICE,
                             message=f"Failed to scan file: {e}",
                             description=str(e),
@@ -191,7 +191,7 @@ class IaCManager:
             return [
                 IaCFinding(
                     rule_id="FILE-NOT-FOUND",
-                    severity=IaCIaCSeverity.INFO,
+                    severity=IaCSeverity.INFO,
                     category=Category.BEST_PRACTICE,
                     message=f"File not found: {file_path}",
                     description="The specified file does not exist",
@@ -369,10 +369,10 @@ class IaCManager:
                 data = json.load(f)
                 return ScanPolicy(
                     enabled_platforms=[IaCPlatform(p) for p in data.get("enabled_platforms", [])],
-                    min_severity=Severity(data.get("min_severity", "low")),
+                    min_severity=IaCSeverity(data.get("min_severity", "low")),
                     excluded_rules=data.get("excluded_rules", []),
                     excluded_paths=data.get("excluded_paths", []),
-                    fail_on_severity=Severity(data.get("fail_on_severity", "high")),
+                    fail_on_severity=IaCSeverity(data.get("fail_on_severity", "high")),
                 )
         except Exception as e:
             logger.warning(f"Failed to load policy: {e}")
