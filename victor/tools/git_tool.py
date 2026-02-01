@@ -25,7 +25,8 @@ import os
 from typing import Any, Optional
 
 from victor.config.timeouts import ProcessTimeouts
-from victor.tools.base import AccessMode, DangerLevel, Priority, ToolConfig
+from victor.tools.base import ToolConfig
+from victor.tools.enums import DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async
 

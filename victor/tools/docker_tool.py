@@ -26,7 +26,7 @@ Features:
 import json
 from typing import Any, Optional
 
-from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
+from victor.tools.enums import CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async, check_docker_available
 

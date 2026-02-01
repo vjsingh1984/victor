@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Optional
 import logging
 
-from victor.tools.base import AccessMode, DangerLevel, Priority
+from victor.tools.enums import DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.common import gather_files_by_pattern
 

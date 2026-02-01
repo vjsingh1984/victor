@@ -34,7 +34,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    pass  # type: ignore[import-not-found]
+    pass
 
 from victor.tools.tool_names import get_canonical_name
 

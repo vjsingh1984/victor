@@ -170,7 +170,7 @@ class PyprojectParser(BaseDependencyParser):
             import tomllib
         except ImportError:
             try:
-                import tomli as tomllib  # type: ignore[import-not-found]
+                import tomli as tomllib
             except ImportError:
                 logger.error("Neither tomllib nor tomli available")
                 return [], []

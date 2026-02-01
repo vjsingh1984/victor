@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Optional
 import logging
 
-from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
+from victor.tools.enums import CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)

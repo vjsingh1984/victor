@@ -18,7 +18,7 @@ from pathlib import Path
 
 from tree_sitter import Query, QueryCursor
 from victor.coding.codebase.tree_sitter_manager import get_parser, get_language
-from victor.tools.base import AccessMode, DangerLevel, Priority
+from victor.tools.enums import DangerLevel, Priority
 from victor.tools.decorators import tool
 
 

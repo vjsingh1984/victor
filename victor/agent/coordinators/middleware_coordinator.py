@@ -34,7 +34,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    pass  # type: ignore[import-not-found]
+    pass
 
 logger = logging.getLogger(__name__)
 

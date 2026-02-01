@@ -22,16 +22,8 @@ from collections.abc import Callable
 from docstring_parser import parse
 
 from victor.core.errors import ToolExecutionError, ToolValidationError
-from victor.tools.base import (
-    AccessMode,
-    BaseTool,
-    CostTier,
-    DangerLevel,
-    ExecutionCategory,
-    Priority,
-    ToolMetadata,
-    ToolResult,
-)
+from victor.tools.base import BaseTool, ToolMetadata, ToolResult
+from victor.tools.enums import AccessMode, CostTier, DangerLevel, ExecutionCategory, Priority
 
 # Module-level flag to control auto-registration (can be disabled for testing)
 _AUTO_REGISTER_TOOLS = True
@@ -210,7 +202,7 @@ def tool(
     priority_hints: Optional[list[str]] = None,
     # Selection/approval metadata parameters
     priority: Priority = Priority.MEDIUM,
-    access_mode: AccessMode = AccessMode.READONLY,
+    access_mode: AccessMode = AccessModeREADONLY,
     danger_level: DangerLevel = DangerLevel.SAFE,
     # Stage affinity for conversation state machine
     stages: Optional[list[str]] = None,

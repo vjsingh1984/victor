@@ -16,7 +16,7 @@
 from typing import Any
 
 from dataclasses import asdict
-from victor.tools.base import AccessMode, DangerLevel, Priority
+from victor.tools.enums import DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.workflows.registry import WorkflowRegistry
 

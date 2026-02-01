@@ -26,15 +26,8 @@ from victor.core.security.audit import (
     AuditReport,
     ComplianceFramework,
 )
-from victor.tools.base import (
-    AccessMode,
-    BaseTool,
-    CostTier,
-    DangerLevel,
-    Priority,
-    ToolMetadata,
-    ToolResult,
-)
+from victor.tools.base import BaseTool, ToolMetadata, ToolResult
+from victor.tools.enums import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.tool_names import ToolNames
 
 logger = logging.getLogger(__name__)

@@ -21,7 +21,7 @@ diagnostics, open, close.
 
 from typing import Any, Optional
 
-from victor.tools.base import AccessMode, DangerLevel, Priority
+from victor.tools.enums import DangerLevel, Priority
 from victor.tools.decorators import tool
 
 # Completion kind mapping
