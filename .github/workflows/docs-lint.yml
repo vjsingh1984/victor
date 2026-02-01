@@ -1,0 +1,101 @@
+name: Documentation Quality Checks
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs-lint.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs-lint.yml'
+
+jobs:
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint Markdown
+        uses: articulate/actions-markdownlint@v1
+        with:
+          config: .markdownlint.json
+          files: 'docs/**/*.md'
+          ignore: 'docs/archive/**'
+
+  link-check:
+    name: Link Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Link Checker
+        uses: lycheeverse/lychee-action@v1
+        with:
+          args: --verbose --no-progress 'docs/**/*.md' --exclude 'docs/archive/**'
+          fail: true
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+  spell-check:
+    name: Spell Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Spelling
+        uses: streetsidesoftware/cspell-action@v2
+        with:
+          files: 'docs/**/*.md'
+          exclude: 'docs/archive/**'
+          config: '.cspell.json'
+
+  file-size-check:
+    name: File Size Limits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check File Sizes
+        run: |
+          python .github/scripts/check_file_sizes.py
+
+  diagram-render:
+    name: Diagram Rendering
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Mermaid CLI
+        run: npm install -g @mermaid-js/mermaid-cli
+
+      - name: Render Diagrams
+        run: |
+          for file in docs/diagrams/**/*.mmd; do
+            echo "Rendering $file"
+            mmdc -i "$file" -o /tmp/test.svg
+          done
+
+  standards-check:
+    name: Documentation Standards
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Standards Compliance
+        run: |
+          python .github/scripts/check_doc_standards.py
