@@ -134,6 +134,7 @@ class BaseRetryStrategy(ABC):
         Args:
             context: Current retry context
         """
+        pass
 
     def on_success(self, context: RetryContext) -> None:
         """Hook called on successful completion.
@@ -141,6 +142,7 @@ class BaseRetryStrategy(ABC):
         Args:
             context: Final retry context
         """
+        pass
 
     def on_failure(self, context: RetryContext) -> None:
         """Hook called when all retries exhausted.
@@ -148,6 +150,7 @@ class BaseRetryStrategy(ABC):
         Args:
             context: Final retry context
         """
+        pass
 
 
 class ExponentialBackoffStrategy(BaseRetryStrategy):

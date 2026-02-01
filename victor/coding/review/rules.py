@@ -395,7 +395,7 @@ class RuleRegistry:
                 name=data["name"],
                 description=data.get("description", ""),
                 category=ReviewCategory(data["category"]),
-                severity=Severity(data.get("severity", "warning")),
+                severity=ReviewSeverity(data.get("severity", "warning")),
                 enabled=data.get("enabled", True),
                 parameters=data.get("parameters", {}),
                 tags=data.get("tags", []),

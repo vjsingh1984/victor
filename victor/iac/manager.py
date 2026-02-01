@@ -151,7 +151,7 @@ class IaCManager:
                     findings.append(
                         IaCFinding(
                             rule_id="SCAN-ERROR",
-                            severity=Severity.INFO,
+                            severity=IaCIaCSeverity.INFO,
                             category=Category.BEST_PRACTICE,
                             message=f"Failed to scan file: {e}",
                             description=str(e),
@@ -191,7 +191,7 @@ class IaCManager:
             return [
                 IaCFinding(
                     rule_id="FILE-NOT-FOUND",
-                    severity=Severity.INFO,
+                    severity=IaCIaCSeverity.INFO,
                     category=Category.BEST_PRACTICE,
                     message=f"File not found: {file_path}",
                     description="The specified file does not exist",
@@ -210,7 +210,7 @@ class IaCManager:
         return [
             IaCFinding(
                 rule_id="UNKNOWN-FORMAT",
-                severity=Severity.INFO,
+                severity=IaCSeverity.INFO,
                 category=Category.BEST_PRACTICE,
                 message=f"Unknown IaC format: {path.name}",
                 description="File format not recognized as IaC",
@@ -229,11 +229,11 @@ class IaCManager:
             Filtered findings
         """
         severity_order = [
-            Severity.INFO,
-            Severity.LOW,
-            Severity.MEDIUM,
-            Severity.HIGH,
-            Severity.CRITICAL,
+            IaCSeverity.INFO,
+            IaCSeverity.LOW,
+            IaCSeverity.MEDIUM,
+            IaCSeverity.HIGH,
+            IaCSeverity.CRITICAL,
         ]
         min_index = severity_order.index(policy.min_severity)
 
@@ -466,11 +466,11 @@ class IaCManager:
 
         policy = await self._load_policy()
         severity_order = [
-            Severity.INFO,
-            Severity.LOW,
-            Severity.MEDIUM,
-            Severity.HIGH,
-            Severity.CRITICAL,
+            IaCSeverity.INFO,
+            IaCSeverity.LOW,
+            IaCSeverity.MEDIUM,
+            IaCSeverity.HIGH,
+            IaCSeverity.CRITICAL,
         ]
         fail_index = severity_order.index(policy.fail_on_severity)
 

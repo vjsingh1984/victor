@@ -16,18 +16,18 @@
 
 from pathlib import Path
 
-from victor.debug.protocol import (
+from victor.observability.debug.protocol import (
     AttachConfiguration,
     Breakpoint,
     DebugSession,
     DebugState,
+    DebugStopReason,
     EvaluateResult,
     ExceptionInfo,
     LaunchConfiguration,
     Scope,
     SourceLocation,
     StackFrame,
-    StopReason,
     Thread,
     Variable,
 )
@@ -67,31 +67,31 @@ class TestDebugState:
 
 
 class TestStopReason:
-    """Tests for StopReason enum."""
+    """Tests for DebugStopReason enum."""
 
     def test_breakpoint(self):
         """Test BREAKPOINT reason."""
-        assert StopReason.BREAKPOINT.value == "breakpoint"
+        assert DebugStopReason.BREAKPOINT.value == "breakpoint"
 
     def test_step(self):
         """Test STEP reason."""
-        assert StopReason.STEP.value == "step"
+        assert DebugStopReason.STEP.value == "step"
 
     def test_exception(self):
         """Test EXCEPTION reason."""
-        assert StopReason.EXCEPTION.value == "exception"
+        assert DebugStopReason.EXCEPTION.value == "exception"
 
     def test_pause(self):
         """Test PAUSE reason."""
-        assert StopReason.PAUSE.value == "pause"
+        assert DebugStopReason.PAUSE.value == "pause"
 
     def test_entry(self):
         """Test ENTRY reason."""
-        assert StopReason.ENTRY.value == "entry"
+        assert DebugStopReason.ENTRY.value == "entry"
 
     def test_function_breakpoint(self):
         """Test FUNCTION_BREAKPOINT reason."""
-        assert StopReason.FUNCTION_BREAKPOINT.value == "function breakpoint"
+        assert DebugStopReason.FUNCTION_BREAKPOINT.value == "function breakpoint"
 
 
 # =============================================================================
