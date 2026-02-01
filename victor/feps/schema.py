@@ -22,7 +22,7 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 import yaml
 
@@ -57,8 +57,8 @@ class FEPMetadata:
     status: FEPStatus
     created: str
     modified: str
-    authors: List[Dict[str, str]] = field(default_factory=list)
-    reviewers: List[str] = field(default_factory=list)
+    authors: list[dict[str, str]] = field(default_factory=list)
+    reviewers: list[str] = field(default_factory=list)
     discussion: Optional[str] = None
     implementation: Optional[str] = None
 
@@ -96,9 +96,9 @@ class FEPValidationResult:
 
     is_valid: bool
     metadata: Optional[FEPMetadata]
-    sections: Dict[str, FEPSection]
-    errors: List[FEPValidationError]
-    warnings: List[FEPValidationError]
+    sections: dict[str, FEPSection]
+    errors: list[FEPValidationError]
+    warnings: list[FEPValidationError]
 
     @property
     def has_errors(self) -> bool:
@@ -201,9 +201,9 @@ class FEPValidator:
         Returns:
             FEPValidationResult with validation details
         """
-        errors: List[FEPValidationError] = []
-        warnings: List[FEPValidationError] = []
-        sections: Dict[str, FEPSection] = {}
+        errors: list[FEPValidationError] = []
+        warnings: list[FEPValidationError] = []
+        sections: dict[str, FEPSection] = {}
 
         # Check file exists
         if not fep_path.exists():
@@ -288,7 +288,7 @@ class FEPValidator:
             warnings=warnings,
         )
 
-    def _validate_metadata(self, metadata: FEPMetadata) -> List[FEPValidationError]:
+    def _validate_metadata(self, metadata: FEPMetadata) -> list[FEPValidationError]:
         """Validate FEP metadata.
 
         Args:
@@ -297,7 +297,7 @@ class FEPValidator:
         Returns:
             List of validation errors
         """
-        errors: List[FEPValidationError] = []
+        errors: list[FEPValidationError] = []
 
         # Validate FEP number (allow 0 for placeholder/draft FEPs)
         if metadata.fep < 0:
@@ -368,8 +368,8 @@ class FEPValidator:
     def _extract_and_validate_sections(
         self,
         content: str,
-        sections: Dict[str, FEPSection],
-    ) -> tuple[List[FEPValidationError], List[FEPValidationError]]:
+        sections: dict[str, FEPSection],
+    ) -> tuple[list[FEPValidationError], list[FEPValidationError]]:
         """Extract and validate FEP sections.
 
         Args:
@@ -379,8 +379,8 @@ class FEPValidator:
         Returns:
             Tuple of (errors, warnings)
         """
-        errors: List[FEPValidationError] = []
-        warnings: List[FEPValidationError] = []
+        errors: list[FEPValidationError] = []
+        warnings: list[FEPValidationError] = []
 
         # Split by markdown headers (##)
         # Pattern: ## Section Name
@@ -448,7 +448,7 @@ class FEPValidator:
         self,
         status_filter: Optional[FEPStatus] = None,
         type_filter: Optional[FEPType] = None,
-    ) -> List[FEPMetadata]:
+    ) -> list[FEPMetadata]:
         """List all FEPs in the feps directory.
 
         Args:

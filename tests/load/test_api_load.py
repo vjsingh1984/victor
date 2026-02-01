@@ -19,11 +19,7 @@ performance SLAs under concurrent user load.
 """
 
 import asyncio
-import pytest
 import time
-from datetime import datetime
-from typing import Any, Dict, List
-from concurrent.futures import ThreadPoolExecutor
 import statistics
 
 import httpx

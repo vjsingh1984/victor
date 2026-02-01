@@ -3,7 +3,7 @@
 Competitive positioning: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
 """
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, cast
 
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
@@ -13,14 +13,8 @@ from victor.core.verticals.protocols import ToolDependencyProviderProtocol
 from victor.core.vertical_types import StageDefinition
 
 # Phase 3: Import framework capabilities
-from victor.framework.capabilities import FileOperationsCapability
 
 # Import ISP-compliant provider protocols
-from victor.core.verticals.protocols.providers import (
-    HandlerProvider,
-    ToolDependencyProvider,
-    ToolProvider,
-)
 
 # Phase 2.1: Protocol auto-registration decorator
 from victor.core.verticals.protocol_decorators import register_protocols
@@ -87,7 +81,7 @@ class DataAnalysisAssistant(VerticalBase):
             ]
         )
 
-        return cast(List[str], tools)
+        return cast(list[str], tools)
 
     @classmethod
     def get_system_prompt(cls) -> str:
@@ -122,7 +116,7 @@ class DataAnalysisAssistant(VerticalBase):
         return template.get_prompt_builder()
 
     @classmethod
-    def get_stages(cls) -> Dict[str, StageDefinition]:
+    def get_stages(cls) -> dict[str, StageDefinition]:
         """Get Data Analysis-specific stage definitions.
 
         Uses canonical tool names from victor.tools.tool_names.
@@ -224,7 +218,7 @@ class DataAnalysisAssistant(VerticalBase):
         )
 
     @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
+    def get_handlers(cls) -> dict[str, Any]:
         """Get compute handlers for DataAnalysis workflows.
 
         Returns handlers from victor.dataanalysis.handlers for workflow execution.

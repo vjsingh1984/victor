@@ -12,7 +12,6 @@ from typing import Optional, TYPE_CHECKING
 from ..types import (
     ASTAccessMethod,
     CodeValidationResult,
-    LanguageTier,
     ValidationConfig,
     ValidationIssue,
     ValidationSeverity,
@@ -21,12 +20,6 @@ from ..extractors.base import BaseLanguageProcessor
 from .python_validator import PythonASTValidator
 from .tree_sitter_validator import TreeSitterValidator
 from .config_validators import (
-    JsonValidator,
-    YamlValidator,
-    TomlValidator,
-    HoconValidator,
-    XmlValidator,
-    MarkdownValidator,
     get_config_validator,
 )
 

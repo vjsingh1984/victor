@@ -27,7 +27,6 @@ from victor.framework.validation.yaml import (
     validate_from_yaml,
 )
 from victor.framework.validation.pipeline import (
-    ValidationAction,
     ValidationPipeline,
     ValidationResult,
 )

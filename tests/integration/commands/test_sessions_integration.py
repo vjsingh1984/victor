@@ -18,8 +18,6 @@ from __future__ import annotations
 
 import pytest
 import re
-from pathlib import Path
-import tempfile
 import shutil
 
 from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence

@@ -22,7 +22,7 @@ from __future__ import annotations
 import ast
 import json
 import re
-from typing import Optional, Tuple
+from typing import Optional
 
 from victor.native.observability import InstrumentedAccelerator
 from victor.native.protocols import CoercedType, CoercedValue
@@ -46,7 +46,7 @@ class PythonArgumentNormalizer(InstrumentedAccelerator):
     def get_version(self) -> Optional[str]:
         return self._version
 
-    def normalize_json(self, value: str) -> Tuple[str, bool]:
+    def normalize_json(self, value: str) -> tuple[str, bool]:
         """Normalize a potentially malformed JSON string.
 
         Attempts multiple repair strategies in order:

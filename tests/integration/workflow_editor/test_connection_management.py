@@ -20,9 +20,7 @@ and visual graph representations.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Set, Tuple
 
-import pytest
 
 from victor.workflows import load_workflow_from_file
 from victor.workflows.definition import (
@@ -30,9 +28,7 @@ from victor.workflows.definition import (
     ConditionNode,
     TeamNodeWorkflow,
     ParallelNode,
-    TransformNode,
 )
-from victor.workflows.yaml_loader import YAMLWorkflowConfig, load_workflow_from_yaml
 
 
 class TestConnectionMapping:
@@ -163,7 +159,7 @@ workflows:
             if team_node.next_nodes:
                 assert len(connections[team_node.id]) > 0
 
-    def _build_connection_map(self, workflow_def: WorkflowDefinition) -> Dict[str, List[str]]:
+    def _build_connection_map(self, workflow_def: WorkflowDefinition) -> dict[str, list[str]]:
         """Build a map of node connections."""
         connections = {}
         for node in workflow_def.nodes.values():  # Fixed: iterate over values
@@ -396,7 +392,7 @@ class TestConnectionCycles:
         has_cycle = self._detect_cycle(connections)
         assert not has_cycle, "Should not detect cycle in DAG"
 
-    def _detect_cycle(self, connections: Dict[str, List[str]]) -> bool:
+    def _detect_cycle(self, connections: dict[str, list[str]]) -> bool:
         """Detect if connection graph has cycles using DFS."""
         visited = set()
         rec_stack = set()
@@ -483,7 +479,7 @@ class TestConnectionPaths:
 
     def _build_connection_map_with_branches(
         self, workflow_def: WorkflowDefinition
-    ) -> Dict[str, List[str]]:
+    ) -> dict[str, list[str]]:
         """Build connection map including conditional branches."""
         connections = {}
         for node in workflow_def.nodes.values():  # Fixed: iterate over values
@@ -512,8 +508,8 @@ class TestConnectionPaths:
         return False
 
     def _find_all_paths(
-        self, connections: Dict[str, List[str]], start: str, end: str, path: List[str] = None
-    ) -> List[List[str]]:
+        self, connections: dict[str, list[str]], start: str, end: str, path: list[str] = None
+    ) -> list[list[str]]:
         """Find all paths from start to end using DFS."""
         if path is None:
             path = []

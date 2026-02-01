@@ -35,7 +35,8 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.core.events import ObservabilityBus as EventBus, MessagingEvent
 
@@ -81,11 +82,11 @@ class BridgeEvent:
     """Event to be sent to clients."""
 
     type: BridgeEventType
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "id": self.id,
@@ -105,7 +106,7 @@ class ClientConnection:
 
     id: str
     send: Callable[[str], None]  # Async send function
-    subscriptions: Set[str] = field(default_factory=set)  # Event types subscribed to
+    subscriptions: set[str] = field(default_factory=set)  # Event types subscribed to
     connected_at: float = field(default_factory=time.time)
     last_activity: float = field(default_factory=time.time)
 
@@ -137,7 +138,7 @@ class EventBroadcaster:
         if self._initialized:
             return
 
-        self._clients: Dict[str, ClientConnection] = {}
+        self._clients: dict[str, ClientConnection] = {}
         self._event_queue: asyncio.Queue[BridgeEvent] = asyncio.Queue()
         self._broadcast_task: Optional[asyncio.Task[None]] = None
         self._running = False
@@ -172,7 +173,7 @@ class EventBroadcaster:
         self,
         client_id: str,
         send_func: Callable[[str], Any],
-        subscriptions: Optional[Set[str]] = None,
+        subscriptions: Optional[set[str]] = None,
     ) -> None:
         """Add a connected client."""
         self._clients[client_id] = ClientConnection(
@@ -188,7 +189,7 @@ class EventBroadcaster:
             del self._clients[client_id]
             logger.info(f"Client disconnected: {client_id}")
 
-    def update_subscriptions(self, client_id: str, subscriptions: Set[str]) -> None:
+    def update_subscriptions(self, client_id: str, subscriptions: set[str]) -> None:
         """Update client's event subscriptions."""
         if client_id in self._clients:
             self._clients[client_id].subscriptions = subscriptions
@@ -343,7 +344,7 @@ class EventBusAdapter:
         """Initialize adapter."""
         self._event_bus = event_bus
         self._broadcaster = broadcaster or EventBroadcaster()
-        self._subscriptions: List[str] = []
+        self._subscriptions: list[str] = []
 
     def connect(self, event_bus: EventBus) -> None:
         """Connect to an EventBus and subscribe to events."""
@@ -407,7 +408,7 @@ class EventBusAdapter:
 # Convenience functions for common events
 def emit_tool_start(
     tool_name: str,
-    arguments: Dict[str, Any],
+    arguments: dict[str, Any],
     tool_id: Optional[str] = None,
 ) -> None:
     """Emit a tool start event."""

@@ -19,7 +19,6 @@ This validates the framework-vertical decoupling architecture.
 """
 
 import sys
-from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -58,7 +57,6 @@ class TestResearchVerticalIndependence:
     def test_research_extensions_no_coding_dependency(self):
         """ResearchAssistant extensions don't depend on coding."""
         from victor.research import ResearchAssistant
-        from victor.core.verticals.protocols import VerticalExtensions
 
         extensions = ResearchAssistant.get_extensions()
         # Note: LazyVerticalExtensions implements the VerticalExtensions protocol
@@ -96,7 +94,6 @@ class TestDevOpsVerticalIndependence:
     def test_devops_extensions_no_coding_dependency(self):
         """DevOpsAssistant extensions don't depend on coding."""
         from victor.devops import DevOpsAssistant
-        from victor.core.verticals.protocols import VerticalExtensions
 
         extensions = DevOpsAssistant.get_extensions()
         # Note: LazyVerticalExtensions implements the VerticalExtensions protocol
@@ -273,7 +270,6 @@ class TestFrameworkShimIntegration:
     def test_shim_accepts_vertical_parameter(self):
         """FrameworkShim constructor accepts vertical parameter."""
         from victor.framework.shim import FrameworkShim
-        from victor.coding import CodingAssistant
         import inspect
 
         # Check that FrameworkShim constructor accepts vertical parameter

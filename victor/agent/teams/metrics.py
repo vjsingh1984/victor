@@ -25,7 +25,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Import canonical types from victor.teams.types
 from victor.teams.types import TeamConfig, TeamFormation, TeamResult
@@ -77,13 +77,13 @@ class TeamMetrics:
     task_category: TaskCategory
     formation: TeamFormation
     member_count: int
-    role_distribution: Dict[str, int]
+    role_distribution: dict[str, int]
     total_tool_budget: int
     tools_used: int
     success: bool
     quality_score: float
     duration_seconds: float
-    member_results: Dict[str, bool] = field(default_factory=dict)
+    member_results: dict[str, bool] = field(default_factory=dict)
     discoveries_count: int = 0
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -109,7 +109,7 @@ class TeamMetrics:
         import uuid
 
         # Count roles
-        role_distribution: Dict[str, int] = {}
+        role_distribution: dict[str, int] = {}
         for member in config.members:
             role = member.role.value
             role_distribution[role] = role_distribution.get(role, 0) + 1
@@ -143,7 +143,7 @@ class TeamMetrics:
             discoveries_count=discoveries_count,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "team_id": self.team_id,
@@ -162,7 +162,7 @@ class TeamMetrics:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TeamMetrics":
+    def from_dict(cls, data: dict[str, Any]) -> "TeamMetrics":
         """Create from dictionary."""
         role_dist = data.get("role_distribution", "{}")
         if isinstance(role_dist, str):
@@ -243,7 +243,7 @@ class CompositionStats:
     """
 
     formation: TeamFormation
-    role_counts: Dict[str, int]
+    role_counts: dict[str, int]
     task_category: TaskCategory
     total_executions: int = 0
     successes: int = 0
@@ -337,7 +337,7 @@ class CompositionStats:
 
         return max(0.0, min(1.0, q_value))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "formation": self.formation.value,
@@ -353,7 +353,7 @@ class CompositionStats:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CompositionStats":
+    def from_dict(cls, data: dict[str, Any]) -> "CompositionStats":
         """Create from dictionary."""
         role_counts = data.get("role_counts", "{}")
         if isinstance(role_counts, str):

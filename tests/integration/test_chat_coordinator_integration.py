@@ -36,9 +36,7 @@ while maintaining test isolation and speed.
 
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, Mock, MagicMock, patch, PropertyMock
-from typing import Any, List, Optional, Dict
-from dataclasses import dataclass
+from unittest.mock import AsyncMock, Mock
 
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 from victor.providers.base import CompletionResponse, StreamChunk
@@ -153,7 +151,6 @@ def integration_orchestrator():
     orch._handle_tool_calls = AsyncMock(return_value=[])
 
     # Mock _tool_pipeline.execute_tool_calls to return a proper result
-    from victor.agent.streaming.tool_execution import ToolExecutionResult
 
     async def mock_execute_tool_calls(tool_calls, context=None):
         """Mock tool execution that returns results."""
@@ -363,7 +360,7 @@ def chat_coordinator(integration_orchestrator):
     return ChatCoordinator(orchestrator=integration_orchestrator)
 
 
-def create_stream_generator(chunks: List[StreamChunk]):
+def create_stream_generator(chunks: list[StreamChunk]):
     """Create an async generator for streaming.
 
     Args:

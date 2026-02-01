@@ -32,7 +32,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 # =============================================================================
@@ -79,7 +79,7 @@ class EnrichmentStrategyProtocol(Protocol):
         self,
         prompt: str,
         context: Any,  # EnrichmentContext from victor.framework.enrichment
-    ) -> List[Any]:  # List[ContextEnrichment]
+    ) -> list[Any]:  # List[ContextEnrichment]
         """Get enrichments for a prompt.
 
         Args:

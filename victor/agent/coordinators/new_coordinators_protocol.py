@@ -23,7 +23,7 @@ Protocols:
 - ITeamCoordinator: Team specification and suggestion management
 """
 
-from typing import Any, Dict, List, Protocol
+from typing import Any, Protocol
 
 
 class IConversationCoordinator(Protocol):
@@ -35,7 +35,7 @@ class IConversationCoordinator(Protocol):
     """
 
     @property
-    def messages(self) -> List[Any]:
+    def messages(self) -> list[Any]:
         """Get conversation messages.
 
         Returns:
@@ -73,7 +73,7 @@ class ISearchCoordinator(Protocol):
     optimal search tool (keyword vs semantic vs hybrid).
     """
 
-    def route_search_query(self, query: str) -> Dict[str, Any]:
+    def route_search_query(self, query: str) -> dict[str, Any]:
         """Route a search query to the optimal search tool.
 
         Analyzes the query to determine whether keyword search or
@@ -129,7 +129,7 @@ class ITeamCoordinator(Protocol):
         """
         ...
 
-    def set_team_specs(self, specs: Dict[str, Any]) -> None:
+    def set_team_specs(self, specs: dict[str, Any]) -> None:
         """Store team specifications.
 
         Provides a clean interface for setting team specs,
@@ -140,7 +140,7 @@ class ITeamCoordinator(Protocol):
         """
         ...
 
-    def get_team_specs(self) -> Dict[str, Any]:
+    def get_team_specs(self) -> dict[str, Any]:
         """Retrieve team specifications.
 
         Returns the dictionary of team specs configured by vertical integration.

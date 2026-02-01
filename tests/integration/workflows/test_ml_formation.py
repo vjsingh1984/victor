@@ -18,17 +18,13 @@ Tests the AdaptiveFormationML, FeatureExtractor, and ModelTrainer
 components with realistic scenarios and validates accuracy improvements.
 """
 
-import asyncio
 import json
-import pickle
 import pytest
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 from victor.coordination.formations.base import TeamContext
-from victor.teams.types import AgentMessage, MemberResult, MessageType
+from victor.teams.types import AgentMessage, MessageType
 from victor.workflows.ml_formation_selector import (
     AdaptiveFormationML,
     FeatureExtractor,
@@ -58,7 +54,7 @@ def sample_task() -> Any:
 def mock_agents() -> Any:
     """Create mock agents for testing."""
 
-    async def mock_execute(task: str, context: Dict[str, Any] = None) -> str:
+    async def mock_execute(task: str, context: dict[str, Any] = None) -> str:
         return f"Executed: {task}"
 
     agents = []

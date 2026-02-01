@@ -19,14 +19,11 @@ Tests are written FIRST, then implementation follows.
 """
 
 import asyncio
-from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from victor.workflows.definition import (
-    AgentNode,
-    TransformNode,
     WorkflowBuilder,
     WorkflowDefinition,
 )
@@ -359,7 +356,7 @@ class TestStreamingWorkflowExecutorSubscribe:
         mock_result.error = None
         mock_result.tool_calls_used = 0
 
-        received_events: List[WorkflowStreamChunk] = []
+        received_events: list[WorkflowStreamChunk] = []
 
         def callback(chunk: WorkflowStreamChunk):
             received_events.append(chunk)

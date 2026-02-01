@@ -54,7 +54,7 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.tools.cache_manager import ToolCacheManager
@@ -89,20 +89,20 @@ class Permission(Enum):
 
 
 # Default permission sets for common scenarios
-DEFAULT_PERMISSIONS: Set[Permission] = {Permission.READ_FILES}
+DEFAULT_PERMISSIONS: set[Permission] = {Permission.READ_FILES}
 
-SAFE_PERMISSIONS: Set[Permission] = {
+SAFE_PERMISSIONS: set[Permission] = {
     Permission.READ_FILES,
 }
 
-STANDARD_PERMISSIONS: Set[Permission] = {
+STANDARD_PERMISSIONS: set[Permission] = {
     Permission.READ_FILES,
     Permission.WRITE_FILES,
     Permission.EXECUTE_COMMANDS,
     Permission.GIT_OPERATIONS,
 }
 
-FULL_PERMISSIONS: Set[Permission] = set(Permission)
+FULL_PERMISSIONS: set[Permission] = set(Permission)
 
 
 @dataclass
@@ -136,7 +136,7 @@ class ToolExecutionContext:
     workspace_root: Path
 
     # Conversation state
-    conversation_history: List[Dict[str, Any]] = field(default_factory=list)
+    conversation_history: list[dict[str, Any]] = field(default_factory=list)
     current_stage: str = "INITIAL"
 
     # Budget tracking
@@ -146,21 +146,21 @@ class ToolExecutionContext:
     # Provider info
     provider_name: str = ""
     model_name: str = ""
-    provider_capabilities: Dict[str, Any] = field(default_factory=dict)
+    provider_capabilities: dict[str, Any] = field(default_factory=dict)
 
     # Permissions
-    user_permissions: Set[Permission] = field(default_factory=lambda: {Permission.READ_FILES})
+    user_permissions: set[Permission] = field(default_factory=lambda: {Permission.READ_FILES})
 
     # File state tracking
-    open_files: Dict[str, str] = field(default_factory=dict)  # path -> content
-    modified_files: Set[str] = field(default_factory=set)
-    created_files: Set[str] = field(default_factory=set)
+    open_files: dict[str, str] = field(default_factory=dict)  # path -> content
+    modified_files: set[str] = field(default_factory=set)
+    created_files: set[str] = field(default_factory=set)
 
     # Vertical context
     vertical: Optional[str] = None
 
     # Extensibility
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # Settings reference (optional, for backwards compatibility)
     settings: Optional[Any] = None
@@ -258,7 +258,7 @@ class ToolExecutionContext:
         """
         return permission in self.user_permissions
 
-    def has_all_permissions(self, permissions: Set[Permission]) -> bool:
+    def has_all_permissions(self, permissions: set[Permission]) -> bool:
         """Check if all specified permissions are granted.
 
         Args:
@@ -269,7 +269,7 @@ class ToolExecutionContext:
         """
         return permissions.issubset(self.user_permissions)
 
-    def has_any_permission(self, permissions: Set[Permission]) -> bool:
+    def has_any_permission(self, permissions: set[Permission]) -> bool:
         """Check if any of the specified permissions are granted.
 
         Args:
@@ -396,7 +396,7 @@ class ToolExecutionContext:
     # Backward Compatibility
     # ==========================================================================
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dict for backward compatibility.
 
         Returns:
@@ -432,7 +432,7 @@ class ToolExecutionContext:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ToolExecutionContext":
+    def from_dict(cls, data: dict[str, Any]) -> "ToolExecutionContext":
         """Create from dict for backward compatibility.
 
         Args:
@@ -446,7 +446,7 @@ class ToolExecutionContext:
         workspace_root = Path(data.get("workspace_root", "."))
 
         # Build permission set from boolean flags
-        permissions: Set[Permission] = set()
+        permissions: set[Permission] = set()
         if data.get("can_read", True):
             permissions.add(Permission.READ_FILES)
         if data.get("can_write", False):
@@ -522,7 +522,7 @@ def create_context(
     session_id: str,
     workspace_root: Path,
     *,
-    permissions: Optional[Set[Permission]] = None,
+    permissions: Optional[set[Permission]] = None,
     budget: int = 25,
     vertical: Optional[str] = None,
     settings: Optional[Any] = None,

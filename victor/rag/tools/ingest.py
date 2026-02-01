@@ -14,12 +14,11 @@
 
 """RAG Ingest Tool - Ingest documents into the RAG store."""
 
-import asyncio
 import logging
 import re
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 import aiohttp
@@ -105,7 +104,7 @@ class RAGIngestTool(BaseTool):
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any] | None = None,
+        _exec_ctx: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> ToolResult:
         """Execute document ingestion.
@@ -125,7 +124,7 @@ class RAGIngestTool(BaseTool):
         Returns:
             ToolResult with ingestion status
         """
-        from victor.rag.document_store import Document, DocumentStore
+        from victor.rag.document_store import Document
 
         path = kwargs.get("path")
         url = kwargs.get("url")
@@ -223,7 +222,7 @@ class RAGIngestTool(BaseTool):
         url: str,
         doc_type: str,
         doc_id: Optional[str],
-        metadata: Optional[Dict[str, Any]],
+        metadata: Optional[dict[str, Any]],
     ) -> ToolResult:
         """Ingest content from a URL."""
         from victor.rag.document_store import Document
@@ -274,7 +273,7 @@ class RAGIngestTool(BaseTool):
                 output=f"Failed to fetch URL {url}: {str(e)}",
             )
 
-    async def _fetch_url(self, url: str) -> Tuple[str, str]:
+    async def _fetch_url(self, url: str) -> tuple[str, str]:
         """Fetch content from URL and extract text.
 
         Returns:
@@ -338,7 +337,7 @@ class RAGIngestTool(BaseTool):
         directory: Path,
         recursive: bool,
         pattern: str,
-        metadata: Optional[Dict[str, Any]],
+        metadata: Optional[dict[str, Any]],
     ) -> ToolResult:
         """Ingest all matching files from a directory."""
         from victor.rag.document_store import Document

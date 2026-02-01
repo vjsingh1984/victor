@@ -18,14 +18,12 @@ import pytest
 
 from victor.framework.tool_packs import (
     BASE_FILE_OPS,
-    BASE_GIT,
     BASE_WEB,
     CODING_PACK,
     DEVOPS_PACK,
     ToolPack,
     ToolPackRegistry,
     create_custom_pack,
-    get_tool_pack_registry,
     register_default_packs,
     resolve_tool_pack,
 )

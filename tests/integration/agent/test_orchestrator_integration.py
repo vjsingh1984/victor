@@ -46,16 +46,13 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from victor.protocols import (
     AnalyticsEvent,
     AnalyticsQuery,
-    AnalyticsResult,
     ExportResult,
     CompactionContext,
     ContextBudget,

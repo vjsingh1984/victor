@@ -21,7 +21,7 @@ FileEditor and file_editor_tool.
 import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 from victor.core.language_capabilities import (
     CodeGroundingHook,

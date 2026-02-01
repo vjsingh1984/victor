@@ -28,7 +28,7 @@ Tests exercise the real implementations in:
 import asyncio
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 import pytest
 
@@ -37,7 +37,6 @@ from victor.framework.agent_protocols import (
     AgentMessage,
     IAgentPersona,
     IAgentRole,
-    ITeamMember,
     MessageType,
     TeamFormation,
 )
@@ -46,13 +45,10 @@ from victor.framework.agent_roles import (
     ManagerRole,
     ResearcherRole,
     ReviewerRole,
-    get_role,
 )
 from victor.framework.personas import Persona, get_persona
 from victor.teams import (
     UnifiedTeamCoordinator,
-    MemberResult,
-    TeamResult,
 )
 
 
@@ -66,10 +62,10 @@ class IntegrationTestRole:
     """Role for integration testing with configurable capabilities."""
 
     name: str = "test_role"
-    capabilities: Set[AgentCapability] = field(
+    capabilities: set[AgentCapability] = field(
         default_factory=lambda: {AgentCapability.READ, AgentCapability.COMMUNICATE}
     )
-    allowed_tools: Set[str] = field(default_factory=lambda: {"read_file"})
+    allowed_tools: set[str] = field(default_factory=lambda: {"read_file"})
     tool_budget: int = 15
 
     def get_system_prompt_section(self) -> str:
@@ -100,10 +96,10 @@ class IntegrationTestAgent:
         self.fail_on_task = fail_on_task
 
         # Tracking for test assertions
-        self.executed_tasks: List[str] = []
-        self.received_contexts: List[Dict[str, Any]] = []
-        self.received_messages: List[AgentMessage] = []
-        self.execution_timestamps: List[float] = []
+        self.executed_tasks: list[str] = []
+        self.received_contexts: list[dict[str, Any]] = []
+        self.received_messages: list[AgentMessage] = []
+        self.execution_timestamps: list[float] = []
 
     @property
     def id(self) -> str:
@@ -117,7 +113,7 @@ class IntegrationTestAgent:
     def persona(self) -> Optional[IAgentPersona]:
         return self._persona
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> str:
         """Execute a task with timing and state tracking."""
         self.execution_timestamps.append(time.time())
         self.executed_tasks.append(task)
@@ -170,13 +166,13 @@ def coordinator() -> UnifiedTeamCoordinator:
 
 
 @pytest.fixture
-def execution_tracker() -> List[str]:
+def execution_tracker() -> list[str]:
     """Create execution order tracker."""
     return []
 
 
 @pytest.fixture
-def three_agent_team() -> List[IntegrationTestAgent]:
+def three_agent_team() -> list[IntegrationTestAgent]:
     """Create a basic three-agent team."""
     return [
         IntegrationTestAgent("agent_1", delay=0.01),
@@ -199,7 +195,7 @@ def hierarchical_team() -> tuple:
 
 
 @pytest.fixture
-def pipeline_team() -> List[IntegrationTestAgent]:
+def pipeline_team() -> list[IntegrationTestAgent]:
     """Create a pipeline team with specialized roles."""
     researcher = IntegrationTestAgent(
         "researcher",
@@ -236,8 +232,8 @@ class TestSequentialFormation:
     async def test_sequential_execution_order(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_agent_team: List[IntegrationTestAgent],
-        execution_tracker: List[str],
+        three_agent_team: list[IntegrationTestAgent],
+        execution_tracker: list[str],
     ):
         """Agents execute in the order they were added."""
         for agent in three_agent_team:
@@ -257,7 +253,7 @@ class TestSequentialFormation:
     async def test_sequential_all_agents_receive_same_task(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_agent_team: List[IntegrationTestAgent],
+        three_agent_team: list[IntegrationTestAgent],
     ):
         """All agents receive the same task description."""
         for agent in three_agent_team:
@@ -276,7 +272,7 @@ class TestSequentialFormation:
     async def test_sequential_collects_all_results(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_agent_team: List[IntegrationTestAgent],
+        three_agent_team: list[IntegrationTestAgent],
     ):
         """Results are collected from all agents."""
         for agent in three_agent_team:
@@ -368,7 +364,7 @@ class TestParallelFormation:
     async def test_parallel_all_agents_execute(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_agent_team: List[IntegrationTestAgent],
+        three_agent_team: list[IntegrationTestAgent],
     ):
         """All agents execute the task in parallel formation."""
         for agent in three_agent_team:
@@ -432,7 +428,7 @@ class TestParallelFormation:
     async def test_parallel_collects_all_results(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_agent_team: List[IntegrationTestAgent],
+        three_agent_team: list[IntegrationTestAgent],
     ):
         """Parallel execution collects results from all agents."""
         for agent in three_agent_team:
@@ -461,7 +457,7 @@ class TestHierarchicalFormation:
         self,
         coordinator: UnifiedTeamCoordinator,
         hierarchical_team: tuple,
-        execution_tracker: List[str],
+        execution_tracker: list[str],
     ):
         """Manager executes before workers in hierarchical formation."""
         manager, workers = hierarchical_team
@@ -486,7 +482,7 @@ class TestHierarchicalFormation:
         self,
         coordinator: UnifiedTeamCoordinator,
         hierarchical_team: tuple,
-        execution_tracker: List[str],
+        execution_tracker: list[str],
     ):
         """Workers execute after manager in hierarchical formation."""
         manager, workers = hierarchical_team
@@ -510,7 +506,7 @@ class TestHierarchicalFormation:
     async def test_hierarchical_auto_selects_manager_by_capability(
         self,
         coordinator: UnifiedTeamCoordinator,
-        execution_tracker: List[str],
+        execution_tracker: list[str],
     ):
         """Auto-selects manager based on DELEGATE capability."""
         # Agent with DELEGATE capability should be auto-selected as manager
@@ -543,7 +539,7 @@ class TestHierarchicalFormation:
     async def test_hierarchical_with_explicit_manager(
         self,
         coordinator: UnifiedTeamCoordinator,
-        execution_tracker: List[str],
+        execution_tracker: list[str],
     ):
         """Explicit manager is used when set."""
         agents = [IntegrationTestAgent(f"agent_{i}") for i in range(3)]
@@ -598,8 +594,8 @@ class TestPipelineFormation:
     async def test_pipeline_sequential_order(
         self,
         coordinator: UnifiedTeamCoordinator,
-        pipeline_team: List[IntegrationTestAgent],
-        execution_tracker: List[str],
+        pipeline_team: list[IntegrationTestAgent],
+        execution_tracker: list[str],
     ):
         """Pipeline executes in sequence."""
         for agent in pipeline_team:
@@ -618,7 +614,7 @@ class TestPipelineFormation:
     async def test_pipeline_passes_output_to_next_stage(
         self,
         coordinator: UnifiedTeamCoordinator,
-        pipeline_team: List[IntegrationTestAgent],
+        pipeline_team: list[IntegrationTestAgent],
     ):
         """Pipeline passes previous output to next stage."""
         for agent in pipeline_team:
@@ -638,7 +634,7 @@ class TestPipelineFormation:
     async def test_pipeline_final_output(
         self,
         coordinator: UnifiedTeamCoordinator,
-        pipeline_team: List[IntegrationTestAgent],
+        pipeline_team: list[IntegrationTestAgent],
     ):
         """Pipeline returns final stage output."""
         for agent in pipeline_team:
@@ -656,7 +652,7 @@ class TestPipelineFormation:
     async def test_pipeline_stops_on_failure(
         self,
         coordinator: UnifiedTeamCoordinator,
-        execution_tracker: List[str],
+        execution_tracker: list[str],
     ):
         """Pipeline stops when a stage fails."""
         agent1 = IntegrationTestAgent("stage_1")
@@ -717,7 +713,7 @@ class TestConsensusFormation:
     async def test_consensus_all_agents_execute(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_agent_team: List[IntegrationTestAgent],
+        three_agent_team: list[IntegrationTestAgent],
     ):
         """All agents execute in consensus formation."""
         for agent in three_agent_team:
@@ -734,7 +730,7 @@ class TestConsensusFormation:
     async def test_consensus_achieved_when_all_succeed(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_agent_team: List[IntegrationTestAgent],
+        three_agent_team: list[IntegrationTestAgent],
     ):
         """Consensus is achieved when all agents succeed."""
         for agent in three_agent_team:
@@ -786,7 +782,7 @@ class TestCrossFormation:
 
         for formation in [TeamFormation.SEQUENTIAL, TeamFormation.PARALLEL]:
             coord = UnifiedTeamCoordinator()
-            tracker: List[str] = []
+            tracker: list[str] = []
 
             agents = [IntegrationTestAgent(f"agent_{i}", delay=0.05) for i in range(3)]
 
@@ -841,7 +837,7 @@ class TestCrossFormation:
     async def test_formation_switching(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_agent_team: List[IntegrationTestAgent],
+        three_agent_team: list[IntegrationTestAgent],
     ):
         """Formation can be switched between tasks."""
         for agent in three_agent_team:

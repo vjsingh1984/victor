@@ -41,8 +41,8 @@ Example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Optional
 
 
 @dataclass
@@ -73,8 +73,8 @@ class Persona:
     name: str
     background: str
     communication_style: str = "professional"
-    expertise_areas: Tuple[str, ...] = ()
-    quirks: Tuple[str, ...] = ()
+    expertise_areas: tuple[str, ...] = ()
+    quirks: tuple[str, ...] = ()
 
     def format_message(self, content: str) -> str:
         """Format a message according to persona's communication style.
@@ -149,7 +149,7 @@ class Persona:
 
         return "\n".join(sections)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert persona to dictionary for serialization.
 
         Returns:
@@ -169,7 +169,7 @@ class Persona:
 # =============================================================================
 
 
-PERSONA_REGISTRY: Dict[str, Persona] = {
+PERSONA_REGISTRY: dict[str, Persona] = {
     "friendly_assistant": Persona(
         name="Friendly Assistant",
         background=(
@@ -299,7 +299,7 @@ def register_persona(name: str, persona: Persona) -> None:
     PERSONA_REGISTRY[name] = persona
 
 
-def list_personas() -> List[str]:
+def list_personas() -> list[str]:
     """List all registered persona names.
 
     Returns:

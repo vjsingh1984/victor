@@ -5,7 +5,6 @@ from victor.config.settings import Settings
 from victor.providers.base import BaseProvider
 from victor.tools.base import BaseTool, ToolResult
 from victor.tools.registry import ToolRegistry
-from pathlib import Path
 
 
 class DummyProvider(BaseProvider):

@@ -18,10 +18,8 @@ These tests follow TDD - written before implementation.
 They verify the agent protocols that enable CrewAI-style multi-agent orchestration.
 """
 
-import pytest
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set
-from unittest.mock import AsyncMock, MagicMock
+from typing import Any, Optional
 
 
 # =============================================================================
@@ -225,7 +223,6 @@ class TestIAgentRoleProtocol:
 
     def test_role_protocol_is_runtime_checkable(self):
         """IAgentRole should be runtime checkable."""
-        from typing import runtime_checkable
 
         from victor.framework.agent_protocols import IAgentRole
 
@@ -427,8 +424,8 @@ class TestProtocolImplementationCompliance:
         @dataclass
         class MockRole:
             name: str = "mock_role"
-            capabilities: Set[AgentCapability] = None
-            allowed_tools: Set[str] = None
+            capabilities: set[AgentCapability] = None
+            allowed_tools: set[str] = None
             tool_budget: int = 10
 
             def __post_init__(self):
@@ -464,8 +461,6 @@ class TestProtocolImplementationCompliance:
         from victor.framework.agent_protocols import (
             AgentCapability,
             AgentMessage,
-            IAgentPersona,
-            IAgentRole,
             ITeamMember,
             MessageType,
         )
@@ -473,8 +468,8 @@ class TestProtocolImplementationCompliance:
         @dataclass
         class MockRole:
             name: str = "mock_role"
-            capabilities: Set[AgentCapability] = None
-            allowed_tools: Set[str] = None
+            capabilities: set[AgentCapability] = None
+            allowed_tools: set[str] = None
             tool_budget: int = 10
 
             def __post_init__(self):
@@ -501,7 +496,7 @@ class TestProtocolImplementationCompliance:
                 self.role = MockRole()
                 self.persona = MockPersona()
 
-            async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+            async def execute_task(self, task: str, context: dict[str, Any]) -> str:
                 return f"Executed: {task}"
 
             async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:

@@ -29,20 +29,15 @@ Target: 70%+ coverage for victor/agent/tool_pipeline.py (2,183 lines)
 """
 
 import asyncio
-import json
 import pytest
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
-from unittest.mock import Mock, AsyncMock, MagicMock, patch
+from typing import Any, Optional
+from unittest.mock import Mock, AsyncMock
 from dataclasses import dataclass
-from threading import Lock
 import time
 
 from victor.agent.tool_pipeline import (
     ToolPipeline,
     ToolPipelineConfig,
-    ToolCallResult,
-    PipelineExecutionResult,
     ExecutionMetrics,
     LRUToolCache,
     ToolRateLimiter,
@@ -54,7 +49,6 @@ from victor.agent.safety import (
     OperationalRiskLevel,
     ApprovalMode,
     ConfirmationRequest,
-    set_confirmation_callback,
 )
 from victor.tools.base import BaseTool
 from victor.tools.registry import ToolRegistry
@@ -80,7 +74,7 @@ class MockTool(BaseTool):
         self._execute_result = execute_result
         self._should_fail = should_fail
         self.execute_count = 0
-        self.last_args: Optional[Dict[str, Any]] = None
+        self.last_args: Optional[dict[str, Any]] = None
 
     async def execute(self, **kwargs) -> Any:
         """Mock execution."""
@@ -96,7 +90,7 @@ class MockToolCall:
     """Mock tool call structure."""
 
     name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
 
 
 @pytest.fixture

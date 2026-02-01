@@ -88,7 +88,7 @@ class ResearchWorkflowProvider(BaseYAMLWorkflowProvider):
         """
         return "victor.research.capabilities"
 
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
+    def get_auto_workflows(self) -> list[tuple[str, str]]:
         """Get automatic workflow triggers based on query patterns.
 
         Returns:

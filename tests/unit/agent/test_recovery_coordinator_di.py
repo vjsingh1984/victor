@@ -18,11 +18,9 @@ Tests dependency injection container resolution and service lifetime.
 """
 
 import pytest
-from unittest.mock import Mock, patch
 
 from victor.agent.service_provider import OrchestratorServiceProvider
 from victor.agent.protocols import StreamingRecoveryCoordinatorProtocol
-from victor.config.settings import Settings
 
 
 @pytest.fixture

@@ -32,9 +32,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import time
-import traceback
-from typing import Any, Dict, Optional
-from datetime import datetime, timezone
+from typing import Any, Optional
 
 from victor.observability.emitters.base import IToolEventEmitter
 from victor.core.events import MessagingEvent
@@ -106,7 +104,7 @@ class ToolEventEmitter(IToolEventEmitter):
     async def emit_async(
         self,
         topic: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> bool:
         """Emit a tool event asynchronously.
 
@@ -169,7 +167,7 @@ class ToolEventEmitter(IToolEventEmitter):
     async def tool_start_async(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         **metadata: Any,
     ) -> bool:
         """Emit tool execution start event asynchronously.
@@ -194,7 +192,7 @@ class ToolEventEmitter(IToolEventEmitter):
     def tool_start(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         **metadata: Any,
     ) -> None:
         """Emit tool execution start event (sync wrapper).
@@ -355,7 +353,7 @@ class ToolEventEmitter(IToolEventEmitter):
     def track_tool(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         **metadata: Any,
     ):
         """Context manager for tracking tool execution.

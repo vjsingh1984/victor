@@ -22,7 +22,7 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 from victor.agent.protocols import IMessageStore
 
@@ -98,7 +98,7 @@ class MessageStore(IMessageStore):
     def add_assistant_message(
         self,
         content: str,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        tool_calls: Optional[list[dict[str, Any]]] = None,
         **metadata: Any,
     ) -> "Message":
         """Add an assistant message.
@@ -137,7 +137,7 @@ class MessageStore(IMessageStore):
         msg = self._controller.add_message("tool", content, **msg_metadata)
         return cast("Message", msg)
 
-    def get_messages(self, limit: Optional[int] = None) -> List["Message"]:
+    def get_messages(self, limit: Optional[int] = None) -> list["Message"]:
         """Retrieve messages.
 
         Args:
@@ -147,7 +147,7 @@ class MessageStore(IMessageStore):
             List of messages
         """
         result = self._controller.messages[:limit] if limit else self._controller.messages
-        return cast(List["Message"], result)
+        return cast(list["Message"], result)
 
     def get_last_user_message(self) -> Optional[str]:
         """Get the last user message content.
@@ -172,13 +172,13 @@ class MessageStore(IMessageStore):
         return None
 
     @property
-    def messages(self) -> List["Message"]:
+    def messages(self) -> list["Message"]:
         """Get all messages.
 
         Returns:
             List of all messages
         """
-        return cast(List["Message"], self._controller.messages)
+        return cast(list["Message"], self._controller.messages)
 
     @property
     def message_count(self) -> int:

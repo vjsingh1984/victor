@@ -25,12 +25,12 @@ Extracted from CRITICAL-001 Phase 2E.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Pattern
+from typing import Any, Optional
+from re import Pattern
 
 from victor.core.events import ObservabilityBus
-from victor.agent.tool_call_extractor import extract_tool_call_from_text, ExtractedToolCall
+from victor.agent.tool_call_extractor import extract_tool_call_from_text
 from victor.storage.embeddings.question_classifier import (
-    QuestionTypeClassifier,
     QuestionType,
     classify_question,
 )
@@ -56,14 +56,14 @@ _OUTPUT_REQUIREMENT_PATTERNS_RAW = {
 }
 
 # Pre-compile all patterns at module load (30-40% speedup on pattern matching)
-OUTPUT_REQUIREMENT_PATTERNS: Dict[str, List[Pattern[Any]]] = {
+OUTPUT_REQUIREMENT_PATTERNS: dict[str, list[Pattern[Any]]] = {
     key: [re.compile(pattern) for pattern in patterns]
     for key, patterns in _OUTPUT_REQUIREMENT_PATTERNS_RAW.items()
 }
 
 # Cache for tool mention patterns (avoid recompiling per-tool patterns)
 # Key: tool_name, Value: list of compiled patterns
-_TOOL_MENTION_PATTERN_CACHE: Dict[str, List[Pattern[Any]]] = {}
+_TOOL_MENTION_PATTERN_CACHE: dict[str, list[Pattern[Any]]] = {}
 
 # Common tool mention pattern templates (compiled once, tool name inserted)
 _TOOL_MENTION_TEMPLATES = [
@@ -73,7 +73,7 @@ _TOOL_MENTION_TEMPLATES = [
 ]
 
 
-def _get_tool_mention_patterns(tool_name: str) -> List[Pattern[Any]]:
+def _get_tool_mention_patterns(tool_name: str) -> list[Pattern[Any]]:
     """Get or create compiled patterns for detecting tool mentions.
 
     Caches compiled patterns per tool name to avoid recompilation.
@@ -134,7 +134,7 @@ class ContinuationStrategy:
             return None
 
     def _emit_event(
-        self, topic: str, data: Dict[str, Any], source: str = "ContinuationStrategy"
+        self, topic: str, data: dict[str, Any], source: str = "ContinuationStrategy"
     ) -> None:
         """Emit event with error handling (non-blocking).
 
@@ -216,7 +216,7 @@ class ContinuationStrategy:
         max_iterations: int,
         estimated_tokens: int,
         content_length: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Calculate hybrid continuation score combining all signals.
 
         Uses the ContinuationSignals class to compute a weighted score from:
@@ -256,8 +256,8 @@ class ContinuationStrategy:
 
     @staticmethod
     def detect_mentioned_tools(
-        text: str, all_tool_names: List[str], tool_aliases: Dict[str, str]
-    ) -> List[str]:
+        text: str, all_tool_names: list[str], tool_aliases: dict[str, str]
+    ) -> list[str]:
         """Detect tool names mentioned in text that model said it would call.
 
         Looks for patterns like:
@@ -276,7 +276,7 @@ class ContinuationStrategy:
         Returns:
             List of mentioned tool names (canonical form)
         """
-        mentioned: List[str] = []
+        mentioned: list[str] = []
         # Lowercase once, reuse for all pattern matches
         text_lower = text.lower()
 
@@ -294,7 +294,7 @@ class ContinuationStrategy:
 
         return mentioned
 
-    def _output_requirements_met(self, content: Optional[str], required_outputs: List[str]) -> bool:
+    def _output_requirements_met(self, content: Optional[str], required_outputs: list[str]) -> bool:
         """Check if response content contains required output elements.
 
         Uses pre-compiled pattern matching to detect common output format elements
@@ -494,7 +494,7 @@ class ContinuationStrategy:
         continuation_prompts: int,
         asking_input_prompts: int,
         one_shot_mode: bool,
-        mentioned_tools: Optional[List[str]],
+        mentioned_tools: Optional[list[str]],
         # Context from orchestrator
         max_prompts_summary_requested: bool,
         settings: Any,
@@ -502,13 +502,13 @@ class ContinuationStrategy:
         provider_name: str,
         model: str,
         tool_budget: int,
-        unified_tracker_config: Dict[str, Any],
-        task_completion_signals: Optional[Dict[str, Any]] = None,
+        unified_tracker_config: dict[str, Any],
+        task_completion_signals: Optional[dict[str, Any]] = None,
         progress_metrics: Optional[Any] = None,  # ProgressMetrics instance
         task_complexity: Optional[
             str
         ] = None,  # Task complexity level (simple/medium/complex/generation)
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
 
         Encapsulates the complex decision logic for handling responses without tool
@@ -547,7 +547,7 @@ class ContinuationStrategy:
         """
         from victor.storage.embeddings.intent_classifier import IntentType
 
-        updates: Dict[str, Any] = {}
+        updates: dict[str, Any] = {}
 
         # Get complexity-based thresholds from settings
         max_interventions = self._get_complexity_threshold(
@@ -1016,9 +1016,9 @@ class ContinuationStrategy:
         # Budget/iteration thresholds (reserved for future use)
         _budget_threshold = (
             tool_budget // 4 if requires_continuation_support else tool_budget // 2
-        )  # noqa: F841
+        )
         max_iterations = unified_tracker_config.get("max_total_iterations", 50)
-        _iteration_threshold = (  # noqa: F841
+        _iteration_threshold = (
             max_iterations * 3 // 4 if requires_continuation_support else max_iterations // 2
         )
 

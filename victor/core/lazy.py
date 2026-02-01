@@ -50,8 +50,9 @@ Known Circular Import Chains (documented for future developers):
 
 import logging
 import threading
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Generic, List, Optional, Type, TypeVar, cast, overload
+from dataclasses import dataclass
+from typing import Any, Generic, Optional, TypeVar, cast, overload
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -88,17 +89,17 @@ class LazyProperty(Generic[T]):
         self._factory = factory
         self._attr_name: Optional[str] = None
 
-    def __set_name__(self, owner: Type[Any], name: str) -> None:
+    def __set_name__(self, owner: type[Any], name: str) -> None:
         """Called when the descriptor is assigned to a class attribute."""
         self._attr_name = f"_lazy_{name}"
 
     @overload
-    def __get__(self, obj: None, objtype: Type[Any]) -> "LazyProperty[T]": ...
+    def __get__(self, obj: None, objtype: type[Any]) -> "LazyProperty[T]": ...
 
     @overload
-    def __get__(self, obj: object, objtype: Type[Any]) -> T: ...
+    def __get__(self, obj: object, objtype: type[Any]) -> T: ...
 
-    def __get__(self, obj: Optional[object], objtype: Type[Any]) -> Any:
+    def __get__(self, obj: Optional[object], objtype: type[Any]) -> Any:
         """Get the lazy-initialized value, creating it on first access."""
         if obj is None:
             return self
@@ -122,7 +123,7 @@ def deferred_import(
     fallback: Optional[T] = None,
     call_method: Optional[str] = None,
     init_args: Optional[tuple[Any, ...]] = None,
-    init_kwargs: Optional[Dict[str, Any]] = None,
+    init_kwargs: Optional[dict[str, Any]] = None,
     logger_name: str = __name__,
 ) -> Optional[T]:
     """Safely import and instantiate a class with fallback on error.
@@ -199,13 +200,13 @@ class SingletonFactory:
         SingletonFactory.clear(TaskAnalyzer)
     """
 
-    _instances: Dict[Type[Any], Any] = {}
+    _instances: dict[type[Any], Any] = {}
     _lock = threading.Lock()
 
     @classmethod
     def get_or_create(
         cls,
-        service_type: Type[T],
+        service_type: type[T],
         factory: Optional[Callable[[], T]] = None,
     ) -> T:
         """Get or create a singleton instance.
@@ -229,12 +230,12 @@ class SingletonFactory:
         return cast(T, cls._instances[service_type])
 
     @classmethod
-    def has_instance(cls, service_type: Type[Any]) -> bool:
+    def has_instance(cls, service_type: type[Any]) -> bool:
         """Check if a singleton instance exists."""
         return service_type in cls._instances
 
     @classmethod
-    def clear(cls, service_type: Optional[Type[Any]] = None) -> None:
+    def clear(cls, service_type: Optional[type[Any]] = None) -> None:
         """Clear singleton instance(s).
 
         Args:
@@ -247,7 +248,7 @@ class SingletonFactory:
                 cls._instances.clear()
 
     @classmethod
-    def set_instance(cls, service_type: Type[T], instance: T) -> None:
+    def set_instance(cls, service_type: type[T], instance: T) -> None:
         """Set a singleton instance directly (useful for testing).
 
         Args:
@@ -267,7 +268,7 @@ class CircularImportInfo:
     """
 
     module: str
-    chain: List[str]
+    chain: list[str]
     reason: str
     solution_file: str
     solution_line: int
@@ -276,7 +277,7 @@ class CircularImportInfo:
 
 
 # Registry of known circular import chains (for documentation)
-KNOWN_CIRCULAR_IMPORTS: Dict[str, CircularImportInfo] = {
+KNOWN_CIRCULAR_IMPORTS: dict[str, CircularImportInfo] = {
     "orchestrator_evaluation": CircularImportInfo(
         module="orchestrator.py",
         chain=[
@@ -359,7 +360,7 @@ def get_circular_import_info(key: str) -> Optional[CircularImportInfo]:
     return KNOWN_CIRCULAR_IMPORTS.get(key)
 
 
-def list_circular_imports() -> List[str]:
+def list_circular_imports() -> list[str]:
     """List all documented circular import chain keys."""
     return list(KNOWN_CIRCULAR_IMPORTS.keys())
 

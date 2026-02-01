@@ -41,13 +41,11 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.tools.selection.protocol import (
-    PerformanceProfile,
     ToolSelectionContext,
     ToolSelectionStrategy,
-    ToolSelectorFeatures,
 )
 
 if TYPE_CHECKING:
@@ -82,8 +80,8 @@ class ToolSelectionStrategyRegistry:
     """
 
     _instance: Optional["ToolSelectionStrategyRegistry"] = None
-    _strategies: Dict[str, ToolSelectionStrategy]
-    _strategy_classes: Dict[str, Type[ToolSelectionStrategy]]
+    _strategies: dict[str, ToolSelectionStrategy]
+    _strategy_classes: dict[str, type[ToolSelectionStrategy]]
 
     def __init__(self) -> None:
         """Initialize registry."""
@@ -132,7 +130,7 @@ class ToolSelectionStrategyRegistry:
     def register_class(
         self,
         name: str,
-        strategy_class: Type[ToolSelectionStrategy],
+        strategy_class: type[ToolSelectionStrategy],
         *,
         replace: bool = False,
     ) -> None:
@@ -245,7 +243,7 @@ class ToolSelectionStrategyRegistry:
 
         return None
 
-    def list_strategies(self) -> List[str]:
+    def list_strategies(self) -> list[str]:
         """List all registered strategy names.
 
         Returns:
@@ -254,7 +252,7 @@ class ToolSelectionStrategyRegistry:
         all_names = set(self._strategies.keys()) | set(self._strategy_classes.keys())
         return sorted(all_names)
 
-    def get_strategy_info(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_strategy_info(self, name: str) -> Optional[dict[str, Any]]:
         """Get information about a strategy.
 
         Args:
@@ -366,7 +364,7 @@ def get_best_strategy(
     )
 
 
-def list_strategies() -> List[str]:
+def list_strategies() -> list[str]:
     """List all strategies in global registry.
 
     Returns:

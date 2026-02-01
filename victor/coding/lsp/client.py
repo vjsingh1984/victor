@@ -20,19 +20,17 @@ import logging
 import os
 import subprocess
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.coding.lsp.config import LSPServerConfig
 
 # Use core LSP types from victor.protocols
 from victor.protocols.lsp_types import (
     Position,
-    Range,
     Location,
     Diagnostic,
-    DiagnosticSeverity,
     CompletionItem,
-    CompletionItemKind,
     Hover,
 )
 
@@ -53,12 +51,12 @@ class LSPClient:
         self.root_uri = root_uri
         self._process: Optional[subprocess.Popen[bytes]] = None
         self._request_id = 0
-        self._pending_requests: Dict[int, asyncio.Future[Any]] = {}
+        self._pending_requests: dict[int, asyncio.Future[Any]] = {}
         self._initialized = False
-        self._capabilities: Dict[str, Any] = {}
-        self._open_documents: Dict[str, int] = {}  # uri -> version
-        self._diagnostics: Dict[str, List[Diagnostic]] = {}
-        self._notification_handlers: Dict[str, List[Callable[..., Any]]] = {}
+        self._capabilities: dict[str, Any] = {}
+        self._open_documents: dict[str, int] = {}  # uri -> version
+        self._diagnostics: dict[str, list[Diagnostic]] = {}
+        self._notification_handlers: dict[str, list[Callable[..., Any]]] = {}
         self._reader_task: Optional[asyncio.Task[None]] = None
 
     @property
@@ -233,7 +231,7 @@ class LSPClient:
         }
         self._write_message(message)
 
-    def _write_message(self, message: Dict[str, Any]) -> None:
+    def _write_message(self, message: dict[str, Any]) -> None:
         """Write a message to the server."""
         if not self._process or not self._process.stdin:
             return
@@ -276,7 +274,7 @@ class LSPClient:
                 logger.error(f"Error reading from server: {e}")
                 break
 
-    def _parse_message(self, buffer: bytes) -> Tuple[Optional[Dict[str, Any]], bytes]:
+    def _parse_message(self, buffer: bytes) -> tuple[Optional[dict[str, Any]], bytes]:
         """Parse a message from the buffer.
 
         Returns:
@@ -320,7 +318,7 @@ class LSPClient:
             logger.error(f"Failed to parse message: {content[:100]}")
             return None, remaining
 
-    async def _handle_message(self, message: Dict[str, Any]) -> None:
+    async def _handle_message(self, message: dict[str, Any]) -> None:
         """Handle a message from the server."""
         if "id" in message:
             # Response to a request
@@ -347,7 +345,7 @@ class LSPClient:
                     except Exception as e:
                         logger.error(f"Notification handler error: {e}")
 
-    async def _handle_diagnostics(self, params: Dict[str, Any]) -> None:
+    async def _handle_diagnostics(self, params: dict[str, Any]) -> None:
         """Handle diagnostics notification."""
         uri = params.get("uri", "")
         diagnostics = [Diagnostic.from_dict(d) for d in params.get("diagnostics", [])]
@@ -417,7 +415,7 @@ class LSPClient:
             },
         )
 
-    async def get_completions(self, uri: str, position: Position) -> List[CompletionItem]:
+    async def get_completions(self, uri: str, position: Position) -> list[CompletionItem]:
         """Get completion items at a position.
 
         Args:
@@ -473,7 +471,7 @@ class LSPClient:
 
         return None
 
-    async def get_definition(self, uri: str, position: Position) -> List[Location]:
+    async def get_definition(self, uri: str, position: Position) -> list[Location]:
         """Get definition locations.
 
         Args:
@@ -505,7 +503,7 @@ class LSPClient:
 
     async def get_references(
         self, uri: str, position: Position, include_declaration: bool = True
-    ) -> List[Location]:
+    ) -> list[Location]:
         """Get reference locations.
 
         Args:
@@ -534,7 +532,7 @@ class LSPClient:
             logger.error(f"References error: {e}")
             return []
 
-    def get_diagnostics(self, uri: str) -> List[Diagnostic]:
+    def get_diagnostics(self, uri: str) -> list[Diagnostic]:
         """Get current diagnostics for a document.
 
         Args:

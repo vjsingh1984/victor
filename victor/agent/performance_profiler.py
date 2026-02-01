@@ -73,7 +73,8 @@ import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, Generator, List, Optional, TypeVar
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable, Generator
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +115,8 @@ class Span:
     start_time: float = field(default_factory=time.perf_counter)
     end_time: Optional[float] = None
     status: SpanStatus = SpanStatus.RUNNING
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    children: List[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    children: list[str] = field(default_factory=list)
     error: Optional[str] = None
 
     @property
@@ -143,7 +144,7 @@ class Span:
         """Add metadata to the span."""
         self.metadata[key] = value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "name": self.name,
@@ -170,11 +171,11 @@ class ProfileReport:
 
     total_duration_ms: float
     span_count: int
-    spans_by_category: Dict[str, List[Span]]
-    root_spans: List[Span]
+    spans_by_category: dict[str, list[Span]]
+    root_spans: list[Span]
     created_at: float = field(default_factory=time.time)
 
-    def get_category_stats(self, category: str) -> Dict[str, float]:
+    def get_category_stats(self, category: str) -> dict[str, float]:
         """Get statistics for a specific category.
 
         Returns:
@@ -208,7 +209,7 @@ class ProfileReport:
             "count": len(durations),
         }
 
-    def get_slowest_spans(self, n: int = 5) -> List[Span]:
+    def get_slowest_spans(self, n: int = 5) -> list[Span]:
         """Get the N slowest spans across all categories."""
         all_spans = []
         for spans in self.spans_by_category.values():
@@ -248,7 +249,7 @@ class ProfileReport:
 
         return "\n".join(lines)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "total_duration_ms": self.total_duration_ms,
@@ -297,8 +298,8 @@ class PerformanceProfiler:
             enabled: If False, profiling is disabled (zero overhead)
         """
         self._enabled = enabled
-        self._spans: Dict[str, Span] = {}
-        self._root_spans: List[str] = []
+        self._spans: dict[str, Span] = {}
+        self._root_spans: list[str] = []
         self._current_span: threading.local = threading.local()
         self._lock = threading.Lock()
         self._start_time: Optional[float] = None
@@ -436,11 +437,11 @@ class PerformanceProfiler:
         """Get a span by ID."""
         return self._spans.get(span_id)
 
-    def get_active_spans(self) -> List[Span]:
+    def get_active_spans(self) -> list[Span]:
         """Get all currently running spans."""
         return [s for s in self._spans.values() if not s.is_complete]
 
-    def get_spans_by_category(self, category: str) -> List[Span]:
+    def get_spans_by_category(self, category: str) -> list[Span]:
         """Get all spans in a category."""
         return [s for s in self._spans.values() if s.category == category]
 
@@ -457,7 +458,7 @@ class PerformanceProfiler:
             total_duration = (time.perf_counter() - self._start_time) * 1000
 
         # Group spans by category
-        spans_by_category: Dict[str, List[Span]] = {}
+        spans_by_category: dict[str, list[Span]] = {}
         for span_obj in self._spans.values():
             if span_obj.category not in spans_by_category:
                 spans_by_category[span_obj.category] = []

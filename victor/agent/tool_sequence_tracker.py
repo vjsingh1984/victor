@@ -42,14 +42,14 @@ Usage:
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 
 # Pre-defined common tool sequences (workflow patterns)
 # Format: (trigger_tool, likely_next_tools_with_base_weight)
-COMMON_TOOL_SEQUENCES: Dict[str, List[Tuple[str, float]]] = {
+COMMON_TOOL_SEQUENCES: dict[str, list[tuple[str, float]]] = {
     # File exploration → editing pattern
     "read_file": [
         ("edit_files", 0.35),
@@ -121,7 +121,7 @@ COMMON_TOOL_SEQUENCES: Dict[str, List[Tuple[str, float]]] = {
 }
 
 # Multi-step workflow patterns (sequences of 3+ tools)
-WORKFLOW_PATTERNS: List[Tuple[List[str], str, float]] = [
+WORKFLOW_PATTERNS: list[tuple[list[str], str, float]] = [
     # Pattern: [previous tools] → suggested tool, weight
     (["read_file", "edit_files"], "run_tests", 0.40),
     (["code_search", "read_file"], "edit_files", 0.35),
@@ -185,16 +185,16 @@ class ToolSequenceTracker:
         self.config = config or SequenceTrackerConfig()
 
         # Session history (recent tool calls)
-        self._history: List[str] = []
+        self._history: list[str] = []
 
         # Transition matrix: tool_a -> tool_b -> stats
-        self._transitions: Dict[str, Dict[str, TransitionStats]] = defaultdict(
+        self._transitions: dict[str, dict[str, TransitionStats]] = defaultdict(
             lambda: defaultdict(TransitionStats)
         )
 
         # Vertical-provided dependencies and sequences
-        self._vertical_dependencies: Dict[str, List[str]] = {}
-        self._vertical_sequences: Dict[str, List[Tuple[str, float]]] = {}
+        self._vertical_dependencies: dict[str, list[str]] = {}
+        self._vertical_sequences: dict[str, list[tuple[str, float]]] = {}
 
         # Pre-load common patterns if enabled
         if self.config.use_predefined_patterns:
@@ -256,8 +256,8 @@ class ToolSequenceTracker:
     def get_next_suggestions(
         self,
         top_k: int = 5,
-        exclude_tools: Optional[Set[str]] = None,
-    ) -> List[Tuple[str, float]]:
+        exclude_tools: Optional[set[str]] = None,
+    ) -> list[tuple[str, float]]:
         """Get suggested next tools with confidence scores.
 
         Args:
@@ -268,7 +268,7 @@ class ToolSequenceTracker:
             List of (tool_name, confidence) tuples sorted by confidence
         """
         exclude = exclude_tools or set()
-        suggestions: Dict[str, float] = {}
+        suggestions: dict[str, float] = {}
 
         if not self._history:
             return []
@@ -301,9 +301,9 @@ class ToolSequenceTracker:
 
     def apply_confidence_boost(
         self,
-        tool_scores: Dict[str, float],
+        tool_scores: dict[str, float],
         max_boost: float = 0.15,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Apply confidence boosts to existing tool scores.
 
         Args:
@@ -339,7 +339,7 @@ class ToolSequenceTracker:
 
         return boosted_scores
 
-    def get_workflow_progress(self) -> Optional[Tuple[str, float]]:
+    def get_workflow_progress(self) -> Optional[tuple[str, float]]:
         """Detect if we're in the middle of a known workflow.
 
         Returns:
@@ -382,7 +382,7 @@ class ToolSequenceTracker:
 
         return None
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get tracker statistics.
 
         Returns:
@@ -418,7 +418,7 @@ class ToolSequenceTracker:
 
         logger.debug("ToolSequenceTracker reset")
 
-    def set_dependencies(self, dependencies: Dict[str, List[str]]) -> None:
+    def set_dependencies(self, dependencies: dict[str, list[str]]) -> None:
         """Set vertical-provided tool dependencies.
 
         Tool dependencies define which tools should be available when
@@ -440,7 +440,7 @@ class ToolSequenceTracker:
 
         logger.debug(f"Set {len(dependencies)} vertical tool dependencies")
 
-    def set_sequences(self, sequences: Dict[str, List[Tuple[str, float]]]) -> None:
+    def set_sequences(self, sequences: dict[str, list[tuple[str, float]]]) -> None:
         """Set vertical-provided tool sequences.
 
         Tool sequences define common workflow patterns for the vertical,
@@ -464,7 +464,7 @@ class ToolSequenceTracker:
 
         logger.debug(f"Set {len(sequences)} vertical tool sequences")
 
-    def get_vertical_dependencies(self) -> Dict[str, List[str]]:
+    def get_vertical_dependencies(self) -> dict[str, list[str]]:
         """Get the vertical-provided tool dependencies.
 
         Returns:
@@ -472,7 +472,7 @@ class ToolSequenceTracker:
         """
         return getattr(self, "_vertical_dependencies", {})
 
-    def get_vertical_sequences(self) -> Dict[str, List[Tuple[str, float]]]:
+    def get_vertical_sequences(self) -> dict[str, list[tuple[str, float]]]:
         """Get the vertical-provided tool sequences.
 
         Returns:

@@ -38,7 +38,7 @@ Usage:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import List, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from victor.core.verticals.protocols.safety_provider import (
     SafetyExtensionProtocol,
@@ -65,7 +65,7 @@ class SafetyExtensionsProtocol(Protocol):
     """
 
     @abstractmethod
-    def get_safety_extensions(self) -> List[SafetyExtensionProtocol]:
+    def get_safety_extensions(self) -> list[SafetyExtensionProtocol]:
         """Get list of safety extension implementations.
 
         Returns:
@@ -74,7 +74,7 @@ class SafetyExtensionsProtocol(Protocol):
         """
         ...
 
-    def get_all_safety_patterns(self) -> List[SafetyPattern]:
+    def get_all_safety_patterns(self) -> list[SafetyPattern]:
         """Collect all safety patterns from extensions.
 
         Aggregates bash and file patterns from all registered
@@ -83,7 +83,7 @@ class SafetyExtensionsProtocol(Protocol):
         Returns:
             Combined list of safety patterns from all extensions
         """
-        patterns: List[SafetyPattern] = []
+        patterns: list[SafetyPattern] = []
         for ext in self.get_safety_extensions():
             patterns.extend(ext.get_bash_patterns())
             patterns.extend(ext.get_file_patterns())

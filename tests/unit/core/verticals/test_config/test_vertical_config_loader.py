@@ -19,8 +19,6 @@ multiple get_* methods with declarative YAML configuration.
 """
 
 import pytest
-from pathlib import Path
-from typing import Dict, Any, List
 
 from victor.core.verticals.config.vertical_config_loader import VerticalConfigLoader
 from victor.core.verticals.base import VerticalConfig, StageDefinition

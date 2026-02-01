@@ -33,7 +33,7 @@ Usage:
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 # =============================================================================
@@ -81,7 +81,7 @@ class NativeSymbol:
     end_line: int
     signature: str = ""
     docstring: str = ""
-    decorators: Tuple[str, ...] = ()
+    decorators: tuple[str, ...] = ()
     parent: Optional[str] = None
     visibility: str = "public"
 
@@ -109,7 +109,7 @@ class ChunkInfo:
     start_offset: int
     end_offset: int
     overlap_prev: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class CoercedType(str, Enum):
@@ -166,7 +166,7 @@ class NativeAcceleratorProtocol(Protocol):
         """Get backend identifier ("rust" or "python")."""
         ...
 
-    def get_metrics(self) -> Dict[str, float]:
+    def get_metrics(self) -> dict[str, float]:
         """Get performance metrics for this accelerator.
 
         Returns:
@@ -191,7 +191,7 @@ class SymbolExtractorProtocol(NativeAcceleratorProtocol, Protocol):
     Hot path: Called for every file during indexing.
     """
 
-    def extract_functions(self, source: str, lang: str) -> List[NativeSymbol]:
+    def extract_functions(self, source: str, lang: str) -> list[NativeSymbol]:
         """Extract function definitions from source.
 
         Args:
@@ -203,7 +203,7 @@ class SymbolExtractorProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def extract_classes(self, source: str, lang: str) -> List[NativeSymbol]:
+    def extract_classes(self, source: str, lang: str) -> list[NativeSymbol]:
         """Extract class definitions from source.
 
         Args:
@@ -215,7 +215,7 @@ class SymbolExtractorProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def extract_imports(self, source: str, lang: str) -> List[str]:
+    def extract_imports(self, source: str, lang: str) -> list[str]:
         """Extract import statements from source.
 
         Args:
@@ -227,7 +227,7 @@ class SymbolExtractorProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def extract_references(self, source: str) -> List[str]:
+    def extract_references(self, source: str) -> list[str]:
         """Extract all identifier references from source.
 
         Fast regex-based extraction of all identifiers.
@@ -262,7 +262,7 @@ class ArgumentNormalizerProtocol(NativeAcceleratorProtocol, Protocol):
     malformed JSON from LLM outputs.
     """
 
-    def normalize_json(self, value: str) -> Tuple[str, bool]:
+    def normalize_json(self, value: str) -> tuple[str, bool]:
         """Normalize a potentially malformed JSON string.
 
         Attempts multiple repair strategies:
@@ -316,7 +316,7 @@ class SimilarityComputerProtocol(NativeAcceleratorProtocol, Protocol):
     Uses SIMD optimizations when available for 2-5x speedup.
     """
 
-    def cosine(self, a: List[float], b: List[float]) -> float:
+    def cosine(self, a: list[float], b: list[float]) -> float:
         """Compute cosine similarity between two vectors.
 
         Args:
@@ -331,7 +331,7 @@ class SimilarityComputerProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def batch_cosine(self, query: List[float], corpus: List[List[float]]) -> List[float]:
+    def batch_cosine(self, query: list[float], corpus: list[list[float]]) -> list[float]:
         """Compute cosine similarity of query against corpus.
 
         Args:
@@ -345,10 +345,10 @@ class SimilarityComputerProtocol(NativeAcceleratorProtocol, Protocol):
 
     def similarity_matrix(
         self,
-        queries: List[List[float]],
-        corpus: List[List[float]],
+        queries: list[list[float]],
+        corpus: list[list[float]],
         normalize: bool = True,
-    ) -> List[List[float]]:
+    ) -> list[list[float]]:
         """Compute pairwise similarity matrix.
 
         Args:
@@ -362,8 +362,8 @@ class SimilarityComputerProtocol(NativeAcceleratorProtocol, Protocol):
         ...
 
     def top_k(
-        self, query: List[float], corpus: List[List[float]], k: int
-    ) -> List[Tuple[int, float]]:
+        self, query: list[float], corpus: list[list[float]], k: int
+    ) -> list[tuple[int, float]]:
         """Find top-k most similar vectors.
 
         Args:
@@ -384,7 +384,7 @@ class TextChunkerProtocol(NativeAcceleratorProtocol, Protocol):
     Optimized for code chunking where line boundaries matter.
     """
 
-    def chunk_with_overlap(self, text: str, chunk_size: int, overlap: int) -> List[ChunkInfo]:
+    def chunk_with_overlap(self, text: str, chunk_size: int, overlap: int) -> list[ChunkInfo]:
         """Chunk text with overlap, respecting line boundaries.
 
         Args:
@@ -408,7 +408,7 @@ class TextChunkerProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def find_line_boundaries(self, text: str) -> List[int]:
+    def find_line_boundaries(self, text: str) -> list[int]:
         """Find byte offsets of all line starts.
 
         Args:
@@ -457,7 +457,7 @@ class AstIndexerProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def batch_is_stdlib_modules(self, module_names: List[str]) -> List[bool]:
+    def batch_is_stdlib_modules(self, module_names: list[str]) -> list[bool]:
         """Check multiple module names for stdlib membership.
 
         Batch version for efficiency when processing many imports.
@@ -470,7 +470,7 @@ class AstIndexerProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def extract_identifiers(self, source: str) -> List[str]:
+    def extract_identifiers(self, source: str) -> list[str]:
         """Extract all identifier references from source code.
 
         Uses regex pattern [A-Za-z_][A-Za-z0-9_]* optimized with SIMD.
@@ -483,7 +483,7 @@ class AstIndexerProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def extract_identifiers_with_positions(self, source: str) -> List[Tuple[str, int, int]]:
+    def extract_identifiers_with_positions(self, source: str) -> list[tuple[str, int, int]]:
         """Extract identifiers with their positions.
 
         Args:
@@ -494,7 +494,7 @@ class AstIndexerProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def filter_stdlib_imports(self, imports: List[str]) -> Tuple[List[str], List[str]]:
+    def filter_stdlib_imports(self, imports: list[str]) -> tuple[list[str], list[str]]:
         """Partition imports into stdlib and non-stdlib.
 
         Args:
@@ -531,7 +531,7 @@ class ContentHasherProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def hash_dict(self, data: Dict[str, Any]) -> str:
+    def hash_dict(self, data: dict[str, Any]) -> str:
         """Hash dictionary with sorted keys for deterministic output.
 
         Args:
@@ -542,7 +542,7 @@ class ContentHasherProtocol(NativeAcceleratorProtocol, Protocol):
         """
         ...
 
-    def hash_list(self, items: List[Any]) -> str:
+    def hash_list(self, items: list[Any]) -> str:
         """Hash list with sorted items for deterministic output.
 
         Args:

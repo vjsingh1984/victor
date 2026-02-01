@@ -21,7 +21,6 @@ across all verticals (Research, DevOps, DataAnalysis).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict
 
 import pytest
 
@@ -352,7 +351,6 @@ class TestAutoRegistration:
     def test_research_handlers_auto_register(self) -> None:
         """Test research handlers auto-register on vertical import."""
         # Import the vertical package
-        from victor.research import workflows as research_workflows
 
         # Handler registration should have happened
         from victor.research.handlers import HANDLERS
@@ -362,7 +360,6 @@ class TestAutoRegistration:
 
     def test_devops_handlers_auto_register(self) -> None:
         """Test devops handlers auto-register on vertical import."""
-        from victor.devops import workflows as devops_workflows
 
         from victor.devops.handlers import HANDLERS
 
@@ -371,7 +368,6 @@ class TestAutoRegistration:
 
     def test_dataanalysis_handlers_auto_register(self) -> None:
         """Test dataanalysis handlers auto-register on vertical import."""
-        from victor.dataanalysis import workflows as dataanalysis_workflows
 
         from victor.dataanalysis.handlers import HANDLERS
 

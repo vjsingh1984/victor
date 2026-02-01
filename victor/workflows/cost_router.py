@@ -45,8 +45,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum, IntEnum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from enum import IntEnum
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class ModelConfig:
     name: str
     provider: str
     cost_tier: CostTier
-    capabilities: List[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     max_context: int = 100000
     input_cost_per_1k: float = 0.0
     output_cost_per_1k: float = 0.0
@@ -117,7 +117,7 @@ class RoutingDecision:
     provider: str
     cost_tier: CostTier
     reason: str
-    alternatives: List[str] = field(default_factory=list)
+    alternatives: list[str] = field(default_factory=list)
 
 
 class CostAwareRouter:
@@ -145,7 +145,7 @@ class CostAwareRouter:
     """
 
     # Default model registry
-    DEFAULT_MODELS: List[ModelConfig] = [
+    DEFAULT_MODELS: list[ModelConfig] = [
         # Anthropic models
         ModelConfig(
             name="claude-opus-4-20250514",
@@ -212,7 +212,7 @@ class CostAwareRouter:
 
     def __init__(
         self,
-        models: Optional[List[ModelConfig]] = None,
+        models: Optional[list[ModelConfig]] = None,
         default_provider: str = "anthropic",
         default_model: str = "claude-sonnet-4-20250514",
     ):
@@ -223,7 +223,7 @@ class CostAwareRouter:
             default_provider: Default provider when no constraints match
             default_model: Default model when no constraints match
         """
-        self._models: Dict[str, ModelConfig] = {}
+        self._models: dict[str, ModelConfig] = {}
         self._default_provider = default_provider
         self._default_model = default_model
 
@@ -244,18 +244,18 @@ class CostAwareRouter:
         """Get model configuration by name."""
         return self._models.get(name)
 
-    def get_models_by_tier(self, tier: CostTier) -> List[ModelConfig]:
+    def get_models_by_tier(self, tier: CostTier) -> list[ModelConfig]:
         """Get all models at a specific cost tier."""
         return [m for m in self._models.values() if m.cost_tier == tier]
 
-    def get_models_up_to_tier(self, max_tier: CostTier) -> List[ModelConfig]:
+    def get_models_up_to_tier(self, max_tier: CostTier) -> list[ModelConfig]:
         """Get all models at or below a cost tier."""
         return [m for m in self._models.values() if m.cost_tier <= max_tier]
 
     def route(
         self,
         max_cost_tier: Optional[CostTier] = None,
-        required_capabilities: Optional[List[str]] = None,
+        required_capabilities: Optional[list[str]] = None,
         preferred_provider: Optional[str] = None,
         min_context: Optional[int] = None,
         task_hint: Optional[str] = None,
@@ -307,7 +307,7 @@ class CostAwareRouter:
             )
 
         # Sort candidates by preference
-        def score_model(m: ModelConfig) -> Tuple[int, int, bool]:
+        def score_model(m: ModelConfig) -> tuple[int, int, bool]:
             tier_score = m.cost_tier  # Lower is better
             cap_score = -len(m.capabilities)  # More caps is better (negative)
             preferred = m.provider == preferred_provider
@@ -334,7 +334,7 @@ class CostAwareRouter:
 
     def select_for_constraints(
         self,
-        constraints_dict: Dict[str, Any],
+        constraints_dict: dict[str, Any],
     ) -> RoutingDecision:
         """Route based on TaskConstraints dictionary.
 
@@ -402,7 +402,7 @@ def get_default_router() -> CostAwareRouter:
 
 def route_for_cost(
     max_cost_tier: str = "HIGH",
-    required_capabilities: Optional[List[str]] = None,
+    required_capabilities: Optional[list[str]] = None,
 ) -> RoutingDecision:
     """Convenience function for quick routing.
 

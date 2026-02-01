@@ -46,7 +46,7 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, Optional, Set
+from typing import Optional
 
 
 logger = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ class EventCategoryRegistry:
         if getattr(self, "_initialized", False):
             return
 
-        self._categories: Dict[str, CustomEventCategory] = {}
+        self._categories: dict[str, CustomEventCategory] = {}
         self._instance_lock = threading.Lock()
         self._initialized = True
 
@@ -274,7 +274,7 @@ class EventCategoryRegistry:
         with self._instance_lock:
             return self._categories.get(name)
 
-    def list_custom(self) -> Set[str]:
+    def list_custom(self) -> set[str]:
         """List all registered custom category names.
 
         Returns:
@@ -283,7 +283,7 @@ class EventCategoryRegistry:
         with self._instance_lock:
             return set(self._categories.keys())
 
-    def list_all(self) -> Set[str]:
+    def list_all(self) -> set[str]:
         """List all category names (built-in + custom).
 
         Returns:
@@ -292,7 +292,7 @@ class EventCategoryRegistry:
         with self._instance_lock:
             return BUILTIN_TOPIC_PREFIXES | set(self._categories.keys())
 
-    def get_all_custom(self) -> Dict[str, CustomEventCategory]:
+    def get_all_custom(self) -> dict[str, CustomEventCategory]:
         """Get all custom categories as a dictionary.
 
         Returns:

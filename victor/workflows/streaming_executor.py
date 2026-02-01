@@ -42,28 +42,19 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Set,
 )
+from collections.abc import AsyncIterator, Callable
 
 from victor.workflows.definition import (
     AgentNode,
-    ConditionNode,
-    ParallelNode,
-    TransformNode,
     WorkflowDefinition,
-    WorkflowNode,
 )
 from victor.workflows.executor import (
     NodeResult,
     ExecutorNodeStatus,
     WorkflowContext,
     WorkflowExecutor,
-    WorkflowResult,
 )
 
 # Import canonical streaming types from streaming.py (DRY - Phase 5 consolidation)
@@ -119,7 +110,7 @@ class _ExecutorStreamContext:
 class _Subscription:
     """Internal subscription data."""
 
-    event_types: List["WorkflowEventType"]
+    event_types: list["WorkflowEventType"]
     callback: Callable[["WorkflowStreamChunk"], None]
     active: bool = True
 
@@ -186,14 +177,14 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
         )
 
         # Streaming state (uses _ExecutorStreamContext for percentage-based progress)
-        self._active_workflows: Dict[str, _ExecutorStreamContext] = {}
-        self._subscriptions: List[_Subscription] = []
+        self._active_workflows: dict[str, _ExecutorStreamContext] = {}
+        self._subscriptions: list[_Subscription] = []
         self._queue_poll_interval = 0.1  # 100ms poll interval
 
     async def astream(
         self,
         workflow: WorkflowDefinition,
-        initial_context: Optional[Dict[str, Any]] = None,
+        initial_context: Optional[dict[str, Any]] = None,
         *,
         timeout: Optional[float] = None,
         thread_id: Optional[str] = None,
@@ -368,8 +359,8 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
             raise ValueError("Workflow has no start node")
 
         # Track executed nodes to prevent loops
-        executed: Set[str] = set()
-        to_execute: List[str] = [workflow.start_node]
+        executed: set[str] = set()
+        to_execute: list[str] = [workflow.start_node]
 
         while to_execute:
             if stream_ctx.is_cancelled:
@@ -527,7 +518,7 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
 
     def subscribe(
         self,
-        event_types: List[WorkflowEventType],
+        event_types: list[WorkflowEventType],
         callback: Callable[[WorkflowStreamChunk], None],
     ) -> Callable[[], None]:
         """Subscribe to workflow events.
@@ -608,7 +599,7 @@ class StreamingWorkflowExecutor(WorkflowExecutor):
         logger.info(f"Cancellation requested for workflow: {workflow_id}")
         return True
 
-    def get_active_workflows(self) -> List[str]:
+    def get_active_workflows(self) -> list[str]:
         """Get list of active workflow IDs.
 
         Returns:

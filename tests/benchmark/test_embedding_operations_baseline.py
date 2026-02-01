@@ -8,7 +8,7 @@ including cosine similarity, top-k selection, cache operations, and matrix opera
 import pytest
 import numpy as np
 from collections import OrderedDict
-from typing import List, Tuple, Optional
+from typing import Optional
 
 
 # =============================================================================

@@ -24,10 +24,9 @@ Example:
 """
 
 import fnmatch
-from typing import Dict, List
 
 # DevOps infrastructure patterns
-DEVOPS_PATTERNS: Dict[str, List[str]] = {
+DEVOPS_PATTERNS: dict[str, list[str]] = {
     "docker": [
         "Dockerfile",
         "Dockerfile.*",
@@ -64,7 +63,7 @@ DEVOPS_PATTERNS: Dict[str, List[str]] = {
 }
 
 # Data file patterns
-DATA_PATTERNS: Dict[str, List[str]] = {
+DATA_PATTERNS: dict[str, list[str]] = {
     "csv": ["*.csv"],
     "excel": ["*.xlsx", "*.xls", "*.xlsm"],
     "parquet": ["*.parquet", "*.pq"],
@@ -76,7 +75,7 @@ DATA_PATTERNS: Dict[str, List[str]] = {
 }
 
 # Code file patterns
-CODE_PATTERNS: Dict[str, List[str]] = {
+CODE_PATTERNS: dict[str, list[str]] = {
     "python": ["*.py", "*.pyi", "*.pyx"],
     "javascript": ["*.js", "*.jsx", "*.mjs", "*.cjs"],
     "typescript": ["*.ts", "*.tsx"],
@@ -102,7 +101,7 @@ class FilePatternMatcher:
         # {"docker": ["Dockerfile"], "config": ["config.yaml"]}
     """
 
-    def __init__(self, categories: Dict[str, List[str]]) -> None:
+    def __init__(self, categories: dict[str, list[str]]) -> None:
         """Initialize with pattern categories.
 
         Args:
@@ -110,7 +109,7 @@ class FilePatternMatcher:
         """
         self.categories = categories
 
-    def match(self, paths: List[str]) -> Dict[str, List[str]]:
+    def match(self, paths: list[str]) -> dict[str, list[str]]:
         """Match paths to categories.
 
         Args:
@@ -120,7 +119,7 @@ class FilePatternMatcher:
             Dict of category -> list of matching paths.
             Only categories with matches are included.
         """
-        result: Dict[str, List[str]] = {cat: [] for cat in self.categories}
+        result: dict[str, list[str]] = {cat: [] for cat in self.categories}
 
         for path in paths:
             # Get just the filename for pattern matching
@@ -137,7 +136,7 @@ class FilePatternMatcher:
         # Remove empty categories
         return {k: v for k, v in result.items() if v}
 
-    def match_category(self, path: str) -> List[str]:
+    def match_category(self, path: str) -> list[str]:
         """Get all categories a path matches.
 
         Args:
@@ -149,7 +148,7 @@ class FilePatternMatcher:
         matches = self.match([path])
         return list(matches.keys())
 
-    def has_match(self, paths: List[str], category: str) -> bool:
+    def has_match(self, paths: list[str], category: str) -> bool:
         """Check if any path matches a category.
 
         Args:
@@ -170,7 +169,7 @@ class FilePatternMatcher:
         return False
 
 
-def create_combined_matcher(*pattern_dicts: Dict[str, List[str]]) -> FilePatternMatcher:
+def create_combined_matcher(*pattern_dicts: dict[str, list[str]]) -> FilePatternMatcher:
     """Create a matcher combining multiple pattern dictionaries.
 
     Args:
@@ -182,7 +181,7 @@ def create_combined_matcher(*pattern_dicts: Dict[str, List[str]]) -> FilePattern
     Example:
         matcher = create_combined_matcher(DEVOPS_PATTERNS, DATA_PATTERNS)
     """
-    combined: Dict[str, List[str]] = {}
+    combined: dict[str, list[str]] = {}
     for pd in pattern_dicts:
         for category, patterns in pd.items():
             if category in combined:

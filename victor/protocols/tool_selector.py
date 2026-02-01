@@ -42,13 +42,8 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
-    Union,
     runtime_checkable,
 )
 
@@ -76,10 +71,10 @@ class ToolSelectionResult:
         metadata: Additional metadata about the selection process
     """
 
-    tool_names: List[str]
-    scores: Dict[str, float] = field(default_factory=dict)
+    tool_names: list[str]
+    scores: dict[str, float] = field(default_factory=dict)
     strategy_used: ToolSelectionStrategy = ToolSelectionStrategy.HYBRID
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def top_tool(self) -> Optional[str]:
@@ -131,15 +126,15 @@ class ToolSelectionContext:
 
     task_description: str
     conversation_stage: Optional[str] = None
-    planned_tools: List[str] = field(default_factory=list)
-    previous_tools: List[str] = field(default_factory=list)
-    failed_tools: Set[str] = field(default_factory=set)
+    planned_tools: list[str] = field(default_factory=list)
+    previous_tools: list[str] = field(default_factory=list)
+    failed_tools: set[str] = field(default_factory=set)
     model_name: str = ""
     provider_name: str = ""
-    enabled_tools: Optional[Set[str]] = None
-    disabled_tools: Set[str] = field(default_factory=set)
+    enabled_tools: Optional[set[str]] = None
+    disabled_tools: set[str] = field(default_factory=set)
     cost_budget: Optional[float] = None
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[dict[str, Any]] = None
 
 
 @runtime_checkable
@@ -168,7 +163,7 @@ class IToolSelector(Protocol):
         prompt: str,
         context: "ToolSelectionContext",
         **kwargs: Any,
-    ) -> Union[ToolSelectionResult, List["ToolDefinition"]]:
+    ) -> ToolSelectionResult | list["ToolDefinition"]:
         """Select relevant tools for a task.
 
         Args:
@@ -216,8 +211,8 @@ class IConfigurableToolSelector(IToolSelector, Protocol):
     def configure(
         self,
         *,
-        enabled_tools: Optional[Set[str]] = None,
-        disabled_tools: Optional[Set[str]] = None,
+        enabled_tools: Optional[set[str]] = None,
+        disabled_tools: Optional[set[str]] = None,
         cost_tier_filter: Optional[str] = None,
     ) -> None:
         """Configure selector options.
@@ -233,7 +228,7 @@ class IConfigurableToolSelector(IToolSelector, Protocol):
         """Reset selector to default configuration."""
         ...
 
-    def get_available_tools(self) -> List[str]:
+    def get_available_tools(self) -> list[str]:
         """Get list of all available tool names.
 
         Returns:

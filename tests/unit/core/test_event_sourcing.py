@@ -16,10 +16,9 @@
 
 import pytest
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, List
 
 from victor.core.event_sourcing import (
     Aggregate,
@@ -29,13 +28,10 @@ from victor.core.event_sourcing import (
     EventEnvelope,
     EventSourcedRepository,
     InMemoryEventStore,
-    Projection,
     SQLiteEventStore,
     TaskCompletedEvent,
-    TaskFailedEvent,
     TaskStartedEvent,
     ToolCalledEvent,
-    ToolResultEvent,
     StateChangedEvent,
 )
 
@@ -80,7 +76,7 @@ class OrderAggregate(Aggregate):
     def __init__(self, aggregate_id: str):
         super().__init__(aggregate_id)
         self.customer = ""
-        self.items: List[Dict] = []
+        self.items: list[dict] = []
         self.total = 0.0
         self.status = "pending"
 

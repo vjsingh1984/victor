@@ -17,20 +17,18 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Callable, Dict
+from typing import Any
+from collections.abc import Callable
 
 import pytest
 
 from victor.tools.composition import (
     Runnable,
-    RunnableBinding,
     RunnableBranch,
     RunnableConfig,
     RunnableLambda,
     RunnableParallel,
     RunnablePassthrough,
-    RunnableSequence,
-    as_runnable,
     branch,
     chain,
     extract_if_success,
@@ -41,11 +39,11 @@ from victor.tools.composition import (
 )
 
 
-class MockRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
+class MockRunnable(Runnable[dict[str, Any], dict[str, Any]]):
     """Mock runnable for testing."""
 
     def __init__(
-        self, name: str, transform: Callable[[Dict[str, Any]], Dict[str, Any]] | None = None
+        self, name: str, transform: Callable[[dict[str, Any]], dict[str, Any]] | None = None
     ):
         self._name = name
         self._transform = transform or (lambda x: x)
@@ -58,9 +56,9 @@ class MockRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
 
     async def invoke(
         self,
-        input: Dict[str, Any],
+        input: dict[str, Any],
         config: RunnableConfig | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         self.invoke_count += 1
         self.last_input = input
         return self._transform(input)

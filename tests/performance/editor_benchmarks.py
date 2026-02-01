@@ -49,7 +49,6 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import gc
 import json
 import logging
@@ -60,8 +59,7 @@ import tracemalloc
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
-from unittest.mock import MagicMock, patch
+from typing import Any, Optional
 
 import pytest
 
@@ -97,11 +95,11 @@ class WorkflowNode:
     x: float
     y: float
     label: str
-    data: Dict[str, Any] = field(default_factory=dict)
-    inputs: List[str] = field(default_factory=list)
-    outputs: List[str] = field(default_factory=list)
+    data: dict[str, Any] = field(default_factory=dict)
+    inputs: list[str] = field(default_factory=list)
+    outputs: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert node to dictionary."""
         return {
             "id": self.id,
@@ -124,7 +122,7 @@ class WorkflowEdge:
     label: Optional[str] = None
     condition: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert edge to dictionary."""
         edge_dict = {
             "id": self.id,
@@ -142,8 +140,8 @@ class WorkflowEdge:
 class WorkflowGraph:
     """Mock workflow graph for editor benchmarking."""
 
-    nodes: List[WorkflowNode] = field(default_factory=list)
-    edges: List[WorkflowEdge] = field(default_factory=list)
+    nodes: list[WorkflowNode] = field(default_factory=list)
+    edges: list[WorkflowEdge] = field(default_factory=list)
 
     def add_node(self, node: WorkflowNode) -> None:
         """Add a node to the graph."""
@@ -153,7 +151,7 @@ class WorkflowGraph:
         """Add an edge to the graph."""
         self.edges.append(edge)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert graph to dictionary."""
         return {
             "nodes": [node.to_dict() for node in self.nodes],
@@ -212,7 +210,7 @@ def generate_random_label(node_type: NodeType) -> str:
 def generate_workflow_graph(
     node_count: int,
     edge_probability: float = 0.3,
-    node_types: Optional[List[NodeType]] = None,
+    node_types: Optional[list[NodeType]] = None,
 ) -> WorkflowGraph:
     """Generate a random workflow graph for benchmarking.
 
@@ -228,7 +226,7 @@ def generate_workflow_graph(
         node_types = list(NodeType)
 
     graph = WorkflowGraph()
-    nodes: Dict[str, WorkflowNode] = {}
+    nodes: dict[str, WorkflowNode] = {}
 
     # Generate nodes in a grid-like pattern
     grid_size = int(node_count**0.5) + 1
@@ -296,9 +294,9 @@ class MockWorkflowEditor:
         self.graph: Optional[WorkflowGraph] = None
         self.render_time: float = 0.0
         self.layout_time: float = 0.0
-        self.selected_nodes: Set[str] = set()
+        self.selected_nodes: set[str] = set()
         self.viewport = {"x": 0, "y": 0, "zoom": 1.0}
-        self._render_cache: Dict[str, Any] = {}
+        self._render_cache: dict[str, Any] = {}
 
     def load_graph(self, graph: WorkflowGraph) -> None:
         """Load a workflow graph into the editor."""
@@ -332,7 +330,7 @@ class MockWorkflowEditor:
                 "visible": True,
             }
 
-    def _calculate_node_bounds(self, node: WorkflowNode) -> Dict[str, float]:
+    def _calculate_node_bounds(self, node: WorkflowNode) -> dict[str, float]:
         """Calculate the bounding box for a node."""
         # Approximate node size based on type
         width = 180
@@ -346,7 +344,7 @@ class MockWorkflowEditor:
             "bottom": node.y + height,
         }
 
-    def _get_node_position(self, node_id: str) -> Optional[Dict[str, float]]:
+    def _get_node_position(self, node_id: str) -> Optional[dict[str, float]]:
         """Get the position of a node by ID."""
         if not self.graph:
             return None
@@ -402,7 +400,7 @@ class MockWorkflowEditor:
 
         return time.perf_counter() - start
 
-    def _is_visible(self, bounds: Dict[str, float]) -> bool:
+    def _is_visible(self, bounds: dict[str, float]) -> bool:
         """Check if a node is visible in the current viewport."""
         # Simple viewport culling
         viewport_width = 2000
@@ -441,7 +439,7 @@ class MockWorkflowEditor:
 
         return time.perf_counter() - start
 
-    def search_nodes(self, query: str) -> List[str]:
+    def search_nodes(self, query: str) -> list[str]:
         """Search for nodes by label."""
         if not self.graph:
             return []
@@ -483,11 +481,11 @@ class MockWorkflowEditor:
             return
 
         # Simple topological sort layering
-        layers: List[List[WorkflowNode]] = []
-        visited: Set[str] = set()
+        layers: list[list[WorkflowNode]] = []
+        visited: set[str] = set()
 
         # Find nodes with no incoming edges
-        in_degree: Dict[str, int] = {node.id: 0 for node in self.graph.nodes}
+        in_degree: dict[str, int] = {node.id: 0 for node in self.graph.nodes}
         for edge in self.graph.edges:
             in_degree[edge.target] += 1
 
@@ -496,7 +494,7 @@ class MockWorkflowEditor:
 
         while current_layer:
             layers.append(current_layer)
-            next_layer: List[WorkflowNode] = []
+            next_layer: list[WorkflowNode] = []
 
             for node in current_layer:
                 visited.add(node.id)

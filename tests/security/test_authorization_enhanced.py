@@ -35,8 +35,6 @@ from victor.core.security.authorization import (
     User,
     Policy,
     PolicyEffect,
-    ResourceType,
-    ActionType,
     AuthorizationDecision,
     get_enhanced_authorizer,
     set_enhanced_authorizer,

@@ -24,24 +24,20 @@ Target: 20% overall performance improvement
 """
 
 import asyncio
-import gc
 import os
 import time
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
+from victor.agent.tool_executor import ToolExecutor
 from victor.tools.base import BaseTool, ToolResult
 from victor.tools.registry import ToolRegistry
-from victor.tools.decorators import tool
 from victor.storage.cache.tool_cache import ToolCache
 from victor.storage.cache.config import CacheConfig
 from victor.agent.coordinators.compaction_strategies import (
     LLMCompactionStrategy,
     TruncationCompactionStrategy,
-    HybridCompactionStrategy,
 )
 from victor.agent.coordinators.prompt_coordinator import (
     PromptCoordinator,
@@ -49,7 +45,6 @@ from victor.agent.coordinators.prompt_coordinator import (
     SystemPromptContributor,
     PromptContext,
 )
-from victor.agent.context_compactor import ContextCompactor
 
 
 # =============================================================================

@@ -41,7 +41,6 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from typing import Dict, List, Tuple
 
 from victor.core.errors import SearchError
 from victor.protocols.search_router import (
@@ -87,7 +86,7 @@ class BackendSearchRouter(ISearchRouter):
 
     def __init__(self) -> None:
         """Initialize the backend search router."""
-        self._backends: Dict[SearchType, List[Tuple[int, ISearchBackend]]] = {}
+        self._backends: dict[SearchType, list[tuple[int, ISearchBackend]]] = {}
         logger.debug("BackendSearchRouter initialized")
 
     def register_backend(
@@ -183,7 +182,7 @@ class BackendSearchRouter(ISearchRouter):
             )
 
         # Track failed backends for detailed error reporting
-        failed_backends: Dict[str, Exception] = {}
+        failed_backends: dict[str, Exception] = {}
 
         # Try backends in priority order
         for priority, backend in backends:
@@ -241,7 +240,7 @@ class BackendSearchRouter(ISearchRouter):
             correlation_id=correlation_id,
         )
 
-    def get_available_backends(self) -> List[str]:
+    def get_available_backends(self) -> list[str]:
         """Get list of all registered backend names.
 
         Returns:
@@ -257,7 +256,7 @@ class BackendSearchRouter(ISearchRouter):
                 backend_names.add(backend.__class__.__name__)
         return list(backend_names)
 
-    def get_backends_for_type(self, search_type: SearchType) -> List[str]:
+    def get_backends_for_type(self, search_type: SearchType) -> list[str]:
         """Get backends registered for a specific search type.
 
         Args:

@@ -22,7 +22,7 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional, cast
 
 from victor.agent.protocols import ISessionManager
 
@@ -119,7 +119,7 @@ class SessionManager(ISessionManager):
             logger.warning(f"Failed to persist session: {e}")
             return False
 
-    def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_sessions(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent sessions.
 
         Args:
@@ -138,7 +138,7 @@ class SessionManager(ISessionManager):
             logger.error(f"Failed to list sessions: {e}")
             return []
 
-    def get_session_stats(self) -> Dict[str, Any]:
+    def get_session_stats(self) -> dict[str, Any]:
         """Get session statistics.
 
         Returns:

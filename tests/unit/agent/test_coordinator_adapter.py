@@ -93,7 +93,6 @@ class TestCoordinatorAdapter:
 
     def test_send_rl_reward_signal_with_coordinator(self):
         """Test sending RL reward signal with coordinator available."""
-        from unittest.mock import AsyncMock
 
         mock_eval_coordinator = Mock()
 

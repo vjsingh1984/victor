@@ -15,9 +15,9 @@
 """Tests for UnifiedStreamAdapter and SDK-specific adapters."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, List, Optional
+from typing import Any, Optional
 
 from victor.providers.stream_adapter import (
     StreamMetrics,
@@ -39,7 +39,6 @@ from victor.providers.base import (
     CompletionResponse,
     Message,
     StreamChunk,
-    ToolDefinition,
 )
 
 
@@ -198,7 +197,7 @@ class TestOpenAIAdapter:
 
         @dataclass
         class MockChunk:
-            choices: List[MockChoice]
+            choices: list[MockChoice]
 
         async def mock_stream():
             yield MockChunk(choices=[MockChoice(delta=MockDelta(content="hello"))])
@@ -238,7 +237,7 @@ class TestOpenAIAdapter:
         @dataclass
         class MockDelta:
             content: str = ""
-            tool_calls: List[MockToolCall] = None
+            tool_calls: list[MockToolCall] = None
 
         @dataclass
         class MockChoice:
@@ -247,7 +246,7 @@ class TestOpenAIAdapter:
 
         @dataclass
         class MockChunk:
-            choices: List[MockChoice]
+            choices: list[MockChoice]
 
         async def mock_stream():
             yield MockChunk(
@@ -413,7 +412,7 @@ class TestGoogleAdapter:
         @dataclass
         class MockChunk:
             text: str
-            candidates: Optional[List[MockCandidate]] = None
+            candidates: Optional[list[MockCandidate]] = None
 
         async def mock_stream():
             yield MockChunk(text="hello")

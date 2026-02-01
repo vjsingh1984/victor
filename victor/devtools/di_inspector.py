@@ -37,7 +37,7 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, cast
+from typing import Any, Optional, cast
 
 
 # Configure logging
@@ -64,7 +64,7 @@ class ServiceDescriptor:
     lifetime: ServiceLifetime
     implementation_type: Optional[str] = None
     file_path: Optional[str] = None
-    dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
     is_created: bool = False
 
     def __str__(self) -> str:
@@ -86,8 +86,8 @@ class DIInspector:
 
     def __init__(self) -> None:
         """Initialize the inspector."""
-        self.services: Dict[str, ServiceDescriptor] = {}
-        self.dependency_graph: Dict[str, Set[str]] = {}
+        self.services: dict[str, ServiceDescriptor] = {}
+        self.dependency_graph: dict[str, set[str]] = {}
         self._container: Any = None
         self._has_loaded = False
 
@@ -228,7 +228,7 @@ class DIInspector:
 
         return None
 
-    def _extract_dependencies(self, service_type: Any) -> List[str]:
+    def _extract_dependencies(self, service_type: Any) -> list[str]:
         """Extract dependencies from service type."""
         dependencies = []
 
@@ -255,7 +255,7 @@ class DIInspector:
         self,
         lifetime: Optional[ServiceLifetime] = None,
         show_created_only: bool = False,
-    ) -> List[ServiceDescriptor]:
+    ) -> list[ServiceDescriptor]:
         """List registered services.
 
         Args:
@@ -315,7 +315,7 @@ class DIInspector:
 
         print()
 
-    def find_dependents(self, service_name: str) -> List[str]:
+    def find_dependents(self, service_name: str) -> list[str]:
         """Find services that depend on this service.
 
         Args:
@@ -358,7 +358,7 @@ class DIInspector:
                         print(f"  -> {dep}")
 
     def _print_dependency_tree(
-        self, service_name: str, depth: int = 0, visited: Optional[Set[str]] = None
+        self, service_name: str, depth: int = 0, visited: Optional[set[str]] = None
     ) -> None:
         """Print dependency tree recursively."""
         if visited is None:
@@ -379,7 +379,7 @@ class DIInspector:
         for dep in service.dependencies:
             self._print_dependency_tree(dep, depth + 1, visited.copy())
 
-    def check_resolution_order(self) -> List[str]:
+    def check_resolution_order(self) -> list[str]:
         """Check if services can be resolved in topological order.
 
         Returns:
@@ -418,7 +418,7 @@ class DIInspector:
 
         return result
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get container statistics."""
         total = len(self.services)
         singletons = sum(

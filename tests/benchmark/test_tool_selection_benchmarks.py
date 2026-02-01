@@ -35,7 +35,6 @@ Performance Targets (to be validated after optimization):
 import asyncio
 import logging
 import os
-from typing import List
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
@@ -88,7 +87,7 @@ def mock_tool_registry():
     """Create a mock tool registry with configurable tool count."""
 
     class MockTool:
-        def __init__(self, name: str, description: str, keywords: List[str] = None):
+        def __init__(self, name: str, description: str, keywords: list[str] = None):
             self.name = name
             self.description = description
             self.keywords = keywords or []
@@ -116,7 +115,7 @@ def mock_tool_registry():
             self.num_tools = num_tools
             self._tools = self._create_mock_tools(num_tools)
 
-        def _create_mock_tools(self, num_tools: int) -> List[MockTool]:
+        def _create_mock_tools(self, num_tools: int) -> list[MockTool]:
             """Create mock tools with realistic descriptions and keywords."""
             tools = []
             tool_templates = [
@@ -147,7 +146,7 @@ def mock_tool_registry():
 
             return tools
 
-        def list_tools(self, only_enabled: bool = True) -> List[MockTool]:
+        def list_tools(self, only_enabled: bool = True) -> list[MockTool]:
             # For benchmarks, always return all tools (ignoring only_enabled)
             return self._tools
 

@@ -32,7 +32,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolCallResult
@@ -59,7 +59,7 @@ class ToolRegistryProtocol(Protocol):
         """Get a tool by name."""
         ...
 
-    def list_tools(self) -> List[str]:
+    def list_tools(self) -> list[str]:
         """List all registered tool names."""
         ...
 
@@ -89,7 +89,7 @@ class ToolPipelineProtocol(Protocol):
         """Maximum tool calls allowed."""
         ...
 
-    async def execute(self, tool_name: str, arguments: Dict[str, Any]) -> ToolCallResult:
+    async def execute(self, tool_name: str, arguments: dict[str, Any]) -> ToolCallResult:
         """Execute a tool call.
 
         Args:
@@ -135,7 +135,7 @@ class ToolExecutorProtocol(Protocol):
     def execute(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         context: Optional[Any] = None,
     ) -> Any:
         """Execute a tool synchronously.
@@ -153,7 +153,7 @@ class ToolExecutorProtocol(Protocol):
     async def aexecute(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         context: Optional[Any] = None,
     ) -> Any:
         """Execute a tool asynchronously.
@@ -171,7 +171,7 @@ class ToolExecutorProtocol(Protocol):
     def validate_arguments(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
     ) -> bool:
         """Validate tool arguments before execution.
 
@@ -197,15 +197,15 @@ class ToolExecutorProtocol(Protocol):
 class ToolCacheProtocol(Protocol):
     """Protocol for tool result caching."""
 
-    def get(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[Any]:
+    def get(self, tool_name: str, arguments: dict[str, Any]) -> Optional[Any]:
         """Get cached result for a tool call."""
         ...
 
-    def set(self, tool_name: str, arguments: Dict[str, Any], result: Any) -> None:
+    def set(self, tool_name: str, arguments: dict[str, Any], result: Any) -> None:
         """Cache a tool result."""
         ...
 
-    def invalidate(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def invalidate(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Invalidate a cached result."""
         ...
 
@@ -223,7 +223,7 @@ class ToolOutputFormatterProtocol(Protocol):
         self,
         tool_name: str,
         result: Any,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Format tool output for LLM consumption.
 
@@ -256,7 +256,7 @@ class ResponseSanitizerProtocol(Protocol):
 class ArgumentNormalizerProtocol(Protocol):
     """Protocol for argument normalization."""
 
-    def normalize(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def normalize(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Normalize tool arguments.
 
         Handles malformed arguments, type coercion, etc.
@@ -303,7 +303,7 @@ class ToolDependencyGraphProtocol(Protocol):
         """
         ...
 
-    def get_dependencies(self, tool: str) -> List[str]:
+    def get_dependencies(self, tool: str) -> list[str]:
         """Get dependencies for a tool.
 
         Args:
@@ -314,7 +314,7 @@ class ToolDependencyGraphProtocol(Protocol):
         """
         ...
 
-    def get_execution_order(self, tools: List[str]) -> List[str]:
+    def get_execution_order(self, tools: list[str]) -> list[str]:
         """Get optimal execution order for a list of tools.
 
         Args:
@@ -341,7 +341,7 @@ class ToolPluginRegistryProtocol(Protocol):
         """
         ...
 
-    def discover_tools(self) -> List[Any]:
+    def discover_tools(self) -> list[Any]:
         """Discover and load tools from registered plugins.
 
         Returns:

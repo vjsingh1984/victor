@@ -15,9 +15,9 @@
 
 import inspect
 import logging
-import warnings
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Set, Union, get_origin, get_args
+from typing import Any, Optional, Union, get_origin, get_args
+from collections.abc import Callable
 
 from docstring_parser import parse
 
@@ -104,7 +104,7 @@ def resolve_tool_name(name: str) -> str:
         return name
 
 
-def _get_json_schema_type(annotation: Any) -> Dict[str, Any]:
+def _get_json_schema_type(annotation: Any) -> dict[str, Any]:
     """Convert Python type annotation to JSON Schema type.
 
     Handles both runtime types (e.g., bool) and string annotations
@@ -201,25 +201,25 @@ def tool(
     func: Optional[Callable[..., Any]] = None,
     *,
     name: Optional[str] = None,
-    aliases: Optional[List[str]] = None,
+    aliases: Optional[list[str]] = None,
     cost_tier: CostTier = CostTier.FREE,
     category: Optional[str] = None,
-    keywords: Optional[List[str]] = None,
-    use_cases: Optional[List[str]] = None,
-    examples: Optional[List[str]] = None,
-    priority_hints: Optional[List[str]] = None,
+    keywords: Optional[list[str]] = None,
+    use_cases: Optional[list[str]] = None,
+    examples: Optional[list[str]] = None,
+    priority_hints: Optional[list[str]] = None,
     # Selection/approval metadata parameters
     priority: Priority = Priority.MEDIUM,
     access_mode: AccessMode = AccessMode.READONLY,
     danger_level: DangerLevel = DangerLevel.SAFE,
     # Stage affinity for conversation state machine
-    stages: Optional[List[str]] = None,
+    stages: Optional[list[str]] = None,
     # NEW: Mandatory keywords that force tool inclusion
-    mandatory_keywords: Optional[List[str]] = None,
+    mandatory_keywords: Optional[list[str]] = None,
     # NEW: Task types for classification-aware selection
-    task_types: Optional[List[str]] = None,
+    task_types: Optional[list[str]] = None,
     # NEW: Progress parameters for loop detection
-    progress_params: Optional[List[str]] = None,
+    progress_params: Optional[list[str]] = None,
     # NEW: Execution category for parallel execution
     execution_category: Optional[str] = None,
     # NEW: Availability check for optional tools requiring configuration
@@ -404,10 +404,10 @@ def _resolve_tool_name(func_name: str, explicit_name: Optional[str] = None) -> s
 def _create_tool_class(
     func: Callable[..., Any],
     cost_tier: CostTier = CostTier.FREE,
-    metadata_params: Optional[Dict[str, Any]] = None,
-    selection_params: Optional[Dict[str, Any]] = None,
+    metadata_params: Optional[dict[str, Any]] = None,
+    selection_params: Optional[dict[str, Any]] = None,
     explicit_name: Optional[str] = None,
-    explicit_aliases: Optional[List[str]] = None,
+    explicit_aliases: Optional[list[str]] = None,
 ) -> type:
     """Dynamically creates a class that wraps the given function to act as a BaseTool.
 
@@ -557,7 +557,7 @@ def _create_tool_class(
             return self._description
 
         @property
-        def parameters(self) -> Dict[str, Any]:
+        def parameters(self) -> dict[str, Any]:
             return self._parameters
 
         @property
@@ -565,7 +565,7 @@ def _create_tool_class(
             return self._cost_tier
 
         @property
-        def aliases(self) -> Set[str]:
+        def aliases(self) -> set[str]:
             """Return alias names for backward compatibility."""
             return self._aliases
 
@@ -589,14 +589,14 @@ def _create_tool_class(
             return self._category
 
         @property
-        def keywords(self) -> List[str]:
+        def keywords(self) -> list[str]:
             """Return keywords for semantic matching from @tool decorator."""
             if self._explicit_metadata and self._explicit_metadata.keywords:
                 return self._explicit_metadata.keywords
             return []
 
         @property
-        def stages(self) -> List[str]:
+        def stages(self) -> list[str]:
             """Return stages where this tool is relevant from @tool decorator.
 
             Stages indicate conversation phases where this tool is most useful:
@@ -611,7 +611,7 @@ def _create_tool_class(
             return self._stages
 
         @property
-        def mandatory_keywords(self) -> List[str]:
+        def mandatory_keywords(self) -> list[str]:
             """Return mandatory keywords that force tool inclusion.
 
             Unlike regular keywords, mandatory keywords guarantee tool inclusion
@@ -621,7 +621,7 @@ def _create_tool_class(
             return self._mandatory_keywords
 
         @property
-        def task_types(self) -> List[str]:
+        def task_types(self) -> list[str]:
             """Return task types this tool is relevant for.
 
             Valid types: "analysis", "action", "generation", "search", "edit", "default".
@@ -630,7 +630,7 @@ def _create_tool_class(
             return self._task_types
 
         @property
-        def progress_params(self) -> List[str]:
+        def progress_params(self) -> list[str]:
             """Return progress parameters for loop detection.
 
             These parameters indicate meaningful progress when changed between
@@ -715,7 +715,7 @@ def _create_tool_class(
             """Check if this tool should be included for the given task type."""
             return self._priority.should_include_for_task(task_type)
 
-        def all_names(self) -> Set[str]:
+        def all_names(self) -> set[str]:
             """Return all valid names (canonical + aliases)."""
             return {self._name} | self._aliases
 
@@ -746,7 +746,7 @@ def _create_tool_class(
             )
 
         async def execute(
-            self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any
+            self, _exec_ctx: dict[str, Any] | None = None, **kwargs: Any
         ) -> ToolResult:
             try:
                 # Check if the target function wants the framework execution context

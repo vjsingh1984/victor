@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.integrations.mcp.client import MCPClient
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -8,7 +8,7 @@ from victor.tools.decorators import tool
 _DEFAULT_MCP_PREFIX = "mcp"
 
 
-def _get_mcp_client(context: Optional[Dict[str, Any]] = None) -> Optional[MCPClient]:
+def _get_mcp_client(context: Optional[dict[str, Any]] = None) -> Optional[MCPClient]:
     """Get MCP client from execution context.
 
     Args:
@@ -22,7 +22,7 @@ def _get_mcp_client(context: Optional[Dict[str, Any]] = None) -> Optional[MCPCli
     return None
 
 
-def _get_mcp_prefix(context: Optional[Dict[str, Any]] = None) -> str:
+def _get_mcp_prefix(context: Optional[dict[str, Any]] = None) -> str:
     """Get MCP prefix from execution context.
 
     Args:
@@ -36,12 +36,12 @@ def _get_mcp_prefix(context: Optional[Dict[str, Any]] = None) -> str:
     return _DEFAULT_MCP_PREFIX
 
 
-def _prefixed(name: str, context: Optional[Dict[str, Any]] = None) -> str:
+def _prefixed(name: str, context: Optional[dict[str, Any]] = None) -> str:
     prefix = _get_mcp_prefix(context)
     return f"{prefix}_{name}"
 
 
-def get_mcp_tool_definitions(context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+def get_mcp_tool_definitions(context: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
     """Return MCP tools as Victor tool definitions with a name prefix."""
     mcp_client = _get_mcp_client(context)
     if not mcp_client or not mcp_client.tools:
@@ -70,9 +70,9 @@ def get_mcp_tool_definitions(context: Optional[Dict[str, Any]] = None) -> List[D
 )
 async def mcp(
     name: str,
-    arguments: Optional[Dict[str, Any]] = None,
-    context: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    arguments: Optional[dict[str, Any]] = None,
+    context: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """
     Call an MCP tool by name (prefixed with the MCP namespace).
     """

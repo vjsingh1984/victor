@@ -75,7 +75,7 @@ import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, cast
+from typing import TYPE_CHECKING, Any, Optional
 from urllib.request import Request, urlopen
 from urllib.error import URLError
 import base64
@@ -149,7 +149,7 @@ class NodeStyle:
 
 
 # Node type styling
-NODE_STYLES: Dict[str, NodeStyle] = {
+NODE_STYLES: dict[str, NodeStyle] = {
     "AgentNode": NodeStyle(
         shape="([{}])",  # stadium shape in mermaid
         color="#E3F2FD",  # light blue
@@ -204,7 +204,7 @@ class DAGNode:
     name: str
     node_type: str
     description: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -235,8 +235,8 @@ class WorkflowVisualizer:
             workflow: The workflow definition to visualize
         """
         self.workflow = workflow
-        self._nodes: List[DAGNode] = []
-        self._edges: List[DAGEdge] = []
+        self._nodes: list[DAGNode] = []
+        self._edges: list[DAGEdge] = []
         self._build_graph()
 
     def _build_graph(self) -> None:
@@ -246,7 +246,6 @@ class WorkflowVisualizer:
             ComputeNode,
             ConditionNode,
             ParallelNode,
-            TransformNode,
         )
 
         # Try to import HITLNode for enhanced metadata
@@ -263,7 +262,7 @@ class WorkflowVisualizer:
         for node_id, node in self.workflow.nodes.items():
             node_type = type(node).__name__
             description = None
-            metadata: Dict[str, Any] = {}
+            metadata: dict[str, Any] = {}
 
             if isinstance(node, AgentNode):
                 description = (
@@ -374,8 +373,8 @@ class WorkflowVisualizer:
         lines.append("")
 
         # Build adjacency for level calculation
-        adjacency: Dict[str, List[str]] = {n.id: [] for n in self._nodes}
-        in_degree: Dict[str, int] = {n.id: 0 for n in self._nodes}
+        adjacency: dict[str, list[str]] = {n.id: [] for n in self._nodes}
+        in_degree: dict[str, int] = {n.id: 0 for n in self._nodes}
 
         for edge in self._edges:
             if edge.target in adjacency:
@@ -383,7 +382,7 @@ class WorkflowVisualizer:
                 in_degree[edge.target] += 1
 
         # Topological levels
-        levels: Dict[str, int] = {}
+        levels: dict[str, int] = {}
         queue = [n for n in in_degree if in_degree[n] == 0]
         if not queue and self.workflow.start_node:
             queue = [self.workflow.start_node]
@@ -401,7 +400,7 @@ class WorkflowVisualizer:
             current_level += 1
 
         # Group nodes by level
-        level_nodes: Dict[int, List[DAGNode]] = {}
+        level_nodes: dict[int, list[DAGNode]] = {}
         for node in self._nodes:
             lvl = levels.get(node.id, 0)
             if lvl not in level_nodes:
@@ -534,7 +533,7 @@ class WorkflowVisualizer:
         lines.append("")
 
         # Build adjacency for traversal
-        visited: Set[str] = set()
+        visited: set[str] = set()
 
         def render_node(node_id: str, indent: str = "") -> None:
             if node_id in visited:
@@ -813,7 +812,7 @@ class WorkflowVisualizer:
             return self._to_svg_matplotlib(output_path)
         else:
             # Try in order
-            from typing import Callable
+            from collections.abc import Callable
 
             svg_methods: list[Callable[[Optional[str]], str]] = [
                 self._to_svg_d2,
@@ -1012,7 +1011,8 @@ class WorkflowVisualizer:
             self._to_png_graphviz(output_path)
         else:
             # Try in order
-            from typing import Callable, cast
+            from typing import cast
+            from collections.abc import Callable
 
             for method in [self._to_png_d2, self._to_png_kroki, self._to_png_graphviz]:
                 try:
@@ -1151,7 +1151,7 @@ def visualize_workflow(
     return viz.render(format, output_path)
 
 
-def get_available_backends() -> Dict[str, bool]:
+def get_available_backends() -> dict[str, bool]:
     """Check which rendering backends are available.
 
     Returns:

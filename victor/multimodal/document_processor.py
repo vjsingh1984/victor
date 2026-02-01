@@ -24,7 +24,7 @@ Supports:
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.multimodal.processor import ProcessingResult
@@ -99,7 +99,7 @@ class DocumentProcessor:
 
     async def process(
         self,
-        document_path: Union[str, Path],
+        document_path: str | Path,
         query: Optional[str] = None,
         extract_images: bool = False,
     ) -> "ProcessingResult":
@@ -174,7 +174,7 @@ class DocumentProcessor:
                 source=str(document_path),
             )
 
-    async def _extract_pdf(self, path: Path, extract_images: bool) -> tuple[str, Dict[str, Any]]:
+    async def _extract_pdf(self, path: Path, extract_images: bool) -> tuple[str, dict[str, Any]]:
         """Extract text from PDF."""
         if not PYPDF2_AVAILABLE:
             return "", {"error": "PyPDF2 not available"}
@@ -204,7 +204,7 @@ class DocumentProcessor:
             logger.error(f"PDF extraction failed: {e}")
             return "", {"error": str(e)}
 
-    async def _extract_docx(self, path: Path) -> tuple[str, Dict[str, Any]]:
+    async def _extract_docx(self, path: Path) -> tuple[str, dict[str, Any]]:
         """Extract text from DOCX."""
         if not DOCX_AVAILABLE:
             return "", {"error": "python-docx not available"}
@@ -238,7 +238,7 @@ class DocumentProcessor:
             logger.error(f"DOCX extraction failed: {e}")
             return "", {"error": str(e)}
 
-    async def _extract_pptx(self, path: Path) -> tuple[str, Dict[str, Any]]:
+    async def _extract_pptx(self, path: Path) -> tuple[str, dict[str, Any]]:
         """Extract text from PPTX."""
         if not PPTX_AVAILABLE:
             return "", {"error": "python-pptx not available"}
@@ -274,7 +274,7 @@ class DocumentProcessor:
             logger.error(f"PPTX extraction failed: {e}")
             return "", {"error": str(e)}
 
-    async def _extract_text(self, path: Path) -> tuple[str, Dict[str, Any]]:
+    async def _extract_text(self, path: Path) -> tuple[str, dict[str, Any]]:
         """Extract text from plain text files."""
         try:
             # Try different encodings

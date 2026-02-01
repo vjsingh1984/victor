@@ -30,7 +30,8 @@ References:
 import json
 import logging
 import re
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -39,7 +40,6 @@ from victor.providers.base import (
     CompletionResponse,
     Message,
     ProviderError,
-    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
@@ -81,7 +81,7 @@ def _model_supports_tools(model: str) -> bool:
     return any(pattern in model_lower for pattern in TOOL_CAPABLE_MODELS)
 
 
-def _extract_thinking_content(response: str) -> Tuple[str, str]:
+def _extract_thinking_content(response: str) -> tuple[str, str]:
     """Extract <think>...</think> tags from response.
 
     Args:
@@ -126,7 +126,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def __init__(
         self,
-        base_url: Union[str, List[str]] = "http://127.0.0.1:1234",
+        base_url: str | list[str] = "http://127.0.0.1:1234",
         timeout: int = DEFAULT_TIMEOUT,
         api_key: str = "lm-studio",
         _skip_discovery: bool = False,
@@ -155,9 +155,9 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
         self._raw_base_urls = base_url
         self._api_key = api_key
         self._models_available: Optional[bool] = None  # Set during URL discovery
-        self._context_window_cache: Dict[str, int] = {}
+        self._context_window_cache: dict[str, int] = {}
         self._current_model: Optional[str] = None  # Track current model for capability detection
-        self._model_tool_support_cache: Dict[str, bool] = {}  # Cache tool support per model
+        self._model_tool_support_cache: dict[str, bool] = {}  # Cache tool support per model
 
         # Use httpx directly (not AsyncOpenAI SDK) for consistent behavior with Ollama
         self.client = httpx.AsyncClient(
@@ -172,7 +172,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
     @classmethod
     async def create(
         cls,
-        base_url: Union[str, List[str]] = "http://127.0.0.1:1234",
+        base_url: str | list[str] = "http://127.0.0.1:1234",
         timeout: int = DEFAULT_TIMEOUT,
         api_key: str = "lm-studio",
         **kwargs: Any,
@@ -257,7 +257,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
             return False
         return _model_uses_thinking_tags(check_model)
 
-    async def check_model_status(self, model: str) -> Dict[str, Any]:
+    async def check_model_status(self, model: str) -> dict[str, Any]:
         """Check if a model is loaded and ready.
 
         Args:
@@ -317,7 +317,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
         context_window: Optional[int] = None
         supports_tools = True
         supports_streaming = True
-        raw_response: Optional[Dict[str, Any]] = None
+        raw_response: Optional[dict[str, Any]] = None
 
         try:
             resp = await self.client.get("/models")
@@ -357,7 +357,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
             raw=raw_response,
         )
 
-    def _extract_context_window(self, model_info: Dict[str, Any]) -> Optional[int]:
+    def _extract_context_window(self, model_info: dict[str, Any]) -> Optional[int]:
         """Extract context window from LMStudio model info."""
         candidates = [
             model_info.get("context_length"),
@@ -373,7 +373,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
                 continue
         return None
 
-    def _select_base_url(self, base_url: Union[str, List[str], None], timeout: int) -> str:
+    def _select_base_url(self, base_url: str | list[str] | None, timeout: int) -> str:
         """Pick the first reachable LMStudio endpoint from a tiered list.
 
         Priority:
@@ -386,7 +386,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
         """
         import os
 
-        candidates: List[str] = []
+        candidates: list[str] = []
 
         # Check environment variable first
         env_endpoints = os.environ.get("LMSTUDIO_ENDPOINTS", "")
@@ -447,8 +447,8 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     @classmethod
     async def _select_base_url_async(
-        cls, base_url: Union[str, List[str], None], timeout: int
-    ) -> Tuple[str, Optional[bool]]:
+        cls, base_url: str | list[str] | None, timeout: int
+    ) -> tuple[str, Optional[bool]]:
         """Async version of _select_base_url for non-blocking endpoint discovery.
 
         Priority:
@@ -464,7 +464,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
         """
         import os
 
-        candidates: List[str] = []
+        candidates: list[str] = []
 
         # Check environment variable first
         env_endpoints = os.environ.get("LMSTUDIO_ENDPOINTS", "")
@@ -524,12 +524,12 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to LMStudio.
@@ -632,12 +632,12 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from LMStudio.
@@ -699,7 +699,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
                 response.raise_for_status()
 
                 accumulated_content = ""
-                accumulated_tool_calls: List[Dict[str, Any]] = []
+                accumulated_tool_calls: list[dict[str, Any]] = []
                 line_count = 0
 
                 async for line in response.aiter_lines():
@@ -773,14 +773,14 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def _build_request_payload(
         self,
-        messages: List[Message],
+        messages: list[Message],
         model: str,
         temperature: float,
         max_tokens: int,
-        tools: Optional[List[ToolDefinition]],
+        tools: Optional[list[ToolDefinition]],
         stream: bool,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build request payload for LMStudio's OpenAI-compatible API.
 
         Args:
@@ -798,7 +798,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
         # Build messages in OpenAI format
         formatted_messages = []
         for msg in messages:
-            formatted_msg: Dict[str, Any] = {
+            formatted_msg: dict[str, Any] = {
                 "role": msg.role,
                 "content": msg.content,
             }
@@ -807,7 +807,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
                 formatted_msg["tool_call_id"] = msg.tool_call_id
             formatted_messages.append(formatted_msg)
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "messages": formatted_messages,
             "temperature": temperature,
@@ -840,8 +840,8 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
         return payload
 
     def _normalize_tool_calls(
-        self, tool_calls: Optional[List[Dict[str, Any]]]
-    ) -> Optional[List[Dict[str, Any]]]:
+        self, tool_calls: Optional[list[dict[str, Any]]]
+    ) -> Optional[list[dict[str, Any]]]:
         """Normalize tool calls from LMStudio's OpenAI-compatible format.
 
         LMStudio returns tool calls in OpenAI format:
@@ -882,7 +882,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return normalized if normalized else None
 
-    def _parse_json_tool_call_from_content(self, content: str) -> Optional[List[Dict[str, Any]]]:
+    def _parse_json_tool_call_from_content(self, content: str) -> Optional[list[dict[str, Any]]]:
         """Parse tool calls from JSON text in content (fallback for models without native support).
 
         Some LMStudio models return tool calls as JSON in content instead of using
@@ -934,7 +934,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return None
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         """Parse LMStudio API response (OpenAI-compatible format).
 
         Handles thinking tag extraction for Qwen3/DeepSeek-R1 models.
@@ -1007,8 +1007,8 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def _parse_stream_chunk(
         self,
-        chunk_data: Dict[str, Any],
-        accumulated_tool_calls: List[Dict[str, Any]],
+        chunk_data: dict[str, Any],
+        accumulated_tool_calls: list[dict[str, Any]],
         model: Optional[str] = None,
     ) -> StreamChunk:
         """Parse streaming chunk from LMStudio (OpenAI-compatible SSE format).
@@ -1065,7 +1065,7 @@ class LMStudioProvider(BaseProvider, HTTPErrorHandlerMixin):
             is_final=finish_reason is not None,
         )
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List available models on LMStudio server.
 
         Returns:

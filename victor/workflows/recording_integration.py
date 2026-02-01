@@ -40,9 +40,10 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, Optional, Union, cast
+from typing import Any, Optional
+from collections.abc import Iterator
 
-from victor.workflows.execution_recorder import ExecutionRecorder, RecordingEventType
+from victor.workflows.execution_recorder import ExecutionRecorder
 from victor.workflows.recording_storage import FileRecordingStorage
 
 logger = logging.getLogger(__name__)
@@ -162,9 +163,9 @@ def record_workflow(
 
 async def save_workflow_recording(
     recorder: ExecutionRecorder,
-    filepath: Union[str, object],
+    filepath: str | object,
     storage: Optional[FileRecordingStorage] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Save a workflow recording to file or storage.
 
     Args:
@@ -199,7 +200,7 @@ async def save_workflow_recording(
 
 def record_node_execution_start(
     node_id: str,
-    inputs: Optional[Dict[str, Any]] = None,
+    inputs: Optional[dict[str, Any]] = None,
     node_type: Optional[str] = None,
 ) -> None:
     """Record node execution start (called by executor).
@@ -216,7 +217,7 @@ def record_node_execution_start(
 
 def record_node_execution_complete(
     node_id: str,
-    outputs: Optional[Dict[str, Any]] = None,
+    outputs: Optional[dict[str, Any]] = None,
     duration_seconds: Optional[float] = None,
     error: Optional[str] = None,
 ) -> None:
@@ -258,7 +259,7 @@ def record_recursion_exit(operation_type: str, identifier: str) -> None:
 
 
 def record_state_snapshot(
-    state: Dict[str, Any],
+    state: dict[str, Any],
     node_id: Optional[str] = None,
     execution_stack: Optional[list[str]] = None,
 ) -> None:
@@ -295,7 +296,7 @@ class RecordingConfig:
         sampling_rate: float = 0.0,
         storage_path: str = "./recordings",
         compress: bool = True,
-        retention_policy: Optional[Dict[str, Any]] = None,
+        retention_policy: Optional[dict[str, Any]] = None,
     ):
         self.enabled = enabled
         self.record_on_failure = record_on_failure

@@ -44,10 +44,8 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from victor.tools.caches.adaptive_cache import AdaptiveLRUCache
 from victor.tools.caches.adaptive_ttl import AdaptiveTTLCache
 from victor.tools.caches.multi_level_cache import MultiLevelCache
 from victor.tools.caches.persistent_cache import PersistentSelectionCache
@@ -70,12 +68,12 @@ class AdvancedCacheMetrics:
         combined: Combined metrics across all strategies
     """
 
-    basic_cache: Dict[str, Any] = field(default_factory=dict)
-    persistent_cache: Dict[str, Any] = field(default_factory=dict)
-    adaptive_ttl: Dict[str, Any] = field(default_factory=dict)
-    multi_level: Dict[str, Any] = field(default_factory=dict)
-    predictive_warming: Dict[str, Any] = field(default_factory=dict)
-    combined: Dict[str, Any] = field(default_factory=dict)
+    basic_cache: dict[str, Any] = field(default_factory=dict)
+    persistent_cache: dict[str, Any] = field(default_factory=dict)
+    adaptive_ttl: dict[str, Any] = field(default_factory=dict)
+    multi_level: dict[str, Any] = field(default_factory=dict)
+    predictive_warming: dict[str, Any] = field(default_factory=dict)
+    combined: dict[str, Any] = field(default_factory=dict)
 
 
 class AdvancedCacheManager:
@@ -312,10 +310,10 @@ class AdvancedCacheManager:
     def put(
         self,
         key: str,
-        value: List[str],
+        value: list[str],
         namespace: str = NAMESPACE_QUERY,
         ttl: Optional[int] = None,
-        tools: Optional[List[Any]] = None,
+        tools: Optional[list[Any]] = None,
         selection_latency_ms: float = 0.0,
     ) -> None:
         """Put value in all enabled caches.
@@ -508,8 +506,8 @@ class AdvancedCacheManager:
     def put_query(
         self,
         key: str,
-        value: List[str],
-        tools: Optional[List[Any]] = None,
+        value: list[str],
+        tools: Optional[list[Any]] = None,
         selection_latency_ms: float = 0.0,
     ) -> None:
         """Store query-based selection."""
@@ -529,8 +527,8 @@ class AdvancedCacheManager:
     def put_context(
         self,
         key: str,
-        value: List[str],
-        tools: Optional[List[Any]] = None,
+        value: list[str],
+        tools: Optional[list[Any]] = None,
         selection_latency_ms: float = 0.0,
     ) -> None:
         """Store context-aware selection."""

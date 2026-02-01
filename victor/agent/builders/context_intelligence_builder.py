@@ -17,7 +17,7 @@
 Part of HIGH-005: Initialization Complexity reduction.
 """
 
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.builders.base import FactoryAwareBuilder
 from victor.agent.context_manager import create_context_manager
@@ -45,10 +45,10 @@ class ContextIntelligenceBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> dict[str, Any]:  # type: ignore[override]
         """Build context and intelligence components and attach them to orchestrator."""
         factory = self._ensure_factory()
-        components: Dict[str, Any] = {}
+        components: dict[str, Any] = {}
 
         # TaskAnalyzer: Unified task analysis facade
         orchestrator._task_analyzer = get_task_analyzer()

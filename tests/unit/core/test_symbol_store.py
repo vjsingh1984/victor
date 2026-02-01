@@ -23,12 +23,9 @@ Tests cover:
 """
 
 import asyncio
-import tempfile
-from pathlib import Path
 
-import pytest
 
-from victor.coding.codebase.symbol_store import SymbolStore, SymbolInfo
+from victor.coding.codebase.symbol_store import SymbolStore
 
 
 class TestPythonExtraction:

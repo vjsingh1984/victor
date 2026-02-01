@@ -1,5 +1,6 @@
 from types import SimpleNamespace
-from typing import Any, AsyncIterator, List
+from typing import Any
+from collections.abc import AsyncIterator
 
 import pytest
 
@@ -10,7 +11,7 @@ from victor.providers.base import Message, StreamChunk, ToolDefinition
 class FakeStream:
     """Async iterator context manager for anthropic stream events."""
 
-    def __init__(self, events: List[Any]):
+    def __init__(self, events: list[Any]):
         self._events = list(events)
 
     async def __aenter__(self):
@@ -60,7 +61,7 @@ async def test_anthropic_stream_emits_tool_calls(monkeypatch):
         lambda **kwargs: FakeStream(events),
     )
 
-    chunks: List[StreamChunk] = []
+    chunks: list[StreamChunk] = []
     async for chunk in provider.stream(
         messages=[Message(role="user", content="hi")],
         model="claude-3-5-sonnet-20241022",

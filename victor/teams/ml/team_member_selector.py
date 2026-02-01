@@ -39,7 +39,7 @@ import logging
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
@@ -64,9 +64,9 @@ class MemberScore:
     member: "TeamMember"
     score: float
     confidence: float
-    reasons: List[str]
+    reasons: list[str]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "member_id": self.member.id,
@@ -122,10 +122,10 @@ class TeamMemberSelector:
     def select_members(
         self,
         task: str,
-        available_members: List["TeamMember"],
+        available_members: list["TeamMember"],
         task_features: "TaskFeatures",
         top_k: int = 5,
-    ) -> List[MemberScore]:
+    ) -> list[MemberScore]:
         """Select optimal members for task.
 
         Args:
@@ -160,7 +160,7 @@ class TeamMemberSelector:
         member: "TeamMember",
         task: str,
         task_features: "TaskFeatures",
-    ) -> Tuple[float, float, List[str]]:
+    ) -> tuple[float, float, list[str]]:
         """Score a member for the task.
 
         Args:
@@ -182,7 +182,7 @@ class TeamMemberSelector:
         self,
         member: "TeamMember",
         task_features: "TaskFeatures",
-    ) -> Tuple[float, float, List[str]]:
+    ) -> tuple[float, float, list[str]]:
         """Score member using trained model.
 
         Args:
@@ -220,7 +220,7 @@ class TeamMemberSelector:
         member: "TeamMember",
         task: str,
         task_features: "TaskFeatures",
-    ) -> Tuple[float, float, List[str]]:
+    ) -> tuple[float, float, list[str]]:
         """Score member using heuristic rules.
 
         Args:
@@ -319,7 +319,7 @@ class TeamMemberSelector:
 
     def train(
         self,
-        training_data: List[Dict[str, Any]],
+        training_data: list[dict[str, Any]],
     ) -> None:
         """Train member selection model.
 
@@ -413,7 +413,7 @@ class TeamMemberSelector:
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
 
-    def get_feature_importance(self) -> Dict[str, float]:
+    def get_feature_importance(self) -> dict[str, float]:
         """Get feature importance from trained model.
 
         Returns:

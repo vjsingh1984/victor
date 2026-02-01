@@ -42,8 +42,7 @@ def test_team_coordinator_get_suggestions(coordinator, mock_mw_coordinator):
 """
 
 import pytest
-from unittest.mock import MagicMock, Mock
-from typing import Dict, Any
+from unittest.mock import Mock
 
 from victor.agent.coordinators.team_coordinator import TeamCoordinator
 from victor.protocols.coordination import (

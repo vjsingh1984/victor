@@ -45,7 +45,7 @@ import random
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -88,11 +88,11 @@ class PromptTemplate:
     """
 
     style: PromptStyle = PromptStyle.STRUCTURED
-    elements: List[PromptElement] = field(default_factory=list)
+    elements: list[PromptElement] = field(default_factory=list)
     confidence: float = 0.5
     sample_count: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "style": self.style.value,
@@ -102,7 +102,7 @@ class PromptTemplate:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PromptTemplate":
+    def from_dict(cls, data: dict[str, Any]) -> "PromptTemplate":
         """Create from dictionary."""
         return cls(
             style=PromptStyle(data.get("style", "structured")),
@@ -158,7 +158,7 @@ class PromptTemplateLearner(BaseLearner):
     """
 
     # Default templates for different task types
-    DEFAULT_TEMPLATES: Dict[str, PromptTemplate] = {
+    DEFAULT_TEMPLATES: dict[str, PromptTemplate] = {
         "analysis": PromptTemplate(
             style=PromptStyle.STRUCTURED,
             elements=[PromptElement.TASK_CONTEXT, PromptElement.OUTPUT_FORMAT],
@@ -223,25 +223,25 @@ class PromptTemplateLearner(BaseLearner):
 
         # Beta distributions for each (context, style) pair
         # Key: (task_type, provider, style) -> BetaDistribution
-        self._style_posteriors: Dict[Tuple[str, str, str], BetaDistribution] = {}
+        self._style_posteriors: dict[tuple[str, str, str], BetaDistribution] = {}
 
         # Beta distributions for each (context, element) pair
         # Key: (task_type, provider, element) -> BetaDistribution
-        self._element_posteriors: Dict[Tuple[str, str, str], BetaDistribution] = {}
+        self._element_posteriors: dict[tuple[str, str, str], BetaDistribution] = {}
 
         # Track recent selections for feedback attribution
-        self._recent_selections: Dict[str, PromptTemplate] = {}
+        self._recent_selections: dict[str, PromptTemplate] = {}
         self._max_tracked_selections = 500
 
         # Sample counts per context
-        self._sample_counts: Dict[str, int] = {}
+        self._sample_counts: dict[str, int] = {}
 
         # Beta distributions for enrichment types per vertical
         # Key: (vertical, enrichment_type, task_type) -> BetaDistribution
-        self._enrichment_posteriors: Dict[Tuple[str, str, str], BetaDistribution] = {}
+        self._enrichment_posteriors: dict[tuple[str, str, str], BetaDistribution] = {}
 
         # Sample counts for enrichments
-        self._enrichment_sample_counts: Dict[str, int] = {}
+        self._enrichment_sample_counts: dict[str, int] = {}
 
         # Load state from database
         self._load_state()
@@ -618,7 +618,7 @@ class PromptTemplateLearner(BaseLearner):
             reason = "Exploration: random template"
         else:
             # Thompson Sampling for style
-            style_samples: Dict[PromptStyle, float] = {}
+            style_samples: dict[PromptStyle, float] = {}
             for style in self.ALL_STYLES:
                 posterior = self._get_style_posterior(task_type, provider, style)
                 style_samples[style] = posterior.sample()
@@ -635,7 +635,7 @@ class PromptTemplateLearner(BaseLearner):
             # Limit elements to avoid overwhelming prompts
             if len(selected_elements) > 4:
                 # Keep highest-sampled elements
-                element_samples: Dict[PromptElement, float] = {
+                element_samples: dict[PromptElement, float] = {
                     e: self._get_element_posterior(task_type, provider, e).sample()
                     for e in selected_elements
                 }
@@ -732,7 +732,7 @@ class PromptTemplateLearner(BaseLearner):
             return PromptTemplate.from_dict(rec.value)
         return self.DEFAULT_TEMPLATES.get(task_type, self.DEFAULT_TEMPLATES["default"])
 
-    def get_style_probabilities(self, task_type: str, provider: str) -> Dict[str, float]:
+    def get_style_probabilities(self, task_type: str, provider: str) -> dict[str, float]:
         """Get posterior mean probabilities for each style.
 
         Args:
@@ -747,7 +747,7 @@ class PromptTemplateLearner(BaseLearner):
             for style in self.ALL_STYLES
         }
 
-    def get_element_probabilities(self, task_type: str, provider: str) -> Dict[str, float]:
+    def get_element_probabilities(self, task_type: str, provider: str) -> dict[str, float]:
         """Get posterior mean probabilities for each element.
 
         Args:
@@ -923,7 +923,7 @@ class PromptTemplateLearner(BaseLearner):
 
         self.db.commit()
 
-    def get_enrichment_probabilities(self, vertical: str, task_type: str = "") -> Dict[str, float]:
+    def get_enrichment_probabilities(self, vertical: str, task_type: str = "") -> dict[str, float]:
         """Get posterior mean probabilities for each enrichment type.
 
         Args:
@@ -941,7 +941,7 @@ class PromptTemplateLearner(BaseLearner):
                     probabilities[etype] = posterior.mean()
         return probabilities
 
-    def get_enrichment_recommendation(self, vertical: str, task_type: str = "") -> Dict[str, bool]:
+    def get_enrichment_recommendation(self, vertical: str, task_type: str = "") -> dict[str, bool]:
         """Get recommendation on which enrichment types to use.
 
         Uses Thompson Sampling to decide which enrichments are worth applying.
@@ -992,7 +992,7 @@ class PromptTemplateLearner(BaseLearner):
 
         return callback
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export learner metrics for monitoring.
 
         Returns:
@@ -1010,7 +1010,7 @@ class PromptTemplateLearner(BaseLearner):
 
             if context not in seen_contexts:
                 seen_contexts.add(context)
-                context_styles: Dict[str, float] = {
+                context_styles: dict[str, float] = {
                     k[2]: v.mean()
                     for k, v in self._style_posteriors.items()
                     if k[0] == task_type and k[1] == provider

@@ -29,17 +29,15 @@ import pytest
 
 from victor.security_analysis.tools import (
     SecurityTestSuite,
-    SeverityLevel,
     AttackType,
 )
 from victor.core.security.authorization import (
     EnhancedAuthorizer,
     Permission,
-    Policy,
     PolicyEffect,
     User,
 )
-from victor.core.security.auth import RBACManager, Permission as RBACPermission
+from victor.core.security.auth import RBACManager
 
 
 # =============================================================================
@@ -131,7 +129,6 @@ class TestSecurityWithOrchestrator:
     async def test_security_with_event_bus(self):
         """Test security events published to event bus."""
         from victor.core.events import create_event_backend, MessagingEvent, BackendConfig
-        import asyncio
 
         # Create event backend
         backend = create_event_backend(BackendConfig.for_observability())
@@ -263,7 +260,6 @@ class TestRealAttackScenarios:
     @pytest.mark.asyncio
     async def test_authorization_bypass_scenarios(self):
         """Test various authorization bypass scenarios."""
-        from unittest.mock import AsyncMock, MagicMock
 
         authorizer = EnhancedAuthorizer()
         user = authorizer.create_user(
@@ -303,7 +299,7 @@ class TestRealAttackScenarios:
     @pytest.mark.asyncio
     async def test_resource_exhaustion_protection(self):
         """Test protection against resource exhaustion."""
-        from unittest.mock import AsyncMock, MagicMock
+        from unittest.mock import MagicMock
         import asyncio
 
         mock_agent = MagicMock()
@@ -470,7 +466,6 @@ class TestRBACIntegration:
 
     def test_permission_mapping(self):
         """Test mapping between permission systems."""
-        from victor.tools.base import AccessMode
 
         enhanced_auth = EnhancedAuthorizer()
 

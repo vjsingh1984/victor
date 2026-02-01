@@ -25,7 +25,7 @@ Features:
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -57,12 +57,12 @@ def _get_icon(name: str) -> str:
 
 
 async def _parallel_search(
-    files: List[Path], pattern: str, use_regex: bool, max_workers: int = _DEFAULT_MAX_WORKERS
-) -> List[Dict[str, Any]]:
+    files: list[Path], pattern: str, use_regex: bool, max_workers: int = _DEFAULT_MAX_WORKERS
+) -> list[dict[str, Any]]:
     """Search files in parallel with progress indication."""
     results = []
 
-    def search_file(file_path: Path) -> Optional[Dict[str, Any]]:
+    def search_file(file_path: Path) -> Optional[dict[str, Any]]:
         try:
             content = file_path.read_text()
             matches = []
@@ -107,17 +107,17 @@ async def _parallel_search(
 
 
 async def _parallel_replace(
-    files: List[Path],
+    files: list[Path],
     find_text: str,
     replace_text: str,
     use_regex: bool,
     dry_run: bool,
     max_workers: int = _DEFAULT_MAX_WORKERS,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Replace in files in parallel with progress indication."""
     results = []
 
-    def replace_in_file(file_path: Path) -> Optional[Dict[str, Any]]:
+    def replace_in_file(file_path: Path) -> Optional[dict[str, Any]]:
         try:
             content = file_path.read_text()
             original = content
@@ -173,12 +173,12 @@ async def _parallel_replace(
 
 
 async def _parallel_analyze(
-    files: List[Path], max_workers: int = _DEFAULT_MAX_WORKERS
-) -> List[Dict[str, Any]]:
+    files: list[Path], max_workers: int = _DEFAULT_MAX_WORKERS
+) -> list[dict[str, Any]]:
     """Analyze files in parallel with progress indication."""
     results = []
 
-    def analyze_file(file_path: Path) -> Dict[str, Any]:
+    def analyze_file(file_path: Path) -> dict[str, Any]:
         try:
             content = file_path.read_text()
             lines = content.split("\n")
@@ -236,8 +236,8 @@ async def batch(
     regex: bool = False,
     dry_run: bool = False,
     max_files: int = 1000,
-    options: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    options: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     r"""
     Unified batch processing tool for multi-file operations.
 
@@ -403,7 +403,7 @@ async def batch(
         total_size = sum(r.get("size", 0) for r in results)
 
         # Group by extension
-        by_ext: Dict[str, Dict[str, int]] = {}
+        by_ext: dict[str, dict[str, int]] = {}
         for result in results:
             ext = result.get("extension", "no extension")
             if ext not in by_ext:

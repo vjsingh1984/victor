@@ -19,7 +19,7 @@ writing to private fields, following Dependency Inversion Principle (DIP).
 """
 
 import pytest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 from victor.core.errors import CapabilityRegistryRequiredError
 from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter

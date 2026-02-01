@@ -27,7 +27,7 @@ Thread Safety:
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from victor.agent.search_router import SearchRoute, SearchType
 
@@ -64,7 +64,7 @@ class SearchCoordinator:
         """
         self._search_router = search_router
 
-    def route_search_query(self, query: str) -> Dict[str, Any]:
+    def route_search_query(self, query: str) -> dict[str, Any]:
         """Route a search query to the optimal search tool.
 
         Analyzes the query to determine whether keyword search (code_search)
@@ -130,6 +130,6 @@ class SearchCoordinator:
             >>> print(tool)
             "code_search"
         """
-        result: Dict[str, Any] = self.route_search_query(query)
+        result: dict[str, Any] = self.route_search_query(query)
         tool_name: str = result["recommended_tool"]
         return tool_name

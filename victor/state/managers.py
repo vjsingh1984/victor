@@ -42,9 +42,9 @@ from __future__ import annotations
 
 import fnmatch
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
-from victor.state.protocols import IStateManager, IStateObserver, StateScope
+from victor.state.protocols import IStateObserver, StateScope
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +69,8 @@ class WorkflowStateManager:
     def __init__(self) -> None:
         """Initialize workflow state manager."""
         self.scope: StateScope = StateScope.WORKFLOW
-        self._state: Dict[str, Any] = {}
-        self._observers: List[IStateObserver] = []
+        self._state: dict[str, Any] = {}
+        self._observers: list[IStateObserver] = []
 
         logger.debug("WorkflowStateManager initialized")
 
@@ -143,7 +143,7 @@ class WorkflowStateManager:
         """
         return key in self._state
 
-    async def keys(self, pattern: str = "*") -> List[str]:
+    async def keys(self, pattern: str = "*") -> list[str]:
         """Get all keys matching pattern.
 
         Args:
@@ -157,7 +157,7 @@ class WorkflowStateManager:
 
         return [k for k in self._state.keys() if fnmatch.fnmatch(k, pattern)]
 
-    async def get_all(self) -> Dict[str, Any]:
+    async def get_all(self) -> dict[str, Any]:
         """Get all state as dictionary.
 
         Returns:
@@ -165,7 +165,7 @@ class WorkflowStateManager:
         """
         return dict(self._state)
 
-    async def update(self, updates: Dict[str, Any]) -> None:
+    async def update(self, updates: dict[str, Any]) -> None:
         """Update multiple keys at once.
 
         Args:
@@ -179,7 +179,7 @@ class WorkflowStateManager:
         self._state.clear()
         logger.debug("Workflow state cleared")
 
-    async def snapshot(self) -> Dict[str, Any]:
+    async def snapshot(self) -> dict[str, Any]:
         """Create immutable snapshot for checkpointing.
 
         Returns:
@@ -187,7 +187,7 @@ class WorkflowStateManager:
         """
         return dict(self._state)
 
-    async def restore(self, snapshot: Dict[str, Any]) -> None:
+    async def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore from snapshot.
 
         Args:
@@ -235,8 +235,8 @@ class ConversationStateManager:
     def __init__(self) -> None:
         """Initialize conversation state manager."""
         self.scope: StateScope = StateScope.CONVERSATION
-        self._state: Dict[str, Any] = {}
-        self._observers: List[IStateObserver] = []
+        self._state: dict[str, Any] = {}
+        self._observers: list[IStateObserver] = []
 
         logger.debug("ConversationStateManager initialized")
 
@@ -309,7 +309,7 @@ class ConversationStateManager:
         """
         return key in self._state
 
-    async def keys(self, pattern: str = "*") -> List[str]:
+    async def keys(self, pattern: str = "*") -> list[str]:
         """Get all keys matching pattern.
 
         Args:
@@ -323,7 +323,7 @@ class ConversationStateManager:
 
         return [k for k in self._state.keys() if fnmatch.fnmatch(k, pattern)]
 
-    async def get_all(self) -> Dict[str, Any]:
+    async def get_all(self) -> dict[str, Any]:
         """Get all state as dictionary.
 
         Returns:
@@ -331,7 +331,7 @@ class ConversationStateManager:
         """
         return dict(self._state)
 
-    async def update(self, updates: Dict[str, Any]) -> None:
+    async def update(self, updates: dict[str, Any]) -> None:
         """Update multiple keys at once.
 
         Args:
@@ -345,7 +345,7 @@ class ConversationStateManager:
         self._state.clear()
         logger.debug("Conversation state cleared")
 
-    async def snapshot(self) -> Dict[str, Any]:
+    async def snapshot(self) -> dict[str, Any]:
         """Create immutable snapshot for checkpointing.
 
         Returns:
@@ -353,7 +353,7 @@ class ConversationStateManager:
         """
         return dict(self._state)
 
-    async def restore(self, snapshot: Dict[str, Any]) -> None:
+    async def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore from snapshot.
 
         Args:
@@ -401,8 +401,8 @@ class TeamStateManager:
     def __init__(self) -> None:
         """Initialize team state manager."""
         self.scope: StateScope = StateScope.TEAM
-        self._state: Dict[str, Any] = {}
-        self._observers: List[IStateObserver] = []
+        self._state: dict[str, Any] = {}
+        self._observers: list[IStateObserver] = []
 
         logger.debug("TeamStateManager initialized")
 
@@ -475,7 +475,7 @@ class TeamStateManager:
         """
         return key in self._state
 
-    async def keys(self, pattern: str = "*") -> List[str]:
+    async def keys(self, pattern: str = "*") -> list[str]:
         """Get all keys matching pattern.
 
         Args:
@@ -489,7 +489,7 @@ class TeamStateManager:
 
         return [k for k in self._state.keys() if fnmatch.fnmatch(k, pattern)]
 
-    async def get_all(self) -> Dict[str, Any]:
+    async def get_all(self) -> dict[str, Any]:
         """Get all state as dictionary.
 
         Returns:
@@ -497,7 +497,7 @@ class TeamStateManager:
         """
         return dict(self._state)
 
-    async def update(self, updates: Dict[str, Any]) -> None:
+    async def update(self, updates: dict[str, Any]) -> None:
         """Update multiple keys at once.
 
         Args:
@@ -511,7 +511,7 @@ class TeamStateManager:
         self._state.clear()
         logger.debug("Team state cleared")
 
-    async def snapshot(self) -> Dict[str, Any]:
+    async def snapshot(self) -> dict[str, Any]:
         """Create immutable snapshot for checkpointing.
 
         Returns:
@@ -519,7 +519,7 @@ class TeamStateManager:
         """
         return dict(self._state)
 
-    async def restore(self, snapshot: Dict[str, Any]) -> None:
+    async def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore from snapshot.
 
         Args:
@@ -567,8 +567,8 @@ class GlobalStateManagerImpl:
     def __init__(self) -> None:
         """Initialize global state manager."""
         self.scope: StateScope = StateScope.GLOBAL
-        self._state: Dict[str, Any] = {}
-        self._observers: List[IStateObserver] = []
+        self._state: dict[str, Any] = {}
+        self._observers: list[IStateObserver] = []
 
         logger.debug("GlobalStateManagerImpl initialized")
 
@@ -641,7 +641,7 @@ class GlobalStateManagerImpl:
         """
         return key in self._state
 
-    async def keys(self, pattern: str = "*") -> List[str]:
+    async def keys(self, pattern: str = "*") -> list[str]:
         """Get all keys matching pattern.
 
         Args:
@@ -655,7 +655,7 @@ class GlobalStateManagerImpl:
 
         return [k for k in self._state.keys() if fnmatch.fnmatch(k, pattern)]
 
-    async def get_all(self) -> Dict[str, Any]:
+    async def get_all(self) -> dict[str, Any]:
         """Get all state as dictionary.
 
         Returns:
@@ -663,7 +663,7 @@ class GlobalStateManagerImpl:
         """
         return dict(self._state)
 
-    async def update(self, updates: Dict[str, Any]) -> None:
+    async def update(self, updates: dict[str, Any]) -> None:
         """Update multiple keys at once.
 
         Args:
@@ -677,7 +677,7 @@ class GlobalStateManagerImpl:
         self._state.clear()
         logger.debug("Global state cleared")
 
-    async def snapshot(self) -> Dict[str, Any]:
+    async def snapshot(self) -> dict[str, Any]:
         """Create immutable snapshot for checkpointing.
 
         Returns:
@@ -685,7 +685,7 @@ class GlobalStateManagerImpl:
         """
         return dict(self._state)
 
-    async def restore(self, snapshot: Dict[str, Any]) -> None:
+    async def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore from snapshot.
 
         Args:

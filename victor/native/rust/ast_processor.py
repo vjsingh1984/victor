@@ -31,10 +31,10 @@ extension is not available.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from tree_sitter import Node, Query, Tree
+    from tree_sitter import Node, Tree
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class ASTProcessorAccelerator:
         self.backend = "rust" if self._use_rust else "python"
 
         # Cache for parsed ASTs
-        self._cache: Dict[str, Tuple["Tree", float]] = {}
+        self._cache: dict[str, tuple["Tree", float]] = {}
         self._cache_max_size = cache_size
         self._cache_hits = 0
         self._cache_misses = 0
@@ -148,8 +148,8 @@ class ASTProcessorAccelerator:
         tree: "Tree",
         query: str,
         language: str,
-        capture_names: Optional[List[str]] = None,
-    ) -> List["Node"]:
+        capture_names: Optional[list[str]] = None,
+    ) -> list["Node"]:
         """Execute tree-sitter query using accelerated executor.
 
         Args:
@@ -185,11 +185,11 @@ class ASTProcessorAccelerator:
         tree: "Tree",
         query: str,
         language: str,
-        capture_names: Optional[List[str]] = None,
-    ) -> List["Node"]:
+        capture_names: Optional[list[str]] = None,
+    ) -> list["Node"]:
         """Execute query using Python tree-sitter (fallback)."""
         try:
-            from victor.coding.codebase.tree_sitter_manager import get_language, run_query
+            from victor.coding.codebase.tree_sitter_manager import run_query
 
             captures = run_query(tree, query, language)
 
@@ -212,9 +212,9 @@ class ASTProcessorAccelerator:
 
     def extract_symbols_parallel(
         self,
-        files: List[Tuple[str, str, str]],  # (language, source_code, file_path)
-        symbol_types: List[str],
-    ) -> Dict[str, List[Dict[str, Any]]]:
+        files: list[tuple[str, str, str]],  # (language, source_code, file_path)
+        symbol_types: list[str],
+    ) -> dict[str, list[dict[str, Any]]]:
         """Extract symbols from multiple files using parallel processing.
 
         Args:
@@ -241,11 +241,11 @@ class ASTProcessorAccelerator:
 
     def _python_extract_symbols_sequential(
         self,
-        files: List[Tuple[str, str, str]],
-        symbol_types: List[str],
-    ) -> Dict[str, List[Dict[str, Any]]]:
+        files: list[tuple[str, str, str]],
+        symbol_types: list[str],
+    ) -> dict[str, list[dict[str, Any]]]:
         """Extract symbols using Python tree-sitter (sequential fallback)."""
-        results: Dict[str, List[Dict[str, Any]]] = {}
+        results: dict[str, list[dict[str, Any]]] = {}
 
         for language, source_code, file_path in files:
             try:
@@ -294,8 +294,8 @@ class ASTProcessorAccelerator:
     def _format_symbol_results(
         self,
         results: Any,
-        file_paths: List[str],
-    ) -> Dict[str, List[Dict[str, Any]]]:
+        file_paths: list[str],
+    ) -> dict[str, list[dict[str, Any]]]:
         """Format Rust symbol extraction results."""
         # This is a placeholder - actual implementation depends on Rust return format
         if isinstance(results, dict):
@@ -316,7 +316,7 @@ class ASTProcessorAccelerator:
             _native_impl.clear_ast_cache()
 
     @property
-    def cache_stats(self) -> Dict[str, int]:
+    def cache_stats(self) -> dict[str, int]:
         """Get cache statistics."""
         total = self._cache_hits + self._cache_misses
         hit_rate = self._cache_hits / total if total > 0 else 0.0

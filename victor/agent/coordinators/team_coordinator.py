@@ -27,7 +27,7 @@ Thread Safety:
 """
 
 import logging
-from typing import Any, Dict, cast
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class TeamCoordinator:
 
         return result
 
-    def set_team_specs(self, specs: Dict[str, Any]) -> None:
+    def set_team_specs(self, specs: dict[str, Any]) -> None:
         """Store team specifications.
 
         Provides a clean public interface for setting team specs,
@@ -124,7 +124,7 @@ class TeamCoordinator:
 
         logger.debug(f"Set team specs: {len(specs)} teams")
 
-    def get_team_specs(self) -> Dict[str, Any]:
+    def get_team_specs(self) -> dict[str, Any]:
         """Retrieve team specifications.
 
         Returns the dictionary of team specs configured by vertical integration.
@@ -148,7 +148,7 @@ class TeamCoordinator:
         # Fall back to vertical context if available
         vertical_context = getattr(self._orchestrator, "vertical_context", None)
         if vertical_context is not None:
-            context_specs: Dict[str, Any] = getattr(vertical_context, "team_specs", None) or {}
+            context_specs: dict[str, Any] = getattr(vertical_context, "team_specs", None) or {}
             if context_specs:
                 return context_specs
 
@@ -163,7 +163,7 @@ class TeamCoordinator:
             # Strip namespace prefix for compatibility with local team names
             if not isinstance(registry_specs, dict):
                 registry_specs = {}  # type: ignore[unreachable]
-            normalized: Dict[str, Any] = registry_specs
+            normalized: dict[str, Any] = registry_specs
             for name, spec in registry_specs.items():
                 short_name = name.split(":", 1)[-1] if ":" in name else name
                 normalized[short_name] = spec

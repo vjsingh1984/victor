@@ -49,15 +49,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Optional
 from uuid import uuid4
 
 from victor.core.cqrs import (
     Command,
     CommandBus,
     CommandHandler,
-    CommandMiddleware,
     CommandResult,
     Query,
     QueryBus,
@@ -99,7 +97,7 @@ class ChatCommand(Command):
     message: str = ""
     provider: str = "anthropic"
     model: Optional[str] = None
-    tools: Optional[List[str]] = None
+    tools: Optional[list[str]] = None
     thinking: bool = False
 
 
@@ -116,7 +114,7 @@ class ExecuteToolCommand(Command):
 
     session_id: str = ""
     tool_name: str = ""
-    arguments: Dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
     dry_run: bool = False
 
 
@@ -160,7 +158,7 @@ class UpdateConfigCommand(Command):
     """
 
     session_id: str = ""
-    config_updates: Dict[str, Any] = field(default_factory=dict)
+    config_updates: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -180,8 +178,8 @@ class StartSessionCommand(Command):
     working_directory: str = "."
     provider: str = "anthropic"
     model: Optional[str] = None
-    tools: Optional[List[str]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    tools: Optional[list[str]] = None
+    metadata: Optional[dict[str, Any]] = None
 
 
 @dataclass
@@ -203,7 +201,7 @@ class EndSessionCommand(Command):
 
 
 @dataclass
-class GetSessionQuery(Query[Dict[str, Any]]):
+class GetSessionQuery(Query[dict[str, Any]]):
     """Query to get session information.
 
     Attributes:
@@ -218,7 +216,7 @@ class GetSessionQuery(Query[Dict[str, Any]]):
 
 
 @dataclass
-class GetConversationHistoryQuery(Query[List[Dict[str, Any]]]):
+class GetConversationHistoryQuery(Query[list[dict[str, Any]]]):
     """Query to get conversation history.
 
     Attributes:
@@ -233,7 +231,7 @@ class GetConversationHistoryQuery(Query[List[Dict[str, Any]]]):
 
 
 @dataclass
-class GetToolsQuery(Query[List[Dict[str, Any]]]):
+class GetToolsQuery(Query[list[dict[str, Any]]]):
     """Query to get available tools.
 
     Attributes:
@@ -248,7 +246,7 @@ class GetToolsQuery(Query[List[Dict[str, Any]]]):
 
 
 @dataclass
-class GetProvidersQuery(Query[List[Dict[str, Any]]]):
+class GetProvidersQuery(Query[list[dict[str, Any]]]):
     """Query to get available providers.
 
     Attributes:
@@ -259,7 +257,7 @@ class GetProvidersQuery(Query[List[Dict[str, Any]]]):
 
 
 @dataclass
-class GetSessionMetricsQuery(Query[Dict[str, Any]]):
+class GetSessionMetricsQuery(Query[dict[str, Any]]):
     """Query to get session metrics.
 
     Attributes:
@@ -268,11 +266,11 @@ class GetSessionMetricsQuery(Query[Dict[str, Any]]):
     """
 
     session_id: str = ""
-    metric_types: Optional[List[str]] = None
+    metric_types: Optional[list[str]] = None
 
 
 @dataclass
-class SearchCodeQuery(Query[List[Dict[str, Any]]]):
+class SearchCodeQuery(Query[list[dict[str, Any]]]):
     """Query to search code in the workspace.
 
     Attributes:
@@ -329,7 +327,7 @@ class ToolExecutedEvent(DomainEvent):
 
     session_id: str = ""
     tool_name: str = ""
-    arguments: Dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
     success: bool = True
     result_summary: str = ""
     execution_time_ms: int = 0
@@ -377,9 +375,9 @@ class SessionProjection(Projection):
 
     def __init__(self) -> None:
         """Initialize session projection."""
-        self.sessions: Dict[str, Dict[str, Any]] = {}
-        self.message_counts: Dict[str, int] = {}
-        self.tool_counts: Dict[str, int] = {}
+        self.sessions: dict[str, dict[str, Any]] = {}
+        self.message_counts: dict[str, int] = {}
+        self.tool_counts: dict[str, int] = {}
 
     async def handle_SessionStartedEvent(self, event: SessionStartedEvent) -> None:
         """Handle session start."""
@@ -462,15 +460,15 @@ class SessionProjection(Projection):
                 }
             )
 
-    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_session(self, session_id: str) -> Optional[dict[str, Any]]:
         """Get session data."""
         return self.sessions.get(session_id)
 
-    def get_active_sessions(self) -> List[Dict[str, Any]]:
+    def get_active_sessions(self) -> list[dict[str, Any]]:
         """Get all active sessions."""
         return [s for s in self.sessions.values() if s.get("status") == "active"]
 
-    def get_session_metrics(self, session_id: str) -> Dict[str, Any]:
+    def get_session_metrics(self, session_id: str) -> dict[str, Any]:
         """Get metrics for a session."""
         session = self.sessions.get(session_id)
         if not session:
@@ -497,7 +495,7 @@ class SessionProjection(Projection):
         if handler:
             await handler(event)
 
-    async def rebuild(self, events: List[DomainEvent]) -> None:
+    async def rebuild(self, events: list[DomainEvent]) -> None:
         """Rebuild projection from event history.
 
         Args:
@@ -529,7 +527,7 @@ class StartSessionHandler(CommandHandler[StartSessionCommand]):
         self.event_store = event_store
         self.dispatcher = dispatcher
 
-    async def handle(self, command: StartSessionCommand) -> Dict[str, Any]:  # type: ignore[override]
+    async def handle(self, command: StartSessionCommand) -> dict[str, Any]:  # type: ignore[override]
         """Handle start session command.
 
         Returns:
@@ -567,7 +565,7 @@ class ChatHandler(CommandHandler[ChatCommand]):
         self.event_store = event_store
         self.dispatcher = dispatcher
 
-    async def handle(self, command: ChatCommand) -> Dict[str, Any]:  # type: ignore[override]
+    async def handle(self, command: ChatCommand) -> dict[str, Any]:  # type: ignore[override]
         """Handle chat command.
 
         Returns:
@@ -602,7 +600,7 @@ class ExecuteToolHandler(CommandHandler[ExecuteToolCommand]):
         self.event_store = event_store
         self.dispatcher = dispatcher
 
-    async def handle(self, command: ExecuteToolCommand) -> Dict[str, Any]:  # type: ignore[override]
+    async def handle(self, command: ExecuteToolCommand) -> dict[str, Any]:  # type: ignore[override]
         """Handle tool execution command.
 
         Returns:
@@ -651,7 +649,7 @@ class EndSessionHandler(CommandHandler[EndSessionCommand]):
         self.dispatcher = dispatcher
         self.projection = projection
 
-    async def handle(self, command: EndSessionCommand) -> Dict[str, Any]:  # type: ignore[override]
+    async def handle(self, command: EndSessionCommand) -> dict[str, Any]:  # type: ignore[override]
         """Handle end session command.
 
         Returns:
@@ -703,7 +701,7 @@ class EndSessionHandler(CommandHandler[EndSessionCommand]):
 # =============================================================================
 
 
-class GetSessionHandler(QueryHandler[Dict[str, Any]]):
+class GetSessionHandler(QueryHandler[dict[str, Any]]):
     """Handler for session queries.
 
     Note: Returns raw dict data. The QueryBus wraps this in QueryResult.
@@ -712,7 +710,7 @@ class GetSessionHandler(QueryHandler[Dict[str, Any]]):
     def __init__(self, projection: SessionProjection):
         self.projection = projection
 
-    async def handle(self, query: GetSessionQuery) -> Dict[str, Any]:  # type: ignore[override]
+    async def handle(self, query: GetSessionQuery) -> dict[str, Any]:  # type: ignore[override]
         """Handle get session query.
 
         Returns:
@@ -743,7 +741,7 @@ class GetSessionHandler(QueryHandler[Dict[str, Any]]):
         return result
 
 
-class GetConversationHistoryHandler(QueryHandler[Dict[str, Any]]):
+class GetConversationHistoryHandler(QueryHandler[dict[str, Any]]):
     """Handler for conversation history queries.
 
     Note: Returns raw dict data. The QueryBus wraps this in QueryResult.
@@ -752,7 +750,7 @@ class GetConversationHistoryHandler(QueryHandler[Dict[str, Any]]):
     def __init__(self, projection: SessionProjection):
         self.projection = projection
 
-    async def handle(self, query: GetConversationHistoryQuery) -> Dict[str, Any]:  # type: ignore[override]
+    async def handle(self, query: GetConversationHistoryQuery) -> dict[str, Any]:  # type: ignore[override]
         """Handle get conversation history query.
 
         Returns:
@@ -781,7 +779,7 @@ class GetConversationHistoryHandler(QueryHandler[Dict[str, Any]]):
         }
 
 
-class GetSessionMetricsHandler(QueryHandler[Dict[str, Any]]):
+class GetSessionMetricsHandler(QueryHandler[dict[str, Any]]):
     """Handler for session metrics queries.
 
     Note: Returns raw dict data. The QueryBus wraps this in QueryResult.
@@ -790,7 +788,7 @@ class GetSessionMetricsHandler(QueryHandler[Dict[str, Any]]):
     def __init__(self, projection: SessionProjection):
         self.projection = projection
 
-    async def handle(self, query: GetSessionMetricsQuery) -> Dict[str, Any]:  # type: ignore[override]
+    async def handle(self, query: GetSessionMetricsQuery) -> dict[str, Any]:  # type: ignore[override]
         """Handle get session metrics query.
 
         Returns:
@@ -914,7 +912,7 @@ class AgentCommandBus:
         """
         return await self.mediator.send(message)
 
-    async def get_events(self, session_id: str) -> List[DomainEvent]:
+    async def get_events(self, session_id: str) -> list[DomainEvent]:
         """Get all events for a session.
 
         Args:

@@ -20,7 +20,8 @@ Example:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import AsyncIterator, Callable
 
 from victor.framework.config import AgentConfig
 from victor.framework.errors import AgentError, CancellationError, ProviderError
@@ -85,7 +86,7 @@ class Agent:
         orchestrator: "AgentOrchestrator",
         provider: str = "anthropic",
         model: Optional[str] = None,
-        vertical: Optional[Type["VerticalBase"]] = None,
+        vertical: Optional[type["VerticalBase"]] = None,
         vertical_config: Optional["VerticalConfig"] = None,
     ) -> None:
         """Initialize Agent with orchestrator. Use Agent.create() instead.
@@ -103,14 +104,14 @@ class Agent:
         self._vertical = vertical
         self._vertical_config = vertical_config
         self._state = State(orchestrator)
-        self._state_observers: List[StateObserver] = []
+        self._state_observers: list[StateObserver] = []
         # CQRS integration (optional)
         self._cqrs_bridge: Optional["CQRSBridge"] = None
         self._cqrs_session_id: Optional[str] = None
         self._cqrs_adapter: Optional["FrameworkEventAdapter"] = None
         # Builder metadata (for internal use by AgentBuilder)
-        self._builder_metadata: Dict[str, Any] = {}
-        self._presets_applied: List[str] = []
+        self._builder_metadata: dict[str, Any] = {}
+        self._presets_applied: list[str] = []
         self._container: Optional["ServiceContainer"] = None
 
     @classmethod
@@ -127,7 +128,7 @@ class Agent:
         profile: Optional[str] = None,
         workspace: Optional[str] = None,
         config: Optional[AgentConfig] = None,
-        vertical: Optional[Type["VerticalBase"]] = None,
+        vertical: Optional[type["VerticalBase"]] = None,
         enable_observability: bool = True,
         session_id: Optional[str] = None,
     ) -> "Agent":
@@ -264,7 +265,7 @@ class Agent:
         cls,
         name: str,
         goal: str,
-        members: List["TeamMemberSpec"],
+        members: list["TeamMemberSpec"],
         *,
         formation: Optional["TeamFormation"] = None,
         provider: str = "anthropic",
@@ -272,7 +273,7 @@ class Agent:
         total_tool_budget: int = 100,
         max_iterations: int = 50,
         timeout_seconds: int = 600,
-        shared_context: Optional[Dict[str, Any]] = None,
+        shared_context: Optional[dict[str, Any]] = None,
         config: Optional[AgentConfig] = None,
     ) -> "AgentTeam":
         """Create a multi-agent team.
@@ -375,7 +376,7 @@ class Agent:
         self,
         prompt: str,
         *,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> TaskResult:
         """Run a task and return the complete result.
 
@@ -399,11 +400,11 @@ class Agent:
                 context={"file": "auth.py", "error": "IndexError"}
             )
         """
-        from victor.framework._internal import collect_tool_calls, format_context_message
+        from victor.framework._internal import collect_tool_calls
 
         # Collect all events
-        events: List[AgentExecutionEvent] = []
-        content_parts: List[str] = []
+        events: list[AgentExecutionEvent] = []
+        content_parts: list[str] = []
         final_success = True
         final_error: Optional[str] = None
 
@@ -443,7 +444,7 @@ class Agent:
         self,
         prompt: str,
         *,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[AgentExecutionEvent]:
         """Stream events as the agent processes a task.
 
@@ -531,7 +532,7 @@ class Agent:
         return self._state
 
     @property
-    def vertical(self) -> Optional[Type["VerticalBase"]]:
+    def vertical(self) -> Optional[type["VerticalBase"]]:
         """Get the vertical class used to create this agent.
 
         Returns:
@@ -606,7 +607,7 @@ class Agent:
         self._provider = provider
         self._model = model
 
-    def set_tools(self, tools: Union[ToolSet, List[str]]) -> None:
+    def set_tools(self, tools: ToolSet | list[str]) -> None:
         """Update available tools.
 
         Args:
@@ -666,7 +667,6 @@ class Agent:
             agent.event_bus.backend.subscribe("tool.*", on_tool_event)
         """
         from typing import cast
-        from victor.core.events import ObservabilityBus
 
         observability = getattr(self._orchestrator, "observability", None)
         if observability:
@@ -798,7 +798,7 @@ class Agent:
         """
         return self._cqrs_session_id
 
-    async def cqrs_get_session(self) -> Dict[str, Any]:
+    async def cqrs_get_session(self) -> dict[str, Any]:
         """Get current session via CQRS query.
 
         Requires CQRS to be enabled via enable_cqrs().
@@ -814,7 +814,7 @@ class Agent:
 
         return await self._cqrs_bridge.get_session(self._cqrs_session_id)
 
-    async def cqrs_get_history(self, limit: int = 100) -> Dict[str, Any]:
+    async def cqrs_get_history(self, limit: int = 100) -> dict[str, Any]:
         """Get conversation history via CQRS query.
 
         Requires CQRS to be enabled via enable_cqrs().
@@ -836,7 +836,7 @@ class Agent:
             limit=limit,
         )
 
-    async def cqrs_get_metrics(self) -> Dict[str, Any]:
+    async def cqrs_get_metrics(self) -> dict[str, Any]:
         """Get session metrics via CQRS query.
 
         Requires CQRS to be enabled via enable_cqrs().
@@ -870,10 +870,10 @@ class Agent:
     async def run_workflow(
         self,
         workflow_name: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         *,
         timeout: Optional[float] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run a workflow by name from the vertical's workflow provider.
 
         This executes a multi-step workflow defined by the vertical,
@@ -926,9 +926,9 @@ class Agent:
         team_name: str,
         goal: str,
         *,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         timeout_seconds: int = 600,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run a pre-configured team from the vertical's team specs.
 
         This creates and executes a multi-agent team defined by the vertical,
@@ -1008,7 +1008,7 @@ class Agent:
             "goal": goal,
         }
 
-    def get_available_workflows(self) -> List[str]:
+    def get_available_workflows(self) -> list[str]:
         """Get list of available workflow names from the vertical.
 
         Returns:
@@ -1028,7 +1028,7 @@ class Agent:
         names = workflow_provider.get_workflow_names()
         return names if isinstance(names, list) else []
 
-    def get_available_teams(self) -> List[str]:
+    def get_available_teams(self) -> list[str]:
         """Get list of available team names from the vertical.
 
         Returns:
@@ -1156,7 +1156,7 @@ class ChatSession:
         return self._delegate.turn_count
 
     @property
-    def history(self) -> List[Dict[str, str]]:
+    def history(self) -> list[dict[str, str]]:
         """Get conversation history.
 
         Returns:
@@ -1177,6 +1177,5 @@ class ChatSession:
         Returns:
             The underlying AgentSession instance
         """
-        from victor.framework.agent_components import AgentSession
 
         return self._delegate

@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 import json
 import logging
 import sqlite3
@@ -122,8 +122,8 @@ class ContextSize(Enum):
 # Extracts ML-friendly features from model name strings
 # =============================================================================
 
-import re  # noqa: E402
-from dataclasses import dataclass as _dataclass  # noqa: E402
+import re
+from dataclasses import dataclass as _dataclass
 
 
 @_dataclass
@@ -401,13 +401,13 @@ class ConversationMessage:
     timestamp: datetime
     token_count: int
     priority: MessagePriority = MessagePriority.MEDIUM
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # For tool calls/results
     tool_name: Optional[str] = None
     tool_call_id: Optional[str] = None
 
-    def to_provider_format(self) -> Dict[str, Any]:
+    def to_provider_format(self) -> dict[str, Any]:
         """Convert to provider message format."""
         base = {
             "role": (
@@ -424,7 +424,7 @@ class ConversationMessage:
 
         return base
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -439,7 +439,7 @@ class ConversationMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ConversationMessage":
+    def from_dict(cls, data: dict[str, Any]) -> "ConversationMessage":
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -459,7 +459,7 @@ class ConversationSession:
     """A conversation session with context management."""
 
     session_id: str
-    messages: List[ConversationMessage] = field(default_factory=list)
+    messages: list[ConversationMessage] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
     last_activity: datetime = field(default_factory=datetime.now)
 
@@ -470,7 +470,7 @@ class ConversationSession:
 
     # Session metadata
     project_path: Optional[str] = None
-    active_files: List[str] = field(default_factory=list)
+    active_files: list[str] = field(default_factory=list)
     tool_usage_count: int = 0
 
     # Provider info (original fields)
@@ -493,7 +493,7 @@ class ConversationSession:
         """Get available tokens for new messages."""
         return self.max_tokens - self.reserved_tokens - self.current_tokens
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "session_id": self.session_id,
@@ -573,13 +573,13 @@ class ConversationStore:
         self.chars_per_token = chars_per_token
 
         # In-memory session cache
-        self._sessions: Dict[str, ConversationSession] = {}
+        self._sessions: dict[str, ConversationSession] = {}
 
         # ID lookup caches for normalized tables (populated lazily)
-        self._model_family_ids: Dict[str, int] = {}
-        self._model_size_ids: Dict[str, int] = {}
-        self._context_size_ids: Dict[str, int] = {}
-        self._provider_ids: Dict[str, int] = {}
+        self._model_family_ids: dict[str, int] = {}
+        self._model_size_ids: dict[str, int] = {}
+        self._context_size_ids: dict[str, int] = {}
+        self._provider_ids: dict[str, int] = {}
 
         # Initialize database
         self._init_database()
@@ -1134,7 +1134,7 @@ class ConversationStore:
         self,
         project_path: Optional[str] = None,
         limit: int = 10,
-    ) -> List[ConversationSession]:
+    ) -> list[ConversationSession]:
         """List recent sessions with JOINs to lookup tables.
 
         Args:
@@ -1196,7 +1196,7 @@ class ConversationStore:
         priority: Optional[MessagePriority] = None,
         tool_name: Optional[str] = None,
         tool_call_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> ConversationMessage:
         """Add a message to the conversation.
 
@@ -1285,7 +1285,7 @@ class ConversationStore:
         session_id: str,
         max_tokens: Optional[int] = None,
         include_system: bool = True,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get messages formatted for the provider, respecting token limits.
 
         Args:
@@ -1332,7 +1332,7 @@ class ConversationStore:
         self,
         session_id: str,
         count: int = 10,
-    ) -> List[ConversationMessage]:
+    ) -> list[ConversationMessage]:
         """Get the most recent messages.
 
         Args:
@@ -1381,7 +1381,7 @@ class ConversationStore:
 
         logger.info(f"Deleted session {session_id}")
 
-    def vacuum(self) -> Dict[str, Any]:
+    def vacuum(self) -> dict[str, Any]:
         """Reclaim unused space in the database.
 
         Performs incremental auto-vacuum plus a checkpoint to merge WAL file.
@@ -1414,7 +1414,7 @@ class ConversationStore:
             "freed_bytes": freed,
         }
 
-    def get_database_stats(self) -> Dict[str, Any]:
+    def get_database_stats(self) -> dict[str, Any]:
         """Get database statistics including file size and record counts.
 
         Returns:
@@ -1440,7 +1440,7 @@ class ConversationStore:
             "journal_mode": journal_mode,
         }
 
-    def get_session_stats(self, session_id: str) -> Dict[str, Any]:
+    def get_session_stats(self, session_id: str) -> dict[str, Any]:
         """Get statistics for a session.
 
         Args:
@@ -1453,7 +1453,7 @@ class ConversationStore:
         if not session:
             return {}
 
-        role_counts: Dict[str, int] = {}
+        role_counts: dict[str, int] = {}
         for msg in session.messages:
             role_counts[msg.role.value] = role_counts.get(msg.role.value, 0) + 1
 
@@ -1475,7 +1475,7 @@ class ConversationStore:
     # Efficient GROUP BY queries on normalized FK columns for learning
     # =========================================================================
 
-    def get_model_family_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_model_family_stats(self) -> dict[str, dict[str, Any]]:
         """Get aggregated statistics by model family for RL feature extraction.
 
         Returns:
@@ -1513,7 +1513,7 @@ class ConversationStore:
                 }
             return result
 
-    def get_provider_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_provider_stats(self) -> dict[str, dict[str, Any]]:
         """Get aggregated statistics by provider for RL feature extraction.
 
         Returns:
@@ -1547,7 +1547,7 @@ class ConversationStore:
                 }
             return result
 
-    def get_model_size_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_model_size_stats(self) -> dict[str, dict[str, Any]]:
         """Get aggregated statistics by model size for RL feature extraction.
 
         Returns:
@@ -1585,7 +1585,7 @@ class ConversationStore:
         self,
         limit: int = 1000,
         filter_tool_capable: Optional[bool] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get session data formatted for RL training.
 
         Returns a list of feature vectors suitable for reinforcement learning.
@@ -1602,7 +1602,7 @@ class ConversationStore:
             conn.row_factory = sqlite3.Row
 
             where_clause = ""
-            params: List[Any] = [limit]
+            params: list[Any] = [limit]
 
             if filter_tool_capable is not None:
                 where_clause = "WHERE s.tool_capable = ?"
@@ -1687,8 +1687,8 @@ class ConversationStore:
 
     def _score_messages(
         self,
-        messages: List[ConversationMessage],
-    ) -> List[tuple[ConversationMessage, float]]:
+        messages: list[ConversationMessage],
+    ) -> list[tuple[ConversationMessage, float]]:
         """Score messages for context selection.
 
         Scoring factors:
@@ -2004,7 +2004,7 @@ class ConversationStore:
         limit: int = 10,
         min_similarity: float = 0.3,
         exclude_recent: int = 5,
-    ) -> List[Tuple[ConversationMessage, float]]:
+    ) -> list[tuple[ConversationMessage, float]]:
         """Retrieve messages semantically relevant to a query from the full history.
 
         This enables enhanced context compaction by finding relevant historical
@@ -2041,7 +2041,7 @@ class ConversationStore:
         limit: int,
         min_similarity: float,
         exclude_recent: int,
-    ) -> List[Tuple[ConversationMessage, float]]:
+    ) -> list[tuple[ConversationMessage, float]]:
         """Retrieve relevant messages using LanceDB vector search.
 
         Much faster than on-the-fly embedding - O(log n) vs O(n).
@@ -2049,7 +2049,7 @@ class ConversationStore:
         import asyncio
 
         # Get recent message IDs to exclude
-        exclude_ids: List[str] = []
+        exclude_ids: list[str] = []
         if exclude_recent > 0:
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
@@ -2065,7 +2065,7 @@ class ConversationStore:
                 exclude_ids = [row["id"] for row in recent_rows]
 
         # Run async search
-        async def _search() -> List[Any]:
+        async def _search() -> list[Any]:
             return await self._embedding_store.search_similar(
                 query=query,
                 session_id=session_id,
@@ -2108,7 +2108,7 @@ class ConversationStore:
             ).fetchall()
 
         # Build result list with similarity scores
-        results: List[Tuple[ConversationMessage, float]] = []
+        results: list[tuple[ConversationMessage, float]] = []
         for row in rows:
             message = self._message_from_row(row)
             similarity = similarity_map.get(message.id, 0.0)
@@ -2125,7 +2125,7 @@ class ConversationStore:
         limit: int,
         min_similarity: float,
         exclude_recent: int,
-    ) -> List[Tuple[ConversationMessage, float]]:
+    ) -> list[tuple[ConversationMessage, float]]:
         """Retrieve relevant messages using on-the-fly embedding computation.
 
         Fallback when LanceDB is not available. Slower but works without setup.
@@ -2157,7 +2157,7 @@ class ConversationStore:
             query_embedding = self._embedding_service.embed_text_sync(query[:2000])
 
             # Compute embeddings and similarities for historical messages
-            scored_messages: List[Tuple[ConversationMessage, float]] = []
+            scored_messages: list[tuple[ConversationMessage, float]] = []
 
             for row in historical_rows:
                 message = self._message_from_row(row)
@@ -2189,7 +2189,7 @@ class ConversationStore:
         query: str,
         limit: int = 3,
         min_similarity: float = 0.25,
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """Retrieve context summaries relevant to current query.
 
         Searches the context_summaries table for summaries that might
@@ -2224,7 +2224,7 @@ class ConversationStore:
                 return []
 
             query_embedding = await self._embedding_service.embed_text(query[:2000])
-            scored_summaries: List[Tuple[str, float]] = []
+            scored_summaries: list[tuple[str, float]] = []
 
             for row in rows:
                 summary = row["summary"]
@@ -2260,7 +2260,7 @@ class ConversationStore:
         self,
         session_id: str,
         summary: str,
-        messages_summarized: List[str],
+        messages_summarized: list[str],
     ) -> None:
         """Store a compaction summary for later retrieval.
 
@@ -2299,9 +2299,9 @@ class ConversationStore:
     def get_historical_tool_results(
         self,
         session_id: str,
-        tool_names: Optional[List[str]] = None,
+        tool_names: Optional[list[str]] = None,
         limit: int = 20,
-    ) -> List[ConversationMessage]:
+    ) -> list[ConversationMessage]:
         """Retrieve historical tool results from the session.
 
         Useful for finding relevant previous tool outputs that might
@@ -2350,8 +2350,8 @@ class ConversationStore:
         session_id: str,
         query: str,
         limit: int = 20,
-        roles: Optional[List[str]] = None,
-    ) -> List[ConversationMessage]:
+        roles: Optional[list[str]] = None,
+    ) -> list[ConversationMessage]:
         """Search messages using FTS5 full-text search.
 
         Uses SQLite FTS5 for O(log n) keyword search instead of O(n) linear scan.
@@ -2419,8 +2419,8 @@ class ConversationStore:
         session_id: str,
         query: str,
         limit: int,
-        roles: Optional[List[str]] = None,
-    ) -> List[ConversationMessage]:
+        roles: Optional[list[str]] = None,
+    ) -> list[ConversationMessage]:
         """Fallback content search using LIKE when FTS5 is unavailable."""
         # Simple tokenization for LIKE search
         terms = query.split()
@@ -2429,7 +2429,7 @@ class ConversationStore:
         if roles:
             role_placeholders = ",".join("?" * len(roles))
             where_clause = f"session_id = ? AND role IN ({role_placeholders})"
-            params: List[Any] = [session_id, *roles]
+            params: list[Any] = [session_id, *roles]
         else:
             where_clause = "session_id = ?"
             params = [session_id]
@@ -2504,7 +2504,7 @@ class ConversationStore:
     # Efficient queries using normalized FK columns for training data extraction
     # =========================================================================
 
-    def get_provider_stats_list(self) -> List[Dict[str, Any]]:
+    def get_provider_stats_list(self) -> list[dict[str, Any]]:
         """Get session statistics grouped by provider.
 
         Returns aggregated stats for ML/RL analysis of provider performance.
@@ -2535,7 +2535,7 @@ class ConversationStore:
 
             return [dict(row) for row in rows]
 
-    def get_model_family_stats_list(self) -> List[Dict[str, Any]]:
+    def get_model_family_stats_list(self) -> list[dict[str, Any]]:
         """Get session statistics grouped by model family.
 
         Returns aggregated stats for ML/RL analysis of model architecture performance.
@@ -2568,7 +2568,7 @@ class ConversationStore:
 
             return [dict(row) for row in rows]
 
-    def get_model_size_stats_list(self) -> List[Dict[str, Any]]:
+    def get_model_size_stats_list(self) -> list[dict[str, Any]]:
         """Get session statistics grouped by model size category.
 
         Returns aggregated stats for ML/RL analysis of model size impact.
@@ -2611,7 +2611,7 @@ class ConversationStore:
         self,
         limit: int = 1000,
         min_messages: int = 2,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get comprehensive session data for RL training.
 
         Returns fully denormalized session data with all ML-friendly features
@@ -2671,7 +2671,7 @@ class ConversationStore:
 
             return [dict(row) for row in rows]
 
-    def get_aggregation_summary(self) -> Dict[str, Any]:
+    def get_aggregation_summary(self) -> dict[str, Any]:
         """Get high-level aggregation summary for ML/RL dashboard.
 
         Returns:
@@ -2725,7 +2725,7 @@ class ConversationStore:
                 "not_tool_capable_sessions": tool_stats[1] or 0,
             }
 
-    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
         """Compute cosine similarity between two vectors.
 
         Uses Rust-accelerated implementation with NumPy fallback.

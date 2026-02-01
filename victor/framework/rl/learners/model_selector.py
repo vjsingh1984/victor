@@ -34,7 +34,7 @@ import logging
 import math
 import random
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -112,11 +112,11 @@ class ModelSelectorLearner(BaseLearner):
         self.strategy = strategy
 
         # In-memory caches
-        self._q_table: Dict[str, float] = {}
-        self._selection_counts: Dict[str, int] = {}
+        self._q_table: dict[str, float] = {}
+        self._selection_counts: dict[str, int] = {}
         self._total_selections: int = 0
-        self._q_table_by_task: Dict[str, Dict[str, float]] = {}
-        self._task_selection_counts: Dict[str, Dict[str, int]] = {}
+        self._q_table_by_task: dict[str, dict[str, float]] = {}
+        self._task_selection_counts: dict[str, dict[str, int]] = {}
 
         # Load state from database
         self._load_state()
@@ -401,8 +401,8 @@ class ModelSelectorLearner(BaseLearner):
         )
 
     def _select_epsilon_greedy(
-        self, providers: List[str], task_type: Optional[str] = None
-    ) -> Tuple[str, str]:
+        self, providers: list[str], task_type: Optional[str] = None
+    ) -> tuple[str, str]:
         """Select using epsilon-greedy strategy."""
         # Exploration
         if random.random() < self.epsilon:
@@ -414,8 +414,8 @@ class ModelSelectorLearner(BaseLearner):
         return self._select_exploit(providers, task_type)
 
     def _select_exploit(
-        self, providers: List[str], task_type: Optional[str] = None
-    ) -> Tuple[str, str]:
+        self, providers: list[str], task_type: Optional[str] = None
+    ) -> tuple[str, str]:
         """Select provider with highest Q-value."""
         best_provider = max(providers, key=lambda p: self._get_q_value(p, task_type))
         reason = "Best Q-value"
@@ -423,7 +423,7 @@ class ModelSelectorLearner(BaseLearner):
             reason += f" [task={task_type}]"
         return best_provider, reason
 
-    def _select_ucb(self, providers: List[str], task_type: Optional[str] = None) -> Tuple[str, str]:
+    def _select_ucb(self, providers: list[str], task_type: Optional[str] = None) -> tuple[str, str]:
         """Select using Upper Confidence Bound (UCB) strategy."""
         if self._total_selections == 0:
             return random.choice(providers), "No history, random selection"
@@ -490,7 +490,7 @@ class ModelSelectorLearner(BaseLearner):
 
         return max(-1.0, min(1.0, reward))
 
-    def get_provider_rankings(self) -> List[Dict[str, Any]]:
+    def get_provider_rankings(self) -> list[dict[str, Any]]:
         """Get all providers ranked by Q-value.
 
         Returns:

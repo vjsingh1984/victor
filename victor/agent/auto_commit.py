@@ -41,7 +41,7 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class CommitResult:
     success: bool
     commit_hash: Optional[str] = None
     message: str = ""
-    files_committed: Optional[List[str]] = None
+    files_committed: Optional[list[str]] = None
     error: Optional[str] = None
 
     def __post_init__(self) -> None:
@@ -132,7 +132,7 @@ class AutoCommitter:
         except Exception:
             return False
 
-    def has_changes(self, files: Optional[List[str]] = None) -> bool:
+    def has_changes(self, files: Optional[list[str]] = None) -> bool:
         """Check if there are uncommitted changes.
 
         Args:
@@ -150,7 +150,7 @@ class AutoCommitter:
         except Exception:
             return False
 
-    def get_changed_files(self) -> List[str]:
+    def get_changed_files(self) -> list[str]:
         """Get list of changed files."""
         try:
             result = self._run_git("status", "--porcelain", check=False)
@@ -167,7 +167,7 @@ class AutoCommitter:
         except Exception:
             return []
 
-    def stage_files(self, files: List[str]) -> bool:
+    def stage_files(self, files: list[str]) -> bool:
         """Stage files for commit.
 
         Args:
@@ -191,7 +191,7 @@ class AutoCommitter:
         description: str,
         change_type: Optional[str] = None,
         scope: Optional[str] = None,
-        files: Optional[List[str]] = None,
+        files: Optional[list[str]] = None,
     ) -> str:
         """Generate a commit message.
 
@@ -237,7 +237,7 @@ class AutoCommitter:
 
         return "\n".join(parts)
 
-    def _detect_change_type(self, description: str, files: Optional[List[str]] = None) -> str:
+    def _detect_change_type(self, description: str, files: Optional[list[str]] = None) -> str:
         """Auto-detect change type from description and files.
 
         Args:
@@ -282,7 +282,7 @@ class AutoCommitter:
 
     def commit_changes(
         self,
-        files: Optional[List[str]] = None,
+        files: Optional[list[str]] = None,
         description: str = "AI-assisted changes",
         change_type: Optional[str] = None,
         scope: Optional[str] = None,

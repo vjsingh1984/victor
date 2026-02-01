@@ -19,7 +19,7 @@ ensuring ISP and DIP compliance for subagent dependencies.
 """
 
 import pytest
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import MagicMock
 
 
@@ -232,16 +232,16 @@ class TestToolExecutorProtocol:
         # Create a minimal implementation
         class MinimalExecutor:
             def execute(
-                self, tool_name: str, arguments: Dict[str, Any], context: Any = None
+                self, tool_name: str, arguments: dict[str, Any], context: Any = None
             ) -> Any:
                 return {"result": "success"}
 
             async def aexecute(
-                self, tool_name: str, arguments: Dict[str, Any], context: Any = None
+                self, tool_name: str, arguments: dict[str, Any], context: Any = None
             ) -> Any:
                 return {"result": "success"}
 
-            def validate_arguments(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
+            def validate_arguments(self, tool_name: str, arguments: dict[str, Any]) -> bool:
                 return True
 
         executor = MinimalExecutor()
@@ -254,12 +254,12 @@ class TestToolExecutorProtocol:
         # Create an incomplete implementation (missing validate_arguments)
         class IncompleteExecutor:
             def execute(
-                self, tool_name: str, arguments: Dict[str, Any], context: Any = None
+                self, tool_name: str, arguments: dict[str, Any], context: Any = None
             ) -> Any:
                 return {}
 
             async def aexecute(
-                self, tool_name: str, arguments: Dict[str, Any], context: Any = None
+                self, tool_name: str, arguments: dict[str, Any], context: Any = None
             ) -> Any:
                 return {}
 
@@ -277,9 +277,9 @@ class TestToolExecutorProtocol:
     def test_can_use_as_type_hint(self):
         """ToolExecutorProtocol can be used as a type hint."""
         from victor.agent.protocols import ToolExecutorProtocol
-        from typing import Any, Dict
+        from typing import Any
 
-        def run_tool_safely(executor: ToolExecutorProtocol, tool: str, args: Dict[str, Any]) -> Any:
+        def run_tool_safely(executor: ToolExecutorProtocol, tool: str, args: dict[str, Any]) -> Any:
             """Function accepting ToolExecutorProtocol."""
             if executor.validate_arguments(tool, args):
                 return executor.execute(tool, args)
@@ -288,16 +288,16 @@ class TestToolExecutorProtocol:
         # Create conforming implementation
         class TestExecutor:
             def execute(
-                self, tool_name: str, arguments: Dict[str, Any], context: Any = None
+                self, tool_name: str, arguments: dict[str, Any], context: Any = None
             ) -> Any:
                 return {"executed": tool_name}
 
             async def aexecute(
-                self, tool_name: str, arguments: Dict[str, Any], context: Any = None
+                self, tool_name: str, arguments: dict[str, Any], context: Any = None
             ) -> Any:
                 return {"executed": tool_name}
 
-            def validate_arguments(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
+            def validate_arguments(self, tool_name: str, arguments: dict[str, Any]) -> bool:
                 return "required_arg" in arguments
 
         executor = TestExecutor()
@@ -324,18 +324,18 @@ class TestToolExecutorProtocolImplementation:
                 self.valid_tools = {"read", "write", "search"}
 
             def execute(
-                self, tool_name: str, arguments: Dict[str, Any], context: Any = None
+                self, tool_name: str, arguments: dict[str, Any], context: Any = None
             ) -> Any:
                 self.executed_tools.append((tool_name, arguments))
                 return {"tool": tool_name, "args": arguments, "sync": True}
 
             async def aexecute(
-                self, tool_name: str, arguments: Dict[str, Any], context: Any = None
+                self, tool_name: str, arguments: dict[str, Any], context: Any = None
             ) -> Any:
                 self.executed_tools.append((tool_name, arguments))
                 return {"tool": tool_name, "args": arguments, "async": True}
 
-            def validate_arguments(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
+            def validate_arguments(self, tool_name: str, arguments: dict[str, Any]) -> bool:
                 return tool_name in self.valid_tools
 
         return MockExecutor()
@@ -421,16 +421,16 @@ class TestProtocolIntegration:
 
         class ExecutorImpl:
             def execute(
-                self, tool_name: str, arguments: Dict[str, Any], context: Any = None
+                self, tool_name: str, arguments: dict[str, Any], context: Any = None
             ) -> Any:
                 return {"success": True}
 
             async def aexecute(
-                self, tool_name: str, arguments: Dict[str, Any], context: Any = None
+                self, tool_name: str, arguments: dict[str, Any], context: Any = None
             ) -> Any:
                 return {"success": True}
 
-            def validate_arguments(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
+            def validate_arguments(self, tool_name: str, arguments: dict[str, Any]) -> bool:
                 return True
 
         context = ContextImpl()
@@ -463,7 +463,7 @@ class TestProtocolIntegration:
         context = SubAgentContextAdapter(orchestrator)
 
         # Function accepting SubAgentContext
-        def configure_subagent(ctx: SubAgentContext) -> Dict[str, Any]:
+        def configure_subagent(ctx: SubAgentContext) -> dict[str, Any]:
             return {
                 "provider": ctx.provider_name,
                 "model": ctx.model,

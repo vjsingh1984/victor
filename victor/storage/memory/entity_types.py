@@ -21,7 +21,7 @@ code elements, and concepts across conversations.
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 import hashlib
 
 
@@ -130,13 +130,13 @@ class Entity:
     name: str
     entity_type: EntityType
     description: Optional[str] = None
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
     source: Optional[str] = None
     confidence: float = 1.0
     mentions: int = 1
     first_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     last_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    embedding: Optional[List[float]] = None
+    embedding: Optional[list[float]] = None
 
     @classmethod
     def create(
@@ -144,7 +144,7 @@ class Entity:
         name: str,
         entity_type: EntityType,
         description: Optional[str] = None,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: Optional[dict[str, Any]] = None,
         source: Optional[str] = None,
         confidence: float = 1.0,
     ) -> "Entity":
@@ -172,7 +172,7 @@ class Entity:
             confidence=confidence,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize entity to dictionary."""
         return {
             "id": self.id,
@@ -189,7 +189,7 @@ class Entity:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Entity":
+    def from_dict(cls, data: dict[str, Any]) -> "Entity":
         """Deserialize entity from dictionary."""
         first_seen = data.get("first_seen")
         if isinstance(first_seen, str):
@@ -269,7 +269,7 @@ class EntityRelation:
     target_id: str
     relation_type: RelationType
     strength: float = 1.0
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
     first_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     last_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -280,7 +280,7 @@ class EntityRelation:
         hash_val = hashlib.sha256(content.encode()).hexdigest()[:12]
         return f"rel_{hash_val}"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize relation to dictionary."""
         return {
             "id": self.id,
@@ -294,7 +294,7 @@ class EntityRelation:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "EntityRelation":
+    def from_dict(cls, data: dict[str, Any]) -> "EntityRelation":
         """Deserialize relation from dictionary."""
         first_seen = data.get("first_seen")
         if isinstance(first_seen, str):

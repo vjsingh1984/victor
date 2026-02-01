@@ -32,17 +32,12 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 import yaml
 
-from victor.core.verticals.config_loader import VerticalConfigLoader, VerticalYAMLConfig
-from victor.core.verticals.base import VerticalBase, VerticalConfig
-from victor.coding import CodingAssistant
-from victor.research import ResearchAssistant
-from victor.devops import DevOpsAssistant
-from victor.rag import RAGAssistant
+from victor.core.verticals.config_loader import VerticalConfigLoader
 
 
 # =============================================================================
@@ -57,7 +52,7 @@ def config_loader() -> VerticalConfigLoader:
 
 
 @pytest.fixture
-def sample_yaml_config() -> Dict[str, Any]:
+def sample_yaml_config() -> dict[str, Any]:
     """Sample YAML configuration for testing."""
     return {
         "metadata": {
@@ -87,7 +82,7 @@ def sample_yaml_config() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def temp_yaml_file(sample_yaml_config: Dict[str, Any]) -> Path:
+def temp_yaml_file(sample_yaml_config: dict[str, Any]) -> Path:
     """Create a temporary YAML file for testing."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.dump(sample_yaml_config, f)

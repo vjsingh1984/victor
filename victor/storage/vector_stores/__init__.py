@@ -88,7 +88,7 @@ def reset_embedding_registry() -> None:
     EmbeddingRegistry.reset()
 
 
-def get_embedding_registry_stats() -> Dict[str, Any]:
+def get_embedding_registry_stats() -> dict[str, Any]:
     """Get statistics about the embedding provider cache.
 
     Returns:

@@ -23,19 +23,16 @@ These tests verify state handling across workflow execution:
 """
 
 import asyncio
-import copy
-import json
 import pytest
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from unittest.mock import MagicMock
 
-from victor.workflows.graph_dsl import WorkflowGraph, State
-from victor.workflows.definition import WorkflowBuilder, TransformNode
+from victor.workflows.graph_dsl import State
+from victor.workflows.definition import WorkflowBuilder
 from victor.workflows.executor import (
     WorkflowExecutor,
     WorkflowContext,
-    WorkflowResult,
     NodeResult,
     ExecutorNodeStatus,
 )
@@ -48,17 +45,17 @@ from victor.workflows.executor import (
 class PersistenceState(State):
     """State for persistence tests."""
 
-    values: List[str] = field(default_factory=list)
+    values: list[str] = field(default_factory=list)
     counter: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class LargeDataState(State):
     """State for large data handling tests."""
 
-    large_list: List[Dict[str, Any]] = field(default_factory=list)
-    nested_data: Dict[str, Any] = field(default_factory=dict)
+    large_list: list[dict[str, Any]] = field(default_factory=list)
+    nested_data: dict[str, Any] = field(default_factory=dict)
     binary_data: Optional[bytes] = None
 
 
@@ -67,17 +64,17 @@ class IsolationState(State):
     """State for isolation tests."""
 
     instance_id: str = ""
-    modifications: List[str] = field(default_factory=list)
+    modifications: list[str] = field(default_factory=list)
 
 
 @dataclass
 class ComplexState(State):
     """Complex nested state for advanced tests."""
 
-    config: Dict[str, Any] = field(default_factory=dict)
-    items: List[Dict[str, Any]] = field(default_factory=list)
-    cache: Dict[str, List[str]] = field(default_factory=dict)
-    counters: Dict[str, int] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
+    items: list[dict[str, Any]] = field(default_factory=list)
+    cache: dict[str, list[str]] = field(default_factory=dict)
+    counters: dict[str, int] = field(default_factory=dict)
 
 
 # ============ Helper Functions ============
@@ -104,17 +101,17 @@ def mock_orchestrator() -> Any:
 def state_modification_workflow() -> Any:
     """Workflow that modifies state in multiple ways."""
 
-    def append_value(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def append_value(ctx: dict[str, Any]) -> dict[str, Any]:
         values = ctx.get("values", [])
         values.append(f"step_{len(values) + 1}")
         ctx["values"] = values
         return ctx
 
-    def increment_counter(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def increment_counter(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["counter"] = ctx.get("counter", 0) + 1
         return ctx
 
-    def update_metadata(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def update_metadata(ctx: dict[str, Any]) -> dict[str, Any]:
         metadata = ctx.get("metadata", {})
         metadata["last_step"] = ctx.get("values", [])[-1] if ctx.get("values") else None
         metadata["counter_value"] = ctx.get("counter", 0)
@@ -136,18 +133,18 @@ def state_modification_workflow() -> Any:
 def nested_state_workflow() -> Any:
     """Workflow that works with deeply nested state."""
 
-    def init_nested(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def init_nested(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["nested"] = {"level1": {"level2": {"level3": {"value": "initial", "items": []}}}}
         return ctx
 
-    def modify_nested(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def modify_nested(ctx: dict[str, Any]) -> dict[str, Any]:
         nested = ctx.get("nested", {})
         nested["level1"]["level2"]["level3"]["value"] = "modified"
         nested["level1"]["level2"]["level3"]["items"].append("item1")
         ctx["nested"] = nested
         return ctx
 
-    def add_sibling(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def add_sibling(ctx: dict[str, Any]) -> dict[str, Any]:
         nested = ctx.get("nested", {})
         nested["level1"]["level2"]["level3"]["items"].append("item2")
         nested["level1"]["level2"]["sibling"] = {"added": True}
@@ -200,19 +197,19 @@ class TestStatePersistenceAcrossNodes:
         """Test that each node can access state from all previous nodes."""
         state_snapshots = []
 
-        def capture_and_modify_a(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def capture_and_modify_a(ctx: dict[str, Any]) -> dict[str, Any]:
             state_snapshots.append(("a", dict(ctx)))
             ctx["from_a"] = True
             ctx["a_value"] = 100
             return ctx
 
-        def capture_and_modify_b(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def capture_and_modify_b(ctx: dict[str, Any]) -> dict[str, Any]:
             state_snapshots.append(("b", dict(ctx)))
             ctx["from_b"] = True
             ctx["b_value"] = ctx.get("a_value", 0) * 2
             return ctx
 
-        def capture_and_modify_c(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def capture_and_modify_c(ctx: dict[str, Any]) -> dict[str, Any]:
             state_snapshots.append(("c", dict(ctx)))
             ctx["from_c"] = True
             ctx["c_value"] = ctx.get("a_value", 0) + ctx.get("b_value", 0)
@@ -275,20 +272,20 @@ class TestStateModificationPropagation:
     async def test_list_modifications_propagate(self, mock_orchestrator) -> None:
         """Test that list modifications are properly propagated."""
 
-        def add_items(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def add_items(ctx: dict[str, Any]) -> dict[str, Any]:
             items = ctx.get("items", [])
             items.extend([{"id": 1}, {"id": 2}])
             ctx["items"] = items
             return ctx
 
-        def modify_items(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def modify_items(ctx: dict[str, Any]) -> dict[str, Any]:
             items = ctx.get("items", [])
             for item in items:
                 item["processed"] = True
             ctx["items"] = items
             return ctx
 
-        def filter_items(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def filter_items(ctx: dict[str, Any]) -> dict[str, Any]:
             items = ctx.get("items", [])
             ctx["items"] = [i for i in items if i.get("processed")]
             ctx["filtered_count"] = len(ctx["items"])
@@ -314,18 +311,18 @@ class TestStateModificationPropagation:
     async def test_dict_modifications_propagate(self, mock_orchestrator) -> None:
         """Test that dictionary modifications are properly propagated."""
 
-        def set_config(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def set_config(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["config"] = {"version": "1.0", "settings": {"debug": True}}
             return ctx
 
-        def update_config(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def update_config(ctx: dict[str, Any]) -> dict[str, Any]:
             config = ctx.get("config", {})
             config["settings"]["logging"] = {"level": "INFO"}
             config["version"] = "1.1"
             ctx["config"] = config
             return ctx
 
-        def read_config(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def read_config(ctx: dict[str, Any]) -> dict[str, Any]:
             config = ctx.get("config", {})
             ctx["final_version"] = config.get("version")
             ctx["has_logging"] = "logging" in config.get("settings", {})
@@ -349,17 +346,17 @@ class TestStateModificationPropagation:
     async def test_state_replacement_vs_modification(self, mock_orchestrator) -> None:
         """Test that both state replacement and modification work correctly."""
 
-        def replace_state(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def replace_state(ctx: dict[str, Any]) -> dict[str, Any]:
             # Replace entire value
             ctx["data"] = {"replaced": True}
             return ctx
 
-        def modify_state(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def modify_state(ctx: dict[str, Any]) -> dict[str, Any]:
             # Modify existing value
             ctx["data"]["modified"] = True
             return ctx
 
-        def add_to_state(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def add_to_state(ctx: dict[str, Any]) -> dict[str, Any]:
             # Add new key
             ctx["new_key"] = "added"
             return ctx
@@ -390,12 +387,12 @@ class TestLargeStateHandling:
     async def test_large_list_state(self, mock_orchestrator) -> None:
         """Test handling state with large lists."""
 
-        def create_large_list(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def create_large_list(ctx: dict[str, Any]) -> dict[str, Any]:
             # Create a list with 10,000 items
             ctx["large_list"] = [{"id": i, "data": f"item_{i}"} for i in range(10000)]
             return ctx
 
-        def process_large_list(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def process_large_list(ctx: dict[str, Any]) -> dict[str, Any]:
             large_list = ctx.get("large_list", [])
             ctx["processed_count"] = len(large_list)
             ctx["sum_ids"] = sum(item["id"] for item in large_list)
@@ -418,7 +415,7 @@ class TestLargeStateHandling:
     async def test_large_nested_state(self, mock_orchestrator) -> None:
         """Test handling deeply nested state structures."""
 
-        def create_nested_structure(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def create_nested_structure(ctx: dict[str, Any]) -> dict[str, Any]:
             # Create nested structure with depth
             nested = {}
             current = nested
@@ -430,7 +427,7 @@ class TestLargeStateHandling:
             ctx["nested"] = nested
             return ctx
 
-        def verify_nested(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def verify_nested(ctx: dict[str, Any]) -> dict[str, Any]:
             # Traverse and verify
             nested = ctx.get("nested", {})
             depth = 0
@@ -461,13 +458,13 @@ class TestLargeStateHandling:
     async def test_large_string_state(self, mock_orchestrator) -> None:
         """Test handling large string values in state."""
 
-        def create_large_strings(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def create_large_strings(ctx: dict[str, Any]) -> dict[str, Any]:
             # Create large string data
             ctx["large_string"] = "x" * 1_000_000  # 1MB string
             ctx["string_list"] = ["y" * 10000 for _ in range(100)]  # 100 x 10KB strings
             return ctx
 
-        def measure_strings(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def measure_strings(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["large_string_len"] = len(ctx.get("large_string", ""))
             ctx["total_list_len"] = sum(len(s) for s in ctx.get("string_list", []))
             return ctx
@@ -489,12 +486,12 @@ class TestLargeStateHandling:
     async def test_state_with_many_keys(self, mock_orchestrator) -> None:
         """Test handling state with many top-level keys."""
 
-        def create_many_keys(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def create_many_keys(ctx: dict[str, Any]) -> dict[str, Any]:
             for i in range(1000):
                 ctx[f"key_{i}"] = {"index": i, "value": f"value_{i}"}
             return ctx
 
-        def verify_keys(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def verify_keys(ctx: dict[str, Any]) -> dict[str, Any]:
             key_count = sum(1 for k in ctx.keys() if k.startswith("key_"))
             ctx["key_count"] = key_count
             return ctx
@@ -522,12 +519,12 @@ class TestStateIsolation:
     async def test_concurrent_workflows_isolated(self, mock_orchestrator) -> None:
         """Test that concurrent workflow executions have isolated state."""
 
-        def set_instance_data(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def set_instance_data(ctx: dict[str, Any]) -> dict[str, Any]:
             instance_id = ctx.get("instance_id", "unknown")
             ctx["data"] = f"data_from_{instance_id}"
             return ctx
 
-        def verify_instance_data(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def verify_instance_data(ctx: dict[str, Any]) -> dict[str, Any]:
             instance_id = ctx.get("instance_id", "unknown")
             expected = f"data_from_{instance_id}"
             ctx["verified"] = ctx.get("data") == expected
@@ -559,7 +556,7 @@ class TestStateIsolation:
     async def test_sequential_workflows_isolated(self, mock_orchestrator) -> None:
         """Test that sequential workflow executions don't leak state."""
 
-        def append_to_list(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def append_to_list(ctx: dict[str, Any]) -> dict[str, Any]:
             items = ctx.get("items", [])
             items.append(ctx.get("value", "unknown"))
             ctx["items"] = items
@@ -594,7 +591,7 @@ class TestWorkflowContextClass:
         """Test WorkflowContext get/set operations during execution."""
         context_operations = []
 
-        def test_context_ops(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def test_context_ops(ctx: dict[str, Any]) -> dict[str, Any]:
             # These operations simulate what happens inside WorkflowContext
             ctx["test_key"] = "test_value"
             context_operations.append(("set", "test_key", "test_value"))
@@ -620,7 +617,7 @@ class TestWorkflowContextClass:
     async def test_context_update_multiple_values(self, mock_orchestrator) -> None:
         """Test updating multiple context values at once."""
 
-        def batch_update(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def batch_update(ctx: dict[str, Any]) -> dict[str, Any]:
             updates = {
                 "key1": "value1",
                 "key2": "value2",
@@ -629,7 +626,7 @@ class TestWorkflowContextClass:
             ctx.update(updates)
             return ctx
 
-        def verify_update(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def verify_update(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["all_present"] = all(ctx.get(f"key{i}") == f"value{i}" for i in range(1, 4))
             return ctx
 
@@ -649,7 +646,7 @@ class TestWorkflowContextClass:
     async def test_context_node_result_tracking(self, mock_orchestrator) -> None:
         """Test that context properly tracks node results."""
 
-        def step(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def step(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["processed"] = True
             return ctx
 
@@ -736,13 +733,13 @@ class TestStateSerializationEdgeCases:
     async def test_state_with_none_values(self, mock_orchestrator) -> None:
         """Test handling state with None values."""
 
-        def set_nones(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def set_nones(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["none_value"] = None
             ctx["list_with_nones"] = [1, None, 3, None]
             ctx["dict_with_nones"] = {"key1": None, "key2": "value"}
             return ctx
 
-        def verify_nones(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def verify_nones(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["none_preserved"] = ctx.get("none_value") is None
             ctx["list_nones_preserved"] = ctx.get("list_with_nones") == [1, None, 3, None]
             return ctx
@@ -764,13 +761,13 @@ class TestStateSerializationEdgeCases:
     async def test_state_with_boolean_values(self, mock_orchestrator) -> None:
         """Test handling state with boolean values."""
 
-        def set_booleans(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def set_booleans(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["true_val"] = True
             ctx["false_val"] = False
             ctx["bool_list"] = [True, False, True]
             return ctx
 
-        def verify_booleans(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def verify_booleans(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["true_is_true"] = ctx.get("true_val") is True
             ctx["false_is_false"] = ctx.get("false_val") is False
             ctx["list_correct"] = ctx.get("bool_list") == [True, False, True]
@@ -794,7 +791,7 @@ class TestStateSerializationEdgeCases:
     async def test_state_with_numeric_types(self, mock_orchestrator) -> None:
         """Test handling state with various numeric types."""
 
-        def set_numbers(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def set_numbers(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["integer"] = 42
             ctx["float_val"] = 3.14159
             ctx["negative"] = -100
@@ -802,7 +799,7 @@ class TestStateSerializationEdgeCases:
             ctx["zero"] = 0
             return ctx
 
-        def verify_numbers(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def verify_numbers(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["integer_correct"] = ctx.get("integer") == 42
             ctx["float_approx"] = abs(ctx.get("float_val", 0) - 3.14159) < 0.0001
             ctx["negative_correct"] = ctx.get("negative") == -100
@@ -830,13 +827,13 @@ class TestStateSerializationEdgeCases:
     async def test_state_with_empty_collections(self, mock_orchestrator) -> None:
         """Test handling state with empty collections."""
 
-        def set_empties(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def set_empties(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["empty_list"] = []
             ctx["empty_dict"] = {}
             ctx["empty_string"] = ""
             return ctx
 
-        def verify_empties(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def verify_empties(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["list_empty"] = ctx.get("empty_list") == []
             ctx["dict_empty"] = ctx.get("empty_dict") == {}
             ctx["string_empty"] = ctx.get("empty_string") == ""

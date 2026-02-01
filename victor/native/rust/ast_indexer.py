@@ -21,7 +21,7 @@ AstIndexerProtocol interface and observability hooks.
 
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import Optional
 
 try:
     import victor_native  # type: ignore[import-not-found]
@@ -66,7 +66,7 @@ class RustAstIndexer(InstrumentedAccelerator):
         with self._timed_call("stdlib_check"):
             return victor_native.is_stdlib_module(module_name)
 
-    def batch_is_stdlib_modules(self, module_names: List[str]) -> List[bool]:
+    def batch_is_stdlib_modules(self, module_names: list[str]) -> list[bool]:
         """Check multiple module names for stdlib membership.
 
         Delegates to Rust implementation for batch processing.
@@ -80,7 +80,7 @@ class RustAstIndexer(InstrumentedAccelerator):
         with self._timed_call("batch_stdlib_check"):
             return victor_native.batch_is_stdlib_modules(module_names)
 
-    def extract_identifiers(self, source: str) -> List[str]:
+    def extract_identifiers(self, source: str) -> list[str]:
         """Extract all unique identifier references from source code.
 
         Delegates to Rust implementation with compiled regex.
@@ -94,7 +94,7 @@ class RustAstIndexer(InstrumentedAccelerator):
         with self._timed_call("extract_identifiers"):
             return victor_native.extract_identifiers(source)
 
-    def extract_identifiers_with_positions(self, source: str) -> List[Tuple[str, int, int]]:
+    def extract_identifiers_with_positions(self, source: str) -> list[tuple[str, int, int]]:
         """Extract identifiers with their positions.
 
         Delegates to Rust implementation.
@@ -108,7 +108,7 @@ class RustAstIndexer(InstrumentedAccelerator):
         with self._timed_call("extract_identifiers_with_positions"):
             return victor_native.extract_identifiers_with_positions(source)
 
-    def filter_stdlib_imports(self, imports: List[str]) -> Tuple[List[str], List[str]]:
+    def filter_stdlib_imports(self, imports: list[str]) -> tuple[list[str], list[str]]:
         """Partition imports into stdlib and non-stdlib.
 
         Delegates to Rust implementation.

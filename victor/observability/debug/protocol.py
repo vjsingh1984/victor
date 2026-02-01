@@ -26,7 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 
 class DebugState(Enum):
@@ -166,7 +166,7 @@ class Variable:
 
     # Evaluation metadata
     evaluate_name: Optional[str] = None  # Expression to get this value
-    presentation_hint: Optional[Dict[str, Any]] = None
+    presentation_hint: Optional[dict[str, Any]] = None
 
 
 @dataclass
@@ -176,7 +176,7 @@ class ExceptionInfo:
     exception_id: str
     description: Optional[str] = None
     break_mode: str = "always"  # "never", "always", "unhandled", "userUnhandled"
-    details: Optional[Dict[str, Any]] = None
+    details: Optional[dict[str, Any]] = None
 
 
 @dataclass
@@ -207,12 +207,12 @@ class DebugSession:
     # Program info
     program: Optional[Path] = None
     working_directory: Optional[Path] = None
-    arguments: List[str] = field(default_factory=list)
-    environment: Dict[str, str] = field(default_factory=dict)
+    arguments: list[str] = field(default_factory=list)
+    environment: dict[str, str] = field(default_factory=dict)
 
     # Debug state
-    breakpoints: Dict[str, List[Breakpoint]] = field(default_factory=dict)  # path -> breakpoints
-    threads: List[Thread] = field(default_factory=list)
+    breakpoints: dict[str, list[Breakpoint]] = field(default_factory=dict)  # path -> breakpoints
+    threads: list[Thread] = field(default_factory=list)
     current_thread_id: Optional[int] = None
     stop_reason: Optional[StopReason] = None
     exception_info: Optional[ExceptionInfo] = None
@@ -226,7 +226,7 @@ class DebugSession:
     supports_exception_options: bool = False
     supports_data_breakpoints: bool = False
 
-    def get_breakpoints_for_file(self, path: Union[str, Path]) -> List[Breakpoint]:
+    def get_breakpoints_for_file(self, path: str | Path) -> list[Breakpoint]:
         """Get all breakpoints for a file."""
         key = str(Path(path).resolve())
         return self.breakpoints.get(key, [])
@@ -247,16 +247,16 @@ class LaunchConfiguration:
 
     program: Path
     language: str
-    arguments: List[str] = field(default_factory=list)
+    arguments: list[str] = field(default_factory=list)
     working_directory: Optional[Path] = None
-    environment: Dict[str, str] = field(default_factory=dict)
+    environment: dict[str, str] = field(default_factory=dict)
 
     # Debug options
     stop_on_entry: bool = False
     no_debug: bool = False  # Run without debugging
 
     # Language-specific options
-    extra_options: Dict[str, Any] = field(default_factory=dict)
+    extra_options: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -269,4 +269,4 @@ class AttachConfiguration:
 
     # Language-specific options
     language: str = "python"
-    extra_options: Dict[str, Any] = field(default_factory=dict)
+    extra_options: dict[str, Any] = field(default_factory=dict)

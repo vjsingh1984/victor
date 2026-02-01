@@ -20,9 +20,8 @@ inconsistent isinstance/hasattr patterns.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
-import pytest
 
 
 # Test protocols
@@ -205,10 +204,10 @@ class TestRealProtocols:
         from victor.core.verticals.protocols.utils import check_protocol
 
         class FakeWorkflowProvider:
-            def get_workflows(self) -> Dict[str, Any]:
+            def get_workflows(self) -> dict[str, Any]:
                 return {"workflow1": {}}
 
-            def get_auto_workflows(self) -> List:
+            def get_auto_workflows(self) -> list:
                 return []
 
         provider = FakeWorkflowProvider()
@@ -223,7 +222,7 @@ class TestRealProtocols:
         from victor.core.verticals.protocols.utils import check_protocol
 
         class FakeRLConfigProvider:
-            def get_rl_config(self) -> Dict[str, Any]:
+            def get_rl_config(self) -> dict[str, Any]:
                 return {"active_learners": []}
 
             def get_rl_hooks(self) -> Optional[Any]:
@@ -241,7 +240,7 @@ class TestRealProtocols:
         from victor.core.verticals.protocols.utils import check_protocol
 
         class FakeTeamSpecProvider:
-            def get_team_specs(self) -> Dict[str, Any]:
+            def get_team_specs(self) -> dict[str, Any]:
                 return {"team1": {}}
 
             def get_default_team(self) -> Optional[str]:

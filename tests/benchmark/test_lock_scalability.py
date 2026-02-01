@@ -18,10 +18,8 @@ Tests the linear scalability of UniversalRegistry with striped locks
 under concurrent access patterns.
 """
 
-import concurrent.futures
 import threading
 import time
-from typing import List
 
 import pytest
 

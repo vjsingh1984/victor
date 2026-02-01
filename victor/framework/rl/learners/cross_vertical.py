@@ -54,7 +54,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -81,7 +81,7 @@ class SharedPattern:
     pattern_name: str
     avg_quality: float
     confidence: float
-    source_verticals: List[str] = field(default_factory=list)
+    source_verticals: list[str] = field(default_factory=list)
     recommended_mode: Optional[str] = None
     recommendation: str = ""
     sample_count: int = 0
@@ -189,7 +189,7 @@ class CrossVerticalLearner(BaseLearner):
         self,
         target_vertical: Optional[str] = None,
         min_confidence: float = 0.5,
-    ) -> List[SharedPattern]:
+    ) -> list[SharedPattern]:
         """Get patterns that apply across verticals.
 
         Args:
@@ -457,7 +457,7 @@ class CrossVerticalLearner(BaseLearner):
     def get_transfer_success_rate(
         self,
         target_vertical: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get success rate of cross-vertical pattern transfers.
 
         Args:

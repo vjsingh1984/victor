@@ -31,24 +31,17 @@ Performance Targets:
 
 import asyncio
 import gc
-import os
 import psutil
 import time
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from victor.core.container import ServiceContainer
 from victor.agent.orchestrator import AgentOrchestrator
-from victor.config.settings import Settings
 from victor.tools.base import BaseTool, ToolResult
-from victor.tools.registry import ToolRegistry
-from victor.agent.tool_executor import ToolExecutor
-from victor.agent.context_compactor import ContextCompactor
 from victor.agent.coordinators.compaction_strategies import (
     TruncationCompactionStrategy,
-    LLMCompactionStrategy,
     HybridCompactionStrategy,
 )
 
@@ -546,7 +539,7 @@ class TestPerformanceRegression:
 
 
 def save_performance_baselines(
-    results: Dict[str, Any], output_path: str = "/tmp/performance_baselines.json"
+    results: dict[str, Any], output_path: str = "/tmp/performance_baselines.json"
 ):
     """Save performance baselines for future comparison."""
     import json
@@ -571,7 +564,7 @@ def save_performance_baselines(
 
 def load_performance_baselines(
     baseline_path: str = "/tmp/performance_baselines.json",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Load historical performance baselines for comparison."""
     import json
     from pathlib import Path
@@ -592,11 +585,6 @@ def load_performance_baselines(
 @pytest.fixture
 async def mock_orchestrator():
     """Create mock orchestrator for performance testing."""
-    from victor.agent.protocols import (
-        ToolExecutorProtocol,
-        ToolRegistryProtocol,
-        ConversationControllerProtocol,
-    )
 
     orchestrator = MagicMock(spec=AgentOrchestrator)
 

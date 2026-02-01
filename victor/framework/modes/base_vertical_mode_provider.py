@@ -58,10 +58,9 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
+from typing import Optional
 
 from victor.core.mode_config import (
-    ComplexityMapper,
     ModeConfigRegistry,
     ModeDefinition,
     RegistryBasedModeConfigProvider,
@@ -108,7 +107,7 @@ class BaseVerticalModeProvider(RegistryBasedModeConfigProvider):
     """
 
     # Default mode and budget for each vertical
-    _VERTICAL_DEFAULTS: Dict[str, tuple[str, int]] = {
+    _VERTICAL_DEFAULTS: dict[str, tuple[str, int]] = {
         "coding": ("default", 10),
         "devops": ("standard", 15),
         "research": ("standard", 12),
@@ -190,7 +189,7 @@ class BaseVerticalModeProvider(RegistryBasedModeConfigProvider):
             f"task budgets for vertical '{self._vertical}'"
         )
 
-    def _get_modes_from_defaults(self) -> Dict[str, ModeDefinition]:
+    def _get_modes_from_defaults(self) -> dict[str, ModeDefinition]:
         """Get mode definitions from VerticalModeDefaults.
 
         Returns:
@@ -216,7 +215,7 @@ class BaseVerticalModeProvider(RegistryBasedModeConfigProvider):
             )
             return {}
 
-    def _get_task_budgets_from_defaults(self) -> Dict[str, int]:
+    def _get_task_budgets_from_defaults(self) -> dict[str, int]:
         """Get task budgets from VerticalModeDefaults.
 
         Returns:
@@ -264,7 +263,7 @@ class BaseVerticalModeProvider(RegistryBasedModeConfigProvider):
         # Use the parent's implementation which delegates to ComplexityMapper
         return super().get_mode_for_complexity(complexity)
 
-    def list_modes(self) -> List[str]:
+    def list_modes(self) -> list[str]:
         """List all available modes for this vertical.
 
         Returns:

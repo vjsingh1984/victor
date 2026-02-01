@@ -8,7 +8,8 @@ for different communication methods:
 """
 
 import json
-from typing import Any, AsyncIterator
+from typing import Any
+from collections.abc import AsyncIterator
 
 import httpx
 

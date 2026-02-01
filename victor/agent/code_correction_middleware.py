@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any, Optional
 
 from victor.evaluation.correction import (
     SelfCorrector,
@@ -63,7 +63,7 @@ class CodeCorrectionConfig:
     collect_metrics: bool = True
 
     # Use frozensets for better performance
-    code_tools: Set[str] = field(
+    code_tools: set[str] = field(
         default_factory=lambda: {
             "code_executor",
             "execute_code",
@@ -75,7 +75,7 @@ class CodeCorrectionConfig:
         }
     )
 
-    code_argument_names: Set[str] = field(
+    code_argument_names: set[str] = field(
         default_factory=lambda: {
             "code",
             "python_code",
@@ -162,7 +162,7 @@ class CodeCorrectionMiddleware:
             return False
         return tool_name in self.config.code_tools
 
-    def find_code_argument(self, arguments: Dict[str, Any]) -> Optional[Tuple[str, str]]:
+    def find_code_argument(self, arguments: dict[str, Any]) -> Optional[tuple[str, str]]:
         """Find the code argument in tool arguments."""
         for arg_name in self.config.code_argument_names:
             if (value := arguments.get(arg_name)) and isinstance(value, str) and value.strip():
@@ -172,7 +172,7 @@ class CodeCorrectionMiddleware:
     def validate_and_fix(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         language_hint: Optional[str] = None,
     ) -> CorrectionResult:
         """Validate and optionally fix code in tool arguments.
@@ -225,8 +225,8 @@ class CodeCorrectionMiddleware:
         )
 
     def apply_correction(
-        self, arguments: Dict[str, Any], result: CorrectionResult
-    ) -> Dict[str, Any]:
+        self, arguments: dict[str, Any], result: CorrectionResult
+    ) -> dict[str, Any]:
         """Apply correction to tool arguments."""
         if not result.was_corrected or not (code_arg := self.find_code_argument(arguments)):
             return arguments

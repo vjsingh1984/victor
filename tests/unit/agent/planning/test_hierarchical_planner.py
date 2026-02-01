@@ -20,17 +20,14 @@ Tests task decomposition, planning, and complexity estimation.
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from victor.agent.planning import (
-    ComplexityScore,
     HierarchicalPlanner,
     Task,
     TaskGraph,
-    UpdatedPlan,
-    ValidationResult,
 )
 
 

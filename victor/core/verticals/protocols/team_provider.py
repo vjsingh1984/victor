@@ -38,7 +38,7 @@ Usage:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 # =============================================================================
@@ -66,7 +66,7 @@ class TeamSpecProviderProtocol(Protocol):
     """
 
     @abstractmethod
-    def get_team_specs(self) -> Dict[str, Any]:
+    def get_team_specs(self) -> dict[str, Any]:
         """Get team specifications for this vertical.
 
         Returns:

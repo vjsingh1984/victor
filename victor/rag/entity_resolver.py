@@ -36,7 +36,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.rag.document_store import DocumentStore
@@ -61,12 +61,12 @@ class EntityInfo:
     name: str
     ticker: Optional[str] = None
     sector: Optional[str] = None
-    aliases: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    doc_ids: List[str] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    doc_ids: list[str] = field(default_factory=list)
     confidence: float = 1.0
 
-    def get_search_terms(self) -> List[str]:
+    def get_search_terms(self) -> list[str]:
         """Get all search terms for this entity.
 
         Returns:
@@ -87,12 +87,12 @@ class EntityIndex:
     """
 
     # Primary index: canonical name -> EntityInfo
-    by_name: Dict[str, EntityInfo] = field(default_factory=dict)
+    by_name: dict[str, EntityInfo] = field(default_factory=dict)
 
     # Secondary indexes for fast lookup
-    by_ticker: Dict[str, str] = field(default_factory=dict)  # ticker -> canonical name
-    by_alias: Dict[str, str] = field(default_factory=dict)  # alias -> canonical name
-    by_sector: Dict[str, List[str]] = field(default_factory=dict)  # sector -> [names]
+    by_ticker: dict[str, str] = field(default_factory=dict)  # ticker -> canonical name
+    by_alias: dict[str, str] = field(default_factory=dict)  # alias -> canonical name
+    by_sector: dict[str, list[str]] = field(default_factory=dict)  # sector -> [names]
 
     def add(self, entity: EntityInfo) -> None:
         """Add entity to the index."""
@@ -139,7 +139,7 @@ class EntityIndex:
 
         return None
 
-    def fuzzy_match(self, term: str, threshold: float = 0.8) -> List[EntityInfo]:
+    def fuzzy_match(self, term: str, threshold: float = 0.8) -> list[EntityInfo]:
         """Find entities with fuzzy matching.
 
         Args:
@@ -176,7 +176,7 @@ class EntityIndex:
             return 0.0
 
         # Simple Jaccard similarity on character bigrams
-        def bigrams(s: str) -> Set[str]:
+        def bigrams(s: str) -> set[str]:
             return set(s[i : i + 2] for i in range(len(s) - 1))
 
         a_bigrams = bigrams(a)
@@ -254,7 +254,7 @@ class EntityResolver:
             docs = await self._store.list_documents()
 
             # Group by entity (e.g., company)
-            entities_seen: Dict[str, EntityInfo] = {}
+            entities_seen: dict[str, EntityInfo] = {}
 
             for doc in docs:
                 metadata = doc.metadata or {}
@@ -357,7 +357,7 @@ class EntityResolver:
         query: str,
         use_fuzzy: bool = True,
         fuzzy_threshold: float = 0.7,
-    ) -> List[EntityInfo]:
+    ) -> list[EntityInfo]:
         """Resolve entities mentioned in a query.
 
         Args:
@@ -370,8 +370,8 @@ class EntityResolver:
         """
         await self.initialize()
 
-        resolved: List[EntityInfo] = []
-        resolved_names: Set[str] = set()
+        resolved: list[EntityInfo] = []
+        resolved_names: set[str] = set()
 
         # Tokenize query into potential entity mentions
         tokens = self._extract_potential_entities(query)
@@ -401,7 +401,7 @@ class EntityResolver:
 
         return resolved
 
-    def _extract_potential_entities(self, query: str) -> List[str]:
+    def _extract_potential_entities(self, query: str) -> list[str]:
         """Extract potential entity mentions from query.
 
         Args:
@@ -460,7 +460,7 @@ class EntityResolver:
 
         return potential
 
-    def analyze_query(self, query: str, entities: List[EntityInfo]) -> Dict[str, Any]:
+    def analyze_query(self, query: str, entities: list[EntityInfo]) -> dict[str, Any]:
         """Analyze query with resolved entities.
 
         Args:
@@ -509,11 +509,11 @@ class EntityResolver:
         """Get total number of indexed entities."""
         return len(self._index.by_name)
 
-    def get_sectors(self) -> List[str]:
+    def get_sectors(self) -> list[str]:
         """Get list of all sectors in the index."""
         return list(self._index.by_sector.keys())
 
-    def get_entities_by_sector(self, sector: str) -> List[EntityInfo]:
+    def get_entities_by_sector(self, sector: str) -> list[EntityInfo]:
         """Get all entities in a sector.
 
         Args:

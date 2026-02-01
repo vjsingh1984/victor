@@ -1,13 +1,13 @@
 """Research Prompt Contributor - Task hints and system prompt extensions for research."""
 
-from typing import Dict, Optional
+from typing import Optional
 
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
 from victor.core.vertical_types import StandardTaskHints
 
 
 # Research-specific task type hints
-RESEARCH_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
+RESEARCH_TASK_TYPE_HINTS: dict[str, TaskTypeHint] = {
     "fact_check": TaskTypeHint(
         task_type="fact_check",
         hint="""[FACT-CHECK] Verify claims with multiple independent sources:
@@ -93,7 +93,7 @@ RESEARCH_TASK_TYPE_HINTS = StandardTaskHints.merge_with(RESEARCH_TASK_TYPE_HINTS
 class ResearchPromptContributor(PromptContributorProtocol):
     """Contributes research-specific prompts and task hints."""
 
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
         """Return research-specific task type hints.
 
         Returns:

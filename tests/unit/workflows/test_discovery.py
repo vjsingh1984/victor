@@ -14,7 +14,6 @@
 
 """Tests for victor.workflows.discovery module."""
 
-import pytest
 
 from victor.workflows.base import BaseWorkflow, WorkflowRegistry
 from victor.workflows.discovery import (

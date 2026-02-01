@@ -31,7 +31,8 @@ Design Principles:
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -66,7 +67,7 @@ class ReminderConfig:
     frequency: int = 1  # Inject every N tool calls
     priority: int = 50  # Higher = more important
     max_tokens: int = 0  # 0 = no limit
-    provider_overrides: Dict[str, int] = field(default_factory=dict)
+    provider_overrides: dict[str, int] = field(default_factory=dict)
 
     def get_frequency_for_provider(self, provider: str) -> int:
         """Get frequency for a specific provider."""
@@ -87,14 +88,14 @@ class ContextState:
         reminder_history: Hash of last reminder content to detect changes
     """
 
-    observed_files: Set[str] = field(default_factory=set)
-    executed_tools: List[str] = field(default_factory=list)
+    observed_files: set[str] = field(default_factory=set)
+    executed_tools: list[str] = field(default_factory=list)
     tool_calls_made: int = 0
     tool_budget: int = 10
     task_complexity: str = "medium"
     task_hint: str = ""
     last_reminder_at: int = 0
-    reminder_history: Dict[ReminderType, str] = field(default_factory=dict)
+    reminder_history: dict[ReminderType, str] = field(default_factory=dict)
 
 
 class ContextReminderManager:
@@ -115,7 +116,7 @@ class ContextReminderManager:
     """
 
     # Default configurations per reminder type
-    DEFAULT_CONFIGS: Dict[ReminderType, ReminderConfig] = {
+    DEFAULT_CONFIGS: dict[ReminderType, ReminderConfig] = {
         ReminderType.EVIDENCE: ReminderConfig(
             enabled=True,
             frequency=3,  # Every 3rd tool call
@@ -158,8 +159,8 @@ class ContextReminderManager:
     def __init__(
         self,
         provider: str = "unknown",
-        configs: Optional[Dict[ReminderType, ReminderConfig]] = None,
-        custom_formatters: Optional[Dict[ReminderType, Callable[[ContextState], str]]] = None,
+        configs: Optional[dict[ReminderType, ReminderConfig]] = None,
+        custom_formatters: Optional[dict[ReminderType, Callable[[ContextState], str]]] = None,
         presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize the context reminder manager.
@@ -190,7 +191,7 @@ class ContextReminderManager:
 
     def update_state(
         self,
-        observed_files: Optional[Set[str]] = None,
+        observed_files: Optional[set[str]] = None,
         executed_tool: Optional[str] = None,
         tool_calls: Optional[int] = None,
         tool_budget: Optional[int] = None,
@@ -350,7 +351,7 @@ class ContextReminderManager:
         parts = []
 
         # Collect reminders by priority
-        reminder_items: List[tuple[int, str]] = []
+        reminder_items: list[tuple[int, str]] = []
 
         for reminder_type in ReminderType:
             if reminder_type == ReminderType.CUSTOM:
@@ -418,7 +419,7 @@ class ContextReminderManager:
             self.configs[ReminderType.EVIDENCE].frequency = 2
             self.configs[ReminderType.GROUNDING].frequency = 5
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get statistics about reminder injection.
 
         Returns:
@@ -459,7 +460,7 @@ def create_reminder_manager(
     return manager
 
 
-def get_evidence_reminder(files: Set[str], provider: str = "unknown") -> str:
+def get_evidence_reminder(files: set[str], provider: str = "unknown") -> str:
     """Quick helper to format an evidence reminder.
 
     Args:

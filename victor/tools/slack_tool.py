@@ -21,7 +21,7 @@ This tool provides:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 try:
     from slack_sdk import WebClient  # type: ignore[import-not-found]
@@ -39,7 +39,7 @@ from victor.tools.decorators import tool
 logger = logging.getLogger(__name__)
 
 
-def _get_slack_client(context: Optional[Dict[str, Any]] = None) -> Optional["WebClient"]:
+def _get_slack_client(context: Optional[dict[str, Any]] = None) -> Optional["WebClient"]:
     """Get Slack client from execution context.
 
     Args:
@@ -53,7 +53,7 @@ def _get_slack_client(context: Optional[Dict[str, Any]] = None) -> Optional["Web
     return None
 
 
-def is_slack_configured(context: Optional[Dict[str, Any]] = None) -> bool:
+def is_slack_configured(context: Optional[dict[str, Any]] = None) -> bool:
     """Check if Slack client is configured and connected."""
     return _get_slack_client(context) is not None
 
@@ -78,8 +78,8 @@ async def slack(
     text: Optional[str] = None,
     query: Optional[str] = None,
     thread_ts: Optional[str] = None,
-    context: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    context: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Perform operations on Slack.
 
     Args:
@@ -114,7 +114,7 @@ async def slack(
                     "error": "Missing required parameters: channel and text",
                 }
             logger.info(f"[slack] Sending message to channel '{channel}'")
-            kwargs: Dict[str, Any] = {"channel": channel, "text": text}
+            kwargs: dict[str, Any] = {"channel": channel, "text": text}
             if thread_ts:
                 kwargs["thread_ts"] = thread_ts
             response = slack_client.chat_postMessage(**kwargs)
@@ -135,7 +135,7 @@ async def slack(
             response = slack_client.search_messages(query=query)
             if response.get("ok"):
                 matches = response.get("messages", {}).get("matches", [])
-                message_results: List[Dict[str, Any]] = [
+                message_results: list[dict[str, Any]] = [
                     {
                         "ts": message.get("ts"),
                         "text": message.get("text", "")[:200],  # Truncate long messages
@@ -153,7 +153,7 @@ async def slack(
             response = slack_client.conversations_list(types="public_channel,private_channel")
             if response.get("ok"):
                 channels_data = response.get("channels", [])
-                channel_results: List[Dict[str, Any]] = [
+                channel_results: list[dict[str, Any]] = [
                     {
                         "id": ch.get("id"),
                         "name": ch.get("name"),

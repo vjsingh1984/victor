@@ -53,7 +53,7 @@ from __future__ import annotations
 
 import warnings
 from enum import Enum
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     # EventCategory removed - use topic-based routing
@@ -378,7 +378,7 @@ class UnifiedEventType(str, Enum):
 # =============================================================================
 
 # Mapping from WorkflowEventType to UnifiedEventType
-_WORKFLOW_EVENT_MAPPING: Dict[str, UnifiedEventType] = {
+_WORKFLOW_EVENT_MAPPING: dict[str, UnifiedEventType] = {
     "workflow_start": UnifiedEventType.WORKFLOW_START,
     "workflow_complete": UnifiedEventType.WORKFLOW_COMPLETE,
     "workflow_error": UnifiedEventType.WORKFLOW_ERROR,
@@ -393,7 +393,7 @@ _WORKFLOW_EVENT_MAPPING: Dict[str, UnifiedEventType] = {
 }
 
 # Mapping from EventCategory to UnifiedEventType (for default event of category)
-_EVENT_CATEGORY_MAPPING: Dict[str, UnifiedEventType] = {
+_EVENT_CATEGORY_MAPPING: dict[str, UnifiedEventType] = {
     "tool": UnifiedEventType.TOOL_CALL,
     "state": UnifiedEventType.STATE_TRANSITION,
     "model": UnifiedEventType.MODEL_REQUEST,
@@ -468,7 +468,7 @@ def map_framework_event(event_name: str) -> UnifiedEventType:
         unified = map_framework_event("content")
         assert unified == UnifiedEventType.FRAMEWORK_CONTENT
     """
-    framework_mapping: Dict[str, UnifiedEventType] = {
+    framework_mapping: dict[str, UnifiedEventType] = {
         "content": UnifiedEventType.FRAMEWORK_CONTENT,
         "thinking": UnifiedEventType.FRAMEWORK_THINKING,
         "chunk": UnifiedEventType.FRAMEWORK_CHUNK,
@@ -489,7 +489,7 @@ def map_tool_event(event_name: str) -> UnifiedEventType:
         unified = map_tool_event("call")
         assert unified == UnifiedEventType.TOOL_CALL
     """
-    tool_mapping: Dict[str, UnifiedEventType] = {
+    tool_mapping: dict[str, UnifiedEventType] = {
         "call": UnifiedEventType.TOOL_CALL,
         "result": UnifiedEventType.TOOL_RESULT,
         "error": UnifiedEventType.TOOL_ERROR,
@@ -512,7 +512,7 @@ def map_agent_event(event_name: str) -> UnifiedEventType:
         unified = map_agent_event("thinking")
         assert unified == UnifiedEventType.AGENT_THINKING
     """
-    agent_mapping: Dict[str, UnifiedEventType] = {
+    agent_mapping: dict[str, UnifiedEventType] = {
         "thinking": UnifiedEventType.AGENT_THINKING,
         "response": UnifiedEventType.AGENT_RESPONSE,
         "content": UnifiedEventType.AGENT_CONTENT,
@@ -535,7 +535,7 @@ def map_system_event(event_name: str) -> UnifiedEventType:
         unified = map_system_event("health")
         assert unified == UnifiedEventType.SYSTEM_HEALTH
     """
-    system_mapping: Dict[str, UnifiedEventType] = {
+    system_mapping: dict[str, UnifiedEventType] = {
         "health": UnifiedEventType.SYSTEM_HEALTH,
         "metrics": UnifiedEventType.SYSTEM_METRICS,
         "error": UnifiedEventType.SYSTEM_ERROR,
@@ -558,7 +558,7 @@ def map_team_event(event_name: str) -> UnifiedEventType:
         unified = map_team_event("execution.started")
         assert unified == UnifiedEventType.TEAM_EXECUTION_STARTED
     """
-    team_mapping: Dict[str, UnifiedEventType] = {
+    team_mapping: dict[str, UnifiedEventType] = {
         "execution.started": UnifiedEventType.TEAM_EXECUTION_STARTED,
         "execution.completed": UnifiedEventType.TEAM_EXECUTION_COMPLETED,
         "member.started": UnifiedEventType.TEAM_MEMBER_STARTED,

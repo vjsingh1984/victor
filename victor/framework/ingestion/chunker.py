@@ -37,7 +37,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.framework.ingestion.models import Chunk, ChunkingConfig
 
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 # Document type detection from file extensions
-EXTENSION_TO_DOCTYPE: Dict[str, str] = {
+EXTENSION_TO_DOCTYPE: dict[str, str] = {
     # HTML/Web
     ".html": "html",
     ".htm": "html",
@@ -195,8 +195,8 @@ class BaseChunker:
         self,
         content: str,
         doc_type: str = "text",
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[Chunk]:
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> list[Chunk]:
         """Chunk content into smaller pieces.
 
         Args:
@@ -234,7 +234,7 @@ class BaseChunker:
 
         return chunks
 
-    def _chunk_text(self, content: str) -> List[Tuple[str, int, int]]:
+    def _chunk_text(self, content: str) -> list[tuple[str, int, int]]:
         """Chunk plain text with sentence boundaries.
 
         Args:
@@ -272,7 +272,7 @@ class BaseChunker:
 
         return chunks
 
-    def _chunk_markdown(self, content: str) -> List[Tuple[str, int, int]]:
+    def _chunk_markdown(self, content: str) -> list[tuple[str, int, int]]:
         """Chunk markdown preserving structure.
 
         Args:
@@ -302,7 +302,7 @@ class BaseChunker:
 
         return chunks
 
-    def _chunk_code(self, content: str) -> List[Tuple[str, int, int]]:
+    def _chunk_code(self, content: str) -> list[tuple[str, int, int]]:
         """Chunk code preserving function/class boundaries.
 
         Args:
@@ -343,7 +343,7 @@ class BaseChunker:
 
         return chunks
 
-    def _chunk_html(self, content: str) -> List[Tuple[str, int, int]]:
+    def _chunk_html(self, content: str) -> list[tuple[str, int, int]]:
         """Chunk HTML preserving semantic structure.
 
         Args:
@@ -402,7 +402,7 @@ class BaseChunker:
             return self._chunk_text(full_text)
 
         # Convert to chunks with size limits
-        current_chunk: List[str] = []
+        current_chunk: list[str] = []
         current_size = 0
         pos = 0
 
@@ -437,7 +437,7 @@ class BaseChunker:
 
         return chunks if chunks else self._chunk_text(soup.get_text())
 
-    def _chunk_json(self, content: str) -> List[Tuple[str, int, int]]:
+    def _chunk_json(self, content: str) -> list[tuple[str, int, int]]:
         """Chunk JSON preserving object boundaries.
 
         Args:
@@ -471,7 +471,7 @@ class BaseChunker:
                     pos += len(chunk_text)
 
         elif isinstance(data, list):
-            current_batch: List[Any] = []
+            current_batch: list[Any] = []
             current_size = 0
 
             for item in data:

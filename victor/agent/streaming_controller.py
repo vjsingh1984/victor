@@ -34,7 +34,8 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 from victor.agent.stream_handler import StreamMetrics, StreamResult
 
@@ -68,7 +69,7 @@ class StreamingSession:
         end = self.end_time or time.time()
         return end - self.start_time
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "session_id": self.session_id,
@@ -148,7 +149,7 @@ class StreamingController:
         # State
         self._current_session: Optional[StreamingSession] = None
         self._current_metrics: Optional[StreamMetrics] = None
-        self._session_history: List[StreamingSession] = []
+        self._session_history: list[StreamingSession] = []
         self._cancellation_requested = False
 
         # Thread safety
@@ -348,7 +349,7 @@ class StreamingController:
         except Exception as e:
             logger.debug(f"Failed to record to metrics collector: {e}")
 
-    def get_session_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_session_history(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent session history.
 
         Args:
@@ -361,7 +362,7 @@ class StreamingController:
             sessions = self._session_history[-limit:]
             return [s.to_dict() for s in reversed(sessions)]
 
-    def get_metrics_summary(self) -> Optional[Dict[str, Any]]:
+    def get_metrics_summary(self) -> Optional[dict[str, Any]]:
         """Get aggregated metrics summary.
 
         Returns:
@@ -381,7 +382,7 @@ class StreamingController:
             logger.warning(f"Failed to get metrics summary: {e}")
             return None
 
-    def get_current_session_info(self) -> Optional[Dict[str, Any]]:
+    def get_current_session_info(self) -> Optional[dict[str, Any]]:
         """Get information about current session.
 
         Returns:
@@ -414,7 +415,7 @@ class StreamingController:
             self._session_history.clear()
             logger.info("Streaming controller reset")
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get overall streaming statistics.
 
         Returns:

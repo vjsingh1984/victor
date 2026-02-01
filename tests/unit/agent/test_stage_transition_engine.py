@@ -23,9 +23,7 @@ These tests verify:
 """
 
 import pytest
-from typing import Callable, Dict, List, Optional
-from unittest.mock import Mock, MagicMock, patch, call
-import time
+from unittest.mock import Mock
 
 from victor.core.state import ConversationStage
 
@@ -42,7 +40,6 @@ class TestStageTransitionEngineProtocol:
     def test_protocol_has_current_stage_property(self):
         """Protocol should define current_stage property."""
         from victor.protocols.stage_transition import StageTransitionProtocol
-        import inspect
 
         # Check for property or attribute definition
         assert hasattr(StageTransitionProtocol, "current_stage")

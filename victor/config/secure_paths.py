@@ -39,7 +39,7 @@ import platform
 import pwd
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +152,7 @@ def get_secure_home() -> Path:
     return env_home
 
 
-def validate_victor_dir_name(dir_name: str) -> Tuple[str, bool]:
+def validate_victor_dir_name(dir_name: str) -> tuple[str, bool]:
     """Validate VICTOR_DIR_NAME against path injection.
 
     Args:
@@ -559,7 +559,7 @@ SECURITY_EVENT_PLUGIN_PATH_INJECTION = "PLUGIN_PATH_INJECTION_ATTEMPT"
 SECURITY_EVENT_PLUGIN_SYMLINK = "PLUGIN_SYMLINK_DETECTED"
 
 
-def validate_plugin_directory(plugin_dir: Path | str) -> Tuple[Path, bool]:
+def validate_plugin_directory(plugin_dir: Path | str) -> tuple[Path, bool]:
     """Validate a plugin directory for security.
 
     Plugin directories can be attack vectors for code injection.
@@ -735,7 +735,7 @@ def create_cache_manifest(cache_dir: Path) -> bool:
     if not cache_dir.exists():
         return False
 
-    manifest: Dict[str, Any] = {
+    manifest: dict[str, Any] = {
         "version": 1,
         "created": str(Path.cwd()),
         "files": {},
@@ -764,7 +764,7 @@ def create_cache_manifest(cache_dir: Path) -> bool:
         return False
 
 
-def verify_cache_integrity(cache_dir: Path) -> Tuple[bool, list[str]]:
+def verify_cache_integrity(cache_dir: Path) -> tuple[bool, list[str]]:
     """Verify cache integrity against manifest.
 
     Args:
@@ -898,7 +898,7 @@ def compute_plugin_hash(plugin_path: Path) -> Optional[str]:
         return None
 
 
-def load_plugin_trust_store() -> Dict[str, Any]:
+def load_plugin_trust_store() -> dict[str, Any]:
     """Load the plugin trust store.
 
     Returns:
@@ -980,7 +980,7 @@ def untrust_plugin(name: str) -> bool:
     return False
 
 
-def verify_plugin_trust(plugin_path: Path) -> Tuple[bool, str]:
+def verify_plugin_trust(plugin_path: Path) -> tuple[bool, str]:
     """Verify if a plugin is trusted.
 
     Args:
@@ -1034,7 +1034,7 @@ def list_trusted_plugins() -> list[dict[str, Any]]:
 # =============================================================================
 
 
-def get_security_status() -> Dict[str, Any]:
+def get_security_status() -> dict[str, Any]:
     """Get comprehensive security status.
 
     Returns:
@@ -1042,7 +1042,7 @@ def get_security_status() -> Dict[str, Any]:
     """
     import platform
 
-    status: Dict[str, Any] = {
+    status: dict[str, Any] = {
         "platform": {
             "system": platform.system(),
             "release": platform.release(),
@@ -1120,8 +1120,8 @@ class PluginSandboxPolicy:
     allow_network: bool = True
     allow_subprocess: bool = True
     allow_file_write: bool = True
-    allowed_paths: List[str] = field(default_factory=list)
-    blocked_paths: List[str] = field(default_factory=list)
+    allowed_paths: list[str] = field(default_factory=list)
+    blocked_paths: list[str] = field(default_factory=list)
     require_trust: bool = False
     max_memory_mb: int = 0
 
@@ -1150,7 +1150,7 @@ def get_plugin_sandbox_policy() -> PluginSandboxPolicy:
 
 def check_plugin_can_load(
     plugin_path: Path, policy: Optional[PluginSandboxPolicy] = None
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """Check if a plugin can be loaded according to sandbox policy.
 
     Args:
@@ -1249,7 +1249,7 @@ def check_sandbox_action(
     action: str,
     details: Optional[dict[str, Any]] = None,
     policy: Optional[PluginSandboxPolicy] = None,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """Check if a plugin action is allowed by sandbox policy.
 
     Args:
@@ -1331,7 +1331,7 @@ def check_sandbox_action(
     return True, "allowed"
 
 
-def get_sandbox_summary() -> Dict[str, Any]:
+def get_sandbox_summary() -> dict[str, Any]:
     """Get summary of sandbox configuration.
 
     Returns:

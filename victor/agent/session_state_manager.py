@@ -64,7 +64,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -86,13 +86,13 @@ class ExecutionState:
     """
 
     tool_calls_used: int = 0
-    observed_files: Set[str] = field(default_factory=set)
-    executed_tools: List[str] = field(default_factory=list)
-    failed_tool_signatures: Set[Tuple[str, str]] = field(default_factory=set)
-    read_files_session: Set[str] = field(default_factory=set)
-    required_files: List[str] = field(default_factory=list)
-    required_outputs: List[str] = field(default_factory=list)
-    token_usage: Dict[str, int] = field(
+    observed_files: set[str] = field(default_factory=set)
+    executed_tools: list[str] = field(default_factory=list)
+    failed_tool_signatures: set[tuple[str, str]] = field(default_factory=set)
+    read_files_session: set[str] = field(default_factory=set)
+    required_files: list[str] = field(default_factory=list)
+    required_outputs: list[str] = field(default_factory=list)
+    token_usage: dict[str, int] = field(
         default_factory=lambda: {
             "prompt_tokens": 0,
             "completion_tokens": 0,
@@ -103,7 +103,7 @@ class ExecutionState:
     )
     disable_embeddings: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize execution state to dictionary.
 
         Returns:
@@ -122,7 +122,7 @@ class ExecutionState:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ExecutionState":
+    def from_dict(cls, data: dict[str, Any]) -> "ExecutionState":
         """Deserialize execution state from dictionary.
 
         Args:
@@ -171,7 +171,7 @@ class SessionFlags:
     consecutive_blocked_attempts: int = 0
     total_blocked_attempts: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize session flags to dictionary.
 
         Returns:
@@ -186,7 +186,7 @@ class SessionFlags:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SessionFlags":
+    def from_dict(cls, data: dict[str, Any]) -> "SessionFlags":
         """Deserialize session flags from dictionary.
 
         Args:
@@ -263,12 +263,12 @@ class SessionStateManager:
         return self._execution_state.tool_calls_used
 
     @property
-    def observed_files(self) -> Set[str]:
+    def observed_files(self) -> set[str]:
         """Get the set of observed files."""
         return self._execution_state.observed_files
 
     @property
-    def executed_tools(self) -> List[str]:
+    def executed_tools(self) -> list[str]:
         """Get the list of executed tools."""
         return self._execution_state.executed_tools
 
@@ -286,7 +286,7 @@ class SessionStateManager:
     # Tool Call Tracking
     # =========================================================================
 
-    def record_tool_call(self, tool_name: str, args: Dict[str, Any]) -> None:
+    def record_tool_call(self, tool_name: str, args: dict[str, Any]) -> None:
         """Record a tool call execution.
 
         Tracks the tool name in the executed tools list and observes any
@@ -341,7 +341,7 @@ class SessionStateManager:
     # =========================================================================
 
     @staticmethod
-    def _hash_args(args: Dict[str, Any]) -> str:
+    def _hash_args(args: dict[str, Any]) -> str:
         """Create a hash of tool arguments for signature matching.
 
         Args:
@@ -382,7 +382,7 @@ class SessionStateManager:
         self._execution_state.failed_tool_signatures.add(signature)
         logger.debug(f"Added failed signature: {name}:{args_hash[:8]}...")
 
-    def check_and_record_failed(self, tool_name: str, args: Dict[str, Any]) -> bool:
+    def check_and_record_failed(self, tool_name: str, args: dict[str, Any]) -> bool:
         """Check if a tool call has failed before, and if not, mark it as failed.
 
         Convenience method combining check and add operations.
@@ -417,7 +417,7 @@ class SessionStateManager:
             f"total_read={len(self._execution_state.read_files_session)}"
         )
 
-    def get_read_files(self) -> Set[str]:
+    def get_read_files(self) -> set[str]:
         """Get the set of files read in this session.
 
         Returns:
@@ -431,8 +431,8 @@ class SessionStateManager:
 
     def set_task_requirements(
         self,
-        required_files: Optional[List[str]] = None,
-        required_outputs: Optional[List[str]] = None,
+        required_files: Optional[list[str]] = None,
+        required_outputs: Optional[list[str]] = None,
     ) -> None:
         """Set the requirements for the current task.
 
@@ -509,7 +509,7 @@ class SessionStateManager:
         """Reset the consecutive blocked attempts counter."""
         self._session_flags.consecutive_blocked_attempts = 0
 
-    def get_blocked_attempts(self) -> Tuple[int, int]:
+    def get_blocked_attempts(self) -> tuple[int, int]:
         """Get blocked attempt counts.
 
         Returns:
@@ -524,7 +524,7 @@ class SessionStateManager:
     # Token Usage Tracking
     # =========================================================================
 
-    def get_token_usage(self) -> Dict[str, int]:
+    def get_token_usage(self) -> dict[str, int]:
         """Get cumulative token usage.
 
         Returns:
@@ -564,7 +564,7 @@ class SessionStateManager:
     # Checkpoint/Restore
     # =========================================================================
 
-    def get_checkpoint_state(self) -> Dict[str, Any]:
+    def get_checkpoint_state(self) -> dict[str, Any]:
         """Serialize session state for checkpointing.
 
         Returns:
@@ -576,7 +576,7 @@ class SessionStateManager:
             "session_flags": self._session_flags.to_dict(),
         }
 
-    def apply_checkpoint_state(self, state: Dict[str, Any]) -> None:
+    def apply_checkpoint_state(self, state: dict[str, Any]) -> None:
         """Restore session state from a checkpoint.
 
         Args:
@@ -630,7 +630,7 @@ class SessionStateManager:
     # Summary/Stats
     # =========================================================================
 
-    def get_session_summary(self) -> Dict[str, Any]:
+    def get_session_summary(self) -> dict[str, Any]:
         """Get a summary of the session state.
 
         Returns:
@@ -670,7 +670,7 @@ class SessionStateManager:
 
 def create_session_state_manager(
     tool_budget: int = 200,
-    initial_state: Optional[Dict[str, Any]] = None,
+    initial_state: Optional[dict[str, Any]] = None,
 ) -> SessionStateManager:
     """Create a SessionStateManager instance.
 

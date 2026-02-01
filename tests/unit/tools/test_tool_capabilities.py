@@ -494,7 +494,6 @@ class TestCapabilityRegistryAutoDiscovery:
 
     def test_auto_discover_logs_warning_for_unmapped_tools(self):
         """Test that tools without clear capability mapping generate warnings."""
-        import logging
         from unittest.mock import patch
 
         registry = CapabilityRegistry()

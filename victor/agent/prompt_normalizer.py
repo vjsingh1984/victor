@@ -30,7 +30,8 @@ import logging
 import re
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Deque, Dict, List, Optional, Pattern, Set
+from typing import Optional
+from re import Pattern
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class NormalizationResult:
     """
 
     normalized: str
-    changes: List[str] = field(default_factory=list)
+    changes: list[str] = field(default_factory=list)
     is_duplicate: bool = False
     tokens_saved: int = 0
 
@@ -73,7 +74,7 @@ class PromptNormalizer:
 
     # Action verb canonicalization map
     # Only includes unambiguous synonyms to avoid changing intent
-    VERB_SYNONYMS: Dict[str, str] = {
+    VERB_SYNONYMS: dict[str, str] = {
         "view": "read",
         "look at": "read",
         "check": "read",
@@ -85,7 +86,7 @@ class PromptNormalizer:
     }
 
     # Patterns for continuation messages that can be collapsed
-    CONTINUATION_PATTERNS: List[Pattern[str]] = [
+    CONTINUATION_PATTERNS: list[Pattern[str]] = [
         re.compile(r"^continue\.?$", re.IGNORECASE),
         re.compile(r"^go on\.?$", re.IGNORECASE),
         re.compile(r"^proceed\.?$", re.IGNORECASE),
@@ -100,8 +101,8 @@ class PromptNormalizer:
         Args:
             max_recent: Maximum recent messages to track for deduplication
         """
-        self._recent_hashes: Deque[str] = deque(maxlen=max_recent)
-        self._recent_messages: Deque[str] = deque(maxlen=max_recent)
+        self._recent_hashes: deque[str] = deque(maxlen=max_recent)
+        self._recent_messages: deque[str] = deque(maxlen=max_recent)
         self._continuation_count: int = 0
 
     def normalize(self, content: str) -> NormalizationResult:
@@ -113,7 +114,7 @@ class PromptNormalizer:
         Returns:
             NormalizationResult with normalized text and metadata
         """
-        changes: List[str] = []
+        changes: list[str] = []
         normalized = content.strip()
         original_length = len(content)
 
@@ -192,7 +193,7 @@ class PromptNormalizer:
         # MD5 used for prompt deduplication, not security
         return hashlib.md5(normalized.encode(), usedforsecurity=False).hexdigest()[:12]
 
-    def deduplicate_sections(self, sections: List[str]) -> List[str]:
+    def deduplicate_sections(self, sections: list[str]) -> list[str]:
         """Remove duplicate sections from prompt components.
 
         Useful for deduplicating grounding rules or system prompt
@@ -204,8 +205,8 @@ class PromptNormalizer:
         Returns:
             List with duplicates removed (preserves order)
         """
-        seen_hashes: Set[str] = set()
-        unique: List[str] = []
+        seen_hashes: set[str] = set()
+        unique: list[str] = []
 
         for section in sections:
             if not section or not section.strip():
@@ -265,7 +266,7 @@ class PromptNormalizer:
             return 0.0
 
         # Use character n-grams for comparison (n=3)
-        def get_ngrams(s: str, n: int = 3) -> Set[str]:
+        def get_ngrams(s: str, n: int = 3) -> set[str]:
             return set(s[i : i + n] for i in range(max(0, len(s) - n + 1)))
 
         ngrams1 = get_ngrams(s1)
@@ -289,7 +290,7 @@ class PromptNormalizer:
         self._continuation_count = 0
         logger.debug("Prompt normalizer reset")
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Get normalizer statistics.
 
         Returns:

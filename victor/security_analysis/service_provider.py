@@ -21,7 +21,7 @@ analysis services.
 from __future__ import annotations
 
 import logging
-from typing import Any, List, TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
 
 from victor.core.container import ServiceLifetime
 
@@ -145,7 +145,7 @@ class SecurityAnalysisServiceProvider(ServiceProviderProtocol):
 
         return ComplianceCheckHandler()
 
-    def get_service_names(self) -> List[str]:
+    def get_service_names(self) -> list[str]:
         """Get list of registered service names.
 
         Returns:

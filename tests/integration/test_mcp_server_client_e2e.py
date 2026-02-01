@@ -27,13 +27,7 @@ For unit testing individual components in isolation (with mocks), see:
 - tests/unit/test_mcp_client.py
 """
 
-import asyncio
-import json
-import os
 import sys
-import tempfile
-from pathlib import Path
-from typing import Any, Dict, List
 
 import pytest
 

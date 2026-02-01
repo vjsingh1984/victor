@@ -19,7 +19,8 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 from victor.agent.message_history import MessageHistory
 from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
@@ -146,14 +147,14 @@ class ConversationController:
         self._session_id = session_id
         self._system_prompt: Optional[str] = None
         self._system_added = False
-        self._context_callbacks: List[Callable[[ContextMetrics], None]] = []
-        self._compaction_summaries: List[str] = []
+        self._context_callbacks: list[Callable[[ContextMetrics], None]] = []
+        self._compaction_summaries: list[str] = []
         self._current_plan: Optional[Any] = None
         # PromptNormalizer for input deduplication (DIP compliance)
         self._normalizer = prompt_normalizer or get_prompt_normalizer()
 
     @property
-    def messages(self) -> List[Message]:
+    def messages(self) -> list[Message]:
         return self._history.messages
 
     @property
@@ -236,7 +237,7 @@ class ConversationController:
         return message
 
     def add_assistant_message(
-        self, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None, **kwargs: Any
+        self, content: str, tool_calls: Optional[list[dict[str, Any]]] = None, **kwargs: Any
     ) -> Message:
         message = self._history.add_assistant_message(content, tool_calls=tool_calls)
         if self.config.enable_stage_tracking:
@@ -328,7 +329,7 @@ class ConversationController:
             )
         return metrics.is_overflow_risk
 
-    def get_stage_recommended_tools(self) -> Set[str]:
+    def get_stage_recommended_tools(self) -> set[str]:
         """Get tools recommended for current conversation stage.
 
         Returns:
@@ -455,7 +456,7 @@ class ConversationController:
         )
         return removed_count
 
-    def _score_messages(self, current_query: Optional[str] = None) -> List[MessageImportance]:
+    def _score_messages(self, current_query: Optional[str] = None) -> list[MessageImportance]:
         """Score messages for importance during compaction.
 
         Scoring factors:
@@ -470,7 +471,7 @@ class ConversationController:
         Returns:
             List of MessageImportance objects
         """
-        scored: List[MessageImportance] = []
+        scored: list[MessageImportance] = []
         total_messages = len(self.messages)
 
         for i, msg in enumerate(self.messages):
@@ -555,7 +556,7 @@ class ConversationController:
 
         return 0.0
 
-    def _generate_compaction_summary(self, removed_messages: List[Message]) -> str:
+    def _generate_compaction_summary(self, removed_messages: list[Message]) -> str:
         """Generate a summary of removed messages for context preservation.
 
         Creates a brief summary of what was discussed in removed messages
@@ -590,7 +591,7 @@ class ConversationController:
             return f"[Earlier conversation: {'; '.join(parts)}]"
         return ""
 
-    def _extract_key_topics(self, text: str) -> List[str]:
+    def _extract_key_topics(self, text: str) -> list[str]:
         """Extract key topics from text using simple heuristics.
 
         Args:
@@ -619,7 +620,7 @@ class ConversationController:
 
         return topics
 
-    def get_compaction_summaries(self) -> List[str]:
+    def get_compaction_summaries(self) -> list[str]:
         """Get summaries from previous compaction operations.
 
         Returns:
@@ -684,7 +685,7 @@ class ConversationController:
         self,
         query: str,
         limit: int = 5,
-    ) -> List[str]:
+    ) -> list[str]:
         """Retrieve relevant historical context from persistent store.
 
         Uses semantic similarity to find relevant messages and summaries
@@ -700,7 +701,7 @@ class ConversationController:
         if not self._conversation_store or not self._session_id:
             return []
 
-        relevant_context: List[str] = []
+        relevant_context: list[str] = []
 
         try:
             # Get semantically similar historical messages
@@ -736,7 +737,7 @@ class ConversationController:
 
         return relevant_context[:limit]
 
-    def persist_compaction_summary(self, summary: str, message_ids: List[str]) -> None:
+    def persist_compaction_summary(self, summary: str, message_ids: list[str]) -> None:
         """Persist a compaction summary to the SQLite store.
 
         Args:
@@ -798,7 +799,7 @@ class ConversationController:
                 return msg.content
         return None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Export conversation state as dictionary.
 
         Returns:
@@ -816,7 +817,7 @@ class ConversationController:
     @classmethod
     def from_messages(
         cls,
-        messages: List[Message],
+        messages: list[Message],
         config: Optional[ConversationConfig] = None,
     ) -> "ConversationController":
         """Create controller from existing messages.

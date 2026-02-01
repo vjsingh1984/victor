@@ -41,7 +41,7 @@ This module is domain-agnostic and can be used by any vertical:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from victor.core.search_types import SearchHit
 
@@ -72,7 +72,7 @@ class HybridSearchResult:
     semantic_rank: int = -1  # -1 if not in semantic results
     keyword_rank: int = -1  # -1 if not in keyword results
     line_number: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_search_hit(self) -> SearchHit:
         """Convert to a generic SearchHit for cross-layer consumers."""
@@ -117,10 +117,10 @@ class HybridSearchEngine:
 
     def combine_results(
         self,
-        semantic_results: List[Dict[str, Any]],
-        keyword_results: List[Dict[str, Any]],
+        semantic_results: list[dict[str, Any]],
+        keyword_results: list[dict[str, Any]],
         max_results: int = 10,
-    ) -> List[HybridSearchResult]:
+    ) -> list[HybridSearchResult]:
         """Combine semantic and keyword search results using RRF.
 
         Args:
@@ -132,14 +132,14 @@ class HybridSearchEngine:
             Combined and ranked results
         """
         # Build mapping of file_path -> (semantic_rank, semantic_score)
-        semantic_map: Dict[str, Tuple[int, float]] = {}
+        semantic_map: dict[str, tuple[int, float]] = {}
         for rank, result in enumerate(semantic_results):
             file_path = result.get("file_path", "")
             score = result.get("score", 0.0)
             semantic_map[file_path] = (rank, score)
 
         # Build mapping of file_path -> (keyword_rank, keyword_score)
-        keyword_map: Dict[str, Tuple[int, float]] = {}
+        keyword_map: dict[str, tuple[int, float]] = {}
         for rank, result in enumerate(keyword_results):
             file_path = result.get("file_path", "")
             score = result.get("score", 0.0)
@@ -203,9 +203,9 @@ class HybridSearchEngine:
     def keyword_search(
         self,
         query: str,
-        documents: List[Dict[str, Any]],
+        documents: list[dict[str, Any]],
         max_results: int = 10,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Simple keyword search using TF-based scoring.
 
         Args:

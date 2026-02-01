@@ -15,7 +15,8 @@
 """Base provider interface for LLM providers."""
 
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
+from collections.abc import AsyncIterator, Callable
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
@@ -65,12 +66,12 @@ class StreamingProvider(Protocol):
 
     async def stream(
         self,
-        messages: List["Message"],
+        messages: list["Message"],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List["ToolDefinition"]] = None,
+        tools: Optional[list["ToolDefinition"]] = None,
         **kwargs: Any,
     ) -> AsyncIterator["StreamChunk"]:
         """Stream a chat completion response.
@@ -165,14 +166,14 @@ class Message(BaseModel):
     role: str = Field(..., description="Message role: system, user, or assistant")
     content: str = Field(..., description="Message content")
     name: Optional[str] = Field(default=None, description="Optional name for the message sender")
-    tool_calls: Optional[List[Dict[str, Any]]] = Field(
+    tool_calls: Optional[list[dict[str, Any]]] = Field(
         default=None, description="Tool calls requested by the assistant"
     )
     tool_call_id: Optional[str] = Field(
         default=None, description="ID of the tool call being responded to"
     )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert message to dictionary representation."""
         return self.model_dump()
 
@@ -182,7 +183,7 @@ class ToolDefinition(BaseModel):
 
     name: str = Field(..., description="Tool name")
     description: str = Field(..., description="What the tool does")
-    parameters: Dict[str, Any] = Field(..., description="JSON Schema for tool parameters")
+    parameters: dict[str, Any] = Field(..., description="JSON Schema for tool parameters")
 
 
 class CompletionResponse(BaseModel):
@@ -192,16 +193,16 @@ class CompletionResponse(BaseModel):
 
     content: str = Field(..., description="Generated content")
     role: str = Field(default="assistant", description="Response role")
-    tool_calls: Optional[List[Dict[str, Any]]] = Field(None, description="Tool calls requested")
+    tool_calls: Optional[list[dict[str, Any]]] = Field(None, description="Tool calls requested")
     stop_reason: Optional[str] = Field(None, description="Why generation stopped")
-    usage: Optional[Dict[str, int]] = Field(None, description="Token usage stats")
+    usage: Optional[dict[str, int]] = Field(None, description="Token usage stats")
     model: Optional[str] = Field(
         None,
         description="Model used",
         validation_alias=AliasChoices("model", "model_name"),
     )
-    raw_response: Optional[Dict[str, Any]] = Field(None, description="Raw provider response")
-    metadata: Optional[Dict[str, Any]] = Field(
+    raw_response: Optional[dict[str, Any]] = Field(None, description="Raw provider response")
+    metadata: Optional[dict[str, Any]] = Field(
         None, description="Additional metadata (e.g., reasoning_content)"
     )
 
@@ -217,13 +218,13 @@ class StreamChunk(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     content: str = Field(default="", description="Incremental content")
-    tool_calls: Optional[List[Dict[str, Any]]] = None
+    tool_calls: Optional[list[dict[str, Any]]] = None
     stop_reason: Optional[str] = None
     is_final: bool = Field(default=False, description="Is this the final chunk")
-    metadata: Optional[Dict[str, Any]] = Field(
+    metadata: Optional[dict[str, Any]] = Field(
         default=None, description="Additional metadata (e.g., reasoning_content)"
     )
-    usage: Optional[Dict[str, int]] = Field(
+    usage: Optional[dict[str, int]] = Field(
         default=None,
         description="Token usage stats (typically on final chunk). Keys: prompt_tokens, completion_tokens, total_tokens, cache_creation_input_tokens, cache_read_input_tokens",
     )
@@ -233,13 +234,7 @@ class StreamChunk(BaseModel):
 # Provider error classes - re-exported from victor/core/errors for backward compatibility
 # All error classes are defined in victor/core/errors.py as the single source of truth
 from victor.core.errors import (
-    ProviderError,
-    ProviderNotFoundError,
-    ProviderTimeoutError,
-    ProviderRateLimitError,
     ProviderAuthError,
-    ProviderConnectionError,
-    ProviderInvalidResponseError,
 )
 
 
@@ -321,7 +316,7 @@ class BaseProvider(ABC):
         """
         return False
 
-    def get_circuit_breaker_stats(self) -> Optional[Dict[str, Any]]:
+    def get_circuit_breaker_stats(self) -> Optional[dict[str, Any]]:
         """Get circuit breaker statistics for monitoring."""
         if self._circuit_breaker:
             return self._circuit_breaker.get_stats()
@@ -336,12 +331,12 @@ class BaseProvider(ABC):
     @abstractmethod
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send a chat completion request.
@@ -365,12 +360,12 @@ class BaseProvider(ABC):
     @abstractmethod
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream a chat completion response.
@@ -413,12 +408,12 @@ class BaseProvider(ABC):
 
     async def stream_chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream a chat completion response (alias for stream()).

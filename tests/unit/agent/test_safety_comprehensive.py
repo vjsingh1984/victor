@@ -37,15 +37,13 @@ Total: ~72 tests
 
 import asyncio
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, AsyncMock, MagicMock, patch
+from unittest.mock import Mock
 from victor.agent.safety import (
     SafetyChecker,
     ConfirmationRequest,
     OperationalRiskLevel,
     ApprovalMode,
     get_safety_checker,
-    set_confirmation_callback,
     _get_risk_icon,
     create_hitl_confirmation_callback,
     setup_hitl_safety_integration,

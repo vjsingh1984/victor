@@ -15,7 +15,7 @@
 """Tests for victor.workflows.compiled_executor module."""
 
 import pytest
-from typing import Any, Dict, AsyncIterator
+from typing import Any
 
 from victor.workflows.compiled_executor import (
     CompiledWorkflowExecutor,
@@ -35,7 +35,7 @@ class MockCompiledGraph:
         self.thread_id_received = None
         self.checkpoint_received = None
 
-    async def invoke(self, initial_state: Dict[str, Any], thread_id=None, checkpoint=None):
+    async def invoke(self, initial_state: dict[str, Any], thread_id=None, checkpoint=None):
         """Mock invoke method."""
         self.invoked = True
         self.initial_state_received = initial_state
@@ -45,7 +45,7 @@ class MockCompiledGraph:
             final_state=initial_state, metrics={"nodes_executed": 5, "duration_seconds": 1.5}
         )
 
-    async def stream(self, initial_state: Dict[str, Any], thread_id=None):
+    async def stream(self, initial_state: dict[str, Any], thread_id=None):
         """Mock stream method."""
         self.streamed = True
         self.initial_state_received = initial_state

@@ -21,7 +21,6 @@ Tests the provider coordination functionality including:
 - Post-switch hooks
 """
 
-import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 

@@ -27,7 +27,7 @@ Supports three strategies:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional, Set
+from typing import TYPE_CHECKING, Optional
 
 from victor.protocols.tool_selector import IToolSelector
 from victor.tools.base import ToolRegistry
@@ -46,7 +46,7 @@ def create_tool_selector_strategy(
     conversation_state: Optional["ConversationStateMachine"] = None,
     model: str = "",
     provider_name: str = "",
-    enabled_tools: Optional[Set[str]] = None,
+    enabled_tools: Optional[set[str]] = None,
     embedding_service: Optional["EmbeddingService"] = None,
     settings: Optional["Settings"] = None,
 ) -> IToolSelector:
@@ -179,7 +179,7 @@ def _create_semantic_selector(
     conversation_state: Optional["ConversationStateMachine"],
     model: str,
     provider_name: str,
-    enabled_tools: Optional[Set[str]],
+    enabled_tools: Optional[set[str]],
     embedding_service: Optional["EmbeddingService"],
 ) -> IToolSelector:
     """Create semantic tool selector.
@@ -232,7 +232,7 @@ def _create_keyword_selector(
     conversation_state: Optional["ConversationStateMachine"],
     model: str,
     provider_name: str,
-    enabled_tools: Optional[Set[str]],
+    enabled_tools: Optional[set[str]],
 ) -> IToolSelector:
     """Create keyword tool selector.
 
@@ -263,7 +263,7 @@ def _create_hybrid_selector(
     conversation_state: Optional["ConversationStateMachine"],
     model: str,
     provider_name: str,
-    enabled_tools: Optional[Set[str]],
+    enabled_tools: Optional[set[str]],
     embedding_service: Optional["EmbeddingService"],
     settings: Optional["Settings"],
 ) -> IToolSelector:

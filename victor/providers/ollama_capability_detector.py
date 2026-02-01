@@ -27,7 +27,7 @@ Usage:
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -108,7 +108,7 @@ class OllamaCapabilityDetector:
         """
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
-        self._cache: Dict[str, ModelToolSupport] = {}
+        self._cache: dict[str, ModelToolSupport] = {}
         self._client = httpx.Client(timeout=timeout)
 
     def __del__(self):
@@ -116,7 +116,7 @@ class OllamaCapabilityDetector:
         if hasattr(self, "_client"):
             self._client.close()
 
-    def get_model_info(self, model: str) -> Optional[Dict[str, Any]]:
+    def get_model_info(self, model: str) -> Optional[dict[str, Any]]:
         """Get model information from Ollama server.
 
         Args:

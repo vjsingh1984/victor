@@ -22,7 +22,8 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.processing.serialization.strategy import (
     SerializationFormat,
@@ -48,8 +49,8 @@ class EncodingResult:
     content: str
     success: bool = True
     error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    reference_table: Optional[Dict[str, str]] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    reference_table: Optional[dict[str, str]] = None
 
 
 class FormatEncoder(ABC):
@@ -217,9 +218,9 @@ class FormatRegistry:
 
     def __init__(self) -> None:
         """Initialize empty registry."""
-        self._encoders: Dict[SerializationFormat, FormatEncoder] = {}
-        self._priority_order: List[SerializationFormat] = []
-        self._hooks: Dict[str, List[Callable[..., Any]]] = {
+        self._encoders: dict[SerializationFormat, FormatEncoder] = {}
+        self._priority_order: list[SerializationFormat] = []
+        self._hooks: dict[str, list[Callable[..., Any]]] = {
             "pre_encode": [],
             "post_encode": [],
             "on_register": [],
@@ -289,7 +290,7 @@ class FormatRegistry:
         """
         return self._encoders.get(format_id)
 
-    def get_all_encoders(self) -> Dict[SerializationFormat, FormatEncoder]:
+    def get_all_encoders(self) -> dict[SerializationFormat, FormatEncoder]:
         """Get all registered encoders.
 
         Returns:
@@ -297,7 +298,7 @@ class FormatRegistry:
         """
         return self._encoders.copy()
 
-    def list_formats(self) -> List[SerializationFormat]:
+    def list_formats(self) -> list[SerializationFormat]:
         """List all registered formats in priority order.
 
         Returns:
@@ -334,7 +335,7 @@ class FormatRegistry:
                 return encoder
 
         # Score all eligible encoders
-        candidates: List[tuple[float, FormatEncoder]] = []
+        candidates: list[tuple[float, FormatEncoder]] = []
 
         for format_id in self._priority_order:
             # Skip disabled formats
@@ -417,7 +418,7 @@ class FormatRegistry:
             except Exception as e:
                 logger.warning(f"Hook {hook_type} failed: {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get registry statistics.
 
         Returns:

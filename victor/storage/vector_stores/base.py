@@ -20,7 +20,7 @@ This module separates concerns:
 """
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
@@ -66,7 +66,7 @@ class EmbeddingConfig(BaseModel):
     )
 
     # Provider-specific configuration
-    extra_config: Dict[str, Any] = Field(
+    extra_config: dict[str, Any] = Field(
         default_factory=dict, description="Provider-specific configuration"
     )
 
@@ -88,7 +88,7 @@ class EmbeddingSearchResult(BaseModel):
     content: str = Field(description="Content that matched")
     score: float = Field(description="Relevance score (0-1, higher is better)")
     line_number: Optional[int] = Field(default=None, description="Line number in file")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
     def to_search_hit(self) -> SearchHit:
         """Convert to a generic SearchHit for cross-layer consumers."""
@@ -145,7 +145,7 @@ class BaseEmbeddingProvider(ABC):
         pass
 
     @abstractmethod
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding vector for a single text.
 
         Args:
@@ -157,7 +157,7 @@ class BaseEmbeddingProvider(ABC):
         pass
 
     @abstractmethod
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts (optimized batch operation).
 
         Args:
@@ -169,7 +169,7 @@ class BaseEmbeddingProvider(ABC):
         pass
 
     @abstractmethod
-    async def index_document(self, doc_id: str, content: str, metadata: Dict[str, Any]) -> None:
+    async def index_document(self, doc_id: str, content: str, metadata: dict[str, Any]) -> None:
         """Index a single document.
 
         Args:
@@ -180,7 +180,7 @@ class BaseEmbeddingProvider(ABC):
         pass
 
     @abstractmethod
-    async def index_documents(self, documents: List[Dict[str, Any]]) -> None:
+    async def index_documents(self, documents: list[dict[str, Any]]) -> None:
         """Batch index multiple documents (optimized).
 
         Args:
@@ -196,8 +196,8 @@ class BaseEmbeddingProvider(ABC):
         self,
         query: str,
         limit: int = 10,
-        filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[EmbeddingSearchResult]:
+        filter_metadata: Optional[dict[str, Any]] = None,
+    ) -> list[EmbeddingSearchResult]:
         """Search for documents similar to query.
 
         Args:
@@ -240,7 +240,7 @@ class BaseEmbeddingProvider(ABC):
         pass
 
     @abstractmethod
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get statistics about the index.
 
         Returns:

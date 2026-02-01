@@ -50,7 +50,7 @@ import logging
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ class TestMetadata:
 
     test_name: str
     test_file: str
-    dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
     avg_duration_ms: float = 0.0
     failure_rate: float = 0.0
     last_run_passed: bool = True
@@ -113,7 +113,7 @@ class TestDependencyLearner:
 
         # In-memory Q-table for fast access
         # Key: (file_hash, test_name), Value: Q-value for failure probability
-        self._q_table: Dict[Tuple[str, str], float] = {}
+        self._q_table: dict[tuple[str, str], float] = {}
         self._load_q_table()
 
     def _ensure_tables(self) -> None:
@@ -167,7 +167,7 @@ class TestDependencyLearner:
         # MD5 used for file path hashing, not security
         return hashlib.md5(file_path.encode(), usedforsecurity=False).hexdigest()[:16]
 
-    def get_failure_probability(self, test_name: str, changed_files: List[str]) -> float:
+    def get_failure_probability(self, test_name: str, changed_files: list[str]) -> float:
         """Get estimated failure probability for a test given changed files.
 
         Args:
@@ -202,7 +202,7 @@ class TestDependencyLearner:
         test_name: str,
         passed: bool,
         duration_ms: float,
-        changed_files: List[str],
+        changed_files: list[str],
     ) -> None:
         """Record test outcome for learning.
 
@@ -329,7 +329,7 @@ class TestPrioritizer:
     def __init__(
         self,
         dependency_learner: Optional[TestDependencyLearner] = None,
-        weights: Optional[Dict[str, float]] = None,
+        weights: Optional[dict[str, float]] = None,
     ):
         """Initialize prioritizer.
 
@@ -347,10 +347,10 @@ class TestPrioritizer:
 
     def prioritize(
         self,
-        test_names: List[str],
-        changed_files: Optional[List[str]] = None,
+        test_names: list[str],
+        changed_files: Optional[list[str]] = None,
         max_tests: Optional[int] = None,
-    ) -> List[TestPriorityResult]:
+    ) -> list[TestPriorityResult]:
         """Prioritize tests based on changed files.
 
         Args:
@@ -443,9 +443,9 @@ class RLTestOptimizer:
         self.learner = TestDependencyLearner(db_path=db_path)
         self.prioritizer = TestPrioritizer(dependency_learner=self.learner)
         self.enable_learning = enable_learning
-        self._current_changed_files: List[str] = []
+        self._current_changed_files: list[str] = []
 
-    def set_changed_files(self, changed_files: List[str]) -> None:
+    def set_changed_files(self, changed_files: list[str]) -> None:
         """Set the files that changed for this test run.
 
         Args:
@@ -455,11 +455,11 @@ class RLTestOptimizer:
 
     def prioritize_tests(
         self,
-        test_files: Optional[List[str]] = None,
-        test_names: Optional[List[str]] = None,
-        changed_files: Optional[List[str]] = None,
+        test_files: Optional[list[str]] = None,
+        test_names: Optional[list[str]] = None,
+        changed_files: Optional[list[str]] = None,
         max_tests: Optional[int] = None,
-    ) -> List[TestPriorityResult]:
+    ) -> list[TestPriorityResult]:
         """Get prioritized test execution order.
 
         Args:
@@ -491,7 +491,7 @@ class RLTestOptimizer:
         test_name: str,
         passed: bool,
         duration_ms: float = 0.0,
-        changed_files: Optional[List[str]] = None,
+        changed_files: Optional[list[str]] = None,
     ) -> None:
         """Record test outcome for learning.
 
@@ -507,7 +507,7 @@ class RLTestOptimizer:
         changed = changed_files or self._current_changed_files
         self.learner.record_outcome(test_name, passed, duration_ms, changed)
 
-    def get_test_stats(self) -> Dict[str, Any]:
+    def get_test_stats(self) -> dict[str, Any]:
         """Get optimizer statistics."""
         cursor = self.learner.db.cursor()
 
@@ -533,10 +533,10 @@ class RLTestOptimizer:
 
     def suggest_tests_for_changes(
         self,
-        changed_files: List[str],
-        all_tests: List[str],
+        changed_files: list[str],
+        all_tests: list[str],
         threshold: float = 0.3,
-    ) -> List[str]:
+    ) -> list[str]:
         """Suggest which tests to run based on changed files.
 
         Uses RL-learned dependencies to identify tests that are likely

@@ -17,7 +17,6 @@
 Tests the structured section classes that provide type-safe prompt construction.
 """
 
-import pytest
 
 from victor.framework.prompt_sections.grounding import GroundingSection
 from victor.framework.prompt_sections.rules import RuleSection, SafetyRuleSection

@@ -30,7 +30,7 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 from victor.config.settings import (
     VICTOR_DIR_NAME,
@@ -40,10 +40,10 @@ from victor.config.settings import (
 
 # Cache for ProjectContext instances and their content
 # Key: (root_path, mtime) -> (content, parsed_sections)
-_context_cache: Dict[Tuple[str, float], Tuple[str, Dict[str, str]]] = {}
+_context_cache: dict[tuple[str, float], tuple[str, dict[str, str]]] = {}
 _cache_lock = threading.Lock()
 _cache_ttl = 60.0  # Seconds to cache before checking mtime again
-_last_cache_check: Dict[str, float] = {}
+_last_cache_check: dict[str, float] = {}
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class ProjectContext:
         self.root_path = Path(root_path) if root_path else Path.cwd()
         self._context_file: Optional[Path] = None
         self._content: Optional[str] = None
-        self._parsed_sections: Dict[str, str] = {}
+        self._parsed_sections: dict[str, str] = {}
 
     def find_context_file(self) -> Optional[Path]:
         """Find the project context file.
@@ -175,7 +175,7 @@ class ProjectContext:
 
         self._parsed_sections = {}
         current_section = "overview"
-        current_content: List[str] = []
+        current_content: list[str] = []
 
         for line in self._content.split("\n"):
             if line.startswith("## "):

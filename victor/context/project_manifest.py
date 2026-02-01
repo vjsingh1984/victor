@@ -45,7 +45,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +90,8 @@ class FileInfo:
     language: str = ""
     size_bytes: int = 0
     line_count: int = 0
-    imports: List[str] = field(default_factory=list)
-    exports: List[str] = field(default_factory=list)
+    imports: list[str] = field(default_factory=list)
+    exports: list[str] = field(default_factory=list)
     description: str = ""
     importance: float = 0.5
     last_modified: float = 0.0
@@ -113,10 +113,10 @@ class ModuleInfo:
 
     name: str
     path: str
-    files: List[str] = field(default_factory=list)
-    dependencies: List[str] = field(default_factory=list)
-    dependents: List[str] = field(default_factory=list)
-    public_api: List[str] = field(default_factory=list)
+    files: list[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
+    dependents: list[str] = field(default_factory=list)
+    public_api: list[str] = field(default_factory=list)
     description: str = ""
 
 
@@ -132,9 +132,9 @@ class ArchitectureLayer:
     """
 
     name: str
-    modules: List[str] = field(default_factory=list)
+    modules: list[str] = field(default_factory=list)
     description: str = ""
-    allowed_dependencies: List[str] = field(default_factory=list)
+    allowed_dependencies: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -159,9 +159,9 @@ class ProjectMetadata:
     language: str = ""
     framework: str = ""
     package_manager: str = ""
-    dependencies: Dict[str, str] = field(default_factory=dict)
-    dev_dependencies: Dict[str, str] = field(default_factory=dict)
-    scripts: Dict[str, str] = field(default_factory=dict)
+    dependencies: dict[str, str] = field(default_factory=dict)
+    dev_dependencies: dict[str, str] = field(default_factory=dict)
+    scripts: dict[str, str] = field(default_factory=dict)
 
 
 class ProjectManifest:
@@ -282,12 +282,12 @@ class ProjectManifest:
             project_root: Root directory of the project
         """
         self.project_root = Path(project_root)
-        self.files: Dict[str, FileInfo] = {}
-        self.modules: Dict[str, ModuleInfo] = {}
+        self.files: dict[str, FileInfo] = {}
+        self.modules: dict[str, ModuleInfo] = {}
         self.metadata = ProjectMetadata()
-        self.architecture: List[ArchitectureLayer] = []
-        self._file_index: Dict[str, Set[str]] = defaultdict(set)
-        self._symbol_index: Dict[str, str] = {}
+        self.architecture: list[ArchitectureLayer] = []
+        self._file_index: dict[str, set[str]] = defaultdict(set)
+        self._symbol_index: dict[str, str] = {}
 
     @classmethod
     async def build(
@@ -640,7 +640,7 @@ class ProjectManifest:
     async def _build_module_graph(self) -> None:
         """Build module dependency graph."""
         # Group files by module (directory)
-        module_files: Dict[str, List[str]] = defaultdict(list)
+        module_files: dict[str, list[str]] = defaultdict(list)
 
         for path in self.files:
             parts = path.split("/")
@@ -660,8 +660,8 @@ class ProjectManifest:
             )
 
             # Aggregate imports and exports
-            all_imports: Set[str] = set()
-            all_exports: Set[str] = set()
+            all_imports: set[str] = set()
+            all_exports: set[str] = set()
 
             for file_path in files:
                 file_info = self.files.get(file_path)
@@ -696,7 +696,7 @@ class ProjectManifest:
             "infrastructure": ["infra", "config", "util", "helper", "lib"],
         }
 
-        layers: Dict[str, List[str]] = defaultdict(list)
+        layers: dict[str, list[str]] = defaultdict(list)
 
         for module_name in self.modules:
             module_lower = module_name.lower()
@@ -741,7 +741,7 @@ class ProjectManifest:
             ),
         ]
 
-    def get_important_files(self, limit: int = 20) -> List[FileInfo]:
+    def get_important_files(self, limit: int = 20) -> list[FileInfo]:
         """Get most important files in the project.
 
         Args:
@@ -757,7 +757,7 @@ class ProjectManifest:
         )
         return sorted_files[:limit]
 
-    def get_files_by_category(self, category: FileCategory) -> List[FileInfo]:
+    def get_files_by_category(self, category: FileCategory) -> list[FileInfo]:
         """Get files by category.
 
         Args:
@@ -769,7 +769,7 @@ class ProjectManifest:
         paths = self._file_index.get(category.value, set())
         return [self.files[p] for p in paths if p in self.files]
 
-    def get_relevant_files(self, query: str, limit: int = 10) -> List[FileInfo]:
+    def get_relevant_files(self, query: str, limit: int = 10) -> list[FileInfo]:
         """Get files relevant to a query.
 
         Args:
@@ -782,7 +782,7 @@ class ProjectManifest:
         query_lower = query.lower()
         query_terms = query_lower.split()
 
-        scored_files: List[tuple] = []
+        scored_files: list[tuple] = []
 
         for path, file_info in self.files.items():
             score = file_info.importance
@@ -825,7 +825,7 @@ class ProjectManifest:
         """
         return self._symbol_index.get(symbol)
 
-    def get_context_for_task(self, task: str) -> Dict[str, Any]:
+    def get_context_for_task(self, task: str) -> dict[str, Any]:
         """Generate context for a specific task.
 
         Args:
@@ -865,7 +865,7 @@ class ProjectManifest:
             "dependencies": list(self.metadata.dependencies.keys())[:20],
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Export manifest to dictionary."""
         return {
             "metadata": {

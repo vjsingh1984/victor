@@ -23,7 +23,6 @@ Tests verify that:
 """
 
 import pytest
-from typing import Dict, Any, List, Optional
 
 
 class TestCodingChainRegistry:

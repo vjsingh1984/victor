@@ -62,11 +62,9 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Dict,
-    List,
     Optional,
 )
+from collections.abc import AsyncIterator
 
 from victor.workflows.deployment import (
     DeploymentConfig,
@@ -145,7 +143,7 @@ class RuntimeConfig:
         max_health_check_failures: Max consecutive health failures before abort
     """
 
-    services: List[ServiceConfig] = field(default_factory=list)
+    services: list[ServiceConfig] = field(default_factory=list)
     deployment: DeploymentConfig = field(default_factory=DeploymentConfig)
     executor: ExecutorConfig = field(default_factory=ExecutorConfig)
     hitl: HITLServerConfig = field(default_factory=HITLServerConfig)
@@ -163,8 +161,8 @@ class RuntimeResult:
     """
 
     execution: ExecutorResult
-    services_started: List[str]
-    services_healthy: Dict[str, bool]
+    services_started: list[str]
+    services_healthy: dict[str, bool]
     deployment_target: DeploymentTarget
     total_duration_seconds: float
     hitl_server_url: Optional[str] = None  # URL of HITL server if started
@@ -176,7 +174,7 @@ class RuntimeResult:
         return bool(result) if result is not None else False
 
     @property
-    def state(self) -> Dict[str, Any]:
+    def state(self) -> dict[str, Any]:
         """Final workflow state."""
         result: Any = self.execution.state
         return dict(result) if result is not None else {}
@@ -239,7 +237,7 @@ class WorkflowRuntime:
         self._deployment_handler: Optional[DeploymentHandler] = None
         self._executor: Optional[StateGraphExecutor] = None
         self._services_running = False
-        self._service_handles: Dict[str, Any] = {}
+        self._service_handles: dict[str, Any] = {}
 
         # HITL server management
         self._hitl_server_task: Optional[asyncio.Task[None]] = None
@@ -300,7 +298,7 @@ class WorkflowRuntime:
     async def execute(
         self,
         workflow: "WorkflowDefinition",
-        initial_context: Optional[Dict[str, Any]] = None,
+        initial_context: Optional[dict[str, Any]] = None,
         *,
         thread_id: Optional[str] = None,
     ) -> RuntimeResult:
@@ -323,7 +321,7 @@ class WorkflowRuntime:
             RuntimeResult with execution outcome and metadata
         """
         start_time = time.time()
-        services_started: List[str] = []
+        services_started: list[str] = []
         hitl_started = False
 
         try:
@@ -399,10 +397,10 @@ class WorkflowRuntime:
     async def stream(
         self,
         workflow: "WorkflowDefinition",
-        initial_context: Optional[Dict[str, Any]] = None,
+        initial_context: Optional[dict[str, Any]] = None,
         *,
         thread_id: Optional[str] = None,
-    ) -> AsyncIterator[tuple[str, Dict[str, Any]]]:
+    ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
         """Stream workflow execution with lifecycle management.
 
         Args:
@@ -574,7 +572,7 @@ class WorkflowRuntime:
         """
         return self._service_manager.get_service(name)
 
-    async def health_check(self) -> Dict[str, bool]:
+    async def health_check(self) -> dict[str, bool]:
         """Check health of all services.
 
         Returns:
@@ -601,9 +599,9 @@ class WorkflowRuntime:
 # Convenience function
 async def run_workflow(
     workflow: "WorkflowDefinition",
-    initial_context: Optional[Dict[str, Any]] = None,
+    initial_context: Optional[dict[str, Any]] = None,
     *,
-    services: Optional[List[ServiceConfig]] = None,
+    services: Optional[list[ServiceConfig]] = None,
     deployment: Optional[DeploymentConfig] = None,
     thread_id: Optional[str] = None,
 ) -> RuntimeResult:

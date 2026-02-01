@@ -39,7 +39,7 @@ Example usage:
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Pattern, Tuple
+from re import Pattern
 
 
 class PIIType(Enum):
@@ -118,7 +118,7 @@ class PIIMatch:
 # Column Name Patterns (for detecting PII columns in datasets)
 # =============================================================================
 
-PII_COLUMN_PATTERNS: Dict[PIIType, str] = {
+PII_COLUMN_PATTERNS: dict[PIIType, str] = {
     # Names
     PIIType.NAME: r"(?i)^(first|last|full|middle|maiden)?[_\s-]?name$",
     # Contact
@@ -153,7 +153,7 @@ PII_COLUMN_PATTERNS: Dict[PIIType, str] = {
 # Content Patterns (for detecting PII in text content)
 # =============================================================================
 
-PII_CONTENT_PATTERNS: Dict[PIIType, Tuple[str, PIISeverity]] = {
+PII_CONTENT_PATTERNS: dict[PIIType, tuple[str, PIISeverity]] = {
     # SSN patterns
     PIIType.SSN: (
         r"\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b",
@@ -200,7 +200,7 @@ PII_CONTENT_PATTERNS: Dict[PIIType, Tuple[str, PIISeverity]] = {
 # Severity Mapping
 # =============================================================================
 
-PII_SEVERITY: Dict[PIIType, PIISeverity] = {
+PII_SEVERITY: dict[PIIType, PIISeverity] = {
     # Critical - Government/Medical/Financial IDs
     PIIType.SSN: PIISeverity.CRITICAL,
     PIIType.PASSPORT: PIISeverity.CRITICAL,
@@ -233,7 +233,7 @@ PII_SEVERITY: Dict[PIIType, PIISeverity] = {
 # Anonymization Suggestions
 # =============================================================================
 
-ANONYMIZATION_SUGGESTIONS: Dict[PIIType, str] = {
+ANONYMIZATION_SUGGESTIONS: dict[PIIType, str] = {
     # Names
     PIIType.NAME: "Replace with fake names using Faker library, or hash with salt",
     # Contact
@@ -288,8 +288,8 @@ class PIIScanner:
 
     def __init__(self) -> None:
         """Initialize the scanner."""
-        self._column_patterns: Dict[PIIType, Pattern[str]] = {}
-        self._content_patterns: Dict[PIIType, Pattern[str]] = {}
+        self._column_patterns: dict[PIIType, Pattern[str]] = {}
+        self._content_patterns: dict[PIIType, Pattern[str]] = {}
         self._compile_patterns()
 
     def _compile_patterns(self) -> None:
@@ -306,7 +306,7 @@ class PIIScanner:
             except re.error:
                 pass
 
-    def detect_columns(self, columns: List[str]) -> List[Tuple[str, PIIType]]:
+    def detect_columns(self, columns: list[str]) -> list[tuple[str, PIIType]]:
         """Detect PII columns in a list of column names.
 
         Args:
@@ -323,7 +323,7 @@ class PIIScanner:
                     break  # One match per column
         return detected
 
-    def scan_content(self, content: str) -> List[PIIMatch]:
+    def scan_content(self, content: str) -> list[PIIMatch]:
         """Scan text content for PII.
 
         Args:
@@ -352,7 +352,7 @@ class PIIScanner:
         matches.sort(key=lambda m: m.matched_text)
         return matches
 
-    def get_summary(self, matches: List[PIIMatch]) -> Dict[str, int]:
+    def get_summary(self, matches: list[PIIMatch]) -> dict[str, int]:
         """Get summary of matches by severity.
 
         Args:
@@ -372,7 +372,7 @@ class PIIScanner:
 # =============================================================================
 
 
-def detect_pii_columns(columns: List[str]) -> List[Tuple[str, PIIType]]:
+def detect_pii_columns(columns: list[str]) -> list[tuple[str, PIIType]]:
     """Detect PII columns in a list of column names.
 
     Args:
@@ -385,7 +385,7 @@ def detect_pii_columns(columns: List[str]) -> List[Tuple[str, PIIType]]:
     return scanner.detect_columns(columns)
 
 
-def detect_pii_in_content(content: str) -> List[PIIMatch]:
+def detect_pii_in_content(content: str) -> list[PIIMatch]:
     """Detect PII in text content.
 
     Args:
@@ -434,7 +434,7 @@ def has_pii(content: str) -> bool:
     return len(detect_pii_in_content(content)) > 0
 
 
-def get_pii_types() -> List[str]:
+def get_pii_types() -> list[str]:
     """Get list of all PII types.
 
     Returns:
@@ -443,7 +443,7 @@ def get_pii_types() -> List[str]:
     return [t.value for t in PIIType]
 
 
-def get_safety_reminders() -> List[str]:
+def get_safety_reminders() -> list[str]:
     """Get safety reminders for handling PII.
 
     Returns:

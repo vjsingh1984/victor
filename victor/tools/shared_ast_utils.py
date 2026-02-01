@@ -34,7 +34,8 @@ import logging
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple, Union
+from typing import Optional
+from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +54,11 @@ class FunctionInfo:
     end_lineno: Optional[int]
     col_offset: int
     is_async: bool
-    args: List[str]
+    args: list[str]
     defaults_count: int
     has_docstring: bool
     docstring: Optional[str]
-    decorators: List[str]
+    decorators: list[str]
     complexity: int
     return_count: int
     has_yield: bool
@@ -71,12 +72,12 @@ class ClassInfo:
     lineno: int
     end_lineno: Optional[int]
     col_offset: int
-    bases: List[str]
+    bases: list[str]
     has_docstring: bool
     docstring: Optional[str]
-    decorators: List[str]
-    methods: List[FunctionInfo] = field(default_factory=list)
-    class_variables: List[str] = field(default_factory=list)
+    decorators: list[str]
+    methods: list[FunctionInfo] = field(default_factory=list)
+    class_variables: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -87,9 +88,9 @@ class ModuleInfo:
     lines_of_code: int
     blank_lines: int
     comment_lines: int
-    functions: List[FunctionInfo]
-    classes: List[ClassInfo]
-    imports: List[str]
+    functions: list[FunctionInfo]
+    classes: list[ClassInfo]
+    imports: list[str]
     docstring: Optional[str]
     complexity: int
     maintainability_index: float
@@ -133,7 +134,7 @@ def parse_code(code: str) -> ParseResult:
         return ParseResult(success=False, tree=None, error=str(e), syntax_error_line=None)
 
 
-def parse_file(path: Union[str, Path], encoding: str = "utf-8") -> ParseResult:
+def parse_file(path: str | Path, encoding: str = "utf-8") -> ParseResult:
     """Safely parse a Python file to AST.
 
     Args:
@@ -184,7 +185,7 @@ def parse_file(path: Union[str, Path], encoding: str = "utf-8") -> ParseResult:
 
 def find_functions(
     tree: ast.AST, include_methods: bool = True, include_nested: bool = True
-) -> Iterator[Union[ast.FunctionDef, ast.AsyncFunctionDef]]:
+) -> Iterator[ast.FunctionDef | ast.AsyncFunctionDef]:
     """Find all function definitions in AST.
 
     Args:
@@ -216,7 +217,7 @@ def find_classes(tree: ast.AST) -> Iterator[ast.ClassDef]:
 
 def find_symbol(
     tree: ast.AST, name: str
-) -> Optional[Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef]]:
+) -> Optional[ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef]:
     """Find a specific function or class by name.
 
     Args:
@@ -233,7 +234,7 @@ def find_symbol(
     return None
 
 
-def find_imports(tree: ast.AST) -> List[str]:
+def find_imports(tree: ast.AST) -> list[str]:
     """Find all import statements in AST.
 
     Args:
@@ -437,7 +438,7 @@ def calculate_cognitive_complexity(node: ast.AST) -> int:
 # =============================================================================
 
 
-def get_function_info(node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> FunctionInfo:
+def get_function_info(node: ast.FunctionDef | ast.AsyncFunctionDef) -> FunctionInfo:
     """Extract detailed information about a function.
 
     Args:
@@ -610,7 +611,7 @@ def has_docstring(node: ast.AST) -> bool:
     return ast.get_docstring(node) is not None  # type: ignore[arg-type]
 
 
-def get_undocumented_functions(tree: ast.AST) -> List[Tuple[str, int]]:
+def get_undocumented_functions(tree: ast.AST) -> list[tuple[str, int]]:
     """Find functions without docstrings.
 
     Args:
@@ -626,7 +627,7 @@ def get_undocumented_functions(tree: ast.AST) -> List[Tuple[str, int]]:
     return undocumented
 
 
-def get_undocumented_classes(tree: ast.AST) -> List[Tuple[str, int]]:
+def get_undocumented_classes(tree: ast.AST) -> list[tuple[str, int]]:
     """Find classes without docstrings.
 
     Args:
@@ -690,7 +691,7 @@ def count_classes(tree: ast.AST) -> int:
     return sum(1 for _ in find_classes(tree))
 
 
-def get_line_count(code: str) -> Dict[str, int]:
+def get_line_count(code: str) -> dict[str, int]:
     """Count different types of lines in code.
 
     Args:

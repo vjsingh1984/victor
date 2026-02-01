@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from typing import Any, Dict
+from typing import Any
 
 from dataclasses import asdict
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -29,8 +29,8 @@ from victor.workflows.registry import WorkflowRegistry
     keywords=["workflow", "automation", "task", "sequence"],
 )
 async def workflow(
-    workflow_name: str, context: dict[str, Any], workflow_args: Dict[str, Any]
-) -> Dict[str, Any]:
+    workflow_name: str, context: dict[str, Any], workflow_args: dict[str, Any]
+) -> dict[str, Any]:
     """
     Runs a pre-defined, multi-step workflow to automate a complex task.
 

@@ -22,7 +22,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Type, Union
+from typing import Optional
+from collections.abc import Callable
 
 from victor.coding.languages.base import LanguagePlugin
 
@@ -43,17 +44,17 @@ class LanguageRegistry:
 
     def __init__(self) -> None:
         """Initialize empty registry."""
-        self._plugins: Dict[str, PluginFactory] = {}
-        self._instances: Dict[str, LanguagePlugin] = {}
-        self._extension_map: Dict[str, str] = {}  # .py -> python
-        self._alias_map: Dict[str, str] = {}  # py -> python
+        self._plugins: dict[str, PluginFactory] = {}
+        self._instances: dict[str, LanguagePlugin] = {}
+        self._extension_map: dict[str, str] = {}  # .py -> python
+        self._alias_map: dict[str, str] = {}  # py -> python
 
     def register(
         self,
         name: str,
-        plugin: Union[Type[LanguagePlugin], PluginFactory],
-        extensions: Optional[List[str]] = None,
-        aliases: Optional[List[str]] = None,
+        plugin: type[LanguagePlugin] | PluginFactory,
+        extensions: Optional[list[str]] = None,
+        aliases: Optional[list[str]] = None,
     ) -> None:
         """Register a language plugin.
 
@@ -204,7 +205,7 @@ class LanguageRegistry:
         except KeyError:
             return False
 
-    def list_languages(self) -> List[str]:
+    def list_languages(self) -> list[str]:
         """List all registered language names.
 
         Returns:
@@ -212,7 +213,7 @@ class LanguageRegistry:
         """
         return sorted(self._plugins.keys())
 
-    def get_extensions(self, name: str) -> List[str]:
+    def get_extensions(self, name: str) -> list[str]:
         """Get file extensions for a language.
 
         Args:

@@ -24,7 +24,8 @@ This module provides:
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Awaitable, Set
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable, Awaitable
 import re
 import logging
 
@@ -125,7 +126,7 @@ _STATIC_WRITE_TOOL_NAMES: frozenset[str] = frozenset(
 )
 
 
-def get_write_tool_names() -> Set[str]:
+def get_write_tool_names() -> set[str]:
     """Get all write tool names from registry + static fallback.
 
     This is the preferred way to get the full set of write tools.
@@ -155,8 +156,8 @@ class ConfirmationRequest:
     tool_name: str
     risk_level: OperationalRiskLevel
     description: str
-    details: List[str]
-    arguments: Dict[str, Any]
+    details: list[str]
+    arguments: dict[str, Any]
 
     def format_message(self, presentation: Optional["PresentationProtocol"] = None) -> str:
         """Format confirmation request as a user-friendly message.
@@ -286,7 +287,7 @@ class SafetyChecker:
         ]
 
         # Custom patterns from vertical extensions
-        self._custom_patterns: List[tuple[re.Pattern[str], str, OperationalRiskLevel]] = []
+        self._custom_patterns: list[tuple[re.Pattern[str], str, OperationalRiskLevel]] = []
 
     def add_custom_pattern(
         self,
@@ -320,7 +321,7 @@ class SafetyChecker:
         except re.error as e:
             logger.warning(f"Invalid regex pattern for safety checker: {pattern} - {e}")
 
-    def check_bash_command(self, command: str) -> tuple[OperationalRiskLevel, List[str]]:
+    def check_bash_command(self, command: str) -> tuple[OperationalRiskLevel, list[str]]:
         """Check a bash command for dangerous patterns.
 
         Args:
@@ -329,7 +330,7 @@ class SafetyChecker:
         Returns:
             Tuple of (risk_level, list of matched pattern descriptions)
         """
-        matched: List[str] = []
+        matched: list[str] = []
         max_risk = OperationalRiskLevel.SAFE
 
         # Check critical patterns first
@@ -372,7 +373,7 @@ class SafetyChecker:
         operation: str,
         file_path: str,
         overwrite: bool = False,
-    ) -> tuple[OperationalRiskLevel, List[str]]:
+    ) -> tuple[OperationalRiskLevel, list[str]]:
         """Check a file operation for risk.
 
         Args:
@@ -383,7 +384,7 @@ class SafetyChecker:
         Returns:
             Tuple of (risk_level, list of risk descriptions)
         """
-        risks: List[str] = []
+        risks: list[str] = []
         max_risk = OperationalRiskLevel.SAFE
 
         path = Path(file_path)
@@ -436,7 +437,7 @@ class SafetyChecker:
     async def check_and_confirm(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
     ) -> tuple[bool, Optional[str]]:
         """Check operation safety and request confirmation if needed.
 
@@ -452,8 +453,8 @@ class SafetyChecker:
             return True, None
 
         risk_level = OperationalRiskLevel.SAFE
-        descriptions: List[str] = []
-        details: List[str] = []
+        descriptions: list[str] = []
+        details: list[str] = []
         is_write_operation = self.is_write_tool(tool_name)
 
         # Check bash commands

@@ -46,10 +46,9 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from victor.framework.debugging.breakpoints import BreakpointPosition
 
@@ -129,11 +128,11 @@ class DebugMessage:
 
     type: DebugMessageType
     session_id: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
     timestamp: float
     request_id: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
@@ -148,7 +147,7 @@ class DebugMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DebugMessage":
+    def from_dict(cls, data: dict[str, Any]) -> "DebugMessage":
         """Create from dictionary.
 
         Args:
@@ -402,7 +401,7 @@ class DebugProtocolHandler:
             request_id=message.request_id,
         )
 
-    def emit_breakpoint_hit(self, node_id: str, state: Dict[str, Any]) -> None:
+    def emit_breakpoint_hit(self, node_id: str, state: dict[str, Any]) -> None:
         """Emit BREAKPOINT_HIT event to client.
 
         Args:

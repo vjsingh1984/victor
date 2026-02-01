@@ -21,7 +21,7 @@ for various Infrastructure-as-Code platforms.
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -111,7 +111,7 @@ class TerraformScanner(IaCScannerProtocol):
             )
 
         # Parse variables
-        variables: Dict[str, Any] = {}
+        variables: dict[str, Any] = {}
         var_pattern = r'variable\s+"([^"]+)"\s*\{'
         for match in re.finditer(var_pattern, content):
             variables[match.group(1)] = None

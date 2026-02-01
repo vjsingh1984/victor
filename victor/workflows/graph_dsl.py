@@ -101,20 +101,13 @@ from dataclasses import dataclass, field, fields, is_dataclass
 from enum import Enum
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Dict,
     Generic,
-    List,
     Optional,
     Protocol,
-    Set,
-    Type,
     TypeVar,
-    Union,
-    cast,
     runtime_checkable,
 )
+from collections.abc import Awaitable, Callable
 
 from victor.workflows.definition import (
     AgentNode,
@@ -146,7 +139,7 @@ class State(ABC):
             results: Dict[str, Any] = field(default_factory=dict)
     """
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert state to dictionary.
 
         Returns:
@@ -157,7 +150,7 @@ class State(ABC):
         return self.__dict__.copy()
 
     @classmethod
-    def from_dict(cls: Type[S], data: Dict[str, Any]) -> S:
+    def from_dict(cls: type[S], data: dict[str, Any]) -> S:
         """Create state from dictionary.
 
         Args:
@@ -182,7 +175,7 @@ class State(ABC):
         """
         return self.from_dict(self.to_dict())
 
-    def merge(self: S, updates: Dict[str, Any]) -> S:
+    def merge(self: S, updates: dict[str, Any]) -> S:
         """Create a new state with merged updates.
 
         Args:
@@ -197,7 +190,7 @@ class State(ABC):
 
 
 # Node function types
-NodeFunc = Callable[[S], Union[S, Awaitable[S]]]
+NodeFunc = Callable[[S], S | Awaitable[S]]
 RouterFunc = Callable[[S], str]
 
 
@@ -231,13 +224,13 @@ class GraphNode(Generic[S]):
     name: str
     func: Optional[NodeFunc[S]] = None
     node_type: GraphNodeType = GraphNodeType.FUNCTION
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # For agent nodes
     agent_role: Optional[str] = None
     agent_goal: Optional[str] = None
     tool_budget: int = 15
-    allowed_tools: Optional[List[str]] = None
+    allowed_tools: Optional[list[str]] = None
 
     # For chaining (>> operator)
     _graph: Optional["WorkflowGraph[S]"] = field(default=None, repr=False)
@@ -316,7 +309,7 @@ class WorkflowGraph(Generic[S]):
 
     def __init__(
         self,
-        state_type: Type[S],
+        state_type: type[S],
         name: Optional[str] = None,
         description: str = "",
     ):
@@ -331,12 +324,12 @@ class WorkflowGraph(Generic[S]):
         self.name = name or state_type.__name__.replace("State", "").lower() + "_workflow"
         self.description = description
 
-        self._nodes: Dict[str, GraphNode[S]] = {}
-        self._edges: Dict[str, List[str]] = {}  # from_node -> [to_nodes]
-        self._conditional_edges: Dict[str, tuple[RouterFunc[S], Dict[str, str]]] = {}
+        self._nodes: dict[str, GraphNode[S]] = {}
+        self._edges: dict[str, list[str]] = {}  # from_node -> [to_nodes]
+        self._conditional_edges: dict[str, tuple[RouterFunc[S], dict[str, str]]] = {}
         self._entry_point: Optional[str] = None
-        self._finish_points: Set[str] = set()
-        self._metadata: Dict[str, Any] = {}
+        self._finish_points: set[str] = set()
+        self._metadata: dict[str, Any] = {}
 
     def add_node(
         self,
@@ -387,7 +380,7 @@ class WorkflowGraph(Generic[S]):
         goal: str,
         *,
         tool_budget: int = 15,
-        allowed_tools: Optional[List[str]] = None,
+        allowed_tools: Optional[list[str]] = None,
         output_key: Optional[str] = None,
     ) -> "WorkflowGraph[S]":
         """Add an agent node to the graph.
@@ -468,7 +461,7 @@ class WorkflowGraph(Generic[S]):
         self,
         from_node: str,
         router: RouterFunc[S],
-        routes: Dict[str, str],
+        routes: dict[str, str],
         *,
         default: Optional[str] = None,
     ) -> "WorkflowGraph[S]":
@@ -636,10 +629,10 @@ class WorkflowGraph(Generic[S]):
     def add_parallel_nodes(
         self,
         name: str,
-        parallel: List[str],
+        parallel: list[str],
         *,
         join_strategy: str = "all",
-        next_nodes: Optional[List[str]] = None,
+        next_nodes: Optional[list[str]] = None,
     ) -> "WorkflowGraph[S]":
         """Add a parallel execution node.
 
@@ -686,7 +679,7 @@ class WorkflowGraph(Generic[S]):
         self._metadata[key] = value
         return self
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Validate the graph structure.
 
         Returns:
@@ -726,7 +719,7 @@ class WorkflowGraph(Generic[S]):
 
         return errors
 
-    def _find_reachable(self) -> Set[str]:
+    def _find_reachable(self) -> set[str]:
         """Find all nodes reachable from entry point."""
         if not self._entry_point:
             return set()
@@ -770,7 +763,7 @@ class WorkflowGraph(Generic[S]):
             raise ValueError(f"Graph validation failed: {'; '.join(errors)}")
 
         workflow_name = name or self.name
-        nodes: Dict[str, WorkflowNode] = {}
+        nodes: dict[str, WorkflowNode] = {}
 
         # Convert graph nodes to workflow nodes
         for node_name, graph_node in self._nodes.items():
@@ -845,10 +838,10 @@ class WorkflowGraph(Generic[S]):
             func = graph_node.func
 
             def transform_wrapper(
-                ctx: Dict[str, Any],
+                ctx: dict[str, Any],
                 f: Optional[NodeFunc[S]] = func,
-                st: Type[S] = self.state_type,
-            ) -> Dict[str, Any]:
+                st: type[S] = self.state_type,
+            ) -> dict[str, Any]:
                 if f is None:
                     return ctx
                 state = st.from_dict(ctx)
@@ -878,7 +871,7 @@ class WorkflowGraph(Generic[S]):
 
 # Convenience functions for creating graphs
 def create_graph(
-    state_type: Type[S],
+    state_type: type[S],
     name: Optional[str] = None,
     description: str = "",
 ) -> WorkflowGraph[S]:

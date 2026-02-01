@@ -15,7 +15,6 @@
 """Tests for framework service lifecycle management."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -24,21 +23,17 @@ from victor.framework.services.lifecycle import (
     BaseServiceConfig,
     create_http_service,
     create_sqlite_service,
-    DockerServiceConfig,
-    DockerServiceHandler,
     ExternalServiceConfig,
     ExternalServiceHandler,
     HTTPServiceConfig,
     HTTPServiceHandler,
     HealthCheckResult,
     HealthStatus,
-    ServiceLifecycleProtocol,
     ServiceManager,
     ServiceMetadata,
     ServiceRegistry,
     ServiceStartError,
     ServiceState,
-    ServiceStopError,
     SQLiteServiceConfig,
     SQLiteServiceHandler,
 )

@@ -27,7 +27,7 @@ Install libclang with: pip install libclang
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from ..types import CodeValidationResult, ValidationConfig, ValidationIssue, ValidationSeverity
 from .tree_sitter_validator import TreeSitterValidator
@@ -144,8 +144,8 @@ class CppValidator:
         Returns:
             CodeValidationResult with validation status
         """
-        issues: List[ValidationIssue] = []
-        warnings: List[ValidationIssue] = []
+        issues: list[ValidationIssue] = []
+        warnings: list[ValidationIssue] = []
 
         # Check if libclang is available
         if not LIBCLANG_AVAILABLE or self._index is None:

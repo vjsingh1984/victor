@@ -14,7 +14,6 @@
 
 """Tests for common tool validators."""
 
-import pytest
 from victor.tools.validators.common import (
     CombinedToolValidator,
     ToolAvailabilityValidator,

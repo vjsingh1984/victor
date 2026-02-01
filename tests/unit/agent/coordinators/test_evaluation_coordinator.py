@@ -30,8 +30,7 @@ Test Strategy:
 """
 
 import pytest
-from unittest.mock import AsyncMock, Mock, MagicMock, patch
-from typing import Any, Dict, Optional
+from unittest.mock import AsyncMock, Mock, patch
 
 from victor.agent.coordinators.evaluation_coordinator import EvaluationCoordinator
 
@@ -1059,7 +1058,6 @@ class TestEvaluationCoordinatorFlushAnalytics:
             enable_event_publishing=False,
         )
 
-        import time
 
         results = await coordinator.flush_analytics()
 

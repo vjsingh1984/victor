@@ -36,19 +36,15 @@ Run explicitly with: pytest -m load_test tests/load_test/
 
 import asyncio
 import gc
-import os
 import psutil
 import time
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from victor.core.container import ServiceContainer
 from victor.agent.orchestrator import AgentOrchestrator
-from victor.config.settings import Settings
 from .async_framework import AsyncLoadTestFramework
 
 
@@ -66,11 +62,6 @@ async def load_test_framework():
 @pytest.fixture
 async def mock_orchestrator():
     """Create mock orchestrator for testing without API server."""
-    from victor.agent.protocols import (
-        ToolExecutorProtocol,
-        ToolRegistryProtocol,
-        ConversationControllerProtocol,
-    )
 
     orchestrator = MagicMock(spec=AgentOrchestrator)
 
@@ -539,7 +530,7 @@ class TestEndurance:
 
 
 def generate_scalability_report(
-    results: Dict[str, Any], output_dir: str = "/tmp/scalability_reports"
+    results: dict[str, Any], output_dir: str = "/tmp/scalability_reports"
 ):
     """Generate detailed scalability report from test results."""
     from pathlib import Path
@@ -569,7 +560,7 @@ def generate_scalability_report(
     return report
 
 
-def _generate_recommendations(results: Dict[str, Any]) -> List[str]:
+def _generate_recommendations(results: dict[str, Any]) -> list[str]:
     """Generate recommendations based on test results."""
     recommendations = []
 

@@ -14,7 +14,6 @@
 
 """Tests for victor.security.safety.code_patterns module."""
 
-import pytest
 
 from victor.core.security.patterns.code_patterns import (
     CodePatternCategory,

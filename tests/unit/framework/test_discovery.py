@@ -19,7 +19,6 @@ This is critical for ensuring the framework can load new verticals without
 modification.
 """
 
-import pytest
 
 from victor.framework.discovery import VerticalDiscovery
 

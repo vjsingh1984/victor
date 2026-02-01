@@ -107,7 +107,6 @@ class TestToolCallSignature:
 
     def test_deduplicate_tool_calls(self):
         """Test tool call deduplication."""
-        import copy
 
         calls = [
             victor_native.ToolCallData("read_file", {"path": "a.txt"}),

@@ -32,19 +32,13 @@ These plugins support embedding-based indexing for:
 - Markdown/reStructuredText
 """
 
-from pathlib import Path
-from typing import Optional
 
 from victor.coding.languages.base import (
     BaseLanguagePlugin,
-    BuildSystem,
     CommentStyle,
-    Formatter,
     LanguageCapabilities,
     LanguageConfig,
-    Linter,
     QueryPattern,
-    TestRunner,
     TreeSitterQueries,
 )
 

@@ -37,7 +37,7 @@ Example (from agent's perspective):
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.tools.base import BaseTool, ToolResult
 from victor.tools.enums import CostTier
@@ -158,7 +158,7 @@ Returns the result from the delegated agent. By default, waits for completion.""
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any] | None = None,
+        _exec_ctx: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> ToolResult:
         """Execute the delegation.
@@ -175,7 +175,7 @@ Returns the result from the delegated agent. By default, waits for completion.""
         role: str = kwargs.get("role", "executor")
         tool_budget: int = kwargs.get("tool_budget", 10)
         await_result: bool = kwargs.get("await_result", True)
-        context: Optional[Dict[str, Any]] = kwargs.get("context")
+        context: Optional[dict[str, Any]] = kwargs.get("context")
 
         logger.info(f"Delegating to {role}: {task[:50]}...")
 

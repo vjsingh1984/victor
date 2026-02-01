@@ -40,7 +40,7 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ class Variant:
 
     name: str
     type: VariantType
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
     description: str = ""
 
 
@@ -105,7 +105,7 @@ class ExperimentConfig:
     control: Variant
     treatment: Variant
     traffic_split: float = 0.1  # 10% to treatment by default
-    metrics: List[str] = field(default_factory=lambda: ["success_rate", "quality_score"])
+    metrics: list[str] = field(default_factory=lambda: ["success_rate", "quality_score"])
     min_samples_per_variant: int = 100
     significance_level: float = 0.05
     min_effect_size: float = 0.05  # 5% improvement
@@ -130,7 +130,7 @@ class VariantMetrics:
     success_count: int = 0
     total_quality: float = 0.0
     total_latency_ms: float = 0.0
-    metric_sums: Dict[str, float] = field(default_factory=dict)
+    metric_sums: dict[str, float] = field(default_factory=dict)
 
     @property
     def success_rate(self) -> float:
@@ -180,9 +180,9 @@ class ExperimentResult:
     treatment_better: bool
     effect_size: float
     p_value: float
-    confidence_interval: Tuple[float, float]
+    confidence_interval: tuple[float, float]
     recommendation: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 class ExperimentCoordinator:
@@ -229,16 +229,16 @@ class ExperimentCoordinator:
         self.db = db_connection
 
         # Active experiments
-        self._experiments: Dict[str, ExperimentConfig] = {}
+        self._experiments: dict[str, ExperimentConfig] = {}
 
         # Experiment status
-        self._status: Dict[str, ExperimentStatus] = {}
+        self._status: dict[str, ExperimentStatus] = {}
 
         # Variant metrics
-        self._metrics: Dict[str, Dict[str, VariantMetrics]] = {}
+        self._metrics: dict[str, dict[str, VariantMetrics]] = {}
 
         # Session assignments (for consistency)
-        self._assignments: Dict[str, Dict[str, str]] = {}
+        self._assignments: dict[str, dict[str, str]] = {}
 
         if db_connection:
             self._ensure_tables()
@@ -502,7 +502,7 @@ class ExperimentCoordinator:
         success: bool,
         quality_score: float = 0.5,
         latency_ms: float = 0.0,
-        custom_metrics: Optional[Dict[str, float]] = None,
+        custom_metrics: Optional[dict[str, float]] = None,
     ) -> None:
         """Record an outcome for an experiment.
 
@@ -691,7 +691,7 @@ class ExperimentCoordinator:
         logger.info(f"ExperimentCoordinator: Rolled back {experiment_id}")
         return True
 
-    def get_experiment_status(self, experiment_id: str) -> Optional[Dict[str, Any]]:
+    def get_experiment_status(self, experiment_id: str) -> Optional[dict[str, Any]]:
         """Get current status of an experiment.
 
         Args:
@@ -732,7 +732,7 @@ class ExperimentCoordinator:
             },
         }
 
-    def list_experiments(self) -> List[Dict[str, Any]]:
+    def list_experiments(self) -> list[dict[str, Any]]:
         """List all experiments.
 
         Returns:
@@ -893,7 +893,7 @@ class ExperimentCoordinator:
 
         self.db.commit()
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export coordinator metrics.
 
         Returns:

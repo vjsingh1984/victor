@@ -51,16 +51,14 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import (
     Any,
-    Callable,
-    Dict,
     Generic,
     Optional,
     Protocol,
-    Type,
     TypeVar,
     cast,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +93,7 @@ class Disposable(Protocol):
 class ServiceDescriptor(Generic[T]):
     """Describes how to create and manage a service."""
 
-    service_type: Type[T]
+    service_type: type[T]
     factory: Callable[["ServiceContainer"], T]
     lifetime: ServiceLifetime
     instance: Optional[T] = None
@@ -119,11 +117,11 @@ class ServiceScope:
             parent: Parent container to inherit singleton services from
         """
         self._parent = parent
-        self._scoped_instances: Dict[Type[Any], Any] = {}
+        self._scoped_instances: dict[type[Any], Any] = {}
         self._disposed = False
         self._lock = threading.Lock()
 
-    def get(self, service_type: Type[T]) -> T:
+    def get(self, service_type: type[T]) -> T:
         """Get a service instance within this scope.
 
         Args:
@@ -179,7 +177,7 @@ class ServiceScope:
 class ServiceNotFoundError(Exception):
     """Raised when a requested service is not registered."""
 
-    def __init__(self, service_type: Type[Any]):
+    def __init__(self, service_type: type[Any]):
         self.service_type = service_type
         # Handle both Type objects and string service names
         name = service_type.__name__ if hasattr(service_type, "__name__") else str(service_type)
@@ -189,7 +187,7 @@ class ServiceNotFoundError(Exception):
 class ServiceAlreadyRegisteredError(Exception):
     """Raised when trying to register a service that already exists."""
 
-    def __init__(self, service_type: Type[Any]):
+    def __init__(self, service_type: type[Any]):
         self.service_type = service_type
         super().__init__(f"Service already registered: {service_type.__name__}")
 
@@ -226,13 +224,13 @@ class ServiceContainer:
 
     def __init__(self) -> None:
         """Initialize empty container."""
-        self._descriptors: Dict[Type[Any], ServiceDescriptor[Any]] = {}
+        self._descriptors: dict[type[Any], ServiceDescriptor[Any]] = {}
         self._lock = threading.RLock()
         self._disposed = False
 
     def register(
         self,
-        service_type: Type[T],
+        service_type: type[T],
         factory: Callable[["ServiceContainer"], T],
         lifetime: ServiceLifetime = ServiceLifetime.SINGLETON,
     ) -> "ServiceContainer":
@@ -262,7 +260,7 @@ class ServiceContainer:
 
         return self
 
-    def register_instance(self, service_type: Type[T], instance: T) -> "ServiceContainer":
+    def register_instance(self, service_type: type[T], instance: T) -> "ServiceContainer":
         """Register an existing instance as a singleton.
 
         Args:
@@ -289,7 +287,7 @@ class ServiceContainer:
 
     def register_or_replace(
         self,
-        service_type: Type[T],
+        service_type: type[T],
         factory: Callable[["ServiceContainer"], T],
         lifetime: ServiceLifetime = ServiceLifetime.SINGLETON,
     ) -> "ServiceContainer":
@@ -324,7 +322,7 @@ class ServiceContainer:
 
         return self
 
-    def get(self, service_type: Type[T]) -> T:
+    def get(self, service_type: type[T]) -> T:
         """Get a service instance.
 
         Args:
@@ -347,7 +345,7 @@ class ServiceContainer:
                 descriptor.instance = descriptor.create_instance(self)
             return descriptor.instance
 
-    def get_optional(self, service_type: Type[T]) -> Optional[T]:
+    def get_optional(self, service_type: type[T]) -> Optional[T]:
         """Get a service instance, or None if not registered.
 
         Args:
@@ -361,7 +359,7 @@ class ServiceContainer:
         except ServiceNotFoundError:
             return None
 
-    def get_service(self, service_type: Type[T]) -> T:
+    def get_service(self, service_type: type[T]) -> T:
         """Alias for get() for backward compatibility.
 
         Args:
@@ -375,7 +373,7 @@ class ServiceContainer:
         """
         return self.get(service_type)
 
-    def is_registered(self, service_type: Type[Any]) -> bool:
+    def is_registered(self, service_type: type[Any]) -> bool:
         """Check if a service type is registered.
 
         Args:
@@ -386,7 +384,7 @@ class ServiceContainer:
         """
         return service_type in self._descriptors
 
-    def _get_descriptor(self, service_type: Type[T]) -> ServiceDescriptor[T]:
+    def _get_descriptor(self, service_type: type[T]) -> ServiceDescriptor[T]:
         """Get the descriptor for a service type.
 
         Args:
@@ -413,7 +411,7 @@ class ServiceContainer:
         """
         return ServiceScope(self)
 
-    def get_registered_types(self) -> list[Type[Any]]:
+    def get_registered_types(self) -> list[type[Any]]:
         """Get list of all registered service types.
 
         Returns:
@@ -501,11 +499,11 @@ def reset_container() -> None:
 class MetricsServiceProtocol(Protocol):
     """Protocol for metrics collection services."""
 
-    def record_metric(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
+    def record_metric(self, name: str, value: float, tags: Optional[dict[str, str]] = None) -> None:
         """Record a metric value."""
         ...
 
-    def increment_counter(self, name: str, tags: Optional[Dict[str, str]] = None) -> None:
+    def increment_counter(self, name: str, tags: Optional[dict[str, str]] = None) -> None:
         """Increment a counter metric."""
         ...
 

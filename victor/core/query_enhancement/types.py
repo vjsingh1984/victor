@@ -48,7 +48,7 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 # Re-export from protocols for stable API
 from victor.integrations.protocols.query_enhancement import (
@@ -87,7 +87,7 @@ class EnhancementMetrics:
     sub_query_count: int = 0
     variant_count: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for logging/analytics."""
         return {
             "technique": self.technique.value,
@@ -197,9 +197,9 @@ class DomainConfig:
     """
 
     name: str
-    default_techniques: List[EnhancementTechnique] = field(default_factory=list)
-    entity_patterns: List[str] = field(default_factory=list)
-    term_expansions: Dict[str, str] = field(default_factory=dict)
+    default_techniques: list[EnhancementTechnique] = field(default_factory=list)
+    entity_patterns: list[str] = field(default_factory=list)
+    term_expansions: dict[str, str] = field(default_factory=dict)
     prompt_hints: str = ""
 
     def __post_init__(self) -> None:
@@ -292,7 +292,7 @@ GENERAL_DOMAIN = DomainConfig(
 )
 
 # Domain registry
-DOMAIN_CONFIGS: Dict[str, DomainConfig] = {
+DOMAIN_CONFIGS: dict[str, DomainConfig] = {
     "financial": FINANCIAL_DOMAIN,
     "code": CODE_DOMAIN,
     "research": RESEARCH_DOMAIN,

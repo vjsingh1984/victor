@@ -36,7 +36,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 from victor.framework.enrichment import (
     ContextEnrichment,
@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _extract_symbols_from_prompt(prompt: str) -> List[str]:
+def _extract_symbols_from_prompt(prompt: str) -> list[str]:
     """Extract potential code symbols from a prompt.
 
     Uses the framework's extract_identifiers() utility for common patterns
@@ -160,7 +160,7 @@ class CodingEnrichmentStrategy:
         self,
         prompt: str,
         context: EnrichmentContext,
-    ) -> List[ContextEnrichment]:
+    ) -> list[ContextEnrichment]:
         """Get enrichments for a coding prompt.
 
         Queries the knowledge graph for:
@@ -175,7 +175,7 @@ class CodingEnrichmentStrategy:
         Returns:
             List of context enrichments
         """
-        enrichments: List[ContextEnrichment] = []
+        enrichments: list[ContextEnrichment] = []
 
         # If no graph store, return empty
         if not self._graph_store:
@@ -215,7 +215,7 @@ class CodingEnrichmentStrategy:
 
     async def _enrich_from_symbols(
         self,
-        symbols: List[str],
+        symbols: list[str],
     ) -> Optional[ContextEnrichment]:
         """Enrich from explicitly mentioned symbols.
 
@@ -259,7 +259,7 @@ class CodingEnrichmentStrategy:
 
     async def _enrich_from_files(
         self,
-        files: List[str],
+        files: list[str],
     ) -> Optional[ContextEnrichment]:
         """Enrich from mentioned files.
 
@@ -317,7 +317,7 @@ class CodingEnrichmentStrategy:
 
     async def _enrich_from_search(
         self,
-        symbols: List[str],
+        symbols: list[str],
     ) -> Optional[ContextEnrichment]:
         """Enrich by searching the knowledge graph.
 

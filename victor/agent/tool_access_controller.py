@@ -40,7 +40,7 @@ import logging
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.agent.protocols import (
     AccessPrecedence,
@@ -52,7 +52,6 @@ from victor.core.vertical_types import TieredToolConfigProtocol
 from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
-    from victor.core.state import ConversationStage
     from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -78,7 +77,7 @@ class AccessLayer(ABC):
     NAME: str = "base"
 
     @abstractmethod
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> tuple[bool, str]:
         """Check if a tool is allowed by this layer.
 
         Args:
@@ -91,8 +90,8 @@ class AccessLayer(ABC):
         ...
 
     def get_allowed_tools(
-        self, all_tools: Set[str], context: Optional[ToolAccessContext]
-    ) -> Set[str]:
+        self, all_tools: set[str], context: Optional[ToolAccessContext]
+    ) -> set[str]:
         """Get all tools allowed by this layer.
 
         Default implementation checks each tool individually.
@@ -158,7 +157,7 @@ class SafetyLayer(AccessLayer):
         """
         self._sandbox_mode = sandbox_mode
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> tuple[bool, str]:
         """Check safety constraints for a tool."""
         if tool_name in self.BLOCKED_TOOLS:
             return False, f"Tool '{tool_name}' is blocked for safety reasons"
@@ -188,7 +187,7 @@ class ModeLayer(AccessLayer, ModeAwareMixin):
     PRECEDENCE = AccessPrecedence.MODE.value
     NAME = "mode"
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> tuple[bool, str]:
         """Check mode restrictions for a tool."""
         # If BUILD mode (allow_all_tools=True), allow everything
         if self.is_build_mode:
@@ -202,8 +201,8 @@ class ModeLayer(AccessLayer, ModeAwareMixin):
         return True, f"Allowed in {self.current_mode_name} mode"
 
     def get_allowed_tools(
-        self, all_tools: Set[str], context: Optional[ToolAccessContext]
-    ) -> Set[str]:
+        self, all_tools: set[str], context: Optional[ToolAccessContext]
+    ) -> set[str]:
         """Get tools allowed by current mode."""
         if self.is_build_mode:
             return all_tools.copy()
@@ -235,7 +234,7 @@ class SessionLayer(AccessLayer):
     PRECEDENCE = AccessPrecedence.SESSION.value
     NAME = "session"
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> tuple[bool, str]:
         """Check session restrictions for a tool."""
         if context is None or context.session_enabled_tools is None:
             return True, "No session restrictions"
@@ -246,8 +245,8 @@ class SessionLayer(AccessLayer):
         return False, f"Tool '{tool_name}' not enabled for this session"
 
     def get_allowed_tools(
-        self, all_tools: Set[str], context: Optional[ToolAccessContext]
-    ) -> Set[str]:
+        self, all_tools: set[str], context: Optional[ToolAccessContext]
+    ) -> set[str]:
         """Get tools allowed by session."""
         if context is None or context.session_enabled_tools is None:
             return all_tools.copy()
@@ -286,7 +285,7 @@ class VerticalLayer(AccessLayer):
         """Update the tiered config (e.g., when vertical changes)."""
         self._tiered_config = config
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> tuple[bool, str]:
         """Check vertical restrictions for a tool."""
         if self._tiered_config is None:
             return True, "No vertical restrictions"
@@ -303,7 +302,7 @@ class VerticalLayer(AccessLayer):
         vertical_name = context.vertical_name if context else "active"
         return False, f"Tool '{tool_name}' not in {vertical_name} vertical's tool set"
 
-    def _get_allowed_from_config(self) -> Set[str]:
+    def _get_allowed_from_config(self) -> set[str]:
         """Extract allowed tools from tiered config (ISP-compliant).
 
         Uses isinstance() checks with TieredToolConfigProtocol.
@@ -316,7 +315,7 @@ class VerticalLayer(AccessLayer):
         if self._tiered_config is None:
             return set()
 
-        allowed: Set[str] = set()
+        allowed: set[str] = set()
 
         # Protocol-based check (ISP-compliant)
         if isinstance(self._tiered_config, TieredToolConfigProtocol):
@@ -370,8 +369,8 @@ class VerticalLayer(AccessLayer):
         return allowed
 
     def get_allowed_tools(
-        self, all_tools: Set[str], context: Optional[ToolAccessContext]
-    ) -> Set[str]:
+        self, all_tools: set[str], context: Optional[ToolAccessContext]
+    ) -> set[str]:
         """Get tools allowed by vertical (ISP fix: uses unified config extraction)."""
         if self._tiered_config is None:
             return all_tools.copy()
@@ -425,7 +424,7 @@ class StageLayer(AccessLayer, ModeAwareMixin):
         {"read", "read_file", "ls", "list_directory", "search", "code_search"}
     )
 
-    def __init__(self, preserved_tools: Optional[Set[str]] = None):
+    def __init__(self, preserved_tools: Optional[set[str]] = None):
         """Initialize stage layer.
 
         Args:
@@ -433,11 +432,11 @@ class StageLayer(AccessLayer, ModeAwareMixin):
         """
         self._preserved_tools = preserved_tools or set()
 
-    def set_preserved_tools(self, tools: Set[str]) -> None:
+    def set_preserved_tools(self, tools: set[str]) -> None:
         """Update preserved tools (e.g., from vertical config)."""
         self._preserved_tools = tools
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> tuple[bool, str]:
         """Check stage restrictions for a tool."""
         # Skip stage filtering in BUILD mode
         if self.is_build_mode:
@@ -509,7 +508,7 @@ class IntentLayer(AccessLayer):
         }
     )
 
-    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
+    def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> tuple[bool, str]:
         """Check intent restrictions for a tool."""
         if context is None or context.intent is None:
             return True, "No intent context available"
@@ -546,17 +545,17 @@ class ToolAccessController(IToolAccessController):
     """
 
     registry: Optional["ToolRegistry"] = None
-    layers: List[AccessLayer] = field(default_factory=list)
-    _cache: Dict[str, ToolAccessDecision] = field(default_factory=dict)
+    layers: list[AccessLayer] = field(default_factory=list)
+    _cache: dict[str, ToolAccessDecision] = field(default_factory=dict)
     _cache_context_hash: Optional[int] = None
-    _allowed_tools_cache: Optional[Set[str]] = None
+    _allowed_tools_cache: Optional[set[str]] = None
 
     def __post_init__(self) -> None:
         """Initialize with default layers if none provided."""
         if not self.layers:
             self.layers = self._create_default_layers()
 
-    def _create_default_layers(self) -> List[AccessLayer]:
+    def _create_default_layers(self) -> list[AccessLayer]:
         """Create default access layers in precedence order."""
         return [
             SafetyLayer(),
@@ -611,9 +610,9 @@ class ToolAccessController(IToolAccessController):
             return self._cache[cache_key]
 
         # Check all layers
-        checked_layers: List[str] = []
-        layer_results: Dict[str, bool] = {}
-        first_denial: Optional[Tuple[AccessLayer, str]] = None
+        checked_layers: list[str] = []
+        layer_results: dict[str, bool] = {}
+        first_denial: Optional[tuple[AccessLayer, str]] = None
 
         for layer in self.layers:
             is_allowed, reason = layer.check(tool_name, context)
@@ -651,8 +650,8 @@ class ToolAccessController(IToolAccessController):
         return decision
 
     def filter_tools(
-        self, tools: List[str], context: Optional[ToolAccessContext] = None
-    ) -> Tuple[List[str], List[ToolAccessDecision]]:
+        self, tools: list[str], context: Optional[ToolAccessContext] = None
+    ) -> tuple[list[str], list[ToolAccessDecision]]:
         """Filter a list of tools to only allowed ones.
 
         Args:
@@ -662,8 +661,8 @@ class ToolAccessController(IToolAccessController):
         Returns:
             Tuple of (allowed_tools, denial_decisions)
         """
-        allowed: List[str] = []
-        denials: List[ToolAccessDecision] = []
+        allowed: list[str] = []
+        denials: list[ToolAccessDecision] = []
 
         for tool_name in tools:
             decision = self.check_access(tool_name, context)
@@ -674,7 +673,7 @@ class ToolAccessController(IToolAccessController):
 
         return allowed, denials
 
-    def get_allowed_tools(self, context: Optional[ToolAccessContext] = None) -> Set[str]:
+    def get_allowed_tools(self, context: Optional[ToolAccessContext] = None) -> set[str]:
         """Get all tools allowed in the given context.
 
         Uses layer-specific optimization and caching for scalability.
@@ -748,7 +747,7 @@ class ToolAccessController(IToolAccessController):
             vertical_layer.set_tiered_config(config)
         self._cache.clear()
 
-    def set_preserved_tools(self, tools: Set[str]) -> None:
+    def set_preserved_tools(self, tools: set[str]) -> None:
         """Update stage layer's preserved tools.
 
         Args:
@@ -769,7 +768,7 @@ def create_tool_access_controller(
     registry: Optional["ToolRegistry"] = None,
     sandbox_mode: bool = False,
     tiered_config: Optional[Any] = None,
-    preserved_tools: Optional[Set[str]] = None,
+    preserved_tools: Optional[set[str]] = None,
     strict_mode: bool = False,
 ) -> ToolAccessController:
     """Create a configured ToolAccessController instance.

@@ -22,14 +22,14 @@ These utilities help reduce code duplication across provider implementations.
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.providers.base import Message, ToolDefinition
 
 logger = logging.getLogger(__name__)
 
 
-def convert_tools_to_openai_format(tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+def convert_tools_to_openai_format(tools: list[ToolDefinition]) -> list[dict[str, Any]]:
     """Convert standard tools to OpenAI function calling format.
 
     This format is used by OpenAI, xAI, LMStudio, vLLM, and Ollama.
@@ -53,7 +53,7 @@ def convert_tools_to_openai_format(tools: List[ToolDefinition]) -> List[Dict[str
     ]
 
 
-def convert_tools_to_anthropic_format(tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+def convert_tools_to_anthropic_format(tools: list[ToolDefinition]) -> list[dict[str, Any]]:
     """Convert standard tools to Anthropic format.
 
     Args:
@@ -72,7 +72,7 @@ def convert_tools_to_anthropic_format(tools: List[ToolDefinition]) -> List[Dict[
     ]
 
 
-def convert_messages_to_openai_format(messages: List[Message]) -> List[Dict[str, Any]]:
+def convert_messages_to_openai_format(messages: list[Message]) -> list[dict[str, Any]]:
     """Convert standard messages to OpenAI format.
 
     Args:
@@ -83,7 +83,7 @@ def convert_messages_to_openai_format(messages: List[Message]) -> List[Dict[str,
     """
     result = []
     for msg in messages:
-        formatted: Dict[str, Any] = {
+        formatted: dict[str, Any] = {
             "role": msg.role,
             "content": msg.content or "",
         }
@@ -120,8 +120,8 @@ def convert_messages_to_openai_format(messages: List[Message]) -> List[Dict[str,
 
 
 def parse_openai_tool_calls(
-    tool_calls_data: Optional[List[Dict[str, Any]]],
-) -> Optional[List[Dict[str, Any]]]:
+    tool_calls_data: Optional[list[dict[str, Any]]],
+) -> Optional[list[dict[str, Any]]]:
     """Parse OpenAI-format tool calls into standard dictionaries.
 
     Args:
@@ -155,7 +155,7 @@ def parse_openai_tool_calls(
     return tool_calls if tool_calls else None
 
 
-def parse_openai_stream_chunk(chunk_data: Dict[str, Any]) -> Dict[str, Any]:
+def parse_openai_stream_chunk(chunk_data: dict[str, Any]) -> dict[str, Any]:
     """Parse OpenAI-compatible streaming chunk.
 
     Args:
@@ -164,7 +164,7 @@ def parse_openai_stream_chunk(chunk_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Parsed chunk with content, tool_calls, finish_reason
     """
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "content": None,
         "tool_calls": None,
         "finish_reason": None,

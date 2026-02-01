@@ -18,15 +18,13 @@ Tests tool execution with retry logic, exponential backoff, and cache integratio
 """
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Any, Dict
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from victor.agent.coordinators.tool_retry_coordinator import (
     ToolRetryCoordinator,
     ToolRetryConfig,
-    ToolExecutionResult,
     create_tool_retry_coordinator,
 )
 

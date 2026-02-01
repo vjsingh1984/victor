@@ -20,8 +20,6 @@ These tests demonstrate the 3-5x speedup over NetworkX for common operations.
 """
 
 import pytest
-import sys
-from pathlib import Path
 
 # Try to import the native module
 try:

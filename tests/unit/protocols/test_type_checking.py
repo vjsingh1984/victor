@@ -53,7 +53,6 @@ class TestProtocolTypeChecking:
         )
 
         # Verify protocols are runtime checkable
-        from typing import runtime_checkable
 
         assert hasattr(CapabilityContainerProtocol, "_is_protocol")
         assert hasattr(WorkflowProviderProtocol, "_is_protocol")

@@ -32,11 +32,7 @@ To skip in CI:
     and FastAPI test client is not available.
 """
 
-import asyncio
-import json
 import os
-import sys
-from typing import Any, Dict, Generator, Optional
 
 import pytest
 

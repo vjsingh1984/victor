@@ -18,7 +18,7 @@ This protocol defines the interface for collecting, aggregating, and reporting
 session-level analytics and metrics.
 """
 
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Optional, Protocol
 from dataclasses import dataclass, field
 
 
@@ -73,8 +73,8 @@ class SessionStats:
     tool_calls_count: int = 0
     total_tokens_used: int = 0
     total_cost_usd: float = 0.0
-    tools_used: List[str] = field(default_factory=list)
-    tool_stats: Dict[str, ToolExecutionStats] = field(default_factory=dict)
+    tools_used: list[str] = field(default_factory=list)
+    tool_stats: dict[str, ToolExecutionStats] = field(default_factory=dict)
     provider_switches: int = 0
     model_switches: int = 0
     errors_encountered: int = 0
@@ -100,7 +100,7 @@ class OptimizationStatus:
     tool_selection_accuracy: float = 0.0
     average_iteration_time: float = 0.0
     cache_hit_rate: float = 0.0
-    recommendations: List[str] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
 
 
 class IAnalyticsCoordinator(Protocol):
@@ -142,7 +142,7 @@ class IAnalyticsCoordinator(Protocol):
         """
         ...
 
-    async def flush_analytics(self) -> Dict[str, bool]:
+    async def flush_analytics(self) -> dict[str, bool]:
         """Flush analytics to backends.
 
         Flushes accumulated analytics data to metrics backends and
@@ -156,7 +156,7 @@ class IAnalyticsCoordinator(Protocol):
     async def record_tool_execution(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         duration_ms: float = 0.0,
         success: bool = True,

@@ -40,7 +40,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 from victor.core.verticals.protocols import IExtension, IExtensionRegistry
 
@@ -70,7 +70,7 @@ class ExtensionRegistry(IExtensionRegistry):
 
     def __init__(self) -> None:
         """Initialize an empty extension registry."""
-        self._extensions_by_type: Dict[str, Dict[str, IExtension]] = {}
+        self._extensions_by_type: dict[str, dict[str, IExtension]] = {}
 
     def register_extension(self, extension: IExtension) -> None:
         """Register an extension.
@@ -150,7 +150,7 @@ class ExtensionRegistry(IExtensionRegistry):
 
         return self._extensions_by_type[extension_type].get(name)
 
-    def get_extensions_by_type(self, extension_type: str) -> List[IExtension]:
+    def get_extensions_by_type(self, extension_type: str) -> list[IExtension]:
         """Get all extensions of a specific type.
 
         Args:
@@ -164,7 +164,7 @@ class ExtensionRegistry(IExtensionRegistry):
 
         return list(self._extensions_by_type[extension_type].values())
 
-    def list_extension_types(self) -> List[str]:
+    def list_extension_types(self) -> list[str]:
         """List all registered extension types.
 
         Returns:
@@ -175,7 +175,7 @@ class ExtensionRegistry(IExtensionRegistry):
     def list_extensions(
         self,
         extension_type: Optional[str] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """List extension names by type.
 
         Args:

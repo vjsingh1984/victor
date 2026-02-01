@@ -82,7 +82,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 from victor.agent.cache.backends.memory import MemoryCacheBackend
 from victor.agent.cache.backends.protocol import ICacheBackend
@@ -123,14 +123,14 @@ class CacheBackendFactory:
     BACKEND_SQLITE = "sqlite"
 
     # Required options for each backend type
-    REQUIRED_OPTIONS: Dict[str, set[str]] = {
+    REQUIRED_OPTIONS: dict[str, set[str]] = {
         BACKEND_REDIS: {"redis_url"},
         BACKEND_MEMORY: set(),
         BACKEND_SQLITE: set(),
     }
 
     @staticmethod
-    def create_backend(config: Dict[str, Any]) -> ICacheBackend:
+    def create_backend(config: dict[str, Any]) -> ICacheBackend:
         """Create a cache backend from configuration.
 
         Args:
@@ -190,7 +190,7 @@ class CacheBackendFactory:
             )
 
     @staticmethod
-    def _create_memory_backend(options: Dict[str, Any]) -> ICacheBackend:
+    def _create_memory_backend(options: dict[str, Any]) -> ICacheBackend:
         """Create in-memory cache backend.
 
         Args:
@@ -213,7 +213,7 @@ class CacheBackendFactory:
         )
 
     @staticmethod
-    def _create_redis_backend(options: Dict[str, Any]) -> RedisCacheBackend:
+    def _create_redis_backend(options: dict[str, Any]) -> RedisCacheBackend:
         """Create Redis cache backend.
 
         Args:
@@ -248,7 +248,7 @@ class CacheBackendFactory:
         )
 
     @staticmethod
-    def _create_sqlite_backend(options: Dict[str, Any]) -> SQLiteCacheBackend:
+    def _create_sqlite_backend(options: dict[str, Any]) -> SQLiteCacheBackend:
         """Create SQLite cache backend.
 
         Args:
@@ -287,7 +287,7 @@ class CacheBackendFactory:
         return MemoryCacheBackend()
 
     @staticmethod
-    def validate_config(config: Dict[str, Any]) -> tuple[bool, list[str]]:
+    def validate_config(config: dict[str, Any]) -> tuple[bool, list[str]]:
         """Validate cache backend configuration.
 
         Args:

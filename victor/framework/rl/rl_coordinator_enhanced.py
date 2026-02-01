@@ -55,10 +55,8 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import logging
 import math
-import pickle
 import random
 from collections import deque
 from dataclasses import dataclass, field
@@ -67,23 +65,16 @@ from enum import Enum
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
-    Dict,
     Generic,
-    List,
     Optional,
-    Protocol,
-    Tuple,
     TypeVar,
-    Union,
     cast,
 )
+from collections.abc import Callable
 
 import numpy as np
 import yaml
 
-from victor.framework.rl.base import BaseLearner, RLOutcome
-from victor.framework.state import State
 from victor.framework.task import TaskResult
 
 logger = logging.getLogger(__name__)
@@ -157,7 +148,7 @@ class PolicyStats:
     convergence_rate: float = 0.0
     last_update_time: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "algorithm": self.algorithm.value,
@@ -193,7 +184,7 @@ class Experience(Generic[S, A]):
     done: bool
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
 
-    def to_tuple(self) -> Tuple[Any, Any, float, Any, bool]:
+    def to_tuple(self) -> tuple[Any, Any, float, Any, bool]:
         """Convert to tuple for efficient storage."""
         return (self.state, self.action, self.reward, self.next_state, self.done)
 
@@ -256,7 +247,7 @@ class ExperienceReplayBuffer(Generic[S, A]):
             idx = len(self.buffer) - 1
             self.priorities[idx] = self.max_priority
 
-    def sample(self, batch_size: int) -> List["Experience[S, A]"]:
+    def sample(self, batch_size: int) -> list["Experience[S, A]"]:
         """Sample a batch of experiences.
 
         Uses uniform sampling if prioritization is disabled,
@@ -285,7 +276,7 @@ class ExperienceReplayBuffer(Generic[S, A]):
             indices = np.random.choice(len(self.buffer), batch_size, p=probabilities)
             return [self.buffer[idx] for idx in indices]
 
-    def update_priorities(self, indices: List[int], priorities: List[float]) -> None:
+    def update_priorities(self, indices: list[int], priorities: list[float]) -> None:
         """Update priorities for sampled experiences.
 
         Args:
@@ -338,7 +329,7 @@ class TargetNetwork:
         self.update_frequency = update_frequency
         self.tau = tau
         self.last_update_step = 0
-        self.target_q_table: Dict[Any, Dict[Any, float]] = {}
+        self.target_q_table: dict[Any, dict[Any, float]] = {}
 
     def should_update(self, step: int) -> bool:
         """Check if target network should be updated.
@@ -351,7 +342,7 @@ class TargetNetwork:
         """
         return step - self.last_update_step >= self.update_frequency
 
-    def update(self, main_q_table: Dict[Any, Dict[Any, float]], step: int) -> None:
+    def update(self, main_q_table: dict[Any, dict[Any, float]], step: int) -> None:
         """Update target network from main network.
 
         Supports both hard and soft updates.
@@ -519,8 +510,8 @@ class ExplorationStrategyImpl:
         self.temperature = temperature
 
         # Track action counts for UCB and Thompson sampling
-        self.action_counts: Dict[Any, int] = {}
-        self.action_values: Dict[Any, Tuple[float, float]] = {}  # (mean, variance) for Thompson
+        self.action_counts: dict[Any, int] = {}
+        self.action_values: dict[Any, tuple[float, float]] = {}  # (mean, variance) for Thompson
 
     def decay_epsilon(self) -> None:
         """Decay exploration rate."""
@@ -528,8 +519,8 @@ class ExplorationStrategyImpl:
 
     def select_action(
         self,
-        q_values: Dict[Any, float],
-        available_actions: List[Any],
+        q_values: dict[Any, float],
+        available_actions: list[Any],
         step: int = 0,
     ) -> Any:
         """Select action using configured exploration strategy.
@@ -560,7 +551,7 @@ class ExplorationStrategyImpl:
             # This is kept for defensive programming and future extensibility
             return self._epsilon_greedy(q_values, available_actions)  # type: ignore[unreachable]
 
-    def _epsilon_greedy(self, q_values: Dict[Any, float], available_actions: List[Any]) -> Any:
+    def _epsilon_greedy(self, q_values: dict[Any, float], available_actions: list[Any]) -> Any:
         """Epsilon-greedy action selection."""
         if random.random() < self.epsilon:
             # Explore: random action
@@ -578,7 +569,7 @@ class ExplorationStrategyImpl:
 
         return action
 
-    def _ucb(self, q_values: Dict[Any, float], available_actions: List[Any], step: int) -> Any:
+    def _ucb(self, q_values: dict[Any, float], available_actions: list[Any], step: int) -> Any:
         """Upper Confidence Bound action selection."""
         best_action = None
         best_value = float("-inf")
@@ -600,7 +591,7 @@ class ExplorationStrategyImpl:
         logger.debug(f"UCB: selected action {best_action} (UCB={best_value:.3f})")
         return best_action
 
-    def _thompson_sampling(self, q_values: Dict[Any, float], available_actions: List[Any]) -> Any:
+    def _thompson_sampling(self, q_values: dict[Any, float], available_actions: list[Any]) -> Any:
         """Thompson sampling action selection."""
         # Sample from Beta distribution for each action
         # Using Q-value as mean and building posterior
@@ -625,7 +616,7 @@ class ExplorationStrategyImpl:
         logger.debug(f"Thompson: selected action {best_action} (sample={best_sample:.3f})")
         return best_action
 
-    def _boltzmann(self, q_values: Dict[Any, float], available_actions: List[Any]) -> Any:
+    def _boltzmann(self, q_values: dict[Any, float], available_actions: list[Any]) -> Any:
         """Boltzmann (softmax) action selection."""
         # Compute probabilities
         valid_actions = [a for a in available_actions if a in q_values]
@@ -645,7 +636,7 @@ class ExplorationStrategyImpl:
         logger.debug(f"Boltzmann: selected action {action} from distribution")
         return action
 
-    def _entropy_bonus(self, q_values: Dict[Any, float], available_actions: List[Any]) -> Any:
+    def _entropy_bonus(self, q_values: dict[Any, float], available_actions: list[Any]) -> Any:
         """Entropy-regularized action selection."""
         # Add entropy bonus to Q-values
         valid_actions = [a for a in available_actions if a in q_values]
@@ -703,9 +694,9 @@ class PolicySerializer:
 
     def save_policy(
         self,
-        q_table: Dict[Any, Dict[Any, float]],
+        q_table: dict[Any, dict[Any, float]],
         policy_name: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> Path:
         """Save policy to YAML file.
 
@@ -735,7 +726,7 @@ class PolicySerializer:
         logger.info(f"Policy saved to {policy_path}")
         return policy_path
 
-    def load_policy(self, policy_name: str) -> Optional[Dict[Any, Dict[Any, float]]]:
+    def load_policy(self, policy_name: str) -> Optional[dict[Any, dict[Any, float]]]:
         """Load policy from YAML file.
 
         Args:
@@ -786,8 +777,8 @@ class PolicySerializer:
             return obj
 
     def _deserialize_q_table(
-        self, q_table: Dict[str, Dict[str, float]]
-    ) -> Dict[Any, Dict[Any, float]]:
+        self, q_table: dict[str, dict[str, float]]
+    ) -> dict[Any, dict[Any, float]]:
         """Deserialize Q-table, attempting to restore original types.
 
         Args:
@@ -800,7 +791,7 @@ class PolicySerializer:
         # In practice, you might want to try to parse back to original types
         return q_table
 
-    def list_policies(self) -> List[str]:
+    def list_policies(self) -> list[str]:
         """List all saved policies.
 
         Returns:
@@ -878,11 +869,11 @@ class EnhancedRLCoordinator(Generic[S, A]):
         self.exploration_strategy = exploration_strategy
 
         # Q-table for Q-learning
-        self.q_table: Dict[Any, Dict[Any, float]] = {}
+        self.q_table: dict[Any, dict[Any, float]] = {}
 
         # Policy for REINFORCE (policy gradient)
-        self.policy: Dict[Any, Dict[Any, float]] = {}
-        self.policy_grad_returns: List[float] = []  # For Monte Carlo returns
+        self.policy: dict[Any, dict[Any, float]] = {}
+        self.policy_grad_returns: list[float] = []  # For Monte Carlo returns
 
         # Experience replay buffer
         self.replay_buffer: ExperienceReplayBuffer[S, A] = ExperienceReplayBuffer(
@@ -904,7 +895,7 @@ class EnhancedRLCoordinator(Generic[S, A]):
         # Statistics
         self.stats = PolicyStats(algorithm=algorithm)
         self.total_steps = 0
-        self.episode_rewards: List[float] = []
+        self.episode_rewards: list[float] = []
 
         logger.info(
             f"Enhanced RL Coordinator initialized with {algorithm.value} "
@@ -988,7 +979,7 @@ class EnhancedRLCoordinator(Generic[S, A]):
 
         # Sample mini-batch from replay buffer
         if len(self.replay_buffer) >= 32:  # Minimum batch size
-            batch: List["Experience[S, A]"] = self.replay_buffer.sample(batch_size=32)
+            batch: list["Experience[S, A]"] = self.replay_buffer.sample(batch_size=32)
 
             for exp in batch:
                 s, a, r, ns, d = exp.to_tuple()
@@ -1071,7 +1062,7 @@ class EnhancedRLCoordinator(Generic[S, A]):
             # Clear returns for next episode
             self.policy_grad_returns.clear()
 
-    def select_action(self, state: S, available_actions: List[A]) -> A:
+    def select_action(self, state: S, available_actions: list[A]) -> A:
         """Select action using current policy.
 
         Args:
@@ -1194,7 +1185,7 @@ class EnhancedRLCoordinator(Generic[S, A]):
 
         return self.stats
 
-    def save_policy(self, policy_name: str, metadata: Optional[Dict[str, Any]] = None) -> Path:
+    def save_policy(self, policy_name: str, metadata: Optional[dict[str, Any]] = None) -> Path:
         """Save policy to YAML file.
 
         Args:
@@ -1250,7 +1241,7 @@ class EnhancedRLCoordinator(Generic[S, A]):
         logger.info(f"Policy '{policy_name}' loaded successfully")
         return True
 
-    def get_q_table(self) -> Dict[Any, Dict[Any, float]]:
+    def get_q_table(self) -> dict[Any, dict[Any, float]]:
         """Get current Q-table.
 
         Returns:
@@ -1258,7 +1249,7 @@ class EnhancedRLCoordinator(Generic[S, A]):
         """
         return {state: actions.copy() for state, actions in self.q_table.items()}
 
-    def get_policy(self) -> Dict[Any, Dict[Any, float]]:
+    def get_policy(self) -> dict[Any, dict[Any, float]]:
         """Get current policy (for policy gradient methods).
 
         Returns:

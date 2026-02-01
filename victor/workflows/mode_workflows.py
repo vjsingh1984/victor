@@ -41,13 +41,11 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Optional
 
 from victor.workflows.definition import WorkflowDefinition
 from victor.workflows.yaml_loader import (
-    YAMLWorkflowProvider,
     load_workflow_from_file,
-    load_workflows_from_directory,
 )
 from victor.core.verticals.protocols import WorkflowProviderProtocol
 
@@ -57,7 +55,7 @@ logger = logging.getLogger(__name__)
 MODE_WORKFLOWS_PATH = Path(__file__).parent / "mode_workflows.yaml"
 
 # Cache for loaded workflows
-_mode_workflows_cache: Optional[Dict[str, WorkflowDefinition]] = None
+_mode_workflows_cache: Optional[dict[str, WorkflowDefinition]] = None
 
 
 class ModeWorkflowProvider(WorkflowProviderProtocol):
@@ -80,9 +78,9 @@ class ModeWorkflowProvider(WorkflowProviderProtocol):
                       Defaults to the built-in mode_workflows.yaml.
         """
         self._yaml_path = yaml_path or MODE_WORKFLOWS_PATH
-        self._workflows: Optional[Dict[str, WorkflowDefinition]] = None
+        self._workflows: Optional[dict[str, WorkflowDefinition]] = None
 
-    def _load_workflows(self) -> Dict[str, WorkflowDefinition]:
+    def _load_workflows(self) -> dict[str, WorkflowDefinition]:
         """Load workflows from YAML file.
 
         Returns:
@@ -112,7 +110,7 @@ class ModeWorkflowProvider(WorkflowProviderProtocol):
             self._workflows = {}
             return self._workflows
 
-    def get_workflow_definitions(self) -> Dict[str, WorkflowDefinition]:
+    def get_workflow_definitions(self) -> dict[str, WorkflowDefinition]:
         """Get workflow definitions for mode-based workflows.
 
         Returns:
@@ -120,7 +118,7 @@ class ModeWorkflowProvider(WorkflowProviderProtocol):
         """
         return self._load_workflows()
 
-    def get_workflows(self) -> Dict[str, WorkflowDefinition]:
+    def get_workflows(self) -> dict[str, WorkflowDefinition]:
         """Get workflow definitions for mode-based workflows.
 
         Returns:
@@ -128,7 +126,7 @@ class ModeWorkflowProvider(WorkflowProviderProtocol):
         """
         return self.get_workflow_definitions()
 
-    def get_auto_workflows(self) -> List[Any]:
+    def get_auto_workflows(self) -> list[Any]:
         """Get automatically triggered workflows.
 
         Mode workflows are not auto-triggered; they are explicitly activated
@@ -151,7 +149,7 @@ class ModeWorkflowProvider(WorkflowProviderProtocol):
         workflows = self._load_workflows()
         return workflows.get(name) if workflows else None
 
-    def list_workflows(self) -> List[str]:
+    def list_workflows(self) -> list[str]:
         """List available workflow names.
 
         Returns:
@@ -201,7 +199,7 @@ def get_mode_workflow_provider() -> ModeWorkflowProvider:
     return ModeWorkflowProvider()
 
 
-def get_all_mode_workflows() -> Dict[str, WorkflowDefinition]:
+def get_all_mode_workflows() -> dict[str, WorkflowDefinition]:
     """Get all mode workflows.
 
     Returns:

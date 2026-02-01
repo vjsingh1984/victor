@@ -37,9 +37,10 @@ Example usage:
 """
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Pattern, Tuple
+from typing import Optional
+from re import Pattern
 
 # Rust-accelerated secret scanning (with Python fallback)
 _RUST_SECRETS_AVAILABLE = False
@@ -141,7 +142,7 @@ JWT_PATTERN = r"eyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]+"
 
 
 # Pattern registry with metadata
-CREDENTIAL_PATTERNS: Dict[str, Tuple[str, SecretSeverity, str]] = {
+CREDENTIAL_PATTERNS: dict[str, tuple[str, SecretSeverity, str]] = {
     # AWS
     "aws_access_key": (
         AWS_ACCESS_KEY_PATTERN,
@@ -269,7 +270,7 @@ class SecretScanner:
 
     def __init__(
         self,
-        patterns: Optional[Dict[str, Tuple[str, SecretSeverity, str]]] = None,
+        patterns: Optional[dict[str, tuple[str, SecretSeverity, str]]] = None,
         include_low_severity: bool = False,
     ):
         """Initialize the scanner.
@@ -279,7 +280,7 @@ class SecretScanner:
             include_low_severity: Whether to include LOW severity matches
         """
         self._patterns = patterns or CREDENTIAL_PATTERNS.copy()
-        self._compiled: Dict[str, Pattern[str]] = {}
+        self._compiled: dict[str, Pattern[str]] = {}
         self._include_low = include_low_severity
         self._compile_patterns()
 
@@ -322,7 +323,7 @@ class SecretScanner:
         self._patterns.pop(name, None)
         self._compiled.pop(name, None)
 
-    def scan(self, content: str) -> List[SecretMatch]:
+    def scan(self, content: str) -> list[SecretMatch]:
         """Scan content for secrets.
 
         Args:
@@ -360,7 +361,7 @@ class SecretScanner:
         matches.sort(key=lambda m: m.start)
         return matches
 
-    def scan_file(self, file_path: str) -> List[SecretMatch]:
+    def scan_file(self, file_path: str) -> list[SecretMatch]:
         """Scan a file for secrets.
 
         Args:
@@ -376,7 +377,7 @@ class SecretScanner:
         except Exception:
             return []
 
-    def _compute_line_offsets(self, lines: List[str]) -> List[int]:
+    def _compute_line_offsets(self, lines: list[str]) -> list[int]:
         """Compute byte offsets for each line."""
         offsets = [0]
         offset = 0
@@ -385,14 +386,14 @@ class SecretScanner:
             offsets.append(offset)
         return offsets
 
-    def _get_line_number(self, position: int, offsets: List[int]) -> int:
+    def _get_line_number(self, position: int, offsets: list[int]) -> int:
         """Get 1-indexed line number for a position."""
         for i, offset in enumerate(offsets):
             if position < offset:
                 return i
         return len(offsets)
 
-    def get_summary(self, matches: List[SecretMatch]) -> Dict[str, int]:
+    def get_summary(self, matches: list[SecretMatch]) -> dict[str, int]:
         """Get summary of matches by severity.
 
         Args:
@@ -412,7 +413,7 @@ class SecretScanner:
 # =============================================================================
 
 
-def detect_secrets(content: str, include_low_severity: bool = False) -> List[SecretMatch]:
+def detect_secrets(content: str, include_low_severity: bool = False) -> list[SecretMatch]:
     """Quick function to detect secrets in content.
 
     Uses Rust-accelerated scanning when available (5-10x faster),
@@ -504,7 +505,7 @@ def has_secrets(content: str) -> bool:
     return len(detect_secrets(content)) > 0
 
 
-def get_secret_types() -> List[str]:
+def get_secret_types() -> list[str]:
     """Get list of all detectable secret types.
 
     Returns:

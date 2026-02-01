@@ -54,14 +54,12 @@ import os
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import (
         VerticalExtensions,
-        SafetyPattern,
-        TaskTypeHint,
-        ModeConfig,
     )
 
 logger = logging.getLogger(__name__)
@@ -206,19 +204,19 @@ class LazyVerticalExtensions:
     # ========================================================================
 
     @property
-    def middleware(self) -> List[Any]:
+    def middleware(self) -> list[Any]:
         """Get middleware list (triggers loading if needed)."""
         extensions = self._load_extensions()
         return extensions.middleware if extensions else []
 
     @property
-    def safety_extensions(self) -> List[Any]:
+    def safety_extensions(self) -> list[Any]:
         """Get safety extensions list (triggers loading if needed)."""
         extensions = self._load_extensions()
         return extensions.safety_extensions if extensions else []
 
     @property
-    def prompt_contributors(self) -> List[Any]:
+    def prompt_contributors(self) -> list[Any]:
         """Get prompt contributors list (triggers loading if needed)."""
         extensions = self._load_extensions()
         return extensions.prompt_contributors if extensions else []
@@ -272,7 +270,7 @@ class LazyVerticalExtensions:
         return extensions.tiered_tool_config if extensions else None
 
     @property
-    def dynamic_extensions(self) -> Dict[str, List[Any]]:
+    def dynamic_extensions(self) -> dict[str, list[Any]]:
         """Get dynamic extensions dict (triggers loading if needed)."""
         extensions = self._load_extensions()
         return extensions._dynamic_extensions if extensions else {}
@@ -287,7 +285,7 @@ class LazyVerticalExtensions:
     # VerticalExtensions Protocol Methods
     # =========================================================================
 
-    def get_all_task_hints(self) -> Dict[str, Any]:
+    def get_all_task_hints(self) -> dict[str, Any]:
         """Merge task hints from all contributors.
 
         Later contributors override earlier ones for same task type.
@@ -298,7 +296,7 @@ class LazyVerticalExtensions:
         extensions = self._load_extensions()
         return extensions.get_all_task_hints() if extensions else {}
 
-    def get_all_safety_patterns(self) -> List[Any]:
+    def get_all_safety_patterns(self) -> list[Any]:
         """Collect safety patterns from all extensions.
 
         Returns:
@@ -307,7 +305,7 @@ class LazyVerticalExtensions:
         extensions = self._load_extensions()
         return extensions.get_all_safety_patterns() if extensions else []
 
-    def get_all_mode_configs(self) -> Dict[str, Any]:
+    def get_all_mode_configs(self) -> dict[str, Any]:
         """Get mode configs from provider.
 
         Returns:

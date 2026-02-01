@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.action_authorizer import ActionAuthorizer, ActionIntent
 from victor.framework.task import (
@@ -33,7 +33,6 @@ from victor.agent.unified_classifier import (
 )
 
 if TYPE_CHECKING:
-    from typing import Union
 
     try:
         from victor.storage.embeddings.task_classifier import TaskType as TaskTypeEnum
@@ -71,14 +70,14 @@ class TaskAnalysis:
     is_analysis_task: bool = False
     is_generation_task: bool = False
     needs_execution: bool = False
-    negated_keywords: List[str] = field(default_factory=list)
+    negated_keywords: list[str] = field(default_factory=list)
     action_intent: ActionIntent = ActionIntent.AMBIGUOUS
     can_write_files: bool = False
     requires_confirmation: bool = False
     continuation_needed: Optional[bool] = None
     intent_type: Optional["IntentType"] = None
-    matched_patterns: List[str] = field(default_factory=list)
-    analysis_details: Dict[str, Any] = field(default_factory=dict)
+    matched_patterns: list[str] = field(default_factory=list)
+    analysis_details: dict[str, Any] = field(default_factory=dict)
     # Coordination suggestions (team/workflow recommendations)
     coordination_suggestion: Optional["CoordinationSuggestion"] = None
 
@@ -202,7 +201,7 @@ class TaskAnalyzer:
         message: str,
         include_task_type: bool = True,
         include_intent: bool = False,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> TaskAnalysis:
         context = context or {}
         history = context.get("history", [])
@@ -353,7 +352,7 @@ class TaskAnalyzer:
         mode: str = "build",
         include_task_type: bool = True,
         include_intent: bool = False,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> TaskAnalysis:
         """Analyze task and get coordination suggestions.
 
@@ -424,7 +423,7 @@ class TaskAnalyzer:
         return self.complexity_classifier.classify(message).tool_budget
 
     def classify_unified(
-        self, message: str, history: Optional[List[Dict[str, Any]]] = None
+        self, message: str, history: Optional[list[dict[str, Any]]] = None
     ) -> ClassificationResult:
         return (
             self.unified_classifier.classify_with_context(message, history)
@@ -438,7 +437,7 @@ class TaskAnalyzer:
     def is_action_task(self, message: str) -> bool:
         return self.unified_classifier.classify(message).is_action_task
 
-    def get_negated_keywords(self, message: str) -> List[str]:
+    def get_negated_keywords(self, message: str) -> list[str]:
         return [m.keyword for m in self.unified_classifier.classify(message).negated_keywords]
 
     def detect_intent(self, message: str) -> Any:
@@ -459,7 +458,7 @@ class TaskAnalyzer:
     # Task Classification Methods (moved from AgentOrchestrator)
     # =========================================================================
 
-    def classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
+    def classify_task_keywords(self, user_message: str) -> dict[str, Any]:
         """Classify task type based on keywords in the user message.
 
         Uses UnifiedTaskClassifier for robust classification with:
@@ -490,8 +489,8 @@ class TaskAnalyzer:
         return result.to_legacy_dict()
 
     def classify_task_with_context(
-        self, user_message: str, history: Optional[List[Dict[str, Any]]] = None
-    ) -> Dict[str, Any]:
+        self, user_message: str, history: Optional[list[dict[str, Any]]] = None
+    ) -> dict[str, Any]:
         """Classify task with conversation context for improved accuracy.
 
         Uses conversation history to boost classification confidence when
@@ -515,7 +514,7 @@ class TaskAnalyzer:
 
         return result.to_legacy_dict()
 
-    def extract_required_files_from_prompt(self, user_message: str) -> List[str]:
+    def extract_required_files_from_prompt(self, user_message: str) -> list[str]:
         """Extract file paths mentioned in user prompt for task completion tracking.
 
         Looks for patterns like:
@@ -532,7 +531,7 @@ class TaskAnalyzer:
         """
         import re
 
-        required_files: List[str] = []
+        required_files: list[str] = []
 
         # Pattern for file paths (absolute, relative, or module-style)
         # Matches paths with at least one / and a file extension
@@ -565,7 +564,7 @@ class TaskAnalyzer:
         logger.debug(f"Extracted required files from prompt: {required_files}")
         return required_files
 
-    def extract_required_outputs_from_prompt(self, user_message: str) -> List[str]:
+    def extract_required_outputs_from_prompt(self, user_message: str) -> list[str]:
         """Extract output requirements from user prompt.
 
         Looks for patterns indicating required output format:
@@ -582,7 +581,7 @@ class TaskAnalyzer:
         """
         import re
 
-        required_outputs: List[str] = []
+        required_outputs: list[str] = []
         message_lower = user_message.lower()
 
         # Check for findings table requirement

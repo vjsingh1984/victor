@@ -32,7 +32,7 @@ import json
 import logging
 import math
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -90,12 +90,12 @@ class ToolSelectorLearner(BaseLearner):
         self.epsilon = epsilon
 
         # In-memory caches for fast access
-        self._tool_q_values: Dict[str, float] = {}  # tool_name -> global Q-value
-        self._tool_task_q_values: Dict[str, Dict[str, float]] = (
+        self._tool_q_values: dict[str, float] = {}  # tool_name -> global Q-value
+        self._tool_task_q_values: dict[str, dict[str, float]] = (
             {}
         )  # tool_name -> {task_type -> Q-value}
-        self._tool_selection_counts: Dict[str, int] = {}  # tool_name -> count
-        self._tool_success_counts: Dict[str, int] = {}  # tool_name -> success count
+        self._tool_selection_counts: dict[str, int] = {}  # tool_name -> count
+        self._tool_success_counts: dict[str, int] = {}  # tool_name -> success count
         self._total_selections: int = 0
 
         # Load state from database
@@ -366,8 +366,8 @@ class ToolSelectorLearner(BaseLearner):
         )
 
     def get_tool_rankings(
-        self, available_tools: List[str], task_type: str
-    ) -> List[Tuple[str, float, float]]:
+        self, available_tools: list[str], task_type: str
+    ) -> list[tuple[str, float, float]]:
         """Get ranked tools with RL-boosted scores.
 
         Args:
@@ -473,7 +473,7 @@ class ToolSelectorLearner(BaseLearner):
         """
         return max(0.0, min(1.0, value))
 
-    def get_tool_stats(self, tool_name: str) -> Dict[str, Any]:
+    def get_tool_stats(self, tool_name: str) -> dict[str, Any]:
         """Get statistics for a specific tool.
 
         Args:
@@ -495,7 +495,7 @@ class ToolSelectorLearner(BaseLearner):
             "task_q_values": self._tool_task_q_values.get(tool_name, {}),
         }
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export learner metrics for monitoring.
 
         Returns:

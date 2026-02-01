@@ -28,7 +28,8 @@ from __future__ import annotations
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional
+from typing import Optional
+from collections.abc import Callable
 
 from victor.config.settings import Settings
 
@@ -209,7 +210,7 @@ class RuntimeFlagResolver(FlagResolver):
 
     def __init__(self) -> None:
         """Initialize runtime resolver."""
-        self._flags: Dict[str, bool] = {}
+        self._flags: dict[str, bool] = {}
 
     def resolve(self, flag_name: str, default: bool = False) -> Optional[bool]:
         """Resolve flag from runtime storage.
@@ -246,7 +247,7 @@ class RuntimeFlagResolver(FlagResolver):
         self._flags.pop(flag_name, None)
         logger.info(f"Cleared feature flag {flag_name} from runtime storage")
 
-    def get_all(self) -> Dict[str, bool]:
+    def get_all(self) -> dict[str, bool]:
         """Get all runtime flags.
 
         Returns:

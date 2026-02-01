@@ -17,8 +17,6 @@
 Tests the StateProtocol interface and conformance.
 """
 
-import pytest
-from typing import List, Set, Tuple
 
 from victor.protocols.state import StateProtocol
 
@@ -40,7 +38,7 @@ class MockStateImplementation:
         }
 
     @property
-    def messages(self) -> List:
+    def messages(self) -> list:
         """Get conversation messages."""
         return self._messages
 
@@ -50,17 +48,17 @@ class MockStateImplementation:
         return self._tool_calls_used
 
     @property
-    def executed_tools(self) -> List[str]:
+    def executed_tools(self) -> list[str]:
         """Get list of executed tool names in order."""
         return self._executed_tools
 
     @property
-    def failed_tool_signatures(self) -> Set[Tuple[str, str]]:
+    def failed_tool_signatures(self) -> set[tuple[str, str]]:
         """Get set of failed tool call signatures."""
         return self._failed_tool_signatures
 
     @property
-    def observed_files(self) -> Set[str]:
+    def observed_files(self) -> set[str]:
         """Get set of files observed during session."""
         return self._observed_files
 

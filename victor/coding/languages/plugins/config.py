@@ -19,8 +19,6 @@ These plugins support indexing of configuration files for:
 - No tree-sitter queries (config files don't have AST-based relationships)
 """
 
-from pathlib import Path
-from typing import Optional
 
 from victor.coding.languages.base import (
     BaseLanguagePlugin,

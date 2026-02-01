@@ -18,7 +18,7 @@ This module provides statistical tests and analysis methods for comparing
 experiment variants.
 """
 
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal
 
 import numpy as np
 from scipy import stats  # type: ignore[import-untyped]
@@ -47,10 +47,10 @@ class StatisticalAnalyzer:
 
     def compare_means(
         self,
-        control: List[float],
-        treatment: List[float],
+        control: list[float],
+        treatment: list[float],
         alpha: float = 0.05,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Perform two-sample t-test to compare means.
 
         Tests whether the mean of treatment is different from control.
@@ -137,7 +137,7 @@ class StatisticalAnalyzer:
         treatment_successes: int,
         treatment_total: int,
         alpha: float = 0.05,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Perform chi-square test to compare proportions.
 
         Tests whether the proportion of successes is different between groups.
@@ -207,10 +207,10 @@ class StatisticalAnalyzer:
 
     def mann_whitney(
         self,
-        control: List[float],
-        treatment: List[float],
+        control: list[float],
+        treatment: list[float],
         alpha: float = 0.05,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Perform Mann-Whitney U test (non-parametric).
 
         Tests whether distributions are different. Use when normality
@@ -267,9 +267,9 @@ class StatisticalAnalyzer:
 
     def calculate_confidence_interval(
         self,
-        data: List[float],
+        data: list[float],
         confidence: float = 0.95,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Calculate confidence interval for mean.
 
         Args:
@@ -305,7 +305,7 @@ class StatisticalAnalyzer:
         successes: int,
         total: int,
         confidence: float = 0.95,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Calculate confidence interval for proportion (Wilson score).
 
         Args:
@@ -429,10 +429,10 @@ class StatisticalAnalyzer:
 
     def determine_winner(
         self,
-        variant_metrics: Dict[str, List[float]],
+        variant_metrics: dict[str, list[float]],
         optimization_goal: Literal["minimize", "maximize"] = "maximize",
         alpha: float = 0.05,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Determine winning variant using statistical tests.
 
         Args:

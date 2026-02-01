@@ -25,9 +25,7 @@ Tests cover:
 import asyncio
 import pytest
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Optional
 
 from victor.storage.memory.unified import (
     MemoryType,
@@ -38,7 +36,6 @@ from victor.storage.memory.unified import (
     RelevanceRankingStrategy,
     RecencyRankingStrategy,
     HybridRankingStrategy,
-    UnifiedMemoryCoordinator,
     create_memory_coordinator,
     get_memory_coordinator,
     reset_memory_coordinator,
@@ -53,17 +50,17 @@ from victor.storage.memory.unified import (
 class MockMemoryProvider:
     """Mock memory provider for testing."""
 
-    def __init__(self, memory_type: MemoryType, results: List[MemoryResult] | None = None):
+    def __init__(self, memory_type: MemoryType, results: list[MemoryResult] | None = None):
         self._memory_type = memory_type
         self._results = results or []
-        self._stored: Dict[str, Any] = {}
+        self._stored: dict[str, Any] = {}
         self._available = True
 
     @property
     def memory_type(self) -> MemoryType:
         return self._memory_type
 
-    async def search(self, query: MemoryQuery) -> List[MemoryResult]:
+    async def search(self, query: MemoryQuery) -> list[MemoryResult]:
         # Filter results by query
         filtered = []
         for r in self._results:
@@ -76,7 +73,7 @@ class MockMemoryProvider:
         self,
         key: str,
         value: Any,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         self._stored[key] = {"value": value, "metadata": metadata}
 
@@ -103,7 +100,7 @@ def reset_coordinator():
 
 
 @pytest.fixture
-def sample_results() -> List[MemoryResult]:
+def sample_results() -> list[MemoryResult]:
     """Create sample memory results for testing."""
     now = time.time()
     return [

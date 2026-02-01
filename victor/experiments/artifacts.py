@@ -25,7 +25,7 @@ import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 from victor.experiments.entities import Artifact, ArtifactType
 from victor.experiments.storage import IStorageBackend
@@ -77,8 +77,8 @@ class ArtifactManager:
         self,
         run_id: str,
         file_path: str,
-        artifact_type: Union[ArtifactType, str] = ArtifactType.CUSTOM,
-        metadata: Optional[Dict[str, Any]] = None,
+        artifact_type: ArtifactType | str = ArtifactType.CUSTOM,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> Artifact:
         """Log an artifact for a run.
 
@@ -209,7 +209,7 @@ class ArtifactManager:
 
     def list_artifacts(
         self, run_id: str, storage: Optional[IStorageBackend] = None
-    ) -> List[Artifact]:
+    ) -> list[Artifact]:
         """List all artifacts for a run.
 
         Args:
@@ -316,7 +316,7 @@ class ArtifactManager:
         logger.info(f"Cleaned up {count} artifacts for run {run_id}")
         return count
 
-    def get_storage_usage(self, run_id: Optional[str] = None) -> Dict[str, int]:
+    def get_storage_usage(self, run_id: Optional[str] = None) -> dict[str, int]:
         """Get storage usage statistics.
 
         Args:

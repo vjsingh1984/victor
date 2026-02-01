@@ -25,7 +25,8 @@ falling back to hardcoded defaults for robustness.
 import json
 import logging
 import re
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.agent.tool_calling.base import (
     BaseToolCallingAdapter,
@@ -94,7 +95,7 @@ class AnthropicToolCallingAdapter(BaseToolCallingAdapter):
             )
         return caps
 
-    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert to Anthropic format (name, description, input_schema)."""
         return [
             {
@@ -108,7 +109,7 @@ class AnthropicToolCallingAdapter(BaseToolCallingAdapter):
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
         """Parse Anthropic tool calls.
 
@@ -223,7 +224,7 @@ class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             )
         return caps
 
-    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert to OpenAI function format."""
         return [
             {
@@ -240,7 +241,7 @@ class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
         """Parse OpenAI tool calls with fallback parsing for OpenAI-compatible providers.
 
@@ -250,7 +251,7 @@ class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         For OpenAI-compatible providers using open-weight models, falls back to
         content parsing when native tool calls are empty or invalid.
         """
-        native_warnings: List[str] = []
+        native_warnings: list[str] = []
 
         # Try native tool calls first
         if raw_tool_calls:
@@ -426,7 +427,7 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
     }
 
     # Cache for dynamic tool support detection results
-    _tool_support_cache: Dict[str, bool] = {}
+    _tool_support_cache: dict[str, bool] = {}
 
     @property
     def provider_name(self) -> str:
@@ -540,7 +541,7 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
         return caps
 
-    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert to Ollama format (OpenAI-compatible)."""
         return [
             {
@@ -573,7 +574,6 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             ToolCallParseResult with parsed tool calls
         """
         import re
-        import json
 
         # Hybrid pattern: <function=name> with </tool_call> closing
         # This is a common malformed pattern from Qwen3 models on Ollama
@@ -583,8 +583,8 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         if not hybrid_matches:
             return ToolCallParseResult(remaining_content=content)
 
-        tool_calls: List[ToolCall] = []
-        warnings: List[str] = ["Used hybrid XML pattern recovery (Ollama-specific)"]
+        tool_calls: list[ToolCall] = []
+        warnings: list[str] = ["Used hybrid XML pattern recovery (Ollama-specific)"]
 
         for name, params_content in hybrid_matches:
             name = name.strip()
@@ -619,7 +619,7 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
         """Parse Ollama tool calls with fallback support.
 
@@ -772,7 +772,7 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             )
         return caps
 
-    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert to Google Gemini function_declarations format.
 
         Google format requires:
@@ -788,7 +788,7 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         """
         function_declarations = []
         for tool in tools:
-            func_decl: Dict[str, Any] = {
+            func_decl: dict[str, Any] = {
                 "name": tool.name,
                 "description": tool.description,
             }
@@ -802,7 +802,7 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
         """Parse Google Gemini tool calls.
 
@@ -1073,7 +1073,7 @@ class LMStudioToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
         return caps
 
-    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert to OpenAI format (LMStudio is OpenAI-compatible)."""
         return [
             {
@@ -1090,7 +1090,7 @@ class LMStudioToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
         """Parse LMStudio tool calls with multi-format support.
 
@@ -1243,7 +1243,7 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
     def __init__(
         self,
         model: str = "",
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[dict[str, Any]] = None,
         provider_variant: str = "lmstudio",
     ):
         """Initialize adapter.
@@ -1315,7 +1315,7 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
                 )
             return caps
 
-    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert to OpenAI format."""
         return [
             {
@@ -1332,7 +1332,7 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
         """Parse tool calls from OpenAI-compatible response."""
         warnings = []
@@ -1561,7 +1561,7 @@ class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             )
         return caps
 
-    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert to OpenAI function format (DeepSeek is OpenAI-compatible)."""
         return [
             {
@@ -1578,7 +1578,7 @@ class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
         """Parse DeepSeek tool calls.
 
@@ -1588,7 +1588,7 @@ class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
         For deepseek-reasoner, no tool calls are expected.
         """
-        warnings: List[str] = []
+        warnings: list[str] = []
 
         # Reasoner model: no tool parsing
         if self._is_reasoner_model():
@@ -1745,7 +1745,7 @@ class BedrockToolCallingAdapter(BaseToolCallingAdapter):
             recommended_tool_budget=15,
         )
 
-    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert to Bedrock Converse API format.
 
         Bedrock uses toolSpec with inputSchema.json for tool definitions.
@@ -1767,7 +1767,7 @@ class BedrockToolCallingAdapter(BaseToolCallingAdapter):
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
         """Parse Bedrock tool calls.
 
@@ -1780,7 +1780,7 @@ class BedrockToolCallingAdapter(BaseToolCallingAdapter):
             return ToolCallParseResult(remaining_content=content)
 
         tool_calls = []
-        warnings: List[str] = []
+        warnings: list[str] = []
 
         for tc in raw_tool_calls:
             name = tc.get("name", "")
@@ -1898,7 +1898,7 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
             recommended_tool_budget=20,
         )
 
-    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert to OpenAI function format (Azure uses same format)."""
         if not self._supports_tools():
             return []
@@ -1918,14 +1918,14 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
         """Parse Azure OpenAI tool calls (same as OpenAI format)."""
         if self._is_o1_model():
             # o1 models don't support tools
             return ToolCallParseResult(remaining_content=content)
 
-        warnings: List[str] = []
+        warnings: list[str] = []
 
         # Try native tool calls first
         if raw_tool_calls:

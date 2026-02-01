@@ -33,9 +33,8 @@ Example:
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.framework.enrichment import (
     ContextEnrichment,
@@ -58,9 +57,9 @@ _keyword_classifier = KeywordClassifier(INFRA_TYPES)
 
 
 def _detect_infra_context(
-    file_mentions: List[str],
+    file_mentions: list[str],
     prompt: str,
-) -> Dict[str, List[str]]:
+) -> dict[str, list[str]]:
     """Detect infrastructure context from file mentions and prompt.
 
     Uses the framework's FilePatternMatcher and KeywordClassifier utilities
@@ -74,7 +73,7 @@ def _detect_infra_context(
         Dict mapping infra type to relevant file paths
     """
     # Initialize context with categories from DEVOPS_PATTERNS
-    context: Dict[str, List[str]] = {
+    context: dict[str, list[str]] = {
         "docker": [],
         "kubernetes": [],
         "terraform": [],
@@ -136,7 +135,7 @@ class DevOpsEnrichmentStrategy:
         self,
         prompt: str,
         context: EnrichmentContext,
-    ) -> List[ContextEnrichment]:
+    ) -> list[ContextEnrichment]:
         """Get enrichments for a DevOps prompt.
 
         Detects infrastructure context and provides relevant
@@ -149,7 +148,7 @@ class DevOpsEnrichmentStrategy:
         Returns:
             List of context enrichments
         """
-        enrichments: List[ContextEnrichment] = []
+        enrichments: list[ContextEnrichment] = []
 
         # Detect infrastructure context
         infra_context = _detect_infra_context(
@@ -202,7 +201,7 @@ class DevOpsEnrichmentStrategy:
 
     def _build_docker_enrichment(
         self,
-        files: List[str],
+        files: list[str],
     ) -> Optional[ContextEnrichment]:
         """Build Docker-related enrichment.
 
@@ -236,7 +235,7 @@ class DevOpsEnrichmentStrategy:
 
     def _build_kubernetes_enrichment(
         self,
-        files: List[str],
+        files: list[str],
     ) -> Optional[ContextEnrichment]:
         """Build Kubernetes-related enrichment.
 
@@ -270,7 +269,7 @@ class DevOpsEnrichmentStrategy:
 
     def _build_terraform_enrichment(
         self,
-        files: List[str],
+        files: list[str],
     ) -> Optional[ContextEnrichment]:
         """Build Terraform-related enrichment.
 
@@ -304,7 +303,7 @@ class DevOpsEnrichmentStrategy:
 
     def _build_cicd_enrichment(
         self,
-        files: List[str],
+        files: list[str],
     ) -> Optional[ContextEnrichment]:
         """Build CI/CD-related enrichment.
 
@@ -338,7 +337,7 @@ class DevOpsEnrichmentStrategy:
 
     def _enrich_from_tool_history(
         self,
-        tool_history: List[Dict[str, Any]],
+        tool_history: list[dict[str, Any]],
     ) -> Optional[ContextEnrichment]:
         """Enrich from previous bash/command tool results.
 

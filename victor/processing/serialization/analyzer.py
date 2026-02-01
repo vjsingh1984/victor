@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import Counter
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.processing.serialization.strategy import (
     DataCharacteristics,
@@ -117,7 +117,7 @@ class DataAnalyzer:
         chars.estimated_json_tokens = max(1, len(json_str) // 4)
         return chars
 
-    def _analyze_list(self, data: List[Any]) -> DataCharacteristics:
+    def _analyze_list(self, data: list[Any]) -> DataCharacteristics:
         """Analyze a list/array.
 
         Args:
@@ -167,7 +167,7 @@ class DataAnalyzer:
     def _analyze_uniform_array(
         self,
         chars: DataCharacteristics,
-        data: List[Dict[str, Any]],
+        data: list[dict[str, Any]],
     ) -> DataCharacteristics:
         """Analyze array of dicts for uniformity.
 
@@ -182,7 +182,7 @@ class DataAnalyzer:
         sample = data[: self.UNIFORMITY_SAMPLE_SIZE]
 
         # Collect all keys
-        all_keys: List[Set[str]] = []
+        all_keys: list[set[str]] = []
         for item in sample:
             all_keys.append(set(item.keys()))
 
@@ -237,7 +237,7 @@ class DataAnalyzer:
 
         return chars
 
-    def _analyze_dict(self, data: Dict[str, Any]) -> DataCharacteristics:
+    def _analyze_dict(self, data: dict[str, Any]) -> DataCharacteristics:
         """Analyze a dictionary/object.
 
         Args:
@@ -344,7 +344,7 @@ class DataAnalyzer:
     def _add_value_analysis(
         self,
         chars: DataCharacteristics,
-        data: List[Any],
+        data: list[Any],
     ) -> DataCharacteristics:
         """Analyze value repetition patterns.
 
@@ -356,7 +356,7 @@ class DataAnalyzer:
             Updated characteristics with repetition metrics
         """
         # Collect all string values
-        all_values: List[str] = []
+        all_values: list[str] = []
 
         def collect_values(obj: Any) -> None:
             if isinstance(obj, str):
@@ -392,9 +392,9 @@ class DataAnalyzer:
 
     def _analyze_field_types(
         self,
-        sample: List[Dict[str, Any]],
-        fields: Set[str],
-    ) -> Dict[str, str]:
+        sample: list[dict[str, Any]],
+        fields: set[str],
+    ) -> dict[str, str]:
         """Determine the predominant type for each field.
 
         Args:
@@ -404,7 +404,7 @@ class DataAnalyzer:
         Returns:
             Map of field name -> type name
         """
-        field_types: Dict[str, str] = {}
+        field_types: dict[str, str] = {}
 
         for field in fields:
             types: Counter[str] = Counter()

@@ -11,7 +11,7 @@ Single source of truth for language capabilities, used by:
 import logging
 import threading
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Optional
 
 from .types import (
     ASTAccessMethod,
@@ -26,7 +26,7 @@ from .feature_flags import FeatureFlagManager
 logger = logging.getLogger(__name__)
 
 
-def _create_default_capabilities() -> List[UnifiedLanguageCapability]:
+def _create_default_capabilities() -> list[UnifiedLanguageCapability]:
     """Create default language capability definitions."""
     capabilities = []
 
@@ -564,9 +564,9 @@ class LanguageCapabilityRegistry:
     _lock = threading.Lock()
 
     def __init__(self) -> None:
-        self._capabilities: Dict[str, UnifiedLanguageCapability] = {}
-        self._extension_map: Dict[str, str] = {}
-        self._filename_map: Dict[str, str] = {}
+        self._capabilities: dict[str, UnifiedLanguageCapability] = {}
+        self._extension_map: dict[str, str] = {}
+        self._filename_map: dict[str, str] = {}
         self._feature_flags = FeatureFlagManager.instance()
         self._internal_lock = threading.RLock()
 
@@ -657,24 +657,24 @@ class LanguageCapabilityRegistry:
             return None
         return cap.get_best_validation_method()
 
-    def list_supported_languages(self, tier: Optional[LanguageTier] = None) -> List[str]:
+    def list_supported_languages(self, tier: Optional[LanguageTier] = None) -> list[str]:
         """List all supported languages, optionally filtered by tier."""
         languages = list(self._capabilities.keys())
         if tier:
             languages = [lang for lang in languages if self._capabilities[lang].tier == tier]
         return sorted(languages)
 
-    def list_extensions(self) -> Set[str]:
+    def list_extensions(self) -> set[str]:
         """List all supported file extensions."""
         return set(self._extension_map.keys())
 
-    def list_filenames(self) -> Set[str]:
+    def list_filenames(self) -> set[str]:
         """List all supported special filenames."""
         return set(self._filename_map.keys())
 
-    def get_languages_by_tier(self) -> Dict[LanguageTier, List[str]]:
+    def get_languages_by_tier(self) -> dict[LanguageTier, list[str]]:
         """Get languages grouped by tier."""
-        result: Dict[LanguageTier, List[str]] = {
+        result: dict[LanguageTier, list[str]] = {
             tier: [] for tier in LanguageTier if tier != LanguageTier.UNSUPPORTED
         }
         for lang, cap in self._capabilities.items():

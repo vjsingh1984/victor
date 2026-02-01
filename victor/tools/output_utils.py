@@ -39,7 +39,7 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional
 
 
 class OutputMode(str, Enum):
@@ -63,16 +63,16 @@ class LineMatch:
 
     line_number: int
     content: str
-    context_before: List[str] = field(default_factory=list)
-    context_after: List[str] = field(default_factory=list)
-    match_positions: List[Tuple[int, int]] = field(default_factory=list)
+    context_before: list[str] = field(default_factory=list)
+    context_after: list[str] = field(default_factory=list)
+    match_positions: list[tuple[int, int]] = field(default_factory=list)
 
 
 @dataclass
 class GrepResult:
     """Result of grep operation on content."""
 
-    matches: List[LineMatch]
+    matches: list[LineMatch]
     total_lines: int
     pattern: str
     file_path: Optional[str] = None
@@ -147,7 +147,7 @@ def grep_lines(
     """
     lines = content.split("\n")
     total_lines = len(lines)
-    matches: List[LineMatch] = []
+    matches: list[LineMatch] = []
 
     # Compile pattern
     if is_regex:
@@ -200,11 +200,11 @@ def grep_lines(
 
 
 def filter_paths(
-    paths: List[str],
+    paths: list[str],
     include_pattern: Optional[str] = None,
     exclude_pattern: Optional[str] = None,
-    extensions: Optional[List[str]] = None,
-) -> List[str]:
+    extensions: Optional[list[str]] = None,
+) -> list[str]:
     """Filter paths by glob patterns and extensions.
 
     Args:
@@ -269,7 +269,7 @@ def truncate_by_lines(
     max_lines: int = 750,
     max_bytes: int = 25600,  # 25KB
     start_line: int = 0,
-) -> Tuple[str, "TruncationInfo"]:
+) -> tuple[str, "TruncationInfo"]:
     """Truncate content by line count and/or byte size.
 
     This function always truncates at complete line boundaries, never mid-line.
@@ -302,7 +302,7 @@ def truncate_by_lines(
     if start_line > 0:
         lines = lines[start_line:]
 
-    result_lines: List[str] = []
+    result_lines: list[str] = []
     current_bytes = 0
     lines_included = 0
 
@@ -380,7 +380,7 @@ class TruncationInfo:
     truncation_reason: Optional[str] = None
     """Why truncation occurred: 'line_limit', 'byte_limit', or None."""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for tool responses."""
         return {
             "was_truncated": self.was_truncated,
@@ -453,7 +453,7 @@ def format_diff(
 def summarize_changes(
     original: str,
     modified: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Generate summary statistics of changes between two contents.
 
     Args:
@@ -493,10 +493,10 @@ def summarize_changes(
 
 
 def compact_file_list(
-    files: List[Dict[str, Any]],
+    files: list[dict[str, Any]],
     group_by_extension: bool = False,
     max_items: int = 100,
-) -> Union[List[str], Dict[str, List[str]]]:
+) -> list[str] | dict[str, list[str]]:
     """Convert detailed file list to compact format.
 
     Args:
@@ -518,7 +518,7 @@ def compact_file_list(
         return paths
 
     # Group by extension
-    grouped: Dict[str, List[str]] = {}
+    grouped: dict[str, list[str]] = {}
     for path in paths:
         if path.endswith("/"):
             ext = "[dirs]"

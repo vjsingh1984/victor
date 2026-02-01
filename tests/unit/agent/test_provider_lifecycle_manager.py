@@ -24,9 +24,8 @@ These tests verify:
 6. DI registration
 """
 
-import pytest
-from typing import Any, List, Optional
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
+from typing import Any
+from unittest.mock import Mock
 from dataclasses import dataclass
 
 
@@ -77,7 +76,6 @@ class TestProviderLifecycleManager:
     def test_manager_implements_protocol(self):
         """Manager should implement ProviderLifecycleProtocol."""
         from victor.agent.provider_lifecycle_manager import ProviderLifecycleManager
-        from victor.protocols.provider_lifecycle import ProviderLifecycleProtocol
 
         container = Mock()
         manager = ProviderLifecycleManager(container)

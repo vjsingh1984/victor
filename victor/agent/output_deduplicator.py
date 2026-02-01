@@ -47,7 +47,7 @@ import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Set
+from typing import Any, Optional
 
 # Import native extensions with fallback
 try:
@@ -78,9 +78,9 @@ class DeduplicationStats:
     total_blocks: int = 0
     duplicates_removed: int = 0
     bytes_saved: int = 0
-    unique_hashes: Set[str] = field(default_factory=set)
+    unique_hashes: set[str] = field(default_factory=set)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "total_blocks": self.total_blocks,
@@ -125,7 +125,7 @@ class OutputDeduplicator:
 
         self._min_block_length = min_block_length
         self._normalize_whitespace = normalize_whitespace
-        self._seen_hashes: Set[str] = set()
+        self._seen_hashes: set[str] = set()
         self._stats = DeduplicationStats()
         self._partial_block: str = ""
         # Use ContentHasher for consistent hashing across components
@@ -353,7 +353,7 @@ class OutputDeduplicator:
             return result
         return ""
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get deduplication statistics.
 
         Returns:
@@ -466,6 +466,6 @@ class StreamingDeduplicator:
             return result
         return ""
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get deduplication statistics."""
         return self._stats.to_dict()

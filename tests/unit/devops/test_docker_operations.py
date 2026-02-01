@@ -23,15 +23,11 @@ Tests cover:
 """
 
 import json
-import tempfile
-from pathlib import Path
-from typing import Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
-import yaml
 
-from victor.tools.docker_tool import docker, _run_docker_command_async
+from victor.tools.docker_tool import docker
 
 
 # ============================================================================

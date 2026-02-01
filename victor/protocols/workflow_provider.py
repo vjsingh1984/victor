@@ -8,7 +8,7 @@ This protocol defines the minimal interface for workflow providers,
 enabling type-safe workflow access without hasattr() checks.
 """
 
-from typing import Protocol, runtime_checkable, Any, Dict, Optional
+from typing import Protocol, runtime_checkable, Any, Optional
 from victor.framework.graph import StateGraph
 
 
@@ -31,7 +31,7 @@ class WorkflowProviderProtocol(Protocol):
         ```
     """
 
-    def get_workflows(self) -> Dict[str, "StateGraph[Any]"]:
+    def get_workflows(self) -> dict[str, "StateGraph[Any]"]:
         """Get all available workflows.
 
         Returns:

@@ -26,7 +26,6 @@ Benchmark modes are optimized for evaluation scenarios:
 
 from __future__ import annotations
 
-from typing import Dict
 
 from victor.core.mode_config import (
     ModeConfig,
@@ -40,7 +39,7 @@ from victor.core.mode_config import (
 # Benchmark-Specific Modes (Registered with Central Registry)
 # =============================================================================
 
-_BENCHMARK_MODES: Dict[str, ModeDefinition] = {
+_BENCHMARK_MODES: dict[str, ModeDefinition] = {
     "fast": ModeDefinition(
         name="fast",
         tool_budget=15,
@@ -112,7 +111,7 @@ _BENCHMARK_MODES: Dict[str, ModeDefinition] = {
 }
 
 # Benchmark-specific task type budgets
-_BENCHMARK_TASK_BUDGETS: Dict[str, int] = {
+_BENCHMARK_TASK_BUDGETS: dict[str, int] = {
     # SWE-bench style tasks
     "bug_fix": 25,
     "feature_addition": 35,

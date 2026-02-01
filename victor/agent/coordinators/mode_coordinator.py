@@ -43,7 +43,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.agent.mode_controller import AgentMode, AgentModeController, OperationalModeConfig
 
@@ -103,7 +103,7 @@ class ModeCoordinator:
         """
         return self._mode_controller.config
 
-    def get_mode_status(self) -> Dict[str, Any]:
+    def get_mode_status(self) -> dict[str, Any]:
         """Get comprehensive status of current mode.
 
         Returns:
@@ -116,7 +116,7 @@ class ModeCoordinator:
         """
         return self._mode_controller.get_status()
 
-    def get_available_modes(self) -> List[Dict[str, str]]:
+    def get_available_modes(self) -> list[dict[str, str]]:
         """Get list of available modes.
 
         Returns:

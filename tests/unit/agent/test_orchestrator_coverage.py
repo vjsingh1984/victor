@@ -20,8 +20,6 @@ Tests focus on testing the structure, configuration, and basic APIs
 without requiring complex mocking.
 """
 
-import pytest
-from typing import Dict, Any, Optional
 
 from victor.agent.orchestrator import (
     # Configuration classes (if they exist)

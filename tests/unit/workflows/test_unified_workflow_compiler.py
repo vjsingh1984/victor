@@ -31,12 +31,11 @@ missing features are implemented in the UnifiedWorkflowCompiler.
 from __future__ import annotations
 
 import asyncio
-import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TypedDict
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Optional
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -359,7 +358,7 @@ class TestCompilationFromDefinition:
     @pytest.mark.asyncio
     async def test_compile_from_workflow_definition(self):
         """Test compiling a WorkflowDefinition to CachedCompiledGraph."""
-        from victor.workflows.definition import TransformNode, WorkflowBuilder, WorkflowDefinition
+        from victor.workflows.definition import WorkflowBuilder
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
 
         # Create a simple workflow definition

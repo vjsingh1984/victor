@@ -36,7 +36,7 @@ Usage:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Dict, Optional, Protocol, Set, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from victor.core.vertical_types import MiddlewarePriority, MiddlewareResult
 
@@ -73,7 +73,7 @@ class MiddlewareProtocol(Protocol):
     """
 
     @abstractmethod
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Called before a tool is executed.
 
         Args:
@@ -88,7 +88,7 @@ class MiddlewareProtocol(Protocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -113,7 +113,7 @@ class MiddlewareProtocol(Protocol):
         """
         return MiddlewarePriority.NORMAL
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get tools this middleware applies to.
 
         Returns:

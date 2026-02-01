@@ -24,12 +24,11 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Container, ScrollableContainer
 from textual.widgets import DataTable, RichLog, Static, Tree
-from textual.widgets.tree import TreeNode
 
 from victor.core.events import MessagingEvent
 
@@ -47,7 +46,7 @@ class VerticalTraceWidget(RichLog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, highlight=True, markup=True, **kwargs)
         self._trace_count = 0
-        self._active_verticals: Dict[str, Dict[str, Any]] = {}
+        self._active_verticals: dict[str, dict[str, Any]] = {}
 
     def add_vertical_event(self, event: MessagingEvent) -> None:
         """Add a vertical integration event to the trace.
@@ -111,7 +110,7 @@ class VerticalTraceWidget(RichLog):
         elif action.lower() == "disabled" and vertical_name in self._active_verticals:
             del self._active_verticals[vertical_name]
 
-    def _write_config_preview(self, config: Dict[str, Any]) -> None:
+    def _write_config_preview(self, config: dict[str, Any]) -> None:
         """Write a preview of configuration.
 
         Args:
@@ -137,7 +136,7 @@ class VerticalTraceWidget(RichLog):
         return self._trace_count
 
     @property
-    def active_verticals(self) -> Dict[str, Dict[str, Any]]:
+    def active_verticals(self) -> dict[str, dict[str, Any]]:
         """Get currently active verticals."""
         return self._active_verticals.copy()
 
@@ -154,7 +153,7 @@ class IntegrationResultWidget(Container):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._results: List[Dict[str, Any]] = []
+        self._results: list[dict[str, Any]] = []
         self._file_path: Optional[Path] = None
 
     def compose(self) -> ComposeResult:
@@ -231,7 +230,7 @@ class IntegrationResultWidget(Container):
             status.update(f"[red]Error loading file: {e}[/]")
             return 0
 
-    def _add_result_row(self, result: Dict[str, Any]) -> None:
+    def _add_result_row(self, result: dict[str, Any]) -> None:
         """Add a result row to the table."""
         table = self.query_one("#results-table", DataTable)
 
@@ -271,7 +270,7 @@ class IntegrationResultWidget(Container):
             result = self._results[-(len(self._results) - event.cursor_row)]
             self._show_result_detail(result)
 
-    def _show_result_detail(self, result: Dict[str, Any]) -> None:
+    def _show_result_detail(self, result: dict[str, Any]) -> None:
         """Show detailed view of a result."""
         detail = self.query_one("#result-detail", Static)
 
@@ -322,9 +321,9 @@ class VerticalConfigTree(Tree):
 
     def __init__(self, *args, **kwargs):
         super().__init__("Verticals", *args, **kwargs)
-        self._verticals: Dict[str, Dict[str, Any]] = {}
+        self._verticals: dict[str, dict[str, Any]] = {}
 
-    def update_vertical(self, name: str, config: Dict[str, Any]) -> None:
+    def update_vertical(self, name: str, config: dict[str, Any]) -> None:
         """Update or add a vertical configuration.
 
         Args:

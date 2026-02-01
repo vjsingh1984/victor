@@ -5,7 +5,7 @@ and cycle detection capabilities.
 """
 
 import pytest
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from victor.workflows.protocols import (
     ProtocolNodeStatus,
@@ -21,7 +21,6 @@ from victor.workflows.graph import (
     BasicWorkflowGraph,
     DuplicateNodeError,
     InvalidEdgeError,
-    GraphValidationError,
 )
 
 
@@ -29,14 +28,14 @@ from victor.workflows.graph import (
 
 
 async def simple_handler(
-    state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+    state: dict[str, Any], context: Optional[dict[str, Any]] = None
 ) -> NodeResult:
     """A simple handler that passes through state."""
     return NodeResult(status=ProtocolNodeStatus.COMPLETED, output=state)
 
 
 async def increment_handler(
-    state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+    state: dict[str, Any], context: Optional[dict[str, Any]] = None
 ) -> NodeResult:
     """Handler that increments a counter in state."""
     new_state = state.copy()
@@ -45,7 +44,7 @@ async def increment_handler(
 
 
 async def failing_handler(
-    state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+    state: dict[str, Any], context: Optional[dict[str, Any]] = None
 ) -> NodeResult:
     """Handler that always fails."""
     return NodeResult(
@@ -139,7 +138,7 @@ class TestConditionalEdge:
     def test_conditional_edge_creation(self):
         """ConditionalEdge should be created with condition function."""
 
-        def condition(state: Dict[str, Any]) -> bool:
+        def condition(state: dict[str, Any]) -> bool:
             return state.get("proceed", False)
 
         edge = ConditionalEdge(
@@ -153,7 +152,7 @@ class TestConditionalEdge:
     def test_conditional_edge_traversal(self):
         """ConditionalEdge should respect condition function."""
 
-        def condition(state: Dict[str, Any]) -> bool:
+        def condition(state: dict[str, Any]) -> bool:
             return state.get("success", False)
 
         edge = ConditionalEdge(
@@ -168,7 +167,7 @@ class TestConditionalEdge:
     def test_conditional_edge_with_state_value(self):
         """ConditionalEdge should work with complex state checks."""
 
-        def condition(state: Dict[str, Any]) -> bool:
+        def condition(state: dict[str, Any]) -> bool:
             return state.get("counter", 0) > 5
 
         edge = ConditionalEdge(
@@ -543,7 +542,7 @@ class TestGraphHelperMethods:
         node_path_a = WorkflowNode(id="path_a", name="Path A", handler=simple_handler)
         node_path_b = WorkflowNode(id="path_b", name="Path B", handler=simple_handler)
 
-        def router_func(state: Dict[str, Any]) -> str:
+        def router_func(state: dict[str, Any]) -> str:
             return state.get("route", "path_a")
 
         (

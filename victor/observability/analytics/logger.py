@@ -3,7 +3,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 
 class UsageLogger:
@@ -38,7 +38,7 @@ class UsageLogger:
         """Returns True if logging is enabled."""
         return self._enabled
 
-    def log_event(self, event_type: str, data: Dict[str, Any]) -> None:
+    def log_event(self, event_type: str, data: dict[str, Any]) -> None:
         """
         Logs a usage event.
 

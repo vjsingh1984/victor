@@ -45,7 +45,6 @@ Design:
 """
 
 import hashlib
-import heapq
 import json
 import logging
 import threading
@@ -53,7 +52,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 import numpy as np
 
@@ -69,7 +68,7 @@ class ToolResultCacheEntry:
 
     tool_name: str
     args_hash: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     result: Any
     embedding: np.ndarray
     created_at: float
@@ -115,7 +114,7 @@ class CacheStats:
         total = self.hits + self.misses
         return self.hits / total if total > 0 else 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "hits": self.hits,
             "misses": self.misses,
@@ -203,8 +202,8 @@ class ToolResultCache:
 
         # Core data structures
         self._entries: OrderedDict[str, ToolResultCacheEntry] = OrderedDict()
-        self._embeddings: List[np.ndarray] = []
-        self._hash_to_idx: Dict[str, int] = {}
+        self._embeddings: list[np.ndarray] = []
+        self._hash_to_idx: dict[str, int] = {}
         self._faiss_index: Optional[Any] = None
         self._embedding_dim: Optional[int] = None
 
@@ -235,7 +234,7 @@ class ToolResultCache:
             return vec / norm
         return vec
 
-    def _hash_args(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+    def _hash_args(self, tool_name: str, arguments: dict[str, Any]) -> str:
         """Generate hash for tool+arguments."""
         normalized = json.dumps(
             {"tool": tool_name, "args": arguments},
@@ -244,7 +243,7 @@ class ToolResultCache:
         )
         return hashlib.sha256(normalized.encode()).hexdigest()[:16]
 
-    def _create_query_text(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+    def _create_query_text(self, tool_name: str, arguments: dict[str, Any]) -> str:
         """Create text representation for embedding."""
         parts = [f"tool:{tool_name}"]
         for key, value in sorted(arguments.items()):
@@ -317,7 +316,7 @@ class ToolResultCache:
     async def get(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         threshold: Optional[float] = None,
     ) -> Optional[Any]:
         """Get cached result for similar tool call.
@@ -437,7 +436,7 @@ class ToolResultCache:
     async def put(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         file_path: Optional[str] = None,
     ) -> bool:
@@ -561,7 +560,7 @@ class ToolResultCache:
 
             return len(to_remove)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         with self._lock:
             stats = self.stats.to_dict()

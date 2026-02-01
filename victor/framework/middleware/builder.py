@@ -46,27 +46,14 @@ import logging
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Type,
     TYPE_CHECKING,
 )
+from collections.abc import Callable
 
 if TYPE_CHECKING:
-    from victor.framework.middleware import (
-        GitSafetyMiddleware,
-        LoggingMiddleware,
-        MetricsMiddleware,
-        SecretMaskingMiddleware,
-        ValidationMiddleware,
-        SafetyCheckMiddleware,
-        OutputValidationMiddleware,
-        CacheMiddleware,
-        RateLimitMiddleware,
-    )
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +72,9 @@ class MiddlewareProtocol(Protocol):
     async def process_before(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> tuple[bool, Optional[str], Dict[str, Any]]:
+        arguments: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
+    ) -> tuple[bool, Optional[str], dict[str, Any]]:
         """Process before tool execution.
 
         Args:
@@ -104,7 +91,7 @@ class MiddlewareProtocol(Protocol):
         self,
         tool_name: str,
         result: Any,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> tuple[bool, Optional[str], Any]:
         """Process after tool execution.
 
@@ -153,15 +140,15 @@ class MiddlewareChain:
         stop_on_first_error: Whether to stop on first middleware error
     """
 
-    middleware: List[MiddlewareProtocol] = field(default_factory=list)
+    middleware: list[MiddlewareProtocol] = field(default_factory=list)
     stop_on_first_error: bool = True
 
     async def process_before(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> tuple[bool, Optional[str], Dict[str, Any]]:
+        arguments: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
+    ) -> tuple[bool, Optional[str], dict[str, Any]]:
         """Process all middleware before tool execution.
 
         Args:
@@ -201,7 +188,7 @@ class MiddlewareChain:
         self,
         tool_name: str,
         result: Any,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> tuple[bool, Optional[str], Any]:
         """Process all middleware after tool execution.
 
@@ -295,7 +282,7 @@ class MiddlewareChain:
                 return True
         return False
 
-    def get_names(self) -> List[str]:
+    def get_names(self) -> list[str]:
         """Get names of all middleware in chain.
 
         Returns:
@@ -326,7 +313,7 @@ class MiddlewareBuilder:
 
     def __init__(self) -> None:
         """Initialize the builder."""
-        self._middleware_factories: List[Callable[[], MiddlewareProtocol]] = []
+        self._middleware_factories: list[Callable[[], MiddlewareProtocol]] = []
         self._stop_on_first_error: bool = True
 
     # =====================================================================

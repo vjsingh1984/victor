@@ -46,7 +46,8 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 import yaml
 
@@ -79,12 +80,12 @@ class CapabilityConfig:
     capability_type: CapabilityType
     version: str
     description: str
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     handler_module: str = ""
     handler_function: str = ""
     getter_function: Optional[str] = None
-    default_config: Dict[str, Any] = field(default_factory=dict)
-    dependencies: List[str] = field(default_factory=list)
+    default_config: dict[str, Any] = field(default_factory=dict)
+    dependencies: list[str] = field(default_factory=list)
 
     def import_handler(self) -> Optional[Callable[..., Any]]:
         """Import the handler function from its module.
@@ -122,7 +123,7 @@ class CapabilityConfig:
             )
             return None
 
-    def get_default_config(self) -> Dict[str, Any]:
+    def get_default_config(self) -> dict[str, Any]:
         """Get the default configuration for this capability.
 
         Returns:
@@ -141,7 +142,7 @@ class VerticalCapabilities:
     """
 
     vertical_name: str
-    capabilities: List[CapabilityConfig] = field(default_factory=list)
+    capabilities: list[CapabilityConfig] = field(default_factory=list)
 
     def get_capability(self, name: str) -> Optional[CapabilityConfig]:
         """Get a specific capability by name.
@@ -157,7 +158,7 @@ class VerticalCapabilities:
                 return cap
         return None
 
-    def list_capabilities(self) -> List[str]:
+    def list_capabilities(self) -> list[str]:
         """List all capability names.
 
         Returns:
@@ -165,7 +166,7 @@ class VerticalCapabilities:
         """
         return [cap.name for cap in self.capabilities]
 
-    def filter_by_type(self, capability_type: CapabilityType) -> List[CapabilityConfig]:
+    def filter_by_type(self, capability_type: CapabilityType) -> list[CapabilityConfig]:
         """Filter capabilities by type.
 
         Args:
@@ -176,7 +177,7 @@ class VerticalCapabilities:
         """
         return [cap for cap in self.capabilities if cap.capability_type == capability_type]
 
-    def filter_by_tag(self, tag: str) -> List[CapabilityConfig]:
+    def filter_by_tag(self, tag: str) -> list[CapabilityConfig]:
         """Filter capabilities by tag.
 
         Args:
@@ -221,7 +222,7 @@ class CapabilityConfigRegistry:
                     self._config_dir = (
                         Path(__file__).parent.parent.parent / "config" / "capabilities"
                     )
-                    self._cache: Dict[str, VerticalCapabilities] = {}
+                    self._cache: dict[str, VerticalCapabilities] = {}
                     self._initialized = True
                     logger.debug(
                         f"CapabilityConfigRegistry initialized with config dir: {self._config_dir}"
@@ -312,7 +313,7 @@ class CapabilityConfigRegistry:
             logger.error(f"Failed to load capability config for {vertical}: {e}")
             return VerticalCapabilities(vertical_name=vertical)
 
-    def list_verticals(self) -> List[str]:
+    def list_verticals(self) -> list[str]:
         """List all available vertical configurations.
 
         Returns:
@@ -339,7 +340,7 @@ class CapabilityConfigRegistry:
         else:
             self._cache.clear()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get registry statistics.
 
         Returns:

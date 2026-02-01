@@ -7,7 +7,7 @@ for each language, falling back through the strategy chain.
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from ..types import ASTAccessMethod, ExtractedSymbol
 from .base import BaseLanguageProcessor
@@ -53,7 +53,7 @@ class UnifiedLanguageExtractor(BaseLanguageProcessor):
         self._tree_sitter = tree_sitter_extractor or TreeSitterExtractor()
 
         # Native extractors by language
-        self._native_extractors: Dict[str, object] = {
+        self._native_extractors: dict[str, object] = {
             "python": self._python_extractor,
         }
 
@@ -62,7 +62,7 @@ class UnifiedLanguageExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: Optional[str] = None,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """
         Process code and extract symbols.
 
@@ -81,7 +81,7 @@ class UnifiedLanguageExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: Optional[str] = None,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """
         Extract symbols using best available method.
 
@@ -124,7 +124,7 @@ class UnifiedLanguageExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: str,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """
         Try extraction with a specific method.
 
@@ -158,7 +158,7 @@ class UnifiedLanguageExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: str,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract using native AST (Python only currently)."""
         if language == "python":
             return self._python_extractor.extract(code, file_path)
@@ -169,7 +169,7 @@ class UnifiedLanguageExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: str,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract using pure Python library (gopygo, javalang, etc.)."""
         # TODO: Implement for Go, Java when libraries are available
         logger.debug(f"Python lib extraction not implemented for {language}")
@@ -180,7 +180,7 @@ class UnifiedLanguageExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: str,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract using tree-sitter."""
         if not self._tree_sitter.is_available():
             return []

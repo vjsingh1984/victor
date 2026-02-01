@@ -14,10 +14,7 @@
 
 """Tests for victor.workflows.executor module."""
 
-from datetime import datetime, timezone
-from enum import Enum
-from unittest.mock import Mock, MagicMock, AsyncMock, patch
-from dataclasses import dataclass, field
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -618,7 +615,6 @@ class TestWorkflowExecutor:
     def test_get_compute_handler(self):
         """Test getting compute handler."""
         from victor.workflows.executor import (
-            WorkflowExecutor,
             get_compute_handler,
             register_compute_handler,
         )

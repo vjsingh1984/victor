@@ -39,7 +39,7 @@ import hashlib
 import logging
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +75,9 @@ class AOTManifest:
 
     version: str
     env_hash: str
-    entries: Dict[str, List[EntryPointEntry]]
+    entries: dict[str, list[EntryPointEntry]]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize manifest to a JSON-compatible dictionary."""
         return {
             "version": self.version,
@@ -88,7 +88,7 @@ class AOTManifest:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AOTManifest":
+    def from_dict(cls, data: dict[str, Any]) -> "AOTManifest":
         """Deserialize manifest from a dictionary.
 
         Args:
@@ -206,7 +206,7 @@ class AOTManifestManager:
             json.dump(manifest.to_dict(), f, indent=2)
         logger.debug("Saved manifest to %s", self.manifest_path)
 
-    def build_manifest(self, groups: List[str]) -> AOTManifest:
+    def build_manifest(self, groups: list[str]) -> AOTManifest:
         """Build a fresh manifest from entry points.
 
         Scans the specified entry point groups and creates entries
@@ -221,7 +221,7 @@ class AOTManifestManager:
         """
         from importlib.metadata import entry_points
 
-        entries: Dict[str, List[EntryPointEntry]] = {}
+        entries: dict[str, list[EntryPointEntry]] = {}
 
         for group in groups:
             eps = entry_points(group=group)

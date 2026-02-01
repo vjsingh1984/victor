@@ -129,8 +129,8 @@ class WorkflowCacheConfig(_LegacyWorkflowCacheConfig):
         max_entries: int = 500,
         persist_to_disk: bool = False,
         disk_cache_path: Optional[str] = None,
-        cacheable_node_types: Optional[Set[str]] = None,
-        excluded_context_keys: Optional[Set[str]] = None,
+        cacheable_node_types: Optional[set[str]] = None,
+        excluded_context_keys: Optional[set[str]] = None,
     ) -> None:
         # Handle dataclass initialization properly
         self.enabled = enabled

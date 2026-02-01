@@ -50,7 +50,8 @@ import sys
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from watchdog.observers.api import BaseObserver
@@ -82,7 +83,7 @@ class DebouncedReloadTimer:
             delay: Debounce delay in seconds
         """
         self.delay = delay
-        self._timers: Dict[str, threading.Timer] = {}
+        self._timers: dict[str, threading.Timer] = {}
         self._lock = threading.Lock()
 
     def schedule(
@@ -184,7 +185,7 @@ class DynamicModuleLoader:
 
     def __init__(
         self,
-        watch_dirs: Optional[List[Path]] = None,
+        watch_dirs: Optional[list[Path]] = None,
         debounce_delay: float = 0.5,
     ) -> None:
         """Initialize the module loader.
@@ -193,7 +194,7 @@ class DynamicModuleLoader:
             watch_dirs: Directories to watch for file changes
             debounce_delay: Delay before triggering reload (default 0.5s)
         """
-        self._watch_dirs: List[Path] = []
+        self._watch_dirs: list[Path] = []
         if watch_dirs:
             for dir_path in watch_dirs:
                 expanded = Path(dir_path).expanduser()
@@ -208,11 +209,11 @@ class DynamicModuleLoader:
         self._file_handler: Optional[Any] = None
 
         # Module tracking
-        self._loaded_modules: Dict[str, Any] = {}
-        self._module_paths: Dict[str, Path] = {}  # module -> file path
+        self._loaded_modules: dict[str, Any] = {}
+        self._module_paths: dict[str, Path] = {}  # module -> file path
 
     @property
-    def watch_dirs(self) -> List[Path]:
+    def watch_dirs(self) -> list[Path]:
         """Get list of watched directories."""
         return list(self._watch_dirs)
 
@@ -313,7 +314,7 @@ class DynamicModuleLoader:
 
     def setup_file_watcher(
         self,
-        dirs: Optional[List[Path]] = None,
+        dirs: Optional[list[Path]] = None,
         on_change: Optional[Callable[[str, str], None]] = None,
         recursive: bool = True,
     ) -> bool:
@@ -522,7 +523,7 @@ class DynamicModuleLoader:
         self._module_paths.pop(module_name, None)
         return was_tracked
 
-    def get_tracked_modules(self) -> List[str]:
+    def get_tracked_modules(self) -> list[str]:
         """Get list of tracked module names.
 
         Returns:
@@ -624,7 +625,7 @@ class CachedEntryPoints:
     """
 
     group: str
-    entries: Dict[str, str]  # name -> module:attr
+    entries: dict[str, str]  # name -> module:attr
     env_hash: str
     timestamp: float
     ttl: float = 3600.0  # 1 hour default
@@ -643,7 +644,7 @@ class CachedEntryPoints:
         now = current_time or time.time()
         return (now - self.timestamp) > self.ttl
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for JSON storage."""
         return {
             "group": self.group,
@@ -654,7 +655,7 @@ class CachedEntryPoints:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CachedEntryPoints":
+    def from_dict(cls, data: dict[str, Any]) -> "CachedEntryPoints":
         """Deserialize from dictionary."""
         return cls(
             group=data["group"],
@@ -717,7 +718,7 @@ class EntryPointCache:
         self._default_ttl = default_ttl
 
         # In-memory cache
-        self._memory_cache: Dict[str, CachedEntryPoints] = {}
+        self._memory_cache: dict[str, CachedEntryPoints] = {}
         self._env_hash: Optional[str] = None
         self._cache_lock = threading.RLock()
 
@@ -852,7 +853,7 @@ class EntryPointCache:
         self,
         group: str,
         force_refresh: bool = False,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Get entry points for a group (cached).
 
         Args:
@@ -896,7 +897,7 @@ class EntryPointCache:
 
         return entries.copy()
 
-    def _scan_entry_points(self, group: str) -> Dict[str, str]:
+    def _scan_entry_points(self, group: str) -> dict[str, str]:
         """Scan entry points for a group.
 
         Args:
@@ -926,7 +927,7 @@ class EntryPointCache:
         self,
         group: str,
         force_refresh: bool = False,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Get entry points for a group asynchronously.
 
         Offloads the potentially slow scan to a thread pool.
@@ -981,7 +982,7 @@ class EntryPointCache:
             return True
         return False
 
-    def get_cached_groups(self) -> List[str]:
+    def get_cached_groups(self) -> list[str]:
         """Get list of cached entry point groups.
 
         Returns:
@@ -990,7 +991,7 @@ class EntryPointCache:
         with self._cache_lock:
             return list(self._memory_cache.keys())
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:
@@ -999,7 +1000,7 @@ class EntryPointCache:
         import time
 
         with self._cache_lock:
-            stats: Dict[str, Any] = {
+            stats: dict[str, Any] = {
                 "groups_cached": len(self._memory_cache),
                 "env_hash": self._env_hash,
                 "cache_file": str(self._cache_file),

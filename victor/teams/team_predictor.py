@@ -47,12 +47,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from victor.teams.types import TeamConfig, TeamFormation, TeamMember
+    from victor.teams.types import TeamConfig
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ class TaskFeatures:
     estimated_lines_of_code: int = 100
     file_count: int = 1
     domain: str = "general"
-    required_expertise: List[str] = field(default_factory=list)
+    required_expertise: list[str] = field(default_factory=list)
     urgency: float = 0.5
     dependencies: int = 0
     novelty: float = 0.5
@@ -116,7 +116,7 @@ class TaskFeatures:
         )
 
     @classmethod
-    def from_task(cls, task: str, context: Dict[str, Any]) -> "TaskFeatures":
+    def from_task(cls, task: str, context: dict[str, Any]) -> "TaskFeatures":
         """Extract features from task description and context.
 
         Args:
@@ -257,13 +257,13 @@ class PredictionResult:
     """
 
     metric: PredictionMetric
-    predicted_value: Union[float, int, str]
+    predicted_value: float | int | str
     confidence: float
     explanation: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "metric": self.metric.value,
@@ -308,9 +308,9 @@ class TeamExecutionRecord:
     quality_score: float
     iteration_count: int
     timestamp: datetime = field(default_factory=datetime.now)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "team_config_hash": self.team_config_hash,
@@ -327,7 +327,7 @@ class TeamExecutionRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TeamExecutionRecord":
+    def from_dict(cls, data: dict[str, Any]) -> "TeamExecutionRecord":
         """Create from dictionary."""
         return cls(
             team_config_hash=data["team_config_hash"],
@@ -387,11 +387,11 @@ class TeamPredictor:
         self.historical_data_path = historical_data_path
 
         # Models (lazy loaded)
-        self._models: Dict[str, Any] = {}
-        self._scalers: Dict[str, Any] = {}
+        self._models: dict[str, Any] = {}
+        self._scalers: dict[str, Any] = {}
 
         # Historical data
-        self._historical_records: List[TeamExecutionRecord] = []
+        self._historical_records: list[TeamExecutionRecord] = []
 
         # Load if paths provided
         if historical_data_path and historical_data_path.exists():
@@ -405,7 +405,7 @@ class TeamPredictor:
         metric: PredictionMetric,
         team_config: "TeamConfig",
         task: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> PredictionResult:
         """Make a prediction for the given metric.
 
@@ -713,8 +713,8 @@ class TeamPredictor:
         self,
         team_config: "TeamConfig",
         task: str,
-        context: Dict[str, Any],
-        execution_result: Dict[str, Any],
+        context: dict[str, Any],
+        execution_result: dict[str, Any],
     ) -> None:
         """Record a team execution for future predictions.
 
@@ -837,7 +837,7 @@ class TeamPredictor:
         except Exception as e:
             logger.error(f"Failed to save model to {path}: {e}")
 
-    def get_historical_stats(self) -> Dict[str, Any]:
+    def get_historical_stats(self) -> dict[str, Any]:
         """Get statistics about historical data.
 
         Returns:

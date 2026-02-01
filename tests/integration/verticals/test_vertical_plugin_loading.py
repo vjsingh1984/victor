@@ -22,7 +22,6 @@ actual external packages during tests.
 """
 
 import logging
-from typing import List
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -43,7 +42,7 @@ class ValidExternalVertical(VerticalBase):
     version = "0.5.0"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read", "write", "external_tool"]
 
     @classmethod
@@ -59,7 +58,7 @@ class AnotherValidVertical(VerticalBase):
     version = "2.0.0"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read", "custom_tool"]
 
     @classmethod
@@ -74,7 +73,7 @@ class InvalidNoNameVertical(VerticalBase):
     description = "Invalid vertical"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read"]
 
     @classmethod
@@ -104,7 +103,7 @@ class InvalidPromptReturnType(VerticalBase):
     description = "Invalid vertical"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read"]
 
     @classmethod
@@ -119,7 +118,7 @@ class ConflictingNameVertical(VerticalBase):
     description = "Conflicting vertical"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read"]
 
     @classmethod
@@ -373,7 +372,7 @@ class TestNameConflictHandling:
             description = "Duplicate"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read"]
 
             @classmethod
@@ -626,7 +625,7 @@ class TestEdgeCases:
             description = "Raises exception"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 raise RuntimeError("Intentional error")
 
             @classmethod

@@ -19,7 +19,7 @@ system prompts, including mode-specific prompts, hints, and thinking mode handli
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.agent.coordinators.prompt_builder_protocol import (
     IPromptBuilderCoordinator,
@@ -63,8 +63,8 @@ class PromptBuilderCoordinator(IPromptBuilderCoordinator):
         """
         self._config = config
         self._base_prompt = base_prompt
-        self._prompt_contributors: List[Any] = []
-        self._prompt_cache: Dict[str, str] = {}
+        self._prompt_contributors: list[Any] = []
+        self._prompt_cache: dict[str, str] = {}
 
     def get_system_prompt(self) -> str:
         """Get current system prompt.
@@ -250,7 +250,7 @@ class PromptBuilderCoordinator(IPromptBuilderCoordinator):
 
         return base_prompt + hints
 
-    def get_prompt_contributors(self) -> List[Any]:
+    def get_prompt_contributors(self) -> list[Any]:
         """Get registered prompt contributors.
 
         Returns:

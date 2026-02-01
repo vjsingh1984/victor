@@ -51,7 +51,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol, Set
+from typing import Any, Optional, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ class ToolRegistryProtocol(Protocol):
         """
         ...
 
-    def list_tools(self, only_enabled: bool = True) -> List[Any]:
+    def list_tools(self, only_enabled: bool = True) -> list[Any]:
         """List all available tools.
 
         Args:
@@ -119,9 +119,9 @@ class ValidationResult:
     """
 
     valid: bool = True
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    context: Dict[str, Any] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    context: dict[str, Any] = field(default_factory=dict)
 
     def add_error(self, error: str) -> None:
         """Add an error message and mark validation as failed.
@@ -168,7 +168,7 @@ class ValidationResult:
             f"Validation failed: {len(self.errors)} error(s), " f"{len(self.warnings)} warning(s)"
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
 
         Returns:
@@ -218,7 +218,7 @@ class ToolAvailabilityValidator:
 
     def validate_tools_available(
         self,
-        tool_names: List[str],
+        tool_names: list[str],
     ) -> ValidationResult:
         """Validate that all tools are available in the registry.
 
@@ -230,7 +230,7 @@ class ToolAvailabilityValidator:
         """
         result = ValidationResult()
 
-        missing_tools: List[str] = []
+        missing_tools: list[str] = []
         for name in tool_names:
             if not self._tool_registry.has_tool(name):
                 missing_tools.append(name)
@@ -274,8 +274,8 @@ class ToolAvailabilityValidator:
 
     def list_missing_tools(
         self,
-        tool_names: List[str],
-    ) -> List[str]:
+        tool_names: list[str],
+    ) -> list[str]:
         """Get list of missing tools from a list.
 
         Args:
@@ -383,7 +383,7 @@ class ToolBudgetValidator:
 
     def validate_task_budgets(
         self,
-        budgets: Dict[str, int],
+        budgets: dict[str, int],
     ) -> ValidationResult:
         """Validate multiple task budgets.
 
@@ -490,9 +490,9 @@ class CombinedToolValidator:
 
     def validate(
         self,
-        tool_names: Optional[List[str]] = None,
+        tool_names: Optional[list[str]] = None,
         tool_budget: Optional[int] = None,
-        task_budgets: Optional[Dict[str, int]] = None,
+        task_budgets: Optional[dict[str, int]] = None,
     ) -> ValidationResult:
         """Validate tools and/or budgets.
 
@@ -546,7 +546,7 @@ class CombinedToolValidator:
 
 
 def validate_tools(
-    tool_names: List[str],
+    tool_names: list[str],
     tool_registry: ToolRegistryProtocol,
     strict: bool = False,
 ) -> ValidationResult:

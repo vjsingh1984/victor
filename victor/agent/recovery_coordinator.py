@@ -27,7 +27,7 @@ The name was changed to avoid confusion between the two different classes.
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.recovery import RecoveryHandler
@@ -341,7 +341,7 @@ class StreamingRecoveryCoordinator:
         self,
         ctx: StreamingRecoveryContext,
         all_blocked: bool,
-    ) -> Optional[Tuple[StreamChunk, bool]]:
+    ) -> Optional[tuple[StreamChunk, bool]]:
         """Check if too many tools have been blocked.
 
         Args:
@@ -372,7 +372,7 @@ class StreamingRecoveryCoordinator:
     def check_force_action(
         self,
         ctx: StreamingRecoveryContext,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, Optional[str]]:
         """Check if recovery handler recommends force action.
 
         Args:
@@ -396,7 +396,7 @@ class StreamingRecoveryCoordinator:
     def handle_empty_response(
         self,
         ctx: StreamingRecoveryContext,
-    ) -> Tuple[Optional[StreamChunk], bool]:
+    ) -> tuple[Optional[StreamChunk], bool]:
         """Handle empty model response.
 
         Args:
@@ -441,7 +441,7 @@ class StreamingRecoveryCoordinator:
         self,
         ctx: StreamingRecoveryContext,
         tool_name: str,
-        tool_args: Dict[str, Any],
+        tool_args: dict[str, Any],
         block_reason: str,
     ) -> StreamChunk:
         """Handle blocked tool call.
@@ -487,7 +487,7 @@ class StreamingRecoveryCoordinator:
     def handle_force_tool_execution(
         self,
         ctx: StreamingRecoveryContext,
-    ) -> Tuple[bool, Optional[List[StreamChunk]]]:
+    ) -> tuple[bool, Optional[list[StreamChunk]]]:
         """Handle forced tool execution.
 
         Args:
@@ -503,7 +503,7 @@ class StreamingRecoveryCoordinator:
     def handle_force_completion(
         self,
         ctx: StreamingRecoveryContext,
-    ) -> Optional[List[StreamChunk]]:
+    ) -> Optional[list[StreamChunk]]:
         """Handle forced completion.
 
         Args:
@@ -548,7 +548,7 @@ class StreamingRecoveryCoordinator:
     def handle_loop_warning(
         self,
         ctx: StreamingRecoveryContext,
-    ) -> Optional[List[StreamChunk]]:
+    ) -> Optional[list[StreamChunk]]:
         """Handle loop detection warning.
 
         Args:
@@ -576,8 +576,8 @@ class StreamingRecoveryCoordinator:
         self,
         ctx: StreamingRecoveryContext,
         full_content: str,
-        tool_calls: Optional[List[Dict[str, Any]]],
-        mentioned_tools: Optional[List[str]] = None,
+        tool_calls: Optional[list[dict[str, Any]]],
+        mentioned_tools: Optional[list[str]] = None,
         message_adder: Any = None,
     ) -> "OrchestratorRecoveryAction":
         """Handle response using the recovery integration.
@@ -751,8 +751,8 @@ class StreamingRecoveryCoordinator:
     def filter_blocked_tool_calls(
         self,
         ctx: StreamingRecoveryContext,
-        tool_calls: List[Dict[str, Any]],
-    ) -> Tuple[List[Dict[str, Any]], List[StreamChunk], int]:
+        tool_calls: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], list[StreamChunk], int]:
         """Filter out blocked tool calls.
 
         Uses unified_tracker.is_blocked_after_warning as the block checker.
@@ -773,9 +773,9 @@ class StreamingRecoveryCoordinator:
     def truncate_tool_calls(
         self,
         ctx: StreamingRecoveryContext,
-        tool_calls: List[Dict[str, Any]],
+        tool_calls: list[dict[str, Any]],
         max_calls: int,
-    ) -> Tuple[List[Dict[str, Any]], bool]:
+    ) -> tuple[list[dict[str, Any]], bool]:
         """Truncate tool calls to budget limit.
 
         Args:
@@ -799,7 +799,7 @@ class StreamingRecoveryCoordinator:
     def get_recovery_prompts(
         self,
         ctx: StreamingRecoveryContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """Get recovery prompts for current context.
 
         Args:
@@ -862,7 +862,7 @@ class StreamingRecoveryCoordinator:
     def format_completion_metrics(
         self,
         ctx: StreamingRecoveryContext,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Format completion metrics for display.
 
         Args:
@@ -881,7 +881,7 @@ class StreamingRecoveryCoordinator:
     def format_budget_exhausted_metrics(
         self,
         ctx: StreamingRecoveryContext,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Format budget exhausted metrics.
 
         Args:
@@ -899,9 +899,9 @@ class StreamingRecoveryCoordinator:
 
     def generate_tool_result_chunks(
         self,
-        results: List[Any],  # List[ToolCallResult]
+        results: list[Any],  # List[ToolCallResult]
         ctx: StreamingRecoveryContext,
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         """Generate stream chunks from tool results.
 
         Args:

@@ -44,7 +44,7 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import yaml
 
@@ -72,14 +72,14 @@ class RLConfig:
     """
 
     vertical_name: str
-    active_learners: List[LearnerType] = field(default_factory=list)
-    task_type_mappings: Dict[str, List[str]] = field(default_factory=dict)
-    quality_thresholds: Dict[str, float] = field(default_factory=dict)
-    default_patience: Dict[str, int] = field(default_factory=dict)
+    active_learners: list[LearnerType] = field(default_factory=list)
+    task_type_mappings: dict[str, list[str]] = field(default_factory=dict)
+    quality_thresholds: dict[str, float] = field(default_factory=dict)
+    default_patience: dict[str, int] = field(default_factory=dict)
     exploration_bonus: float = 0.15
-    extensions: Dict[str, Any] = field(default_factory=dict)
+    extensions: dict[str, Any] = field(default_factory=dict)
 
-    def get_tools_for_task(self, task_type: str) -> List[str]:
+    def get_tools_for_task(self, task_type: str) -> list[str]:
         """Get recommended tools for a task type.
 
         Args:
@@ -166,7 +166,7 @@ class RLConfigRegistry:
             with self._lock:
                 if not self._initialized:
                     self._config_dir = Path(__file__).parent.parent.parent / "config" / "rl"
-                    self._cache: Dict[str, RLConfig] = {}
+                    self._cache: dict[str, RLConfig] = {}
                     self._initialized = True
                     logger.debug(
                         f"RLConfigRegistry initialized with config dir: {self._config_dir}"
@@ -312,7 +312,7 @@ class RLConfigRegistry:
             exploration_bonus=0.15,
         )
 
-    def list_verticals(self) -> List[str]:
+    def list_verticals(self) -> list[str]:
         """List all available vertical configurations.
 
         Returns:
@@ -339,7 +339,7 @@ class RLConfigRegistry:
         else:
             self._cache.clear()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get registry statistics.
 
         Returns:

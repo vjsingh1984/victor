@@ -20,7 +20,6 @@ from victor.teams.swarming import (
     SwarmConfig,
     ConsensusStrategy,
     VotingStrategy,
-    ConflictResolution,
     AgentVote,
     ConsensusResult,
 )

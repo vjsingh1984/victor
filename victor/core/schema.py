@@ -44,9 +44,6 @@ Usage:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum
-from typing import Dict, List, Optional
 
 
 class Tables:
@@ -184,7 +181,7 @@ class LearnerID:
     TEAM_COMPOSITION = "team_composition"
 
     @classmethod
-    def all(cls) -> List[str]:
+    def all(cls) -> list[str]:
         """Get all learner IDs."""
         return [
             cls.MODE_TRANSITION,
@@ -739,7 +736,7 @@ class Schema:
     """
 
     @classmethod
-    def get_all_schemas(cls) -> List[str]:
+    def get_all_schemas(cls) -> list[str]:
         """Get all schema definitions in creation order."""
         return [
             # System
@@ -770,7 +767,7 @@ class Schema:
         ]
 
     @classmethod
-    def get_all_indexes(cls) -> List[str]:
+    def get_all_indexes(cls) -> list[str]:
         """Get all index definitions."""
         return [
             cls.RL_OUTCOME_INDEXES,
@@ -781,7 +778,7 @@ class Schema:
         ]
 
     @classmethod
-    def get_project_schemas(cls) -> List[str]:
+    def get_project_schemas(cls) -> list[str]:
         """Get schema definitions for project-level tables (graph, etc.)."""
         return [
             # Graph
@@ -806,7 +803,7 @@ class Schema:
         ]
 
     @classmethod
-    def get_project_indexes(cls) -> List[str]:
+    def get_project_indexes(cls) -> list[str]:
         """Get index definitions for project-level tables."""
         return [
             cls.GRAPH_INDEXES,
@@ -821,7 +818,7 @@ class Schema:
 CURRENT_SCHEMA_VERSION = 2
 
 
-def get_migration_sql(from_version: int, to_version: int) -> List[str]:
+def get_migration_sql(from_version: int, to_version: int) -> list[str]:
     """Get SQL statements needed to migrate between schema versions.
 
     Args:
@@ -831,7 +828,7 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
     Returns:
         List of SQL statements to execute
     """
-    migrations: Dict[int, List[str]] = {
+    migrations: dict[int, list[str]] = {
         # Version 1 -> 2: Rename tables to new naming convention
         2: [
             # Rename system tables

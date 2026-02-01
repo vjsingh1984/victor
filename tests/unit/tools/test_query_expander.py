@@ -1,6 +1,5 @@
 """Unit tests for query expansion module."""
 
-import pytest
 
 from victor.coding.codebase.query_expander import (
     QueryExpander,

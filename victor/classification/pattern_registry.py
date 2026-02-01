@@ -26,9 +26,10 @@ Design Principles:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Pattern
+from typing import Optional
+from re import Pattern
 
 from victor.framework.task.protocols import TaskComplexity
 
@@ -137,7 +138,7 @@ class ClassificationPattern:
 
 
 # Task type to complexity mapping (default mapping)
-TASK_TYPE_TO_COMPLEXITY: Dict[TaskType, TaskComplexity] = {
+TASK_TYPE_TO_COMPLEXITY: dict[TaskType, TaskComplexity] = {
     # Simple tasks
     TaskType.SEARCH: TaskComplexity.SIMPLE,
     TaskType.DESIGN: TaskComplexity.SIMPLE,
@@ -194,7 +195,7 @@ TASK_TYPE_TO_COMPLEXITY: Dict[TaskType, TaskComplexity] = {
 
 # Single source of truth for all classification patterns
 # Organized by category for maintainability
-PATTERNS: Dict[str, ClassificationPattern] = {}
+PATTERNS: dict[str, ClassificationPattern] = {}
 
 
 def _register_patterns() -> None:
@@ -1022,7 +1023,7 @@ def _register_patterns() -> None:
     PATTERNS = {p.name: p for p in patterns_list}
 
 
-def get_patterns_by_complexity(complexity: TaskComplexity) -> List[ClassificationPattern]:
+def get_patterns_by_complexity(complexity: TaskComplexity) -> list[ClassificationPattern]:
     """Get all patterns that map to a complexity level.
 
     Args:
@@ -1034,7 +1035,7 @@ def get_patterns_by_complexity(complexity: TaskComplexity) -> List[Classificatio
     return [p for p in PATTERNS.values() if p.complexity == complexity]
 
 
-def get_patterns_by_task_type(task_type: TaskType) -> List[ClassificationPattern]:
+def get_patterns_by_task_type(task_type: TaskType) -> list[ClassificationPattern]:
     """Get all patterns that map to a task type.
 
     Args:
@@ -1046,7 +1047,7 @@ def get_patterns_by_task_type(task_type: TaskType) -> List[ClassificationPattern
     return [p for p in PATTERNS.values() if p.task_type == task_type]
 
 
-def get_patterns_sorted_by_priority() -> List[ClassificationPattern]:
+def get_patterns_sorted_by_priority() -> list[ClassificationPattern]:
     """Get all patterns sorted by priority (highest first).
 
     Returns:
@@ -1070,7 +1071,7 @@ def match_first_pattern(text: str) -> Optional[ClassificationPattern]:
     return None
 
 
-def match_all_patterns(text: str) -> List[ClassificationPattern]:
+def match_all_patterns(text: str) -> list[ClassificationPattern]:
     """Find all matching patterns.
 
     Args:

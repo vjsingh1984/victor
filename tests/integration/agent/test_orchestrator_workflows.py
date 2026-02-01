@@ -33,11 +33,8 @@ Run with:
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock
 
 import pytest
 

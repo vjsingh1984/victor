@@ -62,11 +62,10 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
-import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -101,7 +100,7 @@ class PackageSpec:
     version: Optional[str] = None
     source: PackageSourceType = PackageSourceType.PYPI
     url: Optional[str] = None
-    extras: List[str] = field(default_factory=list)
+    extras: list[str] = field(default_factory=list)
 
     @classmethod
     def parse(cls, spec_str: str) -> "PackageSpec":
@@ -262,12 +261,12 @@ class VerticalRegistryManager:
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        self._metadata_cache: Dict[str, VerticalPackageMetadata] = {}
+        self._metadata_cache: dict[str, VerticalPackageMetadata] = {}
 
     def list_verticals(
         self,
         source: str = "all",
-    ) -> List[InstalledVertical]:
+    ) -> list[InstalledVertical]:
         """List verticals.
 
         Args:
@@ -290,7 +289,7 @@ class VerticalRegistryManager:
             # Merge, removing duplicates
             return self._merge_verticals(builtin, installed)
 
-    def _list_builtin_verticals(self, victor_dir: Path) -> List[InstalledVertical]:
+    def _list_builtin_verticals(self, victor_dir: Path) -> list[InstalledVertical]:
         """List built-in verticals."""
         verticals = []
 
@@ -318,7 +317,7 @@ class VerticalRegistryManager:
 
         return verticals
 
-    def _list_installed_verticals(self) -> List[InstalledVertical]:
+    def _list_installed_verticals(self) -> list[InstalledVertical]:
         """List installed external verticals.
 
         Uses importlib.metadata to discover packages that register
@@ -378,7 +377,7 @@ class VerticalRegistryManager:
 
         return None
 
-    def _list_available_verticals(self) -> List[InstalledVertical]:
+    def _list_available_verticals(self) -> list[InstalledVertical]:
         """List verticals available in the remote registry.
 
         Returns:
@@ -418,7 +417,7 @@ class VerticalRegistryManager:
             logger.warning(f"Failed to fetch available verticals: {e}")
             return []
 
-    def _fetch_available_verticals(self) -> List[InstalledVertical]:
+    def _fetch_available_verticals(self) -> list[InstalledVertical]:
         """Fetch available verticals from remote registry.
 
         Returns:
@@ -455,7 +454,7 @@ class VerticalRegistryManager:
             # Return empty list on error
             return []
 
-    def _cache_available_verticals(self, verticals: List[InstalledVertical]) -> None:
+    def _cache_available_verticals(self, verticals: list[InstalledVertical]) -> None:
         """Cache available verticals to disk.
 
         Args:
@@ -482,8 +481,8 @@ class VerticalRegistryManager:
 
     def _merge_verticals(
         self,
-        *lists: List[InstalledVertical],
-    ) -> List[InstalledVertical]:
+        *lists: list[InstalledVertical],
+    ) -> list[InstalledVertical]:
         """Merge multiple lists of verticals, removing duplicates.
 
         Args:
@@ -492,7 +491,7 @@ class VerticalRegistryManager:
         Returns:
             Merged list with duplicates removed (builtin takes precedence)
         """
-        seen: Set[str] = set()
+        seen: set[str] = set()
         merged = []
 
         # Process in order: builtin first, then installed
@@ -504,7 +503,7 @@ class VerticalRegistryManager:
 
         return merged
 
-    def search(self, query: str) -> List[InstalledVertical]:
+    def search(self, query: str) -> list[InstalledVertical]:
         """Search for verticals matching query.
 
         Args:
@@ -566,7 +565,7 @@ class VerticalRegistryManager:
         package_spec: PackageSpec,
         validate: bool = True,
         verbose: bool = False,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Install a vertical package.
 
         Args:
@@ -609,7 +608,7 @@ class VerticalRegistryManager:
         except subprocess.CalledProcessError as e:
             return False, f"Installation failed:\n{e.stderr}"
 
-    def uninstall(self, name: str, verbose: bool = False) -> Tuple[bool, str]:
+    def uninstall(self, name: str, verbose: bool = False) -> tuple[bool, str]:
         """Uninstall a vertical package.
 
         Args:
@@ -648,7 +647,7 @@ class VerticalRegistryManager:
         except subprocess.CalledProcessError as e:
             return False, f"Uninstallation failed:\n{e.stderr}"
 
-    def _validate_package(self, package_spec: PackageSpec) -> List[str]:
+    def _validate_package(self, package_spec: PackageSpec) -> list[str]:
         """Validate a package before installation.
 
         Args:

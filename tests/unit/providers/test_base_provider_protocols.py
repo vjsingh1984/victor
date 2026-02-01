@@ -30,8 +30,9 @@ Total: 50 tests
 
 import asyncio
 import pytest
-from unittest.mock import Mock, AsyncMock, MagicMock, patch
-from typing import List, AsyncIterator, Optional
+from unittest.mock import patch
+from typing import Optional
+from collections.abc import AsyncIterator
 
 from victor.providers.base import (
     BaseProvider,
@@ -47,7 +48,6 @@ from victor.providers.base import (
 from victor.providers.circuit_breaker import CircuitBreakerError, CircuitState
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 from victor.core.errors import (
-    ProviderError,
     ProviderAuthError,
     ProviderConnectionError,
 )
@@ -96,12 +96,12 @@ class MockBasicProvider(BaseProvider):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs,
     ) -> CompletionResponse:
         return CompletionResponse(
@@ -112,12 +112,12 @@ class MockBasicProvider(BaseProvider):
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs,
     ) -> AsyncIterator[StreamChunk]:
         yield StreamChunk(content="Mock chunk", model_name=model)

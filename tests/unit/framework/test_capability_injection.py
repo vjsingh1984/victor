@@ -22,9 +22,7 @@ These tests verify:
 4. Vertical access to injected capabilities
 """
 
-import pytest
-from typing import List, Set
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 from victor.framework.capabilities import FileOperationsCapability
 
@@ -48,7 +46,6 @@ class TestFileOperationsCapabilityProtocol:
 
     def test_capability_implements_protocol(self):
         """FileOperationsCapability should implement protocol."""
-        from victor.protocols.capability_provider import FileOperationsCapabilityProtocol
 
         capability = FileOperationsCapability()
 

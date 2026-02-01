@@ -9,17 +9,13 @@ Phase 6: Migration & Testing - Integration Tests
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict
-from unittest.mock import AsyncMock, Mock, patch
+from typing import Any
 
 import pytest
 
 from victor.framework.protocols import (
     ChatResult,
-    ChatResultProtocol,
-    ChatStateProtocol,
     MutableChatState,
-    WorkflowChatProtocol,
 )
 
 
@@ -30,7 +26,6 @@ class TestWorkflowChatIntegration:
     @pytest.mark.asyncio
     async def test_end_to_end_chat_workflow(self, auto_mock_docker_for_orchestrator):
         """Test complete chat workflow from start to finish."""
-        from victor.framework.protocols import MutableChatState, ChatResult
 
         # Create initial state
         initial_state = {
@@ -130,7 +125,6 @@ class TestWorkflowChatIntegration:
     @pytest.mark.asyncio
     async def test_workflow_error_handling(self, auto_mock_docker_for_orchestrator):
         """Test error handling in workflow execution."""
-        from victor.framework.protocols import MutableChatState
 
         initial_state = {
             "user_message": "This should trigger an error",
@@ -157,7 +151,7 @@ class TestWorkflowChatIntegration:
         """Test multiple concurrent workflow executions."""
         from victor.framework.protocols import MutableChatState
 
-        async def execute_workflow(session_id: int) -> Dict[str, Any]:
+        async def execute_workflow(session_id: int) -> dict[str, Any]:
             """Execute a workflow for a session."""
             state = MutableChatState()
             state.add_message("user", f"Session {session_id} message")
@@ -217,7 +211,7 @@ class TestWorkflowChatIntegration:
         print(f"  Recovered iteration: {recovered_state.iteration_count}")
         print("  Recovery successful: ✓")
 
-    async def _simulate_workflow_execution(self, initial_state: Dict[str, Any]) -> Dict[str, Any]:
+    async def _simulate_workflow_execution(self, initial_state: dict[str, Any]) -> dict[str, Any]:
         """Simulate workflow execution for testing."""
         state = MutableChatState.from_dict(initial_state)
 
@@ -232,7 +226,7 @@ class TestWorkflowChatIntegration:
             "final_response": "Task completed successfully",
         }
 
-    async def _simulate_workflow_with_error(self, initial_state: Dict[str, Any]) -> Dict[str, Any]:
+    async def _simulate_workflow_with_error(self, initial_state: dict[str, Any]) -> dict[str, Any]:
         """Simulate workflow execution with error for testing."""
         state = MutableChatState.from_dict(initial_state)
 
@@ -314,13 +308,13 @@ class TestProtocolConformance:
         # Create mock workflow executor
         class MockWorkflowExecutor:
             async def execute_chat_workflow(
-                self, workflow_name: str, initial_state: Dict[str, Any]
+                self, workflow_name: str, initial_state: dict[str, Any]
             ):
                 from victor.framework.protocols import ChatResult
 
                 return ChatResult(content="Test", iteration_count=1)
 
-            async def stream_chat_workflow(self, workflow_name: str, initial_state: Dict[str, Any]):
+            async def stream_chat_workflow(self, workflow_name: str, initial_state: dict[str, Any]):
                 from victor.framework.protocols import ChatResult
 
                 yield ChatResult(content="Test", iteration_count=1)

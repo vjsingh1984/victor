@@ -55,7 +55,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 try:
     import lancedb  # type: ignore[import-untyped]
@@ -184,7 +184,7 @@ class ConversationEmbeddingStore:
         self._initialized = True
         logger.info("[ConversationEmbeddingStore] Initialized (lazy embedding mode)")
 
-    def _create_table_with_first_record(self, record: Dict[str, Any]) -> None:
+    def _create_table_with_first_record(self, record: dict[str, Any]) -> None:
         """Create the table with the first record."""
         if self._db is not None:
             self._table = self._db.create_table(self.TABLE_NAME, data=[record])
@@ -231,7 +231,7 @@ class ConversationEmbeddingStore:
         after_timestamp: Optional[str] = None,
         min_content_length: int = 20,
         limit: int = 10_000,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Fetch messages from SQLite newer than last embedded timestamp."""
         if self._sqlite_db_path is None or not self._sqlite_db_path.exists():
             return []
@@ -242,7 +242,7 @@ class ConversationEmbeddingStore:
 
                 # Single parameterized query with conditional WHERE clauses
                 conditions = ["LENGTH(content) >= ?"]
-                params: List[Any] = [min_content_length]
+                params: list[Any] = [min_content_length]
 
                 if session_id:
                     conditions.append("session_id = ?")
@@ -378,8 +378,8 @@ class ConversationEmbeddingStore:
         session_id: Optional[str] = None,
         limit: int = 10,
         min_similarity: float = 0.3,
-        exclude_message_ids: Optional[List[str]] = None,
-    ) -> List[ConversationEmbeddingSearchResult]:
+        exclude_message_ids: Optional[list[str]] = None,
+    ) -> list[ConversationEmbeddingSearchResult]:
         """Search for semantically similar messages.
 
         Triggers lazy embedding of any un-embedded messages first.
@@ -561,7 +561,7 @@ class ConversationEmbeddingStore:
         logger.info(f"[ConversationEmbeddingStore] Rebuild complete: {count} embeddings created")
         return count
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get store statistics."""
         if not self._initialized:
             await self.initialize()

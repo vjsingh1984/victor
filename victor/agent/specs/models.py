@@ -23,7 +23,7 @@ Provides type-safe, composable agent definitions with:
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Optional
 import hashlib
 
 
@@ -81,11 +81,11 @@ class AgentCapabilities:
     """
 
     # Tool access
-    tools: Set[str] = field(default_factory=set)
-    tool_patterns: List[str] = field(default_factory=list)  # Glob patterns
+    tools: set[str] = field(default_factory=set)
+    tool_patterns: list[str] = field(default_factory=list)  # Glob patterns
 
     # Skills (high-level capabilities)
-    skills: Set[str] = field(default_factory=set)
+    skills: set[str] = field(default_factory=set)
 
     # Behavioral flags
     can_delegate: bool = False
@@ -106,7 +106,7 @@ class AgentCapabilities:
                 return True
         return False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "tools": list(self.tools),
@@ -120,7 +120,7 @@ class AgentCapabilities:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AgentCapabilities":
+    def from_dict(cls, data: dict[str, Any]) -> "AgentCapabilities":
         """Deserialize from dictionary."""
         return cls(
             tools=set(data.get("tools", [])),
@@ -158,9 +158,9 @@ class AgentConstraints:
 
     # Context requirements
     min_context_tokens: Optional[int] = None
-    required_tools: Set[str] = field(default_factory=set)
+    required_tools: set[str] = field(default_factory=set)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "max_input_tokens": self.max_input_tokens,
@@ -175,7 +175,7 @@ class AgentConstraints:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AgentConstraints":
+    def from_dict(cls, data: dict[str, Any]) -> "AgentConstraints":
         """Deserialize from dictionary."""
         return cls(
             max_input_tokens=data.get("max_input_tokens"),
@@ -230,7 +230,7 @@ class AgentSpec:
 
     # Model preferences
     model_preference: ModelPreference = ModelPreference.DEFAULT
-    model_hints: Dict[str, Any] = field(default_factory=dict)
+    model_hints: dict[str, Any] = field(default_factory=dict)
 
     # Behavioral settings
     system_prompt: Optional[str] = None
@@ -239,8 +239,8 @@ class AgentSpec:
 
     # Metadata
     version: str = "1.0"
-    tags: Set[str] = field(default_factory=set)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tags: set[str] = field(default_factory=set)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def id(self) -> str:
@@ -251,7 +251,7 @@ class AgentSpec:
 
     def with_capabilities(
         self,
-        tools: Optional[Set[str]] = None,
+        tools: Optional[set[str]] = None,
         **kwargs: Any,
     ) -> "AgentSpec":
         """Create new spec with updated capabilities.
@@ -325,7 +325,7 @@ class AgentSpec:
             metadata=self.metadata,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary (YAML/JSON compatible)."""
         return {
             "name": self.name,
@@ -343,7 +343,7 @@ class AgentSpec:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AgentSpec":
+    def from_dict(cls, data: dict[str, Any]) -> "AgentSpec":
         """Deserialize from dictionary.
 
         Supports shorthand notation for capabilities:

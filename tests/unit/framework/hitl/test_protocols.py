@@ -14,7 +14,6 @@
 
 """Tests for HITL protocol definitions."""
 
-import pytest
 
 from victor.framework.hitl.protocols import (
     BaseHITLGate,

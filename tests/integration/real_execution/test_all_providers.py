@@ -28,8 +28,6 @@ import asyncio
 import os
 import time
 from contextlib import asynccontextmanager
-from pathlib import Path
-from typing import List
 
 import pytest
 import pytest_asyncio
@@ -74,7 +72,7 @@ async def skip_on_timeout(timeout_seconds: float, provider_name: str = "unknown"
 # =============================================================================
 
 # List of all providers in priority order (local first, then cheapest cloud)
-ALL_PROVIDERS: List[str] = [
+ALL_PROVIDERS: list[str] = [
     # Local providers (free)
     "ollama",
     # Premium cloud providers (cheapest models)
@@ -284,7 +282,7 @@ async def provider(request):
 # =============================================================================
 
 
-def get_provider_env_vars(provider: str) -> List[str]:
+def get_provider_env_vars(provider: str) -> list[str]:
     """Get environment variable names for a provider.
 
     Args:

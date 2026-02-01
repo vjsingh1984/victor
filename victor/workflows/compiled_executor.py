@@ -24,7 +24,8 @@ executes workflow definitions directly with an orchestrator.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Optional
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import AsyncIterator
 
 if TYPE_CHECKING:
     from victor.workflows.compiler_protocols import (
@@ -57,7 +58,7 @@ class CompiledWorkflowExecutor:
     async def execute(
         self,
         compiled_graph: "CompiledGraphProtocol",
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         *,
         thread_id: Optional[str] = None,
         checkpoint: Optional[str] = None,
@@ -98,7 +99,7 @@ class CompiledWorkflowExecutor:
     async def stream(
         self,
         compiled_graph: "CompiledGraphProtocol",
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         *,
         thread_id: Optional[str] = None,
     ) -> AsyncIterator["ExecutionEventProtocol"]:
@@ -123,16 +124,16 @@ class CompiledWorkflowExecutor:
 class ExecutionResult:
     """Execution result from compiled workflow executor."""
 
-    def __init__(self, final_state: Dict[str, Any], metrics: Dict[str, Any]):
+    def __init__(self, final_state: dict[str, Any], metrics: dict[str, Any]):
         self._final_state = final_state
         self._metrics = metrics
 
     @property
-    def final_state(self) -> Dict[str, Any]:
+    def final_state(self) -> dict[str, Any]:
         return self._final_state
 
     @property
-    def metrics(self) -> Dict[str, Any]:
+    def metrics(self) -> dict[str, Any]:
         return self._metrics
 
 

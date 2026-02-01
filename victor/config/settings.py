@@ -17,7 +17,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Union, List
+from typing import Any, Optional
 
 import yaml
 from pydantic import AliasChoices, Field, field_validator
@@ -310,7 +310,7 @@ class ProviderConfig(BaseSettings):
     """Configuration for a specific provider."""
 
     api_key: Optional[str] = None
-    base_url: Optional[Union[str, List[str]]] = None
+    base_url: Optional[str | list[str]] = None
     timeout: int = 300  # 5 minutes - increased for CPU-only inference
     max_retries: int = 3
     organization: Optional[str] = None  # For OpenAI
@@ -330,7 +330,7 @@ class ProfileConfig(BaseSettings):
     temperature: float = Field(0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(4096, gt=0)
     description: Optional[str] = Field(None, description="Optional profile description")
-    tool_selection: Optional[Dict[str, Any]] = Field(
+    tool_selection: Optional[dict[str, Any]] = Field(
         None, description="Tool selection configuration for adaptive thresholds"
     )
 
@@ -383,7 +383,7 @@ class ProfileConfig(BaseSettings):
 
     @field_validator("tool_selection")
     @classmethod
-    def validate_tool_selection(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def validate_tool_selection(cls, v: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
         """Validate tool_selection configuration.
 
         Args:
@@ -471,7 +471,7 @@ class ProfilesYAMLSettingsSource(PydanticBaseSettingsSource):
             logger.warning(f"Failed to load field '{field_name}' from {self.profiles_path}: {e}")
             return None
 
-    def __call__(self) -> Dict[str, Any]:
+    def __call__(self) -> dict[str, Any]:
         """Load all settings from profiles.yaml."""
         if not self.profiles_path.exists():
             return {}
@@ -527,7 +527,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     # LMStudio tiered endpoints (try in order) - defaults to localhost only
     # Set LMSTUDIO_BASE_URLS env var to add LAN servers
-    lmstudio_base_urls: List[str] = [
+    lmstudio_base_urls: list[str] = [
         "http://127.0.0.1:1234",
     ]
     vllm_base_url: str = "http://localhost:8000"
@@ -814,7 +814,7 @@ class Settings(BaseSettings):
     codebase_batch_size: int = 32  # Batch size for embedding generation
     codebase_graph_store: str = "sqlite"  # Graph backend (sqlite default)
     codebase_graph_path: Optional[str] = None  # Optional explicit graph db path
-    core_readonly_tools: Optional[List[str]] = None  # Override/extend curated read-only tool set
+    core_readonly_tools: Optional[list[str]] = None  # Override/extend curated read-only tool set
 
     # Semantic Search Quality Improvements (P4.X - Multi-Provider Excellence)
     semantic_similarity_threshold: float = (
@@ -902,7 +902,7 @@ class Settings(BaseSettings):
 
     # Models known to support structured tool calls per provider
     # Loaded from model_capabilities.yaml, can be extended in profiles.yaml
-    tool_calling_models: Dict[str, list[str]] = Field(
+    tool_calling_models: dict[str, list[str]] = Field(
         default_factory=_load_tool_capable_patterns_from_yaml
     )
 
@@ -919,7 +919,7 @@ class Settings(BaseSettings):
     tool_cache_enabled: bool = True
     tool_cache_ttl: int = 600  # seconds
     # Note: tool_cache_dir now uses get_project_paths().global_cache_dir
-    tool_cache_allowlist: List[str] = [
+    tool_cache_allowlist: list[str] = [
         "code_search",
         "semantic_code_search",
         "list_directory",
@@ -1109,7 +1109,7 @@ class Settings(BaseSettings):
     prompt_enrichment_timeout_ms: float = 500.0  # Timeout in milliseconds
     prompt_enrichment_cache_enabled: bool = True  # Cache enrichments for repeated prompts
     prompt_enrichment_cache_ttl: int = 300  # Cache TTL in seconds (5 minutes)
-    prompt_enrichment_strategies: List[str] = Field(
+    prompt_enrichment_strategies: list[str] = Field(
         default_factory=lambda: ["knowledge_graph", "conversation", "web_search"],
         description="Enabled enrichment strategies (order matters for priority)",
     )
@@ -1122,9 +1122,9 @@ class Settings(BaseSettings):
     # Plugin System
     plugin_enabled: bool = True  # Enable plugin system
     # Note: plugin_dirs now uses get_project_paths().global_plugins_dir
-    plugin_packages: List[str] = []  # Python packages to load as plugins
-    plugin_disabled: List[str] = []  # List of plugin names to disable
-    plugin_config: Dict[str, Dict[str, Any]] = Field(
+    plugin_packages: list[str] = []  # Python packages to load as plugins
+    plugin_disabled: list[str] = []  # List of plugin names to disable
+    plugin_config: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
         description="Plugin-specific configuration (plugin_name -> config dict)",
     )
@@ -1621,7 +1621,7 @@ class Settings(BaseSettings):
         return config_dir
 
     @classmethod
-    def load_profiles(cls) -> Dict[str, ProfileConfig]:
+    def load_profiles(cls) -> dict[str, ProfileConfig]:
         """Load profiles from YAML file.
 
         Returns:
@@ -1706,7 +1706,7 @@ class Settings(BaseSettings):
         return None
 
     @classmethod
-    def load_tool_config(cls) -> Dict[str, Any]:
+    def load_tool_config(cls) -> dict[str, Any]:
         """Load tool-specific configuration from profiles.yaml (top-level 'tools' key)."""
         profiles_file = cls.get_config_dir() / "profiles.yaml"
         if not profiles_file.exists():
@@ -1719,7 +1719,7 @@ class Settings(BaseSettings):
             print(f"Warning: Failed to load tool config: {e}")
             return {}
 
-    def get_provider_settings(self, provider: str) -> Dict[str, Any]:
+    def get_provider_settings(self, provider: str) -> dict[str, Any]:
         """Get settings for a specific provider.
 
         Uses the ProviderConfigRegistry for OCP-compliant provider configuration.

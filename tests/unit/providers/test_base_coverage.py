@@ -18,8 +18,6 @@ These tests target the base provider interfaces, protocols, and helper functions
 to improve coverage from ~10% to 30% target.
 """
 
-import pytest
-from typing import List, Dict, Any, AsyncIterator
 
 from victor.providers.base import (
     # Protocols
@@ -246,7 +244,6 @@ class TestBaseProvider:
 
     def test_base_provider_has_abstract_methods(self):
         """Test BaseProvider has required abstract methods."""
-        import inspect
 
         abstract_methods = BaseProvider.__abstractmethods__
         # Should have at least chat and name as abstract

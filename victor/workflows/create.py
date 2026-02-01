@@ -44,7 +44,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 from victor.workflows.compiler_registry import WorkflowCompilerRegistry

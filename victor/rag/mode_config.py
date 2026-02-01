@@ -24,7 +24,6 @@ RegistryBasedModeConfigProvider base class (no custom override needed).
 
 from __future__ import annotations
 
-from typing import Dict
 
 from victor.core.mode_config import (
     ModeConfigRegistry,
@@ -38,7 +37,7 @@ from victor.core.mode_config import (
 # =============================================================================
 
 # Vertical-specific modes that extend/override defaults
-_RAG_MODES: Dict[str, ModeDefinition] = {
+_RAG_MODES: dict[str, ModeDefinition] = {
     "bulk_ingest": ModeDefinition(
         name="bulk_ingest",
         tool_budget=50,
@@ -66,7 +65,7 @@ _RAG_MODES: Dict[str, ModeDefinition] = {
 }
 
 # RAG-specific task type budgets
-_RAG_TASK_BUDGETS: Dict[str, int] = {
+_RAG_TASK_BUDGETS: dict[str, int] = {
     "query": 5,
     "search": 8,
     "ingest": 10,

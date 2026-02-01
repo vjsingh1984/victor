@@ -17,7 +17,7 @@
 import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 
 from victor.coding.codebase.embeddings.chunker import ASTAwareChunker
 from victor.coding.languages.base import CodeChunk

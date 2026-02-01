@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from victor.integrations.protocols.query_enhancement import (
     EnhancedQuery,
@@ -77,7 +77,7 @@ class BaseQueryEnhancementStrategy(ABC):
         self._provider_instance: Optional["BaseProvider"] = None
 
         # Domain-specific prompt templates
-        self._prompt_templates: Dict[str, str] = {}
+        self._prompt_templates: dict[str, str] = {}
         self._register_default_templates()
 
     @property

@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 try:
     from fastapi import FastAPI, HTTPException, Query
@@ -52,16 +52,9 @@ except ImportError:
 
 from victor.workflows.team_dashboard_server import (
     TeamDashboardServer,
-    TeamExecutionState,
     get_dashboard_server,
 )
 from victor.workflows.team_metrics import TeamMetricsCollector
-from victor.workflows.team_collaboration import (
-    TeamCommunicationProtocol,
-    SharedTeamContext,
-    NegotiationFramework,
-    CommunicationLog,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +90,7 @@ class MemberStatusResponse(BaseModel):
     end_time: Optional[str]
     duration_seconds: float
     tool_calls_used: int
-    tools_used: List[str]
+    tools_used: list[str]
     error_message: Optional[str]
     last_activity: float
 
@@ -120,8 +113,8 @@ class NegotiationStatusResponse(BaseModel):
     success: bool
     rounds: int
     consensus_achieved: bool
-    agreed_proposal: Optional[Dict[str, Any]]
-    votes: Dict[str, Any]
+    agreed_proposal: Optional[dict[str, Any]]
+    votes: dict[str, Any]
 
 
 class ExecutionDetailsResponse(BaseModel):
@@ -136,9 +129,9 @@ class ExecutionDetailsResponse(BaseModel):
     success: Optional[bool]
     recursion_depth: int
     consensus_achieved: Optional[bool]
-    member_states: Dict[str, MemberStatusResponse]
-    shared_context: Dict[str, Any]
-    communication_logs: List[CommunicationLogResponse]
+    member_states: dict[str, MemberStatusResponse]
+    shared_context: dict[str, Any]
+    communication_logs: list[CommunicationLogResponse]
     negotiation_status: Optional[NegotiationStatusResponse]
 
 
@@ -153,7 +146,7 @@ class MetricsSummaryResponse(BaseModel):
     average_duration_seconds: float
     average_member_count: float
     total_tool_calls: int
-    formation_distribution: Dict[str, int]
+    formation_distribution: dict[str, int]
 
 
 # =============================================================================
@@ -203,7 +196,7 @@ class TeamDashboardAPI:
 
         @self._dashboard_server.app.get(
             "/api/v1/executions",
-            response_model=List[TeamExecutionSummary],
+            response_model=list[TeamExecutionSummary],
             tags=["executions"],
         )
         async def list_executions(
@@ -221,7 +214,7 @@ class TeamDashboardAPI:
                 le=500,
                 description="Maximum number of results",
             ),
-        ) -> List[TeamExecutionSummary]:
+        ) -> list[TeamExecutionSummary]:
             """List all team executions.
 
             Returns a list of team executions with optional filtering by status
@@ -322,10 +315,10 @@ class TeamDashboardAPI:
 
         @self._dashboard_server.app.get(
             "/api/v1/executions/{execution_id}/members",
-            response_model=Dict[str, MemberStatusResponse],
+            response_model=dict[str, MemberStatusResponse],
             tags=["members"],
         )
-        async def get_member_statuses(execution_id: str) -> Dict[str, MemberStatusResponse]:
+        async def get_member_statuses(execution_id: str) -> dict[str, MemberStatusResponse]:
             """Get status of all team members for an execution.
 
             Returns the current status of each team member including
@@ -365,7 +358,7 @@ class TeamDashboardAPI:
 
         @self._dashboard_server.app.get(
             "/api/v1/executions/{execution_id}/communications",
-            response_model=List[CommunicationLogResponse],
+            response_model=list[CommunicationLogResponse],
             tags=["communications"],
         )
         async def get_communication_history(
@@ -384,7 +377,7 @@ class TeamDashboardAPI:
                 None,
                 description="Filter by recipient ID",
             ),
-        ) -> List[CommunicationLogResponse]:
+        ) -> list[CommunicationLogResponse]:
             """Get communication history for a team execution.
 
             Returns the history of messages exchanged between team members.
@@ -411,10 +404,10 @@ class TeamDashboardAPI:
 
         @self._dashboard_server.app.get(
             "/api/v1/executions/{execution_id}/context",
-            response_model=Dict[str, Any],
+            response_model=dict[str, Any],
             tags=["context"],
         )
-        async def get_shared_context(execution_id: str) -> Dict[str, Any]:
+        async def get_shared_context(execution_id: str) -> dict[str, Any]:
             """Get shared context snapshot for a team execution.
 
             Returns the current state of the shared context key-value store.
@@ -433,7 +426,7 @@ class TeamDashboardAPI:
         async def get_context_value(
             execution_id: str,
             key: str,
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             """Get a specific value from the shared context.
 
             Returns the value for a specific key in the shared context.
@@ -497,7 +490,7 @@ class TeamDashboardAPI:
             "/api/v1/metrics/formation/{formation}",
             tags=["metrics"],
         )
-        async def get_formation_stats(formation: str) -> Dict[str, Any]:
+        async def get_formation_stats(formation: str) -> dict[str, Any]:
             """Get statistics for a specific formation type.
 
             Returns execution statistics for teams with the specified formation.
@@ -510,7 +503,7 @@ class TeamDashboardAPI:
             "/api/v1/metrics/recursion",
             tags=["metrics"],
         )
-        async def get_recursion_stats() -> Dict[str, Any]:
+        async def get_recursion_stats() -> dict[str, Any]:
             """Get recursion depth statistics.
 
             Returns statistics about recursion depth across all executions.
@@ -523,7 +516,7 @@ class TeamDashboardAPI:
             "/api/v1/health",
             tags=["health"],
         )
-        async def health_check() -> Dict[str, Any]:
+        async def health_check() -> dict[str, Any]:
             """Health check endpoint.
 
             Returns the health status of the dashboard API.
@@ -538,7 +531,7 @@ class TeamDashboardAPI:
 
 def create_dashboard_app(
     metrics_collector: Optional[TeamMetricsCollector] = None,
-    cors_origins: Optional[List[str]] = None,
+    cors_origins: Optional[list[str]] = None,
 ) -> FastAPI:
     """Create and configure the dashboard FastAPI application.
 

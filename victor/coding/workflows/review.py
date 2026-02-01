@@ -18,7 +18,7 @@ Provides comprehensive code review workflow with parallel analysis
 for security, style, and logic correctness.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from victor.workflows.definition import (
     WorkflowBuilder,
@@ -27,7 +27,7 @@ from victor.workflows.definition import (
 )
 
 
-def _transform_merge_reviews(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def _transform_merge_reviews(ctx: dict[str, Any]) -> dict[str, Any]:
     """Merge parallel review results into a single context.
 
     Args:

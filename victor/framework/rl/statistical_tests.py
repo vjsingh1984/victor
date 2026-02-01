@@ -34,7 +34,7 @@ import logging
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class StatisticalResult:
     p_value: float
     significant: bool
     effect_size: float = 0.0
-    confidence_interval: Tuple[float, float] = (0.0, 0.0)
+    confidence_interval: tuple[float, float] = (0.0, 0.0)
     power: Optional[float] = None
     recommendation: str = ""
 
@@ -455,7 +455,7 @@ def two_proportion_z_test(
 
 
 def chi_squared_test(
-    observed: List[List[int]],
+    observed: list[list[int]],
     significance_level: float = 0.05,
 ) -> StatisticalResult:
     """Perform chi-squared test for independence.
@@ -545,8 +545,8 @@ def chi_squared_test(
 
 
 def mann_whitney_u_test(
-    sample1: List[float],
-    sample2: List[float],
+    sample1: list[float],
+    sample2: list[float],
     significance_level: float = 0.05,
 ) -> StatisticalResult:
     """Perform Mann-Whitney U test (non-parametric).

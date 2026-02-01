@@ -61,26 +61,18 @@ Example usage:
 from __future__ import annotations
 
 import asyncio
-import inspect
 import logging
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Dict,
     Generic,
-    List,
-    Mapping,
     Optional,
-    Sequence,
-    Tuple,
     TypeVar,
-    Union,
     TYPE_CHECKING,
 )
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 
 if TYPE_CHECKING:
     from victor.tools.base import BaseTool, ToolResult
@@ -108,11 +100,11 @@ class RunnableConfig:
         callbacks: Optional callbacks for execution events
     """
 
-    tags: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
     max_concurrency: int = 10
     timeout: Optional[float] = None
-    callbacks: Optional[List[Callable]] = None
+    callbacks: Optional[list[Callable]] = None
 
 
 class Runnable(ABC, Generic[Input, Output]):
@@ -153,7 +145,7 @@ class Runnable(ABC, Generic[Input, Output]):
         ...
 
     def __or__(
-        self, other: Union["Runnable[Output, Other]", Callable[[Output], Other]]
+        self, other: "Runnable[Output, Other]" | Callable[[Output], Other]
     ) -> "RunnableSequence[Input, Other]":
         """Chain this runnable with another using the pipe operator.
 
@@ -173,7 +165,7 @@ class Runnable(ABC, Generic[Input, Output]):
         raise TypeError(f"Cannot chain Runnable with {type(other)}")
 
     def __ror__(
-        self, other: Union["Runnable[Other, Input]", Callable[[Other], Input]]
+        self, other: "Runnable[Other, Input]" | Callable[[Other], Input]
     ) -> "RunnableSequence[Other, Output]":
         """Support reverse pipe operator for left-side non-runnables.
 
@@ -189,7 +181,7 @@ class Runnable(ABC, Generic[Input, Output]):
             return RunnableSequence([RunnableLambda(other), self])
         raise TypeError(f"Cannot chain {type(other)} with Runnable")
 
-    def pipe(self, *others: Union["Runnable", Callable]) -> "RunnableSequence":
+    def pipe(self, *others: "Runnable" | Callable) -> "RunnableSequence":
         """Explicitly pipe through multiple runnables.
 
         Alternative to chained `|` operators for programmatic composition.
@@ -203,7 +195,7 @@ class Runnable(ABC, Generic[Input, Output]):
         Example:
             chain = read_tool.pipe(analyze, format, output)
         """
-        runnables: List[Runnable] = [self]
+        runnables: list[Runnable] = [self]
         for other in others:
             if isinstance(other, Runnable):
                 runnables.append(other)
@@ -246,7 +238,7 @@ class Runnable(ABC, Generic[Input, Output]):
         self,
         inputs: Sequence[Input],
         config: Optional[RunnableConfig] = None,
-    ) -> List[Output]:
+    ) -> list[Output]:
         """Execute this runnable on multiple inputs.
 
         Default implementation runs sequentially. Subclasses may override
@@ -278,7 +270,7 @@ class RunnableSequence(Runnable[Input, Output]):
         chain = RunnableSequence([tool1, tool2, tool3])
     """
 
-    def __init__(self, runnables: List[Runnable]):
+    def __init__(self, runnables: list[Runnable]):
         """Initialize with a list of runnables.
 
         Args:
@@ -299,7 +291,7 @@ class RunnableSequence(Runnable[Input, Output]):
         return self._runnables[-1]
 
     @property
-    def middle(self) -> List[Runnable]:
+    def middle(self) -> list[Runnable]:
         """Get middle runnables (excluding first and last)."""
         return self._runnables[1:-1] if len(self._runnables) > 2 else []
 
@@ -323,7 +315,7 @@ class RunnableSequence(Runnable[Input, Output]):
         return current  # type: ignore[return-value]
 
     def __or__(
-        self, other: Union[Runnable[Output, Other], Callable[[Output], Other]]
+        self, other: Runnable[Output, Other] | Callable[[Output], Other]
     ) -> "RunnableSequence[Input, Other]":
         """Extend the sequence with another runnable."""
         if isinstance(other, RunnableSequence):
@@ -340,7 +332,7 @@ class RunnableSequence(Runnable[Input, Output]):
         return f"RunnableSequence({' | '.join(names)})"
 
 
-class RunnableParallel(Runnable[Input, Dict[str, Any]]):
+class RunnableParallel(Runnable[Input, dict[str, Any]]):
     """Execute multiple runnables in parallel and collect results.
 
     All runnables receive the same input and execute concurrently.
@@ -367,7 +359,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
             steps: Mapping of names to runnables
             **kwargs: Alternative way to specify named runnables
         """
-        self._steps: Dict[str, Runnable] = {}
+        self._steps: dict[str, Runnable] = {}
         if steps:
             self._steps.update(steps)
         self._steps.update(kwargs)
@@ -379,7 +371,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
         self,
         input: Input,
         config: Optional[RunnableConfig] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute all runnables in parallel.
 
         Args:
@@ -391,7 +383,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
         """
         config = config or RunnableConfig()
 
-        async def run_step(name: str, runnable: Runnable[Any, Any]) -> Tuple[str, Any]:
+        async def run_step(name: str, runnable: Runnable[Any, Any]) -> tuple[str, Any]:
             try:
                 result = await runnable.invoke(input, config)
                 return (name, result)
@@ -402,7 +394,7 @@ class RunnableParallel(Runnable[Input, Dict[str, Any]]):
         # Create tasks with optional concurrency limit
         semaphore = asyncio.Semaphore(config.max_concurrency)
 
-        async def bounded_run(name: str, runnable: Runnable[Any, Any]) -> Tuple[str, Any]:
+        async def bounded_run(name: str, runnable: Runnable[Any, Any]) -> tuple[str, Any]:
             async with semaphore:
                 return await run_step(name, runnable)
 
@@ -449,7 +441,7 @@ class RunnableBranch(Runnable[Input, Output]):
 
     def __init__(
         self,
-        *branches: Tuple[Callable[[Input], bool], Runnable[Input, Output]],
+        *branches: tuple[Callable[[Input], bool], Runnable[Input, Output]],
         default: Optional[Runnable[Input, Output]] = None,
     ):
         """Initialize with condition-runnable pairs.
@@ -458,7 +450,7 @@ class RunnableBranch(Runnable[Input, Output]):
             *branches: Tuples of (condition, runnable) evaluated in order
             default: Runnable to use if no conditions match
         """
-        self._branches: List[Tuple[Callable[[Input], bool], Runnable[Input, Output]]] = list(
+        self._branches: list[tuple[Callable[[Input], bool], Runnable[Input, Output]]] = list(
             branches
         )
         self._default = default
@@ -521,7 +513,7 @@ class RunnableLambda(Runnable[Input, Output]):
 
     def __init__(
         self,
-        func: Union[Callable[[Input], Output], Callable[[Input], Awaitable[Output]]],
+        func: Callable[[Input], Output] | Callable[[Input], Awaitable[Output]],
         name: Optional[str] = None,
     ):
         """Initialize with a callable.
@@ -600,7 +592,7 @@ class RunnableBinding(Runnable[Input, Output]):
     def __init__(
         self,
         bound: Runnable[Input, Output],
-        kwargs: Dict[str, Any],
+        kwargs: dict[str, Any],
         config: Optional[RunnableConfig] = None,
     ):
         """Initialize with bound runnable and arguments.
@@ -641,7 +633,7 @@ class RunnableBinding(Runnable[Input, Output]):
         return f"RunnableBinding({self._bound}, kwargs={list(self._kwargs.keys())})"
 
 
-class ToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
+class ToolRunnable(Runnable[dict[str, Any], dict[str, Any]]):
     """Wraps a Victor BaseTool as a Runnable for composition.
 
     This adapter enables Victor tools to participate in LCEL-style chains
@@ -662,7 +654,7 @@ class ToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
         self,
         tool: "BaseTool",
         output_key: Optional[str] = None,
-        input_mapping: Optional[Dict[str, str]] = None,
+        input_mapping: Optional[dict[str, str]] = None,
     ):
         """Initialize with a BaseTool instance.
 
@@ -687,9 +679,9 @@ class ToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
 
     async def invoke(
         self,
-        input: Dict[str, Any],
+        input: dict[str, Any],
         config: Optional[RunnableConfig] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute the tool with input as kwargs.
 
         Args:
@@ -706,7 +698,7 @@ class ToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
             mapped_input[mapped_key] = value
 
         # Build execution context from config
-        exec_ctx: Dict[str, Any] = {}
+        exec_ctx: dict[str, Any] = {}
         if config:
             exec_ctx["tags"] = config.tags
             exec_ctx["metadata"] = config.metadata
@@ -766,7 +758,7 @@ class ToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
         return f"ToolRunnable({self._tool.name})"
 
 
-class FunctionToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
+class FunctionToolRunnable(Runnable[dict[str, Any], dict[str, Any]]):
     """Wraps a @tool decorated function as a Runnable.
 
     This handles the common case where tools are defined using the @tool
@@ -784,7 +776,7 @@ class FunctionToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
         self,
         func: Callable[..., Any],
         output_key: Optional[str] = None,
-        input_mapping: Optional[Dict[str, str]] = None,
+        input_mapping: Optional[dict[str, str]] = None,
     ):
         """Initialize with a @tool decorated function.
 
@@ -808,9 +800,9 @@ class FunctionToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
 
     async def invoke(
         self,
-        input: Dict[str, Any],
+        input: dict[str, Any],
         config: Optional[RunnableConfig] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute the decorated function.
 
         Args:
@@ -827,7 +819,7 @@ class FunctionToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
             mapped_input[mapped_key] = value
 
         # Build execution context
-        exec_ctx: Dict[str, Any] = {}
+        exec_ctx: dict[str, Any] = {}
         if config:
             exec_ctx["tags"] = config.tags
             exec_ctx["metadata"] = config.metadata
@@ -864,11 +856,11 @@ class FunctionToolRunnable(Runnable[Dict[str, Any], Dict[str, Any]]):
 
 
 def as_runnable(
-    tool_or_func: Union["BaseTool", Callable],
+    tool_or_func: "BaseTool" | Callable,
     output_key: Optional[str] = None,
-    input_mapping: Optional[Dict[str, str]] = None,
+    input_mapping: Optional[dict[str, str]] = None,
     **bound_args: Any,
-) -> Runnable[Dict[str, Any], Dict[str, Any]]:
+) -> Runnable[dict[str, Any], dict[str, Any]]:
     """Convert a tool or function to a Runnable.
 
     This is the primary entry point for using Victor tools in LCEL chains.
@@ -919,7 +911,7 @@ def as_runnable(
 # =============================================================================
 
 
-def chain(*runnables: Union[Runnable, Callable]) -> RunnableSequence:
+def chain(*runnables: Runnable | Callable) -> RunnableSequence:
     """Build a chain from multiple runnables.
 
     Alternative to chained `|` operators.
@@ -933,7 +925,7 @@ def chain(*runnables: Union[Runnable, Callable]) -> RunnableSequence:
     Example:
         chain(read_tool, analyze, format)
     """
-    converted: List[Runnable] = []
+    converted: list[Runnable] = []
     for r in runnables:
         if isinstance(r, Runnable):
             converted.append(r)
@@ -944,7 +936,7 @@ def chain(*runnables: Union[Runnable, Callable]) -> RunnableSequence:
     return RunnableSequence(converted)
 
 
-def parallel(**steps: Union[Runnable, Callable]) -> RunnableParallel:
+def parallel(**steps: Runnable | Callable) -> RunnableParallel:
     """Build a parallel execution from named runnables.
 
     Convenience wrapper for RunnableParallel.
@@ -961,7 +953,7 @@ def parallel(**steps: Union[Runnable, Callable]) -> RunnableParallel:
             security=security_scan,
         )
     """
-    converted: Dict[str, Runnable] = {}
+    converted: dict[str, Runnable] = {}
     for name, r in steps.items():
         if isinstance(r, Runnable):
             converted[name] = r
@@ -973,8 +965,8 @@ def parallel(**steps: Union[Runnable, Callable]) -> RunnableParallel:
 
 
 def branch(
-    *conditions: Tuple[Callable, Union[Runnable, Callable]],
-    default: Optional[Union[Runnable, Callable]] = None,
+    *conditions: tuple[Callable, Runnable | Callable],
+    default: Optional[Runnable | Callable] = None,
 ) -> RunnableBranch:
     """Build a conditional branch from condition-runnable pairs.
 
@@ -994,7 +986,7 @@ def branch(
             default=generic_check,
         )
     """
-    branches: List[Tuple[Callable, Runnable]] = []
+    branches: list[tuple[Callable, Runnable]] = []
     for cond, r in conditions:
         if isinstance(r, Runnable):
             branches.append((cond, r))
@@ -1020,7 +1012,7 @@ def branch(
 # =============================================================================
 
 
-def extract_output(result: Dict[str, Any]) -> Any:
+def extract_output(result: dict[str, Any]) -> Any:
     """Extract the output field from a tool result.
 
     Useful in chains to get just the output value.
@@ -1034,7 +1026,7 @@ def extract_output(result: Dict[str, Any]) -> Any:
     return result.get("output")
 
 
-def extract_if_success(result: Dict[str, Any]) -> Any:
+def extract_if_success(result: dict[str, Any]) -> Any:
     """Extract output only if the tool succeeded.
 
     Args:
@@ -1063,7 +1055,7 @@ def extract_if_success(result: Dict[str, Any]) -> Any:
     return result.get("output")
 
 
-def map_keys(mapping: Dict[str, str]) -> Callable[[Dict], Dict]:
+def map_keys(mapping: dict[str, str]) -> Callable[[dict], dict]:
     """Create a function that renames dictionary keys.
 
     Useful for adapting output of one tool to input of another.
@@ -1078,7 +1070,7 @@ def map_keys(mapping: Dict[str, str]) -> Callable[[Dict], Dict]:
         chain = tool1 | map_keys({"result": "input"}) | tool2
     """
 
-    def mapper(d: Dict[str, Any]) -> Dict:
+    def mapper(d: dict[str, Any]) -> dict:
         result = dict(d)
         for old, new in mapping.items():
             if old in result:
@@ -1088,7 +1080,7 @@ def map_keys(mapping: Dict[str, str]) -> Callable[[Dict], Dict]:
     return mapper
 
 
-def select_keys(*keys: str) -> Callable[[Dict], Dict]:
+def select_keys(*keys: str) -> Callable[[dict], dict]:
     """Create a function that selects specific keys from a dict.
 
     Args:
@@ -1098,7 +1090,7 @@ def select_keys(*keys: str) -> Callable[[Dict], Dict]:
         A function that filters to specified keys
     """
 
-    def selector(d: Dict[str, Any]) -> Dict:
+    def selector(d: dict[str, Any]) -> dict:
         return {k: v for k, v in d.items() if k in keys}
 
     return selector

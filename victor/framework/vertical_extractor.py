@@ -32,7 +32,7 @@ from __future__ import annotations
 import inspect
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Optional
 
 from victor.core.verticals.base import VerticalBase
 from victor.framework.vertical_template import (
@@ -40,7 +40,6 @@ from victor.framework.vertical_template import (
     VerticalMetadata,
     ExtensionSpecs,
     MiddlewareSpec,
-    SafetyPatternSpec,
     PromptHintSpec,
     WorkflowSpec,
     TeamSpec,
@@ -57,7 +56,7 @@ class VerticalExtractor:
     template information including metadata, tools, stages, and extensions.
     """
 
-    def extract_from_class(self, vertical_class: Type[VerticalBase]) -> Optional[VerticalTemplate]:
+    def extract_from_class(self, vertical_class: type[VerticalBase]) -> Optional[VerticalTemplate]:
         """Extract template from a vertical class.
 
         Args:
@@ -169,7 +168,7 @@ class VerticalExtractor:
 
         return self.extract_from_module(module_path)
 
-    def _extract_metadata(self, vertical_class: Type[VerticalBase]) -> VerticalMetadata:
+    def _extract_metadata(self, vertical_class: type[VerticalBase]) -> VerticalMetadata:
         """Extract metadata from vertical class."""
         return VerticalMetadata(
             name=vertical_class.name,
@@ -178,7 +177,7 @@ class VerticalExtractor:
             category=getattr(vertical_class, "category", "general"),
         )
 
-    def _extract_extensions(self, vertical_class: Type[VerticalBase]) -> ExtensionSpecs:
+    def _extract_extensions(self, vertical_class: type[VerticalBase]) -> ExtensionSpecs:
         """Extract extension specifications from vertical class."""
         # Try to get middleware
         middleware_specs = []
@@ -222,7 +221,7 @@ class VerticalExtractor:
             prompt_hints=prompt_hints,
         )
 
-    def _extract_workflows(self, vertical_class: Type[VerticalBase]) -> List[WorkflowSpec]:
+    def _extract_workflows(self, vertical_class: type[VerticalBase]) -> list[WorkflowSpec]:
         """Extract workflow specifications from vertical."""
         workflows = []
 
@@ -242,7 +241,7 @@ class VerticalExtractor:
 
         return workflows
 
-    def _extract_teams(self, vertical_class: Type[VerticalBase]) -> List[TeamSpec]:
+    def _extract_teams(self, vertical_class: type[VerticalBase]) -> list[TeamSpec]:
         """Extract team specifications from vertical."""
         teams = []
 
@@ -266,7 +265,7 @@ class VerticalExtractor:
 
         return teams
 
-    def _extract_capabilities(self, vertical_class: Type[VerticalBase]) -> List[CapabilitySpec]:
+    def _extract_capabilities(self, vertical_class: type[VerticalBase]) -> list[CapabilitySpec]:
         """Extract capability specifications from vertical."""
         capabilities = []
 
@@ -297,7 +296,7 @@ class VerticalExtractor:
 
         return capabilities
 
-    def _extract_custom_config(self, vertical_class: Type[VerticalBase]) -> Dict[str, Any]:
+    def _extract_custom_config(self, vertical_class: type[VerticalBase]) -> dict[str, Any]:
         """Extract custom configuration from vertical."""
         custom_config = {}
 
@@ -317,7 +316,7 @@ class VerticalExtractor:
 
 
 def migrate_vertical_to_template(
-    vertical_class: Type[VerticalBase],
+    vertical_class: type[VerticalBase],
     output_path: str | Path,
 ) -> bool:
     """Migrate existing vertical to template-based system.

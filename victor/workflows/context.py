@@ -72,20 +72,16 @@ from __future__ import annotations
 
 import logging
 import uuid
-import warnings
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Optional,
     TypedDict,
-    Union,
 )
 
 if TYPE_CHECKING:
-    from victor.workflows.executor import NodeResult, TemporalContext, WorkflowContext
+    from victor.workflows.executor import NodeResult, WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -140,26 +136,26 @@ class ExecutionContext(TypedDict, total=False):
     """
 
     # Core data
-    data: Dict[str, Any]
-    messages: List[Dict[str, Any]]
+    data: dict[str, Any]
+    messages: list[dict[str, Any]]
 
     # Execution metadata
     _workflow_id: str
     _workflow_name: str
     _current_node: str
-    _node_results: Dict[str, Any]
+    _node_results: dict[str, Any]
     _error: Optional[str]
 
     # Iteration tracking
     _iteration: int
-    _visited_nodes: List[str]
+    _visited_nodes: list[str]
 
     # Parallel execution
-    _parallel_results: Dict[str, Any]
+    _parallel_results: dict[str, Any]
 
     # Human-in-the-loop
     _hitl_pending: bool
-    _hitl_response: Optional[Dict[str, Any]]
+    _hitl_response: Optional[dict[str, Any]]
 
     # Temporal context
     _as_of_date: Optional[str]
@@ -177,7 +173,7 @@ class ExecutionContext(TypedDict, total=False):
 
 
 def create_execution_context(
-    initial_data: Optional[Dict[str, Any]] = None,
+    initial_data: Optional[dict[str, Any]] = None,
     workflow_id: Optional[str] = None,
     workflow_name: Optional[str] = None,
 ) -> ExecutionContext:
@@ -326,7 +322,7 @@ class ExecutionContextWrapper:
             self.state["data"] = {}
         self.state["data"][key] = value
 
-    def update(self, values: Dict[str, Any]) -> None:
+    def update(self, values: dict[str, Any]) -> None:
         """Update multiple context values in data.
 
         DEPRECATED: Use WorkflowStateManager.update() instead.
@@ -352,11 +348,11 @@ class ExecutionContextWrapper:
             self.state["data"] = {}
         self.state["data"].update(values)
 
-    def get_result(self, node_id: str) -> Optional[Dict[str, Any]]:
+    def get_result(self, node_id: str) -> Optional[dict[str, Any]]:
         """Get result for a specific node."""
         return self.state.get("_node_results", {}).get(node_id)
 
-    def add_result(self, node_id: str, result: Dict[str, Any]) -> None:
+    def add_result(self, node_id: str, result: dict[str, Any]) -> None:
         """Add a node result."""
         if "_node_results" not in self.state:
             self.state["_node_results"] = {}
@@ -371,7 +367,7 @@ class ExecutionContextWrapper:
             if isinstance(r, dict)
         )
 
-    def get_outputs(self) -> Dict[str, Any]:
+    def get_outputs(self) -> dict[str, Any]:
         """Get all successful node outputs."""
         results = self.state.get("_node_results", {})
         return {
@@ -432,10 +428,9 @@ def from_workflow_context(ctx: "WorkflowContext") -> ExecutionContext:
     Returns:
         ExecutionContext with data migrated from WorkflowContext
     """
-    from victor.workflows.executor import WorkflowContext
 
     # Convert node results to dict format
-    node_results: Dict[str, Any] = {}
+    node_results: dict[str, Any] = {}
     for node_id, result in ctx.node_results.items():
         node_results[node_id] = {
             "node_id": result.node_id,
@@ -496,7 +491,7 @@ def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
     )
 
     # Convert node results from dict to NodeResult
-    node_results: Dict[str, NodeResult] = {}
+    node_results: dict[str, NodeResult] = {}
     for node_id, result in ctx.get("_node_results", {}).items():
         if isinstance(result, dict):
             # Map status string to enum
@@ -545,7 +540,7 @@ def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
     )
 
 
-def from_compiler_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
+def from_compiler_workflow_state(state: dict[str, Any]) -> ExecutionContext:
     """Convert yaml_to_graph_compiler WorkflowState to ExecutionContext.
 
     Args:
@@ -590,7 +585,7 @@ def from_compiler_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
     }
 
 
-def to_compiler_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
+def to_compiler_workflow_state(ctx: ExecutionContext) -> dict[str, Any]:
     """Convert ExecutionContext to yaml_to_graph_compiler WorkflowState format.
 
     Args:
@@ -600,7 +595,7 @@ def to_compiler_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
         Dict compatible with yaml_to_graph_compiler WorkflowState
     """
     # Start with user data
-    state: Dict[str, Any] = ctx.get("data", {}).copy()
+    state: dict[str, Any] = ctx.get("data", {}).copy()
 
     # Add system fields
     state["_workflow_id"] = ctx.get("_workflow_id", "")
@@ -615,7 +610,7 @@ def to_compiler_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
     return state
 
 
-def from_adapter_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
+def from_adapter_workflow_state(state: dict[str, Any]) -> ExecutionContext:
     """Convert adapters.py WorkflowState to ExecutionContext.
 
     Args:
@@ -645,7 +640,7 @@ def from_adapter_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
     }
 
 
-def to_adapter_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
+def to_adapter_workflow_state(ctx: ExecutionContext) -> dict[str, Any]:
     """Convert ExecutionContext to adapters.py WorkflowState format.
 
     Args:

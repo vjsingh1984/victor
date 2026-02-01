@@ -22,9 +22,9 @@ from __future__ import annotations
 
 import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-from victor.protocols import IPromptContributor, PromptContext
+from victor.protocols import PromptContext
 from victor.agent.coordinators.prompt_contributors import (
     VerticalPromptContributor,
     ContextPromptContributor,

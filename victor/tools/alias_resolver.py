@@ -14,7 +14,8 @@
 
 """Tool alias resolution for shell variants and alternatives."""
 
-from typing import Dict, Optional, List, Callable
+from typing import Optional
+from collections.abc import Callable
 from dataclasses import dataclass, field
 import logging
 
@@ -26,7 +27,7 @@ class ToolAlias:
     """Configuration for a tool alias."""
 
     canonical_name: str
-    aliases: List[str] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
     resolver: Optional[Callable[[str], str]] = None
 
 
@@ -49,8 +50,8 @@ class ToolAliasResolver:
     _instance: Optional["ToolAliasResolver"] = None
 
     def __init__(self) -> None:
-        self._aliases: Dict[str, ToolAlias] = {}
-        self._reverse_map: Dict[str, str] = {}
+        self._aliases: dict[str, ToolAlias] = {}
+        self._reverse_map: dict[str, str] = {}
 
     @classmethod
     def get_instance(cls) -> "ToolAliasResolver":
@@ -74,7 +75,7 @@ class ToolAliasResolver:
     def register(
         self,
         canonical_name: str,
-        aliases: List[str],
+        aliases: list[str],
         resolver: Optional[Callable[[str], str]] = None,
     ) -> None:
         """Register a tool with its aliases.
@@ -92,7 +93,7 @@ class ToolAliasResolver:
         for alias in aliases:
             self._reverse_map[alias] = canonical_name
 
-    def resolve(self, name: str, enabled_tools: List[str]) -> str:
+    def resolve(self, name: str, enabled_tools: list[str]) -> str:
         """Resolve a tool name to an enabled variant.
 
         Looks up the canonical name for the requested tool, then finds
@@ -150,7 +151,7 @@ class ToolAliasResolver:
         """
         return name in self._reverse_map
 
-    def get_aliases(self, canonical_name: str) -> List[str]:
+    def get_aliases(self, canonical_name: str) -> list[str]:
         """Get all aliases for a canonical tool name.
 
         Args:

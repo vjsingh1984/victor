@@ -24,10 +24,7 @@ These tests use the actual MCP registry implementation with mocked clients
 to avoid requiring actual MCP servers to be running.
 """
 
-import json
-from pathlib import Path
-from typing import List
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -51,14 +48,12 @@ pytestmark = pytest.mark.skipif(
 
 
 # Import after skipif check
-from victor.integrations.mcp.registry import (  # noqa: E402
+from victor.integrations.mcp.registry import (
     MCPRegistry,
     MCPServerConfig,
     ServerStatus,
-    ServerEntry,
 )
-from victor.integrations.mcp.client import MCPClient  # noqa: E402
-from victor.integrations.mcp.protocol import MCPTool, MCPResource  # noqa: E402
+from victor.integrations.mcp.protocol import MCPTool, MCPResource
 
 
 class TestMCPRegistryBasics:

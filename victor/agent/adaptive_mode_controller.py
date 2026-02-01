@@ -61,17 +61,15 @@ Usage:
     )
 """
 
-import hashlib
-import json
 import logging
 import math
 import random
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.core.schema import Tables
 
@@ -305,7 +303,7 @@ class QLearningStore:
 
         return row[0] if row else 0.0
 
-    def get_all_actions(self, state_key: str) -> Dict[str, float]:
+    def get_all_actions(self, state_key: str) -> dict[str, float]:
         """Get all Q-values for a state."""
         self._ensure_initialized()
 
@@ -542,7 +540,7 @@ class QLearningStore:
         }
         return min_budgets.get(task_type, 10)
 
-    def get_task_stats(self, task_type: str) -> Dict[str, Any]:
+    def get_task_stats(self, task_type: str) -> dict[str, Any]:
         """Get statistics for a task type."""
         self._ensure_initialized()
 
@@ -665,7 +663,7 @@ class AdaptiveModeController:
 
         # Session tracking
         self._session_start = datetime.now()
-        self._mode_history: List[Tuple[AgentMode, datetime]] = []
+        self._mode_history: list[tuple[AgentMode, datetime]] = []
         self._total_reward = 0.0
 
         # Consecutive no-tool iterations tracking for loop detection
@@ -707,7 +705,7 @@ class AdaptiveModeController:
 
         return provider_map.get(provider, "default")
 
-    def get_iteration_thresholds(self) -> Dict[str, int]:
+    def get_iteration_thresholds(self) -> dict[str, int]:
         """Get provider-specific iteration thresholds for loop detection.
 
         Returns:
@@ -717,7 +715,7 @@ class AdaptiveModeController:
             self._provider_name, self.PROVIDER_ITERATION_THRESHOLDS["default"]
         )
 
-    def get_quality_thresholds(self) -> Dict[str, float]:
+    def get_quality_thresholds(self) -> dict[str, float]:
         """Get provider-specific quality thresholds.
 
         Returns:
@@ -841,7 +839,7 @@ class AdaptiveModeController:
 
         return action
 
-    def _get_possible_actions(self, state: ModeState) -> List[ModeAction]:
+    def _get_possible_actions(self, state: ModeState) -> list[ModeAction]:
         """Get all possible actions from current state."""
         actions = []
         current_mode = state.mode
@@ -894,7 +892,7 @@ class AdaptiveModeController:
     def _select_best_action(
         self,
         state_key: str,
-        possible_actions: List[ModeAction],
+        possible_actions: list[ModeAction],
     ) -> ModeAction:
         """Select best action using Q-values."""
         q_values = self._q_store.get_all_actions(state_key)
@@ -1213,7 +1211,7 @@ class AdaptiveModeController:
         iteration_count: int,
         iteration_budget: int,
         current_tool_calls: int = 0,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Determine if the agent should continue or stop.
 
         Uses provider-aware thresholds for better loop detection.
@@ -1230,7 +1228,7 @@ class AdaptiveModeController:
             Tuple of (should_continue, reason)
         """
         # Get provider-specific thresholds
-        _iter_thresholds = self.get_iteration_thresholds()  # noqa: F841
+        _iter_thresholds = self.get_iteration_thresholds()
         quality_thresholds = self.get_quality_thresholds()
 
         # Hard limits
@@ -1273,7 +1271,7 @@ class AdaptiveModeController:
         self,
         iteration_count: int,
         current_tool_calls: int,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Check for stuck continuation loops using provider-aware thresholds.
 
         Args:
@@ -1311,7 +1309,7 @@ class AdaptiveModeController:
         """Reset loop detection tracking for a new conversation."""
         self._no_tool_iterations = 0
 
-    def get_session_stats(self) -> Dict[str, Any]:
+    def get_session_stats(self) -> dict[str, Any]:
         """Get statistics for the current session."""
         session_duration = (datetime.now() - self._session_start).total_seconds()
 

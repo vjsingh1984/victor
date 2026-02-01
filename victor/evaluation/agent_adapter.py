@@ -32,7 +32,8 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable, Coroutine
 
 from victor.config.settings import load_settings
 
@@ -116,11 +117,11 @@ class VictorAgentAdapter:
         self.config = config or AdapterConfig()
 
         # Execution tracking
-        self._tool_calls: List[EvalToolCall] = []
-        self._file_edits: List[FileEdit] = []
-        self._messages: List[Dict[str, str]] = []
+        self._tool_calls: list[EvalToolCall] = []
+        self._file_edits: list[FileEdit] = []
+        self._messages: list[dict[str, str]] = []
         self._turns: int = 0
-        self._file_snapshots: Dict[str, str] = {}  # path -> content before edit
+        self._file_snapshots: dict[str, str] = {}  # path -> content before edit
 
         # Correction metrics collector
         self._metrics_collector: Optional[CorrectionMetricsCollector] = None
@@ -146,7 +147,7 @@ class VictorAgentAdapter:
         else:
             logger.warning("[AgentAdapter] Could not register hooks - ToolRegistry not found")
 
-    def _on_tool_start_hook(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def _on_tool_start_hook(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Hook called by ToolRegistry before tool execution."""
         self._on_tool_start(tool_name, arguments)
 
@@ -154,7 +155,7 @@ class VictorAgentAdapter:
         """Hook called by ToolRegistry after tool execution."""
         self._on_tool_complete(result)
 
-    def _on_tool_start(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def _on_tool_start(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Track tool call start."""
         start_time = time.time()
         logger.info(f"[AgentAdapter] Tool started: {tool_name}")
@@ -274,7 +275,7 @@ class VictorAgentAdapter:
             )
         )
 
-    def get_partial_trace(self) -> Dict[str, Any]:
+    def get_partial_trace(self) -> dict[str, Any]:
         """Get partial trace data for timeout scenarios.
 
         Returns a dict with current state that can be used to populate

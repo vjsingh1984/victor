@@ -67,12 +67,12 @@ Usage:
     stats = pipeline.get_stats()
 """
 
-import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.providers.base import BaseProvider, Message
@@ -102,7 +102,7 @@ class RequestContext:
     should_continue: bool
     continuation_context: Optional[str] = None
     mode_confidence: float = 0.5
-    profile_stats: Dict[str, Any] = field(default_factory=dict)
+    profile_stats: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -113,9 +113,9 @@ class ResponseResult:
     quality_score: float
     grounding_score: float
     is_grounded: bool
-    quality_details: Dict[str, float] = field(default_factory=dict)
-    grounding_issues: List[str] = field(default_factory=list)
-    improvement_suggestions: List[str] = field(default_factory=list)
+    quality_details: dict[str, float] = field(default_factory=dict)
+    grounding_issues: list[str] = field(default_factory=list)
+    improvement_suggestions: list[str] = field(default_factory=list)
     learning_reward: float = 0.0
     # Grounding failure handling
     should_finalize: bool = False
@@ -197,7 +197,7 @@ class IntelligentAgentPipeline:
         self._deduplication_enabled = self._provider_adapter.capabilities.output_deduplication
 
         # Observers for feedback
-        self._observers: List[Callable[[ResponseResult], None]] = []
+        self._observers: list[Callable[[ResponseResult], None]] = []
 
     @classmethod
     async def create(
@@ -281,7 +281,7 @@ class IntelligentAgentPipeline:
                 logger.warning(f"[IntelligentPipeline] Mode controller init failed: {e}")
         return self._mode_controller
 
-    def get_provider_quality_thresholds(self) -> Dict[str, Any]:
+    def get_provider_quality_thresholds(self) -> dict[str, Any]:
         """Get provider-specific quality thresholds.
 
         Returns:
@@ -452,7 +452,7 @@ class IntelligentAgentPipeline:
         provider_lower = self.provider_name.lower()
         return provider_lower in PROVIDERS_WITH_REPETITION_ISSUES
 
-    def deduplicate_response(self, response: str) -> Tuple[str, Dict[str, Any]]:
+    def deduplicate_response(self, response: str) -> tuple[str, dict[str, Any]]:
         """Apply deduplication to response if enabled for provider.
 
         This method follows the Strategy Pattern - the deduplication strategy
@@ -584,7 +584,7 @@ class IntelligentAgentPipeline:
             recommended_budget = max(recommended_budget, min_budget)
 
         # Get profile stats
-        profile_stats: Dict[str, Any] = {}
+        profile_stats: dict[str, Any] = {}
         prompt_builder = await self._get_prompt_builder()
         if prompt_builder is not None:
             profile_stats = prompt_builder.get_profile_stats()
@@ -618,7 +618,7 @@ class IntelligentAgentPipeline:
         tool_budget: int = 10,
         success: bool = True,
         task_type: str = "general",
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ResponseResult:
         """Process and validate a response.
 
@@ -650,8 +650,8 @@ class IntelligentAgentPipeline:
 
         # Score quality (lazy init)
         quality_score = 0.5
-        quality_details: Dict[str, float] = {}
-        improvement_suggestions: List[str] = []
+        quality_details: dict[str, float] = {}
+        improvement_suggestions: list[str] = []
 
         quality_scorer = await self._get_quality_scorer()
         if quality_scorer is not None and query:
@@ -669,7 +669,7 @@ class IntelligentAgentPipeline:
         # Verify grounding (lazy init)
         grounding_score = 1.0
         is_grounded = True
-        grounding_issues: List[str] = []
+        grounding_issues: list[str] = []
         grounding_result = None  # Store full result for feedback generation
 
         grounding_verifier = await self._get_grounding_verifier()
@@ -808,7 +808,7 @@ class IntelligentAgentPipeline:
     async def execute_with_resilience(
         self,
         provider: "BaseProvider",
-        messages: List["Message"],
+        messages: list["Message"],
         circuit_name: Optional[str] = None,
         fallback: Optional[Callable[[], Any]] = None,
         **kwargs: Any,
@@ -862,7 +862,7 @@ class IntelligentAgentPipeline:
         quality_score: float,
         iteration_count: int,
         iteration_budget: int,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Determine if processing should continue.
 
         Args:
@@ -925,7 +925,7 @@ class IntelligentAgentPipeline:
         if self._mode_controller:
             self._mode_controller.reset_session()
 
-    def get_learning_summary(self) -> Dict[str, Any]:
+    def get_learning_summary(self) -> dict[str, Any]:
         """Get summary of learned behaviors."""
         summary = {
             "profile_name": self.profile_name,
@@ -942,7 +942,7 @@ class IntelligentAgentPipeline:
 
 
 # Module-level convenience functions
-_pipeline_cache: Dict[Tuple[str, str, str, Optional[str]], IntelligentAgentPipeline] = {}
+_pipeline_cache: dict[tuple[str, str, str, Optional[str]], IntelligentAgentPipeline] = {}
 
 
 async def get_pipeline(

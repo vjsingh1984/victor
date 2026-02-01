@@ -18,8 +18,8 @@ This module provides TypedDict and Protocol definitions for common types
 used throughout the codebase. These improve type safety and IDE support.
 """
 
-from typing import Any, Dict, List, Literal, Optional, TypedDict, Union, Protocol
-from typing_extensions import Required, NotRequired
+from typing import Any, Literal, Optional, TypedDict
+from typing_extensions import NotRequired
 
 
 # =============================================================================
@@ -37,7 +37,7 @@ class ToolCall(TypedDict):
     """
 
     name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     id: NotRequired[str]
 
 
@@ -73,8 +73,8 @@ class ToolExecutionContext(TypedDict):
     iteration: int
     budget_remaining: int
     max_tools: int
-    categories: NotRequired[Optional[List[str]]]
-    exclude_tools: NotRequired[Optional[List[str]]]
+    categories: NotRequired[Optional[list[str]]]
+    exclude_tools: NotRequired[Optional[list[str]]]
 
 
 # =============================================================================
@@ -95,8 +95,8 @@ class AgentToolSelectionContext(TypedDict):
     """
 
     max_tools: int
-    categories: NotRequired[Optional[List[str]]]
-    exclude_tools: NotRequired[Optional[List[str]]]
+    categories: NotRequired[Optional[list[str]]]
+    exclude_tools: NotRequired[Optional[list[str]]]
     budget: NotRequired[Optional[int]]
     task_complexity: NotRequired[Optional[str]]
     intent: NotRequired[Optional[str]]
@@ -153,8 +153,8 @@ class ConversationContext(TypedDict):
     """
 
     stage: str
-    messages: List[Dict[str, Any]]
-    tool_calls: List[ToolCall]
+    messages: list[dict[str, Any]]
+    tool_calls: list[ToolCall]
     iteration: int
     tokens_used: int
     budget_remaining: int
@@ -236,7 +236,7 @@ class OrchestratorContext(TypedDict):
     temperature: float
     max_tokens: int
     console: NotRequired[Optional[Any]]  # Optional[Console]
-    tool_selection: NotRequired[Optional[Dict[str, Any]]]
+    tool_selection: NotRequired[Optional[dict[str, Any]]]
     thinking: NotRequired[bool]
     provider_name: NotRequired[Optional[str]]
     profile_name: NotRequired[Optional[str]]
@@ -260,7 +260,7 @@ class Message(TypedDict):
 
     role: str
     content: str
-    tool_calls: NotRequired[Optional[List[ToolCall]]]
+    tool_calls: NotRequired[Optional[list[ToolCall]]]
     tool_call_id: NotRequired[Optional[str]]
     name: NotRequired[Optional[str]]
 
@@ -284,7 +284,7 @@ class StreamChunk(TypedDict):
     content: str
     delta: NotRequired[str]
     finish_reason: NotRequired[Optional[str]]
-    usage: NotRequired[Optional[Dict[str, int]]]
+    usage: NotRequired[Optional[dict[str, int]]]
     is_complete: NotRequired[bool]
 
 
@@ -306,9 +306,9 @@ class CompletionResponse(TypedDict):
 
     content: str
     model: str
-    usage: Dict[str, int]
+    usage: dict[str, int]
     finish_reason: NotRequired[Optional[str]]
-    tool_calls: NotRequired[Optional[List[ToolCall]]]
+    tool_calls: NotRequired[Optional[list[ToolCall]]]
     # Additional fields for compatibility with different providers
     role: NotRequired[str]
     stop_reason: NotRequired[str]
@@ -336,7 +336,7 @@ class ErrorContext(TypedDict):
     error_message: str
     retry_count: int
     last_successful_operation: NotRequired[Optional[str]]
-    context: NotRequired[Dict[str, Any]]
+    context: NotRequired[dict[str, Any]]
 
 
 # =============================================================================

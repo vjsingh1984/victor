@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, Mock
 
-import pytest
 
 # Add scripts to path
 scripts_dir = Path(__file__).parent.parent.parent.parent / "scripts"

@@ -29,8 +29,7 @@ Verticals tested:
 """
 
 import pytest
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock
+from typing import Any
 
 
 # ============ Test Fixtures ============

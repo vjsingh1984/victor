@@ -52,10 +52,9 @@ import sqlite3
 import threading
 import time
 import uuid
-from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
+from typing import Optional
+from collections.abc import Awaitable, Callable
 
 from victor.core.events.protocols import (
     BackendConfig,
@@ -64,7 +63,6 @@ from victor.core.events.protocols import (
     MessagingEvent,
     EventHandler,
     EventPublishError,
-    IEventBackend,
     SubscriptionHandle,
 )
 
@@ -157,7 +155,7 @@ class SQLiteEventBackend:
 
         self._conn: Optional[sqlite3.Connection] = None
         self._is_connected = False
-        self._subscriptions: Dict[str, _SQLiteSubscription] = {}
+        self._subscriptions: dict[str, _SQLiteSubscription] = {}
         self._poller_task: Optional[asyncio.Task[None]] = None
         self._lock = threading.Lock()
 
@@ -308,7 +306,7 @@ class SQLiteEventBackend:
         except Exception as e:
             raise EventPublishError(event, str(e), retryable=True)
 
-    async def publish_batch(self, events: List[MessagingEvent]) -> int:
+    async def publish_batch(self, events: list[MessagingEvent]) -> int:
         """Publish multiple events."""
         success_count = 0
         for event in events:

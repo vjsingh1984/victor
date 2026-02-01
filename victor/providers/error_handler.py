@@ -20,7 +20,7 @@ extracting common error detection and conversion logic.
 
 import logging
 from abc import ABC
-from typing import Any, Dict, List, Optional, Type
+from typing import Optional
 
 from victor.core.errors import (
     ProviderAuthError,
@@ -393,7 +393,7 @@ class HTTPErrorHandlerMixin(ABC):
         )
 
     @staticmethod
-    def _matches_any_pattern(text: str, patterns: List[str]) -> bool:
+    def _matches_any_pattern(text: str, patterns: list[str]) -> bool:
         """Check if text matches any of the given patterns.
 
         Args:

@@ -18,7 +18,6 @@ This module tests the UnifiedEventType enum and mapping functions
 that consolidate event types across the Victor codebase.
 """
 
-import pytest
 import warnings
 
 from victor.core.events.taxonomy import (

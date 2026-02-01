@@ -21,21 +21,17 @@ Tests the full integration of provider pooling with:
 - CLI flags
 """
 
-import asyncio
 import pytest
-from typing import Dict, Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from victor.config.settings import Settings
-from victor.core.container import ServiceContainer, ServiceLifetime
+from victor.core.container import ServiceContainer
 from victor.agent.service_provider import OrchestratorServiceProvider
 from victor.providers.provider_pool import (
     ProviderPool,
     ProviderPoolConfig,
-    PoolStrategy,
 )
 from victor.providers.load_balancer import LoadBalancerType
-from victor.providers.health_monitor import HealthCheckConfig
 
 
 @pytest.fixture
@@ -290,7 +286,6 @@ class TestOrchestratorFactoryPoolIntegration:
     async def test_factory_skips_pool_with_single_url(self, pool_settings):
         """Test that factory skips pool with only one URL."""
         from victor.agent.orchestrator_factory import OrchestratorFactory
-        from victor.providers.mock import MockProvider
 
         # Only one base URL
         pool_settings.lmstudio_base_urls = ["http://localhost:1234"]

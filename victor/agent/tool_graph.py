@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 class CacheStrategy(Enum):
@@ -67,7 +67,7 @@ class ValidationRule:
     constraint: Any
     error_message: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "rule_type": self.rule_type.value,
@@ -77,7 +77,7 @@ class ValidationRule:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ValidationRule":
+    def from_dict(cls, data: dict[str, Any]) -> "ValidationRule":
         """Create from dictionary."""
         return cls(
             rule_type=ValidationRuleType(data["rule_type"]),
@@ -102,12 +102,12 @@ class ToolExecutionNode:
     """
 
     tool_name: str
-    validation_rules: List[ValidationRule] = field(default_factory=list)
+    validation_rules: list[ValidationRule] = field(default_factory=list)
     normalization_strategy: str = "auto"
     cache_policy: str = "default"
     retry_policy: str = "default"
     timeout_seconds: float = 30.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __hash__(self) -> int:
         """Make node hashable for caching."""
@@ -123,7 +123,7 @@ class ToolExecutionNode:
             and self.cache_policy == other.cache_policy
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "tool_name": self.tool_name,
@@ -136,7 +136,7 @@ class ToolExecutionNode:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ToolExecutionNode":
+    def from_dict(cls, data: dict[str, Any]) -> "ToolExecutionNode":
         """Create from dictionary."""
         rules = [ValidationRule.from_dict(rule) for rule in data.get("validation_rules", [])]
         return cls(
@@ -164,7 +164,7 @@ class ToolDependency:
     to_node: str
     condition: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "from": self.from_node,
@@ -173,7 +173,7 @@ class ToolDependency:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ToolDependency":
+    def from_dict(cls, data: dict[str, Any]) -> "ToolDependency":
         """Create from dictionary."""
         return cls(
             from_node=data["from"],
@@ -194,10 +194,10 @@ class ToolExecutionGraph:
         version: Graph format version
     """
 
-    nodes: List[ToolExecutionNode]
-    edges: List[ToolDependency] = field(default_factory=list)
+    nodes: list[ToolExecutionNode]
+    edges: list[ToolDependency] = field(default_factory=list)
     cache_strategy: CacheStrategy = CacheStrategy.ADAPTIVE
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     version: str = "1.0"
 
     def __post_init__(self) -> None:
@@ -219,7 +219,7 @@ class ToolExecutionGraph:
                 return node
         return None
 
-    def get_dependencies(self, tool_name: str) -> List[ToolDependency]:
+    def get_dependencies(self, tool_name: str) -> list[ToolDependency]:
         """Get dependencies for a tool.
 
         Args:
@@ -230,7 +230,7 @@ class ToolExecutionGraph:
         """
         return [edge for edge in self.edges if edge.from_node == tool_name]
 
-    def get_dependents(self, tool_name: str) -> List[ToolDependency]:
+    def get_dependents(self, tool_name: str) -> list[ToolDependency]:
         """Get tools that depend on this tool.
 
         Args:
@@ -241,7 +241,7 @@ class ToolExecutionGraph:
         """
         return [edge for edge in self.edges if edge.to_node == tool_name]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
 
         Returns:
@@ -258,7 +258,7 @@ class ToolExecutionGraph:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ToolExecutionGraph":
+    def from_dict(cls, data: dict[str, Any]) -> "ToolExecutionGraph":
         """Create graph from dictionary.
 
         Args:

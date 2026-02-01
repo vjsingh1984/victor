@@ -1,10 +1,7 @@
 import pytest
 import httpx
 import os
-import json
-import re
 from unittest.mock import AsyncMock, patch, MagicMock
-from typing import List, Dict, Any, AsyncIterator
 
 from victor.providers.ollama_provider import OllamaProvider
 from victor.providers.base import Message, ProviderError, ProviderTimeoutError, ToolDefinition

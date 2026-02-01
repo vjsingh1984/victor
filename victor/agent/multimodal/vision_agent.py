@@ -30,14 +30,13 @@ This module provides the VisionAgent class for multimodal image processing:
 from __future__ import annotations
 
 import base64
-import hashlib
 import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional
 
 from victor.core.errors import ValidationError
 from victor.providers.base import BaseProvider, CompletionResponse, Message
@@ -91,12 +90,12 @@ class BoundingBox:
     width: float
     height: float
 
-    def to_list(self) -> List[float]:
+    def to_list(self) -> list[float]:
         """Convert to list format."""
         return [self.x, self.y, self.width, self.height]
 
     @classmethod
-    def from_list(cls, coords: List[float]) -> "BoundingBox":
+    def from_list(cls, coords: list[float]) -> "BoundingBox":
         """Create from list format."""
         if len(coords) != 4:
             raise ValidationError(f"BoundingBox requires 4 values, got {len(coords)}")
@@ -106,7 +105,7 @@ class BoundingBox:
         """Calculate area of the bounding box."""
         return self.width * self.height
 
-    def center(self) -> Tuple[float, float]:
+    def center(self) -> tuple[float, float]:
         """Get center point."""
         return (self.x + self.width / 2, self.y + self.height / 2)
 
@@ -126,7 +125,7 @@ class DetectedObject:
     class_name: str
     confidence: float
     bbox: BoundingBox
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
     label: Optional[str] = None
 
     def __post_init__(self) -> None:
@@ -142,7 +141,7 @@ class DetectedObject:
         return self.bbox.area()
 
     @property
-    def center(self) -> Tuple[float, float]:
+    def center(self) -> tuple[float, float]:
         """Get center point of the object."""
         return self.bbox.center()
 
@@ -159,7 +158,7 @@ class ColorInfo:
     """
 
     hex_color: str
-    rgb: Tuple[int, int, int]
+    rgb: tuple[int, int, int]
     percentage: float
     name: Optional[str] = None
 
@@ -184,8 +183,8 @@ class FaceDetection:
 
     bbox: BoundingBox
     confidence: float
-    attributes: Dict[str, Any] = field(default_factory=dict)
-    landmarks: Dict[str, Tuple[float, float]] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
+    landmarks: dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
 @dataclass
@@ -204,11 +203,11 @@ class VisionAnalysisResult:
 
     analysis: str
     confidence: float
-    objects_found: List[DetectedObject]
+    objects_found: list[DetectedObject]
     text_content: str
-    colors: List[ColorInfo]
-    faces: List[FaceDetection]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    colors: list[ColorInfo]
+    faces: list[FaceDetection]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate confidence range."""
@@ -224,7 +223,7 @@ class VisionAnalysisResult:
         """
         return self.analysis
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "analysis": self.analysis,
@@ -294,14 +293,14 @@ class PlotData:
     """
 
     chart_type: ChartType
-    data_series: List[str]
-    labels: Dict[str, str]
-    values: List[DataPoint]
-    trends: List[str]
+    data_series: list[str]
+    labels: dict[str, str]
+    values: list[DataPoint]
+    trends: list[str]
     title: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "chart_type": self.chart_type.value,
@@ -338,11 +337,11 @@ class ComparisonResult:
         metadata: Comparison metadata
     """
 
-    differences: List[str]
-    similarities: List[str]
+    differences: list[str]
+    similarities: list[str]
     diff_score: float
-    common_elements: List[str]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    common_elements: list[str]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate diff_score range."""
@@ -370,13 +369,13 @@ class ImageMetadata:
     """
 
     format: ImageFormat
-    dimensions: Tuple[int, int]
+    dimensions: tuple[int, int]
     size_bytes: int
     hash: str
     captured_at: Optional[datetime] = None
-    location: Optional[Tuple[float, float]] = None
+    location: Optional[tuple[float, float]] = None
     camera: Optional[str] = None
-    additional_metadata: Dict[str, Any] = field(default_factory=dict)
+    additional_metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -494,7 +493,7 @@ class VisionAgent:
         """Check if provider supports vision."""
         return self.provider.name in self.VISION_PROVIDERS
 
-    def _encode_image(self, image_path: str) -> Tuple[str, ImageFormat]:
+    def _encode_image(self, image_path: str) -> tuple[str, ImageFormat]:
         """Encode image as base64 and determine media type.
 
         Args:
@@ -812,8 +811,8 @@ class VisionAgent:
     async def detect_objects(
         self,
         image_path: str,
-        object_classes: Optional[List[str]] = None,
-    ) -> List[DetectedObject]:
+        object_classes: Optional[list[str]] = None,
+    ) -> list[DetectedObject]:
         """Detect and classify objects in an image.
 
         Args:
@@ -1122,10 +1121,10 @@ class VisionAgent:
 
     async def batch_process_images(
         self,
-        image_paths: List[str],
+        image_paths: list[str],
         operation: str = "analyze",
         **kwargs: Any,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Process multiple images in batch.
 
         Args:
@@ -1162,7 +1161,7 @@ class VisionAgent:
                 f"Invalid operation: {operation}. Must be one of: {', '.join(valid_operations)}"
             )
 
-        results: List[Any] = []
+        results: list[Any] = []
 
         for image_path in image_paths:
             try:
@@ -1195,7 +1194,7 @@ class VisionAgent:
     async def analyze_image_quality(
         self,
         image_path: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze image quality characteristics.
 
         Args:
@@ -1284,7 +1283,7 @@ class VisionAgent:
         self,
         image_path: str,
         structure: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Extract text from document images with structure preservation.
 
         Enhanced OCR for documents, forms, receipts, etc. with better
@@ -1397,7 +1396,7 @@ class VisionAgent:
         self,
         image_path: str,
         include_attributes: bool = True,
-    ) -> List[FaceDetection]:
+    ) -> list[FaceDetection]:
         """Detect faces with detailed analysis.
 
         Args:
@@ -1510,7 +1509,7 @@ class VisionAgent:
         self,
         image_path: str,
         max_colors: int = 10,
-    ) -> List[ColorInfo]:
+    ) -> list[ColorInfo]:
         """Extract dominant colors from an image.
 
         Args:

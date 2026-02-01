@@ -55,7 +55,6 @@ from __future__ import annotations
 import contextvars
 import logging
 import threading
-import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -63,12 +62,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import (
     Any,
-    Callable,
-    Dict,
-    Iterator,
-    List,
     Optional,
 )
+from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +110,7 @@ class SpanAttributes:
         attributes: Dictionary of attribute key-value pairs
     """
 
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
 
     def set(self, key: str, value: Any) -> None:
         """Set an attribute.
@@ -137,7 +133,7 @@ class SpanAttributes:
         """
         return self.attributes.get(key, default)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary.
 
         Returns:
@@ -154,12 +150,12 @@ class SpanEvents:
         events: List of timestamped events
     """
 
-    events: List[Dict[str, Any]] = field(default_factory=list)
+    events: list[dict[str, Any]] = field(default_factory=list)
 
     def add_event(
         self,
         name: str,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: Optional[dict[str, Any]] = None,
         timestamp: Optional[datetime] = None,
     ) -> None:
         """Add an event to the span.
@@ -177,7 +173,7 @@ class SpanEvents:
             }
         )
 
-    def to_list(self) -> List[Dict[str, Any]]:
+    def to_list(self) -> list[dict[str, Any]]:
         """Convert to list.
 
         Returns:
@@ -223,7 +219,7 @@ class TraceSpan:
         """
         self.attributes.set(key, value)
 
-    def set_attributes(self, attributes: Dict[str, Any]) -> None:
+    def set_attributes(self, attributes: dict[str, Any]) -> None:
         """Set multiple attributes.
 
         Args:
@@ -235,7 +231,7 @@ class TraceSpan:
     def add_event(
         self,
         name: str,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: Optional[dict[str, Any]] = None,
     ) -> None:
         """Add an event to the span.
 
@@ -268,7 +264,7 @@ class TraceSpan:
             return 0.0
         return (self.end_time - self.start_time).total_seconds()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary.
 
         Returns:
@@ -320,7 +316,7 @@ class TeamTracer:
         self._enabled = enabled
         self._otel_available = False
         self._otel_tracer = None
-        self._spans: List[TraceSpan] = []
+        self._spans: list[TraceSpan] = []
         self._lock = threading.RLock()
 
         # Try to import OpenTelemetry
@@ -352,7 +348,7 @@ class TeamTracer:
         name: str,
         parent_span: Optional[TraceSpan] = None,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: Optional[dict[str, Any]] = None,
     ) -> TraceSpan:
         """Start a new span.
 
@@ -399,7 +395,6 @@ class TeamTracer:
         if self._otel_available and self._otel_tracer:
             try:
                 from opentelemetry import trace
-                from opentelemetry.trace import Status, StatusCode
 
                 # Start OpenTelemetry span
                 if parent_span and hasattr(parent_span, "_otel_span"):
@@ -443,7 +438,7 @@ class TeamTracer:
             except Exception as e:
                 logger.warning(f"Failed to end OpenTelemetry span: {e}")
 
-    def get_spans(self) -> List[TraceSpan]:
+    def get_spans(self) -> list[TraceSpan]:
         """Get all recorded spans (local tracing).
 
         Returns:
@@ -452,7 +447,7 @@ class TeamTracer:
         with self._lock:
             return self._spans.copy()
 
-    def get_trace(self, trace_id: str) -> List[TraceSpan]:
+    def get_trace(self, trace_id: str) -> list[TraceSpan]:
         """Get all spans for a trace.
 
         Args:
@@ -514,7 +509,7 @@ def trace_team_execution(
     team_id: str,
     formation: str,
     member_count: int,
-    attributes: Optional[Dict[str, Any]] = None,
+    attributes: Optional[dict[str, Any]] = None,
 ) -> Iterator[TraceSpan]:
     """Context manager for tracing team execution.
 
@@ -564,7 +559,7 @@ def trace_member_execution(
     team_id: str,
     member_id: str,
     role: str = "assistant",
-    attributes: Optional[Dict[str, Any]] = None,
+    attributes: Optional[dict[str, Any]] = None,
 ) -> Iterator[TraceSpan]:
     """Context manager for tracing member execution.
 
@@ -612,7 +607,7 @@ def trace_member_execution(
 @contextmanager
 def trace_workflow_execution(
     workflow_id: str,
-    attributes: Optional[Dict[str, Any]] = None,
+    attributes: Optional[dict[str, Any]] = None,
 ) -> Iterator[TraceSpan]:
     """Context manager for tracing workflow execution.
 
@@ -676,7 +671,7 @@ def set_trace_id(trace_id: str) -> None:
     _trace_context.set(trace_id)
 
 
-def export_trace_to_dict(trace_id: str) -> Dict[str, Any]:
+def export_trace_to_dict(trace_id: str) -> dict[str, Any]:
     """Export a trace to dictionary format.
 
     Args:
@@ -695,7 +690,7 @@ def export_trace_to_dict(trace_id: str) -> Dict[str, Any]:
     }
 
 
-def get_all_traces() -> List[Dict[str, Any]]:
+def get_all_traces() -> list[dict[str, Any]]:
     """Export all traces to dictionary format.
 
     Returns:
@@ -705,7 +700,7 @@ def get_all_traces() -> List[Dict[str, Any]]:
     spans = tracer.get_spans()
 
     # Group by trace ID
-    traces: Dict[str, List[TraceSpan]] = {}
+    traces: dict[str, list[TraceSpan]] = {}
     for span in spans:
         if span.trace_id not in traces:
             traces[span.trace_id] = []

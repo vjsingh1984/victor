@@ -15,12 +15,9 @@
 """Unit tests for workflows base module."""
 
 import pytest
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock
+from typing import Any
 
 from victor.workflows.base import BaseWorkflow, WorkflowRegistry
-from victor.tools.base import ToolResult
-from victor.tools.registry import ToolRegistry
 
 
 class TestWorkflowBase(BaseWorkflow):
@@ -34,7 +31,7 @@ class TestWorkflowBase(BaseWorkflow):
     def description(self) -> str:
         return "A test workflow"
 
-    async def run(self, context: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+    async def run(self, context: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         return {"success": True, "message": "Test completed"}
 
 
@@ -80,7 +77,7 @@ class TestWorkflowRegistry:
             def description(self) -> str:
                 return "Another workflow"
 
-            async def run(self, context: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+            async def run(self, context: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
                 return {}
 
         workflow1 = TestWorkflowBase()

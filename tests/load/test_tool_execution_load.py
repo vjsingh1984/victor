@@ -22,8 +22,7 @@ import asyncio
 import pytest
 import time
 import statistics
-from typing import Any, Dict, List
-from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 import httpx
 from pytest import mark
@@ -90,7 +89,7 @@ class TestToolExecutionLoad:
 
         async def execute_tool_request(
             client: httpx.AsyncClient, request_id: int
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             """Execute a tool-using request."""
             try:
                 start = time.time()
@@ -216,7 +215,7 @@ class TestToolExecutionLoad:
             "Summarize the test coverage",
         ]
 
-        async def run_conversation(client: httpx.AsyncClient, conv_id: int) -> Dict[str, Any]:
+        async def run_conversation(client: httpx.AsyncClient, conv_id: int) -> dict[str, Any]:
             """Run a multi-turn conversation."""
             latencies = []
             errors = 0
@@ -290,7 +289,7 @@ class TestToolExecutionLoad:
             "Invalid tool parameters",
         ]
 
-        async def make_error_request(client: httpx.AsyncClient, req_id: int) -> Dict[str, Any]:
+        async def make_error_request(client: httpx.AsyncClient, req_id: int) -> dict[str, Any]:
             """Make request that will cause tool error."""
             try:
                 start = time.time()

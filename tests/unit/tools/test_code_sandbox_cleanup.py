@@ -19,7 +19,7 @@ to prevent resource leaks.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 
 from victor.tools.code_executor_tool import (
     CodeSandbox,

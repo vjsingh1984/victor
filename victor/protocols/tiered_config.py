@@ -8,7 +8,7 @@ This protocol defines the minimal interface for tiered configuration,
 replacing duck typing with type-safe protocol conformance.
 """
 
-from typing import Protocol, runtime_checkable, Set
+from typing import Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -33,7 +33,7 @@ class TieredConfigProviderProtocol(Protocol):
     """
 
     @property
-    def mandatory(self) -> Set[str]:
+    def mandatory(self) -> set[str]:
         """Get the set of mandatory tools.
 
         Returns:
@@ -42,7 +42,7 @@ class TieredConfigProviderProtocol(Protocol):
         ...
 
     @property
-    def core(self) -> Set[str]:
+    def core(self) -> set[str]:
         """Get the set of core tools.
 
         Returns:

@@ -25,8 +25,8 @@ Extracted from VerticalBase for SRP compliance.
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Type
+from abc import ABC
+from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 from victor.core.vertical_types import TieredToolTemplate
 
@@ -51,7 +51,7 @@ class VerticalMetadataProvider(ABC):
     version: ClassVar[str] = "0.5.0"
 
     @classmethod
-    def get_provider_hints(cls) -> Dict[str, Any]:
+    def get_provider_hints(cls) -> dict[str, Any]:
         """Get hints for provider selection.
 
         Returns:
@@ -74,7 +74,7 @@ class VerticalMetadataProvider(ABC):
             }
 
     @classmethod
-    def get_evaluation_criteria(cls) -> List[str]:
+    def get_evaluation_criteria(cls) -> list[str]:
         """Get criteria for evaluating agent performance.
 
         Returns:
@@ -97,7 +97,7 @@ class VerticalMetadataProvider(ABC):
             ]
 
     @classmethod
-    def get_capability_configs(cls) -> Dict[str, Any]:
+    def get_capability_configs(cls) -> dict[str, Any]:
         """Get capability configurations for this vertical.
 
         Override to provide vertical-specific capability configurations

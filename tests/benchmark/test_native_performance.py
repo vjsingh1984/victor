@@ -34,7 +34,7 @@ from __future__ import annotations
 import random
 import string
 import time
-from typing import Callable, List
+from collections.abc import Callable
 
 import pytest
 
@@ -84,7 +84,7 @@ def generate_sample_code(lines: int) -> str:
     return "\n".join(parts)
 
 
-def generate_vectors(count: int, dim: int) -> List[List[float]]:
+def generate_vectors(count: int, dim: int) -> list[list[float]]:
     """Generate random normalized vectors."""
     vectors = []
     for _ in range(count):
@@ -103,7 +103,7 @@ class TestTypeCoercionPerformance:
     """Benchmark type coercion (3-5x expected speedup)."""
 
     @pytest.fixture
-    def test_values(self) -> List[str]:
+    def test_values(self) -> list[str]:
         """Sample values for type coercion."""
         return [
             "true",
@@ -118,7 +118,7 @@ class TestTypeCoercionPerformance:
             "some random string",
         ] * 100  # 1000 values
 
-    def test_python_coercion(self, test_values: List[str]):
+    def test_python_coercion(self, test_values: list[str]):
         """Benchmark Python fallback type coercion."""
 
         def coerce(value: str):
@@ -145,7 +145,7 @@ class TestTypeCoercionPerformance:
         print(f"\nPython coercion: {ms_per_call:.3f} ms per 1000 values")
 
     @pytest.mark.skipif(not is_rust_available(), reason="Rust not available")
-    def test_rust_coercion(self, test_values: List[str]):
+    def test_rust_coercion(self, test_values: list[str]):
         """Benchmark Rust type coercion."""
         from victor.processing.native import coerce_string_type
 
@@ -166,7 +166,7 @@ class TestStdlibDetectionPerformance:
     """Benchmark stdlib module detection (5-10x expected speedup)."""
 
     @pytest.fixture
-    def module_names(self) -> List[str]:
+    def module_names(self) -> list[str]:
         """Sample module names for testing."""
         return [
             "os",
@@ -183,7 +183,7 @@ class TestStdlibDetectionPerformance:
             "my_custom_module",
         ] * 100  # 1200 lookups
 
-    def test_python_stdlib_detection(self, module_names: List[str]):
+    def test_python_stdlib_detection(self, module_names: list[str]):
         """Benchmark Python fallback stdlib detection."""
         stdlib = frozenset(
             {
@@ -211,7 +211,7 @@ class TestStdlibDetectionPerformance:
         print(f"\nPython stdlib detection: {ms_per_call:.3f} ms per 1200 lookups")
 
     @pytest.mark.skipif(not is_rust_available(), reason="Rust not available")
-    def test_rust_stdlib_detection(self, module_names: List[str]):
+    def test_rust_stdlib_detection(self, module_names: list[str]):
         """Benchmark Rust stdlib detection."""
         from victor.processing.native import is_stdlib_module
 
@@ -312,7 +312,7 @@ class TestJsonRepairPerformance:
     """Benchmark JSON repair (5-10x expected speedup)."""
 
     @pytest.fixture
-    def malformed_json_samples(self) -> List[str]:
+    def malformed_json_samples(self) -> list[str]:
         """Sample malformed JSON strings."""
         return [
             "{'key': 'value'}",  # Single quotes
@@ -323,9 +323,8 @@ class TestJsonRepairPerformance:
             "{'mixed': True, 'none': None}",
         ] * 50  # 300 repairs
 
-    def test_python_json_repair(self, malformed_json_samples: List[str]):
+    def test_python_json_repair(self, malformed_json_samples: list[str]):
         """Benchmark Python JSON repair."""
-        import json
 
         def repair(s: str) -> str:
             result = s
@@ -343,7 +342,7 @@ class TestJsonRepairPerformance:
         print(f"\nPython JSON repair: {ms_per_call:.3f} ms per 300 repairs")
 
     @pytest.mark.skipif(not is_rust_available(), reason="Rust not available")
-    def test_rust_json_repair(self, malformed_json_samples: List[str]):
+    def test_rust_json_repair(self, malformed_json_samples: list[str]):
         """Benchmark Rust JSON repair."""
         from victor.processing.native import repair_json
 

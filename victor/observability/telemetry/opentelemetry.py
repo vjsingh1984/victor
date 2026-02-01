@@ -40,7 +40,7 @@ Usage:
 
 import logging
 import os
-from typing import Optional, Tuple, Any
+from typing import Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def setup_opentelemetry(
     otlp_endpoint: Optional[str] = None,
     enable_tracing: bool = True,
     enable_metrics: bool = True,
-) -> Tuple[Optional[Any], Optional[Any]]:
+) -> tuple[Optional[Any], Optional[Any]]:
     """Initialize OpenTelemetry tracing and metrics.
 
     This function sets up:

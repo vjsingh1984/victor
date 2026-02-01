@@ -14,9 +14,8 @@
 
 """Tests for GroqProvider."""
 
-import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 import httpx
 
 from victor.providers.groq_provider import (
@@ -29,7 +28,6 @@ from victor.providers.base import (
     Message,
     ProviderError,
     ProviderTimeoutError,
-    StreamChunk,
     ToolDefinition,
 )
 

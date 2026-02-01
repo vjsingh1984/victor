@@ -42,7 +42,7 @@ Usage:
 """
 
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +198,7 @@ class StateDelegationMixin:
     """
 
     # Default state delegations (can be overridden by subclasses)
-    _state_delegations: Dict[str, Tuple[str, str]] = {}
+    _state_delegations: dict[str, tuple[str, str]] = {}
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Initialize subclass by creating delegation descriptors.
@@ -209,7 +209,7 @@ class StateDelegationMixin:
         super().__init_subclass__(**kwargs)
 
         # Get all delegations from class hierarchy
-        delegations: Dict[str, Tuple[str, Optional[str], str]] = {}
+        delegations: dict[str, tuple[str, Optional[str], str]] = {}
 
         # Collect from all base classes (in reverse MRO order)
         for base in reversed(cls.__mro__):
@@ -272,7 +272,7 @@ class StateDelegationMixin:
         )
         setattr(cls, property_name, descriptor)
 
-    def get_delegated_state_properties(self) -> Dict[str, Tuple[str, str]]:
+    def get_delegated_state_properties(self) -> dict[str, tuple[str, str]]:
         """Get all delegated state property mappings.
 
         Returns:

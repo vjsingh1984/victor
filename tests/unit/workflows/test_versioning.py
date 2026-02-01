@@ -360,7 +360,6 @@ class TestWorkflowVersionRegistry:
         """Test finding migration path."""
         from victor.workflows.versioning import (
             WorkflowVersionRegistry,
-            VersionedWorkflow,
             WorkflowVersion,
             WorkflowMigration,
         )

@@ -18,7 +18,6 @@ Tests the hierarchical tool cache with dependency-aware invalidation.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 from victor.agent.cache.tool_cache_manager import (
     ToolCacheManager,

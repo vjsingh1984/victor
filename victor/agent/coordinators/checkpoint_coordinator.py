@@ -27,7 +27,8 @@ to improve modularity and testability.
 """
 
 import logging
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.storage.checkpoints.manager import ConversationCheckpointManager
@@ -69,8 +70,8 @@ class CheckpointCoordinator:
         self,
         checkpoint_manager: Optional["ConversationCheckpointManager"],
         session_id: Optional[str],
-        get_state_fn: Callable[[], Dict[str, Any]],
-        apply_state_fn: Callable[[Dict[str, Any]], None],
+        get_state_fn: Callable[[], dict[str, Any]],
+        apply_state_fn: Callable[[dict[str, Any]], None],
     ) -> None:
         """Initialize the checkpoint coordinator.
 

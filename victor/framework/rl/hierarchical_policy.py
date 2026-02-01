@@ -54,7 +54,7 @@ import logging
 import random
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.framework.rl.option_framework import (
@@ -191,10 +191,10 @@ class HierarchicalPolicy(BaseLearner):
         self.epsilon = epsilon
 
         # Q-table: state_key -> option_name -> Q-value
-        self._q_table: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(lambda: 0.5))
+        self._q_table: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(lambda: 0.5))
 
         # Visit counts for UCB exploration
-        self._visit_counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self._visit_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
         # Option registry
         self._option_registry = OptionRegistry()
@@ -206,15 +206,15 @@ class HierarchicalPolicy(BaseLearner):
 
         # Statistics
         self._total_decisions = 0
-        self._option_completions: Dict[str, int] = defaultdict(int)
-        self._option_success_rate: Dict[str, List[bool]] = defaultdict(list)
+        self._option_completions: dict[str, int] = defaultdict(int)
+        self._option_success_rate: dict[str, list[bool]] = defaultdict(list)
 
         # Load from database if available
         if db_connection:
             self._load_from_db()
 
     @property
-    def option_names(self) -> List[str]:
+    def option_names(self) -> list[str]:
         """Get available option names."""
         return [
             self.OPTION_EXPLORE,
@@ -502,7 +502,7 @@ class HierarchicalPolicy(BaseLearner):
 
         return max(0.0, min(1.0, base_reward))
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export policy metrics.
 
         Returns:

@@ -44,7 +44,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.core.events.protocols import MessagingEvent
 
@@ -113,7 +113,7 @@ class EvaluationCompletedEvent:
     success: bool
     quality_score: float
     tool_calls_used: int
-    tokens_used: Dict[str, int]
+    tokens_used: dict[str, int]
     session_id: str
     timestamp: float = field(default_factory=time.time)
 
@@ -264,7 +264,7 @@ class OutcomeRecordedEvent:
     provider: str
     model: str
     tool_calls: int
-    outcome_data: Dict[str, Any] = field(default_factory=dict)
+    outcome_data: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
     def to_messaging_event(self) -> MessagingEvent:
@@ -480,14 +480,14 @@ class ClassificationEnsembleEvent:
 
     query: str
     session_id: str
-    task_type: Dict[str, Any]
-    intent_type: Optional[Dict[str, Any]] = None
-    complexity: Optional[Dict[str, Any]] = None
+    task_type: dict[str, Any]
+    intent_type: Optional[dict[str, Any]] = None
+    complexity: Optional[dict[str, Any]] = None
     unified_type: str = "UNKNOWN"
     confidence: float = 0.5
     tool_budget: int = 5
     requires_confirmation: bool = False
-    matched_patterns: List[str] = field(default_factory=list)
+    matched_patterns: list[str] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
 
     def to_messaging_event(self) -> MessagingEvent:
@@ -521,7 +521,7 @@ def create_evaluation_completed_event(
     success: bool,
     quality_score: float,
     tool_calls_used: int,
-    tokens_used: Dict[str, int],
+    tokens_used: dict[str, int],
     session_id: str,
 ) -> EvaluationCompletedEvent:
     """Create an evaluation completed event.
@@ -608,7 +608,7 @@ def create_outcome_recorded_event(
     provider: str,
     model: str,
     tool_calls: int,
-    outcome_data: Optional[Dict[str, Any]] = None,
+    outcome_data: Optional[dict[str, Any]] = None,
 ) -> OutcomeRecordedEvent:
     """Create an outcome recorded event.
 
@@ -728,14 +728,14 @@ def create_complexity_classified_event(
 def create_classification_ensemble_event(
     query: str,
     session_id: str,
-    task_type: Dict[str, Any],
-    intent_type: Optional[Dict[str, Any]] = None,
-    complexity: Optional[Dict[str, Any]] = None,
+    task_type: dict[str, Any],
+    intent_type: Optional[dict[str, Any]] = None,
+    complexity: Optional[dict[str, Any]] = None,
     unified_type: str = "UNKNOWN",
     confidence: float = 0.5,
     tool_budget: int = 5,
     requires_confirmation: bool = False,
-    matched_patterns: Optional[List[str]] = None,
+    matched_patterns: Optional[list[str]] = None,
 ) -> ClassificationEnsembleEvent:
     """Create a classification ensemble event.
 

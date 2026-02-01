@@ -1,5 +1,5 @@
-from typing import Any, Dict, List, Optional
-from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
+from typing import Any, Optional
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.graph_tool import graph
 
@@ -46,7 +46,7 @@ from victor.tools.graph_tool import graph
 async def architecture_summary(
     top_k: int = 5,
     include_symbols: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return a structured architecture snapshot (modules + symbol hotspots).
 
     Uses module-level PageRank and centrality plus symbol-level PageRank to surface
@@ -81,7 +81,7 @@ async def architecture_summary(
     )
 
     # Symbol hotspots (PageRank) if requested
-    symbol_pr: Optional[Dict[str, Any]] = None
+    symbol_pr: Optional[dict[str, Any]] = None
     if include_symbols:
         symbol_pr = await graph(
             mode="pagerank",

@@ -44,7 +44,7 @@ import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 import yaml
 
@@ -118,10 +118,10 @@ class AgentMode:
     edit_permission: EditPermission
     tool_budget_multiplier: float = 1.0
     max_iterations: int = 10
-    allowed_tools: Set[str] = field(default_factory=set)
-    denied_tools: Set[str] = field(default_factory=set)
+    allowed_tools: set[str] = field(default_factory=set)
+    denied_tools: set[str] = field(default_factory=set)
     description: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def get_exploration_multiplier(self) -> float:
         """Get the exploration multiplier for this mode.
@@ -181,8 +181,8 @@ class VerticalModeConfig:
 
     vertical_name: str
     default_mode: str = "build"
-    modes: Dict[str, AgentMode] = field(default_factory=dict)
-    mode_overrides: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    modes: dict[str, AgentMode] = field(default_factory=dict)
+    mode_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def get_mode(self, mode_name: str) -> Optional[AgentMode]:
         """Get a mode configuration by name.
@@ -195,7 +195,7 @@ class VerticalModeConfig:
         """
         return self.modes.get(mode_name, self.modes.get(self.default_mode))
 
-    def list_modes(self) -> List[str]:
+    def list_modes(self) -> list[str]:
         """List available mode names.
 
         Returns:
@@ -220,7 +220,7 @@ class ModeConfigRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._configs: Dict[str, VerticalModeConfig] = {}
+        self._configs: dict[str, VerticalModeConfig] = {}
         # Config directory is victor/config/modes/
         self._config_dir = Path(__file__).parent.parent / "config" / "modes"
         logger.debug(f"ModeConfigRegistry: Initialized with config_dir={self._config_dir}")
@@ -380,7 +380,7 @@ class ModeConfigRegistry:
 
         return mode
 
-    def list_modes(self, vertical_name: str) -> List[str]:
+    def list_modes(self, vertical_name: str) -> list[str]:
         """List available modes for a vertical.
 
         Args:

@@ -45,18 +45,16 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.core.health import (
     HealthChecker,
-    HealthStatus,
-    ComponentHealth,
     HealthReport,
 )
 
@@ -89,12 +87,12 @@ class HealthCheckResponse:
     """
 
     status: str
-    checks: Dict[str, Dict[str, Any]]
+    checks: dict[str, dict[str, Any]]
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     uptime_seconds: Optional[float] = None
     version: str = "0.5.0"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON response.
 
         Returns:
@@ -171,14 +169,14 @@ class ProductionHealthChecker:
         self.startup_completed = False
 
         # Health check storage
-        self._liveness_checks: Dict[str, Callable[[], bool]] = {}
-        self._readiness_checks: Dict[str, Callable[[], bool]] = {}
-        self._startup_checks: Dict[str, Callable[[], bool]] = {}
+        self._liveness_checks: dict[str, Callable[[], bool]] = {}
+        self._readiness_checks: dict[str, Callable[[], bool]] = {}
+        self._startup_checks: dict[str, Callable[[], bool]] = {}
 
         # Async health check storage
-        self._async_liveness_checks: Dict[str, Callable[[], Any]] = {}
-        self._async_readiness_checks: Dict[str, Callable[[], Any]] = {}
-        self._async_startup_checks: Dict[str, Callable[[], Any]] = {}
+        self._async_liveness_checks: dict[str, Callable[[], Any]] = {}
+        self._async_readiness_checks: dict[str, Callable[[], Any]] = {}
+        self._async_startup_checks: dict[str, Callable[[], Any]] = {}
 
         # Core health checker for detailed checks
         self._health_checker = HealthChecker()

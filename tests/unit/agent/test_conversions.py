@@ -14,7 +14,6 @@
 
 """Unit tests for conversion utilities."""
 
-import pytest
 from dataclasses import dataclass
 
 from victor.agent.utils.conversions import (

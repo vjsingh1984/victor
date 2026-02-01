@@ -43,7 +43,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 import re
 
 
@@ -73,7 +73,7 @@ class GroundingClaim:
 
     claim_type: GroundingClaimType
     value: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     source_text: str = ""
     confidence: float = 1.0
 
@@ -97,7 +97,7 @@ class ClaimVerificationResult:
     is_grounded: bool
     confidence: float = 0.0
     claim: Optional[GroundingClaim] = None
-    evidence: Dict[str, Any] = field(default_factory=dict)
+    evidence: dict[str, Any] = field(default_factory=dict)
     reason: str = ""
 
 
@@ -120,8 +120,8 @@ class AggregatedVerificationResult:
     total_claims: int = 0
     verified_claims: int = 0
     failed_claims: int = 0
-    results: List[ClaimVerificationResult] = field(default_factory=list)
-    strategy_scores: Dict[str, float] = field(default_factory=dict)
+    results: list[ClaimVerificationResult] = field(default_factory=list)
+    strategy_scores: dict[str, float] = field(default_factory=dict)
 
 
 @runtime_checkable
@@ -137,14 +137,14 @@ class IGroundingStrategy(Protocol):
         ...
 
     @property
-    def claim_types(self) -> List[GroundingClaimType]:
+    def claim_types(self) -> list[GroundingClaimType]:
         """Return claim types this strategy can verify."""
         ...
 
     async def verify(
         self,
         claim: GroundingClaim,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ClaimVerificationResult:
         """Verify a claim against context.
 
@@ -160,8 +160,8 @@ class IGroundingStrategy(Protocol):
     def extract_claims(
         self,
         response: str,
-        context: Dict[str, Any],
-    ) -> List[GroundingClaim]:
+        context: dict[str, Any],
+    ) -> list[GroundingClaim]:
         """Extract claims of this type from a response.
 
         Args:
@@ -190,13 +190,13 @@ class FileExistenceStrategy(IGroundingStrategy):
         return "file_existence"
 
     @property
-    def claim_types(self) -> List[GroundingClaimType]:
+    def claim_types(self) -> list[GroundingClaimType]:
         return [GroundingClaimType.FILE_EXISTS, GroundingClaimType.FILE_NOT_EXISTS]
 
     async def verify(
         self,
         claim: GroundingClaim,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ClaimVerificationResult:
         """Verify file existence claims."""
         project_root = context.get("project_root", self._project_root)
@@ -228,8 +228,8 @@ class FileExistenceStrategy(IGroundingStrategy):
     def extract_claims(
         self,
         response: str,
-        context: Dict[str, Any],
-    ) -> List[GroundingClaim]:
+        context: dict[str, Any],
+    ) -> list[GroundingClaim]:
         """Extract file path claims from response."""
         claims = []
 
@@ -300,7 +300,7 @@ class FileExistenceStrategy(IGroundingStrategy):
 class SymbolReferenceStrategy(IGroundingStrategy):
     """Verify code symbol references in responses."""
 
-    def __init__(self, symbol_table: Optional[Dict[str, Any]] = None):
+    def __init__(self, symbol_table: Optional[dict[str, Any]] = None):
         """Initialize with optional symbol table.
 
         Args:
@@ -313,13 +313,13 @@ class SymbolReferenceStrategy(IGroundingStrategy):
         return "symbol_reference"
 
     @property
-    def claim_types(self) -> List[GroundingClaimType]:
+    def claim_types(self) -> list[GroundingClaimType]:
         return [GroundingClaimType.SYMBOL_EXISTS]
 
     async def verify(
         self,
         claim: GroundingClaim,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ClaimVerificationResult:
         """Verify symbol existence claims."""
         symbol_table = context.get("symbol_table", self._symbol_table)
@@ -339,8 +339,8 @@ class SymbolReferenceStrategy(IGroundingStrategy):
     def extract_claims(
         self,
         response: str,
-        context: Dict[str, Any],
-    ) -> List[GroundingClaim]:
+        context: dict[str, Any],
+    ) -> list[GroundingClaim]:
         """Extract symbol reference claims from response."""
         claims = []
 
@@ -378,13 +378,13 @@ class ContentMatchStrategy(IGroundingStrategy):
         return "content_match"
 
     @property
-    def claim_types(self) -> List[GroundingClaimType]:
+    def claim_types(self) -> list[GroundingClaimType]:
         return [GroundingClaimType.CONTENT_MATCH]
 
     async def verify(
         self,
         claim: GroundingClaim,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ClaimVerificationResult:
         """Verify content match claims."""
         expected_content = claim.value
@@ -438,8 +438,8 @@ class ContentMatchStrategy(IGroundingStrategy):
     def extract_claims(
         self,
         response: str,
-        context: Dict[str, Any],
-    ) -> List[GroundingClaim]:
+        context: dict[str, Any],
+    ) -> list[GroundingClaim]:
         """Extract content match claims from response."""
         claims = []
 
@@ -473,7 +473,7 @@ class CompositeGroundingVerifier:
 
     def __init__(
         self,
-        strategies: Optional[List[IGroundingStrategy]] = None,
+        strategies: Optional[list[IGroundingStrategy]] = None,
         threshold: float = 0.7,
         require_all: bool = False,
     ):
@@ -502,7 +502,7 @@ class CompositeGroundingVerifier:
     async def verify(
         self,
         response: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> AggregatedVerificationResult:
         """Verify all claims in a response.
 
@@ -581,7 +581,7 @@ class CompositeGroundingVerifier:
     async def verify_claim(
         self,
         claim: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ClaimVerificationResult:
         """Verify a single claim string.
 

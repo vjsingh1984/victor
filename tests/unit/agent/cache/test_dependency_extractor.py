@@ -27,9 +27,8 @@ Test Coverage:
 
 from __future__ import annotations
 
-from typing import Any, Set
+from typing import Any
 
-import pytest
 
 from victor.protocols import IDependencyExtractor
 

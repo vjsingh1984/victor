@@ -15,7 +15,6 @@
 """Tests for StateDelegationMixin."""
 
 import pytest
-from typing import List
 
 from victor.agent.mixins.state_delegation import (
     StateDelegationMixin,

@@ -14,7 +14,6 @@
 
 """Tests for victor.security.safety.infrastructure module."""
 
-import pytest
 
 from victor.core.security.patterns.infrastructure import (
     InfraPatternCategory,

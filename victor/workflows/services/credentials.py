@@ -70,7 +70,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, Protocol, Tuple, Type, Union
+from typing import Any, Literal, Optional, Union
+from collections.abc import Callable
+import builtins
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +148,7 @@ class MFAConfig:
     cache_duration: int = 300  # 5 minutes
     fallback_method: Optional[MFAMethod] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "method": self.method.value,
             "totp_secret": self.totp_secret,
@@ -157,7 +159,7 @@ class MFAConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MFAConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "MFAConfig":
         fallback = data.get("fallback_method")
         return cls(
             method=MFAMethod(data.get("method", "none")),
@@ -195,7 +197,7 @@ class MFAVerifier:
     """
 
     def __init__(self) -> None:
-        self._verification_cache: Dict[str, datetime] = {}
+        self._verification_cache: dict[str, datetime] = {}
 
     def is_cached(self, key: str, cache_duration: int = 300) -> bool:
         """Check if MFA verification is cached."""
@@ -483,7 +485,7 @@ class SmartCardCredentials:
     """
 
     card_type: SmartCardType
-    slot: Union[str, int] = "0"
+    slot: str | int = "0"
     certificate: Optional[str] = None
     pin_secret: Optional[str] = None
     certificate_subject: Optional[str] = None
@@ -493,7 +495,7 @@ class SmartCardCredentials:
     middleware: Optional[str] = None  # Path to PKCS#11 library
 
     @classmethod
-    def detect_cards(cls) -> List["SmartCardCredentials"]:
+    def detect_cards(cls) -> list["SmartCardCredentials"]:
         """Detect available smart cards.
 
         Returns:
@@ -678,7 +680,7 @@ class SmartCardCredentials:
 
         return None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": "smartcard",
             "card_type": self.card_type.value,
@@ -693,7 +695,7 @@ class SmartCardCredentials:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SmartCardCredentials":
+    def from_dict(cls, data: dict[str, Any]) -> "SmartCardCredentials":
         return cls(
             card_type=SmartCardType(data.get("card_type", "piv")),
             slot=data.get("slot", "0"),
@@ -752,7 +754,7 @@ class SSOConfig:
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
     redirect_uri: str = "http://localhost:8080/callback"
-    scopes: List[str] = field(default_factory=lambda: ["openid", "profile", "email"])
+    scopes: list[str] = field(default_factory=lambda: ["openid", "profile", "email"])
     tenant_id: Optional[str] = None
     issuer_url: Optional[str] = None
     audience: Optional[str] = None
@@ -818,7 +820,7 @@ class SSOConfig:
             client_secret=client_secret,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "provider": self.provider.value,
             "domain": self.domain,
@@ -834,7 +836,7 @@ class SSOConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SSOConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "SSOConfig":
         domain = data.get("domain")
         if not domain and data.get("issuer_url"):
             import urllib.parse
@@ -865,7 +867,7 @@ class SSOTokens:
     id_token: Optional[str] = None
     token_type: str = "Bearer"
     expires_at: Optional[datetime] = None
-    scopes: List[str] = field(default_factory=list)
+    scopes: list[str] = field(default_factory=list)
 
     @property
     def is_expired(self) -> bool:
@@ -873,7 +875,7 @@ class SSOTokens:
             return False
         return datetime.now(timezone.utc) > self.expires_at
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "access_token": self.access_token,
             "refresh_token": self.refresh_token,
@@ -884,7 +886,7 @@ class SSOTokens:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SSOTokens":
+    def from_dict(cls, data: dict[str, Any]) -> "SSOTokens":
         expires_at = None
         if data.get("expires_at"):
             expires_at = datetime.fromisoformat(data["expires_at"])
@@ -990,7 +992,7 @@ class SSOAuthenticator:
         auth_url = f"{self.config.issuer_url}/authorize?{urllib.parse.urlencode(auth_params)}"
 
         # Start local callback server
-        callback_result: Dict[str, Any] = {}
+        callback_result: dict[str, Any] = {}
         callback_event = asyncio.Event()
 
         async def handle_callback(request: Any) -> Any:
@@ -1210,7 +1212,7 @@ class SystemAuthConfig:
     use_current_user: bool = True
     principal: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "auth_type": self.auth_type.value,
             "service_name": self.service_name,
@@ -1224,7 +1226,7 @@ class SystemAuthConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SystemAuthConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "SystemAuthConfig":
         return cls(
             auth_type=SystemAuthType(data["auth_type"]),
             service_name=data.get("service_name", "victor"),
@@ -1655,7 +1657,7 @@ class SystemAuthenticator:
         principal = f"{username}@{realm}"
         return self.kinit(principal, password)
 
-    def get_ad_user_info(self, username: str, domain: str) -> Optional[Dict[str, Any]]:
+    def get_ad_user_info(self, username: str, domain: str) -> Optional[dict[str, Any]]:
         """Get Active Directory user information.
 
         Args:
@@ -1695,7 +1697,7 @@ class SystemAuthenticator:
 
         return None
 
-    def get_ad_groups(self) -> List[str]:
+    def get_ad_groups(self) -> list[str]:
         """Get AD groups for current user.
 
         Returns:
@@ -1744,7 +1746,7 @@ class SystemAuthenticator:
         self,
         username: Optional[str] = None,
         password: Optional[str] = None,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, Optional[str]]:
         """Authenticate using configured method.
 
         Args:
@@ -1796,7 +1798,7 @@ class SystemAuthenticator:
 
         return False, None
 
-    def is_authenticated(self) -> Tuple[bool, Optional[str]]:
+    def is_authenticated(self) -> tuple[bool, Optional[str]]:
         """Check if current session is authenticated.
 
         Returns:
@@ -1876,7 +1878,7 @@ class AWSCredentials:
             return False
         return datetime.now(timezone.utc) > self.expires_at
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": "aws",
             "access_key_id": self.access_key_id,
@@ -1888,7 +1890,7 @@ class AWSCredentials:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AWSCredentials":
+    def from_dict(cls, data: dict[str, Any]) -> "AWSCredentials":
         expires_at = None
         if data.get("expires_at"):
             expires_at = datetime.fromisoformat(data["expires_at"])
@@ -1945,7 +1947,7 @@ class AzureCredentials:
     subscription_id: Optional[str] = None
     profile: str = "default"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": "azure",
             "client_id": self.client_id,
@@ -1956,7 +1958,7 @@ class AzureCredentials:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AzureCredentials":
+    def from_dict(cls, data: dict[str, Any]) -> "AzureCredentials":
         return cls(
             client_id=data["client_id"],
             client_secret=data["client_secret"],
@@ -1992,7 +1994,7 @@ class GCPCredentials:
     project_id: Optional[str] = None
     profile: str = "default"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": "gcp",
             "service_account_json": self.service_account_json,
@@ -2001,7 +2003,7 @@ class GCPCredentials:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GCPCredentials":
+    def from_dict(cls, data: dict[str, Any]) -> "GCPCredentials":
         return cls(
             service_account_json=data["service_account_json"],
             project_id=data.get("project_id"),
@@ -2037,7 +2039,7 @@ class DockerCredentials:
     password: str
     email: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": "docker",
             "registry": self.registry,
@@ -2047,7 +2049,7 @@ class DockerCredentials:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DockerCredentials":
+    def from_dict(cls, data: dict[str, Any]) -> "DockerCredentials":
         return cls(
             registry=data["registry"],
             username=data["username"],
@@ -2055,7 +2057,7 @@ class DockerCredentials:
             email=data.get("email"),
         )
 
-    def to_auth_config(self) -> Dict[str, str]:
+    def to_auth_config(self) -> dict[str, str]:
         """Get Docker SDK auth config."""
         return {
             "username": self.username,
@@ -2078,7 +2080,7 @@ class KubernetesCredentials:
     server: Optional[str] = None  # API server URL
     certificate_authority: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": "kubernetes",
             "context": self.context,
@@ -2092,7 +2094,7 @@ class KubernetesCredentials:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "KubernetesCredentials":
+    def from_dict(cls, data: dict[str, Any]) -> "KubernetesCredentials":
         return cls(
             context=data["context"],
             cluster=data.get("cluster") or data.get("context"),
@@ -2130,7 +2132,7 @@ class DatabaseCredentials:
     driver: Optional[Literal["postgresql", "mysql", "mongodb", "redis", "sqlite"]] = None
     port: Optional[int] = None
     ssl_mode: Optional[str] = None
-    extra_params: Dict[str, str] = field(default_factory=dict)
+    extra_params: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.db_type and self.driver:
@@ -2178,7 +2180,7 @@ class DatabaseCredentials:
 
         raise ValueError(f"Unknown driver: {driver}")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": "database",
             "alias": self.alias,
@@ -2194,7 +2196,7 @@ class DatabaseCredentials:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DatabaseCredentials":
+    def from_dict(cls, data: dict[str, Any]) -> "DatabaseCredentials":
         return cls(
             alias=data["alias"],
             host=data["host"],
@@ -2217,7 +2219,7 @@ class APIKeyCredentials:
     api_key: str
     secret: Optional[str] = None
     endpoint: Optional[str] = None
-    headers: Dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = field(default_factory=dict)
 
     @property
     def key(self) -> str:
@@ -2227,7 +2229,7 @@ class APIKeyCredentials:
     def key(self, value: str) -> None:
         self.api_key = value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": "api_key",
             "name": self.name,
@@ -2238,7 +2240,7 @@ class APIKeyCredentials:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "APIKeyCredentials":
+    def from_dict(cls, data: dict[str, Any]) -> "APIKeyCredentials":
         api_key_value = data.get("api_key") or data.get("key")
         return cls(
             name=data["name"],
@@ -2270,12 +2272,12 @@ class CredentialBackend(ABC):
     """Abstract backend for credential storage."""
 
     @abstractmethod
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> Optional[dict[str, Any]]:
         """Get credential by key."""
         ...
 
     @abstractmethod
-    def set(self, key: str, value: Dict[str, Any]) -> None:
+    def set(self, key: str, value: dict[str, Any]) -> None:
         """Store credential."""
         ...
 
@@ -2285,7 +2287,7 @@ class CredentialBackend(ABC):
         ...
 
     @abstractmethod
-    def list_keys(self) -> List[str]:
+    def list_keys(self) -> list[str]:
         """List all stored keys."""
         ...
 
@@ -2293,7 +2295,7 @@ class CredentialBackend(ABC):
 class EnvironmentBackend(CredentialBackend):
     """Environment variable backend (read-only)."""
 
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> Optional[dict[str, Any]]:
         # Parse key format: aws/default, docker/docker.io, etc.
         parts = key.split("/", 1)
         cred_type = parts[0]
@@ -2316,13 +2318,13 @@ class EnvironmentBackend(CredentialBackend):
 
         return None
 
-    def set(self, key: str, value: Dict[str, Any]) -> None:
+    def set(self, key: str, value: dict[str, Any]) -> None:
         return None
 
     def delete(self, key: str) -> bool:
         return False
 
-    def list_keys(self) -> List[str]:
+    def list_keys(self) -> list[str]:
         keys = []
         if os.environ.get("AWS_ACCESS_KEY_ID"):
             keys.append("aws/default")
@@ -2342,17 +2344,17 @@ class KeyringBackend(CredentialBackend):
         if not KEYRING_AVAILABLE:
             raise ImportError("keyring not available. Install with: pip install keyring")
 
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> Optional[dict[str, Any]]:
         try:
             value = keyring.get_password(self.SERVICE_NAME, key)
             if value:
-                result: Dict[str, Any] = json.loads(value)
+                result: dict[str, Any] = json.loads(value)
                 return result
         except Exception as e:
             logger.debug(f"Keyring get failed for {key}: {e}")
         return None
 
-    def set(self, key: str, value: Dict[str, Any]) -> None:
+    def set(self, key: str, value: dict[str, Any]) -> None:
         try:
             keyring.set_password(self.SERVICE_NAME, key, json.dumps(value))
         except Exception as e:
@@ -2366,19 +2368,19 @@ class KeyringBackend(CredentialBackend):
         except Exception:
             return False
 
-    def list_keys(self) -> List[str]:
+    def list_keys(self) -> list[str]:
         # Keyring doesn't support listing, so we need to track keys separately
         index_key = "__victor_key_index__"
         try:
             index = keyring.get_password(self.SERVICE_NAME, index_key)
             if index:
-                keys: List[str] = json.loads(index)
+                keys: list[str] = json.loads(index)
                 return keys
         except Exception:
             pass
         return []
 
-    def _update_index(self, keys: List[str]) -> None:
+    def _update_index(self, keys: list[str]) -> None:
         index_key = "__victor_key_index__"
         try:
             keyring.set_password(self.SERVICE_NAME, index_key, json.dumps(keys))
@@ -2416,7 +2418,7 @@ class FileBackend(CredentialBackend):
         key = base64.urlsafe_b64encode(kdf.derive(master_key.encode()))
         self._cipher = Fernet(key)
 
-    def _load(self) -> Dict[str, Any]:
+    def _load(self) -> dict[str, Any]:
         """Load credentials from file."""
         if not self._config_path.exists():
             return {}
@@ -2427,13 +2429,13 @@ class FileBackend(CredentialBackend):
             if self._cipher:
                 content = self._cipher.decrypt(content)
 
-            result: Dict[str, Any] = json.loads(content.decode())
+            result: dict[str, Any] = json.loads(content.decode())
             return result
         except Exception as e:
             logger.error(f"Failed to load credentials file: {e}")
             return {}
 
-    def _save(self, data: Dict[str, Any]) -> None:
+    def _save(self, data: dict[str, Any]) -> None:
         """Save credentials to file."""
         self._config_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -2446,11 +2448,11 @@ class FileBackend(CredentialBackend):
         # Set restrictive permissions
         self.path.chmod(0o600)
 
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> Optional[dict[str, Any]]:
         data = self._load()
         return data.get(key)
 
-    def set(self, key: str, value: Dict[str, Any]) -> None:
+    def set(self, key: str, value: dict[str, Any]) -> None:
         data = self._load()
         data[key] = value
         self._save(data)
@@ -2463,7 +2465,7 @@ class FileBackend(CredentialBackend):
             return True
         return False
 
-    def list_keys(self) -> List[str]:
+    def list_keys(self) -> list[str]:
         return list(self._load().keys())
 
 
@@ -2507,7 +2509,7 @@ class CredentialManager:
             config_path: Path to config file
             master_key: Master key for file encryption
         """
-        self._backends: List[CredentialBackend] = []
+        self._backends: list[CredentialBackend] = []
 
         # Add backends in priority order
         self._backends.append(EnvironmentBackend())
@@ -2530,7 +2532,7 @@ class CredentialManager:
         else:
             self._storage_backend = FileBackend(config_path, master_key)
 
-    def _get_raw(self, key: str) -> Optional[Dict[str, Any]]:
+    def _get_raw(self, key: str) -> Optional[dict[str, Any]]:
         """Get raw credential data from any backend."""
         for backend in self._backends:
             try:
@@ -2541,7 +2543,7 @@ class CredentialManager:
                 logger.debug(f"Backend {type(backend).__name__} failed for {key}: {e}")
         return None
 
-    def _parse_credential(self, data: Dict[str, Any]) -> Optional[Credential]:
+    def _parse_credential(self, data: dict[str, Any]) -> Optional[Credential]:
         """Parse credential data into typed object."""
         cred_type = data.get("type")
 
@@ -2686,7 +2688,7 @@ class CredentialManager:
         """Delete a credential."""
         return self._storage_backend.delete(key)
 
-    def list(self) -> List[str]:
+    def list(self) -> builtins.list[str]:
         """List all stored credential keys."""
         keys = set()
         for backend in self._backends:

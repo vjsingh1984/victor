@@ -46,7 +46,7 @@ from __future__ import annotations
 import copy
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 import yaml
 
@@ -68,13 +68,13 @@ class WorkflowTemplateRegistry:
 
     def __init__(self) -> None:
         """Initialize the workflow template registry."""
-        self._templates: Dict[str, Dict[str, Any]] = {}
-        self._stage_templates: Dict[str, Dict[str, Any]] = {}
-        self._template_paths: List[Path] = []
+        self._templates: dict[str, dict[str, Any]] = {}
+        self._stage_templates: dict[str, dict[str, Any]] = {}
+        self._template_paths: list[Path] = []
 
     def load_templates_from_yaml(
         self,
-        yaml_path: Union[str, Path],
+        yaml_path: str | Path,
         namespace: Optional[str] = None,
     ) -> None:
         """Load workflow templates from a YAML file.
@@ -139,7 +139,7 @@ class WorkflowTemplateRegistry:
 
     def load_templates_from_directory(
         self,
-        directory: Union[str, Path],
+        directory: str | Path,
         recursive: bool = True,
         pattern: str = "*.yaml",
     ) -> None:
@@ -167,8 +167,8 @@ class WorkflowTemplateRegistry:
                 logger.warning(f"Failed to load {yaml_file}: {e}")
 
     def get_template(
-        self, name: str, default: Optional[Dict[str, Any]] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, name: str, default: Optional[dict[str, Any]] = None
+    ) -> Optional[dict[str, Any]]:
         """Get a workflow template by name.
 
         Args:
@@ -181,8 +181,8 @@ class WorkflowTemplateRegistry:
         return self._templates.get(name, default)
 
     def get_stage_template(
-        self, name: str, default: Optional[Dict[str, Any]] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, name: str, default: Optional[dict[str, Any]] = None
+    ) -> Optional[dict[str, Any]]:
         """Get a stage template by name.
 
         Args:
@@ -219,9 +219,9 @@ class WorkflowTemplateRegistry:
     def extend_template(
         self,
         base_name: str,
-        overrides: Dict[str, Any],
+        overrides: dict[str, Any],
         deep_merge: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Extend a base template with overrides.
 
         This creates a new template by deep copying the base and applying
@@ -269,7 +269,7 @@ class WorkflowTemplateRegistry:
 
         return extended
 
-    def _deep_merge(self, base: Dict[str, Any], overrides: Dict[str, Any]) -> None:
+    def _deep_merge(self, base: dict[str, Any], overrides: dict[str, Any]) -> None:
         """Deep merge overrides into base dict (in-place).
 
         Args:
@@ -287,7 +287,7 @@ class WorkflowTemplateRegistry:
                 # Replace with override value
                 base[key] = value
 
-    def list_templates(self) -> List[str]:
+    def list_templates(self) -> list[str]:
         """List all registered template names.
 
         Returns:
@@ -295,7 +295,7 @@ class WorkflowTemplateRegistry:
         """
         return sorted(self._templates.keys())
 
-    def list_stage_templates(self) -> List[str]:
+    def list_stage_templates(self) -> list[str]:
         """List all registered stage template names.
 
         Returns:
@@ -303,7 +303,7 @@ class WorkflowTemplateRegistry:
         """
         return sorted(self._stage_templates.keys())
 
-    def register_template(self, name: str, template: Dict[str, Any]) -> None:
+    def register_template(self, name: str, template: dict[str, Any]) -> None:
         """Manually register a workflow template.
 
         Args:
@@ -319,7 +319,7 @@ class WorkflowTemplateRegistry:
         self._templates[name] = template
         logger.debug(f"Registered workflow template: {name}")
 
-    def register_stage_template(self, name: str, stage: Dict[str, Any]) -> None:
+    def register_stage_template(self, name: str, stage: dict[str, Any]) -> None:
         """Manually register a stage template.
 
         Args:
@@ -335,7 +335,7 @@ class WorkflowTemplateRegistry:
         self._stage_templates[name] = stage
         logger.debug(f"Registered stage template: {name}")
 
-    def get_template_info(self, name: str) -> Dict[str, Any]:
+    def get_template_info(self, name: str) -> dict[str, Any]:
         """Get metadata about a template.
 
         Args:
@@ -363,7 +363,7 @@ class WorkflowTemplateRegistry:
             "extends": template.get("extends"),
         }
 
-    def get_stage_info(self, name: str) -> Dict[str, Any]:
+    def get_stage_info(self, name: str) -> dict[str, Any]:
         """Get metadata about a stage template.
 
         Args:
@@ -422,7 +422,6 @@ def register_default_templates() -> None:
 
     This loads all templates from victor/workflows/templates/ directory.
     """
-    from victor.config import settings
 
     # Get the templates directory
     templates_dir = Path(__file__).parent / "templates"

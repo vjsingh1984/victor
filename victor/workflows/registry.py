@@ -26,7 +26,8 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.workflows.definition import (
     WorkflowDefinition,
@@ -55,7 +56,7 @@ class WorkflowMetadata:
     description: str = ""
     agent_count: int = 0
     total_budget: int = 0
-    tags: Set[str] = field(default_factory=set)
+    tags: set[str] = field(default_factory=set)
     created_at: datetime = field(default_factory=datetime.now)
     version: str = "0.5.0"
 
@@ -71,7 +72,7 @@ class WorkflowMetadata:
             version=defn.metadata.get("version", "0.5.0"),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "name": self.name,
@@ -105,11 +106,11 @@ class WorkflowRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._definitions: Dict[str, WorkflowDefinition] = {}
-        self._factories: Dict[str, Callable[[], WorkflowDefinition]] = {}
-        self._metadata: Dict[str, WorkflowMetadata] = {}
-        self._loaded_modules: Set[str] = set()
-        self._workflow_hashes: Dict[str, str] = {}  # Phase 4: Hash-based idempotence
+        self._definitions: dict[str, WorkflowDefinition] = {}
+        self._factories: dict[str, Callable[[], WorkflowDefinition]] = {}
+        self._metadata: dict[str, WorkflowMetadata] = {}
+        self._loaded_modules: set[str] = set()
+        self._workflow_hashes: dict[str, str] = {}  # Phase 4: Hash-based idempotence
 
     def register(
         self,
@@ -258,7 +259,7 @@ class WorkflowRegistry:
             self.get(name)  # This will populate metadata
         return self._metadata.get(name)
 
-    def list_workflows(self) -> List[str]:
+    def list_workflows(self) -> list[str]:
         """List all registered workflow names.
 
         Returns:
@@ -268,7 +269,7 @@ class WorkflowRegistry:
         names.update(self._factories.keys())
         return sorted(names)
 
-    def list_metadata(self, materialize: bool = False) -> List[WorkflowMetadata]:
+    def list_metadata(self, materialize: bool = False) -> list[WorkflowMetadata]:
         """List metadata for all workflows.
 
         Args:
@@ -292,10 +293,10 @@ class WorkflowRegistry:
     def search(
         self,
         *,
-        tags: Optional[Set[str]] = None,
+        tags: Optional[set[str]] = None,
         min_agents: Optional[int] = None,
         max_budget: Optional[int] = None,
-    ) -> List[WorkflowDefinition]:
+    ) -> list[WorkflowDefinition]:
         """Search workflows by criteria.
 
         Args:
@@ -440,7 +441,7 @@ class WorkflowRegistry:
         logger.info(f"Loaded {count} workflows from {path}")
         return count
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize registry state to dictionary.
 
         Returns:

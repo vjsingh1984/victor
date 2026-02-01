@@ -16,7 +16,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from victor.tools.base import BaseTool, ToolResult
 from victor.tools.enums import CostTier
@@ -40,13 +40,12 @@ class RAGListTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.FREE
 
-    async def execute(self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
+    async def execute(self, _exec_ctx: dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
         """List all documents.
 
         Returns:
             ToolResult with document list
         """
-        from victor.rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()
@@ -73,7 +72,7 @@ class RAGListTool(BaseTool):
                 output_parts.append(f"{'='*50}")
 
                 # Group by ticker
-                by_ticker: Dict[str, List[Any]] = {}
+                by_ticker: dict[str, list[Any]] = {}
                 for doc in sec_docs:
                     symbol = doc.metadata.get("symbol", "UNKNOWN")
                     if symbol not in by_ticker:
@@ -86,7 +85,7 @@ class RAGListTool(BaseTool):
                 output_parts.append(f"  {tickers_line}")
 
                 # Group by sector
-                by_sector: Dict[str, int] = {}
+                by_sector: dict[str, int] = {}
                 for doc in sec_docs:
                     sector = doc.metadata.get("sector", "Other")
                     by_sector[sector] = by_sector.get(sector, 0) + 1
@@ -164,7 +163,7 @@ class RAGDeleteTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.LOW
 
-    async def execute(self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
+    async def execute(self, _exec_ctx: dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
         """Delete a document.
 
         Args:
@@ -175,7 +174,6 @@ class RAGDeleteTool(BaseTool):
             ToolResult with deletion status
         """
         doc_id = kwargs.get("doc_id", "")
-        from victor.rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()
@@ -229,13 +227,12 @@ class RAGStatsTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.FREE
 
-    async def execute(self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
+    async def execute(self, _exec_ctx: dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
         """Get store statistics.
 
         Returns:
             ToolResult with statistics
         """
-        from victor.rag.document_store import DocumentStore
 
         try:
             store = self._get_document_store()
@@ -246,7 +243,7 @@ class RAGStatsTool(BaseTool):
 
             # Calculate additional stats
             total_chars = sum(len(doc.content) for doc in docs)
-            doc_types: Dict[str, int] = {}
+            doc_types: dict[str, int] = {}
             for doc in docs:
                 doc_types[doc.doc_type] = doc_types.get(doc.doc_type, 0) + 1
 

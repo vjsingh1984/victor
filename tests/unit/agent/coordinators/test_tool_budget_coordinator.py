@@ -27,7 +27,7 @@ responsibility of ToolBudgetCoordinator.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 from victor.agent.coordinators.tool_budget_coordinator import (
     ToolBudgetCoordinator,

@@ -8,13 +8,13 @@ for local development and feature work.
 import os
 import pytest
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 from victor.config.settings import Settings
 
 
 @pytest.fixture
-def dev_env_vars() -> Dict[str, str]:
+def dev_env_vars() -> dict[str, str]:
     """Development environment variables."""
     return {
         "VICTOR_PROFILE": "development",
@@ -34,7 +34,7 @@ def dev_env_vars() -> Dict[str, str]:
 
 
 @pytest.fixture
-def dev_kubernetes_config() -> Dict[str, Any]:
+def dev_kubernetes_config() -> dict[str, Any]:
     """Expected Kubernetes configuration for development."""
     return {
         "namespace": "victor-ai-dev",

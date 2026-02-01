@@ -15,7 +15,7 @@
 """Tests for victor.tools.selection module."""
 
 import pytest
-from typing import List, Optional, Dict, Any
+from typing import Optional, Any
 
 from victor.tools.selection import (
     BaseToolSelectionStrategy,
@@ -167,11 +167,11 @@ class TestToolSelectorFeatures:
 class MockToolSelector(BaseToolSelectionStrategy):
     """Mock selector for testing."""
 
-    def __init__(self, name: str = "mock", tools: Optional[List[str]] = None):
+    def __init__(self, name: str = "mock", tools: Optional[list[str]] = None):
         super().__init__()
         self._name = name
         self._tools = tools or ["read", "write"]
-        self._recorded_executions: List[Dict[str, Any]] = []
+        self._recorded_executions: list[dict[str, Any]] = []
 
     def get_strategy_name(self) -> str:
         return self._name
@@ -188,14 +188,14 @@ class MockToolSelector(BaseToolSelectionStrategy):
         self,
         context: ToolSelectionContext,
         max_tools: int = 10,
-    ) -> List[str]:
+    ) -> list[str]:
         return self._tools[:max_tools]
 
     def record_tool_execution(
         self,
         tool_name: str,
         success: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         self._recorded_executions.append(
             {
@@ -452,7 +452,7 @@ class TestProtocolCompliance:
                 self,
                 context: ToolSelectionContext,
                 max_tools: int = 10,
-            ) -> List[str]:
+            ) -> list[str]:
                 return []
 
         selector = CustomSelector()

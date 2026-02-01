@@ -31,8 +31,8 @@ DEPRECATION NOTICE:
 """
 
 import warnings
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import Optional
 
 from victor.framework.teams import TeamFormation, TeamMemberSpec
 
@@ -67,7 +67,7 @@ class CodingRoleConfig:
     """
 
     base_role: str
-    tools: List[str]
+    tools: list[str]
     tool_budget: int
     description: str = ""
 
@@ -92,7 +92,7 @@ class CodingRoleConfig:
 
 # Coding-specific roles with tool allocations
 # Note: Uses canonical tool names from victor/tools/tool_names.py
-CODING_ROLES: Dict[str, CodingRoleConfig] = {
+CODING_ROLES: dict[str, CodingRoleConfig] = {
     "code_researcher": CodingRoleConfig(
         base_role="researcher",
         tools=[
@@ -179,7 +179,7 @@ CODING_ROLES: Dict[str, CodingRoleConfig] = {
 
 
 # Mapping from TeamFormation to TeamTopology
-_FORMATION_TO_TOPOLOGY: Dict[TeamFormation, TeamTopology] = {
+_FORMATION_TO_TOPOLOGY: dict[TeamFormation, TeamTopology] = {
     TeamFormation.SEQUENTIAL: TeamTopology.PIPELINE,
     TeamFormation.PIPELINE: TeamTopology.PIPELINE,
     TeamFormation.PARALLEL: TeamTopology.MESH,
@@ -211,7 +211,7 @@ class CodingTeamSpec:
     name: str
     description: str
     formation: TeamFormation
-    members: List[TeamMemberSpec]
+    members: list[TeamMemberSpec]
     total_tool_budget: int = 100
     max_iterations: int = 50
 
@@ -247,7 +247,7 @@ class CodingTeamSpec:
             TeamTemplate instance for use with framework multi-agent system
         """
         # Count roles for member_slots
-        role_counts: Dict[str, int] = {}
+        role_counts: dict[str, int] = {}
         for member in self.members:
             role_counts[member.role] = role_counts.get(member.role, 0) + 1
 
@@ -284,7 +284,7 @@ class CodingTeamSpec:
         template = self.to_team_template()
 
         # Convert members to FrameworkTeamMember instances
-        framework_members: List[FrameworkTeamMember] = []
+        framework_members: list[FrameworkTeamMember] = []
         for member in self.members:
             # Create PersonaTraits from TeamMemberSpec
             persona = PersonaTraits(
@@ -311,7 +311,7 @@ class CodingTeamSpec:
 
 
 # Pre-defined team specifications with rich personas
-CODING_TEAM_SPECS: Dict[str, TeamSpec] = {
+CODING_TEAM_SPECS: dict[str, TeamSpec] = {
     "feature_team": TeamSpec(
         name="Feature Implementation Team",
         description="End-to-end feature implementation with research, planning, implementation, and review",
@@ -678,7 +678,7 @@ def get_role_config(role_name: str) -> Optional[CodingRoleConfig]:
     return CODING_ROLES.get(role_name.lower())
 
 
-def list_team_types() -> List[str]:
+def list_team_types() -> list[str]:
     """List all available team types.
 
     Returns:
@@ -687,7 +687,7 @@ def list_team_types() -> List[str]:
     return list(CODING_TEAM_SPECS.keys())
 
 
-def list_roles() -> List[str]:
+def list_roles() -> list[str]:
     """List all available coding roles.
 
     Returns:

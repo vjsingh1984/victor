@@ -30,7 +30,7 @@ Example YAML usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def deployment_ready(ctx: Dict[str, Any]) -> str:
+def deployment_ready(ctx: dict[str, Any]) -> str:
     """Check if deployment is ready to proceed.
 
     Multi-factor check including config, dependencies, and approvals.
@@ -78,7 +78,7 @@ def deployment_ready(ctx: Dict[str, Any]) -> str:
     return "ready"
 
 
-def health_check_status(ctx: Dict[str, Any]) -> str:
+def health_check_status(ctx: dict[str, Any]) -> str:
     """Evaluate health check results.
 
     Args:
@@ -107,7 +107,7 @@ def health_check_status(ctx: Dict[str, Any]) -> str:
         return "unhealthy"
 
 
-def rollback_needed(ctx: Dict[str, Any]) -> str:
+def rollback_needed(ctx: dict[str, Any]) -> str:
     """Determine if rollback is needed based on deployment status.
 
     Args:
@@ -140,7 +140,7 @@ def rollback_needed(ctx: Dict[str, Any]) -> str:
     return "stable"
 
 
-def container_build_status(ctx: Dict[str, Any]) -> str:
+def container_build_status(ctx: dict[str, Any]) -> str:
     """Check container build status.
 
     Args:
@@ -166,7 +166,7 @@ def container_build_status(ctx: Dict[str, Any]) -> str:
     return "success"
 
 
-def infrastructure_drift(ctx: Dict[str, Any]) -> str:
+def infrastructure_drift(ctx: dict[str, Any]) -> str:
     """Detect infrastructure drift from desired state.
 
     Args:
@@ -201,7 +201,7 @@ def infrastructure_drift(ctx: Dict[str, Any]) -> str:
     return "no_drift"
 
 
-def security_scan_verdict(ctx: Dict[str, Any]) -> str:
+def security_scan_verdict(ctx: dict[str, Any]) -> str:
     """Evaluate security scan results.
 
     Args:
@@ -234,7 +234,7 @@ def security_scan_verdict(ctx: Dict[str, Any]) -> str:
     return "pass"
 
 
-def pipeline_stage_gate(ctx: Dict[str, Any]) -> str:
+def pipeline_stage_gate(ctx: dict[str, Any]) -> str:
     """Evaluate whether to proceed to next pipeline stage.
 
     Args:
@@ -268,7 +268,7 @@ def pipeline_stage_gate(ctx: Dict[str, Any]) -> str:
 # =============================================================================
 
 
-def merge_deployment_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def merge_deployment_results(ctx: dict[str, Any]) -> dict[str, Any]:
     """Merge results from parallel deployment tasks.
 
     Args:
@@ -298,7 +298,7 @@ def merge_deployment_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def generate_deployment_summary(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def generate_deployment_summary(ctx: dict[str, Any]) -> dict[str, Any]:
     """Generate deployment summary for notifications.
 
     Args:
@@ -322,7 +322,7 @@ def generate_deployment_summary(ctx: Dict[str, Any]) -> Dict[str, Any]:
 # =============================================================================
 
 
-def operation_type_check(ctx: Dict[str, Any]) -> str:
+def operation_type_check(ctx: dict[str, Any]) -> str:
     """Determine operation type for DevOps chat workflow routing.
 
     Args:
@@ -341,7 +341,7 @@ def operation_type_check(ctx: Dict[str, Any]) -> str:
     return "other"
 
 
-def deployment_success_check(ctx: Dict[str, Any]) -> str:
+def deployment_success_check(ctx: dict[str, Any]) -> str:
     """Check if deployment was successful.
 
     Args:
@@ -361,7 +361,7 @@ def deployment_success_check(ctx: Dict[str, Any]) -> str:
     return "failed"
 
 
-def can_continue_devops_iteration(ctx: Dict[str, Any]) -> str:
+def can_continue_devops_iteration(ctx: dict[str, Any]) -> str:
     """Check if workflow can continue with another iteration.
 
     Args:
@@ -380,7 +380,7 @@ def can_continue_devops_iteration(ctx: Dict[str, Any]) -> str:
     return "max_reached"
 
 
-def update_devops_conversation(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def update_devops_conversation(ctx: dict[str, Any]) -> dict[str, Any]:
     """Update conversation with tool results from execution.
 
     Args:
@@ -423,7 +423,7 @@ def update_devops_conversation(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def finalize_devops_chat(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def finalize_devops_chat(ctx: dict[str, Any]) -> dict[str, Any]:
     """Format final DevOps chat response for user.
 
     Args:

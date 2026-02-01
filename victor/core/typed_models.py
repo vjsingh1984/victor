@@ -36,7 +36,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 
 # =============================================================================
@@ -94,13 +94,13 @@ class ToolMetadata:
     access_mode: AccessMode = AccessMode.READONLY
     danger_level: DangerLevel = DangerLevel.SAFE
     execution_category: ExecutionCategory = ExecutionCategory.READ_ONLY
-    aliases: Set[str] = field(default_factory=set)
+    aliases: set[str] = field(default_factory=set)
     category: Optional[str] = None
-    keywords: List[str] = field(default_factory=list)
-    stages: List[str] = field(default_factory=list)
-    mandatory_keywords: List[str] = field(default_factory=list)
-    task_types: List[str] = field(default_factory=list)
-    progress_params: List[str] = field(default_factory=list)
+    keywords: list[str] = field(default_factory=list)
+    stages: list[str] = field(default_factory=list)
+    mandatory_keywords: list[str] = field(default_factory=list)
+    task_types: list[str] = field(default_factory=list)
+    progress_params: list[str] = field(default_factory=list)
     cost_tier: Optional[str] = None
 
     @classmethod
@@ -151,7 +151,7 @@ class ProviderMessage:
 
     role: str
     content: str
-    tool_calls: Optional[List[Dict[str, Any]]] = None
+    tool_calls: Optional[list[dict[str, Any]]] = None
     tool_call_id: Optional[str] = None
     name: Optional[str] = None
 
@@ -162,7 +162,7 @@ class StreamDelta:
 
     content: str = ""
     role: Optional[str] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
+    tool_calls: Optional[list[dict[str, Any]]] = None
     finish_reason: Optional[str] = None
 
 
@@ -245,7 +245,7 @@ class ModelMetrics:
     total_tokens: int = 0
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> ModelMetrics:
+    def from_dict(cls, data: dict[str, Any]) -> ModelMetrics:
         """Create from dictionary with safe defaults."""
         return cls(
             provider=data.get("provider", "unknown"),
@@ -270,7 +270,7 @@ class UsageSummary:
     avg_latency: float = 0.0
 
     @classmethod
-    def from_dict(cls, data: Optional[Dict[str, Any]]) -> UsageSummary:
+    def from_dict(cls, data: Optional[dict[str, Any]]) -> UsageSummary:
         """Create from optional dictionary."""
         if data is None:
             return cls()
@@ -291,7 +291,7 @@ class UsageSummary:
 class CQRSEventMetadata:
     """Metadata for CQRS events."""
 
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     timestamp: Optional[float] = None
     correlation_id: Optional[str] = None
 
@@ -305,13 +305,13 @@ class CQRSEvent:
 
     event_type: str
     tool_name: str = ""
-    arguments: Dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
     result: Optional[Any] = None
     error: Optional[str] = None
     metadata: CQRSEventMetadata = field(default_factory=CQRSEventMetadata)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> CQRSEvent:
+    def from_dict(cls, data: dict[str, Any]) -> CQRSEvent:
         """Create from dictionary with safe extraction."""
         metadata_dict = data.get("metadata", {})
         metadata = CQRSEventMetadata(

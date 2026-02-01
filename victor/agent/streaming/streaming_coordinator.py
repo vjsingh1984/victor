@@ -44,7 +44,8 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, AsyncIterator, Dict, List, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
+from collections.abc import AsyncIterator
 
 if TYPE_CHECKING:
     from victor.agent.streaming_controller import StreamingController
@@ -90,9 +91,9 @@ class StreamingCoordinator:
 
     async def process(
         self,
-        response: AsyncIterator[Dict[str, Any]],
-        context: Dict[str, Any],
-    ) -> AsyncIterator[Dict[str, Any]]:
+        response: AsyncIterator[dict[str, Any]],
+        context: dict[str, Any],
+    ) -> AsyncIterator[dict[str, Any]]:
         """Process a streaming response into events.
 
         This method consumes the streaming response, aggregates chunks,
@@ -115,7 +116,7 @@ class StreamingCoordinator:
                 elif event['type'] == 'done':
                     print("\nDone!")
         """
-        chunks: List[Dict[str, Any]] = []
+        chunks: list[dict[str, Any]] = []
 
         try:
             async for chunk in response:
@@ -144,7 +145,7 @@ class StreamingCoordinator:
             # Yield error event
             yield {"type": "error", "data": str(e)}
 
-    def aggregate_chunks(self, chunks: List[Dict[str, Any]]) -> str:
+    def aggregate_chunks(self, chunks: list[dict[str, Any]]) -> str:
         """Aggregate streaming chunks into a complete response.
 
         Delegates to the streaming controller if available, otherwise
@@ -191,8 +192,8 @@ class StreamingCoordinator:
 
     async def dispatch_events(
         self,
-        events: List["MessagingEvent"],
-        context: Dict[str, Any],
+        events: list["MessagingEvent"],
+        context: dict[str, Any],
     ) -> None:
         """Dispatch streaming events for observability.
 
@@ -219,7 +220,7 @@ class StreamingCoordinator:
                 if hasattr(event, "topic"):
                     logger.debug(f"Event: {event.topic} - {event.data}")
 
-    def format_output(self, data: Dict[str, Any]) -> str:
+    def format_output(self, data: dict[str, Any]) -> str:
         """Format streaming output for display.
 
         Args:
@@ -247,8 +248,8 @@ class StreamingCoordinator:
 
     async def handle_completion(
         self,
-        context: Dict[str, Any],
-        metadata: Dict[str, Any],
+        context: dict[str, Any],
+        metadata: dict[str, Any],
     ) -> None:
         """Handle streaming completion.
 

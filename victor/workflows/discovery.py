@@ -40,7 +40,7 @@ import inspect
 import logging
 import pkgutil
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Optional
 
 from victor.workflows.base import BaseWorkflow, WorkflowRegistry
 
@@ -54,10 +54,10 @@ logger = logging.getLogger(__name__)
 # Workflow Registration Decorator
 # =============================================================================
 
-_pending_workflows: List[Type[BaseWorkflow]] = []
+_pending_workflows: list[type[BaseWorkflow]] = []
 
 
-def workflow_class(cls: Type[BaseWorkflow]) -> Type[BaseWorkflow]:
+def workflow_class(cls: type[BaseWorkflow]) -> type[BaseWorkflow]:
     """Decorator to mark a class for auto-registration.
 
     Usage:
@@ -77,8 +77,8 @@ def workflow_class(cls: Type[BaseWorkflow]) -> Type[BaseWorkflow]:
 
 def discover_workflows(
     package_path: str = "victor.workflows",
-    exclude_modules: Optional[List[str]] = None,
-) -> List[BaseWorkflow]:
+    exclude_modules: Optional[list[str]] = None,
+) -> list[BaseWorkflow]:
     """Discover all workflow classes in a package.
 
     Scans the package for classes that inherit from BaseWorkflow
@@ -111,7 +111,7 @@ def discover_workflows(
         }
     )
 
-    workflows: List[BaseWorkflow] = []
+    workflows: list[BaseWorkflow] = []
 
     try:
         package = importlib.import_module(package_path)

@@ -23,7 +23,7 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.config.settings import Settings
@@ -91,8 +91,8 @@ def calculate_max_context_chars(
 
 
 def infer_git_operation(
-    original_name: str, canonical_name: str, args: Dict[str, Any]
-) -> Dict[str, Any]:
+    original_name: str, canonical_name: str, args: dict[str, Any]
+) -> dict[str, Any]:
     """Infer git operation from alias when not explicitly provided.
 
     When the model calls 'git_log' instead of 'git' with operation='log',
@@ -135,7 +135,7 @@ def infer_git_operation(
 
 def get_tool_status_message(
     tool_name: str,
-    tool_args: Dict[str, Any],
+    tool_args: dict[str, Any],
     presentation: Optional["PresentationProtocol"] = None,
 ) -> str:
     """Generate a user-friendly status message for a tool execution.

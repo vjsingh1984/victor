@@ -40,7 +40,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 from victor.core.tool_types import ToolDependency, ToolDependencyProviderProtocol
 
@@ -58,13 +58,13 @@ class ToolDependencyConfig:
         optional_tools: Tools that enhance but aren't required
     """
 
-    dependencies: List[ToolDependency] = field(default_factory=list)
-    transitions: Dict[str, List[Tuple[str, float]]] = field(default_factory=dict)
-    clusters: Dict[str, Set[str]] = field(default_factory=dict)
-    sequences: Dict[str, List[str]] = field(default_factory=dict)
-    required_tools: Set[str] = field(default_factory=set)
-    optional_tools: Set[str] = field(default_factory=set)
-    default_sequence: List[str] = field(default_factory=lambda: ["read", "edit"])
+    dependencies: list[ToolDependency] = field(default_factory=list)
+    transitions: dict[str, list[tuple[str, float]]] = field(default_factory=dict)
+    clusters: dict[str, set[str]] = field(default_factory=dict)
+    sequences: dict[str, list[str]] = field(default_factory=dict)
+    required_tools: set[str] = field(default_factory=set)
+    optional_tools: set[str] = field(default_factory=set)
+    default_sequence: list[str] = field(default_factory=lambda: ["read", "edit"])
 
 
 class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
@@ -103,13 +103,13 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
         config: Optional[ToolDependencyConfig] = None,
         *,
         # Alternative: pass individual args for simpler initialization
-        dependencies: Optional[List[ToolDependency]] = None,
-        transitions: Optional[Dict[str, List[Tuple[str, float]]]] = None,
-        clusters: Optional[Dict[str, Set[str]]] = None,
-        sequences: Optional[Dict[str, List[str]]] = None,
-        required_tools: Optional[Set[str]] = None,
-        optional_tools: Optional[Set[str]] = None,
-        default_sequence: Optional[List[str]] = None,
+        dependencies: Optional[list[ToolDependency]] = None,
+        transitions: Optional[dict[str, list[tuple[str, float]]]] = None,
+        clusters: Optional[dict[str, set[str]]] = None,
+        sequences: Optional[dict[str, list[str]]] = None,
+        required_tools: Optional[set[str]] = None,
+        optional_tools: Optional[set[str]] = None,
+        default_sequence: Optional[list[str]] = None,
     ):
         """Initialize the provider.
 
@@ -137,7 +137,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
             )
 
         # Build reverse lookup for faster dependency checking
-        self._dependency_map: Dict[str, ToolDependency] = {
+        self._dependency_map: dict[str, ToolDependency] = {
             d.tool_name: d for d in self._config.dependencies
         }
 
@@ -145,7 +145,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
     # ToolDependencyProviderProtocol Implementation
     # =========================================================================
 
-    def get_dependencies(self) -> List[ToolDependency]:
+    def get_dependencies(self) -> list[ToolDependency]:
         """Get tool dependencies.
 
         Returns:
@@ -153,7 +153,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
         """
         return self._config.dependencies.copy()
 
-    def get_tool_sequences(self) -> List[List[str]]:
+    def get_tool_sequences(self) -> list[list[str]]:
         """Get common tool sequences.
 
         Returns:
@@ -165,7 +165,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
     # Extended Methods (commonly used across verticals)
     # =========================================================================
 
-    def get_tool_transitions(self) -> Dict[str, List[Tuple[str, float]]]:
+    def get_tool_transitions(self) -> dict[str, list[tuple[str, float]]]:
         """Get tool transition probabilities.
 
         Returns:
@@ -173,7 +173,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
         """
         return self._config.transitions.copy()
 
-    def get_tool_clusters(self) -> Dict[str, Set[str]]:
+    def get_tool_clusters(self) -> dict[str, set[str]]:
         """Get tool clusters (groups of related tools).
 
         Returns:
@@ -181,7 +181,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
         """
         return {k: v.copy() for k, v in self._config.clusters.items()}
 
-    def get_recommended_sequence(self, task_type: str) -> List[str]:
+    def get_recommended_sequence(self, task_type: str) -> list[str]:
         """Get recommended tool sequence for a task type.
 
         Args:
@@ -192,7 +192,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
         """
         return list(self._config.sequences.get(task_type, self._config.default_sequence))
 
-    def get_required_tools(self) -> Set[str]:
+    def get_required_tools(self) -> set[str]:
         """Get tools essential for this vertical.
 
         Returns:
@@ -200,7 +200,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
         """
         return self._config.required_tools.copy()
 
-    def get_optional_tools(self) -> Set[str]:
+    def get_optional_tools(self) -> set[str]:
         """Get tools that enhance but aren't required.
 
         Returns:
@@ -250,7 +250,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
     def suggest_next_tool(
         self,
         current_tool: str,
-        used_tools: Optional[List[str]] = None,
+        used_tools: Optional[list[str]] = None,
     ) -> str:
         """Suggest the next tool based on current tool and history.
 
@@ -296,7 +296,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
                 return cluster_name
         return None
 
-    def get_cluster_tools(self, cluster_name: str) -> Set[str]:
+    def get_cluster_tools(self, cluster_name: str) -> set[str]:
         """Get all tools in a cluster.
 
         Args:

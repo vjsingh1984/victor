@@ -6,7 +6,8 @@ ensuring that LazyProxy[T] is properly understood as a generic type.
 
 from __future__ import annotations
 
-from typing import TypeVar, Generic, Callable, Optional, Type, Any, Dict, List
+from typing import TypeVar, Generic, Optional, Any
+from collections.abc import Callable
 from enum import Enum
 
 # Import VerticalBase for type checking
@@ -58,9 +59,9 @@ class LazyProxy(VerticalBase, Generic[T]):
     # Instance attributes (defined in __init__)
     # Note: 'name' is inherited as class var from VerticalMetadataProvider, overridden here as instance var
     _vertical_name: str
-    _loader: Callable[[], Type[T]]
+    _loader: Callable[[], type[T]]
     _loaded: bool
-    _instance: Optional[Type[T]]
+    _instance: Optional[type[T]]
     _load_lock: Any  # threading.RLock
     _loading: bool
     proxy_type: LazyProxyType
@@ -68,7 +69,7 @@ class LazyProxy(VerticalBase, Generic[T]):
     def __init__(
         self,
         vertical_name: str,
-        loader: Callable[[], Type[T]],
+        loader: Callable[[], type[T]],
         proxy_type: LazyProxyType = LazyProxyType.LAZY,
     ) -> None:
         """Initialize the lazy proxy.
@@ -111,7 +112,7 @@ class LazyProxy(VerticalBase, Generic[T]):
         """
         ...
 
-    def load(self) -> Type[T]:
+    def load(self) -> type[T]:
         """Load vertical on first access with thread-safe lazy initialization.
 
         Returns:
@@ -138,7 +139,7 @@ class LazyProxy(VerticalBase, Generic[T]):
         """
         ...
 
-    def get_tools(self) -> List[str]:  # type: ignore[override]
+    def get_tools(self) -> list[str]:  # type: ignore[override]
         """Get tools from the loaded vertical.
 
         Triggers lazy load if not already loaded.
@@ -177,8 +178,8 @@ class LazyProxyFactory:
     def create_proxy(
         self,
         vertical_name: str,
-        loader: Callable[[], Type[T]],
-        vertical_class: Type[T],
+        loader: Callable[[], type[T]],
+        vertical_class: type[T],
         proxy_type: LazyProxyType = LazyProxyType.LAZY,
     ) -> LazyProxy[T]:
         """Create or retrieve cached LazyProxy for a vertical.

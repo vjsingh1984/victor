@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 
 class PersonalityType(Enum):
@@ -66,8 +66,8 @@ class PersonaConstraints:
     """
 
     max_tool_calls: Optional[int] = None
-    preferred_tools: Optional[Set[str]] = None
-    forbidden_tools: Optional[Set[str]] = None
+    preferred_tools: Optional[set[str]] = None
+    forbidden_tools: Optional[set[str]] = None
     response_length: str = "medium"  # short, medium, long
     explanation_depth: str = "standard"  # brief, standard, detailed
 
@@ -138,7 +138,7 @@ class Persona:
     description: str
     personality: PersonalityType
     communication_style: CommunicationStyle
-    expertise: List[str] = field(default_factory=list)
+    expertise: list[str] = field(default_factory=list)
     backstory: Optional[str] = None
     constraints: Optional[PersonaConstraints] = None
     prompt_templates: Optional[PromptTemplates] = None
@@ -155,7 +155,7 @@ class Persona:
         if not 0.0 <= self.temperature <= 1.0:
             raise ValueError(f"temperature must be between 0.0 and 1.0, got {self.temperature}")
 
-    def matches_expertise(self, required_expertise: Set[str]) -> float:
+    def matches_expertise(self, required_expertise: set[str]) -> float:
         """Calculate expertise match score (0.0 to 1.0).
 
         Args:
@@ -195,7 +195,7 @@ Please respond in a manner consistent with this persona, maintaining the specifi
 communication style and leveraging your expertise areas to provide helpful,
 accurate responses."""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert persona to dictionary representation.
 
         Returns:
@@ -266,16 +266,16 @@ class ContextAdjustment:
     task_type: Optional[str] = None
     personality_override: Optional[PersonalityType] = None
     communication_override: Optional[CommunicationStyle] = None
-    additional_expertise: List[str] = field(default_factory=list)
-    constraint_modifications: Optional[Dict[str, Any]] = None
-    prompt_modifications: Optional[List[str]] = None
+    additional_expertise: list[str] = field(default_factory=list)
+    constraint_modifications: Optional[dict[str, Any]] = None
+    prompt_modifications: Optional[list[str]] = None
 
     # Experimental attributes (Phase 3 memory-driven adaptation)
     temperature: Optional[float] = None
     verbosity: Optional[str] = None
-    tool_preference: Optional[List[str]] = None
-    expertise_boost: Optional[List[str]] = None
-    constraint_relaxations: Optional[Dict[str, Any]] = None
+    tool_preference: Optional[list[str]] = None
+    expertise_boost: Optional[list[str]] = None
+    constraint_relaxations: Optional[dict[str, Any]] = None
 
     def __post_init__(self) -> None:
         """Initialize defaults and validate the adjustment."""
@@ -341,8 +341,8 @@ class AdaptedPersona:
     base_persona: Persona
 
     # Legacy attributes
-    context_adjustments: List[ContextAdjustment] = field(default_factory=list)
-    dynamic_traits: List[DynamicTrait] = field(default_factory=list)
+    context_adjustments: list[ContextAdjustment] = field(default_factory=list)
+    dynamic_traits: list[DynamicTrait] = field(default_factory=list)
     adaptation_reason: str = ""
     adapted_at: datetime = field(default_factory=datetime.utcnow)
 
@@ -379,7 +379,7 @@ class AdaptedPersona:
         return self.base_persona.communication_style
 
     @property
-    def expertise(self) -> List[str]:
+    def expertise(self) -> list[str]:
         """Get effective expertise list after additions."""
         base_expertise = set(self.base_persona.expertise)
         for adjustment in self.context_adjustments:
@@ -408,7 +408,7 @@ class AdaptedPersona:
         base = self.base_persona.constraints or PersonaConstraints()
 
         # Apply modifications
-        modifications: Dict[str, Any] = {}
+        modifications: dict[str, Any] = {}
         for adjustment in self.context_adjustments:
             # Legacy constraint_modifications
             if adjustment.constraint_modifications:
@@ -510,15 +510,15 @@ class Feedback:
     # Legacy attributes
     success_rating: Optional[float] = None
     user_comments: Optional[str] = None
-    suggested_improvements: Optional[Dict[str, Any]] = None
-    context: Optional[Dict[str, Any]] = None
+    suggested_improvements: Optional[dict[str, Any]] = None
+    context: Optional[dict[str, Any]] = None
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
     # Experimental attributes (Phase 3 memory-driven evolution)
     task_type: Optional[str] = None
     success_rate: Optional[float] = None
     average_reward: Optional[float] = None
-    feedback_data: Optional[Dict[str, Any]] = None
+    feedback_data: Optional[dict[str, Any]] = None
 
     def __post_init__(self) -> None:
         """Validate and normalize feedback."""

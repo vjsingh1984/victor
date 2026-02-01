@@ -24,7 +24,6 @@ Tests for the SOLID-compliant capability injection system following:
 Run with: pytest tests/unit/core/verticals/test_capability_injector_extended.py -v
 """
 
-import warnings
 
 import pytest
 
@@ -39,7 +38,6 @@ from victor.core.verticals.capability_provider import (
 from victor.core.verticals.capability_injector import (
     CapabilityInjector,
     get_capability_injector,
-    create_capability_injector,
     _FileOperationsProvider,
 )
 

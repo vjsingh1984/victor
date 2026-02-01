@@ -20,7 +20,7 @@ analysis, coverage tracking, and optimization recommendations.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from victor.observability.pipeline import (
     CoverageMetrics,
@@ -155,7 +155,7 @@ class PipelineAnalyzerTool(BaseTool):
         )
 
     async def execute(
-        self, _exec_ctx: Optional[Dict[str, Any]] = None, **kwargs: Any
+        self, _exec_ctx: Optional[dict[str, Any]] = None, **kwargs: Any
     ) -> ToolResult:
         """Execute pipeline analysis action."""
         action = kwargs.get("action", "summary")

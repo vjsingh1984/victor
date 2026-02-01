@@ -19,7 +19,7 @@ strategy selection based on document type.
 """
 
 import logging
-from typing import Dict, List, Optional, Type, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from victor.core.chunking.base import Chunk, ChunkingConfig, ChunkingStrategy
 from victor.core.chunking.detector import detect_document_type
@@ -51,7 +51,7 @@ class ChunkingRegistry:
             config: Chunking configuration (shared by all strategies)
         """
         self.config = config or ChunkingConfig()
-        self._strategies: Dict[str, ChunkingStrategy] = {}
+        self._strategies: dict[str, ChunkingStrategy] = {}
         self._register_defaults()
 
     def _register_defaults(self) -> None:
@@ -100,7 +100,7 @@ class ChunkingRegistry:
         content: str,
         source: Optional[str] = None,
         doc_type: Optional[str] = None,
-    ) -> List[Chunk]:
+    ) -> list[Chunk]:
         """Chunk content with auto-detected or specified strategy.
 
         Args:
@@ -124,12 +124,12 @@ class ChunkingRegistry:
         return strategy.chunk(content)
 
     @property
-    def available_strategies(self) -> List[str]:
+    def available_strategies(self) -> list[str]:
         """List of available strategy names."""
         return list(set(s.name for s in self._strategies.values()))
 
     @property
-    def supported_types(self) -> List[str]:
+    def supported_types(self) -> list[str]:
         """List of all supported document types."""
         return list(self._strategies.keys())
 
@@ -158,7 +158,7 @@ def chunk_document(
     source: Optional[str] = None,
     doc_type: Optional[str] = None,
     config: Optional[ChunkingConfig] = None,
-) -> List[Chunk]:
+) -> list[Chunk]:
     """Convenience function to chunk a document.
 
     Args:

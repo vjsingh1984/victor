@@ -42,11 +42,8 @@ Example:
             print(f"  {error.location}: {error.message}")
 """
 
-import copy
 import logging
-import re
-from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.workflows.generation.requirements import RequirementValidationResult
@@ -100,7 +97,7 @@ class SchemaValidator:
         """
         self.strict_mode = strict_mode
 
-    def validate(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
+    def validate(self, workflow: dict[str, Any]) -> list[WorkflowValidationError]:
         """Validate workflow schema.
 
         Args:
@@ -133,7 +130,7 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_required_fields(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
+    def _validate_required_fields(self, workflow: dict[str, Any]) -> list[WorkflowValidationError]:
         """Validate required top-level fields."""
         errors = []
         required_fields = ["nodes", "entry_point"]
@@ -152,7 +149,7 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_nodes(self, nodes: List[Dict[str, Any]]) -> List[WorkflowValidationError]:
+    def _validate_nodes(self, nodes: list[dict[str, Any]]) -> list[WorkflowValidationError]:
         """Validate nodes list."""
         errors = []
 
@@ -190,7 +187,7 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_node(self, node: Dict[str, Any], index: int) -> List[WorkflowValidationError]:
+    def _validate_node(self, node: dict[str, Any], index: int) -> list[WorkflowValidationError]:
         """Validate individual node."""
         errors = []
         node_id = node.get("id", f"nodes[{index}]")
@@ -250,8 +247,8 @@ class SchemaValidator:
         return errors
 
     def _validate_agent_node(
-        self, node: Dict[str, Any], location: str
-    ) -> List[WorkflowValidationError]:
+        self, node: dict[str, Any], location: str
+    ) -> list[WorkflowValidationError]:
         """Validate agent node fields."""
         errors = []
 
@@ -315,8 +312,8 @@ class SchemaValidator:
         return errors
 
     def _validate_compute_node(
-        self, node: Dict[str, Any], location: str
-    ) -> List[WorkflowValidationError]:
+        self, node: dict[str, Any], location: str
+    ) -> list[WorkflowValidationError]:
         """Validate compute node fields."""
         errors = []
 
@@ -338,8 +335,8 @@ class SchemaValidator:
         return errors
 
     def _validate_condition_node(
-        self, node: Dict[str, Any], location: str
-    ) -> List[WorkflowValidationError]:
+        self, node: dict[str, Any], location: str
+    ) -> list[WorkflowValidationError]:
         """Validate condition node fields."""
         errors = []
 
@@ -357,8 +354,8 @@ class SchemaValidator:
         return errors
 
     def _validate_parallel_node(
-        self, node: Dict[str, Any], location: str
-    ) -> List[WorkflowValidationError]:
+        self, node: dict[str, Any], location: str
+    ) -> list[WorkflowValidationError]:
         """Validate parallel node fields."""
         errors = []
 
@@ -389,8 +386,8 @@ class SchemaValidator:
         return errors
 
     def _validate_transform_node(
-        self, node: Dict[str, Any], location: str
-    ) -> List[WorkflowValidationError]:
+        self, node: dict[str, Any], location: str
+    ) -> list[WorkflowValidationError]:
         """Validate transform node fields."""
         errors = []
 
@@ -408,8 +405,8 @@ class SchemaValidator:
         return errors
 
     def _validate_team_node(
-        self, node: Dict[str, Any], location: str
-    ) -> List[WorkflowValidationError]:
+        self, node: dict[str, Any], location: str
+    ) -> list[WorkflowValidationError]:
         """Validate team node fields."""
         errors = []
 
@@ -440,8 +437,8 @@ class SchemaValidator:
         return errors
 
     def _validate_edges(
-        self, edges: List[Dict[str, Any]], nodes: List[Dict[str, Any]]
-    ) -> List[WorkflowValidationError]:
+        self, edges: list[dict[str, Any]], nodes: list[dict[str, Any]]
+    ) -> list[WorkflowValidationError]:
         """Validate edges list."""
         errors = []
 
@@ -480,7 +477,7 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_entry_point(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
+    def _validate_entry_point(self, workflow: dict[str, Any]) -> list[WorkflowValidationError]:
         """Validate entry point."""
         errors = []
         entry_point = workflow.get("entry_point")
@@ -500,7 +497,7 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_workflow_config(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
+    def _validate_workflow_config(self, workflow: dict[str, Any]) -> list[WorkflowValidationError]:
         """Validate workflow-level configuration."""
         errors = []
 
@@ -574,7 +571,7 @@ class GraphStructureValidator:
         """
         self.max_cycle_depth = max_cycle_depth
 
-    def validate(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
+    def validate(self, workflow: dict[str, Any]) -> list[WorkflowValidationError]:
         """Validate graph structure.
 
         Args:
@@ -583,7 +580,7 @@ class GraphStructureValidator:
         Returns:
             List of validation errors
         """
-        errors: List[WorkflowValidationError] = []
+        errors: list[WorkflowValidationError] = []
 
         nodes = workflow.get("nodes", [])
         edges = workflow.get("edges", [])
@@ -610,10 +607,10 @@ class GraphStructureValidator:
         return errors
 
     def _build_graph(
-        self, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]
-    ) -> Dict[str, List[str]]:
+        self, nodes: list[dict[str, Any]], edges: list[dict[str, Any]]
+    ) -> dict[str, list[str]]:
         """Build adjacency list representation."""
-        graph: Dict[str, List[str]] = {}
+        graph: dict[str, list[str]] = {}
         for node in nodes:
             node_id = node.get("id")
             if node_id is not None and isinstance(node_id, str):
@@ -633,10 +630,10 @@ class GraphStructureValidator:
         return graph
 
     def _check_reachability(
-        self, graph: Dict[str, List[str]], entry_point: str, nodes: List[Dict[str, Any]]
-    ) -> List[WorkflowValidationError]:
+        self, graph: dict[str, list[str]], entry_point: str, nodes: list[dict[str, Any]]
+    ) -> list[WorkflowValidationError]:
         """Check all nodes are reachable from entry point."""
-        errors: List[WorkflowValidationError] = []
+        errors: list[WorkflowValidationError] = []
 
         if entry_point not in graph:
             return errors  # Schema validation will catch this
@@ -671,8 +668,8 @@ class GraphStructureValidator:
         return errors
 
     def _check_edge_references(
-        self, graph: Dict[str, List[str]], nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]
-    ) -> List[WorkflowValidationError]:
+        self, graph: dict[str, list[str]], nodes: list[dict[str, Any]], edges: list[dict[str, Any]]
+    ) -> list[WorkflowValidationError]:
         """Check edge references exist."""
         errors = []
 
@@ -724,8 +721,8 @@ class GraphStructureValidator:
         return errors
 
     def _check_cycles(
-        self, graph: Dict[str, List[str]], nodes: List[Dict[str, Any]]
-    ) -> List[WorkflowValidationError]:
+        self, graph: dict[str, list[str]], nodes: list[dict[str, Any]]
+    ) -> list[WorkflowValidationError]:
         """Detect invalid cycles (cycles without condition nodes)."""
         errors = []
 
@@ -737,7 +734,7 @@ class GraphStructureValidator:
         visited = set()
         rec_stack = set()
 
-        def dfs(node: str, path: List[str]) -> Optional[List[str]]:
+        def dfs(node: str, path: list[str]) -> Optional[list[str]]:
             """DFS to detect cycles, returns cycle path if found."""
             visited.add(node)
             rec_stack.add(node)
@@ -780,8 +777,8 @@ class GraphStructureValidator:
         return errors
 
     def _check_dead_ends(
-        self, graph: Dict[str, List[str]], nodes: List[Dict[str, Any]]
-    ) -> List[WorkflowValidationError]:
+        self, graph: dict[str, list[str]], nodes: list[dict[str, Any]]
+    ) -> list[WorkflowValidationError]:
         """Check for dead-end nodes."""
         errors = []
 
@@ -825,7 +822,7 @@ class SemanticValidator:
     def __init__(
         self,
         tool_registry: Optional[Any] = None,
-        handler_registry: Optional[Dict[str, Any]] = None,
+        handler_registry: Optional[dict[str, Any]] = None,
         strict_mode: bool = True,
     ):
         """Initialize semantic validator.
@@ -839,7 +836,7 @@ class SemanticValidator:
         self.handler_registry = handler_registry or {}
         self.strict_mode = strict_mode
 
-    def validate(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
+    def validate(self, workflow: dict[str, Any]) -> list[WorkflowValidationError]:
         """Validate workflow semantics.
 
         Args:
@@ -862,7 +859,7 @@ class SemanticValidator:
 
         return errors
 
-    def _validate_node_semantics(self, node: Dict[str, Any]) -> List[WorkflowValidationError]:
+    def _validate_node_semantics(self, node: dict[str, Any]) -> list[WorkflowValidationError]:
         """Validate node semantics."""
         errors = []
         node_id = node.get("id", "unknown")
@@ -879,8 +876,8 @@ class SemanticValidator:
         return errors
 
     def _validate_agent_semantics(
-        self, node: Dict[str, Any], location: str
-    ) -> List[WorkflowValidationError]:
+        self, node: dict[str, Any], location: str
+    ) -> list[WorkflowValidationError]:
         """Validate agent node semantics."""
         errors = []
 
@@ -918,8 +915,8 @@ class SemanticValidator:
         return errors
 
     def _validate_compute_semantics(
-        self, node: Dict[str, Any], location: str
-    ) -> List[WorkflowValidationError]:
+        self, node: dict[str, Any], location: str
+    ) -> list[WorkflowValidationError]:
         """Validate compute node semantics."""
         errors = []
 
@@ -960,8 +957,8 @@ class SemanticValidator:
         return errors
 
     def _validate_condition_semantics(
-        self, node: Dict[str, Any], location: str
-    ) -> List[WorkflowValidationError]:
+        self, node: dict[str, Any], location: str
+    ) -> list[WorkflowValidationError]:
         """Validate condition node semantics."""
         errors = []
 
@@ -1034,7 +1031,7 @@ class SecurityValidator:
         # Network tools (blocked in airgapped mode)
         self.network_tools = {"web_search", "http_request", "api_call", "fetch_url"}
 
-    def validate(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
+    def validate(self, workflow: dict[str, Any]) -> list[WorkflowValidationError]:
         """Validate security and safety constraints.
 
         Args:
@@ -1060,7 +1057,7 @@ class SecurityValidator:
 
         return errors
 
-    def _check_resource_limits(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
+    def _check_resource_limits(self, workflow: dict[str, Any]) -> list[WorkflowValidationError]:
         """Check workflow doesn't exceed resource limits."""
         errors = []
 
@@ -1107,7 +1104,7 @@ class SecurityValidator:
 
         return errors
 
-    def _check_tool_combinations(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
+    def _check_tool_combinations(self, workflow: dict[str, Any]) -> list[WorkflowValidationError]:
         """Check for dangerous tool combinations."""
         errors = []
 
@@ -1135,8 +1132,8 @@ class SecurityValidator:
         return errors
 
     def _check_airgapped_constraints(
-        self, workflow: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+        self, workflow: dict[str, Any]
+    ) -> list[WorkflowValidationError]:
         """Check airgapped mode constraints."""
         errors = []
 
@@ -1163,7 +1160,7 @@ class SecurityValidator:
 
         return errors
 
-    def _check_infinite_loops(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
+    def _check_infinite_loops(self, workflow: dict[str, Any]) -> list[WorkflowValidationError]:
         """Check for potential infinite loops."""
         errors = []
 
@@ -1203,7 +1200,7 @@ class WorkflowValidator:
         self,
         strict_mode: bool = True,
         tool_registry: Optional[Any] = None,
-        handler_registry: Optional[Dict[str, Any]] = None,
+        handler_registry: Optional[dict[str, Any]] = None,
         airgapped_mode: bool = False,
     ):
         """Initialize workflow validator.
@@ -1226,7 +1223,7 @@ class WorkflowValidator:
         self.security_validator = SecurityValidator(airgapped_mode=airgapped_mode)
 
     def validate(
-        self, workflow: Dict[str, Any], workflow_name: Optional[str] = None
+        self, workflow: dict[str, Any], workflow_name: Optional[str] = None
     ) -> WorkflowGenerationValidationResult:
         """Validate workflow across all 4 layers.
 
@@ -1266,7 +1263,7 @@ class WorkflowValidator:
             workflow_name=workflow_name,
         )
 
-    def validate_layer(self, workflow: Dict[str, Any], layer: str) -> List[WorkflowValidationError]:
+    def validate_layer(self, workflow: dict[str, Any], layer: str) -> list[WorkflowValidationError]:
         """Validate a single layer.
 
         Useful for targeted validation.
@@ -1413,7 +1410,6 @@ class RequirementValidator:
         # Import here to avoid circular dependency
         from victor.workflows.generation.requirements import (
             RequirementValidationResult,
-            RequirementValidationError,
         )
 
         errors = []
@@ -1455,7 +1451,7 @@ class RequirementValidator:
             score=score,
         )
 
-    def _check_completeness(self, requirements: Any) -> List[Any]:
+    def _check_completeness(self, requirements: Any) -> list[Any]:
         """Check for missing required information."""
         from victor.workflows.generation.requirements import RequirementValidationError
 
@@ -1558,7 +1554,7 @@ class RequirementValidator:
 
         return errors
 
-    def _check_consistency(self, requirements: Any) -> tuple[List[Any], List[Any]]:
+    def _check_consistency(self, requirements: Any) -> tuple[list[Any], list[Any]]:
         """Check for contradictions.
 
         Returns:
@@ -1651,7 +1647,7 @@ class RequirementValidator:
 
         return errors, warnings
 
-    def _check_feasibility(self, requirements: Any) -> tuple[List[Any], List[Any]]:
+    def _check_feasibility(self, requirements: Any) -> tuple[list[Any], list[Any]]:
         """Check if requirements can be implemented.
 
         Returns:
@@ -1730,7 +1726,7 @@ class RequirementValidator:
 
         return errors, warnings
 
-    def _check_specificity(self, requirements: Any) -> List[Any]:
+    def _check_specificity(self, requirements: Any) -> list[Any]:
         """Check if requirements are specific enough.
 
         Args:
@@ -1784,7 +1780,7 @@ class RequirementValidator:
 
         return warnings
 
-    def _generate_recommendations(self, requirements: Any, errors: Any, warnings: Any) -> List[str]:
+    def _generate_recommendations(self, requirements: Any, errors: Any, warnings: Any) -> list[str]:
         """Generate recommendations for improvement.
 
         Args:
@@ -1863,7 +1859,7 @@ class RequirementValidator:
         # Clamp to [0, 1]
         return max(0.0, min(1.0, score))
 
-    def _detect_cycles(self, dependencies: Any) -> List[Any]:
+    def _detect_cycles(self, dependencies: Any) -> list[Any]:
         """Detect cycles in dependency graph using DFS.
 
         Args:

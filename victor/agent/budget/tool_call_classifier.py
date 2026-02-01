@@ -22,7 +22,7 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
-from typing import Optional, Set
+from typing import Optional
 
 from victor.agent.protocols import IToolCallClassifier
 
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 # Default set of write tools (can be extended via OCP)
-DEFAULT_WRITE_TOOLS: Set[str] = {
+DEFAULT_WRITE_TOOLS: set[str] = {
     "write_file",
     "write",
     "edit_files",
@@ -66,13 +66,13 @@ class ToolCallClassifier(IToolCallClassifier):
         _write_tools: Set of tool names considered write operations
     """
 
-    def __init__(self, write_tools: Optional[Set[str]] = None):
+    def __init__(self, write_tools: Optional[set[str]] = None):
         """Initialize the tool call classifier.
 
         Args:
             write_tools: Optional set of write tool names (uses default if not provided)
         """
-        self._write_tools: Set[str] = set(write_tools or DEFAULT_WRITE_TOOLS)
+        self._write_tools: set[str] = set(write_tools or DEFAULT_WRITE_TOOLS)
 
     def is_write_operation(self, tool_name: str) -> bool:
         """Check if a tool is a write/action operation.
@@ -126,7 +126,7 @@ class ToolCallClassifier(IToolCallClassifier):
             self._write_tools.discard(tool_name.lower())
             logger.debug(f"ToolCallClassifier: removed write tool '{tool_name}'")
 
-    def get_write_tools(self) -> Set[str]:
+    def get_write_tools(self) -> set[str]:
         """Get the current set of write tools.
 
         Returns:

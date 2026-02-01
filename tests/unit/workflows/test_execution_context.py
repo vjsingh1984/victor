@@ -14,7 +14,6 @@
 
 """Tests for victor.workflows.execution_context module."""
 
-import pytest
 
 from victor.workflows.execution_context import ExecutionContext
 

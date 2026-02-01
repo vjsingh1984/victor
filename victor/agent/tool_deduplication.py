@@ -26,7 +26,7 @@ Examples of redundancy:
 import logging
 from collections import deque
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Deque, Dict, List, Optional, Set, cast
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.agent.protocols import ToolDeduplicationTrackerProtocol
@@ -43,7 +43,7 @@ class TrackedToolCall:
     """
 
     tool_name: str
-    args: Dict[str, Any]
+    args: dict[str, Any]
     timestamp: float = field(default_factory=lambda: __import__("time").time())
 
 
@@ -64,7 +64,7 @@ class ToolDeduplicationTracker:
 
         self.window_size = window_size
         self.similarity_threshold = similarity_threshold
-        self.recent_calls: Deque[TrackedToolCall] = deque(maxlen=window_size)
+        self.recent_calls: deque[TrackedToolCall] = deque(maxlen=window_size)
         # Use ContentHasher for consistent hashing across components
         # Tool calls need exact matching (no normalization) for precise deduplication
         self._hasher = ContentHasher(
@@ -74,7 +74,7 @@ class ToolDeduplicationTracker:
         )
 
         # Query synonyms for semantic matching
-        self.query_synonyms: Dict[str, Set[str]] = {
+        self.query_synonyms: dict[str, set[str]] = {
             "tool registration": {
                 "register tool",
                 "tool registry",
@@ -86,7 +86,7 @@ class ToolDeduplicationTracker:
             "error handling": {"exception", "try catch", "try except", "error recovery"},
         }
 
-    def add_call(self, tool_name: str, args: Dict[str, Any]) -> None:
+    def add_call(self, tool_name: str, args: dict[str, Any]) -> None:
         """Add a tool call to the tracker.
 
         Args:
@@ -97,7 +97,7 @@ class ToolDeduplicationTracker:
         self.recent_calls.append(call)
         logger.debug(f"Tracking tool call: {tool_name}({self._format_args(args)})")
 
-    def is_redundant(self, tool_name: str, args: Dict[str, Any], explain: bool = False) -> bool:
+    def is_redundant(self, tool_name: str, args: dict[str, Any], explain: bool = False) -> bool:
         """Check if a tool call is redundant given recent history.
 
         Args:
@@ -134,7 +134,7 @@ class ToolDeduplicationTracker:
 
         return False
 
-    def _has_semantic_overlap(self, tool_name: str, args: Dict[str, Any]) -> bool:
+    def _has_semantic_overlap(self, tool_name: str, args: dict[str, Any]) -> bool:
         """Check if tool call semantically overlaps with recent calls.
 
         Args:
@@ -158,7 +158,7 @@ class ToolDeduplicationTracker:
 
         return False
 
-    def _check_search_redundancy(self, tool_name: str, args: Dict[str, Any]) -> bool:
+    def _check_search_redundancy(self, tool_name: str, args: dict[str, Any]) -> bool:
         """Check if search/grep call is redundant.
 
         Detects patterns like:
@@ -198,7 +198,7 @@ class ToolDeduplicationTracker:
 
         return False
 
-    def _check_file_redundancy(self, tool_name: str, args: Dict[str, Any]) -> bool:
+    def _check_file_redundancy(self, tool_name: str, args: dict[str, Any]) -> bool:
         """Check if file operation is redundant.
 
         Detects patterns like:
@@ -231,7 +231,7 @@ class ToolDeduplicationTracker:
 
         return False
 
-    def _check_list_redundancy(self, tool_name: str, args: Dict[str, Any]) -> bool:
+    def _check_list_redundancy(self, tool_name: str, args: dict[str, Any]) -> bool:
         """Check if list/directory operation is redundant.
 
         Detects patterns like:
@@ -272,7 +272,7 @@ class ToolDeduplicationTracker:
 
         return False
 
-    def _format_args(self, args: Dict[str, Any]) -> str:
+    def _format_args(self, args: dict[str, Any]) -> str:
         """Format args for logging.
 
         Args:
@@ -288,7 +288,7 @@ class ToolDeduplicationTracker:
             formatted.append(f"{key}={repr(value)}")
         return ", ".join(formatted)
 
-    def get_recent_calls(self, limit: Optional[int] = None) -> List[TrackedToolCall]:
+    def get_recent_calls(self, limit: Optional[int] = None) -> list[TrackedToolCall]:
         """Get recent tool calls.
 
         Args:
@@ -369,7 +369,7 @@ def reset_deduplication_tracker() -> None:
     _deduplication_tracker = None
 
 
-def is_redundant_call(tool_name: str, args: Dict[str, Any]) -> bool:
+def is_redundant_call(tool_name: str, args: dict[str, Any]) -> bool:
     """Convenience function to check if a tool call is redundant.
 
     Args:
@@ -383,7 +383,7 @@ def is_redundant_call(tool_name: str, args: Dict[str, Any]) -> bool:
     return tracker.is_redundant(tool_name, args, explain=True)
 
 
-def track_call(tool_name: str, args: Dict[str, Any]) -> None:
+def track_call(tool_name: str, args: dict[str, Any]) -> None:
     """Convenience function to track a tool call.
 
     Args:

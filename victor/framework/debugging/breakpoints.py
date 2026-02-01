@@ -54,7 +54,8 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -137,17 +138,17 @@ class WorkflowBreakpoint:
     type: BreakpointType
     position: BreakpointPosition
     node_id: Optional[str] = None
-    condition: Optional[Callable[[Dict[str, Any]], bool]] = None
+    condition: Optional[Callable[[dict[str, Any]], bool]] = None
     state_key: Optional[str] = None
     state_value: Any = None
     enabled: bool = True
     hit_count: int = 0
     ignore_count: int = 0
     log_message: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def should_hit(
-        self, state: Dict[str, Any], node_id: str, error: Optional[Exception] = None
+        self, state: dict[str, Any], node_id: str, error: Optional[Exception] = None
     ) -> bool:
         """Check if breakpoint should be hit.
 
@@ -204,7 +205,7 @@ class WorkflowBreakpoint:
 
         return False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary.
 
         Returns:
@@ -252,8 +253,8 @@ class BreakpointStorage:
         bps = storage.get_for_node("analyze")
     """
 
-    _breakpoints: Dict[str, WorkflowBreakpoint] = field(default_factory=dict)
-    _node_index: Dict[str, List[str]] = field(default_factory=dict)
+    _breakpoints: dict[str, WorkflowBreakpoint] = field(default_factory=dict)
+    _node_index: dict[str, list[str]] = field(default_factory=dict)
     _persist_enabled: bool = False
     _persist_path: Optional[str] = None
 
@@ -296,7 +297,7 @@ class BreakpointStorage:
         """
         return self._breakpoints.get(breakpoint_id)
 
-    def list_all(self) -> List[WorkflowBreakpoint]:
+    def list_all(self) -> list[WorkflowBreakpoint]:
         """List all breakpoints.
 
         Returns:
@@ -304,7 +305,7 @@ class BreakpointStorage:
         """
         return list(self._breakpoints.values())
 
-    def get_for_node(self, node_id: str) -> List[WorkflowBreakpoint]:
+    def get_for_node(self, node_id: str) -> list[WorkflowBreakpoint]:
         """Get all breakpoints for a specific node.
 
         Args:
@@ -420,13 +421,13 @@ class BreakpointManager:
         self,
         node_id: Optional[str] = None,
         position: BreakpointPosition = BreakpointPosition.BEFORE,
-        condition: Optional[Callable[[Dict[str, Any]], bool]] = None,
+        condition: Optional[Callable[[dict[str, Any]], bool]] = None,
         state_key: Optional[str] = None,
         state_value: Any = None,
         bp_type: BreakpointType = BreakpointType.NODE,
         ignore_count: int = 0,
         log_message: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> WorkflowBreakpoint:
         """Set a new breakpoint.
 
@@ -494,7 +495,7 @@ class BreakpointManager:
 
     def list_breakpoints(
         self, node_id: Optional[str] = None, enabled_only: bool = False
-    ) -> List[WorkflowBreakpoint]:
+    ) -> list[WorkflowBreakpoint]:
         """List breakpoints.
 
         Args:
@@ -546,11 +547,11 @@ class BreakpointManager:
 
     def evaluate_breakpoints(
         self,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         node_id: str,
         position: BreakpointPosition,
         error: Optional[Exception] = None,
-    ) -> List[WorkflowBreakpoint]:
+    ) -> list[WorkflowBreakpoint]:
         """Evaluate which breakpoints should be hit.
 
         Called by DebugHook during workflow execution to check if
@@ -656,7 +657,7 @@ class BreakpointManager:
             logger.debug(f"Failed to emit breakpoint_cleared event: {e}")
 
     def _emit_breakpoint_hit(
-        self, bp: WorkflowBreakpoint, state: Dict[str, Any], node_id: str
+        self, bp: WorkflowBreakpoint, state: dict[str, Any], node_id: str
     ) -> None:
         """Emit breakpoint_hit event.
 

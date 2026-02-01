@@ -18,7 +18,6 @@ Tests that registries skip validation when definitions haven't changed,
 improving startup performance through idempotent registration.
 """
 
-import pytest
 from unittest.mock import Mock
 
 from victor.workflows.registry import WorkflowRegistry

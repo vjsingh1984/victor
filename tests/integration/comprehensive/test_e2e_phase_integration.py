@@ -30,13 +30,10 @@ Test scenarios:
 
 import asyncio
 import time
-from base64 import b64encode
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
-import tempfile
 
 import pytest
 import numpy as np
@@ -87,11 +84,11 @@ class ComprehensiveAgent:
         self,
         task: str,
         user: str,
-        required_permissions: List[str],
+        required_permissions: list[str],
         use_memory: bool = True,
         use_skills: bool = True,
         use_multimodal: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Process task with all phase features."""
         start_time = time.time()
         task_id = uuid4()

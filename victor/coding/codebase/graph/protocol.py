@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Protocol
+from typing import Any, Protocol
+from collections.abc import Iterable
 
 
 @dataclass
@@ -20,7 +21,7 @@ class GraphNode:
     docstring: str | None = None  # extracted docstring
     parent_id: str | None = None  # for nested symbols (methods in classes)
     embedding_ref: str | None = None  # key to vector store entry
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -31,7 +32,7 @@ class GraphEdge:
     dst: str
     type: str  # e.g., CALLS, REFERENCES, CONTAINS, INHERITS
     weight: float | None = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class GraphStoreProtocol(Protocol):
@@ -43,15 +44,15 @@ class GraphStoreProtocol(Protocol):
 
     async def get_neighbors(
         self, node_id: str, edge_types: Iterable[str] | None = None, max_depth: int = 1
-    ) -> List[GraphEdge]: ...
+    ) -> list[GraphEdge]: ...
 
     async def find_nodes(
         self, *, name: str | None = None, type: str | None = None, file: str | None = None
-    ) -> List[GraphNode]: ...
+    ) -> list[GraphNode]: ...
 
     async def search_symbols(
         self, query: str, *, limit: int = 20, symbol_types: Iterable[str] | None = None
-    ) -> List[GraphNode]:
+    ) -> list[GraphNode]:
         """Full-text search across symbol names, signatures, bodies, and docstrings."""
         ...
 
@@ -59,7 +60,7 @@ class GraphStoreProtocol(Protocol):
         """Get a single node by its ID."""
         ...
 
-    async def get_nodes_by_file(self, file: str) -> List[GraphNode]:
+    async def get_nodes_by_file(self, file: str) -> list[GraphNode]:
         """Get all symbols in a specific file."""
         ...
 
@@ -67,7 +68,7 @@ class GraphStoreProtocol(Protocol):
         """Record file modification time for staleness tracking."""
         ...
 
-    async def get_stale_files(self, file_mtimes: Dict[str, float]) -> List[str]:
+    async def get_stale_files(self, file_mtimes: dict[str, float]) -> list[str]:
         """Get files that have changed since last index."""
         ...
 
@@ -79,8 +80,8 @@ class GraphStoreProtocol(Protocol):
         """Clear current repo graph (per-repo store)."""
         ...
 
-    async def stats(self) -> Dict[str, Any]: ...
+    async def stats(self) -> dict[str, Any]: ...
 
-    async def get_all_edges(self) -> List[GraphEdge]:
+    async def get_all_edges(self) -> list[GraphEdge]:
         """Get all edges in the graph (bulk retrieval for loading into memory)."""
         ...

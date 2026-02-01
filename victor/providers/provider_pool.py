@@ -28,25 +28,21 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 from victor.providers.base import BaseProvider, CompletionResponse, Message, StreamChunk
-from victor.providers.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
+from victor.providers.circuit_breaker import CircuitBreakerConfig
 from victor.providers.health_monitor import (
     HealthCheckConfig,
-    HealthMonitor,
     ProviderHealthRegistry,
     get_health_registry,
 )
 from victor.providers.load_balancer import (
-    AdaptiveLoadBalancer,
-    LeastConnectionsLoadBalancer,
     LoadBalancer,
     LoadBalancerType,
     ProviderInstance,
-    RoundRobinLoadBalancer,
     create_load_balancer,
 )
 
@@ -139,7 +135,7 @@ class ProviderPool:
         """
         self.name = name
         self.config = config or ProviderPoolConfig()
-        self._instances: Dict[str, ProviderInstance] = {}
+        self._instances: dict[str, ProviderInstance] = {}
         self._load_balancer: Optional[LoadBalancer] = None
         self._health_registry: Optional[ProviderHealthRegistry] = None
         self._lock = asyncio.Lock()
@@ -285,12 +281,12 @@ class ProviderPool:
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[Any]] = None,
+        tools: Optional[list[Any]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request through the pool.
@@ -369,12 +365,12 @@ class ProviderPool:
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[Any]] = None,
+        tools: Optional[list[Any]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion through the pool.
@@ -467,7 +463,7 @@ class ProviderPool:
         tasks = [warmup_with_limit(inst) for inst in instances]
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    def get_pool_stats(self) -> Dict[str, Any]:
+    def get_pool_stats(self) -> dict[str, Any]:
         """Get comprehensive pool statistics.
 
         Returns:
@@ -500,7 +496,7 @@ class ProviderPool:
             "providers": [inst.get_stats() for inst in instances],
         }
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Perform health check on all providers.
 
         Returns:
@@ -533,7 +529,7 @@ class ProviderPool:
 
 async def create_provider_pool(
     name: str,
-    providers: Dict[str, BaseProvider],
+    providers: dict[str, BaseProvider],
     config: Optional[ProviderPoolConfig] = None,
 ) -> ProviderPool:
     """Create and initialize a provider pool.

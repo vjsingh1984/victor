@@ -30,10 +30,10 @@ This coordinator now publishes events instead of using direct callbacks,
 breaking circular dependencies with the orchestrator.
 """
 
-import asyncio
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.agent.usage_analytics import UsageAnalytics
@@ -135,7 +135,7 @@ class EvaluationCoordinator:
 
         return self._event_bus
 
-    async def _publish_event(self, topic: str, data: Dict[str, Any]) -> None:
+    async def _publish_event(self, topic: str, data: dict[str, Any]) -> None:
         """Publish an event to the observability bus.
 
         Args:
@@ -341,7 +341,7 @@ class EvaluationCoordinator:
             # Invalid reward data
             logger.warning(f"Failed to send RL reward signal (invalid data): {e}")
 
-    async def flush_analytics(self) -> Dict[str, bool]:
+    async def flush_analytics(self) -> dict[str, bool]:
         """Flush all analytics and cached data to persistent storage.
 
         Call this method before shutdown or when you need to ensure
@@ -358,7 +358,7 @@ class EvaluationCoordinator:
             - tool_cache: Whether cache was flushed
         """
         start_time = time.time()
-        results: Dict[str, bool] = {}
+        results: dict[str, bool] = {}
 
         # Flush usage analytics
         if self._usage_analytics:

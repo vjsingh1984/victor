@@ -21,7 +21,7 @@ operations.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class VulnerabilityScanHandler:
             self._scanner = get_scanner()
         return self._scanner
 
-    async def scan_dependencies(self, project_path: str) -> Dict[str, Any]:
+    async def scan_dependencies(self, project_path: str) -> dict[str, Any]:
         """Scan project dependencies for vulnerabilities.
 
         Args:
@@ -95,7 +95,7 @@ class SecretScanHandler:
             self._scanner = SecretScanner()
         return self._scanner
 
-    def scan_content(self, content: str) -> Dict[str, Any]:
+    def scan_content(self, content: str) -> dict[str, Any]:
         """Scan content for secrets.
 
         Args:
@@ -120,7 +120,7 @@ class SecretScanHandler:
             ],
         }
 
-    def scan_file(self, file_path: str) -> Dict[str, Any]:
+    def scan_file(self, file_path: str) -> dict[str, Any]:
         """Scan a file for secrets.
 
         Args:
@@ -154,8 +154,8 @@ class ComplianceCheckHandler:
     async def check_compliance(
         self,
         project_path: str,
-        frameworks: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        frameworks: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         """Check project compliance against frameworks.
 
         Args:
@@ -171,7 +171,7 @@ class ComplianceCheckHandler:
         )
 
         frameworks = frameworks or ["soc2"]
-        results: Dict[str, Any] = {}
+        results: dict[str, Any] = {}
 
         try:
             # Initialize audit manager (validates project path)

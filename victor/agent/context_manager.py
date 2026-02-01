@@ -52,8 +52,8 @@ Usage:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Optional, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.conversation_controller import ConversationController, ContextMetrics

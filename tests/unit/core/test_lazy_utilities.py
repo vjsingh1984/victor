@@ -14,7 +14,6 @@
 
 """Tests for lazy initialization utilities."""
 
-import pytest
 
 from victor.core.lazy import (
     LazyProperty,
@@ -156,7 +155,6 @@ class TestDeferredImport:
 
     def test_deferred_import_with_init_kwargs(self):
         """Should pass kwargs to constructor."""
-        from pathlib import PurePosixPath
 
         result = deferred_import(
             "pathlib",

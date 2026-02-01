@@ -49,7 +49,7 @@ Example:
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 from datetime import datetime
 
 
@@ -126,9 +126,9 @@ class WorkflowValidationError:
     suggestion: Optional[str] = None
     value: Optional[Any] = None
     error_code: Optional[str] = None
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for JSON export."""
         return {
             "category": self.category.value,
@@ -178,27 +178,27 @@ class WorkflowGenerationValidationResult:
     """
 
     is_valid: bool
-    schema_errors: List[WorkflowValidationError] = field(default_factory=list)
-    structure_errors: List[WorkflowValidationError] = field(default_factory=list)
-    semantic_errors: List[WorkflowValidationError] = field(default_factory=list)
-    security_errors: List[WorkflowValidationError] = field(default_factory=list)
+    schema_errors: list[WorkflowValidationError] = field(default_factory=list)
+    structure_errors: list[WorkflowValidationError] = field(default_factory=list)
+    semantic_errors: list[WorkflowValidationError] = field(default_factory=list)
+    security_errors: list[WorkflowValidationError] = field(default_factory=list)
     validation_timestamp: datetime = field(default_factory=datetime.now)
     workflow_name: Optional[str] = None
 
     @property
-    def all_errors(self) -> List[WorkflowValidationError]:
+    def all_errors(self) -> list[WorkflowValidationError]:
         """Get all errors from all categories."""
         return (
             self.schema_errors + self.structure_errors + self.semantic_errors + self.security_errors
         )
 
     @property
-    def critical_errors(self) -> List[WorkflowValidationError]:
+    def critical_errors(self) -> list[WorkflowValidationError]:
         """Get only critical errors."""
         return [e for e in self.all_errors if e.severity == ErrorSeverity.CRITICAL]
 
     @property
-    def error_count(self) -> Dict[str, int]:
+    def error_count(self) -> dict[str, int]:
         """Get count of errors by severity."""
         counts = {"critical": 0, "error": 0, "warning": 0, "info": 0}
         for error in self.all_errors:
@@ -206,7 +206,7 @@ class WorkflowGenerationValidationResult:
         return counts
 
     @property
-    def category_count(self) -> Dict[str, int]:
+    def category_count(self) -> dict[str, int]:
         """Get count of errors by category."""
         return {
             "schema": len(self.schema_errors),
@@ -233,7 +233,7 @@ class WorkflowGenerationValidationResult:
             f"{counts['warning']} warnings)"
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for JSON export."""
         return {
             "is_valid": self.is_valid,
@@ -250,9 +250,9 @@ class WorkflowGenerationValidationResult:
             "workflow_name": self.workflow_name,
         }
 
-    def group_by_node(self) -> Dict[str, List[WorkflowValidationError]]:
+    def group_by_node(self) -> dict[str, list[WorkflowValidationError]]:
         """Group errors by node ID for focused reporting."""
-        grouped: Dict[str, List[WorkflowValidationError]] = {}
+        grouped: dict[str, list[WorkflowValidationError]] = {}
 
         for error in self.all_errors:
             node_id = self._extract_node_id(error.location)
@@ -302,10 +302,10 @@ class RefinementResult:
     success: bool
     refined_schema: Any
     iterations: int
-    fixes_applied: List[str] = field(default_factory=list)
+    fixes_applied: list[str] = field(default_factory=list)
     validation_result: Optional[WorkflowGenerationValidationResult] = None
-    original_errors: List[WorkflowValidationError] = field(default_factory=list)
-    remaining_errors: List[WorkflowValidationError] = field(default_factory=list)
+    original_errors: list[WorkflowValidationError] = field(default_factory=list)
+    remaining_errors: list[WorkflowValidationError] = field(default_factory=list)
     convergence_achieved: bool = False
 
     @property
@@ -332,7 +332,7 @@ class RefinementResult:
             return base
         return f"✗ Refinement failed after {self.iterations} iterations"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "success": self.success,
@@ -374,7 +374,7 @@ class RefinementIteration:
     workflow_schema: Any
     validation_result: WorkflowGenerationValidationResult
     refinement_type: str = "unknown"
-    changes_made: List[str] = field(default_factory=list)
+    changes_made: list[str] = field(default_factory=list)
     duration_ms: Optional[float] = None
 
     @property
@@ -406,7 +406,7 @@ class RefinementHistory:
         print(f"Converged after {history.convergence_iteration} iterations")
     """
 
-    iterations: List[RefinementIteration] = field(default_factory=list)
+    iterations: list[RefinementIteration] = field(default_factory=list)
     final_result: Optional[RefinementResult] = None
     total_duration_ms: float = 0.0
     converged: bool = False
@@ -423,7 +423,7 @@ class RefinementHistory:
         self.converged = True
         self.convergence_iteration = iteration_number
 
-    def get_error_progression(self) -> List[int]:
+    def get_error_progression(self) -> list[int]:
         """Get list of error counts per iteration."""
         return [iter.error_count for iter in self.iterations]
 
@@ -485,7 +485,7 @@ class WorkflowFix:
     after_value: Optional[Any] = None
     auto_applied: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "fix_type": self.fix_type,

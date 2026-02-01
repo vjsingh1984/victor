@@ -20,8 +20,6 @@ Tests Phase 1 Quick Wins:
 - Configuration validation errors with field names and recovery hints
 """
 
-import pytest
-from unittest.mock import Mock, patch
 
 from victor.core.errors import (
     ProviderNotFoundError,

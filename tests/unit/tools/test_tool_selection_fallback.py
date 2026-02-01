@@ -5,9 +5,6 @@ Tests verify that tool selection provides appropriate fallback behavior when
 semantic selection or keyword matching returns no results.
 """
 
-from typing import List
-import asyncio
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -36,24 +33,24 @@ class _DummyProvider(BaseProvider):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: List[ToolDefinition] | None = None,
+        tools: list[ToolDefinition] | None = None,
         **kwargs,
     ) -> CompletionResponse:
         return CompletionResponse(content="", role="assistant", model=model)
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: List[ToolDefinition] | None = None,
+        tools: list[ToolDefinition] | None = None,
         **kwargs,
     ):
         if False:

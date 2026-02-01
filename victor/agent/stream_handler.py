@@ -18,7 +18,8 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator, Callable
 
 from victor.providers.base import StreamChunk
 
@@ -64,7 +65,7 @@ class StreamMetrics:
     total_cost: float = 0.0
     cost_calculated: bool = False
 
-    def record_usage(self, usage: Optional[Dict[str, Any]]) -> None:
+    def record_usage(self, usage: Optional[dict[str, Any]]) -> None:
         """Record token usage from provider API response.
 
         Args:
@@ -160,7 +161,7 @@ class StreamResult:
     """Result from processing a stream."""
 
     content: str = ""
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     stop_reason: Optional[str] = None
     metrics: StreamMetrics = field(default_factory=StreamMetrics)
     error: Optional[str] = None
@@ -180,7 +181,7 @@ class StreamHandler:
     def __init__(
         self,
         on_content: Optional[Callable[[str], None]] = None,
-        on_tool_call: Optional[Callable[[Dict[str, Any]], None]] = None,
+        on_tool_call: Optional[Callable[[dict[str, Any]], None]] = None,
         on_complete: Optional[Callable[[StreamResult], None]] = None,
         on_error: Optional[Callable[[Exception], None]] = None,
         timeout: float = 300.0,
@@ -203,8 +204,8 @@ class StreamHandler:
         # State
         self._cancelled = False
         self._current_content = ""
-        self._tool_calls: List[Dict[str, Any]] = []
-        self._pending_tool_call: Dict[str, Any] = {}
+        self._tool_calls: list[dict[str, Any]] = []
+        self._pending_tool_call: dict[str, Any] = {}
 
     async def process_stream(
         self,
@@ -219,8 +220,8 @@ class StreamHandler:
             StreamResult with accumulated content and metrics
         """
         metrics = StreamMetrics(start_time=time.time())
-        content_parts: List[str] = []
-        tool_calls: List[Dict[str, Any]] = []
+        content_parts: list[str] = []
+        tool_calls: list[dict[str, Any]] = []
         stop_reason: Optional[str] = None
         error: Optional[str] = None
 
@@ -321,13 +322,13 @@ class StreamBuffer:
     """
 
     def __init__(self) -> None:
-        self._buffers: Dict[str, Dict[str, Any]] = {}
+        self._buffers: dict[str, dict[str, Any]] = {}
 
     def add_chunk(
         self,
         tool_call_id: str,
-        chunk: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
+        chunk: dict[str, Any],
+    ) -> Optional[dict[str, Any]]:
         """Add a chunk to the buffer.
 
         Args:
@@ -368,7 +369,7 @@ class StreamBuffer:
 
         return None
 
-    def flush(self) -> List[Dict[str, Any]]:
+    def flush(self) -> list[dict[str, Any]]:
         """Flush all buffered tool calls (may be incomplete)."""
         results = list(self._buffers.values())
         self._buffers.clear()

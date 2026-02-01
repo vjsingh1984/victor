@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from datetime import datetime
 
 
@@ -85,16 +85,16 @@ class NodeStatistics:
     p95_duration: float
     p99_duration: float
     success_rate: float
-    error_types: Dict[str, int] = field(default_factory=dict)
+    error_types: dict[str, int] = field(default_factory=dict)
     avg_input_tokens: int = 0
     avg_output_tokens: int = 0
     token_efficiency: float = 0.0
-    tool_calls: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    tool_calls: dict[str, dict[str, Any]] = field(default_factory=dict)
     total_cost: float = 0.0
     avg_memory_mb: float = 0.0
     avg_cpu_percent: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "node_id": self.node_id,
@@ -140,7 +140,7 @@ class Bottleneck:
     tool_id: Optional[str] = None
     confidence: float = 0.8
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "type": self.type.value,
@@ -187,9 +187,9 @@ class OptimizationOpportunity:
     estimated_cost_reduction: float = 0.0
     estimated_duration_reduction: float = 0.0
     confidence: float = 0.7
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "strategy_type": self.strategy_type.value,
@@ -230,9 +230,9 @@ class OptimizationStrategy:
     enabled: bool = True
     priority: int = 0
     max_iterations: int = 10
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "name": self.name,
@@ -262,9 +262,9 @@ class WorkflowProfile:
     """
 
     workflow_id: str
-    node_stats: Dict[str, NodeStatistics]
-    bottlenecks: List[Bottleneck]
-    opportunities: List[OptimizationOpportunity]
+    node_stats: dict[str, NodeStatistics]
+    bottlenecks: list[Bottleneck]
+    opportunities: list[OptimizationOpportunity]
     total_duration: float
     total_cost: float
     total_tokens: int
@@ -272,7 +272,7 @@ class WorkflowProfile:
     created_at: datetime = field(default_factory=datetime.now)
     num_executions: int = 1
 
-    def get_slowest_nodes(self, n: int = 5) -> List[NodeStatistics]:
+    def get_slowest_nodes(self, n: int = 5) -> list[NodeStatistics]:
         """Get the N slowest nodes by average duration."""
         return sorted(
             self.node_stats.values(),
@@ -280,7 +280,7 @@ class WorkflowProfile:
             reverse=True,
         )[:n]
 
-    def get_most_expensive_nodes(self, n: int = 5) -> List[NodeStatistics]:
+    def get_most_expensive_nodes(self, n: int = 5) -> list[NodeStatistics]:
         """Get the N most expensive nodes by total cost."""
         return sorted(
             self.node_stats.values(),
@@ -288,7 +288,7 @@ class WorkflowProfile:
             reverse=True,
         )[:n]
 
-    def get_least_reliable_nodes(self, n: int = 5) -> List[NodeStatistics]:
+    def get_least_reliable_nodes(self, n: int = 5) -> list[NodeStatistics]:
         """Get the N least reliable nodes by success rate."""
         return sorted(
             self.node_stats.values(),
@@ -299,7 +299,7 @@ class WorkflowProfile:
         self,
         min_confidence: float = 0.7,
         min_improvement: float = 0.1,
-    ) -> List[OptimizationOpportunity]:
+    ) -> list[OptimizationOpportunity]:
         """Get high-impact optimization opportunities.
 
         Args:
@@ -315,7 +315,7 @@ class WorkflowProfile:
             if opp.confidence >= min_confidence and opp.expected_improvement >= min_improvement
         ]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "workflow_id": self.workflow_id,

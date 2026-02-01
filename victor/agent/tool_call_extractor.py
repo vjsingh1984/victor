@@ -36,7 +36,7 @@ Example:
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +46,11 @@ class ExtractedToolCall:
     """Represents a tool call extracted from model text."""
 
     tool_name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     confidence: float  # 0.0-1.0, how confident we are in the extraction
     source_text: str  # The text segment that was parsed
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "tool": self.tool_name,
             "args": self.arguments,
@@ -101,7 +101,7 @@ class ToolCallExtractor:
         r"pattern\s+[`'\"](.+?)[`'\"]",
     ]
 
-    def __init__(self, tool_definitions: Optional[Dict[str, Any]] = None):
+    def __init__(self, tool_definitions: Optional[dict[str, Any]] = None):
         """Initialize the extractor.
 
         Args:
@@ -113,8 +113,8 @@ class ToolCallExtractor:
     def extract_from_text(
         self,
         text: str,
-        mentioned_tools: List[str],
-        context: Optional[Dict[str, Any]] = None,
+        mentioned_tools: list[str],
+        context: Optional[dict[str, Any]] = None,
     ) -> Optional[ExtractedToolCall]:
         """Extract a tool call from model text.
 
@@ -149,7 +149,7 @@ class ToolCallExtractor:
         self,
         text: str,
         tool_name: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> Optional[ExtractedToolCall]:
         """Extract arguments for a specific tool.
 
@@ -184,7 +184,7 @@ class ToolCallExtractor:
         return self._extract_generic_call(text, tool_name, context)
 
     def _extract_write_call(
-        self, text: str, context: Optional[Dict[str, Any]] = None
+        self, text: str, context: Optional[dict[str, Any]] = None
     ) -> Optional[ExtractedToolCall]:
         """Extract write/create file call."""
         # Find file path
@@ -220,7 +220,7 @@ class ToolCallExtractor:
         )
 
     def _extract_edit_call(
-        self, text: str, context: Optional[Dict[str, Any]] = None
+        self, text: str, context: Optional[dict[str, Any]] = None
     ) -> Optional[ExtractedToolCall]:
         """Extract edit file call.
 
@@ -261,7 +261,7 @@ class ToolCallExtractor:
         return None
 
     def _extract_read_call(
-        self, text: str, context: Optional[Dict[str, Any]] = None
+        self, text: str, context: Optional[dict[str, Any]] = None
     ) -> Optional[ExtractedToolCall]:
         """Extract read file call."""
         file_path = self._extract_file_path(text)
@@ -276,7 +276,7 @@ class ToolCallExtractor:
         )
 
     def _extract_shell_call(
-        self, text: str, context: Optional[Dict[str, Any]] = None
+        self, text: str, context: Optional[dict[str, Any]] = None
     ) -> Optional[ExtractedToolCall]:
         """Extract shell/bash command call."""
         command = None
@@ -324,7 +324,7 @@ class ToolCallExtractor:
         )
 
     def _extract_search_call(
-        self, text: str, context: Optional[Dict[str, Any]] = None
+        self, text: str, context: Optional[dict[str, Any]] = None
     ) -> Optional[ExtractedToolCall]:
         """Extract grep/search call."""
         pattern = None
@@ -352,7 +352,7 @@ class ToolCallExtractor:
         )
 
     def _extract_ls_call(
-        self, text: str, context: Optional[Dict[str, Any]] = None
+        self, text: str, context: Optional[dict[str, Any]] = None
     ) -> Optional[ExtractedToolCall]:
         """Extract ls/list directory call."""
         # Find directory path - try backtick-wrapped first
@@ -395,7 +395,7 @@ class ToolCallExtractor:
         )
 
     def _extract_graph_call(
-        self, text: str, context: Optional[Dict[str, Any]] = None
+        self, text: str, context: Optional[dict[str, Any]] = None
     ) -> Optional[ExtractedToolCall]:
         """Extract graph query call."""
         # Try to find graph query patterns
@@ -464,7 +464,7 @@ class ToolCallExtractor:
         self,
         text: str,
         tool_name: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> Optional[ExtractedToolCall]:
         """Generic extraction for unknown tools."""
         # Try to find any arguments in parentheses after tool name
@@ -522,7 +522,7 @@ class ToolCallExtractor:
 
         return None
 
-    def _extract_edit_diff(self, text: str) -> Tuple[Optional[str], Optional[str]]:
+    def _extract_edit_diff(self, text: str) -> tuple[Optional[str], Optional[str]]:
         """Extract old/new content for edit operations.
 
         Looks for patterns like:
@@ -550,7 +550,7 @@ class ToolCallExtractor:
 
         return None, None
 
-    def _parse_args_string(self, args_str: str) -> Dict[str, Any]:
+    def _parse_args_string(self, args_str: str) -> dict[str, Any]:
         """Parse a string of arguments like 'path="foo", content="bar"'."""
         args = {}
         # Match key=value or key="value" patterns
@@ -576,8 +576,8 @@ def get_tool_call_extractor() -> ToolCallExtractor:
 
 def extract_tool_call_from_text(
     text: str,
-    mentioned_tools: List[str],
-    context: Optional[Dict[str, Any]] = None,
+    mentioned_tools: list[str],
+    context: Optional[dict[str, Any]] = None,
 ) -> Optional[ExtractedToolCall]:
     """Convenience function to extract tool call from text.
 

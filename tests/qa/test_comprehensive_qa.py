@@ -29,16 +29,13 @@ Usage:
     pytest tests/qa/test_comprehensive_qa.py -k "performance" -v
 """
 
-import os
 import subprocess
 import sys
 import json
-import tempfile
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any
 from dataclasses import dataclass, field
 from datetime import datetime
-import pytest
 
 from victor import __version__
 
@@ -50,12 +47,12 @@ class QAResult:
     name: str
     passed: bool = False
     duration_seconds: float = 0.0
-    details: Dict[str, Any] = field(default_factory=dict)
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    metrics: Dict[str, float] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    metrics: dict[str, float] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "name": self.name,
@@ -96,7 +93,7 @@ class TestComprehensiveQA:
     SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 
     # Results storage
-    results: List[QAResult] = []
+    results: list[QAResult] = []
 
     @classmethod
     def setup_class(cls):

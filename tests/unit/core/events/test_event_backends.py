@@ -25,14 +25,12 @@ Run with: pytest tests/unit/core/events/test_event_backends.py -v
 """
 
 import asyncio
-from typing import List
 
 import pytest
 
 from victor.core.events import (
     # Core types
     MessagingEvent,
-    SubscriptionHandle,
     DeliveryGuarantee,
     BackendType,
     BackendConfig,
@@ -160,7 +158,7 @@ class TestInMemoryEventBackend:
     @pytest.mark.asyncio
     async def test_publish_subscribe_basic(self, backend):
         """Basic pub/sub should work."""
-        received: List[MessagingEvent] = []
+        received: list[MessagingEvent] = []
 
         async def handler(event: MessagingEvent):
             received.append(event)
@@ -184,8 +182,8 @@ class TestInMemoryEventBackend:
     @pytest.mark.asyncio
     async def test_subscribe_with_pattern(self, backend):
         """Subscriptions should filter by pattern."""
-        tool_events: List[MessagingEvent] = []
-        agent_events: List[MessagingEvent] = []
+        tool_events: list[MessagingEvent] = []
+        agent_events: list[MessagingEvent] = []
 
         async def tool_handler(event: MessagingEvent):
             tool_events.append(event)
@@ -211,7 +209,7 @@ class TestInMemoryEventBackend:
     @pytest.mark.asyncio
     async def test_unsubscribe(self, backend):
         """Unsubscribe should stop event delivery."""
-        received: List[MessagingEvent] = []
+        received: list[MessagingEvent] = []
 
         async def handler(event: MessagingEvent):
             received.append(event)
@@ -235,8 +233,8 @@ class TestInMemoryEventBackend:
     @pytest.mark.asyncio
     async def test_multiple_subscribers(self, backend):
         """Multiple subscribers should all receive events."""
-        handler1_events: List[MessagingEvent] = []
-        handler2_events: List[MessagingEvent] = []
+        handler1_events: list[MessagingEvent] = []
+        handler2_events: list[MessagingEvent] = []
 
         async def handler1(event: MessagingEvent):
             handler1_events.append(event)
@@ -256,7 +254,7 @@ class TestInMemoryEventBackend:
     @pytest.mark.asyncio
     async def test_publish_batch(self, backend):
         """Batch publish should deliver all events."""
-        received: List[MessagingEvent] = []
+        received: list[MessagingEvent] = []
 
         async def handler(event: MessagingEvent):
             received.append(event)
@@ -310,7 +308,7 @@ class TestObservabilityBus:
     @pytest.mark.asyncio
     async def test_emit_event(self, bus):
         """Emit should publish events."""
-        received: List[MessagingEvent] = []
+        received: list[MessagingEvent] = []
 
         async def handler(event: MessagingEvent):
             received.append(event)
@@ -331,7 +329,7 @@ class TestObservabilityBus:
     @pytest.mark.asyncio
     async def test_emit_with_correlation(self, bus):
         """Emit should support correlation IDs."""
-        received: List[MessagingEvent] = []
+        received: list[MessagingEvent] = []
 
         async def handler(event: MessagingEvent):
             received.append(event)
@@ -368,8 +366,8 @@ class TestAgentMessageBus:
     @pytest.mark.asyncio
     async def test_send_to_agent(self, bus):
         """Send should deliver to specific agent."""
-        researcher_msgs: List[MessagingEvent] = []
-        executor_msgs: List[MessagingEvent] = []
+        researcher_msgs: list[MessagingEvent] = []
+        executor_msgs: list[MessagingEvent] = []
 
         async def researcher_handler(event: MessagingEvent):
             researcher_msgs.append(event)
@@ -398,8 +396,8 @@ class TestAgentMessageBus:
     @pytest.mark.asyncio
     async def test_broadcast_to_all(self, bus):
         """Broadcast should reach all agents."""
-        agent1_msgs: List[MessagingEvent] = []
-        agent2_msgs: List[MessagingEvent] = []
+        agent1_msgs: list[MessagingEvent] = []
+        agent2_msgs: list[MessagingEvent] = []
 
         async def agent1_handler(event: MessagingEvent):
             agent1_msgs.append(event)

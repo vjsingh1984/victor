@@ -21,12 +21,10 @@ deployments and testing.
 
 from __future__ import annotations
 
-import asyncio
 import time
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from victor.protocols import ICacheBackend
 
@@ -97,7 +95,7 @@ class MemoryCacheBackend(ICacheBackend):
         self._enable_stats = enable_stats
 
         # Namespace-isolated storage: {namespace: {key: CacheEntry}}
-        self._store: Dict[str, Dict[str, CacheEntry]] = {}
+        self._store: dict[str, dict[str, CacheEntry]] = {}
 
         # Thread safety
         self._lock = threading.RLock()
@@ -231,7 +229,7 @@ class MemoryCacheBackend(ICacheBackend):
 
             return count
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

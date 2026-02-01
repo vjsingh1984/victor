@@ -75,13 +75,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import queue
-import shutil
 import sqlite3
 import threading
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple, cast
+from typing import Any, Optional, cast
+from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +152,7 @@ class DatabaseManager:
 
     def _ensure_database(self) -> None:
         """Ensure database exists and is up to date."""
-        from victor.core.schema import Tables, Schema
+        from victor.core.schema import Schema
 
         # Create database if needed
         conn = self._get_raw_connection()
@@ -216,7 +216,7 @@ class DatabaseManager:
     def execute(
         self,
         sql: str,
-        params: Optional[Tuple[Any, ...]] = None,
+        params: Optional[tuple[Any, ...]] = None,
     ) -> sqlite3.Cursor:
         """Execute SQL with auto-commit.
 
@@ -235,7 +235,7 @@ class DatabaseManager:
     def executemany(
         self,
         sql: str,
-        params_list: List[Tuple[Any, ...]],
+        params_list: list[tuple[Any, ...]],
     ) -> sqlite3.Cursor:
         """Execute SQL for multiple parameter sets.
 
@@ -254,8 +254,8 @@ class DatabaseManager:
     def query(
         self,
         sql: str,
-        params: Optional[Tuple[Any, ...]] = None,
-    ) -> List[sqlite3.Row]:
+        params: Optional[tuple[Any, ...]] = None,
+    ) -> list[sqlite3.Row]:
         """Execute query and return all rows.
 
         Args:
@@ -272,7 +272,7 @@ class DatabaseManager:
     def query_one(
         self,
         sql: str,
-        params: Optional[Tuple[Any, ...]] = None,
+        params: Optional[tuple[Any, ...]] = None,
     ) -> Optional[sqlite3.Row]:
         """Execute query and return first row.
 
@@ -303,7 +303,7 @@ class DatabaseManager:
         )
         return row is not None
 
-    def get_tables(self) -> List[str]:
+    def get_tables(self) -> list[str]:
         """Get list of all tables.
 
         Returns:
@@ -569,13 +569,13 @@ class DatabaseManager:
 
         return backup_path
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get database statistics.
 
         Returns:
             Dict with table counts and sizes
         """
-        stats: Dict[str, Any] = {
+        stats: dict[str, Any] = {
             "path": str(self.db_path),
             "size_bytes": self.db_path.stat().st_size if self.db_path.exists() else 0,
             "tables": {},
@@ -608,7 +608,7 @@ class DatabaseManager:
     def _ensure_async_state(self) -> None:
         """Initialize async-related state if not already done."""
         if not hasattr(self, "_write_queue"):
-            self._write_queue: queue.Queue[Tuple[str, Optional[Tuple[Any, ...]]]] = queue.Queue()
+            self._write_queue: queue.Queue[tuple[str, Optional[tuple[Any, ...]]]] = queue.Queue()
             self._write_lock = threading.Lock()
             self._batch_size = 100
             self._flush_interval = 5.0
@@ -618,7 +618,7 @@ class DatabaseManager:
     async def execute_async(
         self,
         sql: str,
-        params: Optional[Tuple[Any, ...]] = None,
+        params: Optional[tuple[Any, ...]] = None,
     ) -> sqlite3.Cursor:
         """Execute SQL asynchronously.
 
@@ -636,7 +636,7 @@ class DatabaseManager:
     async def executemany_async(
         self,
         sql: str,
-        params_list: List[Tuple[Any, ...]],
+        params_list: list[tuple[Any, ...]],
     ) -> sqlite3.Cursor:
         """Execute SQL for multiple parameter sets asynchronously.
 
@@ -652,8 +652,8 @@ class DatabaseManager:
     async def query_async(
         self,
         sql: str,
-        params: Optional[Tuple[Any, ...]] = None,
-    ) -> List[sqlite3.Row]:
+        params: Optional[tuple[Any, ...]] = None,
+    ) -> list[sqlite3.Row]:
         """Execute query asynchronously.
 
         Args:
@@ -668,7 +668,7 @@ class DatabaseManager:
     async def query_one_async(
         self,
         sql: str,
-        params: Optional[Tuple[Any, ...]] = None,
+        params: Optional[tuple[Any, ...]] = None,
     ) -> Optional[sqlite3.Row]:
         """Execute query and return first row asynchronously.
 
@@ -688,7 +688,7 @@ class DatabaseManager:
     def queue_write(
         self,
         sql: str,
-        params: Optional[Tuple[Any, ...]] = None,
+        params: Optional[tuple[Any, ...]] = None,
     ) -> None:
         """Queue a write operation for batched execution.
 
@@ -720,7 +720,7 @@ class DatabaseManager:
             self._is_flushing = True
 
         try:
-            writes: List[Tuple[str, Optional[Tuple[Any, ...]]]] = []
+            writes: list[tuple[str, Optional[tuple[Any, ...]]]] = []
 
             # Drain the queue
             while not self._write_queue.empty():
@@ -942,7 +942,6 @@ class ProjectDatabaseManager:
 
         This deletes the corrupted database file and recreates it.
         """
-        import shutil
 
         logger.warning(f"Rebuilding corrupted database: {self.db_path}")
 
@@ -1009,7 +1008,7 @@ class ProjectDatabaseManager:
     def execute(
         self,
         sql: str,
-        params: Optional[Tuple[Any, ...]] = None,
+        params: Optional[tuple[Any, ...]] = None,
     ) -> sqlite3.Cursor:
         """Execute SQL with auto-commit."""
         conn = self.get_connection()
@@ -1020,8 +1019,8 @@ class ProjectDatabaseManager:
     def query(
         self,
         sql: str,
-        params: Optional[Tuple[Any, ...]] = None,
-    ) -> List[sqlite3.Row]:
+        params: Optional[tuple[Any, ...]] = None,
+    ) -> list[sqlite3.Row]:
         """Execute query and return all rows."""
         conn = self.get_connection()
         cursor = conn.execute(sql, params or ())
@@ -1030,7 +1029,7 @@ class ProjectDatabaseManager:
     def query_one(
         self,
         sql: str,
-        params: Optional[Tuple[Any, ...]] = None,
+        params: Optional[tuple[Any, ...]] = None,
     ) -> Optional[sqlite3.Row]:
         """Execute query and return first row."""
         conn = self.get_connection()
@@ -1046,7 +1045,7 @@ class ProjectDatabaseManager:
         )
         return row is not None
 
-    def get_tables(self) -> List[str]:
+    def get_tables(self) -> list[str]:
         """Get list of all tables."""
         rows = self.query("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         return [row[0] for row in rows]
@@ -1239,9 +1238,9 @@ class ProjectDatabaseManager:
         except sqlite3.OperationalError as e:
             logger.warning(f"Failed to add column {table}.{column}: {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get database statistics."""
-        stats: Dict[str, Any] = {
+        stats: dict[str, Any] = {
             "path": str(self.db_path),
             "size_bytes": self.db_path.stat().st_size if self.db_path.exists() else 0,
             "tables": {},
@@ -1264,7 +1263,7 @@ class ProjectDatabaseManager:
 
 # Module-level singleton accessors
 _database: Optional[DatabaseManager] = None
-_project_databases: Dict[str, ProjectDatabaseManager] = {}
+_project_databases: dict[str, ProjectDatabaseManager] = {}
 
 
 def get_database(db_path: Optional[Path] = None) -> DatabaseManager:

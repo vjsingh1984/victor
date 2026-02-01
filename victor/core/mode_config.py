@@ -50,7 +50,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Union
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class ModeConfig:
     tool_budget: int
     max_iterations: int
     exploration_multiplier: float = 1.0
-    allowed_tools: Optional[Union[List[str], Set[str]]] = None
+    allowed_tools: Optional[list[str] | set[str]] = None
 
     def __post_init__(self) -> None:
         """Validate configuration at construction time."""
@@ -117,7 +117,7 @@ class ModeConfig:
             self.allowed_tools = set(self.allowed_tools)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ModeConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "ModeConfig":
         """Create ModeConfig from dictionary with validation.
 
         Args:
@@ -166,10 +166,10 @@ class ModeDefinition:
     temperature: float = 0.7
     description: str = ""
     exploration_multiplier: float = 1.0
-    allowed_stages: List[str] = field(default_factory=list)
-    priority_tools: List[str] = field(default_factory=list)
-    allowed_tools: Optional[Union[List[str], Set[str]]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    allowed_stages: list[str] = field(default_factory=list)
+    priority_tools: list[str] = field(default_factory=list)
+    allowed_tools: Optional[list[str] | set[str]] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate configuration at construction time."""
@@ -218,7 +218,7 @@ class ModeDefinition:
             self.allowed_tools = set(self.allowed_tools)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ModeDefinition":
+    def from_dict(cls, data: dict[str, Any]) -> "ModeDefinition":
         """Create ModeDefinition from dictionary with validation.
 
         Args:
@@ -252,7 +252,7 @@ class ModeDefinition:
             allowed_tools=self.allowed_tools,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary format."""
         return {
             "name": self.name,
@@ -281,14 +281,14 @@ class VerticalModeConfig:
     """
 
     vertical_name: str
-    modes: Dict[str, ModeDefinition] = field(default_factory=dict)
-    task_budgets: Dict[str, int] = field(default_factory=dict)
+    modes: dict[str, ModeDefinition] = field(default_factory=dict)
+    task_budgets: dict[str, int] = field(default_factory=dict)
     default_mode: str = "standard"
     default_budget: int = 10
 
 
 # Default modes applicable to all verticals
-DEFAULT_MODES: Dict[str, ModeDefinition] = {
+DEFAULT_MODES: dict[str, ModeDefinition] = {
     "quick": ModeDefinition(
         name="quick",
         tool_budget=10,
@@ -365,7 +365,7 @@ DEFAULT_MODES: Dict[str, ModeDefinition] = {
 
 # Default task type budgets (fallback for all verticals)
 # Significantly increased to support comprehensive exploration
-DEFAULT_TASK_BUDGETS: Dict[str, int] = {
+DEFAULT_TASK_BUDGETS: dict[str, int] = {
     # General tasks
     "general": 50,
     "simple": 10,
@@ -401,10 +401,10 @@ class ModeConfigRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry with default modes."""
-        self._default_modes: Dict[str, ModeDefinition] = DEFAULT_MODES.copy()
-        self._default_task_budgets: Dict[str, int] = DEFAULT_TASK_BUDGETS.copy()
-        self._verticals: Dict[str, VerticalModeConfig] = {}
-        self._mode_aliases: Dict[str, str] = {
+        self._default_modes: dict[str, ModeDefinition] = DEFAULT_MODES.copy()
+        self._default_task_budgets: dict[str, int] = DEFAULT_TASK_BUDGETS.copy()
+        self._verticals: dict[str, VerticalModeConfig] = {}
+        self._mode_aliases: dict[str, str] = {
             "fast": "quick",
             "thorough": "comprehensive",
         }
@@ -428,8 +428,8 @@ class ModeConfigRegistry:
     def register_vertical(
         self,
         name: str,
-        modes: Optional[Dict[str, ModeDefinition]] = None,
-        task_budgets: Optional[Dict[str, int]] = None,
+        modes: Optional[dict[str, ModeDefinition]] = None,
+        task_budgets: Optional[dict[str, int]] = None,
         default_mode: str = "standard",
         default_budget: int = 10,
     ) -> None:
@@ -484,7 +484,7 @@ class ModeConfigRegistry:
 
         return None
 
-    def get_mode_configs(self, vertical: Optional[str] = None) -> Dict[str, ModeDefinition]:
+    def get_mode_configs(self, vertical: Optional[str] = None) -> dict[str, ModeDefinition]:
         """Get all mode configurations for a vertical.
 
         Args:
@@ -584,7 +584,7 @@ class ModeConfigRegistry:
             return self._verticals[vertical].default_mode
         return "default"
 
-    def list_modes(self, vertical: Optional[str] = None) -> List[str]:
+    def list_modes(self, vertical: Optional[str] = None) -> list[str]:
         """List available mode names.
 
         Args:
@@ -598,7 +598,7 @@ class ModeConfigRegistry:
             modes.update(self._verticals[vertical].modes.keys())
         return sorted(modes)
 
-    def list_verticals(self) -> List[str]:
+    def list_verticals(self) -> list[str]:
         """List registered verticals.
 
         Returns:
@@ -615,7 +615,7 @@ class ModeConfigRegistry:
         """
         self._mode_aliases[alias.lower()] = target.lower()
 
-    def get_modes(self, vertical: Optional[str] = None) -> Dict[str, ModeConfig]:
+    def get_modes(self, vertical: Optional[str] = None) -> dict[str, ModeConfig]:
         """Get all modes as simplified ModeConfig objects.
 
         Returns default modes when no vertical specified, or merged modes
@@ -627,7 +627,7 @@ class ModeConfigRegistry:
         Returns:
             Dict mapping mode name to ModeConfig
         """
-        result: Dict[str, ModeConfig] = {}
+        result: dict[str, ModeConfig] = {}
 
         # Add defaults first
         for name, mode_def in self._default_modes.items():
@@ -640,7 +640,7 @@ class ModeConfigRegistry:
 
         return result
 
-    def register_modes(self, vertical: str, modes: Dict[str, ModeConfig]) -> None:
+    def register_modes(self, vertical: str, modes: dict[str, ModeConfig]) -> None:
         """Register vertical-specific modes using simplified ModeConfig.
 
         This method allows registering modes using the simpler ModeConfig
@@ -650,7 +650,7 @@ class ModeConfigRegistry:
             vertical: Vertical name
             modes: Dict mapping mode name to ModeConfig
         """
-        mode_definitions: Dict[str, ModeDefinition] = {}
+        mode_definitions: dict[str, ModeDefinition] = {}
         for name, config in modes.items():
             mode_definitions[name] = ModeDefinition(
                 name=name,
@@ -711,8 +711,8 @@ def get_tool_budget(
 
 def register_vertical_modes(
     vertical: str,
-    modes: Dict[str, ModeDefinition],
-    task_budgets: Optional[Dict[str, int]] = None,
+    modes: dict[str, ModeDefinition],
+    task_budgets: Optional[dict[str, int]] = None,
 ) -> None:
     """Register modes for a vertical.
 
@@ -753,7 +753,7 @@ class ComplexityMapper:
     """
 
     # Standard complexity-to-mode mapping (used as fallback)
-    _BASE_MAPPING: Dict[str, str] = {
+    _BASE_MAPPING: dict[str, str] = {
         "trivial": "quick",
         "simple": "quick",
         "moderate": "standard",
@@ -768,7 +768,7 @@ class ComplexityMapper:
             vertical: Vertical name (e.g., "coding", "devops", "research")
         """
         self._vertical = vertical
-        self._overrides: Dict[str, str] = {}
+        self._overrides: dict[str, str] = {}
         self._load_default_overrides()
 
     def _load_default_overrides(self) -> None:
@@ -841,7 +841,7 @@ class ComplexityMapper:
         return self._BASE_MAPPING.get(complexity, "standard")
 
     @classmethod
-    def get_base_mapping(cls) -> Dict[str, str]:
+    def get_base_mapping(cls) -> dict[str, str]:
         """Get the standard base complexity-to-mode mapping.
 
         Returns:
@@ -866,7 +866,7 @@ class VerticalModeDefaults:
     """
 
     @staticmethod
-    def get_coding_modes() -> Dict[str, ModeDefinition]:
+    def get_coding_modes() -> dict[str, ModeDefinition]:
         """Get coding-specific mode definitions.
 
         Returns:
@@ -908,7 +908,7 @@ class VerticalModeDefaults:
         }
 
     @staticmethod
-    def get_coding_task_budgets() -> Dict[str, int]:
+    def get_coding_task_budgets() -> dict[str, int]:
         """Get coding-specific task budgets.
 
         Returns:
@@ -931,7 +931,7 @@ class VerticalModeDefaults:
         }
 
     @staticmethod
-    def get_devops_modes() -> Dict[str, ModeDefinition]:
+    def get_devops_modes() -> dict[str, ModeDefinition]:
         """Get devops-specific mode definitions.
 
         Returns:
@@ -949,7 +949,7 @@ class VerticalModeDefaults:
         }
 
     @staticmethod
-    def get_devops_task_budgets() -> Dict[str, int]:
+    def get_devops_task_budgets() -> dict[str, int]:
         """Get devops-specific task budgets.
 
         Returns:
@@ -963,7 +963,7 @@ class VerticalModeDefaults:
         }
 
     @staticmethod
-    def get_rag_modes() -> Dict[str, ModeDefinition]:
+    def get_rag_modes() -> dict[str, ModeDefinition]:
         """Get RAG-specific mode definitions.
 
         Returns:
@@ -981,7 +981,7 @@ class VerticalModeDefaults:
         }
 
     @staticmethod
-    def get_rag_task_budgets() -> Dict[str, int]:
+    def get_rag_task_budgets() -> dict[str, int]:
         """Get RAG-specific task budgets.
 
         Returns:
@@ -994,7 +994,7 @@ class VerticalModeDefaults:
         }
 
     @staticmethod
-    def get_dataanalysis_modes() -> Dict[str, ModeDefinition]:
+    def get_dataanalysis_modes() -> dict[str, ModeDefinition]:
         """Get dataanalysis-specific mode definitions.
 
         Returns:
@@ -1012,7 +1012,7 @@ class VerticalModeDefaults:
         }
 
     @staticmethod
-    def get_dataanalysis_task_budgets() -> Dict[str, int]:
+    def get_dataanalysis_task_budgets() -> dict[str, int]:
         """Get dataanalysis-specific task budgets.
 
         Returns:
@@ -1025,7 +1025,7 @@ class VerticalModeDefaults:
         }
 
     @staticmethod
-    def get_research_modes() -> Dict[str, ModeDefinition]:
+    def get_research_modes() -> dict[str, ModeDefinition]:
         """Get research-specific mode definitions.
 
         Returns:
@@ -1051,7 +1051,7 @@ class VerticalModeDefaults:
         }
 
     @staticmethod
-    def get_research_task_budgets() -> Dict[str, int]:
+    def get_research_task_budgets() -> dict[str, int]:
         """Get research-specific task budgets.
 
         Returns:
@@ -1064,7 +1064,7 @@ class VerticalModeDefaults:
         }
 
     @staticmethod
-    def get_benchmark_modes() -> Dict[str, ModeDefinition]:
+    def get_benchmark_modes() -> dict[str, ModeDefinition]:
         """Get benchmark-specific mode definitions.
 
         Returns:
@@ -1073,7 +1073,7 @@ class VerticalModeDefaults:
         return {}
 
     @staticmethod
-    def get_benchmark_task_budgets() -> Dict[str, int]:
+    def get_benchmark_task_budgets() -> dict[str, int]:
         """Get benchmark-specific task budgets.
 
         Returns:
@@ -1213,7 +1213,7 @@ class RegistryBasedModeConfigProvider:
         self._default_budget = default_budget
         self._complexity_mapper = ComplexityMapper(vertical)
 
-    def get_mode_configs(self) -> Dict[str, "ModeConfig"]:
+    def get_mode_configs(self) -> dict[str, "ModeConfig"]:
         """Get mode configurations from the registry.
 
         Returns:

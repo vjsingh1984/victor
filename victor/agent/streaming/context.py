@@ -20,7 +20,7 @@ clean dependency injection and easier testing.
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.agent.stream_handler import StreamMetrics
 from victor.agent.unified_classifier import ClassifierTaskType
@@ -48,7 +48,7 @@ class StreamingChatContext:
     # Metrics
     stream_metrics: StreamMetrics = field(default_factory=StreamMetrics)
     total_tokens: float = 0.0
-    cumulative_usage: Dict[str, int] = field(
+    cumulative_usage: dict[str, int] = field(
         default_factory=lambda: {
             "prompt_tokens": 0,
             "completion_tokens": 0,
@@ -66,7 +66,7 @@ class StreamingChatContext:
 
     # Task classification
     unified_task_type: ClassifierTaskType = ClassifierTaskType.DEFAULT
-    task_classification: Optional[Dict[str, Any]] = None
+    task_classification: Optional[dict[str, Any]] = None
     complexity_tool_budget: Optional[int] = None
     is_analysis_task: bool = False
     is_action_task: bool = False
@@ -79,7 +79,7 @@ class StreamingChatContext:
     context_msg: str = ""
 
     # Goals for tool selection
-    goals: List[str] = field(default_factory=list)
+    goals: list[str] = field(default_factory=list)
 
     # Quality tracking
     last_quality_score: float = 0.5
@@ -96,9 +96,9 @@ class StreamingChatContext:
     asking_input_prompts: int = 0
 
     # Tool execution tracking
-    tool_calls: Optional[List[Dict[str, Any]]] = None
+    tool_calls: Optional[list[dict[str, Any]]] = None
     full_content: str = ""
-    mentioned_tools_detected: List[str] = field(default_factory=list)
+    mentioned_tools_detected: list[str] = field(default_factory=list)
 
     # Recovery tracking
     consecutive_empty_responses: int = 0
@@ -115,7 +115,7 @@ class StreamingChatContext:
     # Tool execution tracking (for budget and progress checks)
     tool_budget: int = 200  # Default tool budget
     tool_calls_used: int = 0
-    unique_resources: Set[str] = field(default_factory=set)
+    unique_resources: set[str] = field(default_factory=set)
 
     def elapsed_time(self) -> float:
         """Get idle time since last activity (provider response or tool execution)."""
@@ -261,8 +261,8 @@ class PreparedStreamContext:
     """
 
     context: StreamingChatContext
-    tools: List[Dict[str, Any]]
-    provider_kwargs: Dict[str, Any]
+    tools: list[dict[str, Any]]
+    provider_kwargs: dict[str, Any]
 
 
 def create_stream_context(

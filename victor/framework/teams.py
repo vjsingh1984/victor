@@ -56,14 +56,9 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Type,
-    Union,
 )
+from collections.abc import AsyncIterator
 
 from victor.core.teams import SubAgentRole
 from victor.agent.teams.coordinator import TeamCoordinator
@@ -145,7 +140,7 @@ class TeamEvent:
     message: str = ""
     result: Optional[MemberResult] = None
     error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
     @property
@@ -167,7 +162,7 @@ class TeamEvent:
             TeamEventType.TEAM_ERROR,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "type": self.type.value,
@@ -183,7 +178,7 @@ class TeamEvent:
 
 
 # Role name to SubAgentRole mapping
-ROLE_MAPPING: Dict[str, SubAgentRole] = {
+ROLE_MAPPING: dict[str, SubAgentRole] = {
     "researcher": SubAgentRole.RESEARCHER,
     "research": SubAgentRole.RESEARCHER,
     "planner": SubAgentRole.PLANNER,
@@ -265,7 +260,7 @@ class TeamMemberSpec:
     priority: int = 0
     # Rich persona attributes (CrewAI-compatible)
     backstory: str = ""
-    expertise: List[str] = field(default_factory=list)
+    expertise: list[str] = field(default_factory=list)
     personality: str = ""
     max_delegation_depth: int = 0
     memory: bool = False
@@ -388,7 +383,7 @@ class AgentTeam:
         self._coordinator = coordinator
         self._config = config
         self._result: Optional[TeamResult] = None
-        self._events: List[TeamEvent] = []
+        self._events: list[TeamEvent] = []
         self._event_queue: asyncio.Queue[TeamEvent] = asyncio.Queue()
 
     @classmethod
@@ -397,13 +392,13 @@ class AgentTeam:
         orchestrator: "AgentOrchestrator",
         name: str,
         goal: str,
-        members: List[TeamMemberSpec],
+        members: list[TeamMemberSpec],
         *,
         formation: TeamFormation = TeamFormation.SEQUENTIAL,
         total_tool_budget: int = 100,
         max_iterations: int = 50,
         timeout_seconds: int = 600,
-        shared_context: Optional[Dict[str, Any]] = None,
+        shared_context: Optional[dict[str, Any]] = None,
     ) -> "AgentTeam":
         """Create a new AgentTeam instance.
 
@@ -474,7 +469,7 @@ class AgentTeam:
         agent: "Agent",
         name: str,
         goal: str,
-        members: List[TeamMemberSpec],
+        members: list[TeamMemberSpec],
         **kwargs: Any,
     ) -> "AgentTeam":
         """Create a team from an existing Agent instance.
@@ -539,7 +534,7 @@ class AgentTeam:
         return self._result
 
     @property
-    def members(self) -> List[TeamMember]:
+    def members(self) -> list[TeamMember]:
         """Get team members."""
         return self._config.members
 
@@ -764,7 +759,7 @@ class AgentTeam:
     # Inspection
     # =========================================================================
 
-    def get_events(self) -> List[TeamEvent]:
+    def get_events(self) -> list[TeamEvent]:
         """Get all captured events.
 
         Returns:

@@ -19,9 +19,7 @@ Q-learning, provider-aware thresholds, and tool budget optimization.
 """
 
 import pytest
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Any
 from unittest.mock import MagicMock, patch
 
 from victor.agent.adaptive_mode_controller import (

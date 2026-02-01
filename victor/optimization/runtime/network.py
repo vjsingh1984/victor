@@ -31,16 +31,13 @@ Performance Improvements:
 from __future__ import annotations
 
 import asyncio
-import gzip
 import hashlib
 import httpx
 import json
 import logging
-import socket
 import time
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
-from urllib.parse import urlparse
+from dataclasses import dataclass
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +66,7 @@ class NetworkStats:
     cache_hits: int = 0
     cache_misses: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "total_requests": self.total_requests,
@@ -105,7 +102,7 @@ class ResponseCache:
             max_size: Maximum number of cached responses
             ttl_seconds: Time-to-live for cache entries
         """
-        self._cache: Dict[str, Tuple[Any, float]] = {}
+        self._cache: dict[str, tuple[Any, float]] = {}
         self._max_size = max_size
         self._ttl = ttl_seconds
         self._lock = asyncio.Lock()
@@ -116,8 +113,8 @@ class ResponseCache:
         self,
         method: str,
         url: str,
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
+        params: Optional[dict[str, Any]] = None,
+        data: Optional[dict[str, Any]] = None,
     ) -> str:
         """Generate cache key from request parameters."""
         key_parts = [method.upper(), url]
@@ -136,8 +133,8 @@ class ResponseCache:
         self,
         method: str,
         url: str,
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
+        params: Optional[dict[str, Any]] = None,
+        data: Optional[dict[str, Any]] = None,
     ) -> Optional[Any]:
         """Get cached response.
 
@@ -173,8 +170,8 @@ class ResponseCache:
         method: str,
         url: str,
         response: Any,
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
+        params: Optional[dict[str, Any]] = None,
+        data: Optional[dict[str, Any]] = None,
     ) -> None:
         """Cache response.
 
@@ -255,13 +252,13 @@ class RequestBatcher:
         """
         self._max_batch_size = max_batch_size
         self._max_wait_time = max_wait_time
-        self._current_batch: List[Tuple[Dict[str, Any], asyncio.Future[Any]]] = []
+        self._current_batch: list[tuple[dict[str, Any], asyncio.Future[Any]]] = []
         self._lock = asyncio.Lock()
         self._timer_task: Optional[asyncio.Task[Any]] = None
 
     async def add_request(
         self,
-        request: Dict[str, Any],
+        request: dict[str, Any],
     ) -> Any:
         """Add request to batch.
 
@@ -355,7 +352,7 @@ class NetworkOptimizer:
     async def initialize(
         self,
         base_url: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
+        headers: Optional[dict[str, str]] = None,
     ) -> None:
         """Initialize HTTP client with optimized settings.
 
@@ -382,13 +379,13 @@ class NetworkOptimizer:
         self,
         method: str,
         url: str,
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
-        json_data: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        params: Optional[dict[str, Any]] = None,
+        data: Optional[dict[str, Any]] = None,
+        json_data: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
         use_cache: bool = True,
         max_retries: int = 3,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Make optimized HTTP request.
 
         Handles caching, retries, compression automatically.
@@ -459,7 +456,7 @@ class NetworkOptimizer:
 
         # Parse response
         try:
-            response_data: Dict[str, Any] = response.json()
+            response_data: dict[str, Any] = response.json()
         except ValueError:
             response_data = {"text": response.text}
 
@@ -479,10 +476,10 @@ class NetworkOptimizer:
         self,
         method: str,
         url: str,
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        params: Optional[dict[str, Any]] = None,
+        data: Optional[dict[str, Any]] = None,
+        json: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
         max_retries: int = 3,
     ) -> httpx.Response:
         """Execute request with exponential backoff retry.
@@ -541,9 +538,9 @@ class NetworkOptimizer:
 
     async def batch_requests(
         self,
-        requests: List[Dict[str, Any]],
+        requests: list[dict[str, Any]],
         max_concurrency: int = 10,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Execute multiple requests concurrently.
 
         Args:
@@ -560,13 +557,13 @@ class NetworkOptimizer:
             ], max_concurrency=5)
         """
 
-        async def execute_request(req: Dict[str, Any]) -> Dict[str, Any]:
+        async def execute_request(req: dict[str, Any]) -> dict[str, Any]:
             return await self.request(**req)
 
         # Use semaphore to limit concurrency
         semaphore = asyncio.Semaphore(max_concurrency)
 
-        async def bounded_execute(req: Dict[str, Any]) -> Dict[str, Any]:
+        async def bounded_execute(req: dict[str, Any]) -> dict[str, Any]:
             async with semaphore:
                 return await execute_request(req)
 
@@ -604,7 +601,7 @@ async def fetch_with_retry(
     url: str,
     max_retries: int = 3,
     timeout: float = 30.0,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     """Utility function to fetch URL with retry.
 
     Args:

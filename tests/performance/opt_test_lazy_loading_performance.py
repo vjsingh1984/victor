@@ -416,7 +416,6 @@ class TestLazyLoadingPerformance:
             )
 
         # Simulate access pattern where some components are accessed frequently
-        import random
 
         hot_components = [0, 5, 10, 15]  # These will be accessed frequently
 

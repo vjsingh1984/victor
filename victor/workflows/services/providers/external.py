@@ -36,18 +36,14 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 from urllib.parse import urlparse
 
 from victor.workflows.services.definition import (
-    HealthCheckConfig,
     ServiceConfig,
     ServiceHandle,
-    ServiceHealthError,
-    ServiceStartError,
     ServiceState,
 )
 from victor.workflows.services.providers.base import BaseServiceProvider
@@ -123,11 +119,11 @@ class ExternalServiceProvider(BaseServiceProvider):
         self,
         handle: ServiceHandle,
         command: str,
-    ) -> Tuple[int, str]:
+    ) -> tuple[int, str]:
         """Cannot run commands in external services."""
         raise NotImplementedError("Cannot run commands in external services")
 
-    def _parse_endpoint(self, endpoint: str) -> Dict[str, Any]:
+    def _parse_endpoint(self, endpoint: str) -> dict[str, Any]:
         """Parse endpoint string (host:port or URL)."""
         if "://" in endpoint:
             parsed = urlparse(endpoint)
@@ -143,7 +139,7 @@ class ExternalServiceProvider(BaseServiceProvider):
         else:
             return {"host": endpoint}
 
-    def _parse_connection_string(self, conn_str: str) -> Dict[str, Any]:
+    def _parse_connection_string(self, conn_str: str) -> dict[str, Any]:
         """Parse database connection string."""
         parsed = urlparse(conn_str)
         return {

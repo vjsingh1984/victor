@@ -36,17 +36,13 @@ Contract-based design ensures:
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from typing import (
     Any,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Tuple,
     TypeVar,
     runtime_checkable,
 )
@@ -123,8 +119,8 @@ class RecoveryContext:
 
     # History for pattern detection
     consecutive_failures: int = 0
-    mentioned_tools: Tuple[str, ...] = ()
-    recent_responses: Tuple[str, ...] = ()  # Last N responses for loop detection
+    mentioned_tools: tuple[str, ...] = ()
+    recent_responses: tuple[str, ...] = ()  # Last N responses for loop detection
 
     # Quality metrics
     last_quality_score: float = 0.5
@@ -224,9 +220,9 @@ class PromptTemplate:
     id: str
     name: str
     template: str
-    failure_types: List[FailureType]
-    provider_patterns: List[str] = field(default_factory=list)  # Glob patterns
-    model_patterns: List[str] = field(default_factory=list)
+    failure_types: list[FailureType]
+    provider_patterns: list[str] = field(default_factory=list)  # Glob patterns
+    model_patterns: list[str] = field(default_factory=list)
 
     # Learning metrics
     usage_count: int = 0
@@ -291,7 +287,7 @@ class RecoveryStrategy(Protocol):
         ...
 
     @property
-    def handles_failure_types(self) -> List[FailureType]:
+    def handles_failure_types(self) -> list[FailureType]:
         """List of failure types this strategy can handle."""
         ...
 
@@ -370,11 +366,11 @@ class TelemetryCollector(Protocol):
         """Record the outcome of a recovery attempt."""
         ...
 
-    def get_failure_stats(self, time_window_hours: int = 24) -> Dict[str, Any]:
+    def get_failure_stats(self, time_window_hours: int = 24) -> dict[str, Any]:
         """Get failure statistics for a time window."""
         ...
 
-    def get_strategy_effectiveness(self) -> Dict[str, Dict[str, float]]:
+    def get_strategy_effectiveness(self) -> dict[str, dict[str, float]]:
         """Get effectiveness metrics per strategy."""
         ...
 
@@ -436,7 +432,7 @@ class ModelFallbackPolicy(Protocol):
         current_provider: str,
         current_model: str,
         failure_type: FailureType,
-    ) -> Optional[Tuple[str, str]]:
+    ) -> Optional[tuple[str, str]]:
         """Get fallback provider and model.
 
         Args:

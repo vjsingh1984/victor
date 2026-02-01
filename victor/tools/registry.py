@@ -15,7 +15,8 @@
 """Tool registry for managing available tools."""
 
 import threading
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.core.registry import BaseRegistry
 from victor.tools.enums import CostTier
@@ -87,13 +88,13 @@ class ToolRegistry(BaseRegistry[str, Any]):
         self._BaseTool = BaseTool
         self._ToolResult = ToolResult
         # Note: self._items is inherited from BaseRegistry, aliased to _tools for compatibility
-        self._tool_enabled: Dict[str, bool] = {}  # Track enabled/disabled state
-        self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = []
-        self._after_hooks: List[Union[Hook, Callable]] = []
+        self._tool_enabled: dict[str, bool] = {}  # Track enabled/disabled state
+        self._before_hooks: list[Hook | Callable[[str, dict[str, Any]], None]] = []
+        self._after_hooks: list[Hook | Callable] = []
 
         # Schema cache: (enabled_tool_names_tuple, schemas_list) for both enabled/all modes
         # Key is (only_enabled: bool), value is (tool_names_tuple, schemas_list)
-        self._schema_cache: Dict[bool, Optional[Tuple[Tuple[str, ...], List[Dict[str, Any]]]]] = {
+        self._schema_cache: dict[bool, Optional[tuple[tuple[str, ...], list[dict[str, Any]]]]] = {
             True: None,  # Cache for only_enabled=True
             False: None,  # Cache for only_enabled=False
         }
@@ -110,7 +111,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
             self._schema_cache[False] = None
 
     def _wrap_hook(
-        self, hook: Union[Hook, Callable], critical: bool = False, name: str = ""
+        self, hook: Hook | Callable, critical: bool = False, name: str = ""
     ) -> Hook:
         """Wrap a callable into a Hook object if needed."""
         if isinstance(hook, Hook):
@@ -121,7 +122,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
 
     def register_before_hook(
         self,
-        hook: Union[Hook, Callable[[str, Dict[str, Any]], None]],
+        hook: Hook | Callable[[str, dict[str, Any]], None],
         critical: bool = False,
         name: str = "",
     ) -> None:
@@ -137,7 +138,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
 
     def register_after_hook(
         self,
-        hook: Union[Hook, Callable],
+        hook: Hook | Callable,
         critical: bool = False,
         name: str = "",
     ) -> None:
@@ -203,7 +204,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """Alias for register(tool). Kept for backwards compatibility."""
         self.register(tool, enabled=enabled)
 
-    def register_dict(self, tool_dict: Dict[str, Any], enabled: bool = True) -> None:
+    def register_dict(self, tool_dict: dict[str, Any], enabled: bool = True) -> None:
         """Register a tool from a dictionary definition.
 
         Used primarily for MCP tool definitions that come as dictionaries.
@@ -230,11 +231,11 @@ class ToolRegistry(BaseRegistry[str, Any]):
                 return description
 
             @property
-            def parameters(self) -> Dict[str, Any]:
+            def parameters(self) -> dict[str, Any]:
                 return parameters
 
             async def execute(
-                self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any
+                self, _exec_ctx: dict[str, Any] | None = None, **kwargs: Any
             ) -> ToolResult:
                 # MCP tools are executed via mcp_call, not directly
                 return ToolResult(
@@ -309,7 +310,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         return self._tool_enabled.get(name, False)
 
-    def set_tool_states(self, tool_states: Dict[str, bool]) -> None:
+    def set_tool_states(self, tool_states: dict[str, bool]) -> None:
         """Set enabled/disabled states for multiple tools.
 
         Args:
@@ -325,7 +326,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         if changed:
             self._invalidate_schema_cache()
 
-    def get_tool_states(self) -> Dict[str, bool]:
+    def get_tool_states(self) -> dict[str, bool]:
         """Get enabled/disabled states for all tools.
 
         Returns:
@@ -359,7 +360,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
             ]
         return list(self._items.values())
 
-    def get_tool_schemas(self, only_enabled: bool = True) -> List[Dict[str, Any]]:
+    def get_tool_schemas(self, only_enabled: bool = True) -> list[dict[str, Any]]:
         """Get JSON schemas for all tools with caching.
 
         Uses a cache to avoid regenerating schemas when the tool set hasn't changed.
@@ -433,7 +434,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         tools = self.list_tools(only_enabled=only_enabled)
         return [t for t in tools if t.cost_tier.weight <= max_tier.weight]
 
-    def get_cost_summary(self, only_enabled: bool = True) -> Dict[str, List[str]]:
+    def get_cost_summary(self, only_enabled: bool = True) -> dict[str, list[str]]:
         """Get a summary of tools grouped by cost tier.
 
         Args:
@@ -442,12 +443,12 @@ class ToolRegistry(BaseRegistry[str, Any]):
         Returns:
             Dictionary mapping cost tier names to lists of tool names
         """
-        summary: Dict[str, List[str]] = {tier.value: [] for tier in CostTier}
+        summary: dict[str, list[str]] = {tier.value: [] for tier in CostTier}
         for tool in self.list_tools(only_enabled=only_enabled):
             summary[tool.cost_tier.value].append(tool.name)
         return summary
 
-    async def execute(self, name: str, _exec_ctx: Dict[str, Any], **kwargs: Any):
+    async def execute(self, name: str, _exec_ctx: dict[str, Any], **kwargs: Any):
         """Execute a tool by name.
 
         Args:

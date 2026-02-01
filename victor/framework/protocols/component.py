@@ -9,14 +9,11 @@ from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.framework.state import Stage
@@ -57,7 +54,7 @@ class ConversationStateProtocol(Protocol):
         """
         ...
 
-    def get_observed_files(self) -> Set[str]:
+    def get_observed_files(self) -> set[str]:
         """Get set of files observed (read) during conversation.
 
         Returns:
@@ -65,7 +62,7 @@ class ConversationStateProtocol(Protocol):
         """
         ...
 
-    def get_modified_files(self) -> Set[str]:
+    def get_modified_files(self) -> set[str]:
         """Get set of files modified (written/edited) during conversation.
 
         Returns:
@@ -141,7 +138,7 @@ class ToolsProtocol(Protocol):
     Provides access to available tools and ability to enable/disable them.
     """
 
-    def get_available_tools(self) -> Set[str]:
+    def get_available_tools(self) -> set[str]:
         """Get names of all registered tools.
 
         Returns:
@@ -149,7 +146,7 @@ class ToolsProtocol(Protocol):
         """
         ...
 
-    def get_enabled_tools(self) -> Set[str]:
+    def get_enabled_tools(self) -> set[str]:
         """Get names of currently enabled tools.
 
         Returns:
@@ -157,7 +154,7 @@ class ToolsProtocol(Protocol):
         """
         ...
 
-    def set_enabled_tools(self, tools: Set[str]) -> None:
+    def set_enabled_tools(self, tools: set[str]) -> None:
         """Set which tools are enabled for this session.
 
         Args:
@@ -219,7 +216,7 @@ class MessagesProtocol(Protocol):
     Provides read access to conversation message history.
     """
 
-    def get_messages(self) -> List[Dict[str, Any]]:
+    def get_messages(self) -> list[dict[str, Any]]:
         """Get conversation message history.
 
         Returns:

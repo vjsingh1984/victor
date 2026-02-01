@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, Optional, Set
+from typing import Any, Optional
 
 from victor.core.verticals.protocols import (
     MiddlewarePriority,
@@ -74,7 +74,7 @@ class CodingMiddleware(MiddlewareProtocol):
     def __init__(
         self,
         enabled: bool = True,
-        applicable_tools: Optional[Set[str]] = None,
+        applicable_tools: Optional[set[str]] = None,
     ):
         """Initialize the middleware.
 
@@ -85,7 +85,7 @@ class CodingMiddleware(MiddlewareProtocol):
         self._enabled = enabled
         self._applicable_tools = applicable_tools
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Called before a tool is executed.
 
         Base implementation does nothing. Override in subclasses.
@@ -102,7 +102,7 @@ class CodingMiddleware(MiddlewareProtocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -129,7 +129,7 @@ class CodingMiddleware(MiddlewareProtocol):
         """
         return MiddlewarePriority.NORMAL
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get tools this middleware applies to.
 
         Returns:
@@ -173,7 +173,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         self._inner_middleware: Optional[Any] = None
         self._rl_hooks: Optional[Any] = None
         # Track timing for RL
-        self._tool_start_times: Dict[str, float] = {}
+        self._tool_start_times: dict[str, float] = {}
 
     def _get_inner(self) -> Optional[Any]:
         """Lazy-load the inner middleware."""
@@ -225,7 +225,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
             return False
         return cast(bool, inner.should_validate(tool_name))
 
-    def validate_and_fix(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
+    def validate_and_fix(self, tool_name: str, arguments: dict[str, Any]) -> Any:
         """Validate and optionally fix code in arguments.
 
         Delegates to the inner middleware.
@@ -258,7 +258,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
             )
         return inner.validate_and_fix(tool_name, arguments)
 
-    def apply_correction(self, arguments: Dict[str, Any], correction_result: Any) -> Dict[str, Any]:
+    def apply_correction(self, arguments: dict[str, Any], correction_result: Any) -> dict[str, Any]:
         """Apply a correction to the arguments.
 
         Delegates to the inner middleware.
@@ -275,9 +275,9 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         inner = self._get_inner()
         if inner is None:
             return arguments
-        return cast(Dict[str, Any], inner.apply_correction(arguments, correction_result))
+        return cast(dict[str, Any], inner.apply_correction(arguments, correction_result))
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Validate and optionally fix code before tool execution.
 
         Also tracks timing for RL recording.
@@ -334,10 +334,10 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> Optional[Any]:
         """Called after tool execution.
 
@@ -400,7 +400,7 @@ class CodeCorrectionMiddleware(MiddlewareProtocol):
         """
         return MiddlewarePriority.HIGH
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get tools this middleware applies to.
 
         Returns:
@@ -432,10 +432,10 @@ class GitSafetyMiddleware(FrameworkGitSafetyMiddleware):
         self,
         block_dangerous: bool = False,  # Coding default: permissive
         warn_on_risky: bool = True,
-        protected_branches: Optional[Set[str]] = None,
-        allowed_force_branches: Optional[Set[str]] = None,
-        custom_blocked: Optional[Set[str]] = None,
-        custom_warned: Optional[Set[str]] = None,
+        protected_branches: Optional[set[str]] = None,
+        allowed_force_branches: Optional[set[str]] = None,
+        custom_blocked: Optional[set[str]] = None,
+        custom_warned: Optional[set[str]] = None,
     ):
         """Initialize coding git safety middleware.
 

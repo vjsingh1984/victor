@@ -27,7 +27,7 @@ Example:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def truncate_snippet(
 
 
 def format_web_results(
-    results: List[Dict[str, Any]],
+    results: list[dict[str, Any]],
     max_results: int = 3,
     max_snippet_length: int = 200,
     include_urls: bool = True,
@@ -141,7 +141,7 @@ class WebSearchFormatter:
 
     def format(
         self,
-        results: List[Dict[str, Any]],
+        results: list[dict[str, Any]],
         query: Optional[str] = None,
     ) -> str:
         """Format search results.
@@ -168,8 +168,8 @@ class WebSearchFormatter:
 
     def format_for_citation(
         self,
-        results: List[Dict[str, Any]],
-    ) -> List[Dict[str, str]]:
+        results: list[dict[str, Any]],
+    ) -> list[dict[str, str]]:
         """Format results for citation purposes.
 
         Returns structured data suitable for building citations.

@@ -18,7 +18,7 @@ Provides hooks for recording outcomes and getting recommendations
 from the RL system, specialized for coding tasks.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.framework.rl import (
     LearnerType,
@@ -92,7 +92,7 @@ class CodingRLHooks:
         provider: str,
         model: str,
         duration_ms: float,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record successful tool execution.
 
@@ -128,7 +128,7 @@ class CodingRLHooks:
         provider: str,
         model: str,
         error: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record failed tool execution.
 
@@ -303,8 +303,8 @@ class CodingRLHooks:
     def get_tool_recommendation(
         self,
         task_type: str,
-        available_tools: Optional[List[str]] = None,
-    ) -> List[str]:
+        available_tools: Optional[list[str]] = None,
+    ) -> list[str]:
         """Get RL-recommended tools for task.
 
         First checks if RL has learned recommendations, then falls back

@@ -46,7 +46,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.state.protocols import IStateManager, StateScope
 
@@ -75,7 +75,7 @@ class GlobalStateManager:
 
     def __init__(self) -> None:
         """Initialize the global state manager."""
-        self._managers: Dict[StateScope, IStateManager] = {}
+        self._managers: dict[StateScope, IStateManager] = {}
         self._tracer: Optional[Any] = None
 
         logger.info("GlobalStateManager initialized")
@@ -222,7 +222,7 @@ class GlobalStateManager:
         self,
         scope: StateScope = StateScope.GLOBAL,
         pattern: str = "*",
-    ) -> List[str]:
+    ) -> list[str]:
         """Get all keys matching pattern from specified scope.
 
         Args:
@@ -241,7 +241,7 @@ class GlobalStateManager:
 
         return await manager.keys(pattern)
 
-    async def get_all(self, scope: StateScope = StateScope.GLOBAL) -> Dict[str, Any]:
+    async def get_all(self, scope: StateScope = StateScope.GLOBAL) -> dict[str, Any]:
         """Get all state from specified scope as dictionary.
 
         Args:
@@ -261,7 +261,7 @@ class GlobalStateManager:
 
     async def update(
         self,
-        updates: Dict[str, Any],
+        updates: dict[str, Any],
         scope: StateScope = StateScope.GLOBAL,
     ) -> None:
         """Update multiple keys at once in specified scope.
@@ -306,7 +306,7 @@ class GlobalStateManager:
         await manager.clear()
         logger.info(f"Cleared all state from scope: {scope.value}")
 
-    async def create_checkpoint(self) -> Dict[str, Any]:
+    async def create_checkpoint(self) -> dict[str, Any]:
         """Create checkpoint across all scopes.
 
         Creates snapshots of all registered managers and returns
@@ -324,7 +324,7 @@ class GlobalStateManager:
             >>> #     "global": {...}
             >>> # }
         """
-        checkpoint: Dict[str, Any] = {}
+        checkpoint: dict[str, Any] = {}
 
         for scope, manager in self._managers.items():
             try:
@@ -337,7 +337,7 @@ class GlobalStateManager:
         logger.info(f"Created checkpoint across {len(checkpoint)} scopes")
         return checkpoint
 
-    async def restore_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+    async def restore_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         """Restore checkpoint across all scopes.
 
         Restores all registered managers from the provided checkpoint
@@ -371,7 +371,7 @@ class GlobalStateManager:
 
         logger.info(f"Restored checkpoint across {len(checkpoint)} scopes")
 
-    async def get_cross_scope_state(self) -> Dict[str, Dict[str, Any]]:
+    async def get_cross_scope_state(self) -> dict[str, dict[str, Any]]:
         """Get all state from all scopes.
 
         Returns a unified dictionary containing all state from all
@@ -389,7 +389,7 @@ class GlobalStateManager:
             >>> #     "global": {"config": {...}}
             >>> # }
         """
-        cross_scope_state: Dict[str, Dict[str, Any]] = {}
+        cross_scope_state: dict[str, dict[str, Any]] = {}
 
         for scope, manager in self._managers.items():
             try:
@@ -401,7 +401,7 @@ class GlobalStateManager:
 
         return cross_scope_state
 
-    def get_registered_scopes(self) -> List[StateScope]:
+    def get_registered_scopes(self) -> list[StateScope]:
         """Get list of registered scopes.
 
         Returns:

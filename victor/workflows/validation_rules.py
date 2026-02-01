@@ -32,7 +32,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 
 class Severity(Enum):
@@ -76,9 +76,9 @@ class ValidationIssue:
     message: str
     location: str
     suggestion: Optional[str] = None
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "rule_id": self.rule_id,
@@ -119,7 +119,7 @@ class ValidationRule(ABC):
         self.enabled = enabled
 
     @abstractmethod
-    def check(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def check(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Check the workflow for issues.
 
         Args:
@@ -136,7 +136,7 @@ class ValidationRule(ABC):
         location: str,
         severity: Optional[Severity] = None,
         suggestion: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ValidationIssue:
         """Create a validation issue.
 
@@ -182,7 +182,7 @@ class NodeIDFormatRule(ValidationRule):
             enabled=enabled,
         )
 
-    def check(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def check(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Check node ID format."""
         issues = []
 
@@ -241,7 +241,7 @@ class RequiredFieldsRule(ValidationRule):
             enabled=enabled,
         )
 
-    def check(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def check(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Check required fields."""
         issues = []
 
@@ -277,7 +277,7 @@ class ConnectionReferencesRule(ValidationRule):
             enabled=enabled,
         )
 
-    def check(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def check(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Check connection references."""
         issues = []
 
@@ -341,7 +341,7 @@ class CircularDependencyRule(ValidationRule):
             enabled=enabled,
         )
 
-    def check(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def check(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Check for circular dependencies using DFS."""
         issues = []
 
@@ -362,7 +362,7 @@ class CircularDependencyRule(ValidationRule):
             visited = set()
             rec_stack = set()
 
-            def dfs(node_id: str, path: List[str]) -> Optional[List[str]]:
+            def dfs(node_id: str, path: list[str]) -> Optional[list[str]]:
                 """DFS to detect cycles."""
                 visited.add(node_id)
                 rec_stack.add(node_id)
@@ -426,7 +426,7 @@ class TeamFormationRule(ValidationRule):
             enabled=enabled,
         )
 
-    def check(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def check(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Check team node configuration."""
         issues = []
 
@@ -538,7 +538,7 @@ class GoalQualityRule(ValidationRule):
             enabled=enabled,
         )
 
-    def check(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def check(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Check goal quality."""
         issues = []
 
@@ -619,7 +619,7 @@ class ToolBudgetRule(ValidationRule):
             enabled=enabled,
         )
 
-    def check(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def check(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Check tool budget."""
         issues = []
 
@@ -667,7 +667,7 @@ class DisconnectedNodesRule(ValidationRule):
             enabled=enabled,
         )
 
-    def check(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def check(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Check for disconnected nodes."""
         issues = []
 
@@ -730,7 +730,7 @@ class DuplicateNodeIDsRule(ValidationRule):
             enabled=enabled,
         )
 
-    def check(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def check(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Check for duplicate node IDs."""
         issues = []
 
@@ -779,7 +779,7 @@ class ComplexityAnalysisRule(ValidationRule):
             enabled=enabled,
         )
 
-    def check(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def check(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Analyze workflow complexity."""
         issues = []
 
@@ -835,7 +835,7 @@ class ComplexityAnalysisRule(ValidationRule):
 
         return issues
 
-    def _calculate_max_depth(self, wf_def: Dict[str, Any]) -> int:
+    def _calculate_max_depth(self, wf_def: dict[str, Any]) -> int:
         """Calculate maximum nesting depth."""
         # Build adjacency list
         adj = {}

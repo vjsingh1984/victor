@@ -19,18 +19,13 @@ for better testability and separation of concerns.
 """
 
 import logging
-import time
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Tuple,
     TYPE_CHECKING,
 )
+from collections.abc import Callable
 
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.iteration import (
@@ -48,8 +43,6 @@ if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
 
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.protocols.agent import IAgentOrchestrator
-    from victor.agent.presentation import PresentationProtocol
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -66,7 +59,7 @@ class MessageAdder(Protocol):
 class ToolExecutor(Protocol):
     """Protocol for executing tools."""
 
-    async def execute_tools(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def execute_tools(self, tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Execute tool calls and return results."""
         ...
 
@@ -248,7 +241,7 @@ class StreamingChatHandler:
 
     def process_tool_results(
         self, execution: ToolExecutionResult, ctx: StreamingChatContext
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         """Process tool execution results and generate status chunks.
 
         Args:
@@ -302,7 +295,7 @@ class StreamingChatHandler:
         return chunks
 
     def generate_tool_start_chunk(
-        self, tool_name: str, tool_args: Dict[str, Any], status_msg: str
+        self, tool_name: str, tool_args: dict[str, Any], status_msg: str
     ) -> StreamChunk:
         """Generate a chunk indicating tool execution start.
 
@@ -407,7 +400,7 @@ class StreamingChatHandler:
         self,
         ctx: StreamingChatContext,
         tool_name: str,
-        tool_args: Dict[str, Any],
+        tool_args: dict[str, Any],
         block_reason: str,
     ) -> StreamChunk:
         """Handle a blocked tool call by recording it and generating feedback.
@@ -440,9 +433,9 @@ class StreamingChatHandler:
     def filter_blocked_tool_calls(
         self,
         ctx: StreamingChatContext,
-        tool_calls: List[Dict[str, Any]],
-        block_checker: Callable[[str, Dict[str, Any]], Optional[str]],
-    ) -> Tuple[List[Dict[str, Any]], List[StreamChunk], int]:
+        tool_calls: list[dict[str, Any]],
+        block_checker: Callable[[str, dict[str, Any]], Optional[str]],
+    ) -> tuple[list[dict[str, Any]], list[StreamChunk], int]:
         """Filter out blocked tool calls and generate notification chunks.
 
         This method iterates through tool calls, checks each one against the
@@ -484,8 +477,8 @@ class StreamingChatHandler:
     def check_force_action(
         self,
         ctx: StreamingChatContext,
-        force_checker: Callable[[], Tuple[bool, Optional[str]]],
-    ) -> Tuple[bool, Optional[str]]:
+        force_checker: Callable[[], tuple[bool, Optional[str]]],
+    ) -> tuple[bool, Optional[str]]:
         """Check if action should be forced and update context accordingly.
 
         This method delegates to a force_checker function that determines
@@ -577,7 +570,7 @@ class StreamingChatHandler:
     def handle_force_tool_execution(
         self,
         ctx: StreamingChatContext,
-        mentioned_tools: List[str],
+        mentioned_tools: list[str],
         force_message: Optional[str] = None,
     ) -> Optional[IterationResult]:
         """Handle forcing tool execution when model mentions tools without calling them.
@@ -675,7 +668,7 @@ class StreamingChatHandler:
             return True
         return False
 
-    def get_budget_exhausted_chunks(self, ctx: StreamingChatContext) -> List[StreamChunk]:
+    def get_budget_exhausted_chunks(self, ctx: StreamingChatContext) -> list[StreamChunk]:
         """Generate chunks for budget exhausted state.
 
         Args:
@@ -692,8 +685,8 @@ class StreamingChatHandler:
         ]
 
     def truncate_tool_calls(
-        self, tool_calls: List[Dict[str, Any]], ctx: StreamingChatContext
-    ) -> List[Dict[str, Any]]:
+        self, tool_calls: list[dict[str, Any]], ctx: StreamingChatContext
+    ) -> list[dict[str, Any]]:
         """Truncate tool calls to fit remaining budget.
 
         Args:
@@ -793,7 +786,7 @@ class StreamingChatHandler:
         base_temperature: float,
         has_thinking_mode: bool,
         thinking_disable_prefix: Optional[str] = None,
-    ) -> List[tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """Generate recovery prompts for empty response recovery.
 
         This method generates a list of recovery prompts with varying temperatures
@@ -920,7 +913,7 @@ class StreamingChatHandler:
         return should_continue_task and attempt <= 2
 
     def get_recovery_fallback_message(
-        self, ctx: StreamingChatContext, unique_resources: List[str]
+        self, ctx: StreamingChatContext, unique_resources: list[str]
     ) -> str:
         """Generate a fallback message when all recovery attempts fail.
 
@@ -1035,7 +1028,7 @@ class StreamingChatHandler:
     def generate_tool_result_chunk(
         self,
         tool_name: str,
-        tool_args: Dict[str, Any],
+        tool_args: dict[str, Any],
         elapsed: float,
         success: bool,
         error: Optional[str] = None,
@@ -1052,7 +1045,7 @@ class StreamingChatHandler:
         Returns:
             StreamChunk with tool_result metadata
         """
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "tool_result": {
                 "name": tool_name,
                 "success": success,
@@ -1132,10 +1125,10 @@ class StreamingChatHandler:
 
     def generate_tool_result_chunks(
         self,
-        result: Dict[str, Any],
+        result: dict[str, Any],
         max_files: int = 3,
         max_edits_per_file: int = 2,
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         """Generate all chunks for a tool result including previews.
 
         This method generates the main tool_result chunk plus any file or
@@ -1149,7 +1142,7 @@ class StreamingChatHandler:
         Returns:
             List of StreamChunks for the tool result
         """
-        chunks: List[StreamChunk] = []
+        chunks: list[StreamChunk] = []
         tool_name = result.get("name", "tool")
         elapsed = result.get("elapsed", 0.0)
         tool_args = result.get("args", {})

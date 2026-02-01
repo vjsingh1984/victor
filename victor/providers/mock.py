@@ -20,7 +20,8 @@ integration tests where you need predictable, controllable responses.
 """
 
 import asyncio
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 from victor.providers.base import (
     BaseProvider,
@@ -75,11 +76,11 @@ class MockProvider(BaseProvider):
     def __init__(
         self,
         model: str = "mock-model",
-        responses: Optional[List[str]] = None,
+        responses: Optional[list[str]] = None,
         simulate_latency: float = 0.0,
         supports_tools: bool = True,
         supports_streaming: bool = True,
-        default_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        default_tool_calls: Optional[list[dict[str, Any]]] = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the mock provider.
@@ -105,7 +106,7 @@ class MockProvider(BaseProvider):
 
         # Request tracking
         self._call_count = 0
-        self._request_history: List[Dict[str, Any]] = []
+        self._request_history: list[dict[str, Any]] = []
 
         # Error simulation
         self._error_to_raise: Optional[Exception] = None
@@ -127,12 +128,12 @@ class MockProvider(BaseProvider):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Generate a mock chat completion.
@@ -186,12 +187,12 @@ class MockProvider(BaseProvider):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream mock chat completion.
@@ -256,7 +257,7 @@ class MockProvider(BaseProvider):
 
     # ============ Configuration Methods ============
 
-    def set_responses(self, responses: List[str]) -> None:
+    def set_responses(self, responses: list[str]) -> None:
         """Set the responses to cycle through.
 
         Args:
@@ -306,7 +307,7 @@ class MockProvider(BaseProvider):
         """
         return self._call_count
 
-    def get_request_history(self) -> List[Dict[str, Any]]:
+    def get_request_history(self) -> list[dict[str, Any]]:
         """Get the history of all requests.
 
         Returns:
@@ -314,7 +315,7 @@ class MockProvider(BaseProvider):
         """
         return self._request_history.copy()
 
-    def get_last_request(self) -> Optional[Dict[str, Any]]:
+    def get_last_request(self) -> Optional[dict[str, Any]]:
         """Get the most recent request.
 
         Returns:
@@ -394,7 +395,7 @@ class MockToolCallingProvider(MockProvider):
 
     def __init__(
         self,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        tool_calls: Optional[list[dict[str, Any]]] = None,
         **kwargs: Any,
     ) -> None:
         """Initialize with tool calling support.
@@ -405,7 +406,7 @@ class MockToolCallingProvider(MockProvider):
         """
         super().__init__(supports_tools=True, default_tool_calls=tool_calls, **kwargs)
 
-    def set_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> None:
+    def set_tool_calls(self, tool_calls: list[dict[str, Any]]) -> None:
         """Set the tool calls to include in responses.
 
         Args:

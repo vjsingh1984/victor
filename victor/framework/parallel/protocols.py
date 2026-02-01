@@ -27,7 +27,6 @@ from __future__ import annotations
 
 from typing import (
     Any,
-    List,
     Optional,
     Protocol,
     runtime_checkable,
@@ -59,9 +58,9 @@ class JoinStrategyProtocol(Protocol):
 
     async def evaluate(
         self,
-        results: List[Any],
-        errors: List[Exception],
-    ) -> tuple[bool, Any, List[Exception]]:
+        results: list[Any],
+        errors: list[Exception],
+    ) -> tuple[bool, Any, list[Exception]]:
         """Evaluate parallel task results.
 
         Args:
@@ -142,7 +141,7 @@ class ResultAggregatorProtocol(Protocol):
 
     async def aggregate(
         self,
-        results: List[Any],
+        results: list[Any],
     ) -> Any:
         """Aggregate multiple results into one.
 
@@ -170,7 +169,7 @@ class ParallelExecutorProtocol(Protocol):
 
     async def execute(
         self,
-        tasks: List[Any],
+        tasks: list[Any],
         config: Any,
     ) -> "ParallelExecutionResult":
         """Execute tasks in parallel according to configuration.
@@ -208,7 +207,7 @@ class ParallelExecutionResult:
         self,
         success: bool,
         results: Any,
-        errors: List[Exception],
+        errors: list[Exception],
         total_count: int,
         success_count: int,
         failure_count: int,

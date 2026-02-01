@@ -35,7 +35,7 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from victor.framework.middleware_profiles.profiles import MiddlewareProfile
 
@@ -68,7 +68,7 @@ class MiddlewareProfileBuilder:
         """Initialize the builder with empty state."""
         self._name: str = "custom"
         self._description: str = "Custom middleware profile"
-        self._middlewares: List[Any] = []
+        self._middlewares: list[Any] = []
         self._priority: int = 50
 
     def set_name(self, name: str) -> "MiddlewareProfileBuilder":
@@ -107,7 +107,7 @@ class MiddlewareProfileBuilder:
         self._middlewares.append(middleware)
         return self
 
-    def add_middlewares(self, middlewares: List[Any]) -> "MiddlewareProfileBuilder":
+    def add_middlewares(self, middlewares: list[Any]) -> "MiddlewareProfileBuilder":
         """Add multiple middlewares to the profile.
 
         Args:
@@ -174,7 +174,7 @@ class MiddlewareProfileBuilder:
 def create_profile(
     name: str = "custom",
     description: str = "Custom middleware profile",
-    middlewares: Optional[List[Any]] = None,
+    middlewares: Optional[list[Any]] = None,
     priority: int = 50,
 ) -> MiddlewareProfile:
     """Create a middleware profile directly.

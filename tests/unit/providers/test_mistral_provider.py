@@ -22,9 +22,8 @@ Tests cover:
 - Error handling
 """
 
-import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 import httpx
 
 from victor.providers.mistral_provider import MistralProvider, MISTRAL_MODELS

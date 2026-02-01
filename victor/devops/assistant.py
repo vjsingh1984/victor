@@ -3,7 +3,7 @@
 Competitive positioning: Docker Desktop AI, Terraform Assistant, Pulumi AI, K8s GPT.
 """
 
-from typing import Any, ClassVar, Dict, List, Optional, Set, TYPE_CHECKING, cast
+from typing import Any, ClassVar, Optional, TYPE_CHECKING, cast
 
 from victor.core.vertical_types import StageDefinition
 
@@ -17,24 +17,10 @@ from victor.core.verticals.defaults.tool_defaults import (
 )
 from victor.core.verticals.protocols import (
     MiddlewareProtocol,
-    ModeConfigProviderProtocol,
-    PromptContributorProtocol,
-    SafetyExtensionProtocol,
-    TieredToolConfig,
     ToolDependencyProviderProtocol,
 )
 
 # Import ISP-compliant provider protocols
-from victor.core.verticals.protocols.providers import (
-    HandlerProvider,
-    MiddlewareProvider,
-    ModeConfigProvider,
-    PromptContributorProvider,
-    SafetyProvider,
-    TieredToolConfigProvider,
-    ToolDependencyProvider,
-    ToolProvider,
-)
 
 # Phase 2.1: Protocol auto-registration decorator
 from victor.core.verticals.protocol_decorators import register_protocols
@@ -71,7 +57,7 @@ class DevOpsAssistant(VerticalBase):
     version: ClassVar[str] = "0.5.0"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         """Get the list of tools for DevOps tasks.
 
         Uses canonical tool names from victor.tools.tool_names.
@@ -149,7 +135,7 @@ class DevOpsAssistant(VerticalBase):
         return builder
 
     @classmethod
-    def get_stages(cls) -> Dict[str, StageDefinition]:
+    def get_stages(cls) -> dict[str, StageDefinition]:
         """Get DevOps-specific stage definitions.
 
         Uses canonical tool names from victor.tools.tool_names.
@@ -228,7 +214,7 @@ class DevOpsAssistant(VerticalBase):
     # to eliminate ~800 lines of duplication. Only override for custom logic.
 
     @classmethod
-    def get_middleware(cls) -> List[MiddlewareProtocol]:
+    def get_middleware(cls) -> list[MiddlewareProtocol]:
         """Get DevOps-specific middleware.
 
         Custom implementation for DevOps vertical with framework-level middleware.
@@ -292,7 +278,7 @@ class DevOpsAssistant(VerticalBase):
         )
 
     @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
+    def get_handlers(cls) -> dict[str, Any]:
         """Get compute handlers for DevOps workflows.
 
         Returns handlers from victor.devops.handlers for workflow execution.

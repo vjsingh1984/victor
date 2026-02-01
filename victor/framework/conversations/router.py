@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
 from victor.framework.conversations.types import (
     ConversationalMessage,
@@ -72,9 +72,9 @@ class MessageRouter:
     async def route_message(
         self,
         message: ConversationalMessage,
-        participants: List[ConversationParticipant],
+        participants: list[ConversationParticipant],
         context: ConversationContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """Route message to appropriate recipients.
 
         Args:
@@ -95,11 +95,11 @@ class MessageRouter:
     async def get_recipients(
         self,
         speaker: str,
-        participants: List[ConversationParticipant],
+        participants: list[ConversationParticipant],
         context: ConversationContext,
         target_role: Optional[str] = None,
         target_capability: Optional[str] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """Get recipients for speaker's message.
 
         Args:
@@ -136,8 +136,8 @@ class MessageRouter:
             return []
 
     def _broadcast_route(
-        self, speaker: str, participants: List[ConversationParticipant]
-    ) -> List[str]:
+        self, speaker: str, participants: list[ConversationParticipant]
+    ) -> list[str]:
         """Broadcast routing - send to all except sender.
 
         Args:
@@ -155,9 +155,9 @@ class MessageRouter:
     def _role_based_route(
         self,
         speaker: str,
-        participants: List[ConversationParticipant],
+        participants: list[ConversationParticipant],
         target_role: Optional[str],
-    ) -> List[str]:
+    ) -> list[str]:
         """Role-based routing - send to specific role(s).
 
         Args:
@@ -201,9 +201,9 @@ class MessageRouter:
     def _capability_based_route(
         self,
         speaker: str,
-        participants: List[ConversationParticipant],
+        participants: list[ConversationParticipant],
         target_capability: Optional[str],
-    ) -> List[str]:
+    ) -> list[str]:
         """Capability-based routing - send to agents with specific capability.
 
         Args:
@@ -225,8 +225,8 @@ class MessageRouter:
         return recipients if recipients else self._broadcast_route(speaker, participants)
 
     def _round_robin_route(
-        self, speaker: str, participants: List[ConversationParticipant]
-    ) -> List[str]:
+        self, speaker: str, participants: list[ConversationParticipant]
+    ) -> list[str]:
         """Round-robin routing - rotate through participants.
 
         Args:

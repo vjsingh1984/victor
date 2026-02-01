@@ -20,8 +20,7 @@ requiring a real Redis instance for unit tests.
 
 import json
 import pickle
-from unittest.mock import AsyncMock, Mock, MagicMock, patch
-from uuid import uuid4
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 

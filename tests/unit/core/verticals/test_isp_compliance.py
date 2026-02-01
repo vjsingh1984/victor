@@ -18,8 +18,7 @@ This test suite verifies that verticals can implement only the protocols
 they need, without being forced to implement all possible capabilities.
 """
 
-import pytest
-from typing import List, Dict, Any, Optional
+from typing import Any, Optional
 
 from victor.core.verticals.base import VerticalBase
 from victor.core.verticals.protocols.providers import (
@@ -45,7 +44,7 @@ class MinimalVertical(VerticalBase):
     description = "Minimal test vertical"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read", "write"]
 
     @classmethod
@@ -60,7 +59,7 @@ class MultiProtocolVertical(VerticalBase):
     description = "Multi-protocol test vertical"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read", "write", "grep"]
 
     @classmethod
@@ -68,7 +67,7 @@ class MultiProtocolVertical(VerticalBase):
         return "You are a multi-protocol test assistant..."
 
     @classmethod
-    def get_middleware(cls) -> List[Any]:
+    def get_middleware(cls) -> list[Any]:
         return []  # Empty middleware list
 
     @classmethod
@@ -83,7 +82,7 @@ class ComprehensiveVertical(VerticalBase):
     description = "Comprehensive test vertical"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read", "write", "grep", "web_search"]
 
     @classmethod
@@ -91,7 +90,7 @@ class ComprehensiveVertical(VerticalBase):
         return "You are a comprehensive test assistant..."
 
     @classmethod
-    def get_middleware(cls) -> List[Any]:
+    def get_middleware(cls) -> list[Any]:
         return []
 
     @classmethod
@@ -103,7 +102,7 @@ class ComprehensiveVertical(VerticalBase):
         return None
 
     @classmethod
-    def get_task_type_hints(cls) -> Dict[str, Any]:
+    def get_task_type_hints(cls) -> dict[str, Any]:
         return {
             "edit": {"hint": "Edit files", "priority_tools": ["write"]},
         }
@@ -327,7 +326,7 @@ class TestBackwardCompatibility:
             description = "Legacy test vertical"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read"]
 
             @classmethod
@@ -422,7 +421,7 @@ class TestISPIntegration:
             description = "Research-like test vertical"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["web_search", "web_fetch", "read", "write"]
 
             @classmethod
@@ -430,7 +429,7 @@ class TestISPIntegration:
                 return "Research assistant..."
 
             @classmethod
-            def get_task_type_hints(cls) -> Dict[str, Any]:
+            def get_task_type_hints(cls) -> dict[str, Any]:
                 return {
                     "search": {"hint": "Use web search"},
                     "synthesize": {"hint": "Combine sources"},

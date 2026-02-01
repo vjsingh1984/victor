@@ -31,16 +31,15 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 from victor.agent.subagents.base import SubAgentRole, SubAgentResult
 from victor.agent.subagents.orchestrator import (
-    ROLE_DEFAULT_BUDGETS,
     ROLE_DEFAULT_TOOLS,
     SubAgentOrchestrator,
 )
 from victor.agent.delegation.protocol import (
-    DelegationPriority,
     DelegationRequest,
     DelegationResponse,
     DelegationStatus,
@@ -49,13 +48,12 @@ from victor.agent.delegation.protocol import (
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.protocols.agent import IAgentOrchestrator
 
 logger = logging.getLogger(__name__)
 
 
 # Mapping from role name strings to SubAgentRole enum
-ROLE_MAPPING: Dict[str, SubAgentRole] = {
+ROLE_MAPPING: dict[str, SubAgentRole] = {
     "researcher": SubAgentRole.RESEARCHER,
     "research": SubAgentRole.RESEARCHER,
     "planner": SubAgentRole.PLANNER,
@@ -133,7 +131,7 @@ class DelegationHandler:
         self.orchestrator = orchestrator
         self.sub_agents = sub_agent_orchestrator or SubAgentOrchestrator(orchestrator)
         self.max_concurrent = max_concurrent
-        self._active: Dict[str, ActiveDelegation] = {}
+        self._active: dict[str, ActiveDelegation] = {}
         self._semaphore = asyncio.Semaphore(max_concurrent)
         self._on_complete: Optional[Callable[[DelegationResponse], None]] = None
 
@@ -444,7 +442,7 @@ class DelegationHandler:
         logger.info(f"Cancelled delegation: {delegation_id}")
         return True
 
-    def get_status(self, delegation_id: str) -> Optional[Dict[str, Any]]:
+    def get_status(self, delegation_id: str) -> Optional[dict[str, Any]]:
         """Get status of a delegation.
 
         Args:

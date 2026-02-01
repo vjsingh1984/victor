@@ -17,7 +17,6 @@
 import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 from victor.tools.file_editor_tool import edit
 

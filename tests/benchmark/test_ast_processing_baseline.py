@@ -51,17 +51,12 @@ from __future__ import annotations
 
 import gc
 import logging
-import os
-import random
-import string
-import threading
 import time
 import tracemalloc
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import MagicMock
+from typing import Any, Optional
 
 import pytest
 
@@ -104,7 +99,7 @@ class BenchmarkResult:
     p99_latency: float
     throughput: float
     memory_mb: float
-    additional_metrics: Dict[str, Any] = field(default_factory=dict)
+    additional_metrics: dict[str, Any] = field(default_factory=dict)
 
     def __str__(self) -> str:
         return (
@@ -291,7 +286,7 @@ class SimpleASTCache:
     """
 
     def __init__(self) -> None:
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
         self._hits = 0
         self._misses = 0
 
@@ -313,7 +308,7 @@ class SimpleASTCache:
         self._hits = 0
         self._misses = 0
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         total = self._hits + self._misses
         hit_rate = (self._hits / total * 100) if total > 0 else 0

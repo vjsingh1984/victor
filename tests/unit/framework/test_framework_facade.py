@@ -24,7 +24,6 @@ The facade pattern provides:
 3. Backward compatibility with original modules
 """
 
-import pytest
 
 
 class TestResilienceFacade:
@@ -204,12 +203,8 @@ class TestResilienceFacade:
         """Test that imports from victor.framework work."""
         from victor.framework import (
             CircuitBreaker,
-            CircuitBreakerRegistry,
             CircuitState,
-            ExponentialBackoffStrategy,
-            ResilientProvider,
             BaseRetryStrategy,
-            with_retry,
         )
 
         # Basic validation that classes are importable and usable
@@ -350,10 +345,8 @@ class TestHealthFacade:
     def test_framework_import_works(self):
         """Test that imports from victor.framework work."""
         from victor.framework import (
-            ComponentHealth,
             HealthChecker,
             HealthStatus,
-            create_default_health_checker,
         )
 
         # Basic validation that classes are importable and usable
@@ -484,12 +477,7 @@ class TestMetricsFacade:
         """Test that imports from victor.framework work."""
         from victor.framework import (
             Counter,
-            Gauge,
-            Histogram,
             MetricsRegistry,
-            Timer,
-            get_tracer,
-            setup_opentelemetry,
         )
 
         # Basic validation that classes are importable and usable
@@ -504,12 +492,8 @@ class TestFrameworkMainExports:
         """Test that resilience exports are available from victor.framework."""
         from victor.framework import (
             CircuitBreaker,
-            CircuitBreakerConfig,
             CircuitState,
-            ExponentialBackoffStrategy,
-            ResilientProvider,
             BaseRetryStrategy,
-            with_retry,
         )
 
         assert CircuitBreaker is not None
@@ -519,11 +503,8 @@ class TestFrameworkMainExports:
     def test_health_exports_in_main_module(self):
         """Test that health exports are available from victor.framework."""
         from victor.framework import (
-            ComponentHealth,
             HealthChecker,
             HealthStatus,
-            ProviderHealthChecker,
-            create_default_health_checker,
         )
 
         assert HealthChecker is not None
@@ -533,12 +514,7 @@ class TestFrameworkMainExports:
         """Test that metrics exports are available from victor.framework."""
         from victor.framework import (
             Counter,
-            Gauge,
-            Histogram,
             MetricsRegistry,
-            Timer,
-            get_tracer,
-            setup_opentelemetry,
         )
 
         assert MetricsRegistry is not None

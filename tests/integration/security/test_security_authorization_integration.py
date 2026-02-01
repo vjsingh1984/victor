@@ -29,12 +29,9 @@ Test scenarios:
 """
 
 import asyncio
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
-import tempfile
+from datetime import datetime
+from typing import Optional, Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -47,7 +44,7 @@ import pytest
 class MockSecurityTool:
     """Mock security tool for testing."""
 
-    def __init__(self, name: str, required_permissions: List[str]):
+    def __init__(self, name: str, required_permissions: list[str]):
         self.name = name
         self.required_permissions = required_permissions
         self.execution_log = []
@@ -87,7 +84,7 @@ class MockAuthorizationManager:
         return role in self.roles.get(user, set())
 
     async def authorize_tool_execution(
-        self, user: str, tool_name: str, required_permissions: List[str]
+        self, user: str, tool_name: str, required_permissions: list[str]
     ) -> tuple[bool, Optional[str]]:
         """Authorize tool execution."""
         self.audit_log.append(
@@ -117,7 +114,7 @@ class MockSecurityEventBus:
     def __init__(self):
         self.events = []
 
-    async def publish(self, event_type: str, data: Dict[str, Any]):
+    async def publish(self, event_type: str, data: dict[str, Any]):
         """Publish security event."""
         self.events.append({"type": event_type, "data": data, "timestamp": datetime.now()})
 

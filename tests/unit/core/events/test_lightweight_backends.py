@@ -18,9 +18,6 @@ Run with: pytest tests/unit/core/events/test_lightweight_backends.py -v
 """
 
 import asyncio
-import tempfile
-from pathlib import Path
-from typing import List
 
 import pytest
 
@@ -86,7 +83,7 @@ class TestSQLiteEventBackend:
     @pytest.mark.asyncio
     async def test_publish_subscribe_basic(self, backend):
         """Basic pub/sub should work with polling."""
-        received: List[MessagingEvent] = []
+        received: list[MessagingEvent] = []
 
         async def handler(event: MessagingEvent):
             received.append(event)
@@ -108,8 +105,8 @@ class TestSQLiteEventBackend:
     @pytest.mark.asyncio
     async def test_pattern_filtering(self, backend):
         """Subscriptions should filter by pattern."""
-        tool_events: List[MessagingEvent] = []
-        agent_events: List[MessagingEvent] = []
+        tool_events: list[MessagingEvent] = []
+        agent_events: list[MessagingEvent] = []
 
         async def tool_handler(event: MessagingEvent):
             tool_events.append(event)
@@ -132,7 +129,7 @@ class TestSQLiteEventBackend:
     @pytest.mark.asyncio
     async def test_unsubscribe(self, backend):
         """Unsubscribe should stop event delivery."""
-        received: List[MessagingEvent] = []
+        received: list[MessagingEvent] = []
 
         async def handler(event: MessagingEvent):
             received.append(event)

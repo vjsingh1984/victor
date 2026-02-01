@@ -20,7 +20,6 @@ to learn optimal hallucination detection thresholds per provider.
 
 import pytest
 from pathlib import Path
-from typing import Dict, Tuple
 
 from victor.framework.rl.base import RLOutcome
 from victor.framework.rl.coordinator import RLCoordinator
@@ -73,7 +72,7 @@ def _get_beta_params_from_db(
     coordinator: RLCoordinator,
     context_key: str,
     threshold: float,
-) -> Tuple[float, float, int]:
+) -> tuple[float, float, int]:
     """Helper to retrieve Beta parameters from the database."""
     cursor = coordinator.db.cursor()
     cursor.execute(

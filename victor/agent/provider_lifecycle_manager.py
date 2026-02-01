@@ -32,7 +32,7 @@ Design Pattern:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, List
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
@@ -92,7 +92,7 @@ class ProviderLifecycleManager:
             f"patience={capabilities.continuation_patience}"
         )
 
-    def get_prompt_contributors(self) -> List[Any]:
+    def get_prompt_contributors(self) -> list[Any]:
         """Get prompt contributors from vertical extensions.
 
         Retrieves registered prompt contributors from the vertical
@@ -125,7 +125,7 @@ class ProviderLifecycleManager:
         model: str,
         tool_adapter: Any,
         capabilities: Any,
-        prompt_contributors: List[Any],
+        prompt_contributors: list[Any],
     ) -> "SystemPromptBuilder":
         """Create a new SystemPromptBuilder with given parameters.
 

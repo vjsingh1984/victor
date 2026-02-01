@@ -5,7 +5,6 @@ Tests the ParallelBranchExecutor and StateGraph.add_parallel_edges functionality
 
 import asyncio
 import time
-from typing import Any, Dict, List
 
 import pytest
 
@@ -16,7 +15,6 @@ from victor.framework.graph import (
     EdgeType,
     ParallelBranchExecutor,
     ParallelBranchResult,
-    CopyOnWriteState,
 )
 
 
@@ -97,7 +95,7 @@ class TestStateGraphParallelEdges:
     def test_add_parallel_edges_with_merge_func(self):
         """Test parallel edges with custom merge function."""
 
-        def custom_merge(states: List[Dict]) -> Dict:
+        def custom_merge(states: list[dict]) -> dict:
             return {"merged": [s.get("value") for s in states]}
 
         graph = StateGraph()
@@ -181,7 +179,7 @@ class TestParallelBranchExecutor:
             "branch_a": Node(id="branch_a", func=branch_a),
             "branch_b": Node(id="branch_b", func=branch_b),
         }
-        edges: Dict[str, List[Edge]] = {}
+        edges: dict[str, list[Edge]] = {}
 
         executor = ParallelBranchExecutor(
             nodes=nodes,
@@ -229,7 +227,7 @@ class TestParallelBranchExecutor:
             "branch_a": Node(id="branch_a", func=slow_branch_a),
             "branch_b": Node(id="branch_b", func=slow_branch_b),
         }
-        edges: Dict[str, List[Edge]] = {}
+        edges: dict[str, list[Edge]] = {}
 
         executor = ParallelBranchExecutor(
             nodes=nodes,
@@ -265,14 +263,14 @@ class TestParallelBranchExecutor:
         async def branch_b(state):
             return {"result": "b"}
 
-        def custom_merge(states: List[Dict]) -> Dict:
+        def custom_merge(states: list[dict]) -> dict:
             return {"results": [s["result"] for s in states]}
 
         nodes = {
             "branch_a": Node(id="branch_a", func=branch_a),
             "branch_b": Node(id="branch_b", func=branch_b),
         }
-        edges: Dict[str, List[Edge]] = {}
+        edges: dict[str, list[Edge]] = {}
 
         executor = ParallelBranchExecutor(
             nodes=nodes,
@@ -310,7 +308,7 @@ class TestParallelBranchExecutor:
             "branch_a": Node(id="branch_a", func=branch_a),
             "branch_b": Node(id="branch_b", func=branch_b),
         }
-        edges: Dict[str, List[Edge]] = {}
+        edges: dict[str, list[Edge]] = {}
 
         executor = ParallelBranchExecutor(
             nodes=nodes,
@@ -352,7 +350,7 @@ class TestParallelBranchExecutor:
             "branch_a": Node(id="branch_a", func=branch_a),
             "branch_b": Node(id="branch_b", func=branch_b),
         }
-        edges: Dict[str, List[Edge]] = {}
+        edges: dict[str, list[Edge]] = {}
 
         executor = ParallelBranchExecutor(
             nodes=nodes,
@@ -491,7 +489,7 @@ class TestCompiledGraphParallelExecution:
             state["summarized"] = True
             return state
 
-        def sum_counts(states: List[Dict]) -> Dict:
+        def sum_counts(states: list[dict]) -> dict:
             total = sum(s.get("count", 0) for s in states)
             merged = {}
             for s in states:

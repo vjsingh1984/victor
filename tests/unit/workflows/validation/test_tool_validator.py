@@ -3,10 +3,9 @@
 """Tests for ToolDependencyValidator."""
 
 from dataclasses import dataclass
-from typing import Any, List, Optional, Set
+from typing import Any, Optional
 from unittest.mock import MagicMock
 
-import pytest
 
 from victor.workflows.validation import (
     ToolDependencyValidator,
@@ -19,13 +18,13 @@ from victor.workflows.validation import (
 class MockToolRegistry:
     """Mock tool registry for testing."""
 
-    def __init__(self, tools: List[str]):
+    def __init__(self, tools: list[str]):
         self._tools = {name: MagicMock() for name in tools}
 
     def get(self, name: str) -> Optional[Any]:
         return self._tools.get(name)
 
-    def list_tools(self, only_enabled: bool = True) -> List[Any]:
+    def list_tools(self, only_enabled: bool = True) -> list[Any]:
         tools = []
         for name, mock in self._tools.items():
             mock.name = name
@@ -38,8 +37,8 @@ class MockNode:
     """Mock workflow node for testing."""
 
     id: str
-    allowed_tools: Optional[Set[str]] = None
-    tools: Optional[Set[str]] = None
+    allowed_tools: Optional[set[str]] = None
+    tools: Optional[set[str]] = None
 
 
 @dataclass

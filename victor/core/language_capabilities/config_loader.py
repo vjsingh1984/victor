@@ -6,7 +6,7 @@ Loads language capability definitions from capabilities.yaml.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import yaml
 
@@ -51,7 +51,7 @@ def _parse_language_tier(value: int) -> LanguageTier:
     return mapping.get(value, LanguageTier.TIER_3)
 
 
-def _parse_ast_capability(data: Optional[Dict[str, Any]]) -> Optional[ASTCapability]:
+def _parse_ast_capability(data: Optional[dict[str, Any]]) -> Optional[ASTCapability]:
     """Parse AST capability from YAML data."""
     if not data:
         return None
@@ -69,7 +69,7 @@ def _parse_ast_capability(data: Optional[Dict[str, Any]]) -> Optional[ASTCapabil
     )
 
 
-def _parse_lsp_capability(data: Optional[Dict[str, Any]]) -> Optional[LSPCapability]:
+def _parse_lsp_capability(data: Optional[dict[str, Any]]) -> Optional[LSPCapability]:
     """Parse LSP capability from YAML data."""
     if not data:
         return None
@@ -85,7 +85,7 @@ def _parse_lsp_capability(data: Optional[Dict[str, Any]]) -> Optional[LSPCapabil
     )
 
 
-def _parse_tree_sitter_capability(data: Optional[Dict[str, Any]]) -> Optional[TreeSitterCapability]:
+def _parse_tree_sitter_capability(data: Optional[dict[str, Any]]) -> Optional[TreeSitterCapability]:
     """Parse tree-sitter capability from YAML data."""
     if not data:
         return None
@@ -98,7 +98,7 @@ def _parse_tree_sitter_capability(data: Optional[Dict[str, Any]]) -> Optional[Tr
     )
 
 
-def _parse_strategy(strategy: Optional[List[str]]) -> List[ASTAccessMethod]:
+def _parse_strategy(strategy: Optional[list[str]]) -> list[ASTAccessMethod]:
     """Parse indexing/validation strategy from YAML data."""
     if not strategy:
         return [ASTAccessMethod.NATIVE, ASTAccessMethod.TREE_SITTER, ASTAccessMethod.LSP]
@@ -106,7 +106,7 @@ def _parse_strategy(strategy: Optional[List[str]]) -> List[ASTAccessMethod]:
     return [_parse_ast_access_method(s) for s in strategy]
 
 
-def _parse_language_capability(name: str, data: Dict[str, Any]) -> UnifiedLanguageCapability:
+def _parse_language_capability(name: str, data: dict[str, Any]) -> UnifiedLanguageCapability:
     """Parse a single language capability from YAML data."""
     return UnifiedLanguageCapability(
         name=name,
@@ -127,7 +127,7 @@ def _parse_language_capability(name: str, data: Dict[str, Any]) -> UnifiedLangua
 
 def load_capabilities_from_yaml(
     config_path: Optional[Path] = None,
-) -> List[UnifiedLanguageCapability]:
+) -> list[UnifiedLanguageCapability]:
     """
     Load language capabilities from YAML configuration file.
 
@@ -180,7 +180,7 @@ def load_capabilities_from_yaml(
 
 def load_feature_flags_from_yaml(
     config_path: Optional[Path] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Load feature flags from YAML configuration file.
 
@@ -200,7 +200,7 @@ def load_feature_flags_from_yaml(
         with open(config_path, "r") as f:
             data = yaml.safe_load(f)
 
-        result: Dict[str, Any] = data.get("feature_flags", {}) if isinstance(data, dict) else {}
+        result: dict[str, Any] = data.get("feature_flags", {}) if isinstance(data, dict) else {}
         return result
 
     except Exception as e:

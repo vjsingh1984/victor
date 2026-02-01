@@ -37,13 +37,13 @@ from __future__ import annotations
 
 import pytest
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Dict, List, Optional, Set
-from unittest.mock import MagicMock, patch
+from typing import Any, ClassVar
+from unittest.mock import MagicMock
 
 from victor.core.verticals.base import VerticalBase
 from victor.core.verticals.extension_loader import VerticalExtensionLoader
 from victor.core.verticals.extension_registry import ExtensionRegistry
-from victor.core.verticals.protocols import IExtension, IExtensionRegistry, StandardExtensionTypes
+from victor.core.verticals.protocols import IExtensionRegistry, StandardExtensionTypes
 from victor.core.errors import ExtensionLoadError
 
 
@@ -76,12 +76,12 @@ def sample_extension():
 
         extension_type: ClassVar[str] = "sample"
         name: str
-        config: Dict[str, Any] = field(default_factory=dict)
+        config: dict[str, Any] = field(default_factory=dict)
 
         def validate(self) -> bool:
             return bool(self.name)
 
-        def get_metadata(self) -> Dict[str, Any]:
+        def get_metadata(self) -> dict[str, Any]:
             return {
                 "version": "0.5.0",
                 "description": "Sample extension for testing",
@@ -101,12 +101,12 @@ def custom_extension_type():
         extension_type: ClassVar[str] = "analytics"
         name: str
         api_key: str
-        metrics: Set[str] = field(default_factory=set)
+        metrics: set[str] = field(default_factory=set)
 
         def validate(self) -> bool:
             return bool(self.api_key) and bool(self.name)
 
-        def get_metadata(self) -> Dict[str, Any]:
+        def get_metadata(self) -> dict[str, Any]:
             return {
                 "version": "2.0.0",
                 "description": "Analytics extension",
@@ -130,7 +130,7 @@ def mock_vertical():
         version = "0.5.0"
 
         @classmethod
-        def get_tools(cls) -> List[str]:
+        def get_tools(cls) -> list[str]:
             return ["read", "write"]
 
         @classmethod
@@ -242,7 +242,7 @@ class TestDynamicExtensionRegistration:
             def validate(self) -> bool:
                 return True
 
-            def get_metadata(self) -> Dict[str, Any]:
+            def get_metadata(self) -> dict[str, Any]:
                 return {}
 
         real_extension_registry.register_extension(ext1)
@@ -280,7 +280,7 @@ class TestDynamicExtensionRegistration:
             def validate(self) -> bool:
                 return True
 
-            def get_metadata(self) -> Dict[str, Any]:
+            def get_metadata(self) -> dict[str, Any]:
                 return {}
 
         ext3 = AnotherExtension()
@@ -463,7 +463,7 @@ class TestExtensionTypeDiscovery:
             def validate(self) -> bool:
                 return True
 
-            def get_metadata(self) -> Dict[str, Any]:
+            def get_metadata(self) -> dict[str, Any]:
                 return {}
 
         ext3 = OtherExtension()
@@ -545,7 +545,7 @@ class TestOCPCompliance:
             def validate(self) -> bool:
                 return bool(self.endpoint)
 
-            def get_metadata(self) -> Dict[str, Any]:
+            def get_metadata(self) -> dict[str, Any]:
                 return {}
 
         analytics_ext = custom_extension_type(name="analytics", api_key="key")
@@ -790,7 +790,7 @@ class TestCacheInvalidation:
             name = "another"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["search"]
 
         # Cache extensions for both verticals
@@ -905,14 +905,14 @@ class TestVerticalBaseIntegration:
             name = "vertical_a"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["tool_a1", "tool_a2"]
 
         class VerticalB(mock_vertical):
             name = "vertical_b"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["tool_b1", "tool_b2"]
 
         # Both should work independently

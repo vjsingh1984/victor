@@ -58,8 +58,8 @@ import tracemalloc
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Optional
+from collections.abc import Callable
 
 import pytest
 
@@ -90,12 +90,12 @@ class NodeType(str, Enum):
 class ExecutionContext:
     """Execution context for workflow nodes."""
 
-    state: Dict[str, Any] = field(default_factory=dict)
-    variables: Dict[str, Any] = field(default_factory=dict)
-    history: List[Dict[str, Any]] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    state: dict[str, Any] = field(default_factory=dict)
+    variables: dict[str, Any] = field(default_factory=dict)
+    history: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def update_state(self, updates: Dict[str, Any]) -> None:
+    def update_state(self, updates: dict[str, Any]) -> None:
         """Update the execution state."""
         self.state.update(updates)
 
@@ -114,7 +114,7 @@ class ExecutionResult:
     error: Optional[str] = None
     execution_time: float = 0.0
     tool_calls: int = 0
-    next_nodes: List[str] = field(default_factory=list)
+    next_nodes: list[str] = field(default_factory=list)
 
 
 class WorkflowNode:
@@ -184,7 +184,7 @@ class ConditionalNode(WorkflowNode):
         self,
         node_id: str,
         condition_func: Callable[[ExecutionContext], str],
-        branches: Dict[str, List[str]],
+        branches: dict[str, list[str]],
         execution_delay: float = 0.005,
     ):
         super().__init__(node_id, NodeType.CONDITION, execution_delay)
@@ -208,11 +208,11 @@ class WorkflowGraph:
 
     def __init__(self, graph_id: str = "test_graph"):
         self.id = graph_id
-        self.nodes: Dict[str, WorkflowNode] = {}
-        self.edges: Dict[str, List[str]] = {}  # node_id -> list of next node IDs
+        self.nodes: dict[str, WorkflowNode] = {}
+        self.edges: dict[str, list[str]] = {}  # node_id -> list of next node IDs
         self.entry_point: Optional[str] = None
         self.enable_caching = False
-        self._execution_cache: Dict[str, ExecutionResult] = {}
+        self._execution_cache: dict[str, ExecutionResult] = {}
 
     def add_node(self, node: WorkflowNode) -> None:
         """Add a node to the graph."""
@@ -233,15 +233,15 @@ class WorkflowGraph:
         self,
         initial_context: Optional[ExecutionContext] = None,
         max_iterations: int = 100,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute the workflow graph."""
         if initial_context is None:
             initial_context = ExecutionContext()
 
         context = initial_context
         current_nodes = [self.entry_point] if self.entry_point else []
-        executed_nodes: Set[str] = set()
-        results: List[ExecutionResult] = []
+        executed_nodes: set[str] = set()
+        results: list[ExecutionResult] = []
         total_tool_calls = 0
 
         start_time = time.perf_counter()

@@ -55,12 +55,8 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import (
     Any,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
     runtime_checkable,
 )
 
@@ -123,7 +119,7 @@ class MemoryResult:
     content: Any
     relevance: float
     id: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: Optional[float] = None
 
     def __post_init__(self) -> None:
@@ -161,8 +157,8 @@ class MemoryQuery:
 
     query: str
     limit: int = 20
-    memory_types: Optional[List[MemoryType]] = None
-    filters: Optional[Dict[str, Any]] = None
+    memory_types: Optional[list[MemoryType]] = None
+    filters: Optional[dict[str, Any]] = None
     min_relevance: float = 0.0
     session_id: Optional[str] = None
     include_metadata: bool = True
@@ -207,7 +203,7 @@ class MemoryProviderProtocol(Protocol):
     async def search(
         self,
         query: MemoryQuery,
-    ) -> List[MemoryResult]:
+    ) -> list[MemoryResult]:
         """Search this memory system.
 
         Args:
@@ -222,7 +218,7 @@ class MemoryProviderProtocol(Protocol):
         self,
         key: str,
         value: Any,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Store a value in this memory system.
 
@@ -268,10 +264,10 @@ class RankingStrategyProtocol(Protocol):
     @abstractmethod
     def rank(
         self,
-        results: List[MemoryResult],
+        results: list[MemoryResult],
         query: MemoryQuery,
         limit: int,
-    ) -> List[MemoryResult]:
+    ) -> list[MemoryResult]:
         """Rank and deduplicate results.
 
         Args:
@@ -295,13 +291,13 @@ class RelevanceRankingStrategy:
 
     def rank(
         self,
-        results: List[MemoryResult],
+        results: list[MemoryResult],
         query: MemoryQuery,
         limit: int,
-    ) -> List[MemoryResult]:
+    ) -> list[MemoryResult]:
         """Rank by relevance score descending."""
         # Deduplicate by ID
-        seen: Set[str] = set()
+        seen: set[str] = set()
         unique_results = []
         for r in results:
             if r.id not in seen:
@@ -327,13 +323,13 @@ class RecencyRankingStrategy:
 
     def rank(
         self,
-        results: List[MemoryResult],
+        results: list[MemoryResult],
         query: MemoryQuery,
         limit: int,
-    ) -> List[MemoryResult]:
+    ) -> list[MemoryResult]:
         """Rank by timestamp descending (most recent first)."""
         # Deduplicate
-        seen: Set[str] = set()
+        seen: set[str] = set()
         unique_results = []
         for r in results:
             if r.id not in seen:
@@ -382,13 +378,13 @@ class HybridRankingStrategy:
 
     def rank(
         self,
-        results: List[MemoryResult],
+        results: list[MemoryResult],
         query: MemoryQuery,
         limit: int,
-    ) -> List[MemoryResult]:
+    ) -> list[MemoryResult]:
         """Rank by weighted combination of relevance and recency."""
         # Deduplicate
-        seen: Set[str] = set()
+        seen: set[str] = set()
         unique_results = []
         for r in results:
             if r.id not in seen:
@@ -459,7 +455,7 @@ class UnifiedMemoryCoordinator:
         Args:
             ranking_strategy: Strategy for ranking results (default: HybridRankingStrategy)
         """
-        self._providers: Dict[MemoryType, MemoryProviderProtocol] = {}
+        self._providers: dict[MemoryType, MemoryProviderProtocol] = {}
         self._ranking_strategy = ranking_strategy or HybridRankingStrategy()
         self._query_count = 0
         self._error_count = 0
@@ -505,7 +501,7 @@ class UnifiedMemoryCoordinator:
         """
         return self._providers.get(memory_type)
 
-    def get_registered_types(self) -> List[MemoryType]:
+    def get_registered_types(self) -> list[MemoryType]:
         """Get list of registered memory types.
 
         Returns:
@@ -525,11 +521,11 @@ class UnifiedMemoryCoordinator:
         self,
         query: str,
         limit: int = 20,
-        memory_types: Optional[List[Any]] = None,
+        memory_types: Optional[list[Any]] = None,
         session_id: Optional[str] = None,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: Optional[dict[str, Any]] = None,
         min_relevance: float = 0.0,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Federated search across registered providers.
 
         Searches all matching providers in parallel and returns
@@ -578,7 +574,7 @@ class UnifiedMemoryCoordinator:
         results_lists = await asyncio.gather(*search_tasks, return_exceptions=True)
 
         # Flatten and filter errors
-        all_results: List[MemoryResult] = []
+        all_results: list[MemoryResult] = []
         for i, results in enumerate(results_lists):
             if isinstance(results, Exception):
                 self._error_count += 1
@@ -600,7 +596,7 @@ class UnifiedMemoryCoordinator:
         self,
         provider: MemoryProviderProtocol,
         query: MemoryQuery,
-    ) -> List[MemoryResult]:
+    ) -> list[MemoryResult]:
         """Search a single provider with error handling."""
         try:
             return await provider.search(query)
@@ -614,7 +610,7 @@ class UnifiedMemoryCoordinator:
         query: str,
         limit: int = 10,
         **kwargs: Any,
-    ) -> List[MemoryResult]:
+    ) -> list[MemoryResult]:
         """Search a specific memory type.
 
         Convenience method for single-type searches.
@@ -659,7 +655,7 @@ class UnifiedMemoryCoordinator:
         memory_type: MemoryType,
         key: str,
         value: Any,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> bool:
         """Store a value in a specific memory type.
 
@@ -684,7 +680,7 @@ class UnifiedMemoryCoordinator:
             logger.error(f"Failed to store in {memory_type.name}: {e}")
             return False
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get coordinator statistics.
 
         Returns:

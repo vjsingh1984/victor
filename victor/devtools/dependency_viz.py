@@ -36,7 +36,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 
 # Configure logging
@@ -53,8 +53,8 @@ class ModuleInfo:
 
     name: str
     file_path: str
-    imports: Set[str] = field(default_factory=set)
-    imported_by: Set[str] = field(default_factory=set)
+    imports: set[str] = field(default_factory=set)
+    imported_by: set[str] = field(default_factory=set)
     is_internal: bool = False
 
     def __hash__(self) -> int:
@@ -65,7 +65,7 @@ class ModuleInfo:
 class CycleInfo:
     """Information about a circular dependency."""
 
-    cycle: List[str]
+    cycle: list[str]
     length: int
 
     def __str__(self) -> str:
@@ -87,9 +87,9 @@ class DependencyGraph:
             victor_root = current.parent.parent
 
         self.victor_root = Path(victor_root)
-        self.modules: Dict[str, ModuleInfo] = {}
-        self.adj_list: Dict[str, Set[str]] = defaultdict(set)
-        self.reverse_adj_list: Dict[str, Set[str]] = defaultdict(set)
+        self.modules: dict[str, ModuleInfo] = {}
+        self.adj_list: dict[str, set[str]] = defaultdict(set)
+        self.reverse_adj_list: dict[str, set[str]] = defaultdict(set)
 
     def build_from_directory(self, directory: Path) -> None:
         """Build dependency graph by scanning directory.
@@ -170,7 +170,7 @@ class DependencyGraph:
             # File is not under victor_root
             return str(file_path)
 
-    def _extract_imports(self, tree: ast.AST, file_path: Path) -> Set[str]:
+    def _extract_imports(self, tree: ast.AST, file_path: Path) -> set[str]:
         """Extract imports from AST."""
         imports = set()
 
@@ -190,7 +190,7 @@ class DependencyGraph:
 
         return imports
 
-    def _filter_imports(self, imports: Set[str]) -> Set[str]:
+    def _filter_imports(self, imports: set[str]) -> set[str]:
         """Filter out non-Victor imports."""
         # Standard library modules (partial list)
         stdlib_modules = {
@@ -247,7 +247,7 @@ class DependencyGraph:
 
         return filtered
 
-    def find_dependencies(self, module: str) -> Set[str]:
+    def find_dependencies(self, module: str) -> set[str]:
         """Find all dependencies of a module.
 
         Args:
@@ -258,7 +258,7 @@ class DependencyGraph:
         """
         return self.adj_list.get(module, set())
 
-    def find_dependents(self, module: str) -> Set[str]:
+    def find_dependents(self, module: str) -> set[str]:
         """Find all modules that depend on this module.
 
         Args:
@@ -269,7 +269,7 @@ class DependencyGraph:
         """
         return self.reverse_adj_list.get(module, set())
 
-    def find_cycles(self) -> List[CycleInfo]:
+    def find_cycles(self) -> list[CycleInfo]:
         """Find circular dependencies using DFS.
 
         Returns:
@@ -304,7 +304,7 @@ class DependencyGraph:
 
         return cycles
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get graph statistics."""
         total_modules = len(self.modules)
         total_edges = sum(len(deps) for deps in self.adj_list.values())

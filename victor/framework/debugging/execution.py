@@ -46,7 +46,7 @@ import asyncio
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.framework.debugging.breakpoints import (
     BreakpointPosition,
@@ -114,13 +114,13 @@ class PauseContext:
     session_id: str
     node_id: str
     position: BreakpointPosition
-    state: Dict[str, Any]
-    breakpoint_ids: List[str]
+    state: dict[str, Any]
+    breakpoint_ids: list[str]
     timestamp: float
     error: Optional[Exception] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary.
 
         Returns:
@@ -201,8 +201,8 @@ class ExecutionController:
     def should_pause(
         self,
         node_id: str,
-        state: Dict[str, Any],
-        breakpoints: List[WorkflowBreakpoint],
+        state: dict[str, Any],
+        breakpoints: list[WorkflowBreakpoint],
     ) -> bool:
         """Check if execution should pause.
 
@@ -233,9 +233,9 @@ class ExecutionController:
     async def pause(
         self,
         node_id: str,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         position: BreakpointPosition,
-        breakpoints: List[WorkflowBreakpoint],
+        breakpoints: list[WorkflowBreakpoint],
         error: Optional[Exception] = None,
     ) -> PauseContext:
         """Pause execution at breakpoint.

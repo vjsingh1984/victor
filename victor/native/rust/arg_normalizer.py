@@ -27,7 +27,7 @@ Performance characteristics:
 from __future__ import annotations
 
 import json
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 try:
     import victor_native  # type: ignore[import-not-found]
@@ -72,7 +72,7 @@ class RustArgumentNormalizer(InstrumentedAccelerator):
     def get_version(self) -> Optional[str]:
         return self._version
 
-    def normalize_json(self, value: str) -> Tuple[str, bool]:
+    def normalize_json(self, value: str) -> tuple[str, bool]:
         """Normalize a potentially malformed JSON string.
 
         Delegates to Rust implementation with serde_json validation.

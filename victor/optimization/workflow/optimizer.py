@@ -21,16 +21,15 @@ all optimization components into a simple, high-level API.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Callable, Union
+from typing import Any, Optional
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from victor.optimization.workflow.models import (
-    Bottleneck,
     OptimizationOpportunity,
     WorkflowProfile,
 )
 from victor.optimization.workflow.profiler import WorkflowProfiler
-from victor.optimization.workflow.strategies import create_strategy
 from victor.optimization.workflow.generator import (
     WorkflowVariant,
     WorkflowVariantGenerator,
@@ -72,7 +71,7 @@ class OptimizationConfig:
     min_confidence: float = 0.6
     min_improvement: float = 0.1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "search_algorithm": self.search_algorithm,
@@ -143,7 +142,7 @@ class WorkflowOptimizer:
 
         # Initialize search algorithm
         if self.config.search_algorithm == "hill_climbing":
-            self.search_optimizer: Union[HillClimbingOptimizer, SimulatedAnnealingOptimizer] = (
+            self.search_optimizer: HillClimbingOptimizer | SimulatedAnnealingOptimizer = (
                 HillClimbingOptimizer(
                     variant_generator=self.variant_generator,
                 )
@@ -204,7 +203,7 @@ class WorkflowOptimizer:
         experiment_tracker: Optional[ExperimentTracker] = None,
         min_executions: int = 3,
         max_suggestions: int = 10,
-    ) -> List[OptimizationOpportunity]:
+    ) -> list[OptimizationOpportunity]:
         """Generate optimization suggestions for a workflow.
 
         Args:
@@ -255,9 +254,9 @@ class WorkflowOptimizer:
     async def optimize_workflow(
         self,
         workflow_id: str,
-        workflow_config: Dict[str, Any],
+        workflow_config: dict[str, Any],
         experiment_tracker: Optional[ExperimentTracker] = None,
-        opportunities: Optional[List[OptimizationOpportunity]] = None,
+        opportunities: Optional[list[OptimizationOpportunity]] = None,
         custom_score_function: Optional[Callable[[WorkflowVariant], float]] = None,
     ) -> Optional[OptimizationResult]:
         """Optimize a workflow using search algorithms.
@@ -313,7 +312,7 @@ class WorkflowOptimizer:
         self,
         variant: WorkflowVariant,
         profile: WorkflowProfile,
-        test_inputs: Optional[List[Dict[str, Any]]] = None,
+        test_inputs: Optional[list[dict[str, Any]]] = None,
     ) -> EvaluationResult:
         """Validate a workflow variant.
 
@@ -347,7 +346,7 @@ class WorkflowOptimizer:
     async def apply_optimization(
         self,
         workflow_id: str,
-        workflow_config: Dict[str, Any],
+        workflow_config: dict[str, Any],
         opportunity: OptimizationOpportunity,
         experiment_tracker: Optional[ExperimentTracker] = None,
         validate_before_applying: bool = True,

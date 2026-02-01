@@ -52,10 +52,11 @@ import json
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.protocols import ICacheBackend, FileChangeEvent
 from victor.agent.cache.dependency_graph import ToolDependencyGraph
+import builtins
 
 
 class CacheNamespace(Enum):
@@ -76,7 +77,7 @@ class CacheNamespace(Enum):
     REQUEST = "request"
     TOOL = "tool"
 
-    def get_child_namespaces(self) -> List[CacheNamespace]:
+    def get_child_namespaces(self) -> list[CacheNamespace]:
         """Get child namespaces in the hierarchy.
 
         Returns:
@@ -118,7 +119,7 @@ class InvalidationResult:
     namespace: str
     keys_cleared: int
     recursive: bool = False
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
@@ -141,11 +142,11 @@ class CacheEntry:
     args_hash: str
     result: Any
     namespace: CacheNamespace
-    dependent_tools: Set[str]
-    file_dependencies: Set[str]
+    dependent_tools: set[str]
+    file_dependencies: set[str]
     created_at: str
     expires_at: Optional[str] = None
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class ToolCacheManager:
@@ -180,7 +181,7 @@ class ToolCacheManager:
         self._default_ttl = default_ttl
         self._enable_dependency_tracking = enable_dependency_tracking
         self._dependency_graph = ToolDependencyGraph()
-        self._namespace_prefixes: Dict[CacheNamespace, str] = {
+        self._namespace_prefixes: dict[CacheNamespace, str] = {
             CacheNamespace.GLOBAL: "global",
             CacheNamespace.SESSION: "session",
             CacheNamespace.REQUEST: "request",
@@ -188,7 +189,7 @@ class ToolCacheManager:
         }
         # Track cache keys by tool name for invalidation
         # Structure: {(tool_name, namespace): set(cache_keys)}
-        self._tool_keys: Dict[tuple[str, str], Set[str]] = {}
+        self._tool_keys: dict[tuple[str, str], set[str]] = {}
 
         # File watching support
         self._enable_file_watching = enable_file_watching
@@ -215,7 +216,7 @@ class ToolCacheManager:
         prefix = self._namespace_prefixes[namespace]
         return f"{prefix}:{tool_name}:{args_hash}"
 
-    def _hash_args(self, args: Dict[str, Any]) -> str:
+    def _hash_args(self, args: dict[str, Any]) -> str:
         """Create a stable hash for tool arguments.
 
         Args:
@@ -233,7 +234,7 @@ class ToolCacheManager:
     async def get_tool_result(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         namespace: CacheNamespace = CacheNamespace.SESSION,
     ) -> Optional[Any]:
         """Get cached tool result.
@@ -262,12 +263,12 @@ class ToolCacheManager:
     async def set_tool_result(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         result: Any,
         namespace: CacheNamespace = CacheNamespace.SESSION,
         ttl_seconds: Optional[int] = None,
-        dependent_tools: Optional[Set[str]] = None,
-        file_dependencies: Optional[Set[str]] = None,
+        dependent_tools: Optional[builtins.set[str]] = None,
+        file_dependencies: Optional[builtins.set[str]] = None,
     ) -> None:
         """Cache a tool result.
 
@@ -471,7 +472,7 @@ class ToolCacheManager:
             total += result.keys_cleared
         return total
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:
@@ -535,7 +536,7 @@ class ToolCacheManager:
     # File Watching Integration
     # =========================================================================
 
-    async def start_file_watching(self, file_paths: List[str]) -> None:
+    async def start_file_watching(self, file_paths: list[str]) -> None:
         """Start file watching for automatic cache invalidation.
 
         Monitors the specified files and directories for changes and

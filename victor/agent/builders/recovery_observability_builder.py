@@ -17,7 +17,7 @@
 Part of HIGH-005: Initialization Complexity reduction.
 """
 
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.builders.base import FactoryAwareBuilder
 from victor.agent.coordinators.checkpoint_coordinator import CheckpointCoordinator
@@ -41,10 +41,10 @@ class RecoveryObservabilityBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> dict[str, Any]:  # type: ignore[override]
         """Build recovery and observability components and attach them to orchestrator."""
         factory = self._ensure_factory()
-        components: Dict[str, Any] = {}
+        components: dict[str, Any] = {}
 
         # Initialize RecoveryHandler for handling model failures and stuck states (via factory)
         orchestrator._recovery_handler = factory.create_recovery_handler()
@@ -110,7 +110,6 @@ class RecoveryObservabilityBuilder(FactoryAwareBuilder):
         components["checkpoint_coordinator"] = orchestrator._checkpoint_coordinator
 
         # Initialize ChatCoordinator for chat and streaming operations (SOLID refactoring)
-        from victor.protocols.agent import IAgentOrchestrator
 
         orchestrator._chat_coordinator = ChatCoordinator(
             orchestrator=orchestrator  # type: ignore[arg-type]

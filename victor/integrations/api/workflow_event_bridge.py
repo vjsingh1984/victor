@@ -49,16 +49,16 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.core.events import (
     ObservabilityBus,
     MessagingEvent,
-    UnifiedEventType,
     get_observability_bus,
     SubscriptionHandle,
 )
-from victor.workflows.streaming import WorkflowEventType, WorkflowStreamChunk
+from victor.workflows.streaming import WorkflowStreamChunk
 
 logger = logging.getLogger(__name__)
 
@@ -93,13 +93,13 @@ class WSMessage:
 
     type: WSMessageType
     workflow_id: Optional[str] = None
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "type": self.type.value,
             "timestamp": self.timestamp,
             "id": self.id,
@@ -170,10 +170,10 @@ class WorkflowEventBridge:
             event_bus: Optional ObservabilityBus instance
         """
         self._event_bus = event_bus
-        self._subscriptions: Dict[tuple[str, str], WorkflowSubscription] = {}
+        self._subscriptions: dict[tuple[str, str], WorkflowSubscription] = {}
         self._running = False
-        self._event_handlers: Dict[str, List[Callable[..., Any]]] = {}
-        self._event_subscriptions: List[SubscriptionHandle] = []
+        self._event_handlers: dict[str, list[Callable[..., Any]]] = {}
+        self._event_subscriptions: list[SubscriptionHandle] = []
 
     async def start(self) -> None:
         """Start the event bridge.
@@ -469,7 +469,7 @@ class WorkflowEventBridge:
         self,
         workflow_id: str,
         event_type: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> None:
         """Broadcast a workflow event to all subscribers.
 
@@ -517,7 +517,7 @@ class WorkflowEventBridge:
             return sum(1 for (wid, _) in self._subscriptions.keys() if wid == workflow_id)
         return len(self._subscriptions)
 
-    def get_workflow_ids(self) -> List[str]:
+    def get_workflow_ids(self) -> list[str]:
         """Get list of workflow IDs with active subscribers.
 
         Returns:
@@ -528,7 +528,7 @@ class WorkflowEventBridge:
 
 def workflow_stream_chunk_to_ws_event(
     chunk: WorkflowStreamChunk,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Convert WorkflowStreamChunk to WebSocket event format.
 
     Args:

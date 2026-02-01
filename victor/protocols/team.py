@@ -40,18 +40,16 @@ from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 # Import types from victor.teams.types (canonical location for types)
 # Use TYPE_CHECKING to avoid circular import during module initialization
 if TYPE_CHECKING:
-    from victor.teams.types import AgentMessage, MemberResult, TeamFormation, TeamResult
+    from victor.teams.types import AgentMessage, TeamFormation
 else:
     # Import at runtime but use lazy loading to avoid circular dependency
     def __getattr__(name: str):
@@ -89,7 +87,7 @@ class IAgent(Protocol):
         """Role of this agent (IAgentRole, SubAgentRole, or any type)."""
         ...
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> Any:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> Any:
         """Execute a task and return the result.
 
         Args:
@@ -119,7 +117,7 @@ class ITeamMember(IAgent, Protocol):
         """Persona of this member (IAgentPersona or None)."""
         ...
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> Any:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> Any:
         """Execute a task and return the result.
 
         Args:
@@ -173,7 +171,7 @@ class ITeamCoordinator(Protocol):
         """
         ...
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> dict[str, Any]:
         """Execute a task with the team.
 
         Args:
@@ -185,7 +183,7 @@ class ITeamCoordinator(Protocol):
         """
         ...
 
-    async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
+    async def broadcast(self, message: AgentMessage) -> list[Optional[AgentMessage]]:
         """Broadcast a message to all team members.
 
         Args:

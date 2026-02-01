@@ -17,13 +17,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from victor.agent.multimodal.audio_agent import AudioAgent, Transcription
-from victor.agent.multimodal.vision_agent import ImageAnalysis, VisionAgent
-from victor.config.settings import Settings
+from victor.agent.multimodal.audio_agent import AudioAgent
+from victor.agent.multimodal.vision_agent import VisionAgent
 from tests.factories import MockProviderFactory
 
 
@@ -521,7 +520,7 @@ class TestMultimodalRealWorldScenarios:
     @pytest.mark.asyncio
     async def test_analyze_screenshot(self, tmp_path):
         """Test analyzing a screenshot (common use case)."""
-        from PIL import Image, ImageDraw, ImageFont
+        from PIL import Image, ImageDraw
 
         # Create a fake screenshot with text
         img = Image.new("RGB", (800, 600), color="white")

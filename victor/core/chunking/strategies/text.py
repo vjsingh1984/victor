@@ -15,9 +15,8 @@
 """Text chunking strategy with sentence boundary awareness."""
 
 import re
-from typing import List, Optional
 
-from victor.core.chunking.base import Chunk, ChunkingConfig, ChunkingStrategy
+from victor.core.chunking.base import Chunk, ChunkingStrategy
 
 
 class TextChunkingStrategy(ChunkingStrategy):
@@ -42,10 +41,10 @@ class TextChunkingStrategy(ChunkingStrategy):
         return "text"
 
     @property
-    def supported_types(self) -> List[str]:
+    def supported_types(self) -> list[str]:
         return ["text", "txt", "log", "plain"]
 
-    def chunk(self, content: str) -> List[Chunk]:
+    def chunk(self, content: str) -> list[Chunk]:
         """Chunk text with sentence boundary awareness.
 
         Args:

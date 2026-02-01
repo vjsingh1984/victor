@@ -33,12 +33,12 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.executor import NodeResult, WorkflowContext
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def solution_quality_check(ctx: Dict[str, Any]) -> str:
+def solution_quality_check(ctx: dict[str, Any]) -> str:
     """Check solution quality based on multiple factors.
 
     Evaluates test pass rate, code quality metrics, and solution completeness.
@@ -97,7 +97,7 @@ def solution_quality_check(ctx: Dict[str, Any]) -> str:
     return "failed"
 
 
-def test_coverage_check(ctx: Dict[str, Any]) -> str:
+def test_coverage_check(ctx: dict[str, Any]) -> str:
     """Check if test coverage is sufficient for the solution.
 
     Evaluates line coverage, branch coverage, and edge case handling.
@@ -144,7 +144,7 @@ def test_coverage_check(ctx: Dict[str, Any]) -> str:
     return "sufficient"
 
 
-def complexity_check(ctx: Dict[str, Any]) -> str:
+def complexity_check(ctx: dict[str, Any]) -> str:
     """Assess problem complexity to adjust strategy.
 
     Evaluates code size, cyclomatic complexity, and problem domain.
@@ -201,7 +201,7 @@ def complexity_check(ctx: Dict[str, Any]) -> str:
 # =============================================================================
 
 
-def extract_patch(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def extract_patch(ctx: dict[str, Any]) -> dict[str, Any]:
     """Extract git diff/patch from generated code.
 
     Creates a unified diff format patch from the solution.
@@ -252,8 +252,8 @@ def extract_patch(ctx: Dict[str, Any]) -> Dict[str, Any]:
     deletions = sum(1 for line in diff_lines if line.startswith("-") and not line.startswith("---"))
 
     # Extract hunks (sections of changes)
-    hunks: List[str] = []
-    current_hunk: List[str] = []
+    hunks: list[str] = []
+    current_hunk: list[str] = []
     for line in diff_lines:
         if line.startswith("@@"):
             if current_hunk:
@@ -276,7 +276,7 @@ def extract_patch(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def merge_tool_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def merge_tool_results(ctx: dict[str, Any]) -> dict[str, Any]:
     """Combine results from multiple tool calls.
 
     Merges outputs from parallel tool executions into a unified result.
@@ -298,9 +298,9 @@ def merge_tool_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
     preserve_order = ctx.get("preserve_order", True)
     aggregate_errors = ctx.get("aggregate_errors", True)
 
-    combined_output: Dict[str, Any] = {}
-    errors: List[str] = []
-    execution_order: List[str] = []
+    combined_output: dict[str, Any] = {}
+    errors: list[str] = []
+    execution_order: list[str] = []
     all_success = True
 
     for result in tool_results:
@@ -338,7 +338,7 @@ def merge_tool_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def format_for_evaluation(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def format_for_evaluation(ctx: dict[str, Any]) -> dict[str, Any]:
     """Prepare output for test runner evaluation.
 
     Formats the solution and metadata for benchmark evaluation harness.
@@ -364,8 +364,8 @@ def format_for_evaluation(ctx: Dict[str, Any]) -> Dict[str, Any]:
     generation_metadata = ctx.get("generation_metadata", {})
 
     # Pre-validate the solution
-    validation_errors: List[str] = []
-    validation_warnings: List[str] = []
+    validation_errors: list[str] = []
+    validation_warnings: list[str] = []
 
     if not solution_code and not patch:
         validation_errors.append("No solution code or patch provided")
@@ -505,9 +505,9 @@ class RunTestsHandler:
                 duration_seconds=time.time() - start_time,
             )
 
-    def _parse_test_output(self, output: str, framework: str) -> Dict[str, Any]:
+    def _parse_test_output(self, output: str, framework: str) -> dict[str, Any]:
         """Parse test output to extract results."""
-        result: Dict[str, Any] = {"passed": 0, "failed": 0, "total": 0, "errors": []}
+        result: dict[str, Any] = {"passed": 0, "failed": 0, "total": 0, "errors": []}
 
         if framework == "pytest":
             # Parse pytest output: "5 passed, 2 failed"
@@ -621,9 +621,9 @@ class ValidatePatchHandler:
             tool_calls_used=1 if target_file else 0,
         )
 
-    def _validate_patch_syntax(self, patch: str) -> Dict[str, Any]:
+    def _validate_patch_syntax(self, patch: str) -> dict[str, Any]:
         """Validate patch syntax without applying."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "valid": True,
             "errors": [],
             "warnings": [],
@@ -670,7 +670,7 @@ class ValidatePatchHandler:
 # =============================================================================
 
 
-def test_execution_status(ctx: Dict[str, Any]) -> str:
+def test_execution_status(ctx: dict[str, Any]) -> str:
     """Determine test execution outcome.
 
     Args:
@@ -706,7 +706,7 @@ def test_execution_status(ctx: Dict[str, Any]) -> str:
     return "all_fail"
 
 
-def should_continue_fixing(ctx: Dict[str, Any]) -> str:
+def should_continue_fixing(ctx: dict[str, Any]) -> str:
     """Determine if agent should continue attempting fixes.
 
     Multi-factor decision based on iteration count, error patterns, and progress.
@@ -746,7 +746,7 @@ def should_continue_fixing(ctx: Dict[str, Any]) -> str:
     return "continue_fixing"
 
 
-def code_complexity_check(ctx: Dict[str, Any]) -> str:
+def code_complexity_check(ctx: dict[str, Any]) -> str:
     """Assess code complexity to determine approach.
 
     Wrapper around complexity_check that uses the naming expected by workflows.
@@ -763,7 +763,7 @@ def code_complexity_check(ctx: Dict[str, Any]) -> str:
     return result
 
 
-def verification_status(ctx: Dict[str, Any]) -> str:
+def verification_status(ctx: dict[str, Any]) -> str:
     """Check verification results for solution.
 
     Args:
@@ -791,7 +791,7 @@ def verification_status(ctx: Dict[str, Any]) -> str:
     return "failed"
 
 
-def escalation_decision(ctx: Dict[str, Any]) -> str:
+def escalation_decision(ctx: dict[str, Any]) -> str:
     """Handle escalation decision from HITL node.
 
     Args:
@@ -814,7 +814,7 @@ def escalation_decision(ctx: Dict[str, Any]) -> str:
     return "submit"
 
 
-def passk_progress_check(ctx: Dict[str, Any]) -> str:
+def passk_progress_check(ctx: dict[str, Any]) -> str:
     """Check pass@k generation progress.
 
     Determines if enough solutions have been generated or if more are needed.
@@ -860,7 +860,7 @@ def passk_progress_check(ctx: Dict[str, Any]) -> str:
 # =============================================================================
 
 
-def extract_error_patterns(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def extract_error_patterns(ctx: dict[str, Any]) -> dict[str, Any]:
     """Extract error patterns from test failures.
 
     Args:
@@ -873,7 +873,7 @@ def extract_error_patterns(ctx: Dict[str, Any]) -> Dict[str, Any]:
     test_results = ctx.get("test_results", {})
     error_output = test_results.get("raw_output", "")
 
-    patterns: Dict[str, List[str]] = {
+    patterns: dict[str, list[str]] = {
         "syntax_errors": [],
         "type_errors": [],
         "import_errors": [],
@@ -919,7 +919,7 @@ def extract_error_patterns(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def format_solution_output(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def format_solution_output(ctx: dict[str, Any]) -> dict[str, Any]:
     """Format solution output for benchmark submission.
 
     Args:

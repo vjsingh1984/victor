@@ -8,7 +8,7 @@ even when code has errors, making them useful for validation.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from ..types import (
     CodeValidationResult,
@@ -21,7 +21,7 @@ from ..types import (
 logger = logging.getLogger(__name__)
 
 # Language module mappings (shared with extractor)
-LANGUAGE_MODULES: Dict[str, Tuple[str, str]] = {
+LANGUAGE_MODULES: dict[str, tuple[str, str]] = {
     "python": ("tree_sitter_python", "language"),
     "javascript": ("tree_sitter_javascript", "language"),
     "typescript": ("tree_sitter_typescript", "language_typescript"),
@@ -71,8 +71,8 @@ class TreeSitterValidator:
     """
 
     def __init__(self) -> None:
-        self._parser_cache: Dict[str, Any] = {}
-        self._language_cache: Dict[str, Any] = {}
+        self._parser_cache: dict[str, Any] = {}
+        self._language_cache: dict[str, Any] = {}
         self._tree_sitter_available = self._check_tree_sitter()
 
     def _check_tree_sitter(self) -> bool:
@@ -253,7 +253,7 @@ class TreeSitterValidator:
         self,
         node: Any,
         max_errors: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Collect error nodes from parse tree.
 
@@ -264,14 +264,14 @@ class TreeSitterValidator:
         Returns:
             List of error dictionaries
         """
-        errors: List[Dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
         self._visit_errors(node, errors, max_errors)
         return errors
 
     def _visit_errors(
         self,
         node: Any,
-        errors: List[Dict[str, Any]],
+        errors: list[dict[str, Any]],
         max_errors: int,
     ) -> bool:
         """
@@ -350,7 +350,7 @@ class TreeSitterValidator:
                 return True
         return False
 
-    def get_supported_languages(self) -> List[str]:
+    def get_supported_languages(self) -> list[str]:
         """Get list of languages with known tree-sitter support."""
         return list(LANGUAGE_MODULES.keys())
 

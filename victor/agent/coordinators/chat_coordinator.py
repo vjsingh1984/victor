@@ -40,13 +40,13 @@ This design enables:
 
 import asyncio
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
+from collections.abc import AsyncIterator
 from unittest.mock import Mock
 
 from victor.framework.task import TaskComplexity
 from victor.agent.unified_task_tracker import TrackerTaskType
 from victor.agent.unified_classifier import ClassifierTaskType
-from victor.agent.response_completer import ToolFailureContext
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
 from victor.providers.base import CompletionResponse, StreamChunk
 from victor.core.errors import ProviderRateLimitError
@@ -57,7 +57,6 @@ if TYPE_CHECKING:
     from victor.agent.streaming.intent_classification import IntentClassificationHandler
     from victor.agent.streaming.continuation import ContinuationHandler
     from victor.agent.streaming.tool_execution import ToolExecutionHandler
-    from victor.agent.streaming import apply_tracking_state_updates, create_tracking_state
 
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
     from victor.protocols.agent import IAgentOrchestrator
@@ -117,7 +116,6 @@ class ChatCoordinator:
         Returns:
             CompletionResponse from the model with complete response
         """
-        from victor.providers.base import StreamChunk
 
         full_content = []
         tool_calls_list = []
@@ -391,7 +389,7 @@ class ChatCoordinator:
                     )
 
             # Initialize mentioned_tools_detected for later use in continuation action
-            mentioned_tools_detected: List[str] = []
+            mentioned_tools_detected: list[str] = []
 
             # Check for mentioned tools early for recovery integration
             from victor.agent.continuation_strategy import ContinuationStrategy
@@ -694,7 +692,7 @@ class ChatCoordinator:
         Any,
         float,
         float,
-        Dict[str, int],
+        dict[str, int],
         int,
         int,
         int,
@@ -720,7 +718,7 @@ class ChatCoordinator:
         total_tokens: float = 0
 
         # Cumulative token usage from provider
-        cumulative_usage: Dict[str, int] = {
+        cumulative_usage: dict[str, int] = {
             "prompt_tokens": 0,
             "completion_tokens": 0,
             "total_tokens": 0,
@@ -970,7 +968,7 @@ class ChatCoordinator:
                 return result
         return {}, 0  # Default: no classification, no complexity budget
 
-    def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
+    def _classify_task_keywords(self, user_message: str) -> dict[str, Any]:
         """Classify task based on keywords in the user message.
 
         Args:
@@ -1423,7 +1421,7 @@ class ChatCoordinator:
     async def _stream_provider_response(
         self,
         tools: Any,
-        provider_kwargs: Dict[str, Any],
+        provider_kwargs: dict[str, Any],
         stream_ctx: "StreamingChatContext",
     ) -> tuple[str, Any, float, bool]:
         """Stream response from provider with rate limit retry.
@@ -1462,7 +1460,7 @@ class ChatCoordinator:
     async def _stream_with_rate_limit_retry(
         self,
         tools: Any,
-        provider_kwargs: Dict[str, Any],
+        provider_kwargs: dict[str, Any],
         stream_ctx: "StreamingChatContext",
         max_retries: int = 3,
     ) -> tuple[str, Any, float, bool]:
@@ -1518,7 +1516,7 @@ class ChatCoordinator:
     async def _stream_provider_response_inner(
         self,
         tools: Any,
-        provider_kwargs: Dict[str, Any],
+        provider_kwargs: dict[str, Any],
         stream_ctx: "StreamingChatContext",
     ) -> tuple[str, Any, float, bool]:
         """Inner implementation of stream_provider_response without retry logic.
@@ -1756,7 +1754,6 @@ class ChatCoordinator:
         Yields:
             StreamChunk objects from tool execution
         """
-        from victor.agent.tool_call_extractor import ExtractedToolCall
         from victor.providers.base import StreamChunk
 
         orch = self._orch()
@@ -1805,7 +1802,7 @@ class ChatCoordinator:
             if execution_result.results:
                 for result in execution_result.results:
                     # ToolCallResult is a TypedDict, access fields directly
-                    result_dict = cast(Dict[str, Any], result)
+                    result_dict = cast(dict[str, Any], result)
                     tool_name = result_dict.get("name", extracted_call.tool_name)
                     output = result_dict.get("output", "")
                     error = result_dict.get("error")
@@ -2077,7 +2074,7 @@ class ChatCoordinator:
         stream_ctx: "StreamingChatContext",
         full_content: str,
         tool_calls: Any,
-        mentioned_tools: Optional[List[str]] = None,
+        mentioned_tools: Optional[list[str]] = None,
     ) -> Any:
         """Handle recovery using the recovery integration system.
 

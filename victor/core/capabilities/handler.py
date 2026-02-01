@@ -28,7 +28,7 @@ Design Pattern: Strategy + Template Method
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Protocol, TYPE_CHECKING
+from typing import Any, Optional, Protocol, TYPE_CHECKING
 
 from victor.core.capabilities.types import CapabilityDefinition
 
@@ -46,7 +46,7 @@ class VerticalContextProtocol(Protocol):
     VerticalContext implementation.
     """
 
-    def set_capability_config(self, name: str, config: Dict[str, Any]) -> None:
+    def set_capability_config(self, name: str, config: dict[str, Any]) -> None:
         """Store capability configuration.
 
         Args:
@@ -56,8 +56,8 @@ class VerticalContextProtocol(Protocol):
         ...
 
     def get_capability_config(
-        self, name: str, default: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, name: str, default: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """Retrieve capability configuration.
 
         Args:
@@ -110,7 +110,7 @@ class CapabilityHandler:
     def configure(
         self,
         context: VerticalContextProtocol,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         validate: bool = True,
     ) -> None:
         """Configure capability with provided settings.
@@ -141,8 +141,8 @@ class CapabilityHandler:
     def get_config(
         self,
         context: VerticalContextProtocol,
-        override: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        override: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """Get current configuration merged with defaults.
 
         Args:
@@ -179,7 +179,7 @@ class CapabilityHandler:
         stored = context.get_capability_config(self._name, None)
         return stored is not None
 
-    def validate(self, config: Dict[str, Any]) -> bool:
+    def validate(self, config: dict[str, Any]) -> bool:
         """Validate configuration without storing.
 
         Args:

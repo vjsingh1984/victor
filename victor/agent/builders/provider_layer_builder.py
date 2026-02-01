@@ -17,7 +17,7 @@
 Part of HIGH-005: Initialization Complexity reduction.
 """
 
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.builders.base import FactoryAwareBuilder
 
@@ -46,14 +46,14 @@ class ProviderLayerBuilder(FactoryAwareBuilder):
         model: str,
         provider_name: Optional[str],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build provider layer components and attach them to orchestrator."""
         factory = self._ensure_factory(
             provider=provider,
             model=model,
             provider_name=provider_name,
         )
-        components: Dict[str, Any] = {}
+        components: dict[str, Any] = {}
 
         # Tool calling matrix for managing provider capabilities (via factory)
         orchestrator.tool_calling_models, orchestrator.tool_capabilities = (

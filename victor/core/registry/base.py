@@ -14,7 +14,8 @@
 
 """Generic base registry implementation."""
 
-from typing import Dict, Generic, Iterator, List, Optional, TypeVar
+from typing import Generic, Optional, TypeVar
+from collections.abc import Iterator
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -45,7 +46,7 @@ class BaseRegistry(Generic[K, V]):
 
     def __init__(self) -> None:
         """Initialize the registry with an empty items dictionary."""
-        self._items: Dict[K, V] = {}
+        self._items: dict[K, V] = {}
 
     def register(self, key: K, value: V) -> None:
         """Register an item with the given key.
@@ -70,7 +71,7 @@ class BaseRegistry(Generic[K, V]):
         """
         return self._items.get(key)
 
-    def list_all(self) -> List[K]:
+    def list_all(self) -> list[K]:
         """List all registered keys.
 
         Returns:
@@ -133,7 +134,7 @@ class BaseRegistry(Generic[K, V]):
         """
         return iter(self._items)
 
-    def values(self) -> List[V]:
+    def values(self) -> list[V]:
         """Get all registered values.
 
         Returns:
@@ -141,7 +142,7 @@ class BaseRegistry(Generic[K, V]):
         """
         return list(self._items.values())
 
-    def items(self) -> List[tuple[K, V]]:
+    def items(self) -> list[tuple[K, V]]:
         """Get all key-value pairs.
 
         Returns:

@@ -14,7 +14,6 @@
 
 """Tests for DynamicCapabilityRegistry."""
 
-import pytest
 
 from victor.agent.capabilities.base import CapabilityBase, CapabilitySpec
 from victor.agent.capabilities.registry import DynamicCapabilityRegistry

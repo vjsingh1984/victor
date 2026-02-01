@@ -22,14 +22,13 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Optional
+from collections.abc import Callable
 from dataclasses import dataclass
-from copy import deepcopy
 import math
 
 from victor.optimization.workflow.models import (
     OptimizationOpportunity,
-    OptimizationStrategyType,
     WorkflowProfile,
 )
 from victor.optimization.workflow.generator import (
@@ -56,13 +55,13 @@ class OptimizationResult:
     best_score: float
     iterations: int
     converged: bool
-    score_history: Optional[List[float]] = None
+    score_history: Optional[list[float]] = None
 
     def __post_init__(self) -> None:
         if self.score_history is None:
             self.score_history = []
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "best_variant_id": self.best_variant.variant_id if self.best_variant else None,
@@ -99,7 +98,7 @@ class HillClimbingOptimizer:
     def __init__(
         self,
         variant_generator: Optional[WorkflowVariantGenerator] = None,
-        objective_weights: Optional[Dict[str, float]] = None,
+        objective_weights: Optional[dict[str, float]] = None,
     ):
         """Initialize the hill climbing optimizer.
 
@@ -118,9 +117,9 @@ class HillClimbingOptimizer:
 
     async def optimize_workflow(
         self,
-        workflow_config: Dict[str, Any],
+        workflow_config: dict[str, Any],
         profile: WorkflowProfile,
-        opportunities: List[OptimizationOpportunity],
+        opportunities: list[OptimizationOpportunity],
         max_iterations: int = 50,
         convergence_threshold: float = 0.01,
         score_function: Optional[Callable[[WorkflowVariant], float]] = None,
@@ -158,7 +157,7 @@ class HillClimbingOptimizer:
         score_history = [current_score]
 
         # Track which opportunities have been applied
-        applied_opportunities: List[int] = []
+        applied_opportunities: list[int] = []
 
         for iteration in range(max_iterations):
             logger.info(
@@ -253,11 +252,11 @@ class HillClimbingOptimizer:
 
     async def _generate_neighbors(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         profile: WorkflowProfile,
-        opportunities: List[OptimizationOpportunity],
-        applied_indices: List[int],
-    ) -> List[tuple[Dict[str, Any], int]]:
+        opportunities: list[OptimizationOpportunity],
+        applied_indices: list[int],
+    ) -> list[tuple[dict[str, Any], int]]:
         """Generate neighbor configurations.
 
         Args:
@@ -301,7 +300,7 @@ class HillClimbingOptimizer:
 
     def _evaluate_config(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         profile: WorkflowProfile,
         score_function: Optional[Callable[[WorkflowVariant], float]] = None,
     ) -> float:
@@ -389,9 +388,9 @@ class SimulatedAnnealingOptimizer:
 
     async def optimize_workflow(
         self,
-        workflow_config: Dict[str, Any],
+        workflow_config: dict[str, Any],
         profile: WorkflowProfile,
-        opportunities: List[OptimizationOpportunity],
+        opportunities: list[OptimizationOpportunity],
         score_function: Optional[Callable[[WorkflowVariant], float]] = None,
     ) -> OptimizationResult:
         """Optimize workflow using simulated annealing.
@@ -410,7 +409,7 @@ class SimulatedAnnealingOptimizer:
         )
 
         # Scoring function
-        def score_config(config: Dict[str, Any]) -> float:
+        def score_config(config: dict[str, Any]) -> float:
             variant = WorkflowVariant(
                 variant_id="temp",
                 base_workflow_id=profile.workflow_id,

@@ -41,7 +41,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class RequestCost:
     duration_seconds: float = 0.0
     tool_calls: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "request_id": self.request_id,
@@ -115,7 +115,7 @@ class SessionCostTracker:
     start_time: float = field(default_factory=time.time)
 
     # Per-request tracking
-    requests: List[RequestCost] = field(default_factory=list)
+    requests: list[RequestCost] = field(default_factory=list)
 
     # Cumulative totals
     total_prompt_tokens: int = 0
@@ -224,7 +224,7 @@ class SessionCostTracker:
 
         return request_cost
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get session cost summary.
 
         Returns:

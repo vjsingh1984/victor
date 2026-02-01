@@ -43,12 +43,9 @@ Example:
 from __future__ import annotations
 
 import logging
-import time
-from dataclasses import asdict
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.storage.memory.unified import (
-    MemoryProviderProtocol,
     MemoryQuery,
     MemoryResult,
     MemoryType,
@@ -56,7 +53,6 @@ from victor.storage.memory.unified import (
 
 if TYPE_CHECKING:
     from victor.storage.memory.entity_memory import EntityMemory
-    from victor.storage.memory.entity_graph import EntityGraph
     from victor.agent.conversation_memory import ConversationStore
 
 logger = logging.getLogger(__name__)
@@ -95,7 +91,7 @@ class EntityMemoryAdapter:
         """Return ENTITY memory type."""
         return MemoryType.ENTITY
 
-    async def search(self, query: MemoryQuery) -> List[MemoryResult]:
+    async def search(self, query: MemoryQuery) -> list[MemoryResult]:
         """Search entity memory.
 
         Args:
@@ -155,7 +151,7 @@ class EntityMemoryAdapter:
         self,
         key: str,
         value: Any,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Store entity in memory.
 
@@ -211,7 +207,7 @@ class EntityMemoryAdapter:
         """Check if entity memory is available."""
         return self._available and self._memory._initialized
 
-    def _entity_to_dict(self, entity: Any) -> Dict[str, Any]:
+    def _entity_to_dict(self, entity: Any) -> dict[str, Any]:
         """Convert entity to dictionary for serialization."""
         return {
             "id": entity.id,
@@ -272,7 +268,7 @@ class ConversationMemoryAdapter:
         """
         self._session_id = session_id
 
-    async def search(self, query: MemoryQuery) -> List[MemoryResult]:
+    async def search(self, query: MemoryQuery) -> list[MemoryResult]:
         """Search conversation history.
 
         Uses semantic search if available, falls back to keyword matching.
@@ -354,7 +350,7 @@ class ConversationMemoryAdapter:
         self,
         key: str,
         value: Any,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Store message in conversation.
 
@@ -449,7 +445,7 @@ class GraphMemoryAdapter:
         """Return GRAPH memory type."""
         return MemoryType.GRAPH
 
-    async def search(self, query: MemoryQuery) -> List[MemoryResult]:
+    async def search(self, query: MemoryQuery) -> list[MemoryResult]:
         """Search entity relationships.
 
         The query is interpreted as an entity ID to find related entities.
@@ -525,7 +521,7 @@ class GraphMemoryAdapter:
         self,
         key: str,
         value: Any,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Store relationship in graph.
 
@@ -603,7 +599,7 @@ class ToolResultsMemoryAdapter:
         """Set the session ID for queries."""
         self._session_id = session_id
 
-    async def search(self, query: MemoryQuery) -> List[MemoryResult]:
+    async def search(self, query: MemoryQuery) -> list[MemoryResult]:
         """Search tool results.
 
         Args:
@@ -676,7 +672,7 @@ class ToolResultsMemoryAdapter:
         self,
         key: str,
         value: Any,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Store tool result (delegates to conversation store)."""
         pass  # Tool results are stored via normal message flow

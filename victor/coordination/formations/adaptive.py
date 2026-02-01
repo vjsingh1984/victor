@@ -65,7 +65,7 @@ from __future__ import annotations
 import logging
 import time
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.types import AgentMessage, MemberResult
@@ -128,7 +128,7 @@ class AdaptiveFormation(BaseFormationStrategy):
         max_switches: int = 3,
         performance_threshold: float = 0.5,
         max_duration_seconds: float = 60.0,
-        formation_cycle: Optional[List[str]] = None,
+        formation_cycle: Optional[list[str]] = None,
     ):
         """Initialize the adaptive formation.
 
@@ -161,16 +161,16 @@ class AdaptiveFormation(BaseFormationStrategy):
         self._current_formation: Optional[BaseFormationStrategy] = None
         self._current_formation_name: Optional[str] = None
         self._formation_index: int = 0
-        self._formation_history: List[Dict[str, Any]] = []
+        self._formation_history: list[dict[str, Any]] = []
         self._switch_count: int = 0
-        self._performance_scores: Dict[str, List[float]] = {}
+        self._performance_scores: dict[str, list[float]] = {}
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute task with adaptive formation switching.
 
         Args:
@@ -341,7 +341,7 @@ class AdaptiveFormation(BaseFormationStrategy):
             logger.warning(f"Unknown formation {formation_name}, using sequential")
             return SequentialFormation()
 
-    def _evaluate_performance(self, results: List[MemberResult], duration: float) -> float:
+    def _evaluate_performance(self, results: list[MemberResult], duration: float) -> float:
         """Evaluate performance of execution.
 
         Args:
@@ -376,7 +376,7 @@ class AdaptiveFormation(BaseFormationStrategy):
             return float(quality_score)
 
     def _should_switch_formation(
-        self, performance_score: float, results: List[MemberResult]
+        self, performance_score: float, results: list[MemberResult]
     ) -> bool:
         """Determine if formation should be switched.
 
@@ -419,7 +419,7 @@ class AdaptiveFormation(BaseFormationStrategy):
             f"(switch {self._switch_count}/{self.max_switches})"
         )
 
-    def _extract_result(self, results: List[MemberResult]) -> Any:
+    def _extract_result(self, results: list[MemberResult]) -> Any:
         """Extract result from MemberResult list.
 
         Args:
@@ -473,7 +473,7 @@ class AdaptiveFormation(BaseFormationStrategy):
         """
         return True
 
-    def get_performance_summary(self) -> Dict[str, Any]:
+    def get_performance_summary(self) -> dict[str, Any]:
         """Get summary of performance across all formations tried.
 
         Returns:

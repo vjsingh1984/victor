@@ -34,7 +34,7 @@ Usage:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, List, Protocol, Type, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
@@ -80,7 +80,7 @@ class ServiceProviderProtocol(Protocol):
         """
         ...
 
-    def get_required_services(self) -> List[Type[Any]]:
+    def get_required_services(self) -> list[type[Any]]:
         """Get list of required service types.
 
         Used for validation that all dependencies are registered.
@@ -90,7 +90,7 @@ class ServiceProviderProtocol(Protocol):
         """
         return []
 
-    def get_optional_services(self) -> List[Type[Any]]:
+    def get_optional_services(self) -> list[type[Any]]:
         """Get list of optional service types.
 
         These are used if available but not required.

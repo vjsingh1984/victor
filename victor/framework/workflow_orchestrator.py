@@ -60,22 +60,17 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 import uuid
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Dict,
-    List,
     Optional,
 )
+from collections.abc import AsyncIterator
 
 from victor.framework.protocols import (
-    ChatResultProtocol,
-    ChatResult,
     MutableChatState,
 )
 from victor.providers.base import CompletionResponse, StreamChunk
@@ -122,7 +117,7 @@ class WorkflowOrchestrator:
         """
         self._workflow_coordinator = workflow_coordinator
         self._graph_coordinator = graph_coordinator
-        self._sessions: Dict[str, MutableChatState] = {}
+        self._sessions: dict[str, MutableChatState] = {}
 
     async def chat(
         self,
@@ -316,7 +311,7 @@ class WorkflowOrchestrator:
             logger.error(f"Workflow streaming failed: {e}", exc_info=True)
             raise RuntimeError(f"Workflow streaming failed: {e}") from e
 
-    def get_available_workflows(self) -> List[str]:
+    def get_available_workflows(self) -> list[str]:
         """Get list of available chat workflows.
 
         Returns:
@@ -364,7 +359,7 @@ class WorkflowOrchestrator:
         message: str,
         session_state: MutableChatState,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Prepare initial state for workflow execution.
 
         Args:

@@ -24,8 +24,7 @@ Total: 70+ tests targeting 75%+ coverage
 """
 
 from datetime import datetime, timedelta
-from typing import Dict, List
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock
 import uuid
 
 import numpy as np
@@ -88,7 +87,7 @@ def sample_episode() -> Episode:
 
 
 @pytest.fixture
-def sample_episodes() -> List[Episode]:
+def sample_episodes() -> list[Episode]:
     """Create multiple sample episodes for testing."""
     episodes = []
     for i in range(10):

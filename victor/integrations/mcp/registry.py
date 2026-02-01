@@ -26,7 +26,8 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from pydantic import BaseModel, Field
 
@@ -50,15 +51,15 @@ class MCPServerConfig(BaseModel):
     """Configuration for an MCP server."""
 
     name: str = Field(description="Unique server identifier")
-    command: List[str] = Field(description="Command to start the server")
+    command: list[str] = Field(description="Command to start the server")
     description: str = Field(default="", description="Server description")
     auto_connect: bool = Field(default=True, description="Connect on registry start")
     health_check_interval: int = Field(default=30, description="Health check interval in seconds")
     max_retries: int = Field(default=3, description="Max reconnection attempts")
     retry_delay: int = Field(default=5, description="Delay between retries in seconds")
     enabled: bool = Field(default=True, description="Whether server is enabled")
-    tags: List[str] = Field(default_factory=list, description="Server tags for filtering")
-    env: Dict[str, str] = Field(default_factory=dict, description="Environment variables")
+    tags: list[str] = Field(default_factory=list, description="Server tags for filtering")
+    env: dict[str, str] = Field(default_factory=dict, description="Environment variables")
 
 
 @dataclass
@@ -71,8 +72,8 @@ class ServerEntry:
     last_health_check: float = 0.0
     consecutive_failures: int = 0
     error_message: Optional[str] = None
-    tools_cache: List[MCPTool] = field(default_factory=list)
-    resources_cache: List[MCPResource] = field(default_factory=list)
+    tools_cache: list[MCPTool] = field(default_factory=list)
+    resources_cache: list[MCPResource] = field(default_factory=list)
 
 
 class MCPRegistry:
@@ -107,13 +108,13 @@ class MCPRegistry:
             health_check_enabled: Enable automatic health monitoring
             default_health_interval: Default health check interval in seconds
         """
-        self._servers: Dict[str, ServerEntry] = {}
-        self._tool_to_server: Dict[str, str] = {}  # tool_name -> server_name
+        self._servers: dict[str, ServerEntry] = {}
+        self._tool_to_server: dict[str, str] = {}  # tool_name -> server_name
         self._health_check_enabled = health_check_enabled
         self._default_health_interval = default_health_interval
         self._health_task: Optional[asyncio.Task[None]] = None
         self._running = False
-        self._event_callbacks: List[Callable[[str, str, Any], None]] = []
+        self._event_callbacks: list[Callable[[str, str, Any], None]] = []
 
     def register_server(self, config: MCPServerConfig) -> None:
         """Register an MCP server configuration.
@@ -244,7 +245,7 @@ class MCPRegistry:
         self._emit_event("disconnected", name, None)
         return True
 
-    async def connect_all(self) -> Dict[str, bool]:
+    async def connect_all(self) -> dict[str, bool]:
         """Connect to all registered servers with auto_connect=True.
 
         Returns:
@@ -407,7 +408,7 @@ class MCPRegistry:
 
         return await entry.client.call_tool(tool_name, **arguments)
 
-    def get_all_tools(self) -> List[MCPTool]:
+    def get_all_tools(self) -> list[MCPTool]:
         """Get all tools from all connected servers.
 
         Returns:
@@ -419,7 +420,7 @@ class MCPRegistry:
                 tools.extend(entry.tools_cache)
         return tools
 
-    def get_all_resources(self) -> List[MCPResource]:
+    def get_all_resources(self) -> list[MCPResource]:
         """Get all resources from all connected servers.
 
         Returns:
@@ -450,7 +451,7 @@ class MCPRegistry:
 
         return next((t for t in entry.tools_cache if t.name == name), None)
 
-    def get_tools_by_server(self, server_name: str) -> List[MCPTool]:
+    def get_tools_by_server(self, server_name: str) -> list[MCPTool]:
         """Get tools from a specific server.
 
         Args:
@@ -464,7 +465,7 @@ class MCPRegistry:
             return []
         return entry.tools_cache
 
-    def get_tools_by_tag(self, tag: str) -> List[MCPTool]:
+    def get_tools_by_tag(self, tag: str) -> list[MCPTool]:
         """Get tools from servers with a specific tag.
 
         Args:
@@ -481,7 +482,7 @@ class MCPRegistry:
 
     # Status and discovery methods
 
-    def get_server_status(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_server_status(self, name: str) -> Optional[dict[str, Any]]:
         """Get status of a specific server.
 
         Args:
@@ -506,7 +507,7 @@ class MCPRegistry:
             "tags": entry.config.tags,
         }
 
-    def get_registry_status(self) -> Dict[str, Any]:
+    def get_registry_status(self) -> dict[str, Any]:
         """Get overall registry status.
 
         Returns:
@@ -538,7 +539,7 @@ class MCPRegistry:
             "running": self._running,
         }
 
-    def list_servers(self) -> List[str]:
+    def list_servers(self) -> list[str]:
         """List all registered server names.
 
         Returns:
@@ -614,7 +615,7 @@ class MCPRegistry:
         from victor.config.settings import get_project_paths
 
         registry = cls()
-        search_paths: List[Path] = []
+        search_paths: list[Path] = []
         paths = get_project_paths()
 
         # Priority order of config locations
@@ -669,7 +670,7 @@ class MCPRegistry:
         return registry
 
     @classmethod
-    def _discover_claude_desktop_servers(cls) -> List[MCPServerConfig]:
+    def _discover_claude_desktop_servers(cls) -> list[MCPServerConfig]:
         """Discover MCP servers configured in Claude Desktop.
 
         Claude Desktop stores MCP server config in:
@@ -683,7 +684,7 @@ class MCPRegistry:
         import json
         import platform
 
-        servers: List[MCPServerConfig] = []
+        servers: list[MCPServerConfig] = []
 
         try:
             from victor.config.secure_paths import get_secure_home
@@ -694,7 +695,7 @@ class MCPRegistry:
 
         # Platform-specific Claude Desktop config locations
         system = platform.system()
-        config_paths: List[Path] = []
+        config_paths: list[Path] = []
 
         if system == "Darwin":  # macOS
             config_paths.append(
@@ -744,7 +745,7 @@ class MCPRegistry:
         return servers
 
     @classmethod
-    def _discover_mcp_executables(cls) -> List[MCPServerConfig]:
+    def _discover_mcp_executables(cls) -> list[MCPServerConfig]:
         """Discover well-known MCP server executables in PATH.
 
         Searches for common MCP server packages that may be installed:
@@ -756,10 +757,10 @@ class MCPRegistry:
         """
         import shutil
 
-        servers: List[MCPServerConfig] = []
+        servers: list[MCPServerConfig] = []
 
         # Well-known MCP server executables and their configurations
-        known_servers: Dict[str, Dict[str, Any]] = {
+        known_servers: dict[str, dict[str, Any]] = {
             # NPM-based servers (typically installed globally)
             "mcp-server-filesystem": {
                 "description": "MCP Filesystem Server - file operations",
@@ -863,7 +864,7 @@ class MCPRegistry:
         return servers
 
     @classmethod
-    def list_discovered_servers(cls) -> Dict[str, Any]:
+    def list_discovered_servers(cls) -> dict[str, Any]:
         """List all discoverable MCP servers without connecting.
 
         This is useful for showing users what servers are available
@@ -872,7 +873,7 @@ class MCPRegistry:
         Returns:
             Dictionary with discovered servers organized by source
         """
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "config_files": [],
             "claude_desktop": [],
             "executables": [],

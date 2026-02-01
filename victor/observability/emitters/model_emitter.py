@@ -29,9 +29,8 @@ Migration Notes:
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.observability.emitters.base import IModelEventEmitter
 from victor.core.events import ObservabilityBus, SyncEventWrapper
@@ -105,7 +104,7 @@ class ModelEventEmitter(IModelEventEmitter):
     async def emit_async(
         self,
         topic: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> bool:
         """Emit a model event asynchronously.
 
@@ -136,8 +135,8 @@ class ModelEventEmitter(IModelEventEmitter):
 
     def emit(
         self,
-        event: Union["MessagingEvent", str],
-        data: Optional[Dict[str, Any]] = None,
+        event: "MessagingEvent" | str,
+        data: Optional[dict[str, Any]] = None,
         *,
         topic: Optional[str] = None,
     ) -> None:
@@ -177,8 +176,8 @@ class ModelEventEmitter(IModelEventEmitter):
 
     def emit_safe(
         self,
-        event: Union["MessagingEvent", str],
-        data: Optional[Dict[str, Any]] = None,
+        event: "MessagingEvent" | str,
+        data: Optional[dict[str, Any]] = None,
         *,
         topic: Optional[str] = None,
     ) -> bool:

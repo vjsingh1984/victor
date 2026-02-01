@@ -22,11 +22,8 @@ Target: 70%+ coverage for orchestrator_factory.py
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
-import pytest
 
 from victor.agent.orchestrator_factory import (
     OrchestratorFactory,
@@ -34,7 +31,6 @@ from victor.agent.orchestrator_factory import (
 )
 from tests.factories import (
     MockProviderFactory,
-    TestFixtureFactory,
     TestSettingsBuilder,
 )
 

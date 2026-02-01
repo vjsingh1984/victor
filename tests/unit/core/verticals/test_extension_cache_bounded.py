@@ -22,9 +22,7 @@ Tests that the extension cache:
 """
 
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from unittest.mock import MagicMock
 
 import pytest
 

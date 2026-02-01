@@ -50,7 +50,7 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.framework.config import SafetyEnforcer, SafetyLevel, SafetyRule
 
@@ -66,7 +66,7 @@ def create_git_safety_rules(
     block_force_push: bool = True,
     block_main_push: bool = True,
     require_tests_before_commit: bool = False,
-    protected_branches: Optional[List[str]] = None,
+    protected_branches: Optional[list[str]] = None,
 ) -> None:
     """Register git-specific safety rules.
 
@@ -136,7 +136,7 @@ def create_file_operation_safety_rules(
     enforcer: SafetyEnforcer,
     *,
     block_destructive_commands: bool = True,
-    protected_patterns: Optional[List[str]] = None,
+    protected_patterns: Optional[list[str]] = None,
 ) -> None:
     """Register file operation safety rules.
 
@@ -197,7 +197,7 @@ def create_deployment_safety_rules(
     *,
     require_approval_for_production: bool = True,
     require_backup_before_deploy: bool = True,
-    protected_environments: Optional[List[str]] = None,
+    protected_environments: Optional[list[str]] = None,
     enable_rollback: bool = True,
 ) -> None:
     """Register deployment-specific safety rules.
@@ -328,7 +328,7 @@ def create_infrastructure_safety_rules(
     *,
     block_destructive_commands: bool = True,
     require_state_backup: bool = True,
-    protected_resources: Optional[List[str]] = None,
+    protected_resources: Optional[list[str]] = None,
 ) -> None:
     """Register infrastructure-specific safety rules.
 
@@ -510,7 +510,7 @@ def create_source_credibility_safety_rules(
     *,
     block_low_credibility_sources: bool = True,
     require_source_verification: bool = False,
-    blocked_domains: Optional[List[str]] = None,
+    blocked_domains: Optional[list[str]] = None,
 ) -> None:
     """Register research source credibility safety rules.
 
@@ -671,7 +671,7 @@ def create_bulk_operation_safety_rules(
     *,
     block_bulk_delete: bool = True,
     block_delete_all: bool = True,
-    protected_collections: Optional[List[str]] = None,
+    protected_collections: Optional[list[str]] = None,
 ) -> None:
     """Register bulk operation safety rules.
 

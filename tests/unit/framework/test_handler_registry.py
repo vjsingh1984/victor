@@ -15,7 +15,7 @@
 """Unit tests for HandlerRegistry."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from victor.framework.handler_registry import (
     HandlerEntry,
@@ -505,11 +505,11 @@ class TestHandlerDecoratorClass:
         """Decorator should register handler with registry."""
         from victor.framework.handler_registry import handler_decorator
         from dataclasses import dataclass
-        from typing import Any, Tuple
+        from typing import Any
 
         @dataclass
         class MockHandler:
-            async def execute(self, node, context, registry) -> Tuple[Any, int]:
+            async def execute(self, node, context, registry) -> tuple[Any, int]:
                 return {}, 0
 
         # Apply decorator
@@ -523,11 +523,11 @@ class TestHandlerDecoratorClass:
         """Decorator should return the class unchanged."""
         from victor.framework.handler_registry import handler_decorator
         from dataclasses import dataclass
-        from typing import Any, Tuple
+        from typing import Any
 
         @dataclass
         class MockHandler:
-            async def execute(self, node, context, registry) -> Tuple[Any, int]:
+            async def execute(self, node, context, registry) -> tuple[Any, int]:
                 return {}, 0
 
         # Apply decorator
@@ -578,11 +578,11 @@ class TestHandlerDecoratorClass:
         """Decorator should register a handler instance, not class."""
         from victor.framework.handler_registry import handler_decorator
         from dataclasses import dataclass
-        from typing import Any, Tuple
+        from typing import Any
 
         @dataclass
         class MockHandler:
-            async def execute(self, node, context, registry) -> Tuple[Any, int]:
+            async def execute(self, node, context, registry) -> tuple[Any, int]:
                 return {"result": "test"}, 1
 
         handler_decorator("instance_handler")(MockHandler)
@@ -626,12 +626,12 @@ class TestHandlerDecoratorClass:
         """Decorator should work as inline decorator."""
         from victor.framework.handler_registry import handler_decorator
         from dataclasses import dataclass
-        from typing import Any, Tuple
+        from typing import Any
 
         @handler_decorator("inline_handler", vertical="test")
         @dataclass
         class InlineHandler:
-            async def execute(self, node, context, registry) -> Tuple[Any, int]:
+            async def execute(self, node, context, registry) -> tuple[Any, int]:
                 return {}, 0
 
         registry = get_handler_registry()

@@ -32,13 +32,12 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 
 from victor.observability.performance_collector import (
-    PerformanceMetricsCollector,
     get_performance_collector,
 )
 
@@ -54,7 +53,7 @@ router = APIRouter(prefix="/api/performance", tags=["performance"])
 
 
 @router.get("/summary")
-async def get_performance_summary() -> Dict[str, Any]:
+async def get_performance_summary() -> dict[str, Any]:
     """Get overall performance metrics summary.
 
     Returns:
@@ -70,7 +69,7 @@ async def get_performance_summary() -> Dict[str, Any]:
 
 
 @router.get("/cache")
-async def get_cache_metrics() -> Dict[str, Any]:
+async def get_cache_metrics() -> dict[str, Any]:
     """Get cache performance metrics.
 
     Returns:
@@ -90,7 +89,7 @@ async def get_cache_metrics() -> Dict[str, Any]:
 
 
 @router.get("/providers")
-async def get_provider_metrics() -> Dict[str, Any]:
+async def get_provider_metrics() -> dict[str, Any]:
     """Get provider pool performance metrics.
 
     Returns:
@@ -110,7 +109,7 @@ async def get_provider_metrics() -> Dict[str, Any]:
 
 
 @router.get("/tools")
-async def get_tool_metrics() -> Dict[str, Any]:
+async def get_tool_metrics() -> dict[str, Any]:
     """Get tool execution performance metrics.
 
     Returns:
@@ -131,7 +130,7 @@ async def get_tool_metrics() -> Dict[str, Any]:
 
 
 @router.get("/system")
-async def get_system_metrics() -> Dict[str, Any]:
+async def get_system_metrics() -> dict[str, Any]:
     """Get system resource metrics.
 
     Returns:
@@ -151,7 +150,7 @@ async def get_system_metrics() -> Dict[str, Any]:
 
 
 @router.get("/bootstrap")
-async def get_bootstrap_metrics() -> Dict[str, Any]:
+async def get_bootstrap_metrics() -> dict[str, Any]:
     """Get bootstrap and startup performance metrics.
 
     Returns:

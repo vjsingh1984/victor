@@ -40,11 +40,11 @@ Usage:
 
 import asyncio
 import logging
-import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
-from victor.benchmark.agent import BenchmarkAgent, BenchmarkAgentConfig, ExecutionTrace
+from victor.benchmark.agent import BenchmarkAgent, BenchmarkAgentConfig
 from victor.evaluation.protocol import (
     BenchmarkTask,
     EvaluationConfig,
@@ -89,7 +89,7 @@ async def create_agent_callback(
     else:
         agent = await BenchmarkAgent.create(provider, model, config)
 
-    async def agent_callback(task: BenchmarkTask) -> Dict[str, Any]:
+    async def agent_callback(task: BenchmarkTask) -> dict[str, Any]:
         """Execute a single benchmark task.
 
         Returns dict with code and metrics for harness compatibility.
@@ -199,7 +199,7 @@ class HighLevelEvaluationRunner:
         self.profile = profile
         self.config = config
         self._agent: Optional[BenchmarkAgent] = None
-        self._results: List[TaskResult] = []
+        self._results: list[TaskResult] = []
 
     async def __aenter__(self) -> "HighLevelEvaluationRunner":
         """Context manager entry - create agent."""
@@ -268,10 +268,10 @@ class HighLevelEvaluationRunner:
 
     async def run_all(
         self,
-        tasks: List[BenchmarkTask],
+        tasks: list[BenchmarkTask],
         workspace_manager: Optional[Any] = None,
         progress_callback: Optional[Callable[[int, int, TaskResult], None]] = None,
-    ) -> List[TaskResult]:
+    ) -> list[TaskResult]:
         """Run all benchmark tasks.
 
         Args:
@@ -309,7 +309,7 @@ class HighLevelEvaluationRunner:
             self._agent = None
 
     @property
-    def results(self) -> List[TaskResult]:
+    def results(self) -> list[TaskResult]:
         """Get all collected results."""
         return self._results
 
@@ -331,7 +331,7 @@ class HighLevelEvaluationRunner:
         """Calculate total tool calls."""
         return sum(r.tool_calls for r in self._results)
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get summary metrics for all results."""
         if not self._results:
             return {}

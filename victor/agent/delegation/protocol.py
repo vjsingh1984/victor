@@ -28,7 +28,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 class DelegationPriority(Enum):
@@ -100,9 +100,9 @@ class DelegationRequest:
     from_agent: str = "main"
     suggested_role: Optional[str] = None
     priority: DelegationPriority = DelegationPriority.NORMAL
-    required_tools: Optional[List[str]] = None
+    required_tools: Optional[list[str]] = None
     tool_budget: int = 10
-    context: Optional[Dict[str, Any]] = None
+    context: Optional[dict[str, Any]] = None
     deadline_seconds: Optional[float] = None
     await_result: bool = True
     parent_goal: Optional[str] = None
@@ -117,7 +117,7 @@ class DelegationRequest:
         if self.deadline_seconds is not None and self.deadline_seconds <= 0:
             raise ValueError("Deadline must be positive")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "delegation_id": self.delegation_id,
@@ -134,7 +134,7 @@ class DelegationRequest:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DelegationRequest":
+    def from_dict(cls, data: dict[str, Any]) -> "DelegationRequest":
         """Create from dictionary."""
         priority_str = data.get("priority", "normal")
         priority = DelegationPriority(priority_str)
@@ -186,14 +186,14 @@ class DelegationResponse:
     error: Optional[str] = None
     tool_calls_used: int = 0
     duration_seconds: float = 0.0
-    discoveries: List[str] = field(default_factory=list)
+    discoveries: list[str] = field(default_factory=list)
 
     @property
     def success(self) -> bool:
         """Check if delegation completed successfully."""
         return self.accepted and self.status == DelegationStatus.COMPLETED
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "delegation_id": self.delegation_id,
@@ -208,7 +208,7 @@ class DelegationResponse:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DelegationResponse":
+    def from_dict(cls, data: dict[str, Any]) -> "DelegationResponse":
         """Create from dictionary."""
         status_str = data.get("status", "pending")
         status = DelegationStatus(status_str)

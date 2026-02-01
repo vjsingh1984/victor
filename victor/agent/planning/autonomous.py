@@ -42,12 +42,12 @@ Example Usage:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
 import uuid
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Optional
+from collections.abc import Callable
 
 from victor.agent.planning.base import (
     ExecutionPlan,
@@ -131,7 +131,7 @@ class AutonomousPlanner:
         self.sub_agent_orchestrator = sub_agent_orchestrator
         self.approval_callback = approval_callback or self._default_approval
         self.active_plan: Optional[ExecutionPlan] = None
-        self._plan_history: List[ExecutionPlan] = []
+        self._plan_history: list[ExecutionPlan] = []
 
         logger.info("AutonomousPlanner initialized")
 
@@ -410,7 +410,6 @@ class AutonomousPlanner:
         progress_callback: Optional[Callable[[PlanStep, StepStatus], None]],
     ) -> None:
         """Execute plan steps in parallel using sub-agents."""
-        from victor.agent.subagents import SubAgentRole
 
         SubAgentTask = getattr(
             __import__("victor.agent.subagents", fromlist=["SubAgentTask"]), "SubAgentTask", None
@@ -573,7 +572,7 @@ class AutonomousPlanner:
         """Get the currently active plan, if any."""
         return self.active_plan
 
-    def get_plan_history(self) -> List[ExecutionPlan]:
+    def get_plan_history(self) -> list[ExecutionPlan]:
         """Get all plans created in this session."""
         return self._plan_history.copy()
 

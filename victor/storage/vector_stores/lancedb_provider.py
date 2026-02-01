@@ -29,7 +29,7 @@ For embedding models:
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 try:
     import lancedb  # type: ignore[import-untyped]
@@ -290,7 +290,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             raise RuntimeError("LanceDB table not initialized. Call initialize() first.")
         return self.table  # type: ignore[unreachable]
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding for single text.
 
         Args:
@@ -306,7 +306,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             raise RuntimeError("Embedding model not initialized")
         return await self.embedding_model.embed_text(text)
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for batch of texts.
 
         Args:
@@ -326,7 +326,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         self,
         doc_id: str,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Index a single document.
 
@@ -358,7 +358,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             table = self._ensure_table()  # type: ignore[unreachable]
             table.add([document])
 
-    async def index_documents(self, documents: List[Dict[str, Any]]) -> None:
+    async def index_documents(self, documents: list[dict[str, Any]]) -> None:
         """Index multiple documents in batch.
 
         Args:
@@ -398,8 +398,8 @@ class LanceDBProvider(BaseEmbeddingProvider):
         self,
         query: str,
         limit: int = 5,
-        filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[EmbeddingSearchResult]:
+        filter_metadata: Optional[dict[str, Any]] = None,
+    ) -> list[EmbeddingSearchResult]:
         """Search for similar documents.
 
         Args:
@@ -514,7 +514,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         self.table = None
         print("🗑️  Cleared index")
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get index statistics.
 
         Returns:

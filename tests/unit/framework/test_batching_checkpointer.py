@@ -5,8 +5,8 @@ Tests the batching checkpoint wrapper for reducing I/O pressure.
 
 import asyncio
 import time
-from typing import List, Optional
-from unittest.mock import AsyncMock, MagicMock
+from typing import Optional
+from unittest.mock import AsyncMock
 
 import pytest
 

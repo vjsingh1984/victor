@@ -28,13 +28,11 @@ Topic Mapping Reference (OLD -> NEW):
 from __future__ import annotations
 
 import logging
-from typing import Dict, Tuple
 
-from victor.core.events.protocols import MessagingEvent
 
 # Migration complete - VictorEvent and EventCategory have been removed
 # TOPIC_MAPPING kept for reference only
-TOPIC_MAPPING: Dict[str, str] = {
+TOPIC_MAPPING: dict[str, str] = {
     # Tool events
     "tool.start": "tool.start",
     "tool.complete": "tool.result",

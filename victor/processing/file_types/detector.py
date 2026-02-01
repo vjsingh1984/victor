@@ -41,11 +41,10 @@ Example usage:
     ))
 """
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
 
 class FileCategory(Enum):
@@ -95,12 +94,12 @@ class FileType:
 
     name: str
     display_name: str = ""
-    extensions: List[str] = field(default_factory=list)
-    filenames: List[str] = field(default_factory=list)
-    shebangs: List[str] = field(default_factory=list)
-    mime_types: List[str] = field(default_factory=list)
+    extensions: list[str] = field(default_factory=list)
+    filenames: list[str] = field(default_factory=list)
+    shebangs: list[str] = field(default_factory=list)
+    mime_types: list[str] = field(default_factory=list)
     category: FileCategory = FileCategory.UNKNOWN
-    aliases: List[str] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.display_name:
@@ -172,9 +171,9 @@ class FileTypeRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry with built-in types."""
-        self._types: Dict[str, FileType] = {}
-        self._extension_map: Dict[str, str] = {}  # ext -> type name
-        self._filename_map: Dict[str, str] = {}  # filename -> type name
+        self._types: dict[str, FileType] = {}
+        self._extension_map: dict[str, str] = {}  # ext -> type name
+        self._filename_map: dict[str, str] = {}  # filename -> type name
         self._register_builtin_types()
 
     @classmethod
@@ -275,7 +274,7 @@ class FileTypeRegistry:
 
         return None
 
-    def get_by_category(self, category: FileCategory) -> List[FileType]:
+    def get_by_category(self, category: FileCategory) -> list[FileType]:
         """Get all file types in a category.
 
         Args:
@@ -299,7 +298,7 @@ class FileTypeRegistry:
         name = self._extension_map.get(ext.lower())
         return self._types.get(name) if name else None
 
-    def list_all(self) -> List[FileType]:
+    def list_all(self) -> list[FileType]:
         """List all registered file types.
 
         Returns:

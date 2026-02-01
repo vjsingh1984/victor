@@ -22,7 +22,8 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class ModelSwitchEvent:
     timestamp: datetime = field(default_factory=datetime.now)
     context_preserved: bool = True
     message_count: int = 0  # Messages at time of switch
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -65,7 +66,7 @@ class ModelInfo:
     supports_streaming: bool = True
     cost_per_1k_input: float = 0.0
     cost_per_1k_output: float = 0.0
-    capabilities: List[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     is_local: bool = False
 
     @property
@@ -88,10 +89,10 @@ class ModelSwitcher:
         """Initialize the model switcher."""
         self._current_provider: Optional[str] = None
         self._current_model: Optional[str] = None
-        self._switch_history: List[ModelSwitchEvent] = []
-        self._callbacks: List[Callable[[ModelSwitchEvent], None]] = []
-        self._available_models: Dict[str, ModelInfo] = {}
-        self._fallback_chain: List[str] = []
+        self._switch_history: list[ModelSwitchEvent] = []
+        self._callbacks: list[Callable[[ModelSwitchEvent], None]] = []
+        self._available_models: dict[str, ModelInfo] = {}
+        self._fallback_chain: list[str] = []
         self._message_count: int = 0
 
         # Register default models
@@ -233,7 +234,7 @@ class ModelSwitcher:
         provider: str,
         model: str,
         reason: SwitchReason = SwitchReason.USER_REQUEST,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> bool:
         """Switch to a different model.
 
@@ -331,7 +332,7 @@ class ModelSwitcher:
 
         return None
 
-    def get_switch_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_switch_history(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent switch history.
 
         Args:
@@ -358,7 +359,7 @@ class ModelSwitcher:
         provider: Optional[str] = None,
         local_only: bool = False,
         capability: Optional[str] = None,
-    ) -> List[ModelInfo]:
+    ) -> list[ModelInfo]:
         """Get list of available models.
 
         Args:
@@ -390,7 +391,7 @@ class ModelSwitcher:
         """
         self._callbacks.append(callback)
 
-    def set_fallback_chain(self, models: List[str]) -> None:
+    def set_fallback_chain(self, models: list[str]) -> None:
         """Set fallback chain for error recovery.
 
         Args:
@@ -505,7 +506,7 @@ class ModelSwitcher:
 
         return candidates[0]
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current switcher status.
 
         Returns:

@@ -35,19 +35,19 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, List, Optional, Type
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from typing import Protocol as TypingProtocol
 else:
     # For runtime, we need a placeholder
-    TypingProtocol = Type[object]  # type: ignore
+    TypingProtocol = type[object]  # type: ignore
 
 logger = logging.getLogger(__name__)
 
 # Known vertical protocols that can be auto-detected
 # These are the protocols commonly implemented by verticals
-KNOWN_VERTICAL_PROTOCOLS: List[Type[object]] = []
+KNOWN_VERTICAL_PROTOCOLS: list[type[object]] = []
 
 
 def _load_known_protocols() -> None:
@@ -90,9 +90,9 @@ def _load_known_protocols() -> None:
 
 
 def get_implemented_protocols(
-    cls: Type[Any],
-    protocols: List[Type[object]],
-) -> List[Type[object]]:
+    cls: type[Any],
+    protocols: list[type[object]],
+) -> list[type[object]]:
     """Detect which protocols a class implements.
 
     Uses isinstance checking with runtime_checkable protocols to
@@ -119,7 +119,7 @@ def get_implemented_protocols(
     return implemented
 
 
-def _class_implements_protocol(cls: Type[Any], protocol: Type[object]) -> bool:
+def _class_implements_protocol(cls: type[Any], protocol: type[object]) -> bool:
     """Check if a class implements a protocol.
 
     This performs a structural check to see if the class has the
@@ -151,9 +151,9 @@ def _class_implements_protocol(cls: Type[Any], protocol: Type[object]) -> bool:
 
 
 def register_protocols(
-    cls: Optional[Type[Any]] = None,
+    cls: Optional[type[Any]] = None,
     *,
-    protocols: Optional[List[Type[object]]] = None,
+    protocols: Optional[list[type[object]]] = None,
     auto_detect: bool = True,
 ) -> Any:  # Returns the class decorator or the decorated class
     """Class decorator for automatic protocol registration.
@@ -186,12 +186,12 @@ def register_protocols(
         Decorated class (unchanged)
     """
 
-    def decorator(cls: Type[Any]) -> Type[Any]:
+    def decorator(cls: type[Any]) -> type[Any]:
         # Lazy load known protocols
         _load_known_protocols()
 
         # Determine protocols to register
-        protocols_to_register: List[Type[object]] = []
+        protocols_to_register: list[type[object]] = []
 
         # Add explicit protocols
         if protocols:

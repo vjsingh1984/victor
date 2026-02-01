@@ -31,7 +31,8 @@ import logging
 import subprocess
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 from victor.config.timeouts import McpTimeouts
 
@@ -73,7 +74,7 @@ class MCPClient:
         max_reconnect_attempts: int = 3,
         reconnect_delay: int = 5,
         sandbox_config: Optional["SandboxConfig"] = None,
-        command: Optional[List[str]] = None,
+        command: Optional[list[str]] = None,
     ):
         """Initialize MCP client.
 
@@ -99,8 +100,8 @@ class MCPClient:
         self.client_info = MCPClientInfo(name=name, version=version)
 
         self.server_info: Optional[MCPServerInfo] = None
-        self.tools: List[MCPTool] = []
-        self.resources: List[MCPResource] = []
+        self.tools: list[MCPTool] = []
+        self.resources: list[MCPResource] = []
 
         self.process: Optional[subprocess.Popen[str]] = None
         self.initialized = False
@@ -116,19 +117,19 @@ class MCPClient:
         self._sandboxed_process: Optional["SandboxedProcess"] = None
 
         # Connection state
-        self._command: Optional[List[str]] = command  # Store for reconnection and context manager
+        self._command: Optional[list[str]] = command  # Store for reconnection and context manager
         self._last_health_check: float = 0.0
         self._consecutive_failures: int = 0
         self._health_task: Optional[asyncio.Task[None]] = None
         self._running = False
-        self._auto_connect_command: Optional[List[str]] = command  # For context manager
+        self._auto_connect_command: Optional[list[str]] = command  # For context manager
 
         # Event callbacks
-        self._on_connect_callbacks: List[Callable[[], None]] = []
-        self._on_disconnect_callbacks: List[Callable[[Optional[str]], None]] = []
-        self._on_health_change_callbacks: List[Callable[[bool], None]] = []
+        self._on_connect_callbacks: list[Callable[[], None]] = []
+        self._on_disconnect_callbacks: list[Callable[[Optional[str]], None]] = []
+        self._on_health_change_callbacks: list[Callable[[bool], None]] = []
 
-    async def connect(self, command: List[str]) -> bool:
+    async def connect(self, command: list[str]) -> bool:
         """Connect to MCP server via stdio.
 
         Args:
@@ -252,7 +253,7 @@ class MCPClient:
         if self._sandboxed_process is not None and self.process is not None:
             try:
                 # Try to get running loop and schedule cleanup
-                _loop = asyncio.get_running_loop()  # noqa: F841
+                _loop = asyncio.get_running_loop()
                 # If we're in an async context, schedule the cleanup
                 asyncio.create_task(self._sandboxed_process.terminate(self.process))
             except RuntimeError:
@@ -297,7 +298,7 @@ class MCPClient:
 
         return False
 
-    async def refresh_tools(self) -> List[MCPTool]:
+    async def refresh_tools(self) -> list[MCPTool]:
         """Refresh list of available tools from server.
 
         Returns:
@@ -315,7 +316,7 @@ class MCPClient:
 
         return []
 
-    async def refresh_resources(self) -> List[MCPResource]:
+    async def refresh_resources(self) -> list[MCPResource]:
         """Refresh list of available resources from server.
 
         Returns:
@@ -412,8 +413,8 @@ class MCPClient:
         return None
 
     async def _send_request(
-        self, method: MCPMessageType, params: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        self, method: MCPMessageType, params: dict[str, Any]
+    ) -> Optional[dict[str, Any]]:
         """Send request to MCP server.
 
         Args:
@@ -516,7 +517,7 @@ class MCPClient:
         if self._sandboxed_process is not None and self.process is not None:
             try:
                 # Try to get running loop and schedule cleanup
-                _loop = asyncio.get_running_loop()  # noqa: F841
+                _loop = asyncio.get_running_loop()
                 asyncio.create_task(self._sandboxed_process.terminate(self.process))
             except RuntimeError:
                 # No running loop, we're in sync context
@@ -822,7 +823,7 @@ class MCPClient:
         """
         return next((r for r in self.resources if r.uri == uri), None)
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get client status.
 
         Returns:

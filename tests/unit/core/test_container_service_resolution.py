@@ -23,10 +23,9 @@ Target: 60%+ coverage for container.py
 
 from __future__ import annotations
 
-import concurrent.futures
 import threading
 import time
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -90,7 +89,7 @@ class SimpleCache(ICache):
     """Test cache implementation."""
 
     def __init__(self) -> None:
-        self._storage: Dict[str, Any] = {}
+        self._storage: dict[str, Any] = {}
 
     def get(self, key: str) -> Any:
         return self._storage.get(key)

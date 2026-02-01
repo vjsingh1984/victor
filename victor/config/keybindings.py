@@ -5,14 +5,14 @@ and support for user-defined keybindings.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Optional
 
 
 # =============================================================================
 # DEFAULT KEYBINDINGS
 # =============================================================================
 
-DEFAULT_KEYBINDINGS: Dict[str, str] = {
+DEFAULT_KEYBINDINGS: dict[str, str] = {
     # Navigation
     "quit": "ctrl+c",
     "clear": "ctrl+l",
@@ -49,7 +49,7 @@ DEFAULT_KEYBINDINGS: Dict[str, str] = {
 # KEYBINDING PRESETS
 # =============================================================================
 
-VIM_PRESET: Dict[str, str] = {
+VIM_PRESET: dict[str, str] = {
     **DEFAULT_KEYBINDINGS,
     "quit": "ctrl+q",
     "clear": "ctrl+d",
@@ -59,7 +59,7 @@ VIM_PRESET: Dict[str, str] = {
 }
 
 
-EMACS_PRESET: Dict[str, str] = {
+EMACS_PRESET: dict[str, str] = {
     **DEFAULT_KEYBINDINGS,
     "quit": "ctrl+x,ctrl+c",
     "clear": "ctrl+x,k",
@@ -82,7 +82,7 @@ class KeybindingConfig:
         preset_name: Name of the preset (if any)
     """
 
-    bindings: Dict[str, str]
+    bindings: dict[str, str]
     preset_name: Optional[str] = None
 
     def get_binding(self, action: str) -> Optional[str]:
@@ -114,7 +114,7 @@ class KeybindingConfig:
         if action in self.bindings:
             del self.bindings[action]
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         """Convert to dictionary.
 
         Returns:
@@ -124,7 +124,7 @@ class KeybindingConfig:
 
     @classmethod
     def from_dict(
-        cls, bindings: Dict[str, str], preset_name: Optional[str] = None
+        cls, bindings: dict[str, str], preset_name: Optional[str] = None
     ) -> "KeybindingConfig":
         """Create from dictionary.
 
@@ -142,14 +142,14 @@ class KeybindingConfig:
 # PRESET REGISTRY
 # =============================================================================
 
-KEYBINDING_PRESETS: Dict[str, Dict[str, str]] = {
+KEYBINDING_PRESETS: dict[str, dict[str, str]] = {
     "default": DEFAULT_KEYBINDINGS,
     "vim": VIM_PRESET,
     "emacs": EMACS_PRESET,
 }
 
 
-def get_preset(name: str) -> Dict[str, str]:
+def get_preset(name: str) -> dict[str, str]:
     """Get a keybinding preset by name.
 
     Args:
@@ -190,7 +190,7 @@ def list_presets() -> list[str]:
     return list(KEYBINDING_PRESETS.keys())
 
 
-def register_preset(name: str, bindings: Dict[str, str]) -> None:
+def register_preset(name: str, bindings: dict[str, str]) -> None:
     """Register a custom keybinding preset.
 
     Args:
@@ -309,7 +309,7 @@ def validate_binding(binding: str) -> bool:
     return True
 
 
-def validate_bindings(bindings: Dict[str, str]) -> tuple[bool, list[str]]:
+def validate_bindings(bindings: dict[str, str]) -> tuple[bool, list[str]]:
     """Validate a dictionary of bindings.
 
     Args:

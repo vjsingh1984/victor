@@ -16,7 +16,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.storage.memory.entity_types import Entity, EntityRelation, EntityType
 
@@ -32,16 +32,16 @@ class ExtractionResult:
         metadata: Additional extraction metadata
     """
 
-    entities: List[Entity] = field(default_factory=list)
-    relations: List[EntityRelation] = field(default_factory=list)
+    entities: list[Entity] = field(default_factory=list)
+    relations: list[EntityRelation] = field(default_factory=list)
     confidence: float = 1.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def merge(self, other: "ExtractionResult") -> "ExtractionResult":
         """Merge with another extraction result."""
         # Deduplicate entities by ID
-        seen_ids: Set[str] = set()
-        merged_entities: List[Entity] = []
+        seen_ids: set[str] = set()
+        merged_entities: list[Entity] = []
 
         for entity in self.entities + other.entities:
             if entity.id not in seen_ids:
@@ -49,8 +49,8 @@ class ExtractionResult:
                 merged_entities.append(entity)
 
         # Deduplicate relations by ID
-        seen_rel_ids: Set[str] = set()
-        merged_relations: List[EntityRelation] = []
+        seen_rel_ids: set[str] = set()
+        merged_relations: list[EntityRelation] = []
 
         for relation in self.relations + other.relations:
             if relation.id not in seen_rel_ids:
@@ -64,7 +64,7 @@ class ExtractionResult:
             metadata={**self.metadata, **other.metadata},
         )
 
-    def filter_by_type(self, entity_types: Set[EntityType]) -> "ExtractionResult":
+    def filter_by_type(self, entity_types: set[EntityType]) -> "ExtractionResult":
         """Filter entities by type."""
         filtered = [e for e in self.entities if e.entity_type in entity_types]
         return ExtractionResult(
@@ -100,7 +100,7 @@ class EntityExtractor(ABC):
 
     @property
     @abstractmethod
-    def supported_types(self) -> Set[EntityType]:
+    def supported_types(self) -> set[EntityType]:
         """Entity types this extractor can identify."""
         ...
 
@@ -109,7 +109,7 @@ class EntityExtractor(ABC):
         self,
         content: str,
         source: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ExtractionResult:
         """Extract entities from content.
 

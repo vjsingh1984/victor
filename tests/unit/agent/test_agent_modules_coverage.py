@@ -8,8 +8,6 @@ Focuses on modules that are 90%+ covered and just need a few more tests:
 - observability.py (93%, 10 uncovered)
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.agent.error_recovery import ErrorRecoveryAction, ErrorRecoveryHandler, RecoveryResult
 from victor.agent.output_deduplicator import OutputDeduplicator, StreamingDeduplicator

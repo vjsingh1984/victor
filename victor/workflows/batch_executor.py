@@ -45,10 +45,7 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
     Generic,
-    List,
     Optional,
     Protocol,
     TypeVar,
@@ -105,7 +102,7 @@ class BatchConfig:
     fail_fast: bool = False
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BatchConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "BatchConfig":
         """Create config from dictionary (e.g., from YAML metadata)."""
         retry_str = data.get("retry_strategy", "end_of_batch")
         retry_strategy = (
@@ -124,7 +121,7 @@ class BatchConfig:
             fail_fast=data.get("fail_fast", False),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "batch_size": self.batch_size,
@@ -215,7 +212,7 @@ class BatchProgress:
             return 100.0
         return (self.completed + self.failed) / self.total * 100
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "total": self.total,
@@ -248,7 +245,7 @@ class BatchResult(Generic[T]):
         error: Error message if aborted
     """
 
-    items: List[BatchItemResult[T]] = field(default_factory=list)
+    items: list[BatchItemResult[T]] = field(default_factory=list)
     total_duration: float = 0.0
     total_successful: int = 0
     total_failed: int = 0
@@ -265,15 +262,15 @@ class BatchResult(Generic[T]):
         """Check if batch had any successful items."""
         return self.total_successful > 0
 
-    def get_successful_results(self) -> List["WorkflowResult"]:
+    def get_successful_results(self) -> list["WorkflowResult"]:
         """Get all successful workflow results."""
         return [item.result for item in self.items if item.success and item.result]
 
-    def get_failed_inputs(self) -> List[T]:
+    def get_failed_inputs(self) -> list[T]:
         """Get inputs that failed."""
         return [item.input for item in self.items if item.status == ItemStatus.FAILED]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "total_duration": round(self.total_duration, 2),
@@ -335,12 +332,12 @@ class BatchWorkflowExecutor(Generic[T]):
         self.workflow_executor = workflow_executor
         self.config = config or BatchConfig()
         self._cancelled = False
-        self._active_tasks: Dict[str, asyncio.Task[Any]] = {}
+        self._active_tasks: dict[str, asyncio.Task[Any]] = {}
 
     async def execute_batch(
         self,
         workflow: "WorkflowDefinition",
-        inputs: List[T],
+        inputs: list[T],
         *,
         on_progress: Optional[ProgressCallback] = None,
         config_override: Optional[BatchConfig] = None,
@@ -378,11 +375,11 @@ class BatchWorkflowExecutor(Generic[T]):
         )
 
         # Initialize results
-        item_results: List[BatchItemResult[T]] = [
+        item_results: list[BatchItemResult[T]] = [
             BatchItemResult(input=inp, status=ItemStatus.PENDING) for inp in inputs
         ]
 
-        retry_queue: List[int] = []  # Indices of items to retry
+        retry_queue: list[int] = []  # Indices of items to retry
         semaphore = asyncio.Semaphore(config.max_concurrent)
 
         logger.info(
@@ -476,13 +473,13 @@ class BatchWorkflowExecutor(Generic[T]):
     async def _execute_batch_items(
         self,
         workflow: "WorkflowDefinition",
-        item_results: List[BatchItemResult[T]],
-        indices: List[int],
+        item_results: list[BatchItemResult[T]],
+        indices: list[int],
         semaphore: asyncio.Semaphore,
         config: BatchConfig,
         progress: BatchProgress,
         on_progress: Optional[ProgressCallback],
-        retry_queue: List[int],
+        retry_queue: list[int],
     ) -> None:
         """Execute a batch of items concurrently.
 
@@ -577,7 +574,7 @@ class BatchWorkflowExecutor(Generic[T]):
         error: str,
         config: BatchConfig,
         progress: BatchProgress,
-        retry_queue: List[int],
+        retry_queue: list[int],
     ) -> None:
         """Handle a failed item execution.
 
@@ -628,8 +625,8 @@ class BatchWorkflowExecutor(Generic[T]):
     async def _process_retry_queue(
         self,
         workflow: "WorkflowDefinition",
-        item_results: List[BatchItemResult[T]],
-        retry_queue: List[int],
+        item_results: list[BatchItemResult[T]],
+        retry_queue: list[int],
         semaphore: asyncio.Semaphore,
         config: BatchConfig,
         progress: BatchProgress,

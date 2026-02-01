@@ -21,7 +21,8 @@ multi-line suggestions (Copilot-style).
 import logging
 import time
 import typing
-from typing import Any, AsyncGenerator, AsyncIterator, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 from victor.processing.completion.protocol import (
     CompletionCapabilities,

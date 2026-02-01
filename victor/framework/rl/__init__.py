@@ -161,7 +161,7 @@ class LearnerStats:
     total_records: int = 0
     success_rate: float = 0.0
     last_updated: Optional[float] = None
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -177,7 +177,7 @@ class RLStats:
 
     total_outcomes: int = 0
     active_learners: int = 0
-    learner_stats: Dict[str, LearnerStats] = field(default_factory=dict)
+    learner_stats: dict[str, LearnerStats] = field(default_factory=dict)
     database_path: Optional[str] = None
 
 
@@ -251,7 +251,7 @@ class RLManager:
 
     def record_outcome(
         self,
-        learner: Union[LearnerType, str],
+        learner: LearnerType | str,
         outcome: RLOutcome,
         *,
         vertical: str = "general",
@@ -272,13 +272,13 @@ class RLManager:
 
     def record_success(
         self,
-        learner: Union[LearnerType, str],
+        learner: LearnerType | str,
         *,
         provider: str = "unknown",
         model: str = "unknown",
         task_type: str = "general",
         quality_score: float = 1.0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         vertical: str = "coding",
     ) -> None:
         """Record a successful outcome.
@@ -307,14 +307,14 @@ class RLManager:
 
     def record_failure(
         self,
-        learner: Union[LearnerType, str],
+        learner: LearnerType | str,
         *,
         provider: str = "unknown",
         model: str = "unknown",
         task_type: str = "general",
         quality_score: float = 0.0,
         error: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         vertical: str = "coding",
     ) -> None:
         """Record a failed outcome.
@@ -351,7 +351,7 @@ class RLManager:
 
     def get_recommendation(
         self,
-        learner: Union[LearnerType, str],
+        learner: LearnerType | str,
         *,
         provider: Optional[str] = None,
         model: Optional[str] = None,
@@ -393,9 +393,9 @@ class RLManager:
         self,
         task_type: str,
         *,
-        available_tools: Optional[List[str]] = None,
+        available_tools: Optional[list[str]] = None,
         vertical: str = "coding",
-    ) -> Optional[List[str]]:
+    ) -> Optional[list[str]]:
         """Get recommended tools for a task type.
 
         Convenience method for tool selection recommendations.
@@ -477,7 +477,7 @@ class RLManager:
 
         return stats
 
-    def get_learner_stats(self, learner: Union[LearnerType, str]) -> Optional[LearnerStats]:
+    def get_learner_stats(self, learner: LearnerType | str) -> Optional[LearnerStats]:
         """Get statistics for a specific learner.
 
         Args:
@@ -494,7 +494,7 @@ class RLManager:
     # Learner Management
     # =========================================================================
 
-    def list_learners(self) -> List[str]:
+    def list_learners(self) -> list[str]:
         """List all registered learners.
 
         Returns:
@@ -506,7 +506,7 @@ class RLManager:
 
     def reset_learner(
         self,
-        learner: Union[LearnerType, str],
+        learner: LearnerType | str,
         *,
         vertical: Optional[str] = None,
     ) -> None:
@@ -536,7 +536,7 @@ def create_outcome(
     model: str = "unknown",
     task_type: str = "general",
     quality_score: Optional[float] = None,
-    metadata: Optional[Dict[str, Any]] = None,
+    metadata: Optional[dict[str, Any]] = None,
     vertical: str = "coding",
 ) -> RLOutcome:
     """Create an RLOutcome.
@@ -591,7 +591,7 @@ def record_tool_success(
         vertical: Vertical context
     """
     coordinator = get_rl_coordinator()
-    metadata: Dict[str, Any] = {"tool": tool_name}
+    metadata: dict[str, Any] = {"tool": tool_name}
     if duration_ms is not None:
         metadata["duration_ms"] = duration_ms
 

@@ -31,7 +31,6 @@ Migrated from: victor/codebase/semantic_threshold_learner.py
 """
 
 import logging
-import sqlite3
 from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation

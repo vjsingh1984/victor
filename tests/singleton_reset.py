@@ -28,7 +28,8 @@ Design Principles:
 from __future__ import annotations
 
 import logging
-from typing import Callable, List, Optional
+from typing import Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class SingletonResetRegistry:
     """
 
     def __init__(self) -> None:
-        self._reset_functions: List[Callable[[], None]] = []
+        self._reset_functions: list[Callable[[], None]] = []
         self._initialized = False
 
     def register(self, reset_fn: Callable[[], None]) -> None:

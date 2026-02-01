@@ -50,18 +50,17 @@ Usage:
     healthy = await manager.get_healthy_providers()
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, cast
+from typing import Any, Optional, cast
+from collections.abc import Callable
 
 from victor.agent.model_switcher import ModelSwitcher, SwitchReason, ModelSwitchEvent
-from victor.agent.tool_calling import ToolCallingAdapterRegistry, ToolCallingCapabilities
+from victor.agent.tool_calling import ToolCallingCapabilities
 from victor.agent.provider import (
     ProviderSwitcher,
     ProviderHealthMonitor,
     ToolAdapterCoordinator,
-    ProviderSwitcherState,
 )
 from victor.agent.strategies import DefaultProviderClassificationStrategy
 from victor.core.errors import (
@@ -93,7 +92,7 @@ class ProviderManagerConfig:
     enable_health_checks: bool = True
     health_check_interval: float = 60.0
     auto_fallback: bool = True
-    fallback_providers: List[str] = field(default_factory=list)
+    fallback_providers: list[str] = field(default_factory=list)
     max_fallback_attempts: int = 3
 
 
@@ -222,10 +221,10 @@ class ProviderManager:
             )
 
         # Callbacks for provider changes
-        self._on_switch_callbacks: List[Callable[[ProviderState], None]] = []
+        self._on_switch_callbacks: list[Callable[[ProviderState], None]] = []
 
         # Runtime capability cache (per provider/model)
-        self._capability_cache: Dict[tuple[str, str], ProviderRuntimeCapabilities] = {}
+        self._capability_cache: dict[tuple[str, str], ProviderRuntimeCapabilities] = {}
 
         logger.debug(
             f"ProviderManager initialized: {self._current_state.provider_name if self._current_state else 'none'}"
@@ -779,7 +778,7 @@ class ProviderManager:
         except Exception as e:
             logger.debug(f"Model selected event emission failed: {e}")
 
-    def get_info(self) -> Dict[str, Any]:
+    def get_info(self) -> dict[str, Any]:
         """Get information about current provider and model.
 
         Returns:
@@ -806,7 +805,7 @@ class ProviderManager:
             "is_healthy": self._current_state.is_healthy,
         }
 
-    def get_switch_history(self) -> List[ModelSwitchEvent]:
+    def get_switch_history(self) -> list[ModelSwitchEvent]:
         """Get history of provider/model switches.
 
         Returns:
@@ -827,7 +826,7 @@ class ProviderManager:
         self._provider_switcher.on_switch(callback)  # type: ignore[arg-type]
 
     # IProviderEventEmitter implementation
-    def emit_switch_event(self, event: Dict[str, Any]) -> None:
+    def emit_switch_event(self, event: dict[str, Any]) -> None:
         """Emit provider switch event.
 
         Implementation of IProviderEventEmitter protocol.
@@ -1008,7 +1007,7 @@ class ProviderManager:
         self._health_check_task = None
         logger.debug("Stopped provider health monitoring")
 
-    async def get_healthy_providers(self) -> List[str]:
+    async def get_healthy_providers(self) -> list[str]:
         """Get list of healthy providers.
 
         Delegates to ProviderHealthMonitor.

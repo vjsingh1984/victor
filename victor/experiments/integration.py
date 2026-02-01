@@ -30,7 +30,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from victor.experiments import ExperimentTracker, ActiveRun, get_experiment_tracker
 
@@ -90,7 +90,7 @@ class WorkflowExperimentTracker:
         self,
         workflow_name: str,
         workflow_path: Optional[str] = None,
-        params: Optional[Dict[str, Any]] = None,
+        params: Optional[dict[str, Any]] = None,
     ) -> ActiveRun:
         """Called when a workflow execution starts.
 
@@ -138,7 +138,7 @@ class WorkflowExperimentTracker:
     def on_workflow_complete(
         self,
         run: ActiveRun,
-        result: Optional[Dict[str, Any]] = None,
+        result: Optional[dict[str, Any]] = None,
         error: Optional[Exception] = None,
     ) -> None:
         """Called when a workflow execution completes.

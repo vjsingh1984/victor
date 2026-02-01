@@ -54,7 +54,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Protocol, runtime_checkable
+from typing import Any, Optional, TYPE_CHECKING, Protocol, runtime_checkable
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.agent.provider.switcher import ProviderSwitcher
@@ -106,7 +107,7 @@ class SwitchContext:
     reason: str
     switch_type: str  # 'provider' or 'model'
     respect_sticky_budget: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @runtime_checkable
@@ -203,9 +204,9 @@ class ProviderSwitchCoordinator:
         self._provider_switcher = provider_switcher
         self._health_monitor = health_monitor
         # Legacy callback-based hooks (for backward compatibility)
-        self._post_switch_hooks: List[Callable[[Any], None]] = []
+        self._post_switch_hooks: list[Callable[[Any], None]] = []
         # New priority-ordered protocol-based hooks
-        self._registered_hooks: List[RegisteredHook] = []
+        self._registered_hooks: list[RegisteredHook] = []
         # Track current provider/model for context
         self._current_provider: Optional[str] = None
         self._current_model: Optional[str] = None
@@ -398,7 +399,7 @@ class ProviderSwitchCoordinator:
 
         return True, None
 
-    def get_switch_history(self) -> List[Dict[str, Any]]:
+    def get_switch_history(self) -> list[dict[str, Any]]:
         """Get history of provider/model switches.
 
         Returns:
@@ -478,7 +479,7 @@ class ProviderSwitchCoordinator:
             logger.debug(f"Unregistered hook '{name}'")
         return removed
 
-    def list_hooks(self) -> List[tuple[str, int]]:
+    def list_hooks(self) -> list[tuple[str, int]]:
         """List registered hooks with their priorities.
 
         Returns:
@@ -513,7 +514,6 @@ class ProviderSwitchCoordinator:
         Args:
             context: Switch context with old/new provider/model info
         """
-        import asyncio
         import inspect
 
         # Execute legacy hooks first (for backward compatibility)

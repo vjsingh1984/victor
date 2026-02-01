@@ -73,7 +73,7 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -133,14 +133,14 @@ class ToolCluster(BaseModel):
     """
 
     name: str = Field(..., description="Cluster identifier name")
-    tools: List[str] = Field(
+    tools: list[str] = Field(
         default_factory=list,
         description="List of tool names in this cluster",
     )
 
     @field_validator("tools")
     @classmethod
-    def validate_tools_list(cls, v: List[str]) -> List[str]:
+    def validate_tools_list(cls, v: list[str]) -> list[str]:
         """Validate tools list is non-empty and contains valid names."""
         if not v:
             raise ValueError("Cluster must contain at least one tool")
@@ -167,14 +167,14 @@ class ToolSequence(BaseModel):
     """
 
     name: str = Field(..., description="Sequence identifier name")
-    tools: List[str] = Field(
+    tools: list[str] = Field(
         default_factory=list,
         description="Ordered list of tool names in sequence",
     )
 
     @field_validator("tools")
     @classmethod
-    def validate_tools_sequence(cls, v: List[str]) -> List[str]:
+    def validate_tools_sequence(cls, v: list[str]) -> list[str]:
         """Validate tools sequence is non-empty."""
         if not v:
             raise ValueError("Sequence must contain at least one tool")
@@ -203,11 +203,11 @@ class ToolDependencyEntry(BaseModel):
     """
 
     tool: str = Field(..., description="Tool name for this dependency")
-    depends_on: List[str] = Field(
+    depends_on: list[str] = Field(
         default_factory=list,
         description="Tools that should be called before this one",
     )
-    enables: List[str] = Field(
+    enables: list[str] = Field(
         default_factory=list,
         description="Tools enabled after this one succeeds",
     )
@@ -228,7 +228,7 @@ class ToolDependencyEntry(BaseModel):
 
     @field_validator("depends_on", "enables")
     @classmethod
-    def validate_tool_lists(cls, v: List[str]) -> List[str]:
+    def validate_tool_lists(cls, v: list[str]) -> list[str]:
         """Clean and validate tool name lists."""
         return [t.strip() for t in v if t and t.strip()]
 
@@ -304,47 +304,47 @@ class ToolDependencySpec(BaseModel):
     )
 
     # Transition probabilities: tool -> list of (next_tool, weight)
-    transitions: Dict[str, List[ToolTransition]] = Field(
+    transitions: dict[str, list[ToolTransition]] = Field(
         default_factory=dict,
         description="Tool transition probability mappings",
     )
 
     # Tool clusters: cluster_name -> list of tools
-    clusters: Dict[str, List[str]] = Field(
+    clusters: dict[str, list[str]] = Field(
         default_factory=dict,
         description="Groups of related tools",
     )
 
     # Tool sequences: sequence_name -> list of tools
-    sequences: Dict[str, List[str]] = Field(
+    sequences: dict[str, list[str]] = Field(
         default_factory=dict,
         description="Named tool sequences for task types",
     )
 
     # Tool dependencies
-    dependencies: List[ToolDependencyEntry] = Field(
+    dependencies: list[ToolDependencyEntry] = Field(
         default_factory=list,
         description="Tool dependency definitions",
     )
 
     # Required and optional tools
-    required_tools: List[str] = Field(
+    required_tools: list[str] = Field(
         default_factory=list,
         description="Essential tools for this vertical",
     )
-    optional_tools: List[str] = Field(
+    optional_tools: list[str] = Field(
         default_factory=list,
         description="Tools that enhance but aren't required",
     )
 
     # Default sequence for unknown task types
-    default_sequence: List[str] = Field(
+    default_sequence: list[str] = Field(
         default_factory=lambda: ["read", "edit"],
         description="Fallback sequence when task type unknown",
     )
 
     # Extensibility: additional metadata
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Optional additional metadata for extensibility",
     )
@@ -359,19 +359,19 @@ class ToolDependencySpec(BaseModel):
 
     @field_validator("clusters")
     @classmethod
-    def validate_clusters(cls, v: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    def validate_clusters(cls, v: dict[str, list[str]]) -> dict[str, list[str]]:
         """Clean cluster tool names."""
         return {name: [t.strip() for t in tools if t and t.strip()] for name, tools in v.items()}
 
     @field_validator("sequences")
     @classmethod
-    def validate_sequences(cls, v: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    def validate_sequences(cls, v: dict[str, list[str]]) -> dict[str, list[str]]:
         """Clean sequence tool names."""
         return {name: [t.strip() for t in tools if t and t.strip()] for name, tools in v.items()}
 
     @field_validator("required_tools", "optional_tools", "default_sequence")
     @classmethod
-    def validate_tool_lists(cls, v: List[str]) -> List[str]:
+    def validate_tool_lists(cls, v: list[str]) -> list[str]:
         """Clean and validate tool name lists."""
         return [t.strip() for t in v if t and t.strip()]
 
@@ -383,7 +383,7 @@ class ToolDependencySpec(BaseModel):
         dependencies, and sequences are defined somewhere in the config.
         """
         # Collect all referenced tool names
-        all_tools: Set[str] = set()
+        all_tools: set[str] = set()
 
         # From transitions
         for source, targets in self.transitions.items():
@@ -415,13 +415,13 @@ class ToolDependencySpec(BaseModel):
 
         return self
 
-    def get_all_tool_names(self) -> Set[str]:
+    def get_all_tool_names(self) -> set[str]:
         """Get all tool names referenced in this spec.
 
         Returns:
             Set of all tool names used anywhere in the configuration.
         """
-        all_tools: Set[str] = set()
+        all_tools: set[str] = set()
 
         for source, targets in self.transitions.items():
             all_tools.add(source)

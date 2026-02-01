@@ -2,7 +2,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.common import EXCLUDE_DIRS, DEFAULT_CODE_EXTENSIONS, latest_mtime
@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 # Legacy cache for semantic indexes (use _get_index_cache() for DI support)
-_INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
+_INDEX_CACHE: dict[str, dict[str, Any]] = {}
 
 
-def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> "ICacheNamespace":
+def _get_index_cache(exec_ctx: Optional[dict[str, Any]] = None) -> "ICacheNamespace":
     """Get the index cache, preferring DI-injected cache if available.
 
     Args:
@@ -149,7 +149,7 @@ def _latest_mtime(root: Path) -> float:
     return latest_mtime(root)
 
 
-def _normalize_extensions(exts: Optional[Union[str, List[str]]]) -> Set[str]:
+def _normalize_extensions(exts: Optional[str | list[str]]) -> set[str]:
     """Normalize extensions to ensure they have leading dots.
 
     Handles:
@@ -176,10 +176,10 @@ def _normalize_extensions(exts: Optional[Union[str, List[str]]]) -> Set[str]:
     return normalized
 
 
-def _gather_files(root: str, exts: Optional[List[str]], max_files: int) -> List[str]:
+def _gather_files(root: str, exts: Optional[list[str]], max_files: int) -> list[str]:
     """Gather files from directory tree."""
-    ext_set: Set[str] = _normalize_extensions(exts)
-    files: List[str] = []
+    ext_set: set[str] = _normalize_extensions(exts)
+    files: list[str] = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
         for fname in filenames:
@@ -200,8 +200,8 @@ async def _get_or_build_index(
     root: Path,
     settings: Any,
     force_reindex: bool = False,
-    exec_ctx: Optional[Dict[str, Any]] = None,
-) -> Tuple[Any, bool]:
+    exec_ctx: Optional[dict[str, Any]] = None,
+) -> tuple[Any, bool]:
     """Return cached CodebaseIndex or build/update one. Returns (index, rebuilt?).
 
     Uses intelligent caching:
@@ -299,8 +299,8 @@ async def _literal_search(
     query: str,
     path: str = ".",
     k: int = 5,
-    exts: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    exts: Optional[list[str]] = None,
+) -> dict[str, Any]:
     """Internal literal/keyword search implementation.
 
     Args:
@@ -311,7 +311,7 @@ async def _literal_search(
     """
     try:
         files = _gather_files(path, exts, 200)
-        scores: List[Dict[str, Any]] = []
+        scores: list[dict[str, Any]] = []
         for file_path in files:
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -377,9 +377,9 @@ async def code_search(
     symbol: Optional[str] = None,
     lang: Optional[str] = None,
     test: Optional[bool] = None,
-    exts: Optional[List[str]] = None,
-    _exec_ctx: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    exts: Optional[list[str]] = None,
+    _exec_ctx: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Find code by CONCEPT or TEXT when you DON'T know exact location/name.
 
     Use this tool for exploration when you need to discover where relevant code
@@ -445,7 +445,7 @@ async def code_search(
             return await _literal_search(query, path, k, exts)
 
         # Build metadata filter from optional parameters
-        filter_metadata: Optional[Dict[str, Any]] = None
+        filter_metadata: Optional[dict[str, Any]] = None
         filters_applied = []
 
         if any([file, symbol, lang, test is not None]):

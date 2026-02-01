@@ -24,7 +24,7 @@ This module provides:
 import logging
 import time
 from contextlib import contextmanager
-from typing import Optional, Dict, Any
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +161,7 @@ class TimingContext:
         self.log_level = log_level
         self.start_time: Optional[float] = None
         self.end_time: Optional[float] = None
-        self.checkpoints: Dict[str, float] = {}
+        self.checkpoints: dict[str, float] = {}
 
     def __enter__(self):
         self.start_time = time.perf_counter()

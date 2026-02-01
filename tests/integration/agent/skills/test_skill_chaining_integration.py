@@ -27,24 +27,21 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from victor.agent.skills.skill_chaining import (
     ChainExecutionStatus,
-    ChainResult,
     ChainStep,
     SkillChain,
     SkillChainer,
 )
 from victor.agent.skills.skill_discovery import (
-    AvailableTool,
     Skill,
     SkillDiscoveryEngine,
 )
-from victor.framework.graph import StateGraph, CompiledGraph, END
 from victor.tools.base import BaseTool
 from victor.tools.enums import CostTier
 
@@ -441,7 +438,7 @@ class TestSkillChainWithRealTools:
         # Create a custom skill executor that mimics real tool execution
         execution_log = []
 
-        async def real_tool_executor(skill_name: str, context: Dict[str, Any]) -> Any:
+        async def real_tool_executor(skill_name: str, context: dict[str, Any]) -> Any:
             # Simulate real tool execution
             execution_log.append(skill_name)
 
@@ -538,7 +535,7 @@ class TestSkillChainWithRealTools:
         # Create executor that fails sometimes
         attempt_count = {"value": 0}
 
-        async def flaky_executor(skill_name: str, context: Dict[str, Any]) -> Any:
+        async def flaky_executor(skill_name: str, context: dict[str, Any]) -> Any:
             attempt_count["value"] += 1
 
             # Fail on first attempt, succeed on retry

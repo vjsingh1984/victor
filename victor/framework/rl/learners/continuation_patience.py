@@ -133,7 +133,7 @@ class ContinuationPatienceLearner(BaseLearner):
 
         flagged_as_stuck = outcome.metadata.get("flagged_as_stuck", False)
         actually_stuck = outcome.metadata.get("actually_stuck", False)
-        _made_progress = outcome.metadata.get("eventually_made_progress", False)  # noqa: F841
+        _made_progress = outcome.metadata.get("eventually_made_progress", False)
 
         if flagged_as_stuck and not actually_stuck:
             # False positive: Flagged as stuck but wasn't really stuck

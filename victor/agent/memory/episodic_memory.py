@@ -67,11 +67,11 @@ Usage:
 from __future__ import annotations
 
 import logging
-import math
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 import numpy as np
 
@@ -115,12 +115,12 @@ class Episode:
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime = field(default_factory=datetime.utcnow)
-    inputs: Dict[str, Any] = field(default_factory=dict)
-    actions: List[str] = field(default_factory=list)
-    outcomes: Dict[str, Any] = field(default_factory=dict)
+    inputs: dict[str, Any] = field(default_factory=dict)
+    actions: list[str] = field(default_factory=list)
+    outcomes: dict[str, Any] = field(default_factory=dict)
     rewards: float = 0.0
     embedding: Optional[np.ndarray] = None
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     importance: float = 0.5
     access_count: int = 0
     last_accessed: Optional[datetime] = None
@@ -221,7 +221,7 @@ class EpisodeMemory:
     updated_at: datetime = field(default_factory=datetime.utcnow)
     access_count: int = 0
     last_accessed: Optional[datetime] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def update_access(self) -> None:
         """Update access statistics."""
@@ -266,7 +266,7 @@ class MemoryStats:
     decay_rate: float = 0.01
     consolidation_count: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
 
         Returns:
@@ -305,13 +305,13 @@ class MemoryIndex:
         dimension: Embedding dimension
     """
 
-    embeddings: Dict[str, np.ndarray] = field(default_factory=dict)
-    metadata_index: Dict[str, Any] = field(
+    embeddings: dict[str, np.ndarray] = field(default_factory=dict)
+    metadata_index: dict[str, Any] = field(
         default_factory=lambda: {"by_key": {}}
     )  # key -> value -> [episode_ids]
-    action_index: Dict[str, List[str]] = field(default_factory=dict)  # action -> [episode_ids]
-    outcome_index: Dict[str, List[str]] = field(default_factory=dict)  # outcome -> [episode_ids]
-    temporal_index: List[Tuple[datetime, str]] = field(default_factory=list)
+    action_index: dict[str, list[str]] = field(default_factory=dict)  # action -> [episode_ids]
+    outcome_index: dict[str, list[str]] = field(default_factory=dict)  # outcome -> [episode_ids]
+    temporal_index: list[tuple[datetime, str]] = field(default_factory=list)
     dimension: int = 384  # Default embedding dimension
 
     def add_embedding(self, episode_id: str, embedding: np.ndarray) -> None:
@@ -344,7 +344,7 @@ class MemoryIndex:
         """
         return self.embeddings.get(episode_id)
 
-    def index_metadata(self, episode_id: str, metadata: Dict[str, Any]) -> None:
+    def index_metadata(self, episode_id: str, metadata: dict[str, Any]) -> None:
         """Index episode metadata for filtering.
 
         Args:
@@ -367,7 +367,7 @@ class MemoryIndex:
             if episode_id not in by_key[key][value_str]:
                 by_key[key][value_str].append(episode_id)
 
-    def index_actions(self, episode_id: str, actions: List[str]) -> None:
+    def index_actions(self, episode_id: str, actions: list[str]) -> None:
         """Index episode actions for action-based lookup.
 
         Args:
@@ -380,7 +380,7 @@ class MemoryIndex:
             if episode_id not in self.action_index[action]:
                 self.action_index[action].append(episode_id)
 
-    def index_outcomes(self, episode_id: str, outcomes: Dict[str, Any]) -> None:
+    def index_outcomes(self, episode_id: str, outcomes: dict[str, Any]) -> None:
         """Index episode outcomes for outcome-based lookup.
 
         Args:
@@ -434,7 +434,7 @@ class MemoryIndex:
         # Remove from temporal index
         self.temporal_index = [(ts, eid) for ts, eid in self.temporal_index if eid != episode_id]
 
-    def query_by_metadata(self, filters: Dict[str, Any]) -> List[str]:
+    def query_by_metadata(self, filters: dict[str, Any]) -> list[str]:
         """Query episodes by metadata filters.
 
         Args:
@@ -461,7 +461,7 @@ class MemoryIndex:
         # Intersection of all filters
         return list(set.intersection(*result_sets)) if result_sets else []
 
-    def query_by_action(self, action: str) -> List[str]:
+    def query_by_action(self, action: str) -> list[str]:
         """Query episodes that contain an action.
 
         Args:
@@ -472,7 +472,7 @@ class MemoryIndex:
         """
         return self.action_index.get(action, [])
 
-    def query_by_outcome(self, outcome: str) -> List[str]:
+    def query_by_outcome(self, outcome: str) -> list[str]:
         """Query episodes that have an outcome key.
 
         Args:
@@ -485,7 +485,7 @@ class MemoryIndex:
 
     def query_by_timerange(
         self, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None
-    ) -> List[str]:
+    ) -> list[str]:
         """Query episodes by time range.
 
         Args:
@@ -506,7 +506,7 @@ class MemoryIndex:
 
     def find_similar(
         self, query_embedding: np.ndarray, k: int = 5, min_similarity: float = 0.0
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """Find similar episodes by cosine similarity.
 
         Args:
@@ -601,7 +601,7 @@ class EpisodicMemory:
         self._consolidation_threshold = consolidation_threshold
 
         # Episode storage (id -> EpisodeMemory)
-        self._episodes: Dict[str, EpisodeMemory] = {}
+        self._episodes: dict[str, EpisodeMemory] = {}
 
         # Memory index for fast search
         self._index = MemoryIndex(dimension=self._embedding_service.dimension)
@@ -722,10 +722,10 @@ class EpisodicMemory:
     async def recall_relevant(
         self,
         query: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         k: int = 5,
         min_similarity: float = 0.0,
-    ) -> List[Episode]:
+    ) -> list[Episode]:
         """Recall episodes relevant to a query.
 
         Uses vector similarity search to find the most relevant episodes.
@@ -778,7 +778,7 @@ class EpisodicMemory:
 
         return episodes
 
-    async def recall_recent(self, n: int = 10) -> List[Episode]:
+    async def recall_recent(self, n: int = 10) -> list[Episode]:
         """Recall the most recent episodes.
 
         Args:
@@ -800,7 +800,7 @@ class EpisodicMemory:
 
         return episodes
 
-    async def recall_by_outcome(self, outcome: str) -> List[Episode]:
+    async def recall_by_outcome(self, outcome: str) -> list[Episode]:
         """Recall episodes that have a specific outcome.
 
         Args:
@@ -827,7 +827,7 @@ class EpisodicMemory:
 
         return episodes
 
-    async def recall_by_action(self, action: str) -> List[Episode]:
+    async def recall_by_action(self, action: str) -> list[Episode]:
         """Recall episodes that contain a specific action.
 
         Args:
@@ -854,7 +854,7 @@ class EpisodicMemory:
 
         return episodes
 
-    async def recall_by_metadata(self, filters: Dict[str, Any]) -> List[Episode]:
+    async def recall_by_metadata(self, filters: dict[str, Any]) -> list[Episode]:
         """Recall episodes matching metadata filters.
 
         Args:
@@ -898,7 +898,7 @@ class EpisodicMemory:
 
     async def consolidate_memories(
         self,
-        consolidation_fn: Optional[Callable[[List[Episode]], Dict[str, Dict[str, Any]]]] = None,
+        consolidation_fn: Optional[Callable[[list[Episode]], dict[str, dict[str, Any]]]] = None,
     ) -> "SemanticMemory":
         """Consolidate episodic memories into semantic knowledge.
 
@@ -945,7 +945,7 @@ class EpisodicMemory:
 
         return semantic_memory
 
-    def _default_consolidation(self, episodes: List[Episode]) -> Dict[str, Dict[str, Any]]:
+    def _default_consolidation(self, episodes: list[Episode]) -> dict[str, dict[str, Any]]:
         """Default consolidation function.
 
         Extracts common patterns from episodes:
@@ -960,7 +960,7 @@ class EpisodicMemory:
         Returns:
             Dictionary of {fact: metadata}
         """
-        knowledge: Dict[str, Dict[str, Any]] = {}
+        knowledge: dict[str, dict[str, Any]] = {}
 
         if not episodes:
             return knowledge
@@ -969,7 +969,7 @@ class EpisodicMemory:
         successful_episodes = [ep for ep in episodes if ep.outcomes.get("success")]
         if successful_episodes:
             # Most common successful actions
-            action_counts: Dict[str, int] = {}
+            action_counts: dict[str, int] = {}
             for ep in successful_episodes:
                 for action in ep.actions:
                     action_counts[action] = action_counts.get(action, 0) + 1
@@ -1000,7 +1000,7 @@ class EpisodicMemory:
                 }
 
         # Extract common outcomes
-        outcome_keys: Dict[str, int] = {}
+        outcome_keys: dict[str, int] = {}
         for ep in episodes:
             for key in ep.outcomes.keys():
                 outcome_keys[key] = outcome_keys.get(key, 0) + 1
@@ -1012,7 +1012,7 @@ class EpisodicMemory:
                 knowledge[fact] = {"type": "common_outcome", "frequency": count}
 
         # Extract common context patterns
-        context_values: Dict[str, int] = {}
+        context_values: dict[str, int] = {}
         for ep in episodes:
             for key, value in ep.context.items():
                 if isinstance(value, str):

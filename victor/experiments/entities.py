@@ -24,7 +24,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -107,7 +107,7 @@ class Metric:
     timestamp: datetime
     step: Optional[int] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         return {
             "run_id": self.run_id,
@@ -143,8 +143,8 @@ class Experiment:
     name: str = ""
     description: str = ""
     hypothesis: str = ""
-    tags: List[str] = field(default_factory=list)
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    parameters: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     status: ExperimentStatus = ExperimentStatus.DRAFT
     git_commit_sha: str = ""
@@ -159,7 +159,7 @@ class Experiment:
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         return {
             "experiment_id": self.experiment_id,
@@ -182,7 +182,7 @@ class Experiment:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Experiment":
+    def from_dict(cls, data: dict[str, Any]) -> "Experiment":
         """Create from dictionary storage."""
         return cls(
             experiment_id=data["experiment_id"],
@@ -234,15 +234,15 @@ class Run:
     status: RunStatus = RunStatus.QUEUED
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
-    metrics_summary: Dict[str, float] = field(default_factory=dict)
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    metrics_summary: dict[str, float] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
     error_message: Optional[str] = None
 
     # Environment metadata (captured automatically)
     python_version: str = ""
     os_info: str = ""
     victor_version: str = ""
-    dependencies: Dict[str, str] = field(default_factory=dict)
+    dependencies: dict[str, str] = field(default_factory=dict)
 
     # Provider/model info
     provider: str = ""
@@ -260,7 +260,7 @@ class Run:
             return (self.completed_at - self.started_at).total_seconds()
         return None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         return {
             "run_id": self.run_id,
@@ -284,7 +284,7 @@ class Run:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Run":
+    def from_dict(cls, data: dict[str, Any]) -> "Run":
         """Create from dictionary storage."""
         return cls(
             run_id=data["run_id"],
@@ -335,9 +335,9 @@ class Artifact:
     file_path: str = ""
     file_size_bytes: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         return {
             "artifact_id": self.artifact_id,
@@ -351,7 +351,7 @@ class Artifact:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Artifact":
+    def from_dict(cls, data: dict[str, Any]) -> "Artifact":
         """Create from dictionary storage."""
         return cls(
             artifact_id=data["artifact_id"],
@@ -394,8 +394,8 @@ class ExperimentQuery(BaseModel):
 
     name_contains: Optional[str] = None
     description_contains: Optional[str] = None
-    tags_any: Optional[List[str]] = None
-    tags_all: Optional[List[str]] = None
+    tags_any: Optional[list[str]] = None
+    tags_all: Optional[list[str]] = None
     status: Optional[ExperimentStatus] = None
     created_after: Optional[datetime] = None
     created_before: Optional[datetime] = None
@@ -434,7 +434,7 @@ class MetricDiff:
     relative_diff: float
     p_value: float = 1.0
     is_significant: bool = False
-    confidence_interval: Tuple[float, float] = (0.0, 0.0)
+    confidence_interval: tuple[float, float] = (0.0, 0.0)
 
 
 @dataclass
@@ -452,11 +452,11 @@ class ExperimentComparison:
         should_rollback: Whether to rollback to baseline
     """
 
-    experiment_ids: List[str]
+    experiment_ids: list[str]
     comparison_date: datetime
-    metric_diffs: Dict[str, MetricDiff] = field(default_factory=dict)
+    metric_diffs: dict[str, MetricDiff] = field(default_factory=dict)
     overall_winner: Optional[str] = None
-    significant_metrics: List[str] = field(default_factory=list)
+    significant_metrics: list[str] = field(default_factory=list)
     confidence_level: float = 0.95
     recommendation: str = ""
     should_rollback: bool = False

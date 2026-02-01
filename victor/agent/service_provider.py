@@ -168,12 +168,7 @@ class OrchestratorServiceProvider:
             SearchRouterProtocol,
             ResponseSanitizerProtocol,
             ArgumentNormalizerProtocol,
-            TaskAnalyzerProtocol,
-            ObservabilityProtocol,
-            ToolRegistryProtocol,
-            ToolRegistrarProtocol,
             ProjectContextProtocol,
-            RecoveryHandlerProtocol,
             CodeExecutionManagerProtocol,
             WorkflowRegistryProtocol,
             UsageAnalyticsProtocol,
@@ -215,8 +210,6 @@ class OrchestratorServiceProvider:
             ToolPlannerProtocol,
             TaskCoordinatorProtocol,
             # Memory protocols
-            UnifiedMemoryCoordinatorProtocol,
-            # New coordinator protocols (WS-D)
             ToolCoordinatorProtocol,
             StateCoordinatorProtocol,
             PromptCoordinatorProtocol,
@@ -692,10 +685,8 @@ class OrchestratorServiceProvider:
         """
         from victor.providers.health_monitor import (
             ProviderHealthRegistry,
-            HealthMonitor,
             get_health_registry,
         )
-        from victor.providers.load_balancer import LoadBalancerType, create_load_balancer
 
         # ProviderHealthRegistry - singleton for health monitoring
         # Note: We register a factory that returns the registry
@@ -1875,7 +1866,6 @@ class OrchestratorServiceProvider:
         from victor.agent.coordinators.tool_retry_coordinator import (
             ToolRetryCoordinator,
             ToolRetryConfig,
-            create_tool_retry_coordinator,
         )
         from victor.agent.protocols import ToolExecutorProtocol, ToolCacheProtocol
 
@@ -1917,9 +1907,7 @@ class OrchestratorServiceProvider:
         """
         from victor.agent.coordinators.memory_coordinator import (
             MemoryCoordinator,
-            create_memory_coordinator,
         )
-        from victor.agent.protocols import ToolExecutorProtocol
 
         # Note: Memory manager and session_id will be set by orchestrator
         # conversation_store will be provided by orchestrator
@@ -1940,7 +1928,6 @@ class OrchestratorServiceProvider:
         """
         from victor.agent.coordinators.tool_capability_coordinator import (
             ToolCapabilityCoordinator,
-            create_tool_capability_coordinator,
         )
 
         # Get tool capabilities from settings
@@ -1968,7 +1955,6 @@ class OrchestratorServiceProvider:
             ToolCallCoordinator instance
         """
         from victor.agent.coordinators.tool_call_coordinator import (
-            ToolCallCoordinator,
             create_tool_call_coordinator,
         )
         from victor.agent.coordinators.tool_call_protocol import ToolCallCoordinatorConfig
@@ -2009,7 +1995,6 @@ class OrchestratorServiceProvider:
             PromptBuilderCoordinator instance
         """
         from victor.agent.coordinators.prompt_builder_coordinator import (
-            PromptBuilderCoordinator,
             create_prompt_builder_coordinator,
         )
         from victor.agent.coordinators.prompt_builder_protocol import PromptBuilderCoordinatorConfig

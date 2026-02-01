@@ -41,20 +41,20 @@ from __future__ import annotations
 
 import logging
 import time
-from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Deque, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
 
 # Type aliases for hook callbacks
-TransitionCallback = Callable[[str, str, Dict[str, Any]], None]
-StageCallback = Callable[[str, Dict[str, Any]], None]
+TransitionCallback = Callable[[str, str, dict[str, Any]], None]
+StageCallback = Callable[[str, dict[str, Any]], None]
 # Enhanced callback with history access
-HistoryAwareCallback = Callable[[str, str, Dict[str, Any], "TransitionHistory"], None]
+HistoryAwareCallback = Callable[[str, str, dict[str, Any], "TransitionHistory"], None]
 
 
 @dataclass(frozen=True)
@@ -75,7 +75,7 @@ class TransitionRecord:
     old_stage: str
     new_stage: str
     timestamp: datetime
-    context: Dict[str, Any]
+    context: dict[str, Any]
     duration_ms: Optional[float] = None
     sequence_number: int = 0
 
@@ -104,9 +104,9 @@ class TransitionHistory:
             max_size: Maximum number of records to keep.
         """
         self.max_size = max_size
-        self.records: Deque[TransitionRecord] = deque(maxlen=max_size)
+        self.records: deque[TransitionRecord] = deque(maxlen=max_size)
         self._sequence: int = 0
-        self._stage_enter_times: Dict[str, float] = {}
+        self._stage_enter_times: dict[str, float] = {}
 
     def add(self, record: TransitionRecord) -> None:
         """Add a transition record.
@@ -120,7 +120,7 @@ class TransitionHistory:
         self,
         old_stage: str,
         new_stage: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> TransitionRecord:
         """Create and add a new transition record.
 
@@ -168,7 +168,7 @@ class TransitionHistory:
             return self.records[-1].old_stage
         return None
 
-    def get_last(self, n: int = 1) -> List[TransitionRecord]:
+    def get_last(self, n: int = 1) -> list[TransitionRecord]:
         """Get the last N transitions.
 
         Args:
@@ -179,7 +179,7 @@ class TransitionHistory:
         """
         return list(self.records)[-n:]
 
-    def get_transitions_to(self, stage: str) -> List[TransitionRecord]:
+    def get_transitions_to(self, stage: str) -> list[TransitionRecord]:
         """Get all transitions into a specific stage.
 
         Args:
@@ -190,7 +190,7 @@ class TransitionHistory:
         """
         return [r for r in self.records if r.new_stage == stage]
 
-    def get_transitions_from(self, stage: str) -> List[TransitionRecord]:
+    def get_transitions_from(self, stage: str) -> list[TransitionRecord]:
         """Get all transitions from a specific stage.
 
         Args:
@@ -205,7 +205,7 @@ class TransitionHistory:
         self,
         from_stage: str,
         to_stage: str,
-    ) -> List[TransitionRecord]:
+    ) -> list[TransitionRecord]:
         """Get all transitions between two specific stages.
 
         Args:
@@ -242,7 +242,7 @@ class TransitionHistory:
             return sum(durations) / len(durations)
         return None
 
-    def get_transition_pattern(self) -> List[Tuple[str, str]]:
+    def get_transition_pattern(self) -> list[tuple[str, str]]:
         """Get the sequence of transitions as (from, to) tuples.
 
         Returns:
@@ -274,7 +274,7 @@ class TransitionHistory:
             visited.add(r.new_stage)
         return False
 
-    def get_stage_sequence(self) -> List[str]:
+    def get_stage_sequence(self) -> list[str]:
         """Get the sequence of stages visited.
 
         Returns:
@@ -318,9 +318,9 @@ class StateTransitionHook:
         name: Optional hook name for debugging
     """
 
-    callback: Union[TransitionCallback, StageCallback, HistoryAwareCallback]
-    on_enter: Set[str] = field(default_factory=set)
-    on_exit: Set[str] = field(default_factory=set)
+    callback: TransitionCallback | StageCallback | HistoryAwareCallback
+    on_enter: set[str] = field(default_factory=set)
+    on_exit: set[str] = field(default_factory=set)
     on_transition: bool = False
     on_transition_with_history: bool = False
     priority: int = 0
@@ -410,7 +410,7 @@ class StateHookManager:
             history_max_size: Maximum transition records to keep.
             enable_history: Whether to track transition history.
         """
-        self._hooks: List[StateTransitionHook] = []
+        self._hooks: list[StateTransitionHook] = []
         self._enabled = True
         self._enable_history = enable_history
         self._history = TransitionHistory(max_size=history_max_size) if enable_history else None
@@ -489,7 +489,7 @@ class StateHookManager:
         *,
         priority: int = 0,
         name: Optional[str] = None,
-    ) -> Union[TransitionCallback, Callable[[TransitionCallback], TransitionCallback]]:
+    ) -> TransitionCallback | Callable[[TransitionCallback], TransitionCallback]:
         """Decorator to register a transition hook.
 
         Can be used with or without arguments:
@@ -529,7 +529,7 @@ class StateHookManager:
         *,
         priority: int = 0,
         name: Optional[str] = None,
-    ) -> Union[HistoryAwareCallback, Callable[[HistoryAwareCallback], HistoryAwareCallback]]:
+    ) -> HistoryAwareCallback | Callable[[HistoryAwareCallback], HistoryAwareCallback]:
         """Decorator to register a history-aware transition hook.
 
         Similar to on_transition, but the callback receives the TransitionHistory
@@ -640,7 +640,7 @@ class StateHookManager:
     # Firing Methods
     # =========================================================================
 
-    def fire_enter(self, stage: str, context: Dict[str, Any]) -> None:
+    def fire_enter(self, stage: str, context: dict[str, Any]) -> None:
         """Fire hooks for entering a stage.
 
         Args:
@@ -657,7 +657,7 @@ class StateHookManager:
                 except Exception as e:
                     logger.warning(f"Hook '{hook.name or 'unnamed'}' error on enter {stage}: {e}")
 
-    def fire_exit(self, stage: str, context: Dict[str, Any]) -> None:
+    def fire_exit(self, stage: str, context: dict[str, Any]) -> None:
         """Fire hooks for exiting a stage.
 
         Args:
@@ -678,7 +678,7 @@ class StateHookManager:
         self,
         old_stage: str,
         new_stage: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> Optional[TransitionRecord]:
         """Fire all hooks for a complete transition.
 
@@ -790,7 +790,7 @@ class LoggingHook:
         self,
         old_stage: str,
         new_stage: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         """Log a transition.
 
@@ -821,8 +821,8 @@ class MetricsHook:
 
     def __init__(self) -> None:
         """Initialize metrics hook."""
-        self._transition_count: Dict[str, int] = {}
-        self._stage_entries: Dict[str, int] = {}
+        self._transition_count: dict[str, int] = {}
+        self._stage_entries: dict[str, int] = {}
         self._total_transitions = 0
 
     def create_hook(self, priority: int = 100) -> StateTransitionHook:
@@ -845,7 +845,7 @@ class MetricsHook:
         self,
         old_stage: str,
         new_stage: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         """Record a transition.
 
@@ -859,7 +859,7 @@ class MetricsHook:
         self._stage_entries[new_stage] = self._stage_entries.get(new_stage, 0) + 1
         self._total_transitions += 1
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get collected statistics.
 
         Returns:

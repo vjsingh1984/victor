@@ -30,7 +30,7 @@ Example YAML usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def should_retry_cleaning(ctx: Dict[str, Any]) -> str:
+def should_retry_cleaning(ctx: dict[str, Any]) -> str:
     """Determine if data cleaning should be retried.
 
     Multi-factor decision based on validation status and iteration count.
@@ -67,7 +67,7 @@ def should_retry_cleaning(ctx: Dict[str, Any]) -> str:
     return "retry"
 
 
-def should_tune_more(ctx: Dict[str, Any]) -> str:
+def should_tune_more(ctx: dict[str, Any]) -> str:
     """Determine if more model tuning is needed.
 
     Checks if model performance meets threshold or max iterations reached.
@@ -99,7 +99,7 @@ def should_tune_more(ctx: Dict[str, Any]) -> str:
     return "tune"
 
 
-def quality_threshold(ctx: Dict[str, Any]) -> str:
+def quality_threshold(ctx: dict[str, Any]) -> str:
     """Multi-level quality assessment for data.
 
     Evaluates data quality across multiple dimensions.
@@ -128,7 +128,7 @@ def quality_threshold(ctx: Dict[str, Any]) -> str:
     return "needs_cleanup"
 
 
-def model_selection_criteria(ctx: Dict[str, Any]) -> str:
+def model_selection_criteria(ctx: dict[str, Any]) -> str:
     """Select best model based on multiple criteria.
 
     Balances accuracy, speed, and interpretability.
@@ -159,7 +159,7 @@ def model_selection_criteria(ctx: Dict[str, Any]) -> str:
         return "needs_improvement"
 
 
-def analysis_confidence(ctx: Dict[str, Any]) -> str:
+def analysis_confidence(ctx: dict[str, Any]) -> str:
     """Assess confidence level of analysis results.
 
     Used to determine if human review is needed.
@@ -193,7 +193,7 @@ def analysis_confidence(ctx: Dict[str, Any]) -> str:
 # =============================================================================
 
 
-def merge_parallel_stats(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def merge_parallel_stats(ctx: dict[str, Any]) -> dict[str, Any]:
     """Merge results from parallel statistical computations.
 
     Combines statistics, correlations, distributions, and anomalies.
@@ -213,7 +213,7 @@ def merge_parallel_stats(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def aggregate_model_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def aggregate_model_results(ctx: dict[str, Any]) -> dict[str, Any]:
     """Aggregate results from multiple model training runs.
 
     Args:
@@ -250,7 +250,7 @@ def aggregate_model_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
 # =============================================================================
 
 
-def analysis_type_check(ctx: Dict[str, Any]) -> str:
+def analysis_type_check(ctx: dict[str, Any]) -> str:
     """Determine analysis type for workflow routing.
 
     Args:
@@ -278,7 +278,7 @@ def analysis_type_check(ctx: Dict[str, Any]) -> str:
     return "exploratory"
 
 
-def can_continue_analysis_iteration(ctx: Dict[str, Any]) -> str:
+def can_continue_analysis_iteration(ctx: dict[str, Any]) -> str:
     """Check if workflow can continue with another iteration.
 
     Args:
@@ -297,7 +297,7 @@ def can_continue_analysis_iteration(ctx: Dict[str, Any]) -> str:
     return "max_reached"
 
 
-def has_pending_tool_calls(ctx: Dict[str, Any]) -> str:
+def has_pending_tool_calls(ctx: dict[str, Any]) -> str:
     """Check if there are pending tool calls to execute.
 
     Args:
@@ -316,7 +316,7 @@ def has_pending_tool_calls(ctx: Dict[str, Any]) -> str:
     return "no_tools"
 
 
-def update_analysis_conversation(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def update_analysis_conversation(ctx: dict[str, Any]) -> dict[str, Any]:
     """Update conversation with tool results from execution.
 
     Args:
@@ -359,7 +359,7 @@ def update_analysis_conversation(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def finalize_analysis_chat(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def finalize_analysis_chat(ctx: dict[str, Any]) -> dict[str, Any]:
     """Format final data analysis chat response for user.
 
     Args:

@@ -27,12 +27,12 @@ Functions:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def token_usage_to_dict(usage: Any) -> Dict[str, int]:
+def token_usage_to_dict(usage: Any) -> dict[str, int]:
     """Convert TokenUsage to dictionary format.
 
     This function handles different TokenUsage implementations and provides
@@ -83,7 +83,7 @@ def token_usage_to_dict(usage: Any) -> Dict[str, int]:
     }
 
 
-def validation_result_to_dict(result: Any) -> Dict[str, Any]:
+def validation_result_to_dict(result: Any) -> dict[str, Any]:
     """Convert ValidationResult to dictionary format.
 
     This function normalizes different ValidationResult implementations
@@ -116,7 +116,7 @@ def validation_result_to_dict(result: Any) -> Dict[str, Any]:
     }
 
 
-def message_to_dict(message: Any) -> Dict[str, Any]:
+def message_to_dict(message: Any) -> dict[str, Any]:
     """Convert Message object to dictionary format.
 
     This function handles different Message implementations and provides
@@ -165,7 +165,7 @@ def message_to_dict(message: Any) -> Dict[str, Any]:
     return result
 
 
-def stream_metrics_to_dict(metrics: Any) -> Dict[str, Any]:
+def stream_metrics_to_dict(metrics: Any) -> dict[str, Any]:
     """Convert StreamMetrics to dictionary format.
 
     This function normalizes StreamMetrics objects into dictionaries
@@ -199,7 +199,7 @@ def stream_metrics_to_dict(metrics: Any) -> Dict[str, Any]:
     }
 
 
-def tool_result_to_dict(result: Any) -> Dict[str, Any]:
+def tool_result_to_dict(result: Any) -> dict[str, Any]:
     """Convert tool execution result to dictionary format.
 
     This function normalizes different tool result implementations

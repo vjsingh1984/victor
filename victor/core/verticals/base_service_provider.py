@@ -38,7 +38,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, List, Type
+from typing import TYPE_CHECKING, Any
 
 from victor.core.verticals.protocols import ServiceProviderProtocol
 
@@ -128,11 +128,6 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
             container: DI container to register services in
             settings: Application settings
         """
-        from victor.core.container import ServiceLifetime
-        from victor.core.verticals.protocols import (
-            ModeConfigProviderProtocol,
-            ToolDependencyProviderProtocol,
-        )
 
         # Register mode config provider if vertical has one
         self._register_mode_config(container, settings)
@@ -279,7 +274,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
         """
         return None
 
-    def get_required_services(self) -> List[Type[Any]]:
+    def get_required_services(self) -> list[type[Any]]:
         """Get list of required service types.
 
         Returns:
@@ -287,7 +282,7 @@ class BaseVerticalServiceProvider(ServiceProviderProtocol):
         """
         return []
 
-    def get_optional_services(self) -> List[Type[Any]]:
+    def get_optional_services(self) -> list[type[Any]]:
         """Get list of optional service types.
 
         Returns:
@@ -321,7 +316,7 @@ class VerticalServiceProviderFactory:
     """
 
     @staticmethod
-    def create(vertical_class: Type[Any]) -> BaseVerticalServiceProvider:
+    def create(vertical_class: type[Any]) -> BaseVerticalServiceProvider:
         """Create a service provider for a vertical.
 
         The created provider is pre-configured with the vertical's
@@ -346,7 +341,7 @@ class _ConfiguredVerticalServiceProvider(BaseVerticalServiceProvider):
     Internal class used by VerticalServiceProviderFactory.
     """
 
-    def __init__(self, vertical_name: str, vertical_class: Type[Any]):
+    def __init__(self, vertical_name: str, vertical_class: type[Any]):
         """Initialize with vertical class.
 
         Args:

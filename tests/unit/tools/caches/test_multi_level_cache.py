@@ -14,7 +14,6 @@
 
 """Unit tests for multi-level caching."""
 
-import pytest
 import tempfile
 from pathlib import Path
 from victor.tools.caches import MultiLevelCache, CacheEntry, LevelMetrics

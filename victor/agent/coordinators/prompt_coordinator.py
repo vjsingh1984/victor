@@ -39,11 +39,10 @@ Usage:
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 from victor.protocols import IPromptContributor, PromptContext
 
@@ -116,7 +115,7 @@ class PromptCoordinator:
 
     def __init__(
         self,
-        contributors: Optional[List[IPromptContributor]] = None,
+        contributors: Optional[list[IPromptContributor]] = None,
         enable_cache: bool = True,
         cache_ttl: Optional[float] = None,  # Time-to-live in seconds
     ) -> None:
@@ -133,7 +132,7 @@ class PromptCoordinator:
         self._cache_ttl = cache_ttl
 
         # Enhanced cache with metadata
-        self._prompt_cache: Dict[str, Tuple[str, float]] = {}  # key -> (prompt, timestamp)
+        self._prompt_cache: dict[str, tuple[str, float]] = {}  # key -> (prompt, timestamp)
         self._cache_hits: int = 0
         self._cache_misses: int = 0
         self._cache_invalidations: int = 0
@@ -269,7 +268,7 @@ class PromptCoordinator:
             self._prompt_cache.clear()
             self._cache_invalidations += invalidated_count
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache performance statistics.
 
         Returns:
@@ -445,7 +444,7 @@ class TaskHintContributor(BasePromptContributor):
 
     def __init__(
         self,
-        hints: Dict[str, str],
+        hints: dict[str, str],
         priority: int = 75,
     ):
         """Initialize the task hint contributor.
@@ -482,7 +481,7 @@ class TaskHintContributor(BasePromptContributor):
         """
         self._hints[task_type] = hint
 
-    def get_hints(self) -> Dict[str, str]:
+    def get_hints(self) -> dict[str, str]:
         """Get all hints.
 
         Returns:

@@ -24,8 +24,7 @@ This test suite provides comprehensive coverage for:
 """
 
 from pathlib import Path
-from typing import List
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -41,7 +40,6 @@ from tests.fixtures.coding_fixtures import (
     SAMPLE_PYTHON_SIMPLE,
     SAMPLE_PYTHON_TYPE_HINTS,
     SAMPLE_PYTHON_WITH_IMPORTS,
-    create_sample_file,
 )
 from victor.coding.codebase.tree_sitter_extractor import (
     ExtractedEdge,

@@ -22,7 +22,7 @@ This enables the evaluation harness to use high-level framework APIs
 while maintaining compatibility with existing benchmark infrastructure.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.evaluation.protocol import (
     BenchmarkTask,
@@ -53,7 +53,7 @@ def benchmark_task_to_framework_task(
     task_type = _infer_task_type(benchmark_task)
 
     # Build context dictionary
-    context: Dict[str, Any] = {
+    context: dict[str, Any] = {
         "task_id": benchmark_task.task_id,
         "benchmark": (
             benchmark_task.benchmark.value
@@ -76,7 +76,7 @@ def benchmark_task_to_framework_task(
 
     # Build list of relevant files if available
     # Note: context_files is not in BenchmarkTask, using hints as alternative
-    files: List[str] = []
+    files: list[str] = []
     # context_files not available in BenchmarkTask protocol
     # Files would need to be extracted from hints or other context
 

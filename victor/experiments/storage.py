@@ -20,7 +20,7 @@ storage implementations (SQLite, PostgreSQL, etc.) to be used interchangeably.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Optional, Protocol
 from typing_extensions import Self
 
 from victor.experiments.entities import (
@@ -74,7 +74,7 @@ class IStorageBackend(Protocol):
         """
         ...
 
-    def update_experiment(self, experiment_id: str, updates: Dict[str, Any]) -> bool:
+    def update_experiment(self, experiment_id: str, updates: dict[str, Any]) -> bool:
         """Update an experiment.
 
         Args:
@@ -103,7 +103,7 @@ class IStorageBackend(Protocol):
         """
         ...
 
-    def list_experiments(self, query: Optional[ExperimentQuery] = None) -> List[Experiment]:
+    def list_experiments(self, query: Optional[ExperimentQuery] = None) -> list[Experiment]:
         """List experiments with optional filtering.
 
         Args:
@@ -141,7 +141,7 @@ class IStorageBackend(Protocol):
         """
         ...
 
-    def update_run(self, run_id: str, updates: Dict[str, Any]) -> bool:
+    def update_run(self, run_id: str, updates: dict[str, Any]) -> bool:
         """Update a run.
 
         Args:
@@ -156,7 +156,7 @@ class IStorageBackend(Protocol):
         """
         ...
 
-    def list_runs(self, experiment_id: str) -> List[Run]:
+    def list_runs(self, experiment_id: str) -> list[Run]:
         """List all runs for an experiment.
 
         Args:
@@ -180,7 +180,7 @@ class IStorageBackend(Protocol):
         """
         ...
 
-    def get_metrics(self, run_id: str) -> List[Metric]:
+    def get_metrics(self, run_id: str) -> list[Metric]:
         """Get all metrics for a run.
 
         Args:
@@ -191,7 +191,7 @@ class IStorageBackend(Protocol):
         """
         ...
 
-    def get_metric_history(self, run_id: str, metric_key: str) -> List[Metric]:
+    def get_metric_history(self, run_id: str, metric_key: str) -> list[Metric]:
         """Get history of a specific metric.
 
         Args:
@@ -216,7 +216,7 @@ class IStorageBackend(Protocol):
         """
         ...
 
-    def get_artifacts(self, run_id: str) -> List[Artifact]:
+    def get_artifacts(self, run_id: str) -> list[Artifact]:
         """Get all artifacts for a run.
 
         Args:

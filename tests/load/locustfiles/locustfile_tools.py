@@ -21,9 +21,7 @@ Or headless: locust -f tests/load/locustfiles/locustfile_tools.py --headless --u
 """
 
 import random
-import time
 from datetime import datetime
-from typing import List
 
 from locust import HttpUser, task, between, events, tag
 

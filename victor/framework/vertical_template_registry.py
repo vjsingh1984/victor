@@ -46,11 +46,11 @@ from __future__ import annotations
 import logging
 import threading
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import yaml
 
-from victor.framework.vertical_template import VerticalTemplate, VerticalMetadata
+from victor.framework.vertical_template import VerticalTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ class VerticalTemplateRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._templates: Dict[str, VerticalTemplate] = {}
+        self._templates: dict[str, VerticalTemplate] = {}
         self._lock: threading.Lock = threading.Lock()
         self._instance_lock: threading.Lock = threading.Lock()
 
@@ -142,7 +142,7 @@ class VerticalTemplateRegistry:
         with self._lock:
             return self._templates.get(name)
 
-    def list_all(self) -> List[VerticalTemplate]:
+    def list_all(self) -> list[VerticalTemplate]:
         """List all registered templates.
 
         Returns:
@@ -151,7 +151,7 @@ class VerticalTemplateRegistry:
         with self._lock:
             return list(self._templates.values())
 
-    def list_names(self) -> List[str]:
+    def list_names(self) -> list[str]:
         """List names of all registered templates.
 
         Returns:
@@ -160,7 +160,7 @@ class VerticalTemplateRegistry:
         with self._lock:
             return list(self._templates.keys())
 
-    def find_by_category(self, category: str) -> List[VerticalTemplate]:
+    def find_by_category(self, category: str) -> list[VerticalTemplate]:
         """Find templates by category.
 
         Args:
@@ -172,7 +172,7 @@ class VerticalTemplateRegistry:
         with self._lock:
             return [t for t in self._templates.values() if t.metadata.category == category]
 
-    def find_by_tag(self, tag: str) -> List[VerticalTemplate]:
+    def find_by_tag(self, tag: str) -> list[VerticalTemplate]:
         """Find templates by tag.
 
         Args:
@@ -382,7 +382,7 @@ class VerticalTemplateRegistry:
             logger.error(f"Error saving template to {path}: {e}")
             return False
 
-    def export_to_dict(self, name: str) -> Optional[Dict[str, Any]]:
+    def export_to_dict(self, name: str) -> Optional[dict[str, Any]]:
         """Export a template to a dictionary.
 
         Args:
@@ -398,7 +398,7 @@ class VerticalTemplateRegistry:
 
     def import_from_dict(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         *,
         overwrite: bool = False,
     ) -> Optional[VerticalTemplate]:
@@ -419,7 +419,7 @@ class VerticalTemplateRegistry:
             logger.error(f"Error importing template from dict: {e}")
             return None
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get registry statistics.
 
         Returns:
@@ -429,7 +429,7 @@ class VerticalTemplateRegistry:
             templates = list(self._templates.values())
             template_names = list(self._templates.keys())
 
-            categories: Dict[str, int] = {}
+            categories: dict[str, int] = {}
             for template in templates:
                 cat = template.metadata.category
                 categories[cat] = categories.get(cat, 0) + 1
@@ -447,7 +447,7 @@ class VerticalTemplateRegistry:
                 "template_names": template_names,
             }
 
-    def validate_registry(self) -> List[str]:
+    def validate_registry(self) -> list[str]:
         """Validate all templates in the registry.
 
         Returns:
@@ -508,7 +508,7 @@ def get_template(name: str) -> Optional[VerticalTemplate]:
     return registry.get(name)
 
 
-def list_templates() -> List[VerticalTemplate]:
+def list_templates() -> list[VerticalTemplate]:
     """List all templates in the global registry.
 
     Returns:

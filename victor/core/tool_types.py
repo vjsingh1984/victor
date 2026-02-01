@@ -27,10 +27,10 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, List, Optional, Protocol, Set, Tuple, runtime_checkable
+from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from victor.core.tool_dependency_base import ToolDependencyConfig
+    pass
 
 
 @dataclass
@@ -45,8 +45,8 @@ class ToolDependency:
     """
 
     tool_name: str
-    depends_on: Set[str] = field(default_factory=set)
-    enables: Set[str] = field(default_factory=set)
+    depends_on: set[str] = field(default_factory=set)
+    enables: set[str] = field(default_factory=set)
     weight: float = 1.0
 
 
@@ -71,7 +71,7 @@ class ToolDependencyProviderProtocol(Protocol):
     """
 
     @abstractmethod
-    def get_dependencies(self) -> List[ToolDependency]:
+    def get_dependencies(self) -> list[ToolDependency]:
         """Get tool dependencies for this vertical.
 
         Returns:
@@ -79,7 +79,7 @@ class ToolDependencyProviderProtocol(Protocol):
         """
         ...
 
-    def get_tool_sequences(self) -> List[List[str]]:
+    def get_tool_sequences(self) -> list[list[str]]:
         """Get common tool call sequences.
 
         Returns:
@@ -114,14 +114,14 @@ class EmptyToolDependencyProvider:
         """
         self._vertical = vertical
         # Minimal valid configuration
-        self._default_sequence: List[str] = ["read"]
-        self._required_tools: Set[str] = {"read"}
-        self._optional_tools: Set[str] = set()
-        self._dependencies: List[ToolDependency] = []
-        self._transitions: Dict[str, List[Tuple[str, float]]] = {}
-        self._clusters: Dict[str, Set[str]] = {}
-        self._sequences: Dict[str, List[str]] = {}
-        self._dependency_map: Dict[str, ToolDependency] = {}
+        self._default_sequence: list[str] = ["read"]
+        self._required_tools: set[str] = {"read"}
+        self._optional_tools: set[str] = set()
+        self._dependencies: list[ToolDependency] = []
+        self._transitions: dict[str, list[tuple[str, float]]] = {}
+        self._clusters: dict[str, set[str]] = {}
+        self._sequences: dict[str, list[str]] = {}
+        self._dependency_map: dict[str, ToolDependency] = {}
 
     @property
     def vertical(self) -> str:
@@ -132,7 +132,7 @@ class EmptyToolDependencyProvider:
     # ToolDependencyProviderProtocol Implementation
     # =========================================================================
 
-    def get_dependencies(self) -> List[ToolDependency]:
+    def get_dependencies(self) -> list[ToolDependency]:
         """Get tool dependencies (empty for fallback).
 
         Returns:
@@ -140,7 +140,7 @@ class EmptyToolDependencyProvider:
         """
         return []
 
-    def get_tool_sequences(self) -> List[List[str]]:
+    def get_tool_sequences(self) -> list[list[str]]:
         """Get common tool sequences (minimal for fallback).
 
         Returns:
@@ -152,15 +152,15 @@ class EmptyToolDependencyProvider:
     # Extended Methods (same interface as BaseToolDependencyProvider)
     # =========================================================================
 
-    def get_tool_transitions(self) -> Dict[str, List[Tuple[str, float]]]:
+    def get_tool_transitions(self) -> dict[str, list[tuple[str, float]]]:
         """Get tool transition probabilities (empty for fallback)."""
         return {}
 
-    def get_tool_clusters(self) -> Dict[str, Set[str]]:
+    def get_tool_clusters(self) -> dict[str, set[str]]:
         """Get tool clusters (empty for fallback)."""
         return {}
 
-    def get_recommended_sequence(self, task_type: str) -> List[str]:
+    def get_recommended_sequence(self, task_type: str) -> list[str]:
         """Get recommended tool sequence (minimal for fallback).
 
         Args:
@@ -171,11 +171,11 @@ class EmptyToolDependencyProvider:
         """
         return self._default_sequence.copy()
 
-    def get_required_tools(self) -> Set[str]:
+    def get_required_tools(self) -> set[str]:
         """Get tools essential for this vertical."""
         return self._required_tools.copy()
 
-    def get_optional_tools(self) -> Set[str]:
+    def get_optional_tools(self) -> set[str]:
         """Get tools that enhance but aren't required (empty for fallback)."""
         return set()
 
@@ -194,7 +194,7 @@ class EmptyToolDependencyProvider:
     def suggest_next_tool(
         self,
         current_tool: str,
-        used_tools: Optional[List[str]] = None,
+        used_tools: Optional[list[str]] = None,
     ) -> str:
         """Suggest the next tool (always "read" for fallback).
 
@@ -211,7 +211,7 @@ class EmptyToolDependencyProvider:
         """Find which cluster a tool belongs to (None for fallback)."""
         return None
 
-    def get_cluster_tools(self, cluster_name: str) -> Set[str]:
+    def get_cluster_tools(self, cluster_name: str) -> set[str]:
         """Get all tools in a cluster (empty for fallback)."""
         return set()
 

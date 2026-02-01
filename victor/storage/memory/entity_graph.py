@@ -42,7 +42,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 from victor.storage.memory.entity_types import (
     Entity,
@@ -64,8 +64,8 @@ class GraphPath:
         total_strength: Sum of relation strengths
     """
 
-    entities: List[Entity] = field(default_factory=list)
-    relations: List[EntityRelation] = field(default_factory=list)
+    entities: list[Entity] = field(default_factory=list)
+    relations: list[EntityRelation] = field(default_factory=list)
     total_strength: float = 0.0
 
     @property
@@ -88,10 +88,10 @@ class GraphStats:
 
     entity_count: int = 0
     relation_count: int = 0
-    entity_type_counts: Dict[EntityType, int] = field(default_factory=dict)
-    relation_type_counts: Dict[RelationType, int] = field(default_factory=dict)
+    entity_type_counts: dict[EntityType, int] = field(default_factory=dict)
+    relation_type_counts: dict[RelationType, int] = field(default_factory=dict)
     avg_connections_per_entity: float = 0.0
-    most_connected_entities: List[Tuple[str, int]] = field(default_factory=list)
+    most_connected_entities: list[tuple[str, int]] = field(default_factory=list)
 
 
 class EntityGraph:
@@ -118,9 +118,9 @@ class EntityGraph:
         self._initialized = False
 
         # In-memory adjacency lists
-        self._outgoing: Dict[str, List[EntityRelation]] = defaultdict(list)
-        self._incoming: Dict[str, List[EntityRelation]] = defaultdict(list)
-        self._entities: Dict[str, Entity] = {}
+        self._outgoing: dict[str, list[EntityRelation]] = defaultdict(list)
+        self._incoming: dict[str, list[EntityRelation]] = defaultdict(list)
+        self._entities: dict[str, Entity] = {}
 
     async def initialize(self) -> None:
         """Initialize the graph storage."""
@@ -288,10 +288,10 @@ class EntityGraph:
     async def get_neighbors(
         self,
         entity_id: str,
-        relation_types: Optional[Set[RelationType]] = None,
+        relation_types: Optional[set[RelationType]] = None,
         direction: str = "both",
         depth: int = 1,
-    ) -> List[Tuple[Entity, EntityRelation, int]]:
+    ) -> list[tuple[Entity, EntityRelation, int]]:
         """Get neighboring entities.
 
         Args:
@@ -306,9 +306,9 @@ class EntityGraph:
         if not self._initialized:
             await self.initialize()
 
-        results: List[Tuple[Entity, EntityRelation, int]] = []
-        visited: Set[str] = {entity_id}
-        queue: deque[Tuple[str, int]] = deque([(entity_id, 0)])
+        results: list[tuple[Entity, EntityRelation, int]] = []
+        visited: set[str] = {entity_id}
+        queue: deque[tuple[str, int]] = deque([(entity_id, 0)])
 
         while queue:
             current_id, current_depth = queue.popleft()
@@ -351,8 +351,8 @@ class EntityGraph:
         source_id: str,
         target_id: str,
         max_depth: int = 5,
-        relation_types: Optional[Set[RelationType]] = None,
-    ) -> List[GraphPath]:
+        relation_types: Optional[set[RelationType]] = None,
+    ) -> list[GraphPath]:
         """Find all paths between two entities.
 
         Args:
@@ -367,7 +367,7 @@ class EntityGraph:
         if not self._initialized:
             await self.initialize()
 
-        paths: List[GraphPath] = []
+        paths: list[GraphPath] = []
         source = self._entities.get(source_id)
         target = self._entities.get(target_id)
 
@@ -419,9 +419,9 @@ class EntityGraph:
 
     async def get_subgraph(
         self,
-        entity_ids: Set[str],
+        entity_ids: set[str],
         include_relations: bool = True,
-    ) -> Tuple[List[Entity], List[EntityRelation]]:
+    ) -> tuple[list[Entity], list[EntityRelation]]:
         """Get a subgraph containing specified entities.
 
         Args:
@@ -433,7 +433,7 @@ class EntityGraph:
         """
         entities = [self._entities[eid] for eid in entity_ids if eid in self._entities]
 
-        relations: List[EntityRelation] = []
+        relations: list[EntityRelation] = []
         if include_relations:
             for eid in entity_ids:
                 for relation in self._outgoing.get(eid, []):

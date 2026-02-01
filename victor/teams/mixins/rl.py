@@ -42,7 +42,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class RLMixin:
         formation: str,
         success: bool,
         quality_score: float,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record RL outcome for team execution.
 

@@ -37,7 +37,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 class EnhancementTechnique(str, Enum):
@@ -77,12 +77,12 @@ class EnhancementContext:
 
     domain: str = "general"
     task_type: Optional[str] = None
-    entity_metadata: List[Dict[str, Any]] = field(default_factory=list)
-    conversation_history: List[str] = field(default_factory=list)
+    entity_metadata: list[dict[str, Any]] = field(default_factory=list)
+    conversation_history: list[str] = field(default_factory=list)
     max_variants: int = 3
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def get_entity_names(self) -> List[str]:
+    def get_entity_names(self) -> list[str]:
         """Get list of entity names from metadata."""
         names = []
         for entity in self.entity_metadata:
@@ -112,14 +112,14 @@ class EnhancedQuery:
     original: str
     enhanced: str
     technique: EnhancementTechnique
-    variants: List[str] = field(default_factory=list)
-    sub_queries: List[str] = field(default_factory=list)
+    variants: list[str] = field(default_factory=list)
+    sub_queries: list[str] = field(default_factory=list)
     hypothetical_doc: Optional[str] = None
     reasoning: Optional[str] = None
     confidence: float = 1.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def get_all_queries(self) -> List[str]:
+    def get_all_queries(self) -> list[str]:
         """Get all query variants including enhanced query and sub-queries."""
         queries = [self.enhanced]
         queries.extend(self.variants)
@@ -151,7 +151,7 @@ class QueryEnhancementConfig:
         temperature: Temperature for LLM calls
     """
 
-    techniques: List[EnhancementTechnique] = field(
+    techniques: list[EnhancementTechnique] = field(
         default_factory=lambda: [EnhancementTechnique.ENTITY_EXPAND]
     )
     enable_llm: bool = False  # Global default: disabled (opt-out pattern)

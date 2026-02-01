@@ -38,7 +38,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from victor.core.verticals.protocols.rl_provider import RLConfigProviderProtocol
 from victor.core.verticals.protocols.team_provider import TeamSpecProviderProtocol
@@ -101,7 +101,7 @@ class FrameworkExtensionsProtocol(Protocol):
     multiple specialized agents.
     """
 
-    def get_workflows(self) -> Dict[str, Any]:
+    def get_workflows(self) -> dict[str, Any]:
         """Get workflow definitions from the workflow provider.
 
         Returns:
@@ -112,7 +112,7 @@ class FrameworkExtensionsProtocol(Protocol):
             return self.workflow_provider.get_workflows()
         return {}
 
-    def get_auto_workflows(self) -> List[Any]:
+    def get_auto_workflows(self) -> list[Any]:
         """Get automatically triggered workflow patterns.
 
         Returns:
@@ -123,7 +123,7 @@ class FrameworkExtensionsProtocol(Protocol):
             return self.workflow_provider.get_auto_workflows()
         return []
 
-    def get_rl_config(self) -> Dict[str, Any]:
+    def get_rl_config(self) -> dict[str, Any]:
         """Get RL configuration from the RL config provider.
 
         Returns:
@@ -145,7 +145,7 @@ class FrameworkExtensionsProtocol(Protocol):
             return self.rl_config_provider.get_rl_hooks()
         return None
 
-    def get_team_specs(self) -> Dict[str, Any]:
+    def get_team_specs(self) -> dict[str, Any]:
         """Get team specifications from the team spec provider.
 
         Returns:

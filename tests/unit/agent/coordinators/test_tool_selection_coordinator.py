@@ -29,7 +29,6 @@ Test Coverage:
 
 import pytest
 from unittest.mock import Mock
-from typing import List, Dict, Any, Optional, Set
 
 from victor.agent.coordinators.tool_selection_coordinator import ToolSelectionCoordinator
 from victor.agent.protocols import AgentToolSelectionContext

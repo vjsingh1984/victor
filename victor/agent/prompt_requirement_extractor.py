@@ -36,7 +36,8 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Pattern, Tuple
+from typing import Any, Optional
+from re import Pattern
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,7 @@ class PromptRequirements:
     # Metadata
     buffer_multiplier: float = 1.5
     confidence: float = 0.0
-    raw_matches: Dict[str, List[str]] = field(default_factory=dict)
+    raw_matches: dict[str, list[str]] = field(default_factory=dict)
 
     def compute_budgets(
         self,
@@ -128,7 +129,7 @@ class PromptRequirements:
             ]
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for logging/serialization."""
         return {
             "file_count": self.file_count,
@@ -161,16 +162,16 @@ class RequirementPattern:
     """
 
     name: str
-    patterns: List[str]
+    patterns: list[str]
     priority: int = 50
 
-    def compile(self) -> List[Pattern[str]]:
+    def compile(self) -> list[Pattern[str]]:
         """Compile all patterns."""
         return [re.compile(p, re.IGNORECASE) for p in self.patterns]
 
 
 # Default patterns for common requirements
-DEFAULT_PATTERNS: List[RequirementPattern] = [
+DEFAULT_PATTERNS: list[RequirementPattern] = [
     # File count patterns
     RequirementPattern(
         name="file_count",
@@ -272,7 +273,7 @@ class PromptRequirementExtractor:
 
     def __init__(
         self,
-        patterns: Optional[List[RequirementPattern]] = None,
+        patterns: Optional[list[RequirementPattern]] = None,
         buffer_multiplier: float = 1.5,
     ):
         """Initialize extractor.
@@ -283,7 +284,7 @@ class PromptRequirementExtractor:
         """
         self._patterns = patterns or DEFAULT_PATTERNS
         self._buffer_multiplier = buffer_multiplier
-        self._compiled: Dict[str, Any] = {}
+        self._compiled: dict[str, Any] = {}
         self._compile_patterns()
 
     def _compile_patterns(self) -> None:
@@ -303,7 +304,7 @@ class PromptRequirementExtractor:
             PromptRequirements with extracted values and computed budgets
         """
         requirements = PromptRequirements(buffer_multiplier=self._buffer_multiplier)
-        raw_matches: Dict[str, List[str]] = {}
+        raw_matches: dict[str, list[str]] = {}
         match_count = 0
         total_patterns = 0
 
@@ -345,7 +346,7 @@ class PromptRequirementExtractor:
 
         return requirements
 
-    def _extract_value(self, matches: List[Any], pattern_name: str = "") -> Optional[int]:
+    def _extract_value(self, matches: list[Any], pattern_name: str = "") -> Optional[int]:
         """Extract numeric value from regex matches.
 
         Handles both simple matches and tuple matches (from groups).

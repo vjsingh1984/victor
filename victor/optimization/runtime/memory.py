@@ -32,13 +32,12 @@ from __future__ import annotations
 import functools
 import gc
 import logging
-import sys
 import threading
 import time
-import weakref
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Callable, Deque, Dict, Generic, List, Optional, Type, TypeVar, cast
+from typing import Any, Generic, Optional, TypeVar
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +58,9 @@ class MemoryStats:
     total_objects: int = 0
     total_size: int = 0
     gc_counts: tuple[int, int, int] = field(default_factory=lambda: (0, 0, 0))
-    pool_stats: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    pool_stats: dict[str, dict[str, float]] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "total_objects": self.total_objects,
@@ -104,7 +103,7 @@ class ObjectPool(Generic[T]):
         self._factory = factory
         self._reset = reset
         self._max_size = max_size
-        self._pool: Deque[T] = deque()
+        self._pool: deque[T] = deque()
         self._lock = threading.Lock()
         self._created = 0
         self._acquired = 0
@@ -151,7 +150,7 @@ class ObjectPool(Generic[T]):
         with self._lock:
             self._pool.clear()
 
-    def get_stats(self) -> Dict[str, float]:
+    def get_stats(self) -> dict[str, float]:
         """Get pool statistics."""
         with self._lock:
             return {
@@ -192,8 +191,8 @@ class MemoryProfiler:
         self._sample_interval = sample_interval
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._samples: List[tuple[Any, ...]] = []
-        self._object_refs: List[Any] = []
+        self._samples: list[tuple[Any, ...]] = []
+        self._object_refs: list[Any] = []
 
     def start(self) -> None:
         """Start memory profiling."""
@@ -260,7 +259,7 @@ class MemoryProfiler:
             gc_counts=gc_counts,
         )
 
-    def detect_leaks(self) -> List[Dict[str, Any]]:
+    def detect_leaks(self) -> list[dict[str, Any]]:
         """Detect potential memory leaks.
 
         Returns:
@@ -333,7 +332,7 @@ class MemoryOptimizer:
 
     def __init__(self) -> None:
         """Initialize memory optimizer."""
-        self._pools: Dict[str, ObjectPool[Any]] = {}
+        self._pools: dict[str, ObjectPool[Any]] = {}
         self._profiler: Optional[MemoryProfiler] = None
         self._original_gc_thresholds: Optional[tuple[Any, ...]] = None
 
@@ -409,7 +408,7 @@ class MemoryOptimizer:
 
         return stats
 
-    def detect_leaks(self) -> List[Dict[str, Any]]:
+    def detect_leaks(self) -> list[dict[str, Any]]:
         """Detect potential memory leaks.
 
         Returns:
@@ -460,7 +459,7 @@ class MemoryOptimizer:
         """
         return self._pools.get(name)
 
-    def collect_garbage(self) -> Dict[str, int]:
+    def collect_garbage(self) -> dict[str, int]:
         """Force garbage collection.
 
         Returns:

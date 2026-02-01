@@ -52,11 +52,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union, TYPE_CHECKING
+from typing import Any, Literal, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.config import AgentConfig
-    from victor.agent.subagents.base import SubAgentConfig, SubAgentRole
+    from victor.agent.subagents.base import SubAgentConfig
 
 
 class AgentMode(str, Enum):
@@ -191,9 +191,9 @@ class UnifiedAgentConfig:
     # ==========================================================================
 
     role: str = "team_member"
-    capabilities: List[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     description: str = ""
-    allowed_tools: List[str] = field(default_factory=list)
+    allowed_tools: list[str] = field(default_factory=list)
     can_spawn_subagents: bool = False
     context_limit: int = 128000
     working_directory: Optional[str] = None
@@ -204,7 +204,7 @@ class UnifiedAgentConfig:
     # ==========================================================================
 
     # Additional settings (pass-through to Settings/extra config)
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
     # ==========================================================================
     # Migration Helpers
@@ -290,7 +290,7 @@ class UnifiedAgentConfig:
             extra=self.extra,
         )
 
-    def to_settings_dict(self) -> Dict[str, Any]:
+    def to_settings_dict(self) -> dict[str, Any]:
         """Convert to Settings-compatible dictionary.
 
         Returns:
@@ -383,9 +383,9 @@ class UnifiedAgentConfig:
     def team_member(
         cls,
         role: str,
-        capabilities: List[str],
+        capabilities: list[str],
         description: str = "",
-        allowed_tools: Optional[List[str]] = None,
+        allowed_tools: Optional[list[str]] = None,
         **kwargs: Any,
     ) -> "UnifiedAgentConfig":
         """Create configuration for team member agent.

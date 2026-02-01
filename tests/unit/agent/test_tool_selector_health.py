@@ -23,7 +23,6 @@ import pytest
 
 from victor.tools.keyword_tool_selector import KeywordToolSelector
 from victor.tools.semantic_selector import SemanticToolSelector
-from victor.agent.tool_selector_factory import create_tool_selector_strategy
 from victor.tools.registry import ToolRegistry
 
 

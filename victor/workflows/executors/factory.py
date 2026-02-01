@@ -33,12 +33,12 @@ SOLID Compliance:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
     from victor.workflows.definition import WorkflowNode, WorkflowNodeType
-    from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
     from victor.workflows.yaml_to_graph_compiler import WorkflowState
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ class NodeExecutorFactory:
         from victor.core.container import ServiceContainer
 
         self._container: ServiceContainer = container or ServiceContainer()
-        self._executor_types: Dict[str, Any] = {}
+        self._executor_types: dict[str, Any] = {}
 
     def register_executor_type(
         self,
@@ -127,7 +127,6 @@ class NodeExecutorFactory:
             executor_fn = factory.create_executor(agent_node)
             result_state = await executor_fn(initial_state)
         """
-        from victor.workflows.definition import WorkflowNodeType
 
         # Get executor class for this node type
         executor_class = self._get_executor_class(node.node_type)

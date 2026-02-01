@@ -33,7 +33,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Protocol, Type, TypeVar, cast
+from typing import Any, Optional, Protocol, TypeVar
 
 from victor.config.settings import Settings, load_settings, get_project_paths
 from victor.core.container import (
@@ -60,10 +60,10 @@ T = TypeVar("T")
 class NullMetricsService:
     """No-op metrics service for when metrics are disabled."""
 
-    def record_metric(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
+    def record_metric(self, name: str, value: float, tags: Optional[dict[str, str]] = None) -> None:
         pass
 
-    def increment_counter(self, name: str, tags: Optional[Dict[str, str]] = None) -> None:
+    def increment_counter(self, name: str, tags: Optional[dict[str, str]] = None) -> None:
         pass
 
 
@@ -91,7 +91,7 @@ class InMemoryCacheService:
     """Simple in-memory cache service."""
 
     def __init__(self, max_size: int = 1000):
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
         self._max_size = max_size
 
     def get(self, key: str) -> Optional[Any]:
@@ -155,15 +155,15 @@ class LazyEmbeddingService:
 class SignatureStoreProtocol(Protocol):
     """Protocol for failed signature storage."""
 
-    def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool: ...
+    def is_known_failure(self, tool_name: str, args: dict[str, Any]) -> bool: ...
 
-    def record_failure(self, tool_name: str, args: Dict[str, Any], error_message: str) -> None: ...
+    def record_failure(self, tool_name: str, args: dict[str, Any], error_message: str) -> None: ...
 
 
 class UsageLoggerProtocol(Protocol):
     """Protocol for usage logging."""
 
-    def log_event(self, event_type: str, data: Dict[str, Any]) -> None: ...
+    def log_event(self, event_type: str, data: dict[str, Any]) -> None: ...
 
     def is_enabled(self) -> bool: ...
 
@@ -176,7 +176,7 @@ class UsageLoggerProtocol(Protocol):
 def bootstrap_container(
     settings: Optional[Settings] = None,
     vertical: Optional[str] = None,
-    override_services: Optional[Dict[Type[Any], Any]] = None,
+    override_services: Optional[dict[type[Any], Any]] = None,
 ) -> ServiceContainer:
     """Bootstrap the DI container with default service implementations.
 
@@ -237,7 +237,7 @@ def bootstrap_container(
     if override_services:
         for service_type, instance in override_services.items():
 
-            def make_factory(c: ServiceContainer, inst: Any = instance) -> Any:  # noqa: B023
+            def make_factory(c: ServiceContainer, inst: Any = instance) -> Any:
                 return inst
 
             container.register_or_replace(
@@ -463,13 +463,13 @@ def _create_signature_store() -> Any:
 class NullSignatureStore:
     """No-op signature store for when the real one fails to load."""
 
-    def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
+    def is_known_failure(self, tool_name: str, args: dict[str, Any]) -> bool:
         return False
 
-    def record_failure(self, tool_name: str, args: Dict[str, Any], error_message: str) -> None:
+    def record_failure(self, tool_name: str, args: dict[str, Any], error_message: str) -> None:
         pass
 
-    def clear_signature(self, tool_name: str, args: Dict[str, Any]) -> bool:
+    def clear_signature(self, tool_name: str, args: dict[str, Any]) -> bool:
         return False
 
 
@@ -626,7 +626,7 @@ def _register_vertical_services(
 # =============================================================================
 
 
-def get_service(service_type: Type[T]) -> T:
+def get_service(service_type: type[T]) -> T:
     """Get a service from the global container.
 
     Args:
@@ -638,7 +638,7 @@ def get_service(service_type: Type[T]) -> T:
     return get_container().get(service_type)
 
 
-def get_service_optional(service_type: Type[T]) -> Optional[T]:
+def get_service_optional(service_type: type[T]) -> Optional[T]:
     """Get a service from the global container, or None if not found.
 
     Args:
@@ -718,7 +718,7 @@ def _ensure_vertical_activated(
 
                 def make_ext_factory(
                     c: ServiceContainer, ext: Any = extensions
-                ) -> Any:  # noqa: B023
+                ) -> Any:
                     return ext
 
                 container.register_or_replace(

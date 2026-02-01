@@ -4,20 +4,14 @@ This module delegates to the framework's safety patterns (victor.security.safety
 for source credibility and content warnings, extending with research-specific patterns.
 """
 
-from typing import Dict, List, Tuple
 
 from victor.core.verticals.protocols import SafetyExtensionProtocol
 from victor.core.security.patterns.types import SafetyPattern
 
 # Import framework safety patterns (DRY principle)
 from victor.core.security.patterns.source_credibility import (
-    SOURCE_CREDIBILITY_PATTERNS as _FRAMEWORK_CREDIBILITY_PATTERNS,
     validate_source_credibility as _framework_validate_credibility,
     get_source_safety_reminders as _framework_source_reminders,
-)
-from victor.core.security.patterns.content_patterns import (
-    CONTENT_WARNING_PATTERNS as _FRAMEWORK_CONTENT_PATTERNS,
-    scan_content_warnings as _framework_scan_warnings,
 )
 
 
@@ -28,7 +22,7 @@ LOW = "LOW"
 
 # Research-specific safety patterns as tuples (pattern, description, risk_level)
 # These are RESEARCH-SPECIFIC, not generic patterns
-_RESEARCH_SAFETY_TUPLES: List[Tuple[str, str, str]] = [
+_RESEARCH_SAFETY_TUPLES: list[tuple[str, str, str]] = [
     # High-risk patterns - could spread misinformation (research-specific)
     (r"(?i)fake\s+news|fabricat.*source|invent.*citation", "Fabricating sources", HIGH),
     (r"(?i)plagiari|copy\s+without\s+attribution", "Plagiarism risk", HIGH),
@@ -44,7 +38,7 @@ _RESEARCH_SAFETY_TUPLES: List[Tuple[str, str, str]] = [
 
 # DEPRECATED: Use victor.security.safety.source_credibility instead
 # Kept for backward compatibility
-SOURCE_CREDIBILITY_PATTERNS: Dict[str, str] = {
+SOURCE_CREDIBILITY_PATTERNS: dict[str, str] = {
     "high_credibility": r"\.gov|\.edu|arxiv\.org|pubmed|doi\.org|nature\.com|science\.org",
     "medium_credibility": r"wikipedia\.org|medium\.com|substack\.com|news\.",
     "low_credibility": r"\.blogspot\.|wordpress\.com/(?!.*official)|tumblr\.com",
@@ -52,7 +46,7 @@ SOURCE_CREDIBILITY_PATTERNS: Dict[str, str] = {
 
 # DEPRECATED: Use victor.security.safety.content_patterns instead
 # Kept for backward compatibility
-CONTENT_WARNING_PATTERNS: List[Tuple[str, str]] = [
+CONTENT_WARNING_PATTERNS: list[tuple[str, str]] = [
     (r"(?i)graphic\s+content|violence|disturbing", "Potentially disturbing content"),
     (r"(?i)trigger\s+warning|sensitive\s+topic", "Sensitive topic"),
     (r"(?i)controversial|disputed|debated", "Controversial topic"),
@@ -66,7 +60,7 @@ class ResearchSafetyExtension(SafetyExtensionProtocol):
     source credibility and content warnings, extending with research-specific patterns.
     """
 
-    def get_bash_patterns(self) -> List[SafetyPattern]:
+    def get_bash_patterns(self) -> list[SafetyPattern]:
         """Return research-specific bash patterns.
 
         Returns:
@@ -82,7 +76,7 @@ class ResearchSafetyExtension(SafetyExtensionProtocol):
             for p, d, r in _RESEARCH_SAFETY_TUPLES
         ]
 
-    def get_danger_patterns(self) -> List[Tuple[str, str, str]]:
+    def get_danger_patterns(self) -> list[tuple[str, str, str]]:
         """Return research-specific danger patterns (legacy format).
 
         Returns:
@@ -90,7 +84,7 @@ class ResearchSafetyExtension(SafetyExtensionProtocol):
         """
         return _RESEARCH_SAFETY_TUPLES
 
-    def get_blocked_operations(self) -> List[str]:
+    def get_blocked_operations(self) -> list[str]:
         """Return operations that should be blocked in research context."""
         return [
             "execute_code",  # Research shouldn't execute arbitrary code
@@ -99,7 +93,7 @@ class ResearchSafetyExtension(SafetyExtensionProtocol):
             "make_purchase",  # Research shouldn't make transactions
         ]
 
-    def get_content_warnings(self) -> List[Tuple[str, str]]:
+    def get_content_warnings(self) -> list[tuple[str, str]]:
         """Return patterns that should trigger content warnings.
 
         Delegates to framework safety patterns for consistency.
@@ -119,7 +113,7 @@ class ResearchSafetyExtension(SafetyExtensionProtocol):
         result = _framework_validate_credibility(url)
         return result.level.value
 
-    def get_safety_reminders(self) -> List[str]:
+    def get_safety_reminders(self) -> list[str]:
         """Return safety reminders for research output.
 
         Extends framework reminders with research-specific guidance.
@@ -171,7 +165,7 @@ Example:
         print(f"Blocked: {reason}")
 """
 
-from victor.framework.config import SafetyEnforcer, SafetyRule, SafetyLevel
+from victor.framework.config import SafetyEnforcer
 
 
 def create_research_source_safety_rules(

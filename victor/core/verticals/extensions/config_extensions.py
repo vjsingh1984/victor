@@ -38,7 +38,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.core.verticals.protocols import ModeConfig
 
@@ -85,9 +85,9 @@ class ConfigExtensions:
 
     mode_config: Optional[Any] = None  # ModeConfigProviderProtocol
     rl_config: Optional[Any] = None  # RLConfigProviderProtocol
-    team_specs: Dict[str, Any] = field(default_factory=dict)  # Dict[str, TeamSpec]
+    team_specs: dict[str, Any] = field(default_factory=dict)  # Dict[str, TeamSpec]
 
-    def get_mode_configs(self) -> Dict[str, ModeConfig]:
+    def get_mode_configs(self) -> dict[str, ModeConfig]:
         """Get mode configurations from the provider.
 
         Returns:
@@ -131,7 +131,7 @@ class ConfigExtensions:
             return budget if isinstance(budget, int) else 10
         return 10
 
-    def get_rl_settings(self) -> Dict[str, Any]:
+    def get_rl_settings(self) -> dict[str, Any]:
         """Get RL configuration settings.
 
         Returns:
@@ -142,7 +142,7 @@ class ConfigExtensions:
             return config if isinstance(config, dict) else {}
         return {}
 
-    def get_active_learners(self) -> List[str]:
+    def get_active_learners(self) -> list[str]:
         """Get list of active RL learners.
 
         Returns:
@@ -154,7 +154,7 @@ class ConfigExtensions:
 
         return cast(list[str], result)
 
-    def get_quality_thresholds(self) -> Dict[str, float]:
+    def get_quality_thresholds(self) -> dict[str, float]:
         """Get task-specific quality thresholds.
 
         Returns:
@@ -187,7 +187,7 @@ class ConfigExtensions:
         """
         return self.team_specs.get(team_name)
 
-    def get_all_team_names(self) -> List[str]:
+    def get_all_team_names(self) -> list[str]:
         """Get all available team names.
 
         Returns:

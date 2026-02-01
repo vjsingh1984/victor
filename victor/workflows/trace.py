@@ -47,10 +47,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import (
     Any,
-    Dict,
-    List,
     Optional,
-    Union,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,8 +73,8 @@ class ToolCallRecord:
     """
 
     tool_name: str
-    inputs: Dict[str, Any]
-    outputs: Optional[Dict[str, Any]]
+    inputs: dict[str, Any]
+    outputs: Optional[dict[str, Any]]
     duration_seconds: float
     success: bool
     error: Optional[str] = None
@@ -103,14 +100,14 @@ class NodeTraceRecord:
 
     node_id: str
     node_type: str
-    inputs: Dict[str, Any]
-    outputs: Optional[Dict[str, Any]]
+    inputs: dict[str, Any]
+    outputs: Optional[dict[str, Any]]
     duration_seconds: float
-    tool_calls: List[ToolCallRecord]
+    tool_calls: list[ToolCallRecord]
     success: bool
     error: Optional[str] = None
     timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -132,10 +129,10 @@ class WorkflowTrace:
     workflow_name: str
     start_time: float
     end_time: Optional[float]
-    inputs: Dict[str, Any]
-    outputs: Optional[Dict[str, Any]]
-    nodes: List[NodeTraceRecord]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    inputs: dict[str, Any]
+    outputs: Optional[dict[str, Any]]
+    nodes: list[NodeTraceRecord]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -163,13 +160,13 @@ class WorkflowTracer:
         self._current_node: Optional[NodeTraceRecord] = None
 
         # Trace history
-        self._traces: List[WorkflowTrace] = []
+        self._traces: list[WorkflowTrace] = []
 
     def start_trace(
         self,
         workflow_name: str,
-        inputs: Dict[str, Any],
-        metadata: Optional[Dict[str, Any]] = None,
+        inputs: dict[str, Any],
+        metadata: Optional[dict[str, Any]] = None,
     ) -> str:
         """Start a new trace.
 
@@ -201,7 +198,7 @@ class WorkflowTracer:
 
     def end_trace(
         self,
-        outputs: Optional[Dict[str, Any]] = None,
+        outputs: Optional[dict[str, Any]] = None,
     ) -> Optional[WorkflowTrace]:
         """End current trace.
 
@@ -240,7 +237,7 @@ class WorkflowTracer:
         self,
         node_id: str,
         node_type: str,
-        inputs: Dict[str, Any],
+        inputs: dict[str, Any],
     ) -> None:
         """Start tracing a node execution.
 
@@ -273,7 +270,7 @@ class WorkflowTracer:
 
     def end_node(
         self,
-        outputs: Optional[Dict[str, Any]] = None,
+        outputs: Optional[dict[str, Any]] = None,
         success: bool = True,
         error: Optional[str] = None,
     ) -> None:
@@ -309,10 +306,10 @@ class WorkflowTracer:
         self,
         node_id: str,
         node_type: str,
-        inputs: Dict[str, Any],
-        outputs: Optional[Dict[str, Any]] = None,
+        inputs: dict[str, Any],
+        outputs: Optional[dict[str, Any]] = None,
         duration_seconds: float = 0.0,
-        tool_calls: Optional[List[ToolCallRecord]] = None,
+        tool_calls: Optional[list[ToolCallRecord]] = None,
         success: bool = True,
         error: Optional[str] = None,
     ) -> None:
@@ -354,8 +351,8 @@ class WorkflowTracer:
     def trace_tool_call(
         self,
         tool_name: str,
-        inputs: Dict[str, Any],
-        outputs: Optional[Dict[str, Any]],
+        inputs: dict[str, Any],
+        outputs: Optional[dict[str, Any]],
         duration_seconds: float,
         success: bool = True,
         error: Optional[str] = None,
@@ -395,7 +392,7 @@ class WorkflowTracer:
         """
         return self._current_trace
 
-    def get_trace_history(self) -> List[WorkflowTrace]:
+    def get_trace_history(self) -> list[WorkflowTrace]:
         """Get trace history.
 
         Returns:
@@ -421,7 +418,7 @@ class WorkflowTracer:
     # Analysis and Reporting
     # =========================================================================
 
-    def analyze_trace(self, trace: Optional[WorkflowTrace] = None) -> Dict[str, Any]:
+    def analyze_trace(self, trace: Optional[WorkflowTrace] = None) -> dict[str, Any]:
         """Analyze trace for insights.
 
         Args:
@@ -674,7 +671,7 @@ class WorkflowTracer:
 
 def trace_workflow(
     workflow_name: str,
-    inputs: Dict[str, Any],
+    inputs: dict[str, Any],
 ) -> WorkflowTracer:
     """Create and start a workflow trace.
 

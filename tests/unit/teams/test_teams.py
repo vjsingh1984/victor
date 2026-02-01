@@ -15,8 +15,7 @@
 """Unit tests for the agent teams module."""
 
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 from victor.agent.teams import (
     TeamMember,
@@ -581,17 +580,6 @@ class TestModuleExports:
 
     def test_teams_init_exports(self):
         """Teams __init__ exports all expected symbols."""
-        from victor.agent.teams import (
-            TeamFormation,
-            TeamMember,
-            TeamConfig,
-            TeamResult,
-            TeamCoordinator,
-            MessageType,
-            AgentMessage,
-            TeamMessageBus,
-            TeamSharedMemory,
-        )
 
         # If we get here without ImportError, all exports work
         assert True

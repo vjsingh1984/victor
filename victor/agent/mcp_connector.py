@@ -38,7 +38,8 @@ Usage:
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
@@ -77,7 +78,7 @@ class MCPConnectResult:
     servers_discovered: int = 0
     servers_connected: int = 0
     tools_registered: int = 0
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -130,7 +131,7 @@ class MCPConnector:
         self._task_callback = task_callback
 
         self._mcp_registry: Optional[Any] = None
-        self._pending_tasks: List[asyncio.Task[Any]] = []
+        self._pending_tasks: list[asyncio.Task[Any]] = []
         self._connected = False
 
     @property
@@ -276,7 +277,7 @@ class MCPConnector:
 
         return tools_registered
 
-    def get_server_info(self) -> List[MCPServerInfo]:
+    def get_server_info(self) -> list[MCPServerInfo]:
         """Get information about MCP servers.
 
         Returns:
@@ -297,7 +298,7 @@ class MCPConnector:
             for s in servers
         ]
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get summary information about MCP servers.
 
         Returns:

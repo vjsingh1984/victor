@@ -20,10 +20,8 @@ hard-coded fallback imports.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 
 class TestRegistryProtocols:

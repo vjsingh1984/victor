@@ -21,7 +21,6 @@ and caching behavior.
 
 import pytest
 import time
-from typing import List
 
 from victor.native.accelerators import (
     EmbeddingOpsAccelerator,

@@ -43,7 +43,8 @@ import importlib.util
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.framework.module_loader import DynamicModuleLoader
 from victor.tools.base import BaseTool, ToolRegistry
@@ -81,8 +82,8 @@ class ToolPluginRegistry:
 
     def __init__(
         self,
-        plugin_dirs: Optional[List[Path]] = None,
-        config: Optional[Dict[str, Dict[str, Any]]] = None,
+        plugin_dirs: Optional[list[Path]] = None,
+        config: Optional[dict[str, dict[str, Any]]] = None,
         auto_load: bool = False,
     ):
         """Initialize plugin registry.
@@ -92,7 +93,7 @@ class ToolPluginRegistry:
             config: Plugin configuration (plugin_name -> config dict)
             auto_load: Automatically discover and load plugins on init
         """
-        self.plugin_dirs: List[Path] = []
+        self.plugin_dirs: list[Path] = []
         if plugin_dirs:
             for dir_path in plugin_dirs:
                 expanded = Path(dir_path).expanduser()
@@ -102,8 +103,8 @@ class ToolPluginRegistry:
                     logger.debug(f"Plugin directory does not exist: {expanded}")
 
         self.config = config or {}
-        self.loaded_plugins: Dict[str, ToolPlugin] = {}
-        self._disabled_plugins: Set[str] = set()
+        self.loaded_plugins: dict[str, ToolPlugin] = {}
+        self._disabled_plugins: set[str] = set()
 
         # Use DynamicModuleLoader for shared module loading infrastructure
         self._module_loader = DynamicModuleLoader(
@@ -114,7 +115,7 @@ class ToolPluginRegistry:
         if auto_load:
             self.discover_and_load()
 
-    def discover_plugins(self) -> List[Path]:
+    def discover_plugins(self) -> list[Path]:
         """Discover plugin directories.
 
         Searches plugin directories for valid plugins.
@@ -306,7 +307,7 @@ class ToolPluginRegistry:
         logger.info(f"Loaded {loaded_count}/{len(discovered)} discovered plugins")
         return loaded_count
 
-    def get_all_tools(self) -> List[BaseTool]:
+    def get_all_tools(self) -> list[BaseTool]:
         """Get all tools from all loaded plugins.
 
         Returns:
@@ -341,7 +342,7 @@ class ToolPluginRegistry:
         logger.info(f"Registered {registered} tools from {len(self.loaded_plugins)} plugins")
         return registered
 
-    def get_plugin_info(self) -> List[PluginMetadata]:
+    def get_plugin_info(self) -> list[PluginMetadata]:
         """Get metadata for all loaded plugins.
 
         Returns:
@@ -523,7 +524,7 @@ class ToolPluginRegistry:
         """
         return self.unload_plugin(plugin_name)
 
-    def list_plugins(self) -> Dict[str, Dict[str, Any]]:
+    def list_plugins(self) -> dict[str, dict[str, Any]]:
         """List all loaded plugins with their metadata.
 
         Returns:

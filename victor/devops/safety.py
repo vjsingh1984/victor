@@ -22,7 +22,7 @@ victor.security.safety.infrastructure for pattern scanning, while maintaining
 backward compatibility for existing interfaces.
 """
 
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from victor.core.security.patterns.infrastructure import (
     InfrastructureScanner,
@@ -90,7 +90,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
         )
         self._secret_scanner = SecretScanner()
 
-    def get_bash_patterns(self) -> List[SafetyPattern]:
+    def get_bash_patterns(self) -> list[SafetyPattern]:
         """Return DevOps-specific bash patterns.
 
         Returns:
@@ -98,7 +98,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
         """
         return self._scanner.all_patterns
 
-    def get_danger_patterns(self) -> List[Tuple[str, str, str]]:
+    def get_danger_patterns(self) -> list[tuple[str, str, str]]:
         """Return DevOps-specific danger patterns (legacy format).
 
         Returns:
@@ -106,7 +106,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
         """
         return [(p.pattern, p.description, p.risk_level) for p in self._scanner.all_patterns]
 
-    def get_blocked_operations(self) -> List[str]:
+    def get_blocked_operations(self) -> list[str]:
         """Return operations that should be blocked in DevOps context."""
         return [
             "delete_production_database",
@@ -116,7 +116,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
             "create_public_s3_bucket",
         ]
 
-    def get_credential_patterns(self) -> Dict[str, str]:
+    def get_credential_patterns(self) -> dict[str, str]:
         """Return patterns for detecting credentials.
 
         Uses patterns from victor.core.security.patterns.secrets for comprehensive detection.
@@ -127,7 +127,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
         # Return simplified dict format for backward compatibility
         return {name: pattern for name, (pattern, _, _) in CREDENTIAL_PATTERNS.items()}
 
-    def scan_for_secrets(self, content: str) -> List[Dict[str, Any]]:
+    def scan_for_secrets(self, content: str) -> list[dict[str, Any]]:
         """Scan content for secrets using the core SecretScanner.
 
         Args:
@@ -158,7 +158,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
         """
         return self._scanner.scan_command(command)
 
-    def validate_dockerfile(self, content: str) -> List[str]:
+    def validate_dockerfile(self, content: str) -> list[str]:
         """Validate Dockerfile security best practices.
 
         Returns:
@@ -166,7 +166,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
         """
         return core_validate_dockerfile(content)
 
-    def validate_kubernetes_manifest(self, content: str) -> List[str]:
+    def validate_kubernetes_manifest(self, content: str) -> list[str]:
         """Validate Kubernetes manifest security.
 
         Returns:
@@ -174,7 +174,7 @@ class DevOpsSafetyExtension(SafetyExtensionProtocol):
         """
         return core_validate_kubernetes_manifest(content)
 
-    def get_safety_reminders(self) -> List[str]:
+    def get_safety_reminders(self) -> list[str]:
         """Return safety reminders for DevOps output."""
         return core_get_safety_reminders()
 
@@ -232,7 +232,7 @@ Example:
         print(f"Blocked: {reason}")
 """
 
-from victor.framework.config import SafetyEnforcer, SafetyRule, SafetyLevel
+from victor.framework.config import SafetyEnforcer
 
 
 def create_deployment_safety_rules(

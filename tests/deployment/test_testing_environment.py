@@ -5,14 +5,13 @@ Validates that the testing environment is properly configured
 for automated testing and CI/CD validation.
 """
 
-import os
 import pytest
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 
 @pytest.fixture
-def testing_env_vars() -> Dict[str, str]:
+def testing_env_vars() -> dict[str, str]:
     """Testing environment variables."""
     return {
         "VICTOR_PROFILE": "testing",
@@ -30,7 +29,7 @@ def testing_env_vars() -> Dict[str, str]:
 
 
 @pytest.fixture
-def testing_kubernetes_config() -> Dict[str, Any]:
+def testing_kubernetes_config() -> dict[str, Any]:
     """Expected Kubernetes configuration for testing."""
     return {
         "namespace": "victor-ai-test",
@@ -159,7 +158,6 @@ class TestTestingEnvironmentIntegration:
     def test_sqlite_checkpoint_persistence(self, tmp_path):
         """Test that SQLite checkpoint backend works."""
         import sqlite3
-        from pathlib import Path
 
         # Create test database
         db_path = tmp_path / "test_checkpoints.db"

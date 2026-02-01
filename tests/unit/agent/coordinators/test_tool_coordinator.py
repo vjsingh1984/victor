@@ -32,16 +32,13 @@ Testing Strategy:
 - Ensure backward compatibility
 """
 
-import asyncio
 import pytest
-from unittest.mock import Mock, MagicMock, AsyncMock, patch, call
-from typing import Dict, Any, List, Optional, Set
+from unittest.mock import Mock, AsyncMock
 
 from victor.agent.coordinators.tool_coordinator import (
     ToolCoordinator,
     ToolCoordinatorConfig,
     TaskContext,
-    IToolCoordinator,
     create_tool_coordinator,
 )
 from victor.agent.argument_normalizer import NormalizationStrategy

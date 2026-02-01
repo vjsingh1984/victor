@@ -45,13 +45,8 @@ Usage:
     )
 """
 
-import ast
-import asyncio
-import json
 import logging
-import time
-from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 
@@ -290,39 +285,9 @@ __all__ = [
 # =============================================================================
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator_integration import OrchestratorIntegration
-    from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator
-    from victor.agent.chunk_generator import ChunkGenerator
-    from victor.agent.tool_planner import ToolPlanner
-    from victor.agent.task_coordinator import TaskCoordinator
-    from victor.agent.protocols import ToolAccessContext
-    from victor.evaluation.protocol import TokenUsage
-    from victor.agent.subagents import SubAgentOrchestrator
 
     # Factory-created components (type hints only)
-    from victor.agent.response_sanitizer import ResponseSanitizer
-    from victor.agent.search_router import SearchRouter
-    from victor.framework.task import TaskComplexityService as ComplexityClassifier
-    from victor.agent.metrics_collector import MetricsCollector
-    from victor.agent.conversation_controller import ConversationController
-    from victor.agent.context_compactor import ContextCompactor
-    from victor.agent.usage_analytics import UsageAnalytics
-    from victor.agent.tool_sequence_tracker import ToolSequenceTracker
-    from victor.agent.recovery import RecoveryHandler
-    from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration
-    from victor.agent.tool_output_formatter import ToolOutputFormatter
-    from victor.agent.tool_pipeline import ToolPipeline
-    from victor.agent.streaming_controller import StreamingController
-    from victor.agent.task_analyzer import TaskAnalyzer
-    from victor.agent.tool_registrar import ToolRegistrar
-    from victor.agent.orchestrator_factory import OrchestratorComponents
-    from victor.agent.provider_manager import ProviderManager
-    from victor.agent.provider_coordinator import ProviderCoordinator
-    from victor.agent.tool_selection import ToolSelector
-    from victor.agent.tool_executor import ToolExecutor
-    from victor.agent.safety import SafetyChecker
-    from victor.agent.auto_commit import AutoCommitter
-    from victor.agent.conversation_manager import ConversationManager
+    pass
 
 # =============================================================================
 # RUNTIME AGENT COMPONENTS
@@ -374,7 +339,7 @@ from victor.config.settings import Settings
 from victor.config.model_capabilities import ToolCallingMatrix
 
 from victor.agent.conversation_state import ConversationStateMachine
-from victor.agent.conversation_state import ConversationStage  # noqa: F401
+from victor.agent.conversation_state import ConversationStage
 from victor.agent.action_authorizer import ActionIntent
 from victor.agent.prompt_builder import get_task_type_hint, SystemPromptBuilder
 from victor.agent.search_router import SearchRoute, SearchType
@@ -511,8 +476,8 @@ from victor.core.errors import (
 # TOOL IMPORTS
 # =============================================================================
 
-from victor.tools.enums import CostTier  # noqa: F401
-from victor.tools.registry import ToolRegistry  # noqa: F401
+from victor.tools.enums import CostTier
+from victor.tools.registry import ToolRegistry
 from victor.tools.code_executor_tool import CodeSandbox
 from victor.tools.mcp_bridge_tool import get_mcp_tool_definitions
 from victor.tools.plugin_registry import ToolPluginRegistry

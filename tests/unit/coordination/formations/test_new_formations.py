@@ -22,7 +22,7 @@ Tests for:
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock
 
 from victor.coordination.formations.reflection import ReflectionFormation
 from victor.coordination.formations.dynamic_router import DynamicRouterFormation
@@ -30,7 +30,7 @@ from victor.coordination.formations.multi_level_hierarchy import (
     MultiLevelHierarchyFormation,
     HierarchyNode,
 )
-from victor.coordination.formations.adaptive import AdaptiveFormation, AdaptationStrategy
+from victor.coordination.formations.adaptive import AdaptiveFormation
 from victor.coordination.formations.base import TeamContext
 from victor.teams.types import AgentMessage, MessageType
 

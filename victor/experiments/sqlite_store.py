@@ -25,7 +25,7 @@ import sqlite3
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.experiments.entities import (
     Artifact,
@@ -34,7 +34,7 @@ from victor.experiments.entities import (
     Metric,
     Run,
 )
-from victor.experiments.storage import IStorageBackend, StorageBackendError
+from victor.experiments.storage import StorageBackendError
 
 
 class SQLiteStorage:
@@ -237,7 +237,7 @@ class SQLiteStorage:
 
         return self._row_to_experiment(row)
 
-    def update_experiment(self, experiment_id: str, updates: Dict[str, Any]) -> bool:
+    def update_experiment(self, experiment_id: str, updates: dict[str, Any]) -> bool:
         """Update an experiment."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -280,7 +280,7 @@ class SQLiteStorage:
 
         return cursor.rowcount > 0
 
-    def list_experiments(self, query: Optional[ExperimentQuery] = None) -> List[Experiment]:
+    def list_experiments(self, query: Optional[ExperimentQuery] = None) -> list[Experiment]:
         """List experiments with optional filtering."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -377,7 +377,7 @@ class SQLiteStorage:
 
         return self._row_to_run(row)
 
-    def update_run(self, run_id: str, updates: Dict[str, Any]) -> bool:
+    def update_run(self, run_id: str, updates: dict[str, Any]) -> bool:
         """Update a run."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -407,7 +407,7 @@ class SQLiteStorage:
 
         return cursor.rowcount > 0
 
-    def list_runs(self, experiment_id: str) -> List[Run]:
+    def list_runs(self, experiment_id: str) -> list[Run]:
         """List all runs for an experiment."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -445,7 +445,7 @@ class SQLiteStorage:
         except sqlite3.Error as e:
             raise StorageBackendError(f"Failed to log metric: {e}") from e
 
-    def get_metrics(self, run_id: str) -> List[Metric]:
+    def get_metrics(self, run_id: str) -> list[Metric]:
         """Get all metrics for a run."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -464,7 +464,7 @@ class SQLiteStorage:
             for row in rows
         ]
 
-    def get_metric_history(self, run_id: str, metric_key: str) -> List[Metric]:
+    def get_metric_history(self, run_id: str, metric_key: str) -> list[Metric]:
         """Get history of a specific metric."""
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -520,7 +520,7 @@ class SQLiteStorage:
         except sqlite3.Error as e:
             raise StorageBackendError(f"Failed to log artifact: {e}") from e
 
-    def get_artifacts(self, run_id: str) -> List[Artifact]:
+    def get_artifacts(self, run_id: str) -> list[Artifact]:
         """Get all artifacts for a run."""
         conn = self._get_connection()
         cursor = conn.cursor()

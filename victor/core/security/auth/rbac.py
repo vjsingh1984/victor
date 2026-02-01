@@ -39,14 +39,14 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from functools import wraps
 from pathlib import Path
-from typing import AbstractSet, Any, Callable, Dict, FrozenSet, List, Optional, Set, TYPE_CHECKING
+from typing import AbstractSet, Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.tools.enums import AccessMode
-    from victor.tools.base import BaseTool
 
 logger = logging.getLogger(__name__)
 
@@ -196,16 +196,16 @@ class User:
     """
 
     name: str
-    roles: Set[Role] = field(default_factory=set)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    roles: set[Role] = field(default_factory=set)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def get_effective_permissions(self) -> Set[Permission]:
+    def get_effective_permissions(self) -> set[Permission]:
         """Get all permissions from all assigned roles.
 
         Returns:
             Union of all role permissions
         """
-        permissions: Set[Permission] = set()
+        permissions: set[Permission] = set()
         for role in self.roles:
             permissions.update(role.permissions)
         return permissions
@@ -257,7 +257,7 @@ class RBACManager:
     """
 
     # Predefined roles for convenience
-    PREDEFINED_ROLES: Dict[str, Role] = {
+    PREDEFINED_ROLES: dict[str, Role] = {
         "admin": Role("admin", frozenset({Permission.ADMIN})),
         "developer": Role(
             "developer",
@@ -289,8 +289,8 @@ class RBACManager:
         self._lock = threading.RLock()
 
         # Initialize with predefined roles
-        self._roles: Dict[str, Role] = dict(self.PREDEFINED_ROLES)
-        self._users: Dict[str, User] = {}
+        self._roles: dict[str, Role] = dict(self.PREDEFINED_ROLES)
+        self._users: dict[str, User] = {}
 
         # Current user context (set per-request)
         self._current_user: Optional[str] = None
@@ -472,7 +472,7 @@ class RBACManager:
 
         return self.check_tool_access(username, tool_name, category, access_mode)
 
-    def load_from_dict(self, config: Dict[str, Any]) -> None:
+    def load_from_dict(self, config: dict[str, Any]) -> None:
         """Load RBAC configuration from a dictionary.
 
         Args:
@@ -528,7 +528,7 @@ class RBACManager:
         rbac_config = config.get("rbac", config)
         self.load_from_dict(rbac_config)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get RBAC statistics.
 
         Returns:

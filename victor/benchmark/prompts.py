@@ -21,14 +21,13 @@ the framework via the PromptContributorProtocol.
 
 from __future__ import annotations
 
-from typing import Dict
 
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
 
 
 # Task-type-specific prompt hints for benchmark tasks
 # These guide the model's approach based on detected task type
-BENCHMARK_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
+BENCHMARK_TASK_TYPE_HINTS: dict[str, TaskTypeHint] = {
     "swe_bench_issue": TaskTypeHint(
         task_type="swe_bench_issue",
         hint="""[SWE-BENCH ISSUE] Resolve GitHub issue with minimal changes.
@@ -307,7 +306,7 @@ class BenchmarkPromptContributor(PromptContributorProtocol):
         """
         self._use_extended_grounding = use_extended_grounding
 
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
         """Get benchmark-specific task type hints.
 
         Returns:

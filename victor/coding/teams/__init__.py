@@ -129,7 +129,7 @@ class CodingTeamSpecProvider:
     ISP compliance across all verticals.
     """
 
-    def get_team_specs(self) -> Dict[str, TeamSpec]:
+    def get_team_specs(self) -> dict[str, TeamSpec]:
         """Get all Coding team specifications.
 
         Returns:
@@ -148,7 +148,7 @@ class CodingTeamSpecProvider:
         """
         return get_team_for_task(task_type)
 
-    def list_team_types(self) -> List[str]:
+    def list_team_types(self) -> list[str]:
         """List all available team types.
 
         Returns:

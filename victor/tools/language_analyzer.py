@@ -61,7 +61,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, Set, Tuple, Type, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 # Import Rust-accelerated regex engine for 10-20x faster pattern matching
 try:
@@ -113,8 +113,8 @@ class AnalysisResult:
 
     file_path: str
     language: str
-    issues: List[AnalysisIssue] = field(default_factory=list)
-    functions: List[FunctionMetrics] = field(default_factory=list)
+    issues: list[AnalysisIssue] = field(default_factory=list)
+    functions: list[FunctionMetrics] = field(default_factory=list)
     lines_of_code: int = 0
     success: bool = True
     error: Optional[str] = None
@@ -136,7 +136,7 @@ class SecurityPattern:
 
 
 # Language-specific security patterns
-SECURITY_PATTERNS: Dict[str, List[SecurityPattern]] = {
+SECURITY_PATTERNS: dict[str, list[SecurityPattern]] = {
     "python": [
         SecurityPattern(
             "hardcoded_password",
@@ -683,7 +683,7 @@ SECURITY_PATTERNS["cpp"] = SECURITY_PATTERNS["c"] + SECURITY_PATTERNS["cpp"]
 # =============================================================================
 
 
-CODE_SMELL_PATTERNS: Dict[str, List[SecurityPattern]] = {
+CODE_SMELL_PATTERNS: dict[str, list[SecurityPattern]] = {
     "python": [
         SecurityPattern(
             "print_debug",
@@ -1116,7 +1116,7 @@ CODE_SMELL_PATTERNS["r"] = [
 # =============================================================================
 
 
-EXTENSION_TO_LANGUAGE: Dict[str, str] = {
+EXTENSION_TO_LANGUAGE: dict[str, str] = {
     # Python
     ".py": "python",
     ".pyw": "python",
@@ -1190,7 +1190,7 @@ EXTENSION_TO_LANGUAGE: Dict[str, str] = {
 }
 
 # Glob patterns per language
-LANGUAGE_GLOB_PATTERNS: Dict[str, str] = {
+LANGUAGE_GLOB_PATTERNS: dict[str, str] = {
     "python": "*.py",
     "javascript": "*.{js,mjs,cjs,jsx}",
     "typescript": "*.{ts,tsx}",
@@ -1220,7 +1220,7 @@ LANGUAGE_GLOB_PATTERNS: Dict[str, str] = {
 # =============================================================================
 
 # Queries to find functions/methods for complexity analysis
-FUNCTION_QUERIES: Dict[str, str] = {
+FUNCTION_QUERIES: dict[str, str] = {
     "python": """
         (function_definition
             name: (identifier) @name
@@ -1282,7 +1282,7 @@ FUNCTION_QUERIES: Dict[str, str] = {
 }
 
 # Control flow nodes that increase complexity (per language)
-COMPLEXITY_NODE_TYPES: Dict[str, Set[str]] = {
+COMPLEXITY_NODE_TYPES: dict[str, set[str]] = {
     "python": {
         "if_statement",
         "elif_clause",
@@ -1498,29 +1498,29 @@ class LanguageAnalyzer(Protocol):
         ...
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         """Return supported file extensions."""
         ...
 
-    def check_security(self, content: str, file_path: Path) -> List[AnalysisIssue]:
+    def check_security(self, content: str, file_path: Path) -> list[AnalysisIssue]:
         """Check for security vulnerabilities."""
         ...
 
-    def check_code_smells(self, content: str, file_path: Path) -> List[AnalysisIssue]:
+    def check_code_smells(self, content: str, file_path: Path) -> list[AnalysisIssue]:
         """Check for code smells and anti-patterns."""
         ...
 
     def calculate_complexity(
         self, content: str, file_path: Path
-    ) -> Tuple[List[AnalysisIssue], List[FunctionMetrics]]:
+    ) -> tuple[list[AnalysisIssue], list[FunctionMetrics]]:
         """Calculate cyclomatic complexity for functions."""
         ...
 
-    def check_documentation(self, content: str, file_path: Path) -> List[AnalysisIssue]:
+    def check_documentation(self, content: str, file_path: Path) -> list[AnalysisIssue]:
         """Check documentation coverage."""
         ...
 
-    def analyze(self, content: str, file_path: Path, aspects: List[str]) -> AnalysisResult:
+    def analyze(self, content: str, file_path: Path, aspects: list[str]) -> AnalysisResult:
         """Run full analysis on content."""
         ...
 
@@ -1566,7 +1566,7 @@ class BaseLanguageAnalyzer(ABC):
 
     @property
     @abstractmethod
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         """Return supported file extensions."""
         pass
 
@@ -1585,15 +1585,15 @@ class BaseLanguageAnalyzer(ABC):
                 self._parser = None
         return self._parser
 
-    def _get_security_patterns(self) -> List[SecurityPattern]:
+    def _get_security_patterns(self) -> list[SecurityPattern]:
         """Get security patterns for this language."""
         return SECURITY_PATTERNS.get(self.language, [])
 
-    def _get_smell_patterns(self) -> List[SecurityPattern]:
+    def _get_smell_patterns(self) -> list[SecurityPattern]:
         """Get code smell patterns for this language."""
         return CODE_SMELL_PATTERNS.get(self.language, [])
 
-    def check_security(self, content: str, file_path: Path) -> List[AnalysisIssue]:
+    def check_security(self, content: str, file_path: Path) -> list[AnalysisIssue]:
         """Check for security vulnerabilities using regex patterns."""
         issues = []
         lines = content.split("\n")
@@ -1616,7 +1616,7 @@ class BaseLanguageAnalyzer(ABC):
 
         return issues
 
-    def check_code_smells(self, content: str, file_path: Path) -> List[AnalysisIssue]:
+    def check_code_smells(self, content: str, file_path: Path) -> list[AnalysisIssue]:
         """Check for code smells using regex patterns."""
         issues = []
         lines = content.split("\n")
@@ -1641,7 +1641,7 @@ class BaseLanguageAnalyzer(ABC):
 
     def calculate_complexity(
         self, content: str, file_path: Path
-    ) -> Tuple[List[AnalysisIssue], List[FunctionMetrics]]:
+    ) -> tuple[list[AnalysisIssue], list[FunctionMetrics]]:
         """Calculate cyclomatic complexity using tree-sitter.
 
         Falls back to regex-based estimation if tree-sitter unavailable.
@@ -1697,7 +1697,7 @@ class BaseLanguageAnalyzer(ABC):
 
         return issues, functions
 
-    def _find_function_nodes(self, root) -> List[Tuple[str, Any]]:
+    def _find_function_nodes(self, root) -> list[tuple[str, Any]]:
         """Find all function/method nodes in the AST.
 
         Override in subclasses for language-specific traversal.
@@ -1819,7 +1819,7 @@ class BaseLanguageAnalyzer(ABC):
 
     def _estimate_complexity_regex(
         self, content: str, file_path: Path
-    ) -> Tuple[List[AnalysisIssue], List[FunctionMetrics]]:
+    ) -> tuple[list[AnalysisIssue], list[FunctionMetrics]]:
         """Fallback: estimate complexity using regex patterns."""
         # Simple heuristic: count control flow keywords
         keywords = {
@@ -1887,9 +1887,9 @@ class BaseLanguageAnalyzer(ABC):
         # Rough estimate - no function-level breakdown
         return [], []
 
-    def check_documentation(self, content: str, file_path: Path) -> List[AnalysisIssue]:
+    def check_documentation(self, content: str, file_path: Path) -> list[AnalysisIssue]:
         """Check documentation coverage using tree-sitter."""
-        issues: List[AnalysisIssue] = []
+        issues: list[AnalysisIssue] = []
         parser = self._get_parser()
 
         if parser is None:
@@ -1924,8 +1924,8 @@ class BaseLanguageAnalyzer(ABC):
         self,
         source_code: str,
         language: str,
-        patterns: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        patterns: Optional[list[str]] = None,
+    ) -> list[dict[str, Any]]:
         """Analyze code using Rust-accelerated regex engine.
 
         Provides 10-20x faster pattern matching than Python re module.
@@ -1970,8 +1970,8 @@ class BaseLanguageAnalyzer(ABC):
         self,
         source_code: str,
         language: str,
-        patterns: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        patterns: Optional[list[str]] = None,
+    ) -> list[dict[str, Any]]:
         """Python fallback for code analysis.
 
         Args:
@@ -2015,7 +2015,7 @@ class BaseLanguageAnalyzer(ABC):
 
         return matches
 
-    def analyze(self, content: str, file_path: Path, aspects: List[str]) -> AnalysisResult:
+    def analyze(self, content: str, file_path: Path, aspects: list[str]) -> AnalysisResult:
         """Run full analysis on content.
 
         Args:
@@ -2073,7 +2073,7 @@ class PythonAnalyzer(BaseLanguageAnalyzer):
         return "python"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".py", ".pyw", ".pyi"]
 
     def _has_docstring(self, func_node, content: str) -> bool:
@@ -2099,7 +2099,7 @@ class JavaScriptAnalyzer(BaseLanguageAnalyzer):
         return "javascript"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".js", ".mjs", ".cjs", ".jsx"]
 
     def _has_docstring(self, func_node, content: str) -> bool:
@@ -2120,7 +2120,7 @@ class TypeScriptAnalyzer(JavaScriptAnalyzer):
         return "typescript"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".ts", ".tsx"]
 
 
@@ -2132,7 +2132,7 @@ class JavaAnalyzer(BaseLanguageAnalyzer):
         return "java"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".java"]
 
     def _has_docstring(self, func_node, content: str) -> bool:
@@ -2153,7 +2153,7 @@ class GoAnalyzer(BaseLanguageAnalyzer):
         return "go"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".go"]
 
     def _has_docstring(self, func_node, content: str) -> bool:
@@ -2174,7 +2174,7 @@ class RustAnalyzer(BaseLanguageAnalyzer):
         return "rust"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".rs"]
 
     def _has_docstring(self, func_node, content: str) -> bool:
@@ -2195,7 +2195,7 @@ class CAnalyzer(BaseLanguageAnalyzer):
         return "c"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".c", ".h"]
 
     def _is_function_node(self, node) -> bool:
@@ -2219,7 +2219,7 @@ class CppAnalyzer(CAnalyzer):
         return "cpp"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"]
 
 
@@ -2231,7 +2231,7 @@ class CSharpAnalyzer(BaseLanguageAnalyzer):
         return "c_sharp"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".cs"]
 
     def _is_function_node(self, node) -> bool:
@@ -2255,7 +2255,7 @@ class RubyAnalyzer(BaseLanguageAnalyzer):
         return "ruby"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".rb", ".rake", ".gemspec"]
 
     def _is_function_node(self, node) -> bool:
@@ -2279,7 +2279,7 @@ class PHPAnalyzer(BaseLanguageAnalyzer):
         return "php"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".php", ".phtml"]
 
     def _is_function_node(self, node) -> bool:
@@ -2303,7 +2303,7 @@ class KotlinAnalyzer(BaseLanguageAnalyzer):
         return "kotlin"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".kt", ".kts"]
 
     def _is_function_node(self, node) -> bool:
@@ -2327,7 +2327,7 @@ class SwiftAnalyzer(BaseLanguageAnalyzer):
         return "swift"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".swift"]
 
     def _is_function_node(self, node) -> bool:
@@ -2351,7 +2351,7 @@ class ScalaAnalyzer(BaseLanguageAnalyzer):
         return "scala"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".scala", ".sc"]
 
     def _is_function_node(self, node) -> bool:
@@ -2375,7 +2375,7 @@ class BashAnalyzer(BaseLanguageAnalyzer):
         return "bash"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".sh", ".bash", ".zsh", ".ksh"]
 
     def _is_function_node(self, node) -> bool:
@@ -2403,7 +2403,7 @@ class SQLAnalyzer(BaseLanguageAnalyzer):
         return "sql"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".sql", ".ddl", ".dml"]
 
     def _is_function_node(self, node) -> bool:
@@ -2412,7 +2412,7 @@ class SQLAnalyzer(BaseLanguageAnalyzer):
 
     def calculate_complexity(
         self, content: str, file_path: Path
-    ) -> Tuple[List[AnalysisIssue], List[FunctionMetrics]]:
+    ) -> tuple[list[AnalysisIssue], list[FunctionMetrics]]:
         # SQL doesn't have typical control flow complexity
         return [], []
 
@@ -2425,7 +2425,7 @@ class LuaAnalyzer(BaseLanguageAnalyzer):
         return "lua"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".lua"]
 
     def _is_function_node(self, node) -> bool:
@@ -2449,7 +2449,7 @@ class ElixirAnalyzer(BaseLanguageAnalyzer):
         return "elixir"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".ex", ".exs"]
 
     def _is_function_node(self, node) -> bool:
@@ -2474,7 +2474,7 @@ class HaskellAnalyzer(BaseLanguageAnalyzer):
         return "haskell"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".hs", ".lhs"]
 
     def _is_function_node(self, node) -> bool:
@@ -2498,7 +2498,7 @@ class RAnalyzer(BaseLanguageAnalyzer):
         return "r"
 
     @property
-    def file_extensions(self) -> List[str]:
+    def file_extensions(self) -> list[str]:
         return [".r", ".R", ".rmd", ".Rmd"]
 
     def _is_function_node(self, node) -> bool:
@@ -2523,7 +2523,7 @@ class RAnalyzer(BaseLanguageAnalyzer):
 class LanguageRegistry:
     """Registry for language analyzers with auto-detection."""
 
-    _analyzers: Dict[str, Type[BaseLanguageAnalyzer]] = {
+    _analyzers: dict[str, type[BaseLanguageAnalyzer]] = {
         # Core languages
         "python": PythonAnalyzer,
         "javascript": JavaScriptAnalyzer,
@@ -2553,7 +2553,7 @@ class LanguageRegistry:
         "r": RAnalyzer,
     }
 
-    _instances: Dict[str, BaseLanguageAnalyzer] = {}
+    _instances: dict[str, BaseLanguageAnalyzer] = {}
 
     @classmethod
     def get_analyzer(
@@ -2604,17 +2604,17 @@ class LanguageRegistry:
         return None
 
     @classmethod
-    def supported_languages(cls) -> List[str]:
+    def supported_languages(cls) -> list[str]:
         """Return list of supported language names."""
         return list(cls._analyzers.keys())
 
     @classmethod
-    def supported_extensions(cls) -> List[str]:
+    def supported_extensions(cls) -> list[str]:
         """Return list of supported file extensions."""
         return list(EXTENSION_TO_LANGUAGE.keys())
 
     @classmethod
-    def register_analyzer(cls, language: str, analyzer_class: Type[BaseLanguageAnalyzer]) -> None:
+    def register_analyzer(cls, language: str, analyzer_class: type[BaseLanguageAnalyzer]) -> None:
         """Register a custom language analyzer.
 
         Args:
@@ -2685,7 +2685,7 @@ def get_glob_pattern(language: str) -> str:
 
 async def analyze_file(
     file_path: Path,
-    aspects: Optional[List[str]] = None,
+    aspects: Optional[list[str]] = None,
     max_complexity: int = 10,
 ) -> AnalysisResult:
     """Analyze a single file with auto-detected language.
@@ -2725,11 +2725,11 @@ async def analyze_file(
     return analyzer.analyze(content, file_path, aspects)
 
 
-def supported_languages() -> List[str]:
+def supported_languages() -> list[str]:
     """Return list of supported language names."""
     return LanguageRegistry.supported_languages()
 
 
-def supported_extensions() -> List[str]:
+def supported_extensions() -> list[str]:
     """Return list of supported file extensions."""
     return LanguageRegistry.supported_extensions()

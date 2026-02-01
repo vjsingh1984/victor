@@ -26,16 +26,15 @@ Exposes the codebase knowledge graph to enable algorithms like:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
+from typing import Any, Literal, Optional
 
 from victor.coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
 from victor.coding.codebase.graph.registry import create_graph_store
-from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority, ExecutionCategory
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)
@@ -87,12 +86,12 @@ ALL_EDGE_TYPES = [
 class GraphAnalyzer:
     """In-memory graph analyzer with common algorithms."""
 
-    nodes: Dict[str, GraphNode] = field(default_factory=dict)
+    nodes: dict[str, GraphNode] = field(default_factory=dict)
     # Adjacency lists: node_id -> [(target_id, edge_type, weight)]
-    outgoing: Dict[str, List[Tuple[str, str, float]]] = field(
+    outgoing: dict[str, list[tuple[str, str, float]]] = field(
         default_factory=lambda: defaultdict(list)
     )
-    incoming: Dict[str, List[Tuple[str, str, float]]] = field(
+    incoming: dict[str, list[tuple[str, str, float]]] = field(
         default_factory=lambda: defaultdict(list)
     )
 
@@ -116,13 +115,13 @@ class GraphAnalyzer:
         self,
         node_id: str,
         direction: Literal["in", "out", "both"] = "both",
-        edge_types: Optional[List[str]] = None,
+        edge_types: Optional[list[str]] = None,
         max_depth: int = 1,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get neighbors up to max_depth hops away."""
-        visited: Set[str] = set()
-        result: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
-        queue: deque[Tuple[str, int]] = deque([(node_id, 0)])
+        visited: set[str] = set()
+        result: dict[int, list[dict[str, Any]]] = defaultdict(list)
+        queue: deque[tuple[str, int]] = deque([(node_id, 0)])
 
         while queue:
             current, depth = queue.popleft()
@@ -169,19 +168,19 @@ class GraphAnalyzer:
         self,
         damping: float = 0.85,
         iterations: int = 100,
-        edge_types: Optional[List[str]] = None,
+        edge_types: Optional[list[str]] = None,
         top_k: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Compute PageRank to find most important symbols."""
         if not self.nodes:
             return []
 
         # Initialize scores
         n = len(self.nodes)
-        scores: Dict[str, float] = dict.fromkeys(self.nodes, 1.0 / n)
+        scores: dict[str, float] = dict.fromkeys(self.nodes, 1.0 / n)
 
         for _ in range(iterations):
-            new_scores: Dict[str, float] = {}
+            new_scores: dict[str, float] = {}
             for node_id in self.nodes:
                 rank_sum = 0.0
                 for src, edge_type, _weight in self.incoming.get(node_id, []):
@@ -217,11 +216,11 @@ class GraphAnalyzer:
 
     def degree_centrality(
         self,
-        edge_types: Optional[List[str]] = None,
+        edge_types: Optional[list[str]] = None,
         top_k: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find most connected nodes by degree centrality."""
-        centrality: Dict[str, int] = {}
+        centrality: dict[str, int] = {}
 
         for node_id in self.nodes:
             in_edges = [
@@ -255,18 +254,18 @@ class GraphAnalyzer:
         self,
         source: str,
         target: str,
-        edge_types: Optional[List[str]] = None,
+        edge_types: Optional[list[str]] = None,
         max_depth: int = 10,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Find shortest path between two symbols using BFS."""
         if source not in self.nodes:
             return {"error": f"Source node '{source}' not found"}
         if target not in self.nodes:
             return {"error": f"Target node '{target}' not found"}
 
-        visited: Set[str] = {source}
-        parent: Dict[str, Tuple[str, str]] = {}  # child -> (parent, edge_type)
-        queue: deque[Tuple[str, int]] = deque([(source, 0)])
+        visited: set[str] = {source}
+        parent: dict[str, tuple[str, str]] = {}  # child -> (parent, edge_type)
+        queue: deque[tuple[str, int]] = deque([(source, 0)])
 
         while queue:
             current, depth = queue.popleft()
@@ -316,17 +315,17 @@ class GraphAnalyzer:
     def impact_analysis(
         self,
         node_id: str,
-        edge_types: Optional[List[str]] = None,
+        edge_types: Optional[list[str]] = None,
         max_depth: int = 3,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze what would be affected if a symbol changes."""
         if node_id not in self.nodes:
             return {"error": f"Node '{node_id}' not found"}
 
         # Find all nodes that depend on this one (incoming edges)
-        affected: Dict[int, Set[str]] = defaultdict(set)
-        visited: Set[str] = {node_id}
-        queue: deque[Tuple[str, int]] = deque([(node_id, 0)])
+        affected: dict[int, set[str]] = defaultdict(set)
+        visited: set[str] = {node_id}
+        queue: deque[tuple[str, int]] = deque([(node_id, 0)])
 
         while queue:
             current, depth = queue.popleft()
@@ -343,7 +342,7 @@ class GraphAnalyzer:
                     queue.append((src, depth + 1))
 
         # Group by file for easier navigation
-        by_file: Dict[str, List[str]] = defaultdict(list)
+        by_file: dict[str, list[str]] = defaultdict(list)
         for depth_nodes in affected.values():
             for nid in depth_nodes:
                 node = self.nodes.get(nid)
@@ -376,15 +375,14 @@ class GraphAnalyzer:
         node_type: Optional[str] = None,
         file_pattern: Optional[str] = None,
         expand_neighbors: bool = False,
-        edge_types: Optional[List[str]] = None,
+        edge_types: Optional[list[str]] = None,
         limit: int = 20,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Find symbols by name pattern, optionally expand via graph."""
         import fnmatch
-        import re
 
         query_lower = query.lower()
-        matches: List[Dict[str, Any]] = []
+        matches: list[dict[str, Any]] = []
 
         for node_id, node in self.nodes.items():
             # Skip if type filter doesn't match
@@ -442,7 +440,7 @@ class GraphAnalyzer:
         self,
         file_path: str,
         direction: Literal["imports", "imported_by", "both"] = "both",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get file-level dependencies."""
         # Find nodes in the file
         file_nodes = [
@@ -452,8 +450,8 @@ class GraphAnalyzer:
         if not file_nodes:
             return {"error": f"No symbols found in file: {file_path}"}
 
-        imports: Set[str] = set()
-        imported_by: Set[str] = set()
+        imports: set[str] = set()
+        imported_by: set[str] = set()
 
         for node in file_nodes:
             node_id = node.node_id
@@ -482,7 +480,7 @@ class GraphAnalyzer:
             "symbols_in_file": [{"name": n.name, "type": n.type} for n in file_nodes[:20]],
         }
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get graph statistics."""
         edge_type_counts: Counter = Counter()
         node_type_counts: Counter = Counter()
@@ -507,7 +505,7 @@ class GraphAnalyzer:
             ),
         }
 
-    def detect_patterns(self) -> Dict[str, Any]:
+    def detect_patterns(self) -> dict[str, Any]:
         """Detect design patterns via graph structure analysis.
 
         Detects patterns like:
@@ -518,10 +516,10 @@ class GraphAnalyzer:
         - Strategy/Provider: Base class with multiple implementations
         - Composition: COMPOSED_OF relationships
         """
-        patterns: List[Dict[str, Any]] = []
+        patterns: list[dict[str, Any]] = []
 
         # Pattern 1: Provider/Strategy Pattern - Base class with multiple INHERITS
-        inheritance_counts: Dict[str, List[str]] = defaultdict(list)
+        inheritance_counts: dict[str, list[str]] = defaultdict(list)
         for node_id in self.nodes:
             for src, edge_type, _ in self.incoming.get(node_id, []):
                 if edge_type == "INHERITS":
@@ -599,7 +597,7 @@ class GraphAnalyzer:
                     )
 
         # Pattern 5: Composition - COMPOSED_OF relationships
-        composition_holders: Dict[str, List[str]] = defaultdict(list)
+        composition_holders: dict[str, list[str]] = defaultdict(list)
         for node_id in self.nodes:
             for target, edge_type, _ in self.outgoing.get(node_id, []):
                 if edge_type == "COMPOSED_OF":
@@ -664,7 +662,7 @@ class GraphAnalyzer:
 
     def _aggregate_to_modules(
         self, granularity: Literal["file", "package"] = "file"
-    ) -> Dict[str, Set[str]]:
+    ) -> dict[str, set[str]]:
         """Aggregate symbols to modules (files or packages).
 
         Args:
@@ -673,7 +671,7 @@ class GraphAnalyzer:
         Returns:
             Dict mapping module path to set of node IDs in that module
         """
-        module_to_nodes: Dict[str, Set[str]] = defaultdict(set)
+        module_to_nodes: dict[str, set[str]] = defaultdict(set)
         for node_id, node in self.nodes.items():
             if not node.file:
                 continue
@@ -690,8 +688,8 @@ class GraphAnalyzer:
     def _build_module_graph(
         self,
         granularity: Literal["file", "package"] = "file",
-        edge_types: Optional[List[str]] = None,
-    ) -> Tuple[Dict[str, Set[str]], Dict[str, Dict[str, int]], Dict[str, Dict[str, int]]]:
+        edge_types: Optional[list[str]] = None,
+    ) -> tuple[dict[str, set[str]], dict[str, dict[str, int]], dict[str, dict[str, int]]]:
         """Build a module-level graph from symbol-level edges.
 
         Returns:
@@ -701,11 +699,11 @@ class GraphAnalyzer:
         module_to_nodes = self._aggregate_to_modules(granularity)
 
         # Build module-level adjacency with edge counts
-        outgoing: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-        incoming: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        outgoing: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        incoming: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
         # Map node_id -> module for quick lookup
-        node_to_module: Dict[str, str] = {}
+        node_to_module: dict[str, str] = {}
         for module, nodes in module_to_nodes.items():
             for node_id in nodes:
                 node_to_module[node_id] = module
@@ -730,11 +728,11 @@ class GraphAnalyzer:
     def module_pagerank(
         self,
         granularity: Literal["file", "package"] = "file",
-        edge_types: Optional[List[str]] = None,
+        edge_types: Optional[list[str]] = None,
         damping: float = 0.85,
         iterations: int = 100,
         top_k: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Compute PageRank at module/file level for architectural importance.
 
         Unlike symbol-level PageRank which favors utility functions (__init__, copy, etc.),
@@ -761,11 +759,11 @@ class GraphAnalyzer:
         # Initialize scores
         modules = list(module_to_nodes.keys())
         n = len(modules)
-        scores: Dict[str, float] = dict.fromkeys(modules, 1.0 / n)
+        scores: dict[str, float] = dict.fromkeys(modules, 1.0 / n)
 
         # PageRank iteration
         for _ in range(iterations):
-            new_scores: Dict[str, float] = {}
+            new_scores: dict[str, float] = {}
             for module in modules:
                 rank_sum = 0.0
                 # Sum contributions from modules that link to this one
@@ -822,9 +820,9 @@ class GraphAnalyzer:
     def module_centrality(
         self,
         granularity: Literal["file", "package"] = "file",
-        edge_types: Optional[List[str]] = None,
+        edge_types: Optional[list[str]] = None,
         top_k: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find most connected modules by degree centrality.
 
         Identifies modules that are hubs in the architecture - either because
@@ -845,7 +843,7 @@ class GraphAnalyzer:
             return []
 
         # Calculate centrality for each module
-        centrality: List[Tuple[str, int, int, int]] = []
+        centrality: list[tuple[str, int, int, int]] = []
         for module in module_to_nodes:
             in_edges = sum(incoming.get(module, {}).values())
             out_edges = sum(outgoing.get(module, {}).values())
@@ -888,9 +886,9 @@ class GraphAnalyzer:
         source_module: str,
         target_module: Optional[str] = None,
         granularity: Literal["file", "package"] = "file",
-        edge_types: Optional[List[str]] = None,
+        edge_types: Optional[list[str]] = None,
         depth: int = 3,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze call flow between modules.
 
         Shows how control/data flows from one module to another, including
@@ -939,9 +937,9 @@ class GraphAnalyzer:
                 }
 
             # BFS for shortest path
-            visited: Set[str] = {resolved_source}
-            parent: Dict[str, Tuple[str, int]] = {}  # child -> (parent, edge_count)
-            queue: deque[Tuple[str, int]] = deque([(resolved_source, 0)])
+            visited: set[str] = {resolved_source}
+            parent: dict[str, tuple[str, int]] = {}  # child -> (parent, edge_count)
+            queue: deque[tuple[str, int]] = deque([(resolved_source, 0)])
 
             while queue:
                 current, d = queue.popleft()
@@ -1011,7 +1009,7 @@ class GraphAnalyzer:
             )
 
         # Find transitive dependencies (2-hop)
-        transitive_deps: Dict[str, int] = defaultdict(int)
+        transitive_deps: dict[str, int] = defaultdict(int)
         for direct in outgoing.get(resolved_source, {}):
             for transitive, count in outgoing.get(direct, {}).items():
                 if transitive != resolved_source and transitive not in outgoing.get(
@@ -1037,16 +1035,16 @@ class GraphAnalyzer:
         self,
         center_node: str,
         max_depth: int = 2,
-        edge_types: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        edge_types: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         """Extract a subgraph centered on a node."""
         if center_node not in self.nodes:
             return {"error": f"Node '{center_node}' not found"}
 
-        visited: Set[str] = set()
-        nodes_in_subgraph: List[Dict[str, Any]] = []
-        edges_in_subgraph: List[Dict[str, Any]] = []
-        queue: deque[Tuple[str, int]] = deque([(center_node, 0)])
+        visited: set[str] = set()
+        nodes_in_subgraph: list[dict[str, Any]] = []
+        edges_in_subgraph: list[dict[str, Any]] = []
+        queue: deque[tuple[str, int]] = deque([(center_node, 0)])
 
         while queue:
             current, depth = queue.popleft()
@@ -1197,12 +1195,12 @@ async def graph(
     query: Optional[str] = None,
     file: Optional[str] = None,
     node_type: Optional[str] = None,
-    edge_types: Optional[List[str]] = None,
+    edge_types: Optional[list[str]] = None,
     depth: int = 2,
     top_k: int = 20,
     direction: Literal["in", "out", "both"] = "both",
     expand: bool = False,
-    exclude_paths: Optional[List[str]] = None,
+    exclude_paths: Optional[list[str]] = None,
     only_runtime: bool = True,
     runtime_weighted: bool = True,
     modules_only: bool = False,
@@ -1217,10 +1215,10 @@ async def graph(
     max_callsites_modules: int = 3,
     module_edge_weight_bias: bool = True,
     include_neighbors: bool = False,
-    neighbors_edge_types: Optional[List[str]] = None,
+    neighbors_edge_types: Optional[list[str]] = None,
     neighbors_limit: int = 3,
     granularity: Literal["file", "package"] = "file",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """[GRAPH] Query codebase STRUCTURE for relationships, impact, and importance.
 
     Uses the code graph built from AST analysis for structural queries like
@@ -1400,8 +1398,8 @@ async def graph(
                 return any(excl in path for excl in effective_excludes)
             return any(excl in path for excl in effective_excludes)
 
-        def _add_edge_counts(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-            enriched: List[Dict[str, Any]] = []
+        def _add_edge_counts(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            enriched: list[dict[str, Any]] = []
             for item in items:
                 nid = item.get("node_id")
                 if not nid:
@@ -1426,10 +1424,10 @@ async def graph(
                 enriched.append(item)
             return enriched
 
-        def _add_callsites(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        def _add_callsites(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if not include_callsites:
                 return items
-            enriched: List[Dict[str, Any]] = []
+            enriched: list[dict[str, Any]] = []
             for item in items:
                 nid = item.get("node_id")
                 if not nid:
@@ -1523,7 +1521,7 @@ async def graph(
                 ]
 
                 # Combine and deduplicate (prioritize name matches)
-                all_matches: Dict[str, GraphNode] = {}
+                all_matches: dict[str, GraphNode] = {}
                 for nid, n in name_matches + file_matches + partial_matches:
                     if nid not in all_matches:
                         all_matches[nid] = n
@@ -1736,8 +1734,8 @@ async def graph(
                 effective_granularity, weighted_edges
             )
             # Reuse existing node->module map and edge counts
-            node_to_module_2_a: Dict[str, str] = {}
-            module_edge_counts_2_a: Dict[str, Dict[str, int]] = {}
+            node_to_module_2_a: dict[str, str] = {}
+            module_edge_counts_2_a: dict[str, dict[str, int]] = {}
             for module_name, node_ids in module_to_nodes.items():
                 for node_id in node_ids:
                     node_to_module_2_a[node_id] = module_name
@@ -1786,7 +1784,7 @@ async def graph(
                     continue
                 _in_edges = sum(
                     incoming_modules.get(module_name_result, {}).values() or [0]
-                )  # noqa: F841
+                )
                 out_edges = sum(outgoing_modules.get(module_name_result, {}).values() or [0])
                 # Merge aggregated counts with aggregate totals
                 edge_counts = module_edge_counts_2_a.get(module_name_result, {}).copy()
@@ -1843,11 +1841,11 @@ async def graph(
             module_to_nodes_b, outgoing_modules_b, incoming_modules_b = (
                 analyzer._build_module_graph(effective_granularity_c, weighted_edges)
             )
-            node_to_module_2_b: Dict[str, str] = {}
+            node_to_module_2_b: dict[str, str] = {}
             for mod, nodes in module_to_nodes_b.items():
                 for nid in nodes:
                     node_to_module_2_b[nid] = mod
-            module_edge_counts_2_b: Dict[str, Dict[str, int]] = defaultdict(
+            module_edge_counts_2_b: dict[str, dict[str, int]] = defaultdict(
                 lambda: {
                     "calls_in": 0,
                     "calls_out": 0,
@@ -1891,7 +1889,7 @@ async def graph(
                     continue
                 _in_edges = sum(
                     incoming_modules_b.get(module_name_result_b, {}).values() or [0]
-                )  # noqa: F841
+                )
                 out_edges = sum(outgoing_modules_b.get(module_name_result_b, {}).values() or [0])
                 edge_counts = module_edge_counts_2_b.get(module_name_result_b, {}).copy()
                 edge_counts["imports"] = out_edges

@@ -44,7 +44,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from victor.rag.entity_resolver import EntityInfo
@@ -78,15 +78,15 @@ class EnhancedQuery:
     original: str
     enhanced: str
     technique: EnhancementTechnique
-    variants: List[str] = field(default_factory=list)
+    variants: list[str] = field(default_factory=list)
     hypothetical_doc: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # Already using field default factories, no need to check None
         pass
 
-    def get_all_queries(self) -> List[str]:
+    def get_all_queries(self) -> list[str]:
         """Get all query variants including enhanced query."""
         queries = [self.enhanced]
         queries.extend(self.variants)
@@ -241,7 +241,7 @@ class QueryEnhancer:
             logger.warning(f"LLM call failed: {e}")
             return None
 
-    def _format_entity_context(self, entities: List["EntityInfo"]) -> str:
+    def _format_entity_context(self, entities: list["EntityInfo"]) -> str:
         """Format entity information for prompt context.
 
         Args:
@@ -267,7 +267,7 @@ class QueryEnhancer:
     async def rewrite_query(
         self,
         query: str,
-        entities: Optional[List["EntityInfo"]] = None,
+        entities: Optional[list["EntityInfo"]] = None,
     ) -> EnhancedQuery:
         """Rewrite query for better retrieval.
 
@@ -297,7 +297,7 @@ class QueryEnhancer:
     async def generate_hypothetical_document(
         self,
         query: str,
-        entities: Optional[List["EntityInfo"]] = None,
+        entities: Optional[list["EntityInfo"]] = None,
     ) -> EnhancedQuery:
         """Generate hypothetical document for HyDE technique.
 
@@ -353,7 +353,7 @@ class QueryEnhancer:
     async def generate_query_variants(
         self,
         query: str,
-        entities: Optional[List["EntityInfo"]] = None,
+        entities: Optional[list["EntityInfo"]] = None,
         num_variants: int = 3,
     ) -> EnhancedQuery:
         """Generate multiple query variants for comprehensive retrieval.
@@ -400,8 +400,8 @@ class QueryEnhancer:
     async def enhance(
         self,
         query: str,
-        entities: Optional[List["EntityInfo"]] = None,
-        techniques: Optional[List[EnhancementTechnique]] = None,
+        entities: Optional[list["EntityInfo"]] = None,
+        techniques: Optional[list[EnhancementTechnique]] = None,
     ) -> EnhancedQuery:
         """Apply enhancement techniques to query.
 
@@ -420,7 +420,7 @@ class QueryEnhancer:
         enhanced_query = self._fallback_rewrite(query, entities)
         variants = []
         hypothetical = None
-        all_metadata: Dict[str, Any] = {"entities": [e.name for e in (entities or [])]}
+        all_metadata: dict[str, Any] = {"entities": [e.name for e in (entities or [])]}
 
         for technique in techniques:
             if technique == EnhancementTechnique.REWRITE:
@@ -460,7 +460,7 @@ class QueryEnhancer:
     def _fallback_rewrite(
         self,
         query: str,
-        entities: Optional[List["EntityInfo"]] = None,
+        entities: Optional[list["EntityInfo"]] = None,
     ) -> str:
         """Fallback rewrite using entity metadata (no LLM).
 

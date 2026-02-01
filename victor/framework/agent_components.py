@@ -24,16 +24,11 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Type,
-    Union,
     runtime_checkable,
 )
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 import uuid
 
@@ -52,9 +47,7 @@ if TYPE_CHECKING:
         EventRegistryService,
         ToolConfiguratorService,
     )
-    from victor.observability.integration import ObservabilityIntegration
-    from victor.core.events import ObservabilityBus
-    from victor.core.verticals.base import VerticalBase, VerticalConfig
+    from victor.core.verticals.base import VerticalBase
 
 
 logger = logging.getLogger(__name__)
@@ -69,12 +62,12 @@ logger = logging.getLogger(__name__)
 class AgentProtocol(Protocol):
     """Protocol defining the core Agent interface."""
 
-    async def run(self, prompt: str, *, context: Optional[Dict[str, Any]] = None) -> TaskResult:
+    async def run(self, prompt: str, *, context: Optional[dict[str, Any]] = None) -> TaskResult:
         """Run a task and return the result."""
         ...
 
     async def stream(
-        self, prompt: str, *, context: Optional[Dict[str, Any]] = None
+        self, prompt: str, *, context: Optional[dict[str, Any]] = None
     ) -> AsyncIterator[AgentExecutionEvent]:
         """Stream events as the agent processes a task."""
         ...
@@ -107,7 +100,7 @@ class SessionProtocol(Protocol):
         ...
 
     @property
-    def history(self) -> List[Dict[str, str]]:
+    def history(self) -> list[dict[str, str]]:
         """Get conversation history."""
         ...
 
@@ -142,14 +135,14 @@ class AgentBuildOptions:
     profile: Optional[str] = None
     workspace: Optional[str] = None
     config: Optional[AgentConfig] = None
-    vertical: Optional[Type["VerticalBase"]] = None
+    vertical: Optional[type["VerticalBase"]] = None
     enable_observability: bool = True
     session_id: Optional[str] = None
     enable_cqrs: bool = False
     cqrs_event_sourcing: bool = True
     custom_system_prompt: Optional[str] = None
-    state_hooks: Optional[Dict[str, Callable[..., Any]]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    state_hooks: Optional[dict[str, Callable[..., Any]]] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -206,9 +199,9 @@ class AgentBuilder:
                        When provided, services are resolved from the container.
         """
         self._options = AgentBuildOptions()
-        self._presets_applied: List[BuilderPreset] = []
+        self._presets_applied: list[BuilderPreset] = []
         self._container: Optional["ServiceContainer"] = container
-        self._tool_filters: List[Any] = []
+        self._tool_filters: list[Any] = []
 
     @classmethod
     def from_options(
@@ -571,7 +564,7 @@ class AgentBuilder:
         self._options.config = config
         return self
 
-    def vertical(self, vertical_class: Type["VerticalBase"]) -> "AgentBuilder":
+    def vertical(self, vertical_class: type["VerticalBase"]) -> "AgentBuilder":
         """Use a domain-specific vertical.
 
         Args:
@@ -641,7 +634,7 @@ class AgentBuilder:
     # State Hooks
     # -------------------------------------------------------------------------
 
-    def on_enter_stage(self, callback: Callable[[str, Dict[str, Any]], None]) -> "AgentBuilder":
+    def on_enter_stage(self, callback: Callable[[str, dict[str, Any]], None]) -> "AgentBuilder":
         """Register callback for stage entry.
 
         Args:
@@ -655,7 +648,7 @@ class AgentBuilder:
         self._options.state_hooks["on_enter"] = callback
         return self
 
-    def on_exit_stage(self, callback: Callable[[str, Dict[str, Any]], None]) -> "AgentBuilder":
+    def on_exit_stage(self, callback: Callable[[str, dict[str, Any]], None]) -> "AgentBuilder":
         """Register callback for stage exit.
 
         Args:
@@ -669,7 +662,7 @@ class AgentBuilder:
         self._options.state_hooks["on_exit"] = callback
         return self
 
-    def on_transition(self, callback: Callable[[str, str, Dict[str, Any]], None]) -> "AgentBuilder":
+    def on_transition(self, callback: Callable[[str, str, dict[str, Any]], None]) -> "AgentBuilder":
         """Register callback for state transitions.
 
         Args:
@@ -862,7 +855,7 @@ class SessionContext:
 
     session_id: str
     created_at: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -879,7 +872,7 @@ class SessionMetrics:
     failed_turns: int = 0
     average_turn_duration: float = 0.0
 
-    def update(self, turn_data: Dict[str, Any]) -> None:
+    def update(self, turn_data: dict[str, Any]) -> None:
         """Update metrics with turn data."""
         self.total_turns += 1
         self.total_duration += turn_data.get("duration", 0.0)
@@ -893,7 +886,7 @@ class SessionMetrics:
         if self.total_turns > 0:
             self.average_turn_duration = self.total_duration / self.total_turns
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert metrics to dictionary."""
         return {
             "total_turns": self.total_turns,
@@ -973,7 +966,7 @@ class AgentSession:
         initial_prompt: str,
         *,
         session_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         hooks: Optional[SessionLifecycleHooks] = None,
         container: Optional["ServiceContainer"] = None,
     ) -> None:
@@ -1002,7 +995,7 @@ class AgentSession:
         )
 
         # Turn history for this session
-        self._turns: List[Dict[str, Any]] = []
+        self._turns: list[dict[str, Any]] = []
 
         # Phase 8.3: Lifecycle management
         self._hooks = hooks or SessionLifecycleHooks()
@@ -1033,7 +1026,7 @@ class AgentSession:
         return self._turn_count
 
     @property
-    def history(self) -> List[Dict[str, str]]:
+    def history(self) -> list[dict[str, str]]:
         """Get conversation history.
 
         Returns:
@@ -1043,7 +1036,7 @@ class AgentSession:
         return [{"role": msg.role, "content": msg.content} for msg in messages]
 
     @property
-    def turns(self) -> List[Dict[str, Any]]:
+    def turns(self) -> list[dict[str, Any]]:
         """Get detailed turn history.
 
         Returns:
@@ -1102,7 +1095,7 @@ class AgentSession:
         self,
         message: str,
         *,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> TaskResult:
         """Send a message with optional context.
 
@@ -1194,7 +1187,7 @@ class AgentSession:
         self,
         message: str,
         *,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[AgentExecutionEvent]:
         """Stream a response with optional context.
 
@@ -1235,7 +1228,7 @@ class AgentSession:
             except Exception as e:
                 logger.debug(f"on_turn_start hook error: {e}")
 
-        content_parts: List[str] = []
+        content_parts: list[str] = []
         tool_count = 0
         success = True
 
@@ -1548,7 +1541,7 @@ class AgentBridge:
     # CQRS Operations
     # -------------------------------------------------------------------------
 
-    async def get_session_info(self) -> Dict[str, Any]:
+    async def get_session_info(self) -> dict[str, Any]:
         """Get session information.
 
         Returns:
@@ -1565,7 +1558,7 @@ class AgentBridge:
 
         return await self._cqrs_bridge.get_session(self._session_id)
 
-    async def get_conversation_history(self, limit: int = 100) -> Dict[str, Any]:
+    async def get_conversation_history(self, limit: int = 100) -> dict[str, Any]:
         """Get conversation history.
 
         Args:
@@ -1588,7 +1581,7 @@ class AgentBridge:
             limit=limit,
         )
 
-    async def get_metrics(self) -> Dict[str, Any]:
+    async def get_metrics(self) -> dict[str, Any]:
         """Get session metrics.
 
         Returns:

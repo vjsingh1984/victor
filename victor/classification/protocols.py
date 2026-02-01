@@ -24,7 +24,7 @@ classification-specific protocols.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
 # Re-export core protocols from framework
 from victor.framework.task.protocols import (
@@ -46,7 +46,7 @@ class TaskTypeResult:
 
     task_type: TaskType
     confidence: float
-    top_matches: List[Tuple[str, float]]  # Top matching patterns with scores
+    top_matches: list[tuple[str, float]]  # Top matching patterns with scores
     has_file_context: bool  # Whether the prompt mentions specific files
     nudge_applied: Optional[str] = None  # Name of nudge rule applied
     preprocessed_prompt: Optional[str] = None  # Preprocessed prompt used
@@ -70,7 +70,7 @@ class SemanticClassifierProtocol(Protocol):
         """
         ...
 
-    def get_embedding(self, text: str) -> List[float]:
+    def get_embedding(self, text: str) -> list[float]:
         """Get embedding vector for text.
 
         Args:
@@ -100,7 +100,7 @@ class PatternMatcherProtocol(Protocol):
         """
         ...
 
-    def match_all(self, text: str) -> List[ClassificationPattern]:
+    def match_all(self, text: str) -> list[ClassificationPattern]:
         """Find all matching patterns.
 
         Args:
@@ -125,8 +125,8 @@ class NudgeEngineProtocol(Protocol):
         prompt: str,
         embedding_result: TaskType,
         embedding_confidence: float,
-        scores: Dict[TaskType, float],
-    ) -> Tuple[TaskType, float, Optional[str]]:
+        scores: dict[TaskType, float],
+    ) -> tuple[TaskType, float, Optional[str]]:
         """Apply nudge rules to correct edge cases.
 
         Args:

@@ -49,7 +49,8 @@ from __future__ import annotations
 import logging
 import threading
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.feature_flags.flags import (
     FEATURE_FLAGS,
@@ -62,10 +63,6 @@ from victor.feature_flags.flags import (
 )
 from victor.feature_flags.resolvers import (
     ChainedFlagResolver,
-    EnvironmentFlagResolver,
-    SettingsFlagResolver,
-    RuntimeFlagResolver,
-    StagedRolloutResolver,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,7 +99,7 @@ class FlagChangeAuditLog:
         self.source = source
         self.timestamp = timestamp
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary.
 
         Returns:
@@ -161,15 +158,15 @@ class FeatureFlagManager:
         self._enable_audit_logging = enable_audit_logging
 
         # Audit log (thread-safe)
-        self._audit_log: List[FlagChangeAuditLog] = []
+        self._audit_log: list[FlagChangeAuditLog] = []
         self._audit_lock = threading.RLock()
 
         # Change callbacks
-        self._callbacks: Dict[str, List[Callable[[str, bool], None]]] = {}
+        self._callbacks: dict[str, list[Callable[[str, bool], None]]] = {}
         self._callbacks_lock = threading.RLock()
 
         # Cache for resolved values
-        self._cache: Dict[str, bool] = {}
+        self._cache: dict[str, bool] = {}
         self._cache_lock = threading.RLock()
 
         logger.info("FeatureFlagManager initialized")
@@ -304,7 +301,7 @@ class FeatureFlagManager:
         logger.info(f"Feature flag {flag_name} set to {value} (source: {source})")
         return True
 
-    def get_all_flags(self, include_disabled: bool = True) -> Dict[str, bool]:
+    def get_all_flags(self, include_disabled: bool = True) -> dict[str, bool]:
         """Get all feature flag values.
 
         Args:
@@ -330,7 +327,7 @@ class FeatureFlagManager:
 
         return flags
 
-    def get_flag_metadata(self, flag_name: str) -> Dict[str, Any]:
+    def get_flag_metadata(self, flag_name: str) -> dict[str, Any]:
         """Get metadata for a feature flag.
 
         Args:
@@ -345,7 +342,7 @@ class FeatureFlagManager:
         """
         return get_flag_metadata(flag_name)
 
-    def get_flags_by_category(self, category: str) -> Dict[str, bool]:
+    def get_flags_by_category(self, category: str) -> dict[str, bool]:
         """Get all flags in a specific category.
 
         Args:
@@ -360,7 +357,7 @@ class FeatureFlagManager:
         flag_names = get_flags_by_category(category).keys()
         return {name: self.is_enabled(name) for name in flag_names}
 
-    def get_stable_flags(self) -> Dict[str, bool]:
+    def get_stable_flags(self) -> dict[str, bool]:
         """Get all flags marked as stable (safe for production).
 
         Returns:
@@ -372,7 +369,7 @@ class FeatureFlagManager:
         flag_names = get_stable_flags().keys()
         return {name: self.is_enabled(name) for name in flag_names}
 
-    def get_experimental_flags(self) -> Dict[str, bool]:
+    def get_experimental_flags(self) -> dict[str, bool]:
         """Get all flags marked as experimental (not stable).
 
         Returns:
@@ -456,7 +453,7 @@ class FeatureFlagManager:
 
     def get_audit_log(
         self, flag_name: Optional[str] = None, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get audit log entries for flag changes.
 
         Args:
@@ -492,7 +489,7 @@ class FeatureFlagManager:
             self._audit_log.clear()
         logger.info("Feature flag audit log cleared")
 
-    def export_state(self) -> Dict[str, Any]:
+    def export_state(self) -> dict[str, Any]:
         """Export current state of all flags.
 
         Returns:
@@ -510,7 +507,7 @@ class FeatureFlagManager:
             "cache_size": len(self._cache),
         }
 
-    def import_state(self, state: Dict[str, Any], merge: bool = True) -> None:
+    def import_state(self, state: dict[str, Any], merge: bool = True) -> None:
         """Import flag state from dictionary.
 
         Args:

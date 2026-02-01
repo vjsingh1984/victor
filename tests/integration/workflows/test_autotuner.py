@@ -26,9 +26,7 @@ from __future__ import annotations
 
 import json
 import pytest
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any
 
 from victor.workflows.performance_autotuner import (
     PerformanceAnalyzer,
@@ -51,7 +49,7 @@ from victor.workflows.performance_autotuner import (
 
 
 @pytest.fixture
-def sample_metrics() -> List[Dict[str, Any]]:
+def sample_metrics() -> list[dict[str, Any]]:
     """Sample metrics data for testing."""
     return [
         {
@@ -103,7 +101,7 @@ def sample_metrics() -> List[Dict[str, Any]]:
 
 
 @pytest.fixture
-def sample_workflow_config() -> Dict[str, Any]:
+def sample_workflow_config() -> dict[str, Any]:
     """Sample workflow configuration."""
     return {
         "team_formation": "sequential",

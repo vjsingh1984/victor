@@ -46,7 +46,7 @@ import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ class FileSnapshot:
     permissions: int = 0o644  # File permissions
     existed: bool = True  # Whether file existed when snapshot was taken
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "path": self.path,
@@ -72,7 +72,7 @@ class FileSnapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "FileSnapshot":
+    def from_dict(cls, data: dict[str, Any]) -> "FileSnapshot":
         """Create from dictionary."""
         return cls(
             path=data["path"],
@@ -90,12 +90,12 @@ class WorkspaceSnapshot:
     snapshot_id: str
     created_at: str  # ISO format timestamp
     description: str
-    files: List[FileSnapshot] = field(default_factory=list)
+    files: list[FileSnapshot] = field(default_factory=list)
     workspace_root: str = ""
     git_ref: Optional[str] = None  # Git HEAD ref at snapshot time
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "snapshot_id": self.snapshot_id,
@@ -108,7 +108,7 @@ class WorkspaceSnapshot:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WorkspaceSnapshot":
+    def from_dict(cls, data: dict[str, Any]) -> "WorkspaceSnapshot":
         """Create from dictionary."""
         return cls(
             snapshot_id=data["snapshot_id"],
@@ -141,7 +141,7 @@ class FileDiff:
     status: str  # "added", "modified", "deleted", "unchanged"
     snapshot_content: Optional[str] = None
     current_content: Optional[str] = None
-    diff_lines: List[str] = field(default_factory=list)
+    diff_lines: list[str] = field(default_factory=list)
 
 
 class FileSnapshotStore:
@@ -169,8 +169,8 @@ class FileSnapshotStore:
         self.workspace_root = workspace_root or Path.cwd()
         self.max_snapshots = max_snapshots
         self.persist_dir = persist_dir
-        self._snapshots: Dict[str, WorkspaceSnapshot] = {}
-        self._snapshot_order: List[str] = []  # Oldest to newest
+        self._snapshots: dict[str, WorkspaceSnapshot] = {}
+        self._snapshot_order: list[str] = []  # Oldest to newest
         self._counter = 0
 
         if persist_dir:
@@ -241,9 +241,9 @@ class FileSnapshotStore:
 
     def create_snapshot(
         self,
-        files: Optional[List[str]] = None,
+        files: Optional[list[str]] = None,
         description: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> str:
         """Create a snapshot of specified files or tracked changes.
 
@@ -312,7 +312,7 @@ class FileSnapshotStore:
         logger.info(f"Created snapshot {snapshot_id}: {description} ({len(files)} files)")
         return snapshot_id
 
-    def _get_modified_files(self) -> List[str]:
+    def _get_modified_files(self) -> list[str]:
         """Get list of modified files from git status."""
         try:
             result = subprocess.run(
@@ -384,7 +384,7 @@ class FileSnapshotStore:
         logger.info(f"Restored snapshot {snapshot_id}: {restored_count} files")
         return True
 
-    def diff_snapshot(self, snapshot_id: str) -> List[FileDiff]:
+    def diff_snapshot(self, snapshot_id: str) -> list[FileDiff]:
         """Get diff between snapshot and current state.
 
         Args:
@@ -398,7 +398,7 @@ class FileSnapshotStore:
             return []
 
         diffs = []
-        current_files: Set[str] = set()
+        current_files: set[str] = set()
 
         for file_snap in snapshot.files:
             full_path = self.workspace_root / file_snap.path
@@ -449,7 +449,7 @@ class FileSnapshotStore:
 
         return diffs
 
-    def _generate_diff_lines(self, old: str, new: str) -> List[str]:
+    def _generate_diff_lines(self, old: str, new: str) -> list[str]:
         """Generate unified diff lines between old and new content."""
         import difflib
 
@@ -465,7 +465,7 @@ class FileSnapshotStore:
         )
         return list(diff)
 
-    def list_snapshots(self, limit: int = 10) -> List[WorkspaceSnapshot]:
+    def list_snapshots(self, limit: int = 10) -> list[WorkspaceSnapshot]:
         """List recent snapshots.
 
         Args:

@@ -24,9 +24,7 @@ Uses Hypothesis to test invariants across many iterations:
 """
 
 import pytest
-from hypothesis import given, strategies as st, settings, Phase, assume
-from typing import List, Set
-from unittest.mock import Mock
+from hypothesis import given, strategies as st, settings, Phase
 
 from victor.agent.mode_controller import AgentModeController, AgentMode
 
@@ -63,7 +61,7 @@ class TestModeSwitchProperties:
 
     @given(modes=st.lists(mode_strategy, min_size=1, max_size=10))
     @settings(max_examples=30, phases=[Phase.generate])
-    def test_sequential_mode_switches(self, modes: List[AgentMode]):
+    def test_sequential_mode_switches(self, modes: list[AgentMode]):
         """Sequential mode switches should result in last mode being current."""
         controller = AgentModeController()
 
@@ -104,7 +102,7 @@ class TestToolAllowedProperties:
 
     @given(tool_names=st.lists(tool_name_strategy, min_size=1, max_size=10, unique=True))
     @settings(max_examples=30, phases=[Phase.generate])
-    def test_tool_allowed_consistency_across_queries(self, tool_names: List[str]):
+    def test_tool_allowed_consistency_across_queries(self, tool_names: list[str]):
         """Same tool should have same allowed status across repeated queries."""
         controller = AgentModeController()
         controller.switch_mode(AgentMode.BUILD)

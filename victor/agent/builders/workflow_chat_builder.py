@@ -18,7 +18,7 @@ Part of Phase 1: Domain-Agnostic Workflow Chat
 Creates WorkflowOrchestrator and WorkflowChatCoordinator for workflow-based chat execution.
 """
 
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 import logging
 
@@ -51,7 +51,7 @@ class WorkflowChatBuilder:
         self.settings = settings
         self._factory = factory
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> dict[str, Any]:
         """Build workflow chat components and attach them to orchestrator.
 
         This method conditionally creates workflow chat components based on
@@ -66,7 +66,7 @@ class WorkflowChatBuilder:
         Returns:
             Dictionary of built components
         """
-        components: Dict[str, Any] = {}
+        components: dict[str, Any] = {}
 
         # Check feature flag
         use_workflow_chat = getattr(self.settings, "use_workflow_chat", False)

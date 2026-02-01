@@ -23,7 +23,7 @@ This test module covers:
 6. SemanticToolSelector integration with metadata
 """
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -58,7 +58,7 @@ class MockTool(BaseTool):
         "required": ["param1"],
     }
 
-    async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(self, context: dict[str, Any], **kwargs: Any) -> ToolResult:
         return ToolResult(success=True, output="mock result")
 
 
@@ -79,7 +79,7 @@ class MockToolWithExplicitMetadata(BaseTool):
             priority_hints=["Use for testing metadata system"],
         )
 
-    async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(self, context: dict[str, Any], **kwargs: Any) -> ToolResult:
         return ToolResult(success=True, output="explicit metadata result")
 
 
@@ -90,7 +90,7 @@ class GitMockTool(BaseTool):
     description = "Commit changes to git repository."
     parameters = {"type": "object", "properties": {}}
 
-    async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(self, context: dict[str, Any], **kwargs: Any) -> ToolResult:
         return ToolResult(success=True, output="committed")
 
 
@@ -105,7 +105,7 @@ class HighCostTool(BaseTool):
     def cost_tier(self) -> CostTier:
         return CostTier.HIGH
 
-    async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(self, context: dict[str, Any], **kwargs: Any) -> ToolResult:
         return ToolResult(success=True, output="expensive result")
 
 
@@ -640,7 +640,7 @@ class TestPluginToolSupport:
                     use_cases=["extending victor", "custom functionality"],
                 )
 
-            async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
+            async def execute(self, context: dict[str, Any], **kwargs: Any) -> ToolResult:
                 return ToolResult(success=True, output="plugin result")
 
         registry.register_tool(PluginTool())

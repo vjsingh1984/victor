@@ -37,7 +37,7 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.tools.registry import ToolRegistry
 
@@ -55,8 +55,8 @@ class ToolCatalogConfig:
     """
 
     airgapped_mode: bool = False
-    enabled_tools: List[str] = field(default_factory=list)
-    disabled_tools: List[str] = field(default_factory=list)
+    enabled_tools: list[str] = field(default_factory=list)
+    disabled_tools: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -71,7 +71,7 @@ class CatalogLoadResult:
 
     tools_loaded: int = 0
     tools_disabled: int = 0
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class ToolCatalogLoader:
@@ -210,13 +210,13 @@ class ToolCatalogLoader:
 
         return disabled_count
 
-    def get_tool_config(self) -> Dict[str, Any]:
+    def get_tool_config(self) -> dict[str, Any]:
         """Get tool configuration for context injection.
 
         Returns:
             Dictionary with tool-specific settings for context injection.
         """
-        config: Dict[str, Any] = {}
+        config: dict[str, Any] = {}
 
         # Load web tool config if not air-gapped
         if not self._config.airgapped_mode:

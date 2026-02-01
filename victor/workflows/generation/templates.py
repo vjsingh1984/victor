@@ -46,9 +46,8 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Optional, cast
 from enum import Enum
 
 from victor.workflows.generation.requirements import WorkflowRequirements
@@ -105,12 +104,12 @@ class WorkflowTemplate:
     name: str
     description: str
     template_type: TemplateType
-    verticals: List[str]
-    keywords: List[str]
+    verticals: list[str]
+    keywords: list[str]
     execution_order: str
     min_tasks: int = 1
     max_tasks: Optional[int] = None
-    schema: Dict[str, Any] = field(default_factory=dict)
+    schema: dict[str, Any] = field(default_factory=dict)
 
     def matches(
         self,
@@ -226,7 +225,7 @@ class TemplateLibrary:
         self,
         template: WorkflowTemplate,
         requirements: WorkflowRequirements,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Instantiate template with requirements.
 
         Args:
@@ -254,7 +253,7 @@ class TemplateLibrary:
 
     def list_templates(
         self, vertical: Optional[str] = None, template_type: Optional[TemplateType] = None
-    ) -> List[WorkflowTemplate]:
+    ) -> list[WorkflowTemplate]:
         """List available templates.
 
         Args:
@@ -278,7 +277,7 @@ class TemplateLibrary:
     # Template Definitions
     # =============================================================================
 
-    def _load_builtin_templates(self) -> List[WorkflowTemplate]:
+    def _load_builtin_templates(self) -> list[WorkflowTemplate]:
         """Load built-in workflow templates.
 
         Returns templates for all verticals and common patterns.
@@ -381,7 +380,7 @@ class TemplateLibrary:
     # Template Schemas
     # =============================================================================
 
-    def _sequential_research_schema(self) -> Dict[str, Any]:
+    def _sequential_research_schema(self) -> dict[str, Any]:
         """Schema for sequential research workflow."""
         return {
             "workflow_name": "{workflow_name}",
@@ -426,7 +425,7 @@ class TemplateLibrary:
             },
         }
 
-    def _conditional_research_schema(self) -> Dict[str, Any]:
+    def _conditional_research_schema(self) -> dict[str, Any]:
         """Schema for conditional research with quality check."""
         return {
             "workflow_name": "{workflow_name}",
@@ -480,7 +479,7 @@ class TemplateLibrary:
             },
         }
 
-    def _sequential_coding_schema(self) -> Dict[str, Any]:
+    def _sequential_coding_schema(self) -> dict[str, Any]:
         """Schema for sequential coding workflow."""
         return {
             "workflow_name": "{workflow_name}",
@@ -524,7 +523,7 @@ class TemplateLibrary:
             },
         }
 
-    def _bug_fix_schema(self) -> Dict[str, Any]:
+    def _bug_fix_schema(self) -> dict[str, Any]:
         """Schema for bug fix workflow with testing loop."""
         return {
             "workflow_name": "{workflow_name}",
@@ -586,7 +585,7 @@ class TemplateLibrary:
             },
         }
 
-    def _deploy_schema(self) -> Dict[str, Any]:
+    def _deploy_schema(self) -> dict[str, Any]:
         """Schema for deployment workflow."""
         return {
             "workflow_name": "{workflow_name}",
@@ -631,7 +630,7 @@ class TemplateLibrary:
             },
         }
 
-    def _eda_schema(self) -> Dict[str, Any]:
+    def _eda_schema(self) -> dict[str, Any]:
         """Schema for exploratory data analysis."""
         return {
             "workflow_name": "{workflow_name}",
@@ -674,8 +673,8 @@ class TemplateLibrary:
     # =============================================================================
 
     def _replace_placeholders(
-        self, schema: Dict[str, Any], requirements: WorkflowRequirements
-    ) -> Dict[str, Any]:
+        self, schema: dict[str, Any], requirements: WorkflowRequirements
+    ) -> dict[str, Any]:
         """Replace placeholders in template with values from requirements.
 
         Supports placeholders like:
@@ -727,9 +726,9 @@ class TemplateLibrary:
             return obj
 
         result = replace_in_dict(schema)
-        return cast(Dict[str, Any], result)
+        return cast(dict[str, Any], result)
 
-    def _validate_instantiated_schema(self, schema: Dict[str, Any]) -> None:
+    def _validate_instantiated_schema(self, schema: dict[str, Any]) -> None:
         """Validate instantiated schema.
 
         Args:

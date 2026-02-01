@@ -9,19 +9,16 @@ registration with entry points and YAML fallback (TDD approach).
 """
 
 import os
-import pytest
-from pathlib import Path
-from typing import Dict, Type, Any, List
-from unittest.mock import Mock, patch, MagicMock
+from typing import Any
+from unittest.mock import Mock, patch
 from dataclasses import dataclass
 
-from victor.core.verticals.base import VerticalBase, VerticalRegistry
+from victor.core.verticals.base import VerticalBase
 from victor.core.verticals.plugin_discovery import (
     PluginDiscovery,
     PluginSource,
     DiscoveryResult,
     get_plugin_discovery,
-    BuiltinVerticalConfig,
 )
 
 
@@ -38,7 +35,7 @@ class MockVertical(VerticalBase):
     display_name: str = "Mock Vertical"
     description: str = "A mock vertical for testing"
 
-    def get_tools(self) -> List[Any]:
+    def get_tools(self) -> list[Any]:
         return []
 
     def get_system_prompt(self) -> str:

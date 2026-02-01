@@ -20,7 +20,6 @@ This module provides chat workflows for the DevOps vertical.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Tuple
 
 from victor.framework.workflows import BaseYAMLWorkflowProvider
 
@@ -48,7 +47,7 @@ class DevOpsChatWorkflowProvider(BaseYAMLWorkflowProvider):
         """
         return "victor.devops.escape_hatches"
 
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
+    def get_auto_workflows(self) -> list[tuple[str, str]]:
         """Get automatic workflow registrations.
 
         Returns:

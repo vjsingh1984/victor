@@ -56,16 +56,15 @@ Usage:
 """
 
 import asyncio
-import hashlib
 import json
 import logging
 import sqlite3
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 import numpy as np
 
@@ -214,10 +213,10 @@ class PromptContext:
     model: str
 
     # Historical context
-    relevant_fragments: List[ContextFragment] = field(default_factory=list)
+    relevant_fragments: list[ContextFragment] = field(default_factory=list)
 
     # Tool context
-    available_tools: List[str] = field(default_factory=list)
+    available_tools: list[str] = field(default_factory=list)
     recommended_tool_budget: int = 10
 
     # Mode context
@@ -256,7 +255,6 @@ class ProfileLearningStore:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
         except OSError:
             # If project directory is read-only, fall back to global victor directory
-            import os
             from pathlib import Path
 
             global_dir = Path.home() / ".victor"
@@ -421,7 +419,7 @@ class ProfileLearningStore:
         self,
         profile_name: str,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get recent interactions for a profile."""
         self._ensure_initialized()
 
@@ -460,7 +458,7 @@ class EmbeddingScheduler:
         self._state = CacheState.COLD
         self._last_refresh: Optional[datetime] = None
         self._background_task: Optional[asyncio.Task[None]] = None
-        self._cache: Dict[str, np.ndarray] = {}
+        self._cache: dict[str, np.ndarray] = {}
         self._cache_ttl = timedelta(minutes=30)
 
     @property
@@ -604,7 +602,7 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
         )
 
         # Observers for feedback
-        self._observers: List[Callable[[str, float, bool], None]] = []
+        self._observers: list[Callable[[str, float, bool], None]] = []
 
     @classmethod
     async def create(
@@ -661,8 +659,8 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
         self,
         task: str,
         task_type: str = "general",
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
-        available_tools: Optional[List[str]] = None,
+        conversation_history: Optional[list[dict[str, Any]]] = None,
+        available_tools: Optional[list[str]] = None,
         current_mode: str = "explore",
         tool_budget: int = 10,
         iteration_budget: int = 20,
@@ -720,8 +718,8 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
         self,
         task: str,
         task_type: str,
-        conversation_history: Optional[List[Dict[str, Any]]],
-        available_tools: List[str],
+        conversation_history: Optional[list[dict[str, Any]]],
+        available_tools: list[str],
         current_mode: str,
         tool_budget: int,
         iteration_budget: int,
@@ -757,7 +755,7 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
         task_type: str,
         session_id: str,
         limit: int = 5,
-    ) -> List[ContextFragment]:
+    ) -> list[ContextFragment]:
         """Retrieve relevant context fragments from conversation history."""
         if not self._embedding_store:
             return []
@@ -939,7 +937,7 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
                 "3. Do NOT output XML tags or function call syntax."
             )
 
-    def _format_context_fragments(self, fragments: List[ContextFragment]) -> str:
+    def _format_context_fragments(self, fragments: list[ContextFragment]) -> str:
         """Format relevant context fragments."""
         if not fragments:
             return ""
@@ -1016,7 +1014,7 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
             f"tools={tool_calls}/{tool_budget}"
         )
 
-    def get_profile_stats(self) -> Dict[str, Any]:
+    def get_profile_stats(self) -> dict[str, Any]:
         """Get profile statistics."""
         return {
             "profile_name": self.profile_name,

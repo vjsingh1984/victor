@@ -15,22 +15,16 @@ Protocols defined:
 - IWorkflowValidator: Interface for validating workflow definitions (DIP compliant)
 """
 
-from abc import abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Tuple,
-    Type,
     runtime_checkable,
     TYPE_CHECKING,
 )
+from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
     from victor.workflows.streaming import WorkflowStreamChunk
@@ -73,7 +67,7 @@ class RetryPolicy:
     max_retries: int = 3
     delay_seconds: float = 1.0
     exponential_backoff: bool = True
-    retry_on_exceptions: Tuple[Type[Exception], ...] = (Exception,)
+    retry_on_exceptions: tuple[type[Exception], ...] = (Exception,)
 
 
 @dataclass
@@ -90,7 +84,7 @@ class NodeResult:
     status: ProtocolNodeStatus
     output: Any = None
     error: Optional[Exception] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @runtime_checkable
@@ -143,7 +137,7 @@ class IWorkflowNode(Protocol):
         ...
 
     async def execute(
-        self, state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+        self, state: dict[str, Any], context: Optional[dict[str, Any]] = None
     ) -> NodeResult:
         """Execute the node with the given state.
 
@@ -188,7 +182,7 @@ class IWorkflowEdge(Protocol):
         """ID of the target node."""
         ...
 
-    def should_traverse(self, state: Dict[str, Any]) -> bool:
+    def should_traverse(self, state: dict[str, Any]) -> bool:
         """Determine if this edge should be traversed.
 
         Args:
@@ -256,7 +250,7 @@ class IWorkflowGraph(Protocol):
         """
         ...
 
-    def get_next_nodes(self, node_id: str, state: Dict[str, Any]) -> List[IWorkflowNode]:
+    def get_next_nodes(self, node_id: str, state: dict[str, Any]) -> list[IWorkflowNode]:
         """Get the next nodes to execute after the given node.
 
         Args:
@@ -268,7 +262,7 @@ class IWorkflowGraph(Protocol):
         """
         ...
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Validate the graph structure.
 
         Returns:
@@ -294,8 +288,8 @@ class ICheckpointStore(Protocol):
         self,
         workflow_id: str,
         checkpoint_id: str,
-        state: Dict[str, Any],
-        metadata: Optional[Dict[str, Any]] = None,
+        state: dict[str, Any],
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Save a checkpoint.
 
@@ -307,7 +301,7 @@ class ICheckpointStore(Protocol):
         """
         ...
 
-    async def load(self, workflow_id: str, checkpoint_id: str) -> Optional[Dict[str, Any]]:
+    async def load(self, workflow_id: str, checkpoint_id: str) -> Optional[dict[str, Any]]:
         """Load a checkpoint.
 
         Args:
@@ -319,7 +313,7 @@ class ICheckpointStore(Protocol):
         """
         ...
 
-    async def list_checkpoints(self, workflow_id: str) -> List[str]:
+    async def list_checkpoints(self, workflow_id: str) -> list[str]:
         """List all checkpoints for a workflow.
 
         Args:
@@ -358,9 +352,9 @@ class IWorkflowExecutor(Protocol):
     async def execute(
         self,
         graph: IWorkflowGraph,
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         checkpoint_store: Optional[ICheckpointStore] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a workflow graph.
 
         Args:
@@ -379,7 +373,7 @@ class IWorkflowExecutor(Protocol):
         checkpoint_store: ICheckpointStore,
         workflow_id: str,
         checkpoint_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Resume a workflow from a checkpoint.
 
         Args:
@@ -427,7 +421,7 @@ class IStreamingWorkflowExecutor(Protocol):
     async def astream(
         self,
         graph: IWorkflowGraph,
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         checkpoint_store: Optional[ICheckpointStore] = None,
     ) -> AsyncIterator["WorkflowStreamChunk"]:
         """Stream workflow execution events.
@@ -521,7 +515,7 @@ class NodeRunnerResult:
     output: Any = None
     error: Optional[str] = None
     duration_seconds: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def status(self) -> ProtocolNodeStatus:
@@ -579,9 +573,9 @@ class NodeRunner(Protocol):
     async def execute(
         self,
         node_id: str,
-        node_config: Dict[str, Any],
-        context: Dict[str, Any],  # ExecutionContext TypedDict
-    ) -> Tuple[Dict[str, Any], "NodeRunnerResult"]:
+        node_config: dict[str, Any],
+        context: dict[str, Any],  # ExecutionContext TypedDict
+    ) -> tuple[dict[str, Any], "NodeRunnerResult"]:
         """Execute a node and return updated context with result.
 
         Args:
@@ -639,7 +633,7 @@ class IWorkflowCompiler(Protocol):
                 return CompiledGraph(...)
     """
 
-    def compile(self, workflow_def: Dict[str, Any]) -> Any:
+    def compile(self, workflow_def: dict[str, Any]) -> Any:
         """Compile a workflow definition into an executable graph.
 
         Args:
@@ -680,7 +674,7 @@ class IWorkflowLoader(Protocol):
                 return self._db.get_workflow(source)
     """
 
-    def load(self, source: str) -> Dict[str, Any]:
+    def load(self, source: str) -> dict[str, Any]:
         """Load a workflow definition from a source.
 
         Args:
@@ -726,7 +720,7 @@ class IWorkflowValidator(Protocol):
             warnings: List[str] = field(default_factory=list)
     """
 
-    def validate(self, workflow_def: Dict[str, Any]) -> Any:
+    def validate(self, workflow_def: dict[str, Any]) -> Any:
         """Validate a workflow definition.
 
         Args:

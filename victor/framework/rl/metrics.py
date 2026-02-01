@@ -45,8 +45,8 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from datetime import datetime
+from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.rl.coordinator import RLCoordinator
@@ -85,9 +85,9 @@ class RLSystemMetrics:
 
     total_outcomes: int = 0
     total_learners: int = 0
-    active_learners: List[str] = field(default_factory=list)
-    inactive_learners: List[str] = field(default_factory=list)
-    event_counts: Dict[str, int] = field(default_factory=dict)
+    active_learners: list[str] = field(default_factory=list)
+    inactive_learners: list[str] = field(default_factory=list)
+    event_counts: dict[str, int] = field(default_factory=dict)
     overall_success_rate: float = 0.0
     overall_quality: float = 0.5
     export_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())

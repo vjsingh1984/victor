@@ -41,7 +41,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field as dataclass_field
-from typing import Any, Callable, Dict, List, Optional, Union, cast
+from typing import Any, Optional, cast
+from collections.abc import Callable
 
 from victor.framework.validation.pipeline import (
     ChainHandler,
@@ -50,13 +51,11 @@ from victor.framework.validation.pipeline import (
     RetryHandler,
     SkipHandler,
     ValidationAction,
-    ValidationConfig,
     ValidationHandler,
     ValidationPipeline,
 )
 from victor.framework.validation.validators import (
     BaseValidator,
-    CompositeLogic,
     CompositeValidator,
     ConditionalValidator,
     LengthValidator,
@@ -89,10 +88,10 @@ class ValidatorConfig:
 
     type: str
     field_name: Optional[str] = None
-    config: Dict[str, Any] = dataclass_field(default_factory=dict)
+    config: dict[str, Any] = dataclass_field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> ValidatorConfig:
+    def from_dict(cls, data: dict[str, Any]) -> ValidatorConfig:
         """Create from YAML dict."""
         return cls(
             type=data.get("type", ""),
@@ -111,10 +110,10 @@ class HandlerConfig:
     """
 
     type: str
-    config: Dict[str, Any] = dataclass_field(default_factory=dict)
+    config: dict[str, Any] = dataclass_field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any] | str) -> HandlerConfig:
+    def from_dict(cls, data: dict[str, Any] | str) -> HandlerConfig:
         """Create from YAML dict."""
         # Support both 'type' field and direct handler specification
         if isinstance(data, str):
@@ -139,7 +138,7 @@ class ValidationNodeConfig:
         enable_logging: Whether to log validation steps
     """
 
-    validators: List[ValidatorConfig] = dataclass_field(default_factory=list)
+    validators: list[ValidatorConfig] = dataclass_field(default_factory=list)
     handler: Optional[HandlerConfig] = None
     halt_on_error: bool = True
     collect_all_errors: bool = True
@@ -148,7 +147,7 @@ class ValidationNodeConfig:
     enable_logging: bool = True
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ValidationNodeConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "ValidationNodeConfig":
         """Create from YAML dict."""
         validators = [ValidatorConfig.from_dict(v) for v in data.get("validators", [])]
 
@@ -192,7 +191,7 @@ class ValidatorFactory:
 
     def __init__(self) -> None:
         """Initialize the factory."""
-        self._custom_validators: Dict[str, type[ValidatorProtocol]] = {}
+        self._custom_validators: dict[str, type[ValidatorProtocol]] = {}
 
     def register_validator(
         self,
@@ -378,7 +377,7 @@ class ValidatorFactory:
         condition_path = cfg.get("condition")
         if condition_path:
 
-            def condition(data: Dict[str, Any]) -> bool:
+            def condition(data: dict[str, Any]) -> bool:
                 parts = condition_path.split(".")
                 value: Any = data
                 for part in parts:
@@ -390,7 +389,7 @@ class ValidatorFactory:
 
         else:
 
-            def condition(data: Dict[str, Any]) -> bool:
+            def condition(data: dict[str, Any]) -> bool:
                 value = data.get("_validate", True)
                 assert isinstance(value, bool)
                 return value
@@ -614,7 +613,7 @@ class ValidationPipelineBuilder:
 
     def from_dict(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
     ) -> ValidationPipeline:
         """Create a pipeline from dictionary configuration.
 
@@ -651,7 +650,7 @@ class ValidationPipelineBuilder:
 
     def from_yaml_node(
         self,
-        node_data: Dict[str, Any],
+        node_data: dict[str, Any],
     ) -> ValidationPipeline:
         """Create a pipeline from a workflow YAML node.
 
@@ -683,7 +682,7 @@ class ValidationPipelineBuilder:
 
 
 def create_pipeline_from_yaml(
-    yaml_config: Dict[str, Any],
+    yaml_config: dict[str, Any],
 ) -> ValidationPipeline:
     """Create a validation pipeline from YAML configuration.
 
@@ -706,8 +705,8 @@ def create_pipeline_from_yaml(
 
 
 def validate_from_yaml(
-    data: Dict[str, Any],
-    yaml_config: Dict[str, Any],
+    data: dict[str, Any],
+    yaml_config: dict[str, Any],
 ) -> Any:
     """Validate data using YAML configuration.
 
@@ -724,10 +723,10 @@ def validate_from_yaml(
 
 # Workflow node handler function
 def validate_pipeline_handler(
-    node_config: Dict[str, Any],
-    graph_state: Dict[str, Any],
+    node_config: dict[str, Any],
+    graph_state: dict[str, Any],
     orchestrator: Any = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Handler for validate_pipeline workflow nodes.
 
     This function can be registered as a node handler in the workflow system.

@@ -25,7 +25,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.agent.protocols import IModeCompletionChecker
 
@@ -55,8 +55,8 @@ class ModeCompletionConfig:
     min_files_read: int = 1
     min_files_written: int = 0
     max_iterations: int = 20
-    completion_signals: List[str] = field(default_factory=list)
-    required_sections: List[str] = field(default_factory=list)
+    completion_signals: list[str] = field(default_factory=list)
+    required_sections: list[str] = field(default_factory=list)
 
 
 class ModeCompletionChecker(IModeCompletionChecker):
@@ -130,14 +130,14 @@ class ModeCompletionChecker(IModeCompletionChecker):
         ),
     }
 
-    def __init__(self, custom_criteria: Optional[Dict[str, ModeCompletionConfig]] = None):
+    def __init__(self, custom_criteria: Optional[dict[str, ModeCompletionConfig]] = None):
         """Initialize with optional custom criteria.
 
         Args:
             custom_criteria: Override default criteria for specific modes
         """
         self._custom_criteria = custom_criteria or {}
-        self._iteration_counts: Dict[str, int] = {}
+        self._iteration_counts: dict[str, int] = {}
 
     def get_criteria(self, mode: str) -> ModeCompletionConfig:
         """Get completion criteria for mode.
@@ -244,7 +244,7 @@ class ModeCompletionChecker(IModeCompletionChecker):
         elif mode.upper() in self._iteration_counts:
             del self._iteration_counts[mode.upper()]
 
-    def get_progress(self, mode: str) -> Dict[str, Any]:
+    def get_progress(self, mode: str) -> dict[str, Any]:
         """Get progress towards mode completion.
 
         Args:

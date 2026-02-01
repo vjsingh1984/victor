@@ -44,7 +44,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.framework.teams import TeamFormation, TeamMemberSpec
 from victor.framework.tool_naming import canonicalize_tool_list
@@ -65,7 +65,7 @@ class RoleConfig:
     """
 
     base_role: str
-    tools: List[str]
+    tools: list[str]
     tool_budget: int
     description: str = ""
 
@@ -100,12 +100,12 @@ class TeamSpec:
     description: str
     vertical: str
     formation: TeamFormation
-    members: List[TeamMemberSpec]
+    members: list[TeamMemberSpec]
     total_tool_budget: int = 100
     max_iterations: int = 50
-    tags: List[str] = field(default_factory=list)
-    task_types: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    task_types: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Canonicalize tool names in members on creation."""
@@ -120,7 +120,7 @@ class TeamSpec:
         return len(self.members)
 
     @property
-    def roles(self) -> Set[str]:
+    def roles(self) -> set[str]:
         """Get the set of roles in this team."""
         return {m.role for m in self.members}
 
@@ -138,7 +138,7 @@ class TeamSpec:
                 return member
         return None
 
-    def get_members_by_role(self, role: str) -> List[TeamMemberSpec]:
+    def get_members_by_role(self, role: str) -> list[TeamMemberSpec]:
         """Get all members with a specific role.
 
         Args:
@@ -149,7 +149,7 @@ class TeamSpec:
         """
         return [m for m in self.members if m.role == role]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary.
 
         Returns:
@@ -184,7 +184,7 @@ class TeamSpec:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TeamSpec":
+    def from_dict(cls, data: dict[str, Any]) -> "TeamSpec":
         """Create from dictionary.
 
         Args:
@@ -233,7 +233,7 @@ def create_team_spec(
     description: str,
     vertical: str,
     formation: TeamFormation,
-    members: List[TeamMemberSpec],
+    members: list[TeamMemberSpec],
     **kwargs: Any,
 ) -> TeamSpec:
     """Factory function for creating team specs.

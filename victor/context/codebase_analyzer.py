@@ -30,11 +30,11 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Counter, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.coding.codebase.ignore_patterns import (
     DEFAULT_SKIP_DIRS,
-    is_hidden_path,
     should_ignore_path,
 )
 from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
@@ -49,7 +49,7 @@ class ClassInfo:
     name: str
     file_path: str
     line_number: int
-    base_classes: List[str] = field(default_factory=list)
+    base_classes: list[str] = field(default_factory=list)
     docstring: Optional[str] = None
     is_abstract: bool = False
     category: Optional[str] = None  # e.g., "provider", "tool", "manager"
@@ -61,8 +61,8 @@ class ModuleInfo:
 
     name: str
     path: str
-    classes: List[ClassInfo] = field(default_factory=list)
-    functions: List[str] = field(default_factory=list)
+    classes: list[ClassInfo] = field(default_factory=list)
+    functions: list[str] = field(default_factory=list)
     description: Optional[str] = None
 
 
@@ -73,20 +73,20 @@ class CodebaseAnalysis:
     project_name: str
     root_path: Path
     main_package: Optional[str] = None
-    deprecated_paths: List[str] = field(default_factory=list)
-    packages: Dict[str, List[ModuleInfo]] = field(default_factory=dict)
-    key_components: List[ClassInfo] = field(default_factory=list)
-    entry_points: Dict[str, str] = field(default_factory=dict)
-    cli_commands: List[str] = field(default_factory=list)
-    architecture_patterns: List[str] = field(default_factory=list)
-    config_files: List[Tuple[str, str]] = field(default_factory=list)  # (path, description)
+    deprecated_paths: list[str] = field(default_factory=list)
+    packages: dict[str, list[ModuleInfo]] = field(default_factory=dict)
+    key_components: list[ClassInfo] = field(default_factory=list)
+    entry_points: dict[str, str] = field(default_factory=dict)
+    cli_commands: list[str] = field(default_factory=list)
+    architecture_patterns: list[str] = field(default_factory=list)
+    config_files: list[tuple[str, str]] = field(default_factory=list)  # (path, description)
     # Enhanced fields
-    dependencies: Dict[str, List[str]] = field(default_factory=dict)  # {category: [dep1, dep2]}
+    dependencies: dict[str, list[str]] = field(default_factory=dict)  # {category: [dep1, dep2]}
     test_coverage: Optional[float] = None  # Coverage percentage if available
-    loc_stats: Dict[str, int] = field(
+    loc_stats: dict[str, int] = field(
         default_factory=dict
     )  # {total_lines, total_files, largest_file}
-    top_imports: List[Tuple[str, int]] = field(default_factory=list)  # [(module, import_count)]
+    top_imports: list[tuple[str, int]] = field(default_factory=list)  # [(module, import_count)]
     method_count: int = 0
     protocol_count: int = 0  # Python Protocol/ABC count
 
@@ -142,8 +142,8 @@ class CodebaseAnalyzer:
     def __init__(
         self,
         root_path: Optional[str] = None,
-        include_dirs: Optional[List[str]] = None,
-        exclude_dirs: Optional[List[str]] = None,
+        include_dirs: Optional[list[str]] = None,
+        exclude_dirs: Optional[list[str]] = None,
     ):
         """Initialize analyzer.
 
@@ -482,7 +482,7 @@ class CodebaseAnalyzer:
             category=category,
         )
 
-    def _categorize_class(self, name: str, base_classes: List[str]) -> Optional[str]:
+    def _categorize_class(self, name: str, base_classes: list[str]) -> Optional[str]:
         """Categorize a class based on its name and base classes."""
         all_names = [name] + base_classes
 
@@ -494,7 +494,7 @@ class CodebaseAnalyzer:
 
     def _identify_key_components(self) -> None:
         """Identify the most important classes in the codebase."""
-        all_classes: List[ClassInfo] = []
+        all_classes: list[ClassInfo] = []
         method_count = 0
         protocol_count = 0
 
@@ -649,7 +649,7 @@ class CodebaseAnalyzer:
         if pyproject.exists():
             try:
                 content = pyproject.read_text(encoding="utf-8")
-                deps: Dict[str, List[str]] = {"core": [], "dev": [], "optional": []}
+                deps: dict[str, list[str]] = {"core": [], "dev": [], "optional": []}
 
                 # Parse [project.dependencies]
                 deps_match = re.search(
@@ -693,7 +693,7 @@ class CodebaseAnalyzer:
                 import json
 
                 data = json.loads(package_json.read_text(encoding="utf-8"))
-                package_deps: Dict[str, List[str]] = {"core": [], "dev": []}
+                package_deps: dict[str, list[str]] = {"core": [], "dev": []}
 
                 if "dependencies" in data:
                     package_deps["core"] = list(data["dependencies"].keys())[:15]
@@ -711,7 +711,7 @@ class CodebaseAnalyzer:
         total_files = 0
         largest_file = ""
         largest_file_lines = 0
-        file_sizes: List[Tuple[str, int]] = []
+        file_sizes: list[tuple[str, int]] = []
 
         # Scan all source files
         for ext in self.LANGUAGE_EXTENSIONS.keys():
@@ -751,7 +751,7 @@ class CodebaseAnalyzer:
 
     def _extract_top_imports(self) -> None:
         """Extract the most commonly imported modules (Python only)."""
-        import_counts: Dict[str, int] = defaultdict(int)
+        import_counts: dict[str, int] = defaultdict(int)
 
         # Only scan Python files
         search_dirs = (
@@ -873,8 +873,8 @@ class CodebaseAnalyzer:
 
 def generate_smart_victor_md(
     root_path: Optional[str] = None,
-    include_dirs: Optional[List[str]] = None,
-    exclude_dirs: Optional[List[str]] = None,
+    include_dirs: Optional[list[str]] = None,
+    exclude_dirs: Optional[list[str]] = None,
 ) -> str:
     """Generate comprehensive project context using codebase analysis.
 
@@ -1012,8 +1012,8 @@ def generate_smart_victor_md(
 
 def _generate_generic_victor_md(
     root_path: Optional[str] = None,
-    include_dirs: Optional[List[str]] = None,
-    exclude_dirs: Optional[List[str]] = None,
+    include_dirs: Optional[list[str]] = None,
+    exclude_dirs: Optional[list[str]] = None,
 ) -> str:
     """Generate init.md for non-Python projects using language-agnostic analysis.
 
@@ -1166,8 +1166,8 @@ CONTEXT_FILE_ALIASES = {
 def create_context_symlinks(
     root_path: Optional[str] = None,
     source_file: Optional[str] = None,
-    aliases: Optional[List[str]] = None,
-) -> Dict[str, str]:
+    aliases: Optional[list[str]] = None,
+) -> dict[str, str]:
     """Create symlinks from .victor/init.md to other context file names.
 
     This allows a single source of truth (.victor/init.md) to work with
@@ -1189,7 +1189,7 @@ def create_context_symlinks(
         source_file = str(source.relative_to(root))
     else:
         source = root / source_file
-    results: Dict[str, str] = {}
+    results: dict[str, str] = {}
 
     if not source.exists():
         logger.warning(f"Source file {source} does not exist")
@@ -1224,8 +1224,8 @@ def create_context_symlinks(
 
 def remove_context_symlinks(
     root_path: Optional[str] = None,
-    aliases: Optional[List[str]] = None,
-) -> Dict[str, str]:
+    aliases: Optional[list[str]] = None,
+) -> dict[str, str]:
     """Remove symlinks to context files.
 
     Only removes files that are symlinks pointing to .victor/init.md or similar.
@@ -1239,7 +1239,7 @@ def remove_context_symlinks(
         Dict mapping alias name to status ('removed', 'not_symlink', 'not_found')
     """
     root = Path(root_path).resolve() if root_path else Path.cwd()
-    results: Dict[str, str] = {}
+    results: dict[str, str] = {}
 
     target_aliases = aliases if aliases is not None else list(CONTEXT_FILE_ALIASES.keys())
 
@@ -1302,9 +1302,9 @@ def _extract_readme_description(root: Path) -> str:
 def gather_project_context(
     root_path: Optional[str] = None,
     max_files: int = 50,
-    include_dirs: Optional[List[str]] = None,
-    exclude_dirs: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    include_dirs: Optional[list[str]] = None,
+    exclude_dirs: Optional[list[str]] = None,
+) -> dict[str, Any]:
     """Gather project context for LLM analysis (works with any language).
 
     This function collects structural information about any project type
@@ -1386,7 +1386,7 @@ def gather_project_context(
         ".svelte": "Svelte",
     }
 
-    context: Dict[str, Any] = {
+    context: dict[str, Any] = {
         "project_name": root.name,
         "root_path": str(root),
         "detected_languages": [],
@@ -1425,8 +1425,8 @@ def gather_project_context(
             break
 
     # Collect directory structure (depth 2)
-    def walk_dirs(path: Path, depth: int = 0, max_depth: int = 2) -> List[str]:
-        dirs: List[str] = []
+    def walk_dirs(path: Path, depth: int = 0, max_depth: int = 2) -> list[str]:
+        dirs: list[str] = []
         if depth > max_depth:
             return dirs
         try:
@@ -1454,7 +1454,7 @@ def gather_project_context(
 
     # Collect source files with extensions
     file_count = 0
-    lang_counts: Dict[str, int] = {}
+    lang_counts: dict[str, int] = {}
 
     search_paths = [root / d for d in include_dirs] if include_dirs else [root]
 
@@ -1514,7 +1514,7 @@ def gather_project_context(
     return context
 
 
-def build_llm_prompt_for_victor_md(context: Dict[str, Any]) -> str:
+def build_llm_prompt_for_victor_md(context: dict[str, Any]) -> str:
     """Build the prompt for LLM to generate project context file.
 
     Args:
@@ -1611,8 +1611,8 @@ async def generate_victor_md_with_llm(
     model: str,
     root_path: Optional[str] = None,
     max_files: int = 50,
-    include_dirs: Optional[List[str]] = None,
-    exclude_dirs: Optional[List[str]] = None,
+    include_dirs: Optional[list[str]] = None,
+    exclude_dirs: Optional[list[str]] = None,
 ) -> str:
     """Generate project context file using an LLM provider.
 
@@ -1662,7 +1662,7 @@ async def generate_victor_md_with_llm(
         )
 
 
-def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[dict[str, Any]]:
     """Summarize embedding/cache health for init.md enrichment."""
     root = Path(root_path).resolve() if root_path else Path.cwd()
     try:
@@ -1677,7 +1677,7 @@ def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[
         logger.debug("Failed to collect embedding status: %s", exc)
         return None
 
-    caches: List[Dict[str, Any]] = []
+    caches: list[dict[str, Any]] = []
     for cache in status.caches:
         caches.append(
             {
@@ -1689,7 +1689,7 @@ def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[
             }
         )
 
-    info: Dict[str, Any] = {
+    info: dict[str, Any] = {
         "total_files": status.total_files,
         "total_size": status.total_size_str,
         "caches": caches,
@@ -1715,9 +1715,9 @@ def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[
                 table = db.open_table(table_name)
                 row_count = table.count_rows()
 
-                sample_keys: Dict[str, int] = defaultdict(int)
-                chunk_types: Set[str] = set()
-                span_lengths: List[int] = []
+                sample_keys: dict[str, int] = defaultdict(int)
+                chunk_types: set[str] = set()
+                span_lengths: list[int] = []
 
                 try:
                     sample_rows = table.head(min(50, row_count)).to_list()  # small sample
@@ -1756,15 +1756,15 @@ def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[
 
 
 def _build_analyzer_section(
-    stats: Dict[str, Any],
-    graph_insights: Dict[str, Any],
-    embedding_status: Optional[Dict[str, Any]],
-) -> List[str]:
+    stats: dict[str, Any],
+    graph_insights: dict[str, Any],
+    embedding_status: Optional[dict[str, Any]],
+) -> list[str]:
     """Construct analyzer coverage section from index + graph data."""
     if not stats:
         return []
 
-    lines: List[str] = []
+    lines: list[str] = []
     lines.append("## Analyzer Coverage\n")
 
     total_symbols = stats.get("total_symbols", 0)
@@ -1864,9 +1864,9 @@ def _infer_python_requires(root: Path) -> Optional[str]:
     return None
 
 
-def _infer_commands(root: Path) -> List[str]:
+def _infer_commands(root: Path) -> list[str]:
     """Infer project commands from Makefile, package.json, and common conventions."""
-    commands: List[str] = []
+    commands: list[str] = []
 
     makefile = root / "Makefile"
     if makefile.exists():
@@ -1919,8 +1919,8 @@ def _infer_commands(root: Path) -> List[str]:
         commands.append("cd web/ui && npm install && npm run dev")
 
     # Deduplicate preserving order
-    seen: Set[str] = set()
-    deduped: List[str] = []
+    seen: set[str] = set()
+    deduped: list[str] = []
     for cmd in commands:
         if cmd not in seen:
             deduped.append(cmd)
@@ -1928,11 +1928,11 @@ def _infer_commands(root: Path) -> List[str]:
     return deduped
 
 
-def _infer_env_vars(root: Path) -> List[str]:
+def _infer_env_vars(root: Path) -> list[str]:
     """Infer env vars from .env/.env.example (uppercase keys)."""
     env_files = [root / ".env", root / ".env.example"]
-    vars_found: List[str] = []
-    seen: Set[str] = set()
+    vars_found: list[str] = []
+    seen: set[str] = set()
     for env_file in env_files:
         if not env_file.exists():
             continue
@@ -1950,11 +1950,11 @@ def _infer_env_vars(root: Path) -> List[str]:
     return vars_found[:10]
 
 
-def _build_quick_start(commands: List[str]) -> List[str]:
+def _build_quick_start(commands: list[str]) -> list[str]:
     """Pick a concise quick-start command set."""
     if not commands:
         return []
-    quick: List[str] = []
+    quick: list[str] = []
     # Prefer install, lint/test, serve/dev commands if present
     priorities = [
         ("install", ("install", "pip install", "npm install", "make install")),
@@ -1978,10 +1978,10 @@ def _build_quick_start(commands: List[str]) -> List[str]:
     return quick[:4]
 
 
-def _find_config_files(root: Path) -> List[str]:
+def _find_config_files(root: Path) -> list[str]:
     """Find common config files (json/yaml/toml) while skipping vendor/venv/build artifacts."""
     exts = {".json", ".yaml", ".yml", ".toml"}
-    results: List[str] = []
+    results: list[str] = []
     extra_skip = {
         "venv",
         "env",
@@ -2011,9 +2011,9 @@ def _find_config_files(root: Path) -> List[str]:
     return results[:15]
 
 
-def _find_docs_files(root: Path) -> List[str]:
+def _find_docs_files(root: Path) -> list[str]:
     """Find markdown/adoc docs (top-N) while skipping vendor/venv/build artifacts."""
-    results: List[tuple[int, str]] = []
+    results: list[tuple[int, str]] = []
     extra_skip = {
         "venv",
         "env",
@@ -2047,8 +2047,8 @@ def _find_docs_files(root: Path) -> List[str]:
 async def generate_victor_md_from_index(
     root_path: Optional[str] = None,
     force: bool = False,
-    include_dirs: Optional[List[str]] = None,
-    exclude_dirs: Optional[List[str]] = None,
+    include_dirs: Optional[list[str]] = None,
+    exclude_dirs: Optional[list[str]] = None,
 ) -> str:
     """Generate init.md from the SymbolStore (pre-indexed symbols).
 
@@ -2119,7 +2119,7 @@ async def generate_victor_md_from_index(
     sections.append("| Path | Type | Description |")
     sections.append("|------|------|-------------|")
 
-    dirs_seen: Set[str] = set()
+    dirs_seen: set[str] = set()
 
     def add_dir(path: str, type_label: str, desc: str) -> None:
         if path in dirs_seen:
@@ -2166,7 +2166,7 @@ async def generate_victor_md_from_index(
             and not str(comp.file_path).startswith("vscode-victor/out")
         ]
         display_components = filtered_components or key_components
-        seen_components: Set[str] = set()
+        seen_components: set[str] = set()
 
         for comp in display_components[:15]:  # Show top 15 (increased from 12)
             if comp.name in seen_components:
@@ -2408,7 +2408,7 @@ async def generate_victor_md_from_index(
     return "\n".join(sections)
 
 
-async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict[str, Any]:
+async def extract_conversation_insights(root_path: Optional[str] = None) -> dict[str, Any]:
     """Extract insights from conversation history to enhance init.md.
 
     Analyzes stored conversations to identify:
@@ -2558,7 +2558,7 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
     return insights
 
 
-async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, Any]:
+async def extract_graph_insights(root_path: Optional[str] = None) -> dict[str, Any]:
     """Extract insights from the code graph for init.md enrichment.
 
     Analyzes the code graph to detect:
@@ -2575,14 +2575,13 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
         Dictionary with graph insights
     """
     from pathlib import Path
-    from victor.tools.graph_tool import GraphAnalyzer, _load_graph
-    from victor.coding.codebase.graph.registry import create_graph_store
+    from victor.tools.graph_tool import GraphAnalyzer
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
     # Use consolidated project.db
     graph_db_path = root / ".victor" / "project.db"
 
-    insights: Dict[str, Any] = {
+    insights: dict[str, Any] = {
         "has_graph": False,
         "patterns": [],
         "important_symbols": [],
@@ -2605,7 +2604,6 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
     try:
         # Use direct SQL queries for fast stats instead of loading entire graph
         import sqlite3
-        import json
 
         conn = sqlite3.connect(graph_db_path)
         try:
@@ -2735,8 +2733,8 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 )
 
                 # Connected components (undirected view)
-                visited: Set[str] = set()
-                components: List[int] = []
+                visited: set[str] = set()
+                components: list[int] = []
                 for node_id in ga.nodes:
                     if node_id in visited:
                         continue
@@ -2791,10 +2789,10 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
 
             if module_edges:
                 # Build module adjacency for PageRank calculation
-                module_in_degree: Dict[str, int] = defaultdict(int)
-                module_out_degree: Dict[str, int] = defaultdict(int)
-                module_weighted_in: Dict[str, int] = defaultdict(int)
-                all_modules: Set[str] = set()
+                module_in_degree: dict[str, int] = defaultdict(int)
+                module_out_degree: dict[str, int] = defaultdict(int)
+                module_weighted_in: dict[str, int] = defaultdict(int)
+                all_modules: set[str] = set()
 
                 for src_mod, dst_mod, count in module_edges:
                     all_modules.add(src_mod)
@@ -2874,8 +2872,8 @@ async def generate_enhanced_init_md(
     include_conversations: bool = True,
     on_progress: Optional[Callable[[str, str], None]] = None,
     force: bool = False,
-    include_dirs: Optional[List[str]] = None,
-    exclude_dirs: Optional[List[str]] = None,
+    include_dirs: Optional[list[str]] = None,
+    exclude_dirs: Optional[list[str]] = None,
     auto_index: bool = True,
 ) -> str:
     """Generate init.md using symbol index, conversation insights, and optional LLM.
@@ -2897,7 +2895,7 @@ async def generate_enhanced_init_md(
 
     from victor.providers.base import Message
 
-    step_times: Dict[str, float] = {}
+    step_times: dict[str, float] = {}
     step_start: float = 0
 
     def progress(stage: str, msg: str, complete: bool = False):

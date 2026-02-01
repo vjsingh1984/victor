@@ -16,7 +16,7 @@
 import logging
 import time
 from pathlib import Path
-from typing import Any, TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import Any, TYPE_CHECKING, Optional
 
 from tree_sitter import Language, Parser, Query, QueryCursor
 
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # Install with: pip install tree-sitter-<language>
 # Format: "language_name": ("module_name", "function_name")
 # function_name is the function that returns the Language object (usually "language")
-LANGUAGE_MODULES: Dict[str, tuple[str, str]] = {
+LANGUAGE_MODULES: dict[str, tuple[str, str]] = {
     # Core languages (commonly used)
     "python": ("tree_sitter_python", "language"),
     "javascript": ("tree_sitter_javascript", "language"),
@@ -65,8 +65,8 @@ LANGUAGE_MODULES: Dict[str, tuple[str, str]] = {
     "r": ("tree_sitter_r", "language"),
 }
 
-_language_cache: Dict[str, Language] = {}
-_parser_cache: Dict[str, Parser] = {}
+_language_cache: dict[str, Language] = {}
+_parser_cache: dict[str, Parser] = {}
 
 # Try to import Rust AST processor accelerator
 _ast_accelerator = None
@@ -145,7 +145,7 @@ def get_parser(language: str) -> Parser:
     return parser
 
 
-def run_query(tree: "Tree", query_src: str, language: str) -> Dict[str, List["Node"]]:
+def run_query(tree: "Tree", query_src: str, language: str) -> dict[str, list["Node"]]:
     """Run a tree-sitter query using the modern QueryCursor API.
 
     This is the preferred way to run queries in tree-sitter 0.25+.
@@ -177,7 +177,7 @@ def run_query(tree: "Tree", query_src: str, language: str) -> Dict[str, List["No
             nodes_list = _ast_accelerator.execute_query(tree, query_src, language)  # type: ignore[call-arg]
             # Convert list of nodes to capture dict format
             # For now, return all nodes under a default capture name
-            return {"_all": cast(List["Node"], nodes_list)}
+            return {"_all": cast(list["Node"], nodes_list)}
         except Exception as e:
             logger.debug(f"Rust query execution failed, falling back to Python: {e}")
 
@@ -232,7 +232,7 @@ def parse_file_accelerated(
     return parser.parse(bytes(source_code, "utf-8"))
 
 
-def parse_file_with_timing(file_path: str) -> Tuple[Optional["Tree"], float]:
+def parse_file_with_timing(file_path: str) -> tuple[Optional["Tree"], float]:
     """Parse file and return timing information for performance monitoring.
 
     Args:
@@ -256,9 +256,9 @@ def parse_file_with_timing(file_path: str) -> Tuple[Optional["Tree"], float]:
 
 
 def extract_symbols_parallel(
-    files: List[str],
-    symbol_types: List[str],
-) -> Dict[str, List[Dict[str, Any]]]:
+    files: list[str],
+    symbol_types: list[str],
+) -> dict[str, list[dict[str, Any]]]:
     """Extract symbols from multiple files using parallel processing.
 
     This function provides 10x faster symbol extraction by using the Rust
@@ -291,7 +291,7 @@ def extract_symbols_parallel(
     # Use Rust parallel extraction if available
     if _ast_accelerator is not None and _ast_accelerator.rust_available:
         try:
-            results: Dict[str, List[Dict[str, Any]]] = _ast_accelerator.extract_symbols_parallel(file_data, symbol_types)  # type: ignore[arg-type, assignment]
+            results: dict[str, list[dict[str, Any]]] = _ast_accelerator.extract_symbols_parallel(file_data, symbol_types)  # type: ignore[arg-type, assignment]
             return results
         except Exception as e:
             logger.debug(f"Rust parallel extraction failed, falling back to Python: {e}")
@@ -372,7 +372,7 @@ def clear_ast_cache() -> None:
     logger.debug("AST cache cleared")
 
 
-def get_cache_stats() -> Dict[str, int]:
+def get_cache_stats() -> dict[str, int]:
     """Get AST cache statistics.
 
     Returns:

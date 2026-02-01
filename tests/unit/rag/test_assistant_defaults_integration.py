@@ -21,7 +21,6 @@ Note: RAG is a read-only vertical (for analysis), so it uses
 COMMON_READONLY_TOOLS instead of COMMON_REQUIRED_TOOLS.
 """
 
-import pytest
 
 from victor.core.verticals.defaults.tool_defaults import COMMON_READONLY_TOOLS
 from victor.framework.tool_naming import ToolNames
@@ -129,7 +128,6 @@ class TestRAGSharedDefaultsUsage:
 
     def test_rag_uses_merge_required_tools_in_get_tools(self):
         """RAG get_tools() should use merge_required_tools()."""
-        import victor.rag.assistant as rag_assistant_module
         import inspect
 
         # Get the source code of get_tools method

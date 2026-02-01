@@ -25,7 +25,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from victor.framework.conversations.types import (
     ConversationalMessage,
@@ -51,8 +51,8 @@ class ConversationHistory:
     """
 
     conversation_id: str
-    turns: List[ConversationalTurn] = field(default_factory=list)
-    messages_by_sender: Dict[str, List[ConversationalMessage]] = field(
+    turns: list[ConversationalTurn] = field(default_factory=list)
+    messages_by_sender: dict[str, list[ConversationalMessage]] = field(
         default_factory=lambda: defaultdict(list)
     )
     created_at: datetime = field(default_factory=datetime.now)
@@ -82,7 +82,7 @@ class ConversationHistory:
     async def get_history(
         self,
         context: ConversationContext,
-    ) -> List[ConversationalTurn]:
+    ) -> list[ConversationalTurn]:
         """Get full conversation history.
 
         Args:
@@ -97,7 +97,7 @@ class ConversationHistory:
         self,
         context: ConversationContext,
         n: int,
-    ) -> List[ConversationalTurn]:
+    ) -> list[ConversationalTurn]:
         """Get last N turns from conversation.
 
         Args:
@@ -122,7 +122,7 @@ class ConversationHistory:
         self.messages_by_sender.clear()
         logger.debug(f"Cleared history for conversation {self.conversation_id}")
 
-    def get_messages_by_sender(self, sender_id: str) -> List[ConversationalMessage]:
+    def get_messages_by_sender(self, sender_id: str) -> list[ConversationalMessage]:
         """Get all messages from a specific sender.
 
         Args:
@@ -145,7 +145,7 @@ class ConversationHistory:
             total += len(turn.responses)
         return total
 
-    def get_participation_stats(self) -> Dict[str, int]:
+    def get_participation_stats(self) -> dict[str, int]:
         """Get message count per participant.
 
         Returns:
@@ -202,7 +202,7 @@ class ConversationExporter:
     @staticmethod
     def to_markdown(
         history: ConversationHistory,
-        participants: Optional[Dict[str, ConversationParticipant]] = None,
+        participants: Optional[dict[str, ConversationParticipant]] = None,
     ) -> str:
         """Export history to Markdown.
 

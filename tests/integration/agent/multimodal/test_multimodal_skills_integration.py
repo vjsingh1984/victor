@@ -30,18 +30,12 @@ Test scenarios:
 
 import asyncio
 from base64 import b64encode
-from datetime import datetime
-from typing import Dict, List, Optional, Any
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
-import tempfile
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import numpy as np
 
-from victor.agent.multimodal.audio_agent import AudioAgent
 from victor.agent.multimodal.vision_agent import VisionAgent
-from victor.agent.skills.skill_discovery import SkillDiscoveryEngine, AvailableTool, CompositeSkill
+from victor.agent.skills.skill_discovery import SkillDiscoveryEngine
 from victor.agent.skills.skill_chaining import (
     SkillChainer,
     SkillChain,
@@ -49,7 +43,6 @@ from victor.agent.skills.skill_chaining import (
     ChainExecutionStatus,
 )
 from victor.protocols.tool_selector import ToolSelectionContext
-from victor.tools.base import BaseTool
 from victor.tools.enums import CostTier
 
 
@@ -199,7 +192,6 @@ def skill_chainer(mock_tool_registry, mock_event_bus):
 @pytest.fixture
 def sample_image_path(tmp_path):
     """Create a sample image file for testing."""
-    import os
 
     # Create a minimal valid PNG image
     from PIL import Image

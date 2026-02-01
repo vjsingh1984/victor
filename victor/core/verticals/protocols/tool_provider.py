@@ -39,7 +39,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 # =============================================================================
@@ -68,9 +68,9 @@ class VerticalToolSelectionContext:
     task_type: str
     user_message: str
     conversation_stage: str = "exploration"
-    available_tools: Set[str] = field(default_factory=set)
-    recent_tools: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    available_tools: set[str] = field(default_factory=set)
+    recent_tools: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # Backward compatibility alias
@@ -89,9 +89,9 @@ class ToolSelectionResult:
         reasoning: Optional explanation for selection decisions
     """
 
-    priority_tools: List[str] = field(default_factory=list)
-    excluded_tools: Set[str] = field(default_factory=set)
-    tool_weights: Dict[str, float] = field(default_factory=dict)
+    priority_tools: list[str] = field(default_factory=list)
+    excluded_tools: set[str] = field(default_factory=set)
+    tool_weights: dict[str, float] = field(default_factory=dict)
     budget_override: Optional[int] = None
     reasoning: Optional[str] = None
 
@@ -151,7 +151,7 @@ class ToolSelectionStrategyProtocol(Protocol):
         """
         ...
 
-    def get_task_tool_mapping(self) -> Dict[str, List[str]]:
+    def get_task_tool_mapping(self) -> dict[str, list[str]]:
         """Get mapping of task types to priority tools.
 
         Returns:

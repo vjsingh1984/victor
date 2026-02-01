@@ -43,8 +43,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
-from unittest.mock import Mock
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -97,7 +96,7 @@ class ExploitPattern:
     mitigation: str
     category: str
     cwe_id: Optional[str] = None
-    references: List[str] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
 
     def matches(self, text: str) -> bool:
         """Check if the pattern matches the given text.
@@ -118,7 +117,7 @@ class ExploitPattern:
                 return True
         return False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert exploit pattern to dictionary."""
         return {
             "pattern": self.pattern,
@@ -155,9 +154,9 @@ class Vulnerability:
     attack_payload: str = ""
     cve_id: Optional[str] = None
     cvss_score: Optional[float] = None
-    references: List[str] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert vulnerability to dictionary."""
         return {
             "type": self.type.value,
@@ -193,9 +192,9 @@ class SecurityReport:
 
     test_name: str
     attack_type: AttackType
-    vulnerabilities_found: List[Vulnerability] = field(default_factory=list)
-    passed_tests: List[str] = field(default_factory=list)
-    failed_tests: List[str] = field(default_factory=list)
+    vulnerabilities_found: list[Vulnerability] = field(default_factory=list)
+    passed_tests: list[str] = field(default_factory=list)
+    failed_tests: list[str] = field(default_factory=list)
     test_count: int = 0
     duration_ms: float = 0.0
     timestamp: datetime = field(default_factory=datetime.now)
@@ -225,7 +224,7 @@ class SecurityReport:
         """Whether the test passed (no CRITICAL or HIGH vulnerabilities)."""
         return self.critical_count == 0 and self.high_count == 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert report to dictionary."""
         return {
             "test_name": self.test_name,
@@ -257,8 +256,8 @@ class ComprehensiveSecurityReport:
         timestamp: When the comprehensive test was run
     """
 
-    individual_reports: List[SecurityReport] = field(default_factory=list)
-    total_vulnerabilities: List[Vulnerability] = field(default_factory=list)
+    individual_reports: list[SecurityReport] = field(default_factory=list)
+    total_vulnerabilities: list[Vulnerability] = field(default_factory=list)
     total_duration_ms: float = 0.0
     timestamp: datetime = field(default_factory=datetime.now)
 
@@ -331,7 +330,7 @@ class ComprehensiveSecurityReport:
         return round(normalized_score, 2)
 
     @property
-    def recommendations(self) -> List[str]:
+    def recommendations(self) -> list[str]:
         """Generate prioritized recommendations based on findings.
 
         Returns:
@@ -608,7 +607,7 @@ class ComprehensiveSecurityReport:
 
         return "\n".join(lines)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "timestamp": self.timestamp.isoformat(),

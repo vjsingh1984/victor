@@ -22,8 +22,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -35,7 +34,6 @@ from victor.agent.planning import (
 from victor.agent.planning.task_decomposition import (
     SimpleTask,
     TaskDecomposition,
-    TaskStatus,
 )
 from tests.factories import MockProviderFactory
 

@@ -29,7 +29,7 @@ Example YAML usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def source_coverage_check(ctx: Dict[str, Any]) -> str:
+def source_coverage_check(ctx: dict[str, Any]) -> str:
     """Check if source coverage is sufficient for synthesis.
 
     Evaluates source count, diversity, and quality.
@@ -68,7 +68,7 @@ def source_coverage_check(ctx: Dict[str, Any]) -> str:
     return "needs_more"
 
 
-def should_search_more(ctx: Dict[str, Any]) -> str:
+def should_search_more(ctx: dict[str, Any]) -> str:
     """Determine if additional source searching is needed.
 
     Multi-factor decision based on coverage, iteration count, and gaps.
@@ -104,7 +104,7 @@ def should_search_more(ctx: Dict[str, Any]) -> str:
     return "proceed"
 
 
-def source_credibility_check(ctx: Dict[str, Any]) -> str:
+def source_credibility_check(ctx: dict[str, Any]) -> str:
     """Assess overall source credibility.
 
     Args:
@@ -138,7 +138,7 @@ def source_credibility_check(ctx: Dict[str, Any]) -> str:
         return "low_credibility"
 
 
-def fact_verdict(ctx: Dict[str, Any]) -> str:
+def fact_verdict(ctx: dict[str, Any]) -> str:
     """Determine fact-check verdict based on evidence.
 
     Args:
@@ -178,7 +178,7 @@ def fact_verdict(ctx: Dict[str, Any]) -> str:
         return "false"
 
 
-def literature_relevance(ctx: Dict[str, Any]) -> str:
+def literature_relevance(ctx: dict[str, Any]) -> str:
     """Assess paper relevance for literature review.
 
     Args:
@@ -209,7 +209,7 @@ def literature_relevance(ctx: Dict[str, Any]) -> str:
     return "irrelevant"
 
 
-def competitive_threat_level(ctx: Dict[str, Any]) -> str:
+def competitive_threat_level(ctx: dict[str, Any]) -> str:
     """Assess competitive threat level.
 
     Args:
@@ -248,7 +248,7 @@ def competitive_threat_level(ctx: Dict[str, Any]) -> str:
 # =============================================================================
 
 
-def merge_search_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def merge_search_results(ctx: dict[str, Any]) -> dict[str, Any]:
     """Merge results from parallel search operations.
 
     Deduplicates and ranks by relevance.
@@ -291,7 +291,7 @@ def merge_search_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def format_bibliography(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def format_bibliography(ctx: dict[str, Any]) -> dict[str, Any]:
     """Format sources as bibliography entries.
 
     Args:
@@ -327,7 +327,7 @@ def format_bibliography(ctx: Dict[str, Any]) -> Dict[str, Any]:
 # =============================================================================
 
 
-def research_type_check(ctx: Dict[str, Any]) -> str:
+def research_type_check(ctx: dict[str, Any]) -> str:
     """Determine research type for workflow routing.
 
     Args:
@@ -349,7 +349,7 @@ def research_type_check(ctx: Dict[str, Any]) -> str:
     return "deep"
 
 
-def answer_quality_check(ctx: Dict[str, Any]) -> str:
+def answer_quality_check(ctx: dict[str, Any]) -> str:
     """Check if answer quality is sufficient.
 
     Args:
@@ -370,7 +370,7 @@ def answer_quality_check(ctx: Dict[str, Any]) -> str:
     return "insufficient"
 
 
-def source_coverage_chat_check(ctx: Dict[str, Any]) -> str:
+def source_coverage_chat_check(ctx: dict[str, Any]) -> str:
     """Check if source coverage is adequate for chat workflow.
 
     Args:
@@ -390,7 +390,7 @@ def source_coverage_chat_check(ctx: Dict[str, Any]) -> str:
     return "inadequate"
 
 
-def can_continue_research_iteration(ctx: Dict[str, Any]) -> str:
+def can_continue_research_iteration(ctx: dict[str, Any]) -> str:
     """Check if workflow can continue with another iteration.
 
     Args:
@@ -409,7 +409,7 @@ def can_continue_research_iteration(ctx: Dict[str, Any]) -> str:
     return "max_reached"
 
 
-def has_pending_tool_calls(ctx: Dict[str, Any]) -> str:
+def has_pending_tool_calls(ctx: dict[str, Any]) -> str:
     """Check if there are pending tool calls to execute.
 
     Args:
@@ -428,7 +428,7 @@ def has_pending_tool_calls(ctx: Dict[str, Any]) -> str:
     return "no_tools"
 
 
-def update_research_conversation(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def update_research_conversation(ctx: dict[str, Any]) -> dict[str, Any]:
     """Update conversation with tool results from execution.
 
     Args:
@@ -471,7 +471,7 @@ def update_research_conversation(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def finalize_research_chat(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def finalize_research_chat(ctx: dict[str, Any]) -> dict[str, Any]:
     """Format final research chat response for user.
 
     Args:

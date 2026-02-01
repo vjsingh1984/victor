@@ -7,7 +7,7 @@ Performance target: 10-20% improvement in tool execution throughput.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Tuple, Any, Optional, Union
+from typing import Any
 import json
 import logging
 
@@ -39,7 +39,7 @@ class ToolNormalizationResult:
         signature: Computed call signature
     """
 
-    normalized_args: Dict[str, Any]
+    normalized_args: dict[str, Any]
     strategy: str
     signature: str
 
@@ -65,9 +65,9 @@ class ToolExecutionDecisionCache:
         Args:
             max_size: Maximum number of entries per cache before eviction
         """
-        self._validation_cache: Dict[str, ToolValidationResult] = {}
-        self._normalization_cache: Dict[
-            Tuple[str, Union[str, frozenset[Tuple[str, str]], None]], ToolNormalizationResult
+        self._validation_cache: dict[str, ToolValidationResult] = {}
+        self._normalization_cache: dict[
+            tuple[str, str | frozenset[tuple[str, str]] | None], ToolNormalizationResult
         ] = {}
         self._max_size = max_size
         self._hits = 0
@@ -125,7 +125,7 @@ class ToolExecutionDecisionCache:
             ToolNormalizationResult with normalized args, strategy, and signature
         """
         # Create hashable key from args (handle strings, dicts, None)
-        key_items: Union[str, frozenset[Tuple[str, str]], None]
+        key_items: str | frozenset[tuple[str, str]] | None
         try:
             if isinstance(raw_args, str):
                 # For string args, use the string itself as key
@@ -140,7 +140,7 @@ class ToolExecutionDecisionCache:
             # Fallback for unhashable values - convert to string
             key_items = str(raw_args)
 
-        key: Tuple[str, Union[str, frozenset[Tuple[str, str]], None]] = (tool_name, key_items)
+        key: tuple[str, str | frozenset[tuple[str, str]] | None] = (tool_name, key_items)
 
         if key not in self._normalization_cache:
             # Cache miss - normalize and cache
@@ -171,7 +171,7 @@ class ToolExecutionDecisionCache:
 
         return self._normalization_cache[key]
 
-    def _compute_signature(self, tool_name: str, args: Dict[str, Any]) -> str:
+    def _compute_signature(self, tool_name: str, args: dict[str, Any]) -> str:
         """Compute signature for tool call.
 
         Uses JSON serialization with sorted keys for deterministic hashing.
@@ -189,7 +189,7 @@ class ToolExecutionDecisionCache:
             args_str = str(args)
         return f"{tool_name}:{args_str}"
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

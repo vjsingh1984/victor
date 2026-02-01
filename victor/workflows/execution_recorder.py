@@ -57,18 +57,13 @@ import uuid
 import gzip
 import hashlib
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import (
     Any,
-    Dict,
-    List,
     Optional,
-    Iterator,
-    Tuple,
-    Union,
 )
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
@@ -117,10 +112,10 @@ class RecordingEvent:
     timestamp: float
     workflow_id: str
     node_id: Optional[str] = None
-    data: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert event to dictionary for serialization."""
         return {
             "event_id": self.event_id,
@@ -183,14 +178,14 @@ class RecordingMetadata:
     event_count: int = 0
     file_size_bytes: Optional[int] = None
     checksum: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert metadata to dictionary."""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "RecordingMetadata":
+    def from_dict(cls, data: dict[str, Any]) -> "RecordingMetadata":
         """Create metadata from dictionary."""
         return cls(**data)
 
@@ -213,11 +208,11 @@ class StateSnapshot:
     timestamp: float
     workflow_id: str
     node_id: Optional[str]
-    state: Dict[str, Any]
+    state: dict[str, Any]
     recursion_depth: int
-    execution_stack: List[str]
+    execution_stack: list[str]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert snapshot to dictionary."""
         return {
             "snapshot_id": self.snapshot_id,
@@ -273,7 +268,7 @@ class ExecutionRecorder:
         record_outputs: bool = True,
         record_state_snapshots: bool = False,
         compress: bool = True,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
     ):
         """Initialize the execution recorder.
 
@@ -288,8 +283,8 @@ class ExecutionRecorder:
         """
         self.workflow_id = workflow_id or uuid.uuid4().hex
         self.workflow_name = workflow_name
-        self.events: List[RecordingEvent] = []
-        self.snapshots: List[StateSnapshot] = []
+        self.events: list[RecordingEvent] = []
+        self.snapshots: list[StateSnapshot] = []
 
         self.config = {
             "record_inputs": record_inputs,
@@ -313,7 +308,7 @@ class ExecutionRecorder:
 
         logger.debug(f"Initialized recorder for workflow '{workflow_name}' (id={self.workflow_id})")
 
-    def record_workflow_start(self, initial_context: Dict[str, Any]) -> None:
+    def record_workflow_start(self, initial_context: dict[str, Any]) -> None:
         """Record workflow execution start.
 
         Args:
@@ -331,7 +326,7 @@ class ExecutionRecorder:
 
     def record_workflow_complete(
         self,
-        final_state: Dict[str, Any],
+        final_state: dict[str, Any],
         success: bool,
         error: Optional[str] = None,
     ) -> None:
@@ -368,7 +363,7 @@ class ExecutionRecorder:
     def record_node_start(
         self,
         node_id: str,
-        inputs: Optional[Dict[str, Any]] = None,
+        inputs: Optional[dict[str, Any]] = None,
         node_type: Optional[str] = None,
     ) -> None:
         """Record node execution start.
@@ -396,7 +391,7 @@ class ExecutionRecorder:
     def record_node_complete(
         self,
         node_id: str,
-        outputs: Optional[Dict[str, Any]] = None,
+        outputs: Optional[dict[str, Any]] = None,
         duration_seconds: Optional[float] = None,
         error: Optional[str] = None,
     ) -> None:
@@ -433,7 +428,7 @@ class ExecutionRecorder:
         team_id: str,
         formation: str,
         member_count: int,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record team execution start.
 
@@ -570,9 +565,9 @@ class ExecutionRecorder:
 
     def record_state_snapshot(
         self,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         node_id: Optional[str] = None,
-        execution_stack: Optional[List[str]] = None,
+        execution_stack: Optional[list[str]] = None,
     ) -> None:
         """Record a state snapshot.
 
@@ -623,7 +618,7 @@ class ExecutionRecorder:
 
         return self.metadata
 
-    async def save(self, filepath: Union[str, Path]) -> RecordingMetadata:
+    async def save(self, filepath: str | Path) -> RecordingMetadata:
         """Save recording to file.
 
         Args:
@@ -712,8 +707,8 @@ class ExecutionReplayer:
         self,
         recording_path: Path,
         metadata: RecordingMetadata,
-        events: List[RecordingEvent],
-        snapshots: List[StateSnapshot],
+        events: list[RecordingEvent],
+        snapshots: list[StateSnapshot],
     ):
         """Initialize the replayer.
 
@@ -730,8 +725,8 @@ class ExecutionReplayer:
         self.current_position = 0
 
         # Build event index
-        self._event_index: Dict[str, int] = {event.event_id: i for i, event in enumerate(events)}
-        self._node_events: Dict[str, List[int]] = {}
+        self._event_index: dict[str, int] = {event.event_id: i for i, event in enumerate(events)}
+        self._node_events: dict[str, list[int]] = {}
         for i, event in enumerate(events):
             if event.node_id:
                 if event.node_id not in self._node_events:
@@ -741,7 +736,7 @@ class ExecutionReplayer:
         logger.debug(f"Loaded recording: {recording_path} ({len(events)} events)")
 
     @classmethod
-    def load(cls, filepath: Union[str, Path]) -> "ExecutionReplayer":
+    def load(cls, filepath: str | Path) -> "ExecutionReplayer":
         """Load a recording from file.
 
         Args:
@@ -804,7 +799,7 @@ class ExecutionReplayer:
             return self.events[index]
         return None
 
-    def get_node_events(self, node_id: str) -> List[RecordingEvent]:
+    def get_node_events(self, node_id: str) -> list[RecordingEvent]:
         """Get all events for a specific node.
 
         Args:
@@ -816,7 +811,7 @@ class ExecutionReplayer:
         indices = self._node_events.get(node_id, [])
         return [self.events[i] for i in indices]
 
-    def get_state_at_event(self, event_id: str) -> Optional[Dict[str, Any]]:
+    def get_state_at_event(self, event_id: str) -> Optional[dict[str, Any]]:
         """Get the workflow state at a specific event.
 
         Args:
@@ -936,7 +931,7 @@ class ExecutionReplayer:
             yield iter([])
         self.current_position = original_position
 
-    def compare(self, other: "ExecutionReplayer") -> Dict[str, Any]:
+    def compare(self, other: "ExecutionReplayer") -> dict[str, Any]:
         """Compare this recording with another.
 
         Args:
@@ -968,7 +963,7 @@ class ExecutionReplayer:
         self_path = [e.node_id for e in self.events if e.node_id]
         other_path = [e.node_id for e in other.events if e.node_id]
 
-        path_diff: Dict[str, Any] = {
+        path_diff: dict[str, Any] = {
             "self_path": self_path,
             "other_path": other_path,
             "first_difference": None,
@@ -989,7 +984,7 @@ class ExecutionReplayer:
             "path_diff": path_diff,
         }
 
-    def visualize(self, output_path: Optional[Union[str, Path]] = None) -> str:
+    def visualize(self, output_path: Optional[str | Path] = None) -> str:
         """Generate a visualization of the execution graph.
 
         Args:

@@ -64,12 +64,11 @@ Usage:
     stats = integration.get_pipeline_stats()
 """
 
-import asyncio
 import logging
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
@@ -82,7 +81,6 @@ if TYPE_CHECKING:
     )
 
 # Import protocols for runtime type hints (protocols.py has no heavy deps)
-from victor.core.protocols import OrchestratorProtocol, IntelligentPipelineProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -157,8 +155,8 @@ class OrchestratorIntegration:
         self._session_start = datetime.now()
 
         # Observers for quality/grounding events
-        self._quality_observers: List[Callable[[float, Dict[str, float]], None]] = []
-        self._grounding_observers: List[Callable[[bool, List[str]], None]] = []
+        self._quality_observers: list[Callable[[float, dict[str, float]], None]] = []
+        self._grounding_observers: list[Callable[[bool, list[str]], None]] = []
 
     @classmethod
     async def create(
@@ -376,7 +374,7 @@ class OrchestratorIntegration:
             return self._pipeline._mode_controller.get_optimal_tool_budget(task_type)
         return self._orchestrator.tool_budget
 
-    def add_quality_observer(self, observer: Callable[[float, "Dict[str, float]"], None]) -> None:
+    def add_quality_observer(self, observer: Callable[[float, "dict[str, float]"], None]) -> None:
         """Add observer for quality score events.
 
         Args:
@@ -384,7 +382,7 @@ class OrchestratorIntegration:
         """
         self._quality_observers.append(observer)
 
-    def add_grounding_observer(self, observer: Callable[[bool, "List[str]"], None]) -> None:
+    def add_grounding_observer(self, observer: Callable[[bool, "list[str]"], None]) -> None:
         """Add observer for grounding verification events.
 
         Args:
@@ -392,7 +390,7 @@ class OrchestratorIntegration:
         """
         self._grounding_observers.append(observer)
 
-    def get_pipeline_stats(self) -> Dict[str, Any]:
+    def get_pipeline_stats(self) -> dict[str, Any]:
         """Get comprehensive pipeline statistics.
 
         Returns:
@@ -425,7 +423,7 @@ class OrchestratorIntegration:
             },
         }
 
-    def get_quality_threshold_status(self) -> Dict[str, Any]:
+    def get_quality_threshold_status(self) -> dict[str, Any]:
         """Check if quality metrics meet configured thresholds.
 
         Returns:
@@ -471,7 +469,7 @@ class OrchestratorIntegration:
         task_type: str,
         conversation_state: Any,
         unified_tracker: Any,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Pre-request hook for intelligent pipeline integration.
 
         Called at the start of stream_chat to:
@@ -537,7 +535,7 @@ class OrchestratorIntegration:
         query: str,
         tool_calls: int,
         task_type: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Post-response hook for intelligent pipeline integration.
 
         Called after each streaming iteration to:

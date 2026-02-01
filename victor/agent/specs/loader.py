@@ -45,7 +45,7 @@ Usage:
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 from victor.agent.specs.models import AgentSpec
 from victor.agent.specs.ensemble import (
@@ -69,9 +69,9 @@ class AgentConfig:
         metadata: Additional configuration metadata
     """
 
-    agents: Dict[str, AgentSpec] = field(default_factory=dict)
+    agents: dict[str, AgentSpec] = field(default_factory=dict)
     ensemble: Optional[Ensemble] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def get_agent(self, name: str) -> AgentSpec:
         """Get an agent by name.
@@ -91,7 +91,7 @@ class AgentConfig:
 
 
 def load_agents_from_yaml(
-    path: Union[str, Path],
+    path: str | Path,
     include_presets: bool = True,
 ) -> AgentConfig:
     """Load agent configuration from YAML file.
@@ -116,7 +116,7 @@ def load_agents_from_yaml(
 
 
 def load_agents_from_dict(
-    data: Dict[str, Any],
+    data: dict[str, Any],
     include_presets: bool = True,
 ) -> AgentConfig:
     """Load agent configuration from dictionary.
@@ -165,7 +165,7 @@ def load_agents_from_dict(
     return config
 
 
-def _merge_agent_spec(base: AgentSpec, overrides: Dict[str, Any]) -> AgentSpec:
+def _merge_agent_spec(base: AgentSpec, overrides: dict[str, Any]) -> AgentSpec:
     """Merge overrides into a base agent spec.
 
     Args:
@@ -213,8 +213,8 @@ def _merge_agent_spec(base: AgentSpec, overrides: Dict[str, Any]) -> AgentSpec:
 
 
 def _build_ensemble(
-    data: Dict[str, Any],
-    agents: Dict[str, AgentSpec],
+    data: dict[str, Any],
+    agents: dict[str, AgentSpec],
 ) -> Ensemble:
     """Build ensemble from configuration.
 
@@ -230,7 +230,7 @@ def _build_ensemble(
     name = data.get("name")
 
     # Resolve agent names to specs
-    resolved_agents: List[AgentSpec] = []
+    resolved_agents: list[AgentSpec] = []
     for agent_name in agent_names:
         if agent_name not in agents:
             raise ValueError(f"Unknown agent in ensemble: {agent_name}")
@@ -263,7 +263,7 @@ def _build_ensemble(
 
 def save_agents_to_yaml(
     config: AgentConfig,
-    path: Union[str, Path],
+    path: str | Path,
     include_presets: bool = False,
 ) -> None:
     """Save agent configuration to YAML file.
@@ -279,7 +279,7 @@ def save_agents_to_yaml(
 
     preset_names = set(list_preset_agents()) if not include_presets else set()
 
-    data: Dict[str, Any] = {}
+    data: dict[str, Any] = {}
 
     # Export agents
     agents_data = []

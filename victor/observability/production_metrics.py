@@ -50,21 +50,17 @@ Example:
 from __future__ import annotations
 
 import logging
-import os
 import psutil  # type: ignore[import-untyped]
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 from enum import Enum
 
 from victor.observability.metrics import (
     Counter,
-    Gauge,
-    Histogram,
     MetricsRegistry,
-    Timer,
 )
 
 logger = logging.getLogger(__name__)
@@ -272,7 +268,7 @@ class ProductionMetricsCollector:
             f"{self._prefix}_errors_total",
             "Total errors",
         )
-        self.errors_by_type: Dict[str, Counter] = {}
+        self.errors_by_type: dict[str, Counter] = {}
         self.error_rate = self._registry.gauge(
             f"{self._prefix}_error_rate",
             "Current error rate",
@@ -314,7 +310,7 @@ class ProductionMetricsCollector:
         provider: str,
         success: bool,
         latency_ms: float,
-        labels: Optional[Dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
     ) -> None:
         """Record a request metric.
 
@@ -347,7 +343,7 @@ class ProductionMetricsCollector:
         tool_name: str,
         success: bool,
         duration_ms: float,
-        labels: Optional[Dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
     ) -> None:
         """Record a tool execution metric.
 
@@ -393,7 +389,7 @@ class ProductionMetricsCollector:
         coordinator_name: str,
         success: bool,
         duration_ms: float,
-        labels: Optional[Dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
     ) -> None:
         """Record coordinator execution metric.
 
@@ -620,7 +616,7 @@ class ProductionMetricsCollector:
 
         return "\n".join(lines)
 
-    def export_json(self) -> Dict[str, Any]:
+    def export_json(self) -> dict[str, Any]:
         """Export metrics as JSON-serializable dict.
 
         Returns:
@@ -632,7 +628,7 @@ class ProductionMetricsCollector:
             "summary": self.get_summary(),
         }
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get metrics summary.
 
         Returns:

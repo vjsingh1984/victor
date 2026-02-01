@@ -56,13 +56,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 from threading import Lock
 
 if TYPE_CHECKING:
     from victor.agent.session_state_manager import SessionStateManager
     from victor.agent.conversation_state import ConversationStateMachine
-    from victor.core.state import ConversationStage
 
 logger = logging.getLogger(__name__)
 
@@ -95,12 +95,12 @@ class StateChange:
     """
 
     scope: StateScope
-    old_state: Dict[str, Any]
-    new_state: Dict[str, Any]
-    changes: Dict[str, Any] = field(default_factory=dict)
+    old_state: dict[str, Any]
+    new_state: dict[str, Any]
+    changes: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=lambda: __import__("time").time())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "scope": self.scope.value,
@@ -153,10 +153,10 @@ class StateCoordinator:
 
         self._enable_history = enable_history
         self._max_history_size = max_history_size
-        self._state_history: List[StateChange] = []
+        self._state_history: list[StateChange] = []
 
         # Observer pattern: list of callbacks for state changes
-        self._observers: List[StateObserver] = []
+        self._observers: list[StateObserver] = []
         self._observer_lock = Lock()
 
         logger.debug("StateCoordinator initialized")
@@ -167,7 +167,7 @@ class StateCoordinator:
 
     def get_state(
         self, scope: StateScope = StateScope.ALL, include_metadata: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get current state across specified scopes.
 
         Args:
@@ -177,7 +177,7 @@ class StateCoordinator:
         Returns:
             Dictionary containing the requested state
         """
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
 
         if include_metadata:
             result["_metadata"] = {
@@ -196,7 +196,7 @@ class StateCoordinator:
 
         return result
 
-    def set_state(self, state: Dict[str, Any], scope: StateScope = StateScope.ALL) -> None:
+    def set_state(self, state: dict[str, Any], scope: StateScope = StateScope.ALL) -> None:
         """Restore state from a dictionary.
 
         Args:
@@ -305,7 +305,7 @@ class StateCoordinator:
             return None
         return self._conversation_state.get_stage().name
 
-    def get_stage_tools(self) -> Set[str]:
+    def get_stage_tools(self) -> set[str]:
         """Get tools relevant to the current stage.
 
         Returns:
@@ -325,12 +325,12 @@ class StateCoordinator:
         return self._session_state.tool_calls_used
 
     @property
-    def observed_files(self) -> Set[str]:
+    def observed_files(self) -> set[str]:
         """Get set of observed files."""
         return self._session_state.observed_files
 
     @property
-    def executed_tools(self) -> List[str]:
+    def executed_tools(self) -> list[str]:
         """Get list of executed tools."""
         return self._session_state.executed_tools
 
@@ -363,7 +363,7 @@ class StateCoordinator:
         """Get remaining tool budget."""
         return self._session_state.get_remaining_budget()
 
-    def record_tool_call(self, tool_name: str, args: Dict[str, Any]) -> None:
+    def record_tool_call(self, tool_name: str, args: dict[str, Any]) -> None:
         """Record a tool call execution.
 
         Args:
@@ -485,7 +485,7 @@ class StateCoordinator:
     # State History
     # ========================================================================
 
-    def get_state_history(self, limit: Optional[int] = None) -> List[StateChange]:
+    def get_state_history(self, limit: Optional[int] = None) -> list[StateChange]:
         """Get history of state changes.
 
         Args:
@@ -514,7 +514,7 @@ class StateCoordinator:
     # Checkpoint State
     # ========================================================================
 
-    def _get_checkpoint_state(self) -> Dict[str, Any]:
+    def _get_checkpoint_state(self) -> dict[str, Any]:
         """Build checkpoint state for serialization.
 
         Returns:
@@ -528,7 +528,7 @@ class StateCoordinator:
             "tool_budget": self.tool_budget,
         }
 
-    def _apply_checkpoint_state(self, state: Dict[str, Any]) -> None:
+    def _apply_checkpoint_state(self, state: dict[str, Any]) -> None:
         """Apply checkpoint state to restore.
 
         Args:
@@ -556,7 +556,7 @@ class StateCoordinator:
     # State Summary
     # ========================================================================
 
-    def get_state_summary(self) -> Dict[str, Any]:
+    def get_state_summary(self) -> dict[str, Any]:
         """Get a comprehensive summary of current state.
 
         Returns:
@@ -567,7 +567,7 @@ class StateCoordinator:
         }
 
         if self._conversation_state:
-            conv_summary: Dict[str, Any] = (
+            conv_summary: dict[str, Any] = (
                 self._conversation_state.get_state_summary()
                 if callable(getattr(self._conversation_state, "get_state_summary", None))
                 else {}
@@ -584,7 +584,7 @@ class StateCoordinator:
     # ========================================================================
 
     @staticmethod
-    def _diff_changes(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
+    def _diff_changes(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
         """Calculate differences between two state dictionaries.
 
         Args:
@@ -594,7 +594,7 @@ class StateCoordinator:
         Returns:
             Dictionary of changed fields with (old, new) tuples
         """
-        changes: Dict[str, Any] = {}
+        changes: dict[str, Any] = {}
 
         # Check for modified values
         for key, new_value in new.items():

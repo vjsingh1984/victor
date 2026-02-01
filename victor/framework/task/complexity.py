@@ -40,14 +40,14 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import Callable
 
-from .protocols import TaskClassification, TaskClassifierProtocol, TaskComplexity
+from .protocols import TaskClassification, TaskComplexity
 
 # Import TASK_TYPE_TO_COMPLEXITY from classification module (Single Source of Truth)
 from victor.classification import (
     TASK_TYPE_TO_COMPLEXITY as CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY,
-    TaskType,
     get_pattern_matcher,
 )
 
@@ -55,7 +55,7 @@ logger = logging.getLogger(__name__)
 
 
 # Consolidated pattern definitions for classification
-PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
+PATTERNS: dict[TaskComplexity, list[tuple[str, float, str]]] = {
     TaskComplexity.SIMPLE: [
         (r"\b(list|show|display)\s+.*?(files?|directories?|folders?)\b", 1.0, "list_files"),
         (r"\bwhat\s+files\s+(are\s+)?(in|at)\b", 1.0, "what_files"),
@@ -190,7 +190,7 @@ class ComplexityBudget:
 
 
 # Single source of truth for all budget-related configs
-COMPLEXITY_BUDGETS: Dict[TaskComplexity, ComplexityBudget] = {
+COMPLEXITY_BUDGETS: dict[TaskComplexity, ComplexityBudget] = {
     TaskComplexity.SIMPLE: ComplexityBudget(
         tool_budget=10,
         max_turns=5,
@@ -230,14 +230,14 @@ COMPLEXITY_BUDGETS: Dict[TaskComplexity, ComplexityBudget] = {
 }
 
 # Legacy: Simple tool budgets for backward compatibility
-DEFAULT_BUDGETS: Dict[TaskComplexity, int] = {
+DEFAULT_BUDGETS: dict[TaskComplexity, int] = {
     complexity: budget.tool_budget for complexity, budget in COMPLEXITY_BUDGETS.items()
 }
 
 # LEGACY: String-based mapping for backwards compatibility
 # Prefer using CLASSIFICATION_TASK_TYPE_TO_COMPLEXITY from victor.classification
 # which uses TaskType enum keys directly (Single Source of Truth)
-TASK_TYPE_TO_COMPLEXITY: Dict[str, TaskComplexity] = {
+TASK_TYPE_TO_COMPLEXITY: dict[str, TaskComplexity] = {
     # Core task types
     "edit": TaskComplexity.MEDIUM,
     "search": TaskComplexity.MEDIUM,
@@ -298,9 +298,9 @@ class TaskComplexityService:
 
     def __init__(
         self,
-        budgets: Optional[Dict[TaskComplexity, int]] = None,
-        custom_patterns: Optional[Dict[TaskComplexity, List[Tuple[str, float, str]]]] = None,
-        custom_classifiers: Optional[List[Callable[[str], Optional[TaskClassification]]]] = None,
+        budgets: Optional[dict[TaskComplexity, int]] = None,
+        custom_patterns: Optional[dict[TaskComplexity, list[tuple[str, float, str]]]] = None,
+        custom_classifiers: Optional[list[Callable[[str], Optional[TaskClassification]]]] = None,
         use_semantic: bool = True,
         semantic_threshold: float = 0.65,
         use_rl: bool = True,
@@ -332,7 +332,7 @@ class TaskComplexityService:
         self._rl_learner: Optional[Any] = None
 
         # Compile regex patterns
-        self._patterns: Dict[TaskComplexity, List[Tuple[re.Pattern[str], float, str]]] = {
+        self._patterns: dict[TaskComplexity, list[tuple[re.Pattern[str], float, str]]] = {
             complexity: [] for complexity in TaskComplexity
         }
         for complexity, patterns in PATTERNS.items():
@@ -342,7 +342,7 @@ class TaskComplexityService:
                 self._add_patterns(complexity, patterns)
 
     def _add_patterns(
-        self, complexity: TaskComplexity, patterns: List[Tuple[str, float, str]]
+        self, complexity: TaskComplexity, patterns: list[tuple[str, float, str]]
     ) -> None:
         """Add regex patterns for a complexity level."""
         for pattern_str, weight, name in patterns:
@@ -567,10 +567,10 @@ class TaskComplexityService:
                 return semantic_result
 
         # Score all patterns
-        scores: Dict[TaskComplexity, Tuple[float, List[str]]] = {}
+        scores: dict[TaskComplexity, tuple[float, list[str]]] = {}
         for complexity, patterns in self._patterns.items():
             total_score = 0.0
-            matched: List[str] = []
+            matched: list[str] = []
             for pattern, weight, name in patterns:
                 if pattern.search(message):
                     total_score += weight

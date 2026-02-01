@@ -23,7 +23,7 @@ Supports:
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.multimodal.processor import ProcessingResult
@@ -104,7 +104,7 @@ class AudioProcessor:
 
     async def process(
         self,
-        audio_path: Union[str, Path],
+        audio_path: str | Path,
         query: Optional[str] = None,
         diarize: bool = False,
     ) -> "ProcessingResult":
@@ -165,7 +165,7 @@ class AudioProcessor:
                 source=str(audio_path),
             )
 
-    def _get_audio_metadata(self, path: Path) -> Dict[str, Any]:
+    def _get_audio_metadata(self, path: Path) -> dict[str, Any]:
         """Extract audio metadata."""
         metadata = {
             "filename": path.name,
@@ -189,7 +189,7 @@ class AudioProcessor:
 
         return metadata
 
-    async def _transcribe(self, path: Path, diarize: bool) -> tuple[str, Dict[str, Any]]:
+    async def _transcribe(self, path: Path, diarize: bool) -> tuple[str, dict[str, Any]]:
         """Transcribe audio using Whisper."""
         if not WHISPER_AVAILABLE:
             return "", {"error": "Whisper not available"}
@@ -231,7 +231,7 @@ class AudioProcessor:
             logger.error(f"Transcription failed: {e}")
             return "", {"error": str(e)}
 
-    def _calculate_confidence(self, result: Dict[str, Any]) -> float:
+    def _calculate_confidence(self, result: dict[str, Any]) -> float:
         """Calculate confidence score from transcription result."""
         if "segments" not in result:
             return 0.85  # Default confidence
@@ -280,7 +280,7 @@ class AudioProcessor:
 
     async def process_video_audio(
         self,
-        video_path: Union[str, Path],
+        video_path: str | Path,
     ) -> "ProcessingResult":
         """Extract and transcribe audio from video.
 
@@ -359,8 +359,8 @@ class AudioProcessor:
 
     def convert_audio_format(
         self,
-        input_path: Union[str, Path],
-        output_path: Union[str, Path],
+        input_path: str | Path,
+        output_path: str | Path,
         output_format: str = "wav",
     ) -> bool:
         """Convert audio to different format.

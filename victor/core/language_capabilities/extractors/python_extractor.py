@@ -12,7 +12,7 @@ Provides deep symbol extraction for Python code including:
 import ast
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from ..types import ExtractedSymbol
 
@@ -31,7 +31,7 @@ class PythonASTExtractor:
         self,
         code: str,
         file_path: Path,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """
         Extract symbols from Python code.
 
@@ -48,14 +48,14 @@ class PythonASTExtractor:
             logger.warning(f"Failed to parse Python file {file_path}: {e}")
             return []
 
-        symbols: List[ExtractedSymbol] = []
+        symbols: list[ExtractedSymbol] = []
         self._extract_from_node(tree, symbols, str(file_path), None)
         return symbols
 
     def _extract_from_node(
         self,
         node: ast.AST,
-        symbols: List[ExtractedSymbol],
+        symbols: list[ExtractedSymbol],
         file_path: str,
         parent: Optional[str],
     ) -> None:
@@ -184,7 +184,7 @@ class PythonASTExtractor:
         node: ast.Assign | ast.AnnAssign,
         file_path: str,
         parent: Optional[str],
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract variable assignments."""
         symbols = []
 
@@ -224,7 +224,7 @@ class PythonASTExtractor:
 
         return symbols
 
-    def _extract_parameters(self, args: ast.arguments) -> List[str]:
+    def _extract_parameters(self, args: ast.arguments) -> list[str]:
         """Extract parameter names with type annotations."""
         parameters = []
 
@@ -268,7 +268,7 @@ class PythonASTExtractor:
 
         return parameters
 
-    def _extract_decorators(self, decorator_list: List[ast.expr]) -> List[str]:
+    def _extract_decorators(self, decorator_list: list[ast.expr]) -> list[str]:
         """Extract decorator names."""
         decorators = []
         for dec in decorator_list:
@@ -348,7 +348,7 @@ class PythonASTExtractor:
         except SyntaxError:
             return False
 
-    def get_syntax_errors(self, code: str) -> List[Dict[str, Any]]:
+    def get_syntax_errors(self, code: str) -> list[dict[str, Any]]:
         """Get syntax errors from code."""
         try:
             ast.parse(code)

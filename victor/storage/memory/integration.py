@@ -28,14 +28,13 @@ Example:
     # Returns [Entity(name="UserAuth", type=CLASS, ...)]
 """
 
-import asyncio
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.storage.memory.entity_memory import EntityMemory, EntityMemoryConfig
 from victor.storage.memory.entity_types import Entity, EntityType
-from victor.storage.memory.extractors.composite import CompositeExtractor, create_default_extractor
+from victor.storage.memory.extractors.composite import create_default_extractor
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +86,7 @@ class EntityMemoryIntegration:
         session_id: str,
         message_id: Optional[str] = None,
         role: Optional[str] = None,
-    ) -> List[Entity]:
+    ) -> list[Entity]:
         """Process a message and extract entities.
 
         Args:
@@ -130,9 +129,9 @@ class EntityMemoryIntegration:
     async def get_context_entities(
         self,
         query: str,
-        entity_types: Optional[List[EntityType]] = None,
+        entity_types: Optional[list[EntityType]] = None,
         limit: int = 10,
-    ) -> List[Entity]:
+    ) -> list[Entity]:
         """Get entities relevant to a query.
 
         Args:
@@ -152,7 +151,7 @@ class EntityMemoryIntegration:
             limit=limit,
         )
 
-    async def get_session_entities(self) -> List[Entity]:
+    async def get_session_entities(self) -> list[Entity]:
         """Get all entities from current session.
 
         Returns:
@@ -165,10 +164,10 @@ class EntityMemoryIntegration:
 
     async def get_entity_context(
         self,
-        entity_names: List[str],
+        entity_names: list[str],
         include_related: bool = True,
         max_related: int = 5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get rich context for specified entities.
 
         Args:
@@ -182,7 +181,7 @@ class EntityMemoryIntegration:
         if not self._initialized:
             await self.initialize()
 
-        context: Dict[str, Any] = {
+        context: dict[str, Any] = {
             "entities": [],
             "relationships": [],
         }
@@ -221,7 +220,7 @@ class EntityMemoryIntegration:
 
     async def build_entity_prompt_context(
         self,
-        recent_messages: List[str],
+        recent_messages: list[str],
         max_entities: int = 10,
     ) -> str:
         """Build entity context for system prompt enhancement.

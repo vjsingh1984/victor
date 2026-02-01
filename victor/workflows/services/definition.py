@@ -51,20 +51,14 @@ from __future__ import annotations
 
 import logging
 import uuid
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from typing import (
     Any,
-    Dict,
-    List,
     Literal,
     Optional,
     Protocol,
-    Tuple,
-    Type,
-    Union,
     runtime_checkable,
 )
 
@@ -171,7 +165,7 @@ class HealthCheckConfig:
     timeout: float = 5.0  # seconds per attempt
     retries: int = 30
     start_period: float = 0.0  # grace period before first check
-    expected_status: List[int] = field(default_factory=lambda: [200])
+    expected_status: list[int] = field(default_factory=lambda: [200])
     expected_output: Optional[str] = None
 
     @property
@@ -179,7 +173,7 @@ class HealthCheckConfig:
         """Maximum time to wait for healthy status."""
         return self.start_period + (self.interval * self.retries)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": self.type.value,
             "port": self.port,
@@ -195,7 +189,7 @@ class HealthCheckConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "HealthCheckConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "HealthCheckConfig":
         check_type = data.get("type", "tcp")
         if isinstance(check_type, str):
             check_type = HealthCheckType(check_type)
@@ -307,7 +301,7 @@ class LifecycleConfig:
     restart_policy: Literal["no", "on-failure", "always"] = "no"
     max_restarts: int = 3
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "startup_order": self.startup_order,
             "shutdown_order": self.shutdown_order,
@@ -319,7 +313,7 @@ class LifecycleConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "LifecycleConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "LifecycleConfig":
         return cls(
             startup_order=data.get("startup_order", 100),
             shutdown_order=data.get("shutdown_order"),
@@ -355,7 +349,7 @@ class PortMapping:
     host_ip: str = "0.0.0.0"
 
     @classmethod
-    def parse(cls, spec: Union[str, int, Dict[str, Any], "PortMapping"]) -> "PortMapping":
+    def parse(cls, spec: str | int | dict[str, Any] | "PortMapping") -> "PortMapping":
         """Parse port specification.
 
         Formats:
@@ -409,7 +403,7 @@ class VolumeMount:
     type: Literal["bind", "volume", "tmpfs"] = "bind"
 
     @classmethod
-    def parse(cls, spec: Union[str, Dict[str, Any], "VolumeMount"]) -> "VolumeMount":
+    def parse(cls, spec: str | dict[str, Any] | "VolumeMount") -> "VolumeMount":
         """Parse volume specification.
 
         Formats:
@@ -501,11 +495,11 @@ class ServiceConfig:
 
     # Container settings
     image: Optional[str] = None
-    command: Optional[List[str]] = None
-    entrypoint: Optional[List[str]] = None
-    ports: List[PortMapping] = field(default_factory=list)
-    environment: Dict[str, str] = field(default_factory=dict)
-    volumes: List[VolumeMount] = field(default_factory=list)
+    command: Optional[list[str]] = None
+    entrypoint: Optional[list[str]] = None
+    ports: list[PortMapping] = field(default_factory=list)
+    environment: dict[str, str] = field(default_factory=dict)
+    volumes: list[VolumeMount] = field(default_factory=list)
     working_dir: Optional[str] = None
     user: Optional[str] = None
 
@@ -514,18 +508,18 @@ class ServiceConfig:
     lifecycle: LifecycleConfig = field(default_factory=LifecycleConfig)
 
     # Connection exports
-    exports: Dict[str, str] = field(default_factory=dict)
+    exports: dict[str, str] = field(default_factory=dict)
 
     # Metadata
-    labels: Dict[str, str] = field(default_factory=dict)
-    depends_on: List[str] = field(default_factory=list)
+    labels: dict[str, str] = field(default_factory=dict)
+    depends_on: list[str] = field(default_factory=list)
 
     # Docker-specific
     network: Optional[str] = None
     network_mode: Optional[str] = None
     privileged: bool = False
-    cap_add: List[str] = field(default_factory=list)
-    cap_drop: List[str] = field(default_factory=list)
+    cap_add: list[str] = field(default_factory=list)
+    cap_drop: list[str] = field(default_factory=list)
 
     # AWS-specific
     aws_region: Optional[str] = None
@@ -540,7 +534,7 @@ class ServiceConfig:
     k8s_manifest: Optional[str] = None
     k8s_replicas: int = 1
     k8s_service_account: Optional[str] = None
-    k8s_node_selector: Dict[str, str] = field(default_factory=dict)
+    k8s_node_selector: dict[str, str] = field(default_factory=dict)
 
     # External service
     endpoint: Optional[str] = None
@@ -613,7 +607,7 @@ class ServiceConfig:
             return self.ports[0].container_port
         return default
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "provider": self.provider,
@@ -634,7 +628,7 @@ class ServiceConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ServiceConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "ServiceConfig":
         """Create ServiceConfig from dictionary (YAML parsing)."""
         health_data = data.get("health_check")
         lifecycle_data = data.get("lifecycle", {})
@@ -701,13 +695,13 @@ class ServiceHandle:
     config: ServiceConfig
     state: ServiceState = ServiceState.PENDING
     host: str = "localhost"
-    ports: Dict[int, int] = field(default_factory=dict)  # container_port → host_port
+    ports: dict[int, int] = field(default_factory=dict)  # container_port → host_port
     container_id: Optional[str] = None
     process_id: Optional[int] = None
     started_at: Optional[datetime] = None
     healthy_at: Optional[datetime] = None
-    connection_info: Dict[str, str] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    connection_info: dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
 
     @classmethod
@@ -729,7 +723,7 @@ class ServiceHandle:
             return f"{self.host}:{host_port}"
         return None
 
-    def resolve_exports(self) -> Dict[str, str]:
+    def resolve_exports(self) -> dict[str, str]:
         """Resolve export templates with actual connection info."""
         resolved = {}
 
@@ -756,7 +750,7 @@ class ServiceHandle:
 
         return resolved
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "service_id": self.service_id,
             "name": self.config.name,

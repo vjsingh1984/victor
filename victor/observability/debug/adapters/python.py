@@ -45,7 +45,7 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.observability.debug.adapter import (
     BaseDebugAdapter,
@@ -100,7 +100,7 @@ class PythonDebugAdapter(BaseDebugAdapter):
         self._reader: Optional[asyncio.StreamReader] = None
         self._writer: Optional[asyncio.StreamWriter] = None
         self._seq = 0
-        self._pending_requests: Dict[int, asyncio.Future] = {}
+        self._pending_requests: dict[int, asyncio.Future] = {}
         self._initialized = False
 
     @property
@@ -108,7 +108,7 @@ class PythonDebugAdapter(BaseDebugAdapter):
         return "debugpy"
 
     @property
-    def languages(self) -> List[str]:
+    def languages(self) -> list[str]:
         return ["python", "py", "python3"]
 
     def _get_default_capabilities(self) -> DebugAdapterCapabilities:
@@ -330,9 +330,9 @@ class PythonDebugAdapter(BaseDebugAdapter):
         self,
         session_id: str,
         source: Path,
-        breakpoints: List[SourceLocation],
-        conditions: Optional[Dict[int, str]] = None,
-    ) -> List[Breakpoint]:
+        breakpoints: list[SourceLocation],
+        conditions: Optional[dict[int, str]] = None,
+    ) -> list[Breakpoint]:
         """Set breakpoints in a source file."""
         conditions = conditions or {}
 
@@ -368,7 +368,7 @@ class PythonDebugAdapter(BaseDebugAdapter):
 
         return result
 
-    async def set_function_breakpoints(self, session_id: str, names: List[str]) -> List[Breakpoint]:
+    async def set_function_breakpoints(self, session_id: str, names: list[str]) -> list[Breakpoint]:
         """Set breakpoints on function names."""
         response = await self._send_request(
             "setFunctionBreakpoints",
@@ -435,7 +435,7 @@ class PythonDebugAdapter(BaseDebugAdapter):
 
     # Inspection
 
-    async def get_threads(self, session_id: str) -> List[Thread]:
+    async def get_threads(self, session_id: str) -> list[Thread]:
         """Get all threads."""
         response = await self._send_request("threads", {})
 
@@ -453,7 +453,7 @@ class PythonDebugAdapter(BaseDebugAdapter):
         thread_id: int,
         start_frame: int = 0,
         levels: int = 20,
-    ) -> List[StackFrame]:
+    ) -> list[StackFrame]:
         """Get stack trace."""
         response = await self._send_request(
             "stackTrace",
@@ -481,7 +481,7 @@ class PythonDebugAdapter(BaseDebugAdapter):
             for f in response.get("stackFrames", [])
         ]
 
-    async def get_scopes(self, session_id: str, frame_id: int) -> List[Scope]:
+    async def get_scopes(self, session_id: str, frame_id: int) -> list[Scope]:
         """Get variable scopes."""
         response = await self._send_request("scopes", {"frameId": frame_id})
 
@@ -501,9 +501,9 @@ class PythonDebugAdapter(BaseDebugAdapter):
         filter_type: Optional[str] = None,
         start: int = 0,
         count: int = 100,
-    ) -> List[Variable]:
+    ) -> list[Variable]:
         """Get variables."""
-        args: Dict[str, Any] = {
+        args: dict[str, Any] = {
             "variablesReference": variables_reference,
             "start": start,
             "count": count,
@@ -532,7 +532,7 @@ class PythonDebugAdapter(BaseDebugAdapter):
         context: str = "repl",
     ) -> EvaluateResult:
         """Evaluate expression."""
-        args: Dict[str, Any] = {
+        args: dict[str, Any] = {
             "expression": expression,
             "context": context,
         }
@@ -563,7 +563,7 @@ class PythonDebugAdapter(BaseDebugAdapter):
                 else:
                     raise RuntimeError(f"Could not connect to debugpy at {host}:{self._port}")
 
-    async def _send_request(self, command: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    async def _send_request(self, command: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Send DAP request and wait for response."""
         if self._writer is None:
             raise RuntimeError("Not connected to debugpy")
@@ -629,7 +629,7 @@ class PythonDebugAdapter(BaseDebugAdapter):
         except Exception as e:
             logger.error(f"Error reading messages: {e}")
 
-    def _handle_message(self, message: Dict[str, Any]) -> None:
+    def _handle_message(self, message: dict[str, Any]) -> None:
         """Handle incoming DAP message."""
         msg_type = message.get("type")
 

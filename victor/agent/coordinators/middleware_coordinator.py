@@ -31,10 +31,10 @@ Phase 6 Refactoring: Extracted from AgentOrchestrator
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from victor.agent.middleware.base import MiddlewareChain  # type: ignore[import-not-found]
+    pass  # type: ignore[import-not-found]
 
 logger = logging.getLogger(__name__)
 
@@ -60,16 +60,16 @@ class MiddlewareCoordinator:
 
     def __init__(self) -> None:
         """Initialize MiddlewareCoordinator."""
-        self._vertical_middleware: List[Any] = []
+        self._vertical_middleware: list[Any] = []
         self._middleware_chain: Optional[Any] = None
-        self._vertical_safety_patterns: List[Any] = []
+        self._vertical_safety_patterns: list[Any] = []
         self._code_correction_middleware: Optional[Any] = None
 
     # ========================================================================
     # Middleware Management (VerticalStorageProtocol Implementation)
     # ========================================================================
 
-    def set_middleware(self, middleware: List[Any]) -> None:
+    def set_middleware(self, middleware: list[Any]) -> None:
         """Store middleware configuration.
 
         Implements VerticalStorageProtocol.set_middleware().
@@ -82,7 +82,7 @@ class MiddlewareCoordinator:
         self._vertical_middleware = middleware
         logger.debug(f"Set {len(middleware)} middleware instances")
 
-    def get_middleware(self) -> List[Any]:
+    def get_middleware(self) -> list[Any]:
         """Retrieve middleware configuration.
 
         Implements VerticalStorageProtocol.get_middleware().
@@ -97,7 +97,7 @@ class MiddlewareCoordinator:
     # Safety Patterns Management (VerticalStorageProtocol Implementation)
     # ========================================================================
 
-    def set_safety_patterns(self, patterns: List[Any]) -> None:
+    def set_safety_patterns(self, patterns: list[Any]) -> None:
         """Store safety patterns.
 
         Implements VerticalStorageProtocol.set_safety_patterns().
@@ -110,7 +110,7 @@ class MiddlewareCoordinator:
         self._vertical_safety_patterns = patterns
         logger.debug(f"Set {len(patterns)} safety patterns")
 
-    def get_safety_patterns(self) -> List[Any]:
+    def get_safety_patterns(self) -> list[Any]:
         """Retrieve safety patterns.
 
         Implements VerticalStorageProtocol.get_safety_patterns().
@@ -144,7 +144,7 @@ class MiddlewareCoordinator:
 
     def build_middleware_chain(
         self,
-        middleware_list: List[Any],
+        middleware_list: list[Any],
     ) -> Optional[Any]:
         """Build middleware chain from list of middleware.
 
@@ -193,7 +193,7 @@ class MiddlewareCoordinator:
     # Internal Storage Setters (DIP Compliance)
     # ========================================================================
 
-    def _set_vertical_middleware_storage(self, middleware: List[Any]) -> None:
+    def _set_vertical_middleware_storage(self, middleware: list[Any]) -> None:
         """Internal: Set vertical middleware storage.
 
         DIP Compliance: Provides controlled setter instead of direct
@@ -215,7 +215,7 @@ class MiddlewareCoordinator:
         """
         self._middleware_chain = chain
 
-    def _set_safety_patterns_storage(self, patterns: List[Any]) -> None:
+    def _set_safety_patterns_storage(self, patterns: list[Any]) -> None:
         """Internal: Set safety patterns storage.
 
         DIP Compliance: Provides controlled setter instead of direct

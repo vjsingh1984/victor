@@ -40,7 +40,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from victor.framework.protocols import MutableChatState
 
@@ -72,8 +72,8 @@ class CodingChatState(MutableChatState):
         """Initialize the coding chat state."""
         super().__init__()
         # Coding-specific state
-        self._required_files: List[str] = []
-        self._required_outputs: List[str] = []
+        self._required_files: list[str] = []
+        self._required_outputs: list[str] = []
         self._read_files_session: set[str] = set()
         self._all_files_read_nudge_sent: bool = False
 
@@ -82,7 +82,7 @@ class CodingChatState(MutableChatState):
     # ========================================================================
 
     @property
-    def required_files(self) -> List[str]:
+    def required_files(self) -> list[str]:
         """Get the list of required files for task completion.
 
         Returns:
@@ -90,7 +90,7 @@ class CodingChatState(MutableChatState):
         """
         return self._required_files.copy()
 
-    def set_required_files(self, files: List[str]) -> None:
+    def set_required_files(self, files: list[str]) -> None:
         """Set the list of required files for task completion.
 
         Args:
@@ -115,7 +115,7 @@ class CodingChatState(MutableChatState):
     # ========================================================================
 
     @property
-    def required_outputs(self) -> List[str]:
+    def required_outputs(self) -> list[str]:
         """Get the list of required outputs for task completion.
 
         Returns:
@@ -123,7 +123,7 @@ class CodingChatState(MutableChatState):
         """
         return self._required_outputs.copy()
 
-    def set_required_outputs(self, outputs: List[str]) -> None:
+    def set_required_outputs(self, outputs: list[str]) -> None:
         """Set the list of required outputs for task completion.
 
         Args:
@@ -167,7 +167,7 @@ class CodingChatState(MutableChatState):
         """
         return file_path in self._read_files_session
 
-    def get_read_files(self) -> List[str]:
+    def get_read_files(self) -> list[str]:
         """Get list of files that have been read.
 
         Returns:
@@ -191,7 +191,7 @@ class CodingChatState(MutableChatState):
             return False
         return self._read_files_session.issuperset(set(self._required_files))
 
-    def get_unread_files(self) -> List[str]:
+    def get_unread_files(self) -> list[str]:
         """Get list of required files that haven't been read yet.
 
         Returns:
@@ -262,7 +262,7 @@ class CodingChatState(MutableChatState):
     # State Management
     # ========================================================================
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert state to dictionary for serialization.
 
         Returns:
@@ -280,7 +280,7 @@ class CodingChatState(MutableChatState):
         return base_dict
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CodingChatState":
+    def from_dict(cls, data: dict[str, Any]) -> "CodingChatState":
         """Create state from dictionary.
 
         Args:

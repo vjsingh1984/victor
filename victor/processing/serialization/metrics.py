@@ -29,7 +29,8 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Iterator
 
 if TYPE_CHECKING:
     from victor.processing.serialization.adaptive import SerializationContext, SerializationMetrics
@@ -59,7 +60,7 @@ class SerializationMetricRecord:
     analysis_time_ms: float
     encoding_time_ms: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
 
@@ -200,7 +201,7 @@ class SerializationMetricsCollector:
         except Exception as e:
             logger.warning(f"Failed to record serialization metric: {e}")
 
-    def get_tool_stats(self, tool_name: str) -> Dict[str, Any]:
+    def get_tool_stats(self, tool_name: str) -> dict[str, Any]:
         """Get aggregated statistics for a specific tool.
 
         Args:
@@ -253,7 +254,7 @@ class SerializationMetricsCollector:
             "avg_encoding_time_ms": 0,
         }
 
-    def get_format_stats(self) -> List[Dict[str, Any]]:
+    def get_format_stats(self) -> list[dict[str, Any]]:
         """Get aggregated statistics per format.
 
         Returns:
@@ -290,7 +291,7 @@ class SerializationMetricsCollector:
             logger.warning(f"Failed to get format stats: {e}")
             return []
 
-    def get_overall_stats(self) -> Dict[str, Any]:
+    def get_overall_stats(self) -> dict[str, Any]:
         """Get overall serialization statistics.
 
         Returns:

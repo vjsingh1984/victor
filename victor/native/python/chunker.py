@@ -19,7 +19,7 @@ Provides line-aware text chunking for code embedding.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 
 from victor.native.observability import InstrumentedAccelerator
 from victor.native.protocols import ChunkInfo
@@ -38,7 +38,7 @@ class PythonTextChunker(InstrumentedAccelerator):
     def get_version(self) -> Optional[str]:
         return self._version
 
-    def chunk_with_overlap(self, text: str, chunk_size: int, overlap: int) -> List[ChunkInfo]:
+    def chunk_with_overlap(self, text: str, chunk_size: int, overlap: int) -> list[ChunkInfo]:
         """Chunk text with overlap, respecting line boundaries.
 
         Args:
@@ -129,7 +129,7 @@ class PythonTextChunker(InstrumentedAccelerator):
                 return 0
             return text.count("\n") + 1
 
-    def find_line_boundaries(self, text: str) -> List[int]:
+    def find_line_boundaries(self, text: str) -> list[int]:
         """Find byte offsets of all line starts.
 
         Args:
@@ -178,7 +178,7 @@ class PythonTextChunker(InstrumentedAccelerator):
                     line += 1
             return line
 
-    def _line_at_offset_cached(self, line_starts: List[int], offset: int) -> int:
+    def _line_at_offset_cached(self, line_starts: list[int], offset: int) -> int:
         """Get line number using pre-computed line boundaries.
 
         Uses binary search for O(log n) lookup.

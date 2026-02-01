@@ -21,8 +21,6 @@ Tests cover:
 - Text-based tool matching
 """
 
-import pytest
-from unittest.mock import MagicMock
 
 from victor.tools.metadata_registry import (
     ToolMetadataRegistry,
@@ -751,7 +749,7 @@ class TestStageBasedToolSelection:
         )
 
         # Clear and setup global registry
-        _ = get_global_registry()  # noqa: F841 - Test function exists
+        _ = get_global_registry()
         # Note: We can't easily clear the global registry, so we just test the function exists
         # and returns a set
         result = get_tools_by_stage("reading")

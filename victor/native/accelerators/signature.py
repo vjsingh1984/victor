@@ -39,7 +39,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class ToolCallData:
     """
 
     tool_name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     signature: str = ""
 
     def __hash__(self) -> int:
@@ -134,11 +134,11 @@ class SignatureAccelerator:
         Args:
             max_cache_size: Maximum number of signatures to cache
         """
-        self._cache: Dict[str, str] = {}
+        self._cache: dict[str, str] = {}
         self._lock = threading.RLock()
         self._max_cache_size = max_cache_size
         self._stats = SignatureCacheStats()
-        self._access_order: List[str] = []
+        self._access_order: list[str] = []
 
     @property
     def rust_available(self) -> bool:
@@ -150,7 +150,7 @@ class SignatureAccelerator:
         """Get cache statistics."""
         return self._stats
 
-    def compute_signature(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+    def compute_signature(self, tool_name: str, arguments: dict[str, Any]) -> str:
         """Compute signature for a tool call.
 
         Uses xxHash3-based hashing when Rust is available (10x faster),
@@ -193,13 +193,13 @@ class SignatureAccelerator:
 
             return signature
 
-    def _compute_signature_python(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+    def _compute_signature_python(self, tool_name: str, arguments: dict[str, Any]) -> str:
         """Compute signature using Python hashlib (non-cryptographic, for deduplication only)."""
         args_str = json.dumps(arguments, sort_keys=True, default=str)
         signature_input = f"{tool_name}:{args_str}".encode("utf-8")
         return hashlib.md5(signature_input, usedforsecurity=False).hexdigest()[:16]
 
-    def deduplicate_calls(self, calls: List[ToolCallData]) -> List[ToolCallData]:
+    def deduplicate_calls(self, calls: list[ToolCallData]) -> list[ToolCallData]:
         """Remove duplicate tool calls from a list.
 
         Args:
@@ -226,7 +226,7 @@ class SignatureAccelerator:
 
         return self._deduplicate_calls_python(calls)
 
-    def _deduplicate_calls_python(self, calls: List[ToolCallData]) -> List[ToolCallData]:
+    def _deduplicate_calls_python(self, calls: list[ToolCallData]) -> list[ToolCallData]:
         """Deduplicate using Python dict-based approach."""
         seen = set()
         deduplicated = []

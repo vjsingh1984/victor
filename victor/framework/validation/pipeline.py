@@ -28,22 +28,16 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
-    Callable,
-    Dict,
-    Generic,
-    Iterator,
-    List,
     Optional,
     Protocol,
     TypeVar,
-    Union,
     runtime_checkable,
 )
+from collections.abc import Callable, Iterator
 
 from victor.framework.validation.validators import ValidatorProtocol
 
@@ -114,7 +108,7 @@ class ValidationIssue:
             return f"{prefix} {self.path}: {self.message} (code: {self.code})"
         return f"{prefix} {self.path}: {self.message}"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "path": self.path,
@@ -144,14 +138,14 @@ class ValidationResult:
     """
 
     is_valid: bool = True
-    issues: List[ValidationIssue] = field(default_factory=list)
-    data: Dict[str, Any] = field(default_factory=dict)
-    context: Dict[str, Any] = field(default_factory=dict)
+    issues: list[ValidationIssue] = field(default_factory=list)
+    data: dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     duration_seconds: float = 0.0
     retry_count: int = 0
 
     @property
-    def errors(self) -> List[ValidationIssue]:
+    def errors(self) -> list[ValidationIssue]:
         """Get all error-level issues."""
         return [
             i
@@ -160,12 +154,12 @@ class ValidationResult:
         ]
 
     @property
-    def warnings(self) -> List[ValidationIssue]:
+    def warnings(self) -> list[ValidationIssue]:
         """Get all warning-level issues."""
         return [i for i in self.issues if i.severity == ValidationSeverity.WARNING]
 
     @property
-    def info(self) -> List[ValidationIssue]:
+    def info(self) -> list[ValidationIssue]:
         """Get all info-level issues."""
         return [i for i in self.issues if i.severity == ValidationSeverity.INFO]
 
@@ -240,7 +234,7 @@ class ValidationResult:
             f"Validation failed: {len(self.errors)} error(s), " f"{len(self.warnings)} warning(s)"
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "is_valid": self.is_valid,
@@ -272,9 +266,9 @@ class ValidationContext:
         max_retries: Maximum allowed retries
     """
 
-    data: Dict[str, Any]
-    state: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any]
+    state: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     retry_count: int = 0
     max_retries: int = 3
 
@@ -472,7 +466,7 @@ class ConditionalHandler:
 class ChainHandler:
     """Chain multiple handlers in sequence."""
 
-    def __init__(self, handlers: List[ValidationHandler]):
+    def __init__(self, handlers: list[ValidationHandler]):
         self.handlers = handlers
 
     def can_handle(self, result: ValidationResult) -> bool:
@@ -512,7 +506,7 @@ class ValidationConfig:
         enable_logging: Whether to log validation steps
     """
 
-    validators: List[ValidatorProtocol] = field(default_factory=list)
+    validators: list[ValidatorProtocol] = field(default_factory=list)
     handler: Optional[ValidationHandler] = None
     halt_on_error: bool = True
     collect_all_errors: bool = True
@@ -560,7 +554,7 @@ class ValidationPipeline:
 
     def __init__(
         self,
-        validators: Optional[List[ValidatorProtocol]] = None,
+        validators: Optional[list[ValidatorProtocol]] = None,
         handler: Optional[ValidationHandler] = None,
         halt_on_error: bool = True,
         collect_all_errors: bool = True,
@@ -630,9 +624,9 @@ class ValidationPipeline:
 
     def validate(
         self,
-        data: Dict[str, Any],
-        state: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any],
+        state: Optional[dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> ValidationResult:
         """Validate the data using the pipeline.
 
@@ -734,8 +728,8 @@ class ValidationPipeline:
 
     def validate_stream(
         self,
-        data_stream: Iterator[Dict[str, Any]],
-        state: Optional[Dict[str, Any]] = None,
+        data_stream: Iterator[dict[str, Any]],
+        state: Optional[dict[str, Any]] = None,
     ) -> Iterator[ValidationResult]:
         """Validate a stream of data items.
 
@@ -751,9 +745,9 @@ class ValidationPipeline:
 
     def validate_batch(
         self,
-        data_batch: List[Dict[str, Any]],
-        state: Optional[Dict[str, Any]] = None,
-    ) -> List[ValidationResult]:
+        data_batch: list[dict[str, Any]],
+        state: Optional[dict[str, Any]] = None,
+    ) -> list[ValidationResult]:
         """Validate a batch of data items.
 
         Args:
@@ -767,7 +761,7 @@ class ValidationPipeline:
 
     def aggregate_results(
         self,
-        results: List[ValidationResult],
+        results: list[ValidationResult],
     ) -> ValidationResult:
         """Aggregate multiple validation results.
 
@@ -803,7 +797,7 @@ class ValidationPipeline:
 
 
 def create_validation_pipeline(
-    validators: Optional[List[ValidatorProtocol]] = None,
+    validators: Optional[list[ValidatorProtocol]] = None,
     **kwargs: Any,
 ) -> ValidationPipeline:
     """Create a validation pipeline with the given configuration.
@@ -831,9 +825,9 @@ def create_validation_pipeline(
 
 
 def validate_and_get_errors(
-    data: Dict[str, Any],
-    validators: List[ValidatorProtocol],
-) -> List[str]:
+    data: dict[str, Any],
+    validators: list[ValidatorProtocol],
+) -> list[str]:
     """Validate data and return error messages.
 
     Args:
@@ -849,8 +843,8 @@ def validate_and_get_errors(
 
 
 def is_valid(
-    data: Dict[str, Any],
-    validators: List[ValidatorProtocol],
+    data: dict[str, Any],
+    validators: list[ValidatorProtocol],
 ) -> bool:
     """Check if data is valid.
 

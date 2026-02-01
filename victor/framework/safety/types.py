@@ -32,7 +32,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +156,7 @@ class SafetyPattern:
     pattern: str
     severity: Severity
     message: str
-    domains: List[str] = field(default_factory=lambda: ["all"])
+    domains: list[str] = field(default_factory=lambda: ["all"])
     action: Action = field(default=Action.BLOCK)
     _compiled_pattern: Optional[re.Pattern[str]] = field(default=None, repr=False, compare=False)
 
@@ -181,7 +181,7 @@ class SafetyPattern:
             return False
         return bool(self._compiled_pattern.search(content))
 
-    def find_matches(self, content: str) -> List[str]:
+    def find_matches(self, content: str) -> list[str]:
         """Find all matches in content.
 
         Args:
@@ -207,13 +207,13 @@ class SafetyPattern:
             return True
         return domain.lower() in [d.lower() for d in self.domains]
 
-    def to_yaml_dict(self) -> Dict[str, Any]:
+    def to_yaml_dict(self) -> dict[str, Any]:
         """Convert to YAML-serializable dictionary.
 
         Returns:
             Dictionary suitable for YAML serialization
         """
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "name": self.name,
             "pattern": self.pattern,
             "severity": self.severity.value,
@@ -229,7 +229,7 @@ class SafetyPattern:
         return result
 
     @classmethod
-    def from_yaml_dict(cls, data: Dict[str, Any]) -> "SafetyPattern":
+    def from_yaml_dict(cls, data: dict[str, Any]) -> "SafetyPattern":
         """Create SafetyPattern from YAML dictionary.
 
         Args:
@@ -294,13 +294,13 @@ class SafetyViolation:
     line_number: Optional[int] = None
     context: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
 
         Returns:
             Dictionary with violation details
         """
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "pattern_name": self.pattern_name,
             "severity": self.severity.value,
             "message": self.message,

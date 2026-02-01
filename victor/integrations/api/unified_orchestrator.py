@@ -48,11 +48,10 @@ Port: 8765 (matches VictorFastAPIServer default)
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
@@ -575,7 +574,7 @@ def _include_workflow_editor_api(app: FastAPI) -> None:
             logger.info("Creating simplified workflow endpoints")
 
             @app.get("/api/v1/workflows/nodes/types", tags=["Workflows"])
-            async def get_node_types_fallback() -> Dict[str, Any]:
+            async def get_node_types_fallback() -> dict[str, Any]:
                 """Get available workflow node types (simplified)."""
                 return {
                     "agent": {
@@ -606,7 +605,7 @@ def _include_workflow_editor_api(app: FastAPI) -> None:
                 }
 
             @app.get("/api/v1/workflows/formations", tags=["Workflows"])
-            async def get_formations_fallback() -> Dict[str, Any]:
+            async def get_formations_fallback() -> dict[str, Any]:
                 """Get available team formation types (simplified)."""
                 return {
                     "parallel": {
@@ -724,9 +723,9 @@ def _setup_health_check(app: FastAPI) -> None:
     """Setup unified health check."""
 
     @app.get("/health", tags=["System"])
-    async def unified_health_check() -> Dict[str, Any]:
+    async def unified_health_check() -> dict[str, Any]:
         """Health check for all services."""
-        status: Dict[str, Any] = {
+        status: dict[str, Any] = {
             "status": "healthy",
             "services": {
                 "main_api": "healthy",

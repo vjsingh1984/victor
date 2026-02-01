@@ -14,7 +14,7 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 
 class BaseWorkflow(ABC):
@@ -36,7 +36,7 @@ class BaseWorkflow(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def run(self, context: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+    async def run(self, context: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         """
         Executes the workflow.
 
@@ -54,7 +54,7 @@ class WorkflowRegistry:
     """A registry for discovering and managing available workflows."""
 
     def __init__(self) -> None:
-        self._workflows: Dict[str, BaseWorkflow] = {}
+        self._workflows: dict[str, BaseWorkflow] = {}
 
     def register(self, workflow: BaseWorkflow) -> None:
         """Registers a workflow instance."""

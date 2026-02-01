@@ -15,8 +15,7 @@
 """In-memory checkpoint storage backend for testing."""
 
 import copy
-from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 from victor.storage.checkpoints.protocol import (
     CheckpointData,
@@ -35,13 +34,13 @@ class MemoryCheckpointBackend(CheckpointManagerProtocol):
 
     def __init__(self) -> None:
         """Initialize empty storage."""
-        self._checkpoints: Dict[str, CheckpointData] = {}
-        self._by_session: Dict[str, List[str]] = {}
+        self._checkpoints: dict[str, CheckpointData] = {}
+        self._by_session: dict[str, list[str]] = {}
 
     async def save_checkpoint(
         self,
         session_id: str,
-        state_data: Dict[str, Any],
+        state_data: dict[str, Any],
         metadata: CheckpointMetadata,
     ) -> str:
         """Save checkpoint to memory."""
@@ -78,7 +77,7 @@ class MemoryCheckpointBackend(CheckpointManagerProtocol):
         session_id: str,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[CheckpointMetadata]:
+    ) -> list[CheckpointMetadata]:
         """List checkpoints for session."""
         if session_id not in self._by_session:
             return []

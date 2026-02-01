@@ -14,7 +14,7 @@
 
 """Generic prompt contribution capability provider (Phase 3)."""
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Optional
 from dataclasses import dataclass
 
 
@@ -67,7 +67,7 @@ class PromptContributionCapability:
 
     def __init__(
         self,
-        contributions: Optional[List[PromptContribution]] = None,
+        contributions: Optional[list[PromptContribution]] = None,
     ):
         """Initialize prompt contribution capability.
 
@@ -76,7 +76,7 @@ class PromptContributionCapability:
         """
         self.contributions = contributions or self.COMMON_HINTS.copy()
 
-    def get_task_hints(self) -> Dict[str, Dict[str, Any]]:
+    def get_task_hints(self) -> dict[str, dict[str, Any]]:
         """Get all task hints as dictionary.
 
         Returns:
@@ -92,7 +92,7 @@ class PromptContributionCapability:
 
         return hints
 
-    def get_contributors(self) -> List[Any]:
+    def get_contributors(self) -> list[Any]:
         """Get prompt contributors for vertical.
 
         Returns:

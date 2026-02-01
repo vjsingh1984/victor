@@ -16,7 +16,7 @@
 
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any
 
 
 class CommunicationStyle(Enum):
@@ -98,12 +98,12 @@ class PersonaTraits:
     communication_style: CommunicationStyle = CommunicationStyle.TECHNICAL
     expertise_level: ExpertiseLevel = ExpertiseLevel.EXPERT
     verbosity: float = 0.5
-    strengths: List[str] = field(default_factory=list)
-    weaknesses: List[str] = field(default_factory=list)
-    preferred_tools: List[str] = field(default_factory=list)
+    strengths: list[str] = field(default_factory=list)
+    weaknesses: list[str] = field(default_factory=list)
+    preferred_tools: list[str] = field(default_factory=list)
     risk_tolerance: float = 0.5
     creativity: float = 0.5
-    custom_traits: Dict[str, Any] = field(default_factory=dict)
+    custom_traits: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate trait values after initialization."""
@@ -138,7 +138,7 @@ class PersonaTraits:
             lines.append(f"Strengths: {', '.join(self.strengths)}")
         return "\n".join(lines)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert persona traits to dictionary for serialization.
 
         Returns:
@@ -150,7 +150,7 @@ class PersonaTraits:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PersonaTraits":
+    def from_dict(cls, data: dict[str, Any]) -> "PersonaTraits":
         """Create PersonaTraits from dictionary.
 
         Args:
@@ -197,7 +197,7 @@ class PersonaTemplate:
     """
 
     base_traits: PersonaTraits
-    overrides: Dict[str, Any] = field(default_factory=dict)
+    overrides: dict[str, Any] = field(default_factory=dict)
 
     def create(self, **kwargs: Any) -> PersonaTraits:
         """Create a PersonaTraits instance from this template.

@@ -60,25 +60,16 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 from victor.storage.checkpoints.protocol import (
-    CheckpointData,
-    CheckpointDiff,
     CheckpointManagerProtocol,
     CheckpointMetadata,
-    CheckpointNotFoundError,
     CheckpointError,
-    DiffType,
-    FieldDiff,
 )
 
 if TYPE_CHECKING:
@@ -149,7 +140,7 @@ class BranchMetadata:
     updated_at: datetime
     status: BranchStatus = BranchStatus.ACTIVE
     description: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     merge_parent_id: Optional[str] = None
 
     @classmethod
@@ -160,7 +151,7 @@ class BranchMetadata:
         head_checkpoint_id: str,
         base_checkpoint_id: Optional[str] = None,
         description: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
     ) -> "BranchMetadata":
         """Create a new branch.
 
@@ -188,7 +179,7 @@ class BranchMetadata:
             tags=tags or [],
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "branch_id": self.branch_id,
@@ -205,7 +196,7 @@ class BranchMetadata:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BranchMetadata":
+    def from_dict(cls, data: dict[str, Any]) -> "BranchMetadata":
         """Deserialize from dictionary."""
         return cls(
             branch_id=data["branch_id"],
@@ -240,7 +231,7 @@ class CheckpointNode:
 
     checkpoint_id: str
     parent_id: Optional[str]
-    children_ids: List[str] = field(default_factory=list)
+    children_ids: list[str] = field(default_factory=list)
     branch_name: Optional[str] = None
     metadata: Optional[CheckpointMetadata] = None
     depth: int = 0
@@ -273,8 +264,8 @@ class MergeResult:
     success: bool
     merge_checkpoint_id: Optional[str] = None
     strategy_used: Optional[MergeStrategy] = None
-    conflicts: List[Dict[str, Any]] = field(default_factory=list)
-    changes_merged: Dict[str, int] = field(default_factory=dict)
+    conflicts: list[dict[str, Any]] = field(default_factory=list)
+    changes_merged: dict[str, int] = field(default_factory=dict)
 
     def has_conflicts(self) -> bool:
         """Check if merge has unresolved conflicts."""
@@ -296,9 +287,9 @@ class ReplayStep:
     """
 
     checkpoint_id: str
-    action: Dict[str, Any]
-    state_before: Optional[Dict[str, Any]] = None
-    state_after: Optional[Dict[str, Any]] = None
+    action: dict[str, Any]
+    state_before: Optional[dict[str, Any]] = None
+    state_after: Optional[dict[str, Any]] = None
     step_index: int = 0
 
 
@@ -319,16 +310,16 @@ class CheckpointTree:
 
     def __init__(self) -> None:
         """Initialize empty tree."""
-        self._nodes: Dict[str, CheckpointNode] = {}
+        self._nodes: dict[str, CheckpointNode] = {}
         self._root_id: Optional[str] = None
-        self._branches: Dict[str, BranchMetadata] = {}
+        self._branches: dict[str, BranchMetadata] = {}
 
     @classmethod
     async def build_from_session(
         cls,
         backend: CheckpointManagerProtocol,
         session_id: str,
-        branches: Optional[Dict[str, BranchMetadata]] = None,
+        branches: Optional[dict[str, BranchMetadata]] = None,
     ) -> "CheckpointTree":
         """Build tree from all checkpoints in a session.
 
@@ -390,7 +381,7 @@ class CheckpointTree:
         self,
         checkpoint_id: str,
         max_depth: Optional[int] = None,
-    ) -> List[CheckpointNode]:
+    ) -> list[CheckpointNode]:
         """Get all ancestors of a checkpoint (parent to root).
 
         Args:
@@ -421,7 +412,7 @@ class CheckpointTree:
         self,
         checkpoint_id: str,
         max_depth: Optional[int] = None,
-    ) -> List[CheckpointNode]:
+    ) -> list[CheckpointNode]:
         """Get all descendants of a checkpoint (children to leaves).
 
         Args:
@@ -431,7 +422,7 @@ class CheckpointTree:
         Returns:
             List of descendant nodes in breadth-first order
         """
-        descendants: List[CheckpointNode] = []
+        descendants: list[CheckpointNode] = []
         node = self._nodes.get(checkpoint_id)
 
         if not node:
@@ -456,7 +447,7 @@ class CheckpointTree:
         self,
         from_checkpoint: str,
         to_checkpoint: str,
-    ) -> List[CheckpointNode]:
+    ) -> list[CheckpointNode]:
         """Get path between two checkpoints.
 
         Args:
@@ -549,15 +540,15 @@ class CheckpointTree:
         )
         return self._nodes.get(deepest_id)
 
-    def get_branch_points(self) -> List[CheckpointNode]:
+    def get_branch_points(self) -> list[CheckpointNode]:
         """Get all checkpoints that are branch points (have multiple children)."""
         return [n for n in self._nodes.values() if n.is_branch_point()]
 
-    def get_leaves(self) -> List[CheckpointNode]:
+    def get_leaves(self) -> list[CheckpointNode]:
         """Get all leaf checkpoints (no children)."""
         return [n for n in self._nodes.values() if n.is_leaf()]
 
-    def get_branch_heads(self) -> Dict[str, CheckpointNode]:
+    def get_branch_heads(self) -> dict[str, CheckpointNode]:
         """Get head checkpoints for all branches."""
         heads = {}
         for branch_name, branch in self._branches.items():
@@ -565,7 +556,7 @@ class CheckpointTree:
                 heads[branch_name] = self._nodes[branch.head_checkpoint_id]
         return heads
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize tree to dictionary."""
         return {
             "root_id": self._root_id,
@@ -603,7 +594,7 @@ class CheckpointTree:
         checkpoint_id: str,
         prefix: str,
         is_last: bool,
-        lines: List[str],
+        lines: list[str],
         max_depth: Optional[int],
         current_depth: int,
     ) -> None:
@@ -667,8 +658,8 @@ class BranchManager:
         self.default_branch_name = default_branch_name
 
         # In-memory branch storage (should be persisted in production)
-        self._branches: Dict[str, Dict[str, BranchMetadata]] = {}  # session_id -> {name: branch}
-        self._current_branch: Dict[str, str] = {}  # session_id -> branch_name
+        self._branches: dict[str, dict[str, BranchMetadata]] = {}  # session_id -> {name: branch}
+        self._current_branch: dict[str, str] = {}  # session_id -> branch_name
 
     async def create_branch(
         self,
@@ -811,7 +802,7 @@ class BranchManager:
         session_id: str,
         strategy: MergeStrategy = MergeStrategy.THREE_WAY,
         state_merger: Optional[
-            Callable[[Dict[Any, Any], Dict[Any, Any], Dict[Any, Any]], Dict[Any, Any]]
+            Callable[[dict[Any, Any], dict[Any, Any], dict[Any, Any]], dict[Any, Any]]
         ] = None,
     ) -> MergeResult:
         """Merge one branch into another.
@@ -984,10 +975,10 @@ class BranchManager:
 
     def _default_state_merge(
         self,
-        base: Dict[str, Any],
-        source: Dict[str, Any],
-        target: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base: dict[str, Any],
+        source: dict[str, Any],
+        target: dict[str, Any],
+    ) -> dict[str, Any]:
         """Default three-way state merge.
 
         Simple merge strategy:
@@ -1077,7 +1068,7 @@ class BranchManager:
         self,
         session_id: str,
         include_archived: bool = False,
-    ) -> List[BranchMetadata]:
+    ) -> list[BranchMetadata]:
         """List all branches for a session.
 
         Args:
@@ -1113,8 +1104,8 @@ class BranchManager:
         self,
         checkpoint_id: str,
         session_id: str,
-        action_replay: Optional[Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]] = None,
-    ) -> List[ReplayStep]:
+        action_replay: Optional[Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]] = None,
+    ) -> list[ReplayStep]:
         """Replay conversation from a checkpoint.
 
         Useful for debugging or reproducing behavior from a specific point.
@@ -1150,7 +1141,7 @@ class BranchManager:
             data = await self.backend.load_checkpoint(node.checkpoint_id)
 
             # Extract action from state diff
-            action: Dict[str, Any] = {}
+            action: dict[str, Any] = {}
             if prev_state:
                 # Compute what changed
                 tools_before = set(prev_state.get("tool_history", []))
@@ -1237,7 +1228,7 @@ class BranchStorageProtocol(Protocol):
 
     async def list_branches(
         self, session_id: str, include_archived: bool = False
-    ) -> List[BranchMetadata]:
+    ) -> list[BranchMetadata]:
         """List branches for a session."""
         ...
 

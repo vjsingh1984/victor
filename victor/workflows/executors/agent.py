@@ -20,13 +20,12 @@ Executes agent nodes by spawning sub-agents with role-specific configurations.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Match, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 if TYPE_CHECKING:
     from victor.agent.subagents.base import SubAgentRole
     from victor.workflows.definition import AgentNode
     from victor.workflows.adapters import WorkflowState
-    from victor.workflows.compiler_protocols import NodeExecutorProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +74,6 @@ class AgentNodeExecutor:
             Exception: If agent execution fails
         """
         from victor.agent.subagents.orchestrator import SubAgentOrchestrator
-        from victor.agent.subagents.roles import SubAgentRole  # type: ignore[import-not-found]
 
         logger.info(f"Executing agent node: {node.id} with role: {node.role}")
 
@@ -189,7 +187,7 @@ class AgentNodeExecutor:
         """
         from victor.agent.subagents.roles import SubAgentRole
 
-        role_map: Dict[str, SubAgentRole] = {
+        role_map: dict[str, SubAgentRole] = {
             "researcher": SubAgentRole.RESEARCHER,
             "planner": SubAgentRole.PLANNER,
             "executor": SubAgentRole.EXECUTOR,
@@ -209,7 +207,7 @@ class AgentNodeExecutor:
         # But mypy can't infer this, so we use a type ignore
         return result
 
-    def _substitute_context(self, template: str, context: Dict[str, Any]) -> str:
+    def _substitute_context(self, template: str, context: dict[str, Any]) -> str:
         """Substitute context variables in template string.
 
         Args:

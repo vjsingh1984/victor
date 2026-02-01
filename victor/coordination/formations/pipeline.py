@@ -19,10 +19,10 @@ Each agent transforms the data, creating a processing pipeline.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
-from victor.teams.types import AgentMessage, MemberResult, MessageType
+from victor.teams.types import AgentMessage, MemberResult
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +42,10 @@ class PipelineFormation(BaseFormationStrategy):
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute agents as a pipeline."""
         results = []
         previous_output = None

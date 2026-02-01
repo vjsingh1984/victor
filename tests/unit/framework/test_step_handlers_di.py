@@ -18,12 +18,11 @@ Tests that FrameworkStepHandler uses injected registries instead of
 hard-coded imports, following Dependency Inversion Principle (DIP).
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.protocols.agent import IAgentOrchestrator
+    pass
 
 from victor.framework.step_handlers import FrameworkStepHandler
 from victor.core.verticals.base import VerticalBase

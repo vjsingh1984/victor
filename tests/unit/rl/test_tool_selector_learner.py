@@ -20,7 +20,7 @@ conservative exploration (ε=0.1) for adaptive tool ranking.
 
 import pytest
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 from unittest.mock import patch
 
 from victor.framework.rl.base import RLOutcome
@@ -85,7 +85,7 @@ def _get_q_value_from_db(
     coordinator: RLCoordinator,
     tool_name: str,
     task_type: Optional[str] = None,
-) -> Tuple[float, int]:
+) -> tuple[float, int]:
     """Helper to retrieve Q-value and selection count from the database."""
     cursor = coordinator.db.cursor()
     if task_type:

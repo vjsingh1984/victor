@@ -19,7 +19,6 @@ to reference predefined stage templates from the WorkflowTemplateRegistry.
 """
 
 import pytest
-from typing import Dict, Any
 
 from victor.workflows.yaml_loader import (
     _resolve_stage_templates,
@@ -28,7 +27,6 @@ from victor.workflows.yaml_loader import (
     YAMLWorkflowError,
 )
 from victor.workflows.template_registry import (
-    WorkflowTemplateRegistry,
     get_workflow_template_registry,
 )
 

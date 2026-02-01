@@ -16,20 +16,15 @@
 
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
-import json
 import sys
 
 from victor.integrations.protocol.adapters import DirectProtocolAdapter, HTTPProtocolAdapter
 from victor.integrations.protocol.interface import (
     ChatMessage,
     ChatResponse,
-    ClientStreamChunk,
-    ToolCall,
-    UndoRedoResult,
     AgentMode,
     AgentStatus,
 )
-from victor.integrations.search_types import CodeSearchResult
 
 
 # =============================================================================

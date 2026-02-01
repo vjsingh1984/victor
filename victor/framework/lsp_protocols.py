@@ -38,7 +38,7 @@ Benefits:
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 @dataclass
@@ -103,7 +103,7 @@ class LSPSymbol:
     kind: int  # SymbolKind enum value
     range: LSPRange
     selection_range: LSPRange
-    children: Optional[List["LSPSymbol"]] = None
+    children: Optional[list["LSPSymbol"]] = None
     detail: Optional[str] = None
     deprecated: bool = False
 
@@ -167,7 +167,7 @@ class LSPServiceProtocol(Protocol):
 
     async def get_completions(
         self, file_path: str, line: int, character: int
-    ) -> List[LSPCompletionItem]:
+    ) -> list[LSPCompletionItem]:
         """Get completions at position.
 
         Args:
@@ -180,7 +180,7 @@ class LSPServiceProtocol(Protocol):
         """
         ...
 
-    async def get_definition(self, file_path: str, line: int, character: int) -> List[LSPLocation]:
+    async def get_definition(self, file_path: str, line: int, character: int) -> list[LSPLocation]:
         """Get definition locations.
 
         Args:
@@ -193,7 +193,7 @@ class LSPServiceProtocol(Protocol):
         """
         ...
 
-    async def get_references(self, file_path: str, line: int, character: int) -> List[LSPLocation]:
+    async def get_references(self, file_path: str, line: int, character: int) -> list[LSPLocation]:
         """Get reference locations.
 
         Args:
@@ -206,7 +206,7 @@ class LSPServiceProtocol(Protocol):
         """
         ...
 
-    def get_diagnostics(self, file_path: str) -> List[LSPDiagnostic]:
+    def get_diagnostics(self, file_path: str) -> list[LSPDiagnostic]:
         """Get diagnostics for a file.
 
         Args:
@@ -260,7 +260,7 @@ class LSPPoolProtocol(Protocol):
         """
         ...
 
-    def get_available_servers(self) -> List[Dict[str, Any]]:
+    def get_available_servers(self) -> list[dict[str, Any]]:
         """Get list of available language servers.
 
         Returns:
@@ -273,7 +273,7 @@ class LSPPoolProtocol(Protocol):
         """
         ...
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get status of all servers.
 
         Returns:

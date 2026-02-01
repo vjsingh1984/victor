@@ -25,7 +25,7 @@ Features:
 import ast
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 import logging
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
@@ -50,7 +50,7 @@ def _get_icon(name: str) -> str:
 # Helper functions
 
 
-def _find_symbol(tree: ast.AST, name: str) -> Optional[Dict[str, Any]]:
+def _find_symbol(tree: ast.AST, name: str) -> Optional[dict[str, Any]]:
     """Find symbol in AST."""
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name == name:
@@ -63,7 +63,7 @@ def _find_symbol(tree: ast.AST, name: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _analyze_variables(tree: ast.AST) -> Dict[str, List[str]]:
+def _analyze_variables(tree: ast.AST) -> dict[str, list[str]]:
     """Analyze variables used in code block."""
     # Simple analysis - can be enhanced
     names = set()
@@ -79,7 +79,7 @@ def _analyze_variables(tree: ast.AST) -> Dict[str, List[str]]:
     }
 
 
-def _find_function_insert_point(lines: List[str], current_line: int) -> int:
+def _find_function_insert_point(lines: list[str], current_line: int) -> int:
     """Find best location to insert extracted function."""
     # Simple heuristic: insert at the beginning of file (after imports)
     for i, line in enumerate(lines):
@@ -93,7 +93,7 @@ def _find_function_insert_point(lines: List[str], current_line: int) -> int:
     return 0
 
 
-def _find_variable_assignment(tree: ast.AST, name: str) -> Optional[Dict[str, Any]]:
+def _find_variable_assignment(tree: ast.AST, name: str) -> Optional[dict[str, Any]]:
     """Find simple variable assignment."""
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
@@ -169,7 +169,7 @@ def _collect_python_files(
     scope: str,
     depth: int,
     current_depth: int = 0,
-) -> List[Path]:
+) -> list[Path]:
     """Collect Python files based on scope and depth settings.
 
     Args:
@@ -221,7 +221,7 @@ def _rename_in_file(
     old_name: str,
     new_name: str,
     require_definition: bool = False,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     """Perform rename in a single file.
 
     Args:
@@ -315,7 +315,7 @@ async def rename(
     scope: str = "file",
     depth: int = -1,
     preview: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """[AST-AWARE] Rename symbols safely using word-boundary matching.
 
     Uses AST parsing + word boundaries to rename symbols without false positives.
@@ -402,7 +402,7 @@ async def rename(
         }
 
     # Process each file
-    all_file_changes: List[Dict[str, Any]] = []
+    all_file_changes: list[dict[str, Any]] = []
     total_changes = 0
 
     # For single-file scope, require symbol definition
@@ -509,7 +509,7 @@ async def extract(
     end_line: int,
     function_name: str,
     preview: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Extract code block into a new function.
 
     Extracts selected lines of code into a new function,
@@ -655,7 +655,7 @@ async def inline(
     file: str,
     variable_name: str,
     preview: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Inline a variable by replacing usages with its assigned value.
 
     Args:
@@ -786,7 +786,7 @@ async def inline(
 async def organize_imports(
     file: str,
     preview: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Organize imports: sort into groups (stdlib/third-party/local), remove duplicates.
 
     Args:

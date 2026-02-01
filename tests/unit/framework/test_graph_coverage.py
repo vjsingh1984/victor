@@ -18,8 +18,7 @@ These tests target the StateGraph workflow components to improve coverage
 from ~0% to 20% target.
 """
 
-import pytest
-from typing import Dict, Any, TypedDict
+from typing import Any
 
 from victor.framework.graph import (
     # Constants
@@ -106,7 +105,7 @@ class TestNode:
     def test_create_function_node(self):
         """Test creating a function node."""
 
-        def my_node(state: Dict[str, Any]) -> Dict[str, Any]:
+        def my_node(state: dict[str, Any]) -> dict[str, Any]:
             return {"result": "done"}
 
         node = Node(id="test_node", func=my_node)
@@ -116,7 +115,7 @@ class TestNode:
     def test_create_agent_node(self):
         """Test creating an agent node."""
 
-        def agent_fn(state: Dict[str, Any]) -> Dict[str, Any]:
+        def agent_fn(state: dict[str, Any]) -> dict[str, Any]:
             return {"output": "agent response"}
 
         # Create node without config if that's not supported
@@ -139,7 +138,7 @@ class TestEdge:
     def test_create_conditional_edge(self):
         """Test creating a conditional edge."""
 
-        def condition(state: Dict[str, Any]) -> str:
+        def condition(state: dict[str, Any]) -> str:
             return "node2"
 
         edge = Edge(
@@ -156,39 +155,39 @@ class TestStateGraph:
 
     def test_create_graph(self):
         """Test creating a StateGraph."""
-        graph = StateGraph(Dict[str, Any])
+        graph = StateGraph(dict[str, Any])
         assert graph is not None
 
     def test_graph_has_add_node_method(self):
         """Test StateGraph has add_node method."""
-        graph = StateGraph(Dict[str, Any])
+        graph = StateGraph(dict[str, Any])
         assert hasattr(graph, "add_node")
 
     def test_graph_has_add_edge_method(self):
         """Test StateGraph has add_edge method."""
-        graph = StateGraph(Dict[str, Any])
+        graph = StateGraph(dict[str, Any])
         assert hasattr(graph, "add_edge")
 
     def test_graph_has_add_conditional_edge_method(self):
         """Test StateGraph has add_conditional_edge method."""
-        graph = StateGraph(Dict[str, Any])
+        graph = StateGraph(dict[str, Any])
         assert hasattr(graph, "add_conditional_edge")
 
     def test_graph_has_set_entry_point_method(self):
         """Test StateGraph has set_entry_point method."""
-        graph = StateGraph(Dict[str, Any])
+        graph = StateGraph(dict[str, Any])
         assert hasattr(graph, "set_entry_point")
 
     def test_graph_has_compile_method(self):
         """Test StateGraph has compile method."""
-        graph = StateGraph(Dict[str, Any])
+        graph = StateGraph(dict[str, Any])
         assert hasattr(graph, "compile")
 
     def test_add_simple_node(self):
         """Test adding a simple node to the graph."""
-        graph = StateGraph(Dict[str, Any])
+        graph = StateGraph(dict[str, Any])
 
-        def test_node(state: Dict[str, Any]) -> Dict[str, Any]:
+        def test_node(state: dict[str, Any]) -> dict[str, Any]:
             return {"result": "success"}
 
         graph.add_node("test", test_node)

@@ -25,8 +25,8 @@ Tests cover:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from typing import Any
+from unittest.mock import Mock
 
 import pytest
 
@@ -35,7 +35,7 @@ from victor.dataanalysis.enrichment import (
     _detect_analysis_type,
     _extract_data_references,
 )
-from victor.framework.enrichment import EnrichmentContext, EnrichmentPriority, EnrichmentType
+from victor.framework.enrichment import EnrichmentContext, EnrichmentType
 
 
 class TestDetectAnalysisType:
@@ -240,7 +240,7 @@ class TestDataAnalysisEnrichmentStrategy:
         """Test enrichment with schema lookup function."""
 
         # Create async schema lookup function
-        async def mock_schema_lookup(source: str) -> Dict[str, Any]:
+        async def mock_schema_lookup(source: str) -> dict[str, Any]:
             return {
                 "columns": [
                     {"name": "id", "type": "integer", "nullable": False},
@@ -304,7 +304,7 @@ class TestDataAnalysisEnrichmentStrategy:
     async def test_get_enrichments_with_multiple_data_sources(self, strategy, mock_context):
         """Test enrichment with multiple data sources."""
 
-        async def mock_schema_lookup(source: str) -> Dict[str, Any]:
+        async def mock_schema_lookup(source: str) -> dict[str, Any]:
             return {"columns": [{"name": f"{source}_col", "type": "string", "nullable": False}]}
 
         strategy.set_schema_lookup_fn(mock_schema_lookup)
@@ -320,7 +320,7 @@ class TestDataAnalysisEnrichmentStrategy:
     def test_set_schema_lookup_function(self, strategy):
         """Test setting schema lookup function."""
 
-        async def dummy_lookup(source: str) -> Dict[str, Any]:
+        async def dummy_lookup(source: str) -> dict[str, Any]:
             return {}
 
         strategy.set_schema_lookup_fn(dummy_lookup)
@@ -343,7 +343,7 @@ class TestDataAnalysisEnrichmentStrategy:
         """Test that exceptions in enrichment are handled gracefully."""
 
         # Create a schema lookup that raises an exception
-        async def failing_lookup(source: str) -> Dict[str, Any]:
+        async def failing_lookup(source: str) -> dict[str, Any]:
             raise ValueError("Database connection failed")
 
         strategy.set_schema_lookup_fn(failing_lookup)
@@ -437,7 +437,7 @@ class TestDataAnalysisEnrichmentStrategy:
     async def test_enrich_from_schema_with_empty_data_sources(self, strategy):
         """Test schema enrichment with no data sources."""
 
-        async def mock_schema_lookup(source: str) -> Dict[str, Any]:
+        async def mock_schema_lookup(source: str) -> dict[str, Any]:
             return {"columns": []}
 
         strategy.set_schema_lookup_fn(mock_schema_lookup)
@@ -457,7 +457,7 @@ class TestDataAnalysisEnrichmentStrategy:
     async def test_enrich_from_schema_limits_columns(self, strategy, mock_context):
         """Test that schema enrichment respects max_columns limit."""
 
-        async def mock_schema_lookup(source: str) -> Dict[str, Any]:
+        async def mock_schema_lookup(source: str) -> dict[str, Any]:
             # Return 25 columns (more than default max of 20)
             return {
                 "columns": [

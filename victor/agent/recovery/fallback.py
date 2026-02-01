@@ -31,15 +31,13 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 # Import canonical CircuitState from circuit_breaker.py
 from victor.providers.circuit_breaker import CircuitState
 
 from victor.agent.recovery.protocols import (
     FailureType,
-    ModelFallbackPolicy,
-    RecoveryContext,
 )
 
 logger = logging.getLogger(__name__)
@@ -145,8 +143,8 @@ class ModelCapability:
     supports_streaming: bool = True
     max_context_tokens: int = 8192
     cost_tier: str = "medium"  # low, medium, high
-    strengths: Set[str] = field(default_factory=set)  # e.g., {"code", "analysis", "creative"}
-    weaknesses: Set[str] = field(default_factory=set)
+    strengths: set[str] = field(default_factory=set)  # e.g., {"code", "analysis", "creative"}
+    weaknesses: set[str] = field(default_factory=set)
 
 
 class AutomaticModelFallback:
@@ -167,7 +165,7 @@ class AutomaticModelFallback:
     """
 
     # Default fallback chains by provider
-    DEFAULT_FALLBACK_CHAINS: Dict[str, List[Tuple[str, str]]] = {
+    DEFAULT_FALLBACK_CHAINS: dict[str, list[tuple[str, str]]] = {
         # Anthropic fallbacks
         "anthropic": [
             ("anthropic", "claude-3-5-sonnet-latest"),
@@ -200,7 +198,7 @@ class AutomaticModelFallback:
     }
 
     # Default model capabilities
-    DEFAULT_CAPABILITIES: Dict[str, ModelCapability] = {
+    DEFAULT_CAPABILITIES: dict[str, ModelCapability] = {
         "claude-3-5-sonnet": ModelCapability(
             provider="anthropic",
             model="claude-3-5-sonnet-latest",
@@ -247,8 +245,8 @@ class AutomaticModelFallback:
 
     def __init__(
         self,
-        fallback_chains: Optional[Dict[str, List[Tuple[str, str]]]] = None,
-        capabilities: Optional[Dict[str, ModelCapability]] = None,
+        fallback_chains: Optional[dict[str, list[tuple[str, str]]]] = None,
+        capabilities: Optional[dict[str, ModelCapability]] = None,
         airgapped_mode: bool = False,
     ):
         self._fallback_chains = fallback_chains or dict(self.DEFAULT_FALLBACK_CHAINS)
@@ -256,10 +254,10 @@ class AutomaticModelFallback:
         self._airgapped_mode = airgapped_mode
 
         # Circuit breakers per model
-        self._circuit_breakers: Dict[str, CircuitBreaker] = {}
+        self._circuit_breakers: dict[str, CircuitBreaker] = {}
 
         # Failure-specific fallback preferences
-        self._failure_preferences: Dict[FailureType, List[str]] = {
+        self._failure_preferences: dict[FailureType, list[str]] = {
             # For stuck loops, prefer models with better instruction following
             FailureType.STUCK_LOOP: ["claude", "gpt-4"],
             # For hallucinations, prefer more deterministic models
@@ -280,7 +278,7 @@ class AutomaticModelFallback:
         current_provider: str,
         current_model: str,
         failure_type: FailureType,
-    ) -> Optional[Tuple[str, str]]:
+    ) -> Optional[tuple[str, str]]:
         """Get fallback provider and model.
 
         Args:
@@ -377,7 +375,7 @@ class AutomaticModelFallback:
         cb = self._get_circuit_breaker(provider, model)
         return cb.is_available()
 
-    def get_circuit_breaker_status(self) -> Dict[str, Dict[str, Any]]:
+    def get_circuit_breaker_status(self) -> dict[str, dict[str, Any]]:
         """Get status of all circuit breakers."""
         return {
             key: {
@@ -392,7 +390,7 @@ class AutomaticModelFallback:
     def add_fallback_chain(
         self,
         provider: str,
-        chain: List[Tuple[str, str]],
+        chain: list[tuple[str, str]],
     ) -> None:
         """Add or update a fallback chain for a provider."""
         self._fallback_chains[provider.lower()] = chain

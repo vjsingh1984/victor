@@ -5,18 +5,15 @@ from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
     runtime_checkable,
 )
+from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
     from victor.framework.state import Stage
-    from victor.framework.protocols.streaming import ChunkType, OrchestratorStreamChunk
+    from victor.framework.protocols.streaming import OrchestratorStreamChunk
 
 
 @runtime_checkable
@@ -135,7 +132,7 @@ class OrchestratorProtocol(Protocol):
         ...
 
     # --- MessagesProtocol ---
-    def get_messages(self) -> List[Dict[str, Any]]:
+    def get_messages(self) -> list[dict[str, Any]]:
         """Get conversation messages."""
         ...
 
@@ -153,7 +150,7 @@ class OrchestratorProtocol(Protocol):
         self,
         message: str,
         *,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator["OrchestratorStreamChunk"]:
         """Stream a chat response with standardized chunks.
 
@@ -178,7 +175,7 @@ class OrchestratorProtocol(Protocol):
         self,
         message: str,
         *,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Non-streaming chat that returns complete response.
 

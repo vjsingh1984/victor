@@ -18,7 +18,7 @@ This module provides the core components for managing roles, users, and permissi
 """
 
 from enum import Enum
-from typing import Dict, Optional, Set
+from typing import Optional
 
 
 class Permission(Enum):
@@ -39,7 +39,7 @@ class Permission(Enum):
 class Role:
     """Represents a role with a set of permissions."""
 
-    def __init__(self, name: str, permissions: Set[Permission]):
+    def __init__(self, name: str, permissions: set[Permission]):
         self.name = name
         self.permissions = permissions
 
@@ -51,7 +51,7 @@ class Role:
 class User:
     """Represents a user with a set of roles."""
 
-    def __init__(self, name: str, roles: Set[Role]):
+    def __init__(self, name: str, roles: set[Role]):
         self.name = name
         self.roles = roles
 
@@ -64,8 +64,8 @@ class RBAC:
     """Provides the main interface for checking permissions."""
 
     def __init__(self) -> None:
-        self.roles: Dict[str, Role] = {}
-        self.users: Dict[str, User] = {}
+        self.roles: dict[str, Role] = {}
+        self.users: dict[str, User] = {}
 
     def add_role(self, role: Role) -> None:
         """Adds a role to the RBAC system."""

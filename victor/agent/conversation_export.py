@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from html import escape as html_escape
 
 logger = logging.getLogger(__name__)
@@ -46,21 +46,21 @@ class ConversationMessage:
     role: str  # "user", "assistant", "system"
     content: str
     timestamp: Optional[datetime] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    tool_calls: Optional[list[dict[str, Any]]] = None
+    metadata: Optional[dict[str, Any]] = None
 
 
 @dataclass
 class ConversationExport:
     """Exported conversation data."""
 
-    messages: List[ConversationMessage]
+    messages: list[ConversationMessage]
     title: Optional[str] = None
     created_at: Optional[datetime] = None
     model: Optional[str] = None
     provider: Optional[str] = None
     session_id: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[dict[str, Any]] = None
 
 
 class ConversationExporter:
@@ -225,14 +225,14 @@ class ConversationExporter:
         include_tool_calls: bool,
     ) -> str:
         """Export to JSON format."""
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "version": "1.0",
             "exported_at": datetime.now().isoformat(),
             "messages": [],
         }
 
         if include_metadata:
-            metadata_dict: Dict[str, Any] = {
+            metadata_dict: dict[str, Any] = {
                 "title": conversation.title,
                 "created_at": (
                     conversation.created_at.isoformat() if conversation.created_at else None
@@ -246,7 +246,7 @@ class ConversationExporter:
             data["metadata"] = metadata_dict
 
         for msg in conversation.messages:
-            msg_data: Dict[str, Any] = {
+            msg_data: dict[str, Any] = {
                 "role": msg.role,
                 "content": msg.content,
             }
@@ -446,7 +446,7 @@ class ConversationExporter:
 
     @staticmethod
     def from_message_list(
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         title: Optional[str] = None,
         model: Optional[str] = None,
         provider: Optional[str] = None,
@@ -566,7 +566,7 @@ class ConversationPersistence:
             logger.error(f"Failed to load conversation: {e}")
             return None
 
-    def _from_json(self, data: Dict[str, Any]) -> ConversationExport:
+    def _from_json(self, data: dict[str, Any]) -> ConversationExport:
         """Convert JSON data to ConversationExport."""
         metadata = data.get("metadata", {})
 
@@ -606,7 +606,7 @@ class ConversationPersistence:
             metadata=metadata,
         )
 
-    def list_sessions(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def list_sessions(self, limit: int = 20) -> list[dict[str, Any]]:
         """List available sessions.
 
         Args:
@@ -656,7 +656,7 @@ class ConversationPersistence:
 
         return False
 
-    def get_recent(self, count: int = 5) -> List[ConversationExport]:
+    def get_recent(self, count: int = 5) -> list[ConversationExport]:
         """Get recent conversations.
 
         Args:

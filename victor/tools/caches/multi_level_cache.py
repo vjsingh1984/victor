@@ -40,8 +40,6 @@ Example:
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import pickle
 import threading
@@ -49,7 +47,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -344,7 +342,7 @@ class MultiLevelCache:
                 self._clear_l2()
                 self._l3_cache.clear()
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get comprehensive cache metrics.
 
         Returns:
@@ -623,7 +621,7 @@ class MultiLevelCache:
     # Utility Methods
     # ========================================================================
 
-    def _get_level_metrics(self, level: int) -> Dict[str, Any]:
+    def _get_level_metrics(self, level: int) -> dict[str, Any]:
         """Get metrics for a specific level.
 
         Args:

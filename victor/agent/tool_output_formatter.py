@@ -61,9 +61,9 @@ Extracted from AgentOrchestrator (December 2025) for cleaner separation of conce
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -171,7 +171,7 @@ class ToolOutputFormatter:
     def format_tool_output(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         output: Any,
         context: Optional[FormattingContext] = None,
     ) -> str:
@@ -248,7 +248,7 @@ class ToolOutputFormatter:
 
     def _format_read_file(
         self,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         output: Any,
         output_str: str,
         original_len: int,
@@ -291,7 +291,7 @@ You MUST use this actual content in your analysis. Do NOT fabricate or imagine d
 
     def _format_large_file_structure(
         self,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         output: Any,
         output_str: str,
         original_len: int,
@@ -341,7 +341,7 @@ ACTION REQUIRED: This file is too large to display fully.
 - Use 'offset' and 'limit' parameters to read specific line ranges
 - DO NOT re-read the full file without parameters - you will get this same structure view"""
 
-    def _format_list_directory(self, args: Dict[str, Any], output_str: str) -> str:
+    def _format_list_directory(self, args: dict[str, Any], output_str: str) -> str:
         """Format list_directory tool output."""
         dir_path = args.get("path", ".")
         return f"""<TOOL_OUTPUT tool="list_directory" path="{dir_path}">
@@ -352,7 +352,7 @@ ACTION REQUIRED: This file is too large to display fully.
 
 Use only the files/directories listed above. Do not invent files that are not shown."""
 
-    def _format_code_search(self, tool_name: str, args: Dict[str, Any], output_str: str) -> str:
+    def _format_code_search(self, tool_name: str, args: dict[str, Any], output_str: str) -> str:
         """Format code_search / semantic_code_search tool output."""
         query = args.get("query", args.get("pattern", ""))
         return f"""<TOOL_OUTPUT tool="{tool_name}" query="{query}">
@@ -363,7 +363,7 @@ Use only the files/directories listed above. Do not invent files that are not sh
 
 These are the actual search results. Reference only the files and matches shown above."""
 
-    def _format_bash(self, args: Dict[str, Any], output_str: str) -> str:
+    def _format_bash(self, args: dict[str, Any], output_str: str) -> str:
         """Format execute_bash tool output."""
         command = args.get("command", "")
         return f"""<TOOL_OUTPUT tool="execute_bash" command="{command}">
@@ -390,9 +390,9 @@ These are the actual search results. Reference only the files and matches shown 
         self,
         tool_name: str,
         output: Any,
-        tool_args: Optional[Dict[str, Any]],
+        tool_args: Optional[dict[str, Any]],
         context: FormattingContext,
-    ) -> Tuple[str, Optional[str]]:
+    ) -> tuple[str, Optional[str]]:
         """Serialize structured tool output for token efficiency.
 
         Uses adaptive serialization to convert lists and dicts to compact formats
@@ -493,7 +493,7 @@ These are the actual search results. Reference only the files and matches shown 
 
         return "\n".join(summary_parts)
 
-    def _extract_python_structure(self, lines: List[str], summary_parts: List[str]) -> None:
+    def _extract_python_structure(self, lines: list[str], summary_parts: list[str]) -> None:
         """Extract Python class and function definitions."""
         classes = []
         functions = []
@@ -525,7 +525,7 @@ These are the actual search results. Reference only the files and matches shown 
                     f"  ... and {len(functions) - self.config.max_functions_shown} more"
                 )
 
-    def _extract_js_structure(self, lines: List[str], summary_parts: List[str]) -> None:
+    def _extract_js_structure(self, lines: list[str], summary_parts: list[str]) -> None:
         """Extract JavaScript/TypeScript exports and functions."""
         exports = []
         functions = []
@@ -546,7 +546,7 @@ These are the actual search results. Reference only the files and matches shown 
             summary_parts.append(f"\nFunctions ({len(functions)}):")
             summary_parts.extend(functions[: self.config.max_classes_shown])
 
-    def get_status_message(self, tool_name: str, tool_args: Dict[str, Any]) -> str:
+    def get_status_message(self, tool_name: str, tool_args: dict[str, Any]) -> str:
         """Generate a user-friendly status message for a tool execution.
 
         Provides context-aware status messages showing relevant details
@@ -615,7 +615,7 @@ def create_tool_output_formatter(
 # Convenience function for one-off formatting
 def format_tool_output(
     tool_name: str,
-    args: Dict[str, Any],
+    args: dict[str, Any],
     output: Any,
     context: Optional[FormattingContext] = None,
     config: Optional[ToolOutputFormatterConfig] = None,

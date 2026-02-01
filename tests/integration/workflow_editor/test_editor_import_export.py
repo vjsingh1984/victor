@@ -22,10 +22,9 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
-import yaml
 
 from victor.workflows import load_workflow_from_file
 from victor.workflows.definition import (
@@ -198,7 +197,7 @@ class TestEditorGraphConversion:
         else:
             return "unknown"
 
-    def _extract_node_config(self, node) -> Dict[str, Any]:
+    def _extract_node_config(self, node) -> dict[str, Any]:
         """Extract node configuration for editor."""
         config = {}
 

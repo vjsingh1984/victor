@@ -25,17 +25,13 @@ Tests cover:
 """
 
 import asyncio
-from pathlib import Path
-from typing import List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from tests.fixtures.coding_fixtures import (
     MOCK_LSP_COMPLETIONS,
     MOCK_LSP_DIAGNOSTICS,
-    MOCK_LSP_SYMBOLS,
-    SAMPLE_PYTHON_CLASS,
     SAMPLE_PYTHON_SIMPLE,
     create_sample_file,
 )
@@ -43,15 +39,11 @@ from victor.coding.lsp.client import LSPClient
 from victor.coding.lsp.config import LSPServerConfig
 from victor.protocols.lsp_types import (
     CompletionItem,
-    CompletionItemKind,
     Diagnostic,
-    DiagnosticSeverity,
-    DocumentSymbol,
     Hover,
     Location,
     Position,
     Range,
-    SymbolKind,
 )
 
 

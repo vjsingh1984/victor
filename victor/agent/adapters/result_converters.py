@@ -28,13 +28,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.agent.coordinators.validation_coordinator import (
-        IntelligentValidationResult,
-        ValidationResult,
-    )
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +57,7 @@ class ResultConverters:
     """
 
     @staticmethod
-    def validation_result_to_dict(result: Any) -> Dict[str, Any]:
+    def validation_result_to_dict(result: Any) -> dict[str, Any]:
         """Convert ValidationResult to dictionary format.
 
         Args:
@@ -81,7 +78,7 @@ class ResultConverters:
     @staticmethod
     def intelligent_validation_to_dict(
         result: Any,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Convert IntelligentValidationResult to dictionary format.
 
         This converter maintains backward compatibility with code expecting
@@ -115,7 +112,7 @@ class ResultConverters:
         }
 
     @staticmethod
-    def token_usage_to_dict(usage: Any) -> Dict[str, Any]:
+    def token_usage_to_dict(usage: Any) -> dict[str, Any]:
         """Convert TokenUsage to dictionary format.
 
         Args:
@@ -142,7 +139,7 @@ class ResultConverters:
         }
 
     @staticmethod
-    def tool_execution_to_dict(execution_result: Any) -> Dict[str, Any]:
+    def tool_execution_to_dict(execution_result: Any) -> dict[str, Any]:
         """Convert tool execution result to dictionary format.
 
         Args:
@@ -171,7 +168,7 @@ class ResultConverters:
         return result
 
     @staticmethod
-    def checkpoint_state_to_dict(state: Any) -> Dict[str, Any]:
+    def checkpoint_state_to_dict(state: Any) -> dict[str, Any]:
         """Convert checkpoint state to dictionary format.
 
         Args:

@@ -48,10 +48,10 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from victor.framework.persona_registry import PersonaSpec
+    pass
 
 
 # =============================================================================
@@ -77,7 +77,7 @@ class CapabilityProviderProtocol(Protocol):
                 }
     """
 
-    def get_capabilities(self) -> Dict[str, Any]:
+    def get_capabilities(self) -> dict[str, Any]:
         """Get capability definitions for this vertical.
 
         Returns:
@@ -109,7 +109,7 @@ class ChainProviderProtocol(Protocol):
                 }
     """
 
-    def get_chains(self) -> Dict[str, Any]:
+    def get_chains(self) -> dict[str, Any]:
         """Get chain definitions for this vertical.
 
         Returns:
@@ -139,7 +139,7 @@ class PersonaProviderProtocol(Protocol):
                 }
     """
 
-    def get_personas(self) -> Dict[str, Any]:
+    def get_personas(self) -> dict[str, Any]:
         """Get persona definitions for this vertical.
 
         Returns:
@@ -188,7 +188,7 @@ class VerticalPersonaProviderProtocol(Protocol):
     """
 
     @classmethod
-    def get_persona_specs(cls) -> Dict[str, Any]:  # PersonaSpec
+    def get_persona_specs(cls) -> dict[str, Any]:  # PersonaSpec
         """Get typed PersonaSpec objects for this vertical.
 
         Returns:
@@ -206,7 +206,7 @@ class VerticalPersonaProviderProtocol(Protocol):
         ...
 
     @classmethod
-    def get_persona_tags(cls) -> List[str]:
+    def get_persona_tags(cls) -> list[str]:
         """Get tags to apply to all personas from this vertical.
 
         Returns:

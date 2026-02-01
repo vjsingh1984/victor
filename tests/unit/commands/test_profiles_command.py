@@ -15,22 +15,14 @@
 """Tests for profiles CLI commands - achieving 70%+ coverage."""
 
 import pytest
-import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import yaml
 
 from typer.testing import CliRunner
-import typer
 
 from victor.ui.commands.profiles import (
     profiles_app,
-    list_profiles,
-    create_profile,
-    edit_profile,
-    delete_profile,
-    show_profile,
-    set_default_profile,
     _load_profiles_yaml,
     _save_profiles_yaml,
 )

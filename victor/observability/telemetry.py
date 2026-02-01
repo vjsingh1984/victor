@@ -60,8 +60,8 @@ import logging
 import os
 import time
 from contextlib import contextmanager
-from typing import Any, Optional, Callable, Dict, List, Union
-from dataclasses import dataclass
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -465,7 +465,7 @@ class _LLMSpan:
         self._span = span
         self._start_time = time.time()
 
-    def set_prompt(self, messages: List[Dict[str, Any]], tokens: Optional[int] = None):
+    def set_prompt(self, messages: list[dict[str, Any]], tokens: Optional[int] = None):
         """Set prompt attributes.
 
         Args:

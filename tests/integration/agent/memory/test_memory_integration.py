@@ -21,10 +21,7 @@ Tests cover:
 4. Memory persistence and recovery (3 tests)
 """
 
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import numpy as np
 import pytest

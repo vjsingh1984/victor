@@ -59,13 +59,12 @@ Example:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
 
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.protocols.agent import IAgentOrchestrator
 
 
 @runtime_checkable
@@ -262,7 +261,7 @@ class RoleToolProvider(Protocol):
         self,
         role: str,
         vertical: Optional[str] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """Get tools available for a role, optionally within a vertical.
 
         Args:
@@ -308,7 +307,7 @@ class DefaultRoleToolProvider:
     CORE_TOOLS = ["read", "ls", "grep"]
 
     # Role-specific default tools (coding-focused for backward compat)
-    ROLE_TOOLS: Dict[str, List[str]] = {
+    ROLE_TOOLS: dict[str, list[str]] = {
         "researcher": [
             "read",
             "ls",
@@ -325,7 +324,7 @@ class DefaultRoleToolProvider:
         "tester": ["read", "write", "ls", "grep", "search", "test", "shell"],
     }
 
-    ROLE_BUDGETS: Dict[str, int] = {
+    ROLE_BUDGETS: dict[str, int] = {
         "researcher": 15,
         "planner": 10,
         "executor": 30,
@@ -333,7 +332,7 @@ class DefaultRoleToolProvider:
         "tester": 20,
     }
 
-    ROLE_CONTEXT_LIMITS: Dict[str, int] = {
+    ROLE_CONTEXT_LIMITS: dict[str, int] = {
         "researcher": 50000,
         "planner": 30000,
         "executor": 80000,
@@ -345,7 +344,7 @@ class DefaultRoleToolProvider:
         self,
         role: str,
         vertical: Optional[str] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """Get tools for role. Vertical parameter reserved for extension."""
         role_lower = role.lower()
         return self.ROLE_TOOLS.get(role_lower, self.CORE_TOOLS)

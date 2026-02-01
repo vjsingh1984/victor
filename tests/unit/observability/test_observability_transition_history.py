@@ -20,7 +20,7 @@ machine transitions, including analytics and query capabilities.
 
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
@@ -28,7 +28,6 @@ from victor.observability import (
     LoggingHook,
     MetricsHook,
     StateHookManager,
-    StateTransitionHook,
     TransitionHistory,
     TransitionRecord,
 )
@@ -378,10 +377,10 @@ class TestHistoryAwareHooks:
     def test_on_transition_with_history_decorator(self):
         """Test the history-aware decorator."""
         manager = StateHookManager()
-        received: List[Dict[str, Any]] = []
+        received: list[dict[str, Any]] = []
 
         @manager.on_transition_with_history
-        def analyze(old: str, new: str, ctx: Dict, history: TransitionHistory) -> None:
+        def analyze(old: str, new: str, ctx: dict, history: TransitionHistory) -> None:
             received.append(
                 {
                     "old": old,
@@ -404,7 +403,7 @@ class TestHistoryAwareHooks:
     def test_on_transition_with_history_priority(self):
         """Test history-aware hooks respect priority."""
         manager = StateHookManager()
-        call_order: List[str] = []
+        call_order: list[str] = []
 
         @manager.on_transition_with_history(priority=10)
         def high_priority(old, new, ctx, history):
@@ -534,7 +533,7 @@ class TestHistoryIntegrationPatterns:
     def test_cycle_detection_hook(self):
         """Test implementing cycle detection with history."""
         manager = StateHookManager()
-        cycle_warnings: List[str] = []
+        cycle_warnings: list[str] = []
 
         @manager.on_transition_with_history
         def detect_cycles(old, new, ctx, history):
@@ -551,7 +550,7 @@ class TestHistoryIntegrationPatterns:
     def test_stage_duration_tracking(self):
         """Test tracking time spent in each stage."""
         manager = StateHookManager()
-        durations: Dict[str, List[float]] = {}
+        durations: dict[str, list[float]] = {}
 
         @manager.on_transition_with_history
         def track_durations(old, new, ctx, history):
@@ -572,7 +571,7 @@ class TestHistoryIntegrationPatterns:
     def test_conditional_behavior_based_on_history(self):
         """Test implementing conditional behavior based on history."""
         manager = StateHookManager()
-        actions: List[str] = []
+        actions: list[str] = []
 
         @manager.on_transition_with_history
         def conditional_action(old, new, ctx, history):

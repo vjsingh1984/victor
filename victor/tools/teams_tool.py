@@ -37,7 +37,7 @@ Setup:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 try:
     import httpx
@@ -55,7 +55,7 @@ logger = logging.getLogger(__name__)
 _GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
 
 
-def _get_teams_access_token(context: Optional[Dict[str, Any]] = None) -> Optional[str]:
+def _get_teams_access_token(context: Optional[dict[str, Any]] = None) -> Optional[str]:
     """Get Teams access token from execution context.
 
     Args:
@@ -69,12 +69,12 @@ def _get_teams_access_token(context: Optional[Dict[str, Any]] = None) -> Optiona
     return None
 
 
-def is_teams_configured(context: Optional[Dict[str, Any]] = None) -> bool:
+def is_teams_configured(context: Optional[dict[str, Any]] = None) -> bool:
     """Check if Teams client is configured and has valid token."""
     return _get_teams_access_token(context) is not None
 
 
-def _get_headers(context: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
+def _get_headers(context: Optional[dict[str, Any]] = None) -> dict[str, str]:
     """Get headers for Graph API requests."""
     access_token = _get_teams_access_token(context) or ""
     return {
@@ -105,8 +105,8 @@ async def teams(
     query: Optional[str] = None,
     channel_name: Optional[str] = None,
     channel_description: Optional[str] = None,
-    context: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    context: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Perform operations on Microsoft Teams.
 
     Args:
@@ -170,7 +170,7 @@ async def _send_message(
     team_id: Optional[str],
     channel_id: Optional[str],
     text: Optional[str],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Send a message to a Teams channel."""
     if not team_id or not channel_id or not text:
         return {
@@ -204,7 +204,7 @@ async def _send_message(
 async def _search_messages(
     client: "httpx.AsyncClient",
     query: Optional[str],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Search for messages across Teams."""
     if not query:
         return {"success": False, "error": "Missing required parameter: query"}
@@ -231,7 +231,7 @@ async def _search_messages(
     data = response.json()
 
     # Parse search results
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     hits_containers = data.get("value", [])
     for container in hits_containers:
         hits = container.get("hitsContainers", [])
@@ -252,7 +252,7 @@ async def _search_messages(
     return {"success": True, "results": results, "count": len(results)}
 
 
-async def _list_teams(client: "httpx.AsyncClient") -> Dict[str, Any]:
+async def _list_teams(client: "httpx.AsyncClient") -> dict[str, Any]:
     """List all teams the app has access to."""
     logger.info("[teams] Listing teams")
 
@@ -262,7 +262,7 @@ async def _list_teams(client: "httpx.AsyncClient") -> Dict[str, Any]:
     data = response.json()
 
     teams_data = data.get("value", [])
-    results: List[Dict[str, Any]] = [
+    results: list[dict[str, Any]] = [
         {
             "id": team.get("id"),
             "name": team.get("displayName"),
@@ -278,7 +278,7 @@ async def _list_teams(client: "httpx.AsyncClient") -> Dict[str, Any]:
 async def _list_channels(
     client: "httpx.AsyncClient",
     team_id: Optional[str],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List channels in a team."""
     if not team_id:
         return {"success": False, "error": "Missing required parameter: team_id"}
@@ -291,7 +291,7 @@ async def _list_channels(
     data = response.json()
 
     channels_data = data.get("value", [])
-    results: List[Dict[str, Any]] = [
+    results: list[dict[str, Any]] = [
         {
             "id": channel.get("id"),
             "name": channel.get("displayName"),
@@ -309,7 +309,7 @@ async def _create_channel(
     team_id: Optional[str],
     channel_name: Optional[str],
     channel_description: Optional[str],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a new channel in a team."""
     if not team_id or not channel_name:
         return {

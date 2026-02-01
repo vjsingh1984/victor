@@ -36,14 +36,13 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.agent.recovery.protocols import (
     FailureType,
     RecoveryAction,
     RecoveryContext,
     RecoveryResult,
-    TelemetryCollector,
 )
 
 logger = logging.getLogger(__name__)
@@ -86,9 +85,9 @@ class AggregatedStats:
     total_failures: int = 0
     total_recoveries: int = 0
     successful_recoveries: int = 0
-    failures_by_type: Dict[str, int] = field(default_factory=dict)
-    recoveries_by_strategy: Dict[str, Dict[str, int]] = field(default_factory=dict)
-    failures_by_model: Dict[str, int] = field(default_factory=dict)
+    failures_by_type: dict[str, int] = field(default_factory=dict)
+    recoveries_by_strategy: dict[str, dict[str, int]] = field(default_factory=dict)
+    failures_by_model: dict[str, int] = field(default_factory=dict)
     avg_quality_improvement: float = 0.0
 
     @property
@@ -121,14 +120,14 @@ class RecoveryTelemetryCollector:
         self._prometheus_enabled = prometheus_enabled
 
         # In-memory storage (ring buffer)
-        self._failure_events: List[FailureEvent] = []
-        self._recovery_events: List[RecoveryEvent] = []
+        self._failure_events: list[FailureEvent] = []
+        self._recovery_events: list[RecoveryEvent] = []
         self._lock = threading.RLock()
 
         # Aggregated counters (for Prometheus)
-        self._failure_counts: Dict[str, int] = defaultdict(int)
-        self._recovery_counts: Dict[str, int] = defaultdict(int)
-        self._success_counts: Dict[str, int] = defaultdict(int)
+        self._failure_counts: dict[str, int] = defaultdict(int)
+        self._recovery_counts: dict[str, int] = defaultdict(int)
+        self._success_counts: dict[str, int] = defaultdict(int)
 
         # Initialize database
         if db_path:
@@ -354,7 +353,7 @@ class RecoveryTelemetryCollector:
         except Exception as e:
             logger.warning(f"Failed to persist recovery event: {e}")
 
-    def get_failure_stats(self, time_window_hours: int = 24) -> Dict[str, Any]:
+    def get_failure_stats(self, time_window_hours: int = 24) -> dict[str, Any]:
         """Get failure statistics for a time window."""
         cutoff = datetime.now() - timedelta(hours=time_window_hours)
 
@@ -363,9 +362,9 @@ class RecoveryTelemetryCollector:
             recent_recoveries = [e for e in self._recovery_events if e.timestamp >= cutoff]
 
         # Aggregate by type
-        failures_by_type: Dict[str, int] = defaultdict(int)
-        failures_by_model: Dict[str, int] = defaultdict(int)
-        failures_by_provider: Dict[str, int] = defaultdict(int)
+        failures_by_type: dict[str, int] = defaultdict(int)
+        failures_by_model: dict[str, int] = defaultdict(int)
+        failures_by_provider: dict[str, int] = defaultdict(int)
 
         for event in recent_failures:
             failures_by_type[event.failure_type.name] += 1
@@ -388,10 +387,10 @@ class RecoveryTelemetryCollector:
             "failures_by_provider": dict(failures_by_provider),
         }
 
-    def get_strategy_effectiveness(self) -> Dict[str, Dict[str, float]]:
+    def get_strategy_effectiveness(self) -> dict[str, dict[str, float]]:
         """Get effectiveness metrics per strategy."""
         with self._lock:
-            recovery_by_strategy: Dict[str, List[RecoveryEvent]] = defaultdict(list)
+            recovery_by_strategy: dict[str, list[RecoveryEvent]] = defaultdict(list)
             for event in self._recovery_events:
                 recovery_by_strategy[event.strategy_name].append(event)
 
@@ -408,10 +407,10 @@ class RecoveryTelemetryCollector:
 
         return effectiveness
 
-    def get_model_failure_patterns(self) -> Dict[str, Dict[str, int]]:
+    def get_model_failure_patterns(self) -> dict[str, dict[str, int]]:
         """Get failure patterns per model."""
         with self._lock:
-            patterns: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            patterns: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
             for event in self._failure_events:
                 patterns[event.model][event.failure_type.name] += 1
 

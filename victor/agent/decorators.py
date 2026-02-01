@@ -22,7 +22,8 @@ import functools
 import inspect
 import logging
 import warnings
-from typing import Any, Callable, Optional, TypeVar, cast
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable
 
 # Type variables for generic decorator support
 F = TypeVar("F", bound=Callable[..., Any])

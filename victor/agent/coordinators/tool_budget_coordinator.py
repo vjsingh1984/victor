@@ -33,7 +33,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Callable, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.agent.budget_manager import BudgetManager

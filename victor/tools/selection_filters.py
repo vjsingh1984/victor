@@ -24,7 +24,7 @@ for use across different tool selector implementations (Keyword, Semantic, Hybri
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Dict, List, Set
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.providers.base import ToolDefinition
@@ -37,10 +37,10 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 # Web-related keywords for explicit web tool inclusion
-WEB_KEYWORDS: List[str] = ["search", "web", "online", "lookup", "http", "https"]
+WEB_KEYWORDS: list[str] = ["search", "web", "online", "lookup", "http", "https"]
 
 # Small model indicators (for limiting tools)
-SMALL_MODEL_INDICATORS: List[str] = [":0.5b", ":1.5b", ":3b"]
+SMALL_MODEL_INDICATORS: list[str] = [":0.5b", ":1.5b", ":3b"]
 
 # Default thresholds for semantic selection
 DEFAULT_THRESHOLD: float = 0.18
@@ -88,7 +88,7 @@ def needs_web_tools(message: str) -> bool:
     return any(kw in message_lower for kw in WEB_KEYWORDS)
 
 
-def deduplicate_tools(tools: List["ToolDefinition"]) -> List["ToolDefinition"]:
+def deduplicate_tools(tools: list["ToolDefinition"]) -> list["ToolDefinition"]:
     """Deduplicate tools by name, preserving order.
 
     Extracted from tool_selection.py lines 1272-1275.
@@ -99,18 +99,18 @@ def deduplicate_tools(tools: List["ToolDefinition"]) -> List["ToolDefinition"]:
     Returns:
         Deduplicated list of tools
     """
-    dedup: Dict[str, "ToolDefinition"] = {}
+    dedup: dict[str, "ToolDefinition"] = {}
     for t in tools:
         dedup[t.name] = t
     return list(dedup.values())
 
 
 def blend_tool_results(
-    semantic_tools: List["ToolDefinition"],
-    keyword_tools: List["ToolDefinition"],
+    semantic_tools: list["ToolDefinition"],
+    keyword_tools: list["ToolDefinition"],
     semantic_weight: float = 0.7,
     keyword_weight: float = 0.3,
-) -> List["ToolDefinition"]:
+) -> list["ToolDefinition"]:
     """Blend semantic and keyword tool selection results.
 
     Combines results from both selection strategies, avoiding duplicates.
@@ -137,7 +137,7 @@ def blend_tool_results(
     return blended
 
 
-def cap_tools_to_max(tools: List["ToolDefinition"], max_tools: int) -> List["ToolDefinition"]:
+def cap_tools_to_max(tools: list["ToolDefinition"], max_tools: int) -> list["ToolDefinition"]:
     """Cap tool list to maximum length.
 
     Extracted from tool_selection.py lines 1298-1299.
@@ -154,7 +154,7 @@ def cap_tools_to_max(tools: List["ToolDefinition"], max_tools: int) -> List["Too
     return tools
 
 
-def get_tool_names_set(tools: List["ToolDefinition"]) -> Set[str]:
+def get_tool_names_set(tools: list["ToolDefinition"]) -> set[str]:
     """Extract tool names as a set.
 
     Helper for checking tool membership.

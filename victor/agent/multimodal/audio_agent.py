@@ -46,12 +46,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 from victor.core.errors import ValidationError
 from victor.providers.base import BaseProvider, Message
@@ -110,7 +109,7 @@ class SpeakerSegment:
     end_time: float
     transcript: str
     confidence: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate segment data."""
@@ -163,7 +162,7 @@ class TranscriptionResult:
     confidence: float
     timestamp: datetime
     language: str
-    segments: List[SpeakerSegment]
+    segments: list[SpeakerSegment]
     duration: float
 
     def __post_init__(self) -> None:
@@ -173,7 +172,7 @@ class TranscriptionResult:
         if self.duration < 0:
             raise ValidationError(f"Duration must be non-negative, got {self.duration}")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
 
         Returns:
@@ -257,7 +256,7 @@ class AudioAnalysis:
     format: str
     quality_metrics: AudioQualityMetrics
     bitrate: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate analysis data."""
@@ -268,7 +267,7 @@ class AudioAnalysis:
         if self.channels <= 0:
             raise ValidationError(f"Channels must be positive, got {self.channels}")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
 
         Returns:
@@ -753,7 +752,7 @@ class AudioAgent:
         audio_path: str,
         num_speakers: Optional[int] = None,
         min_segment_length: float = 1.0,
-    ) -> List[SpeakerSegment]:
+    ) -> list[SpeakerSegment]:
         """Extract speaker segments from audio with diarization.
 
         Identifies different speakers and when they're speaking. This requires
@@ -830,7 +829,7 @@ class AudioAgent:
         transcription: TranscriptionResult,
         num_speakers: Optional[int],
         min_segment_length: float,
-    ) -> List[SpeakerSegment]:
+    ) -> list[SpeakerSegment]:
         """Perform speaker diarization using pyannote.audio.
 
         Args:
@@ -964,7 +963,7 @@ class AudioAgent:
 
     async def generate_audio_summary(
         self,
-        transcription: Union[str, TranscriptionResult],
+        transcription: str | TranscriptionResult,
         max_words: int = 300,
     ) -> str:
         """Generate a summary of audio transcription.
@@ -1062,10 +1061,10 @@ Summary:"""
 
     async def batch_process_audio(
         self,
-        audio_paths: List[str],
+        audio_paths: list[str],
         operation: str = "transcribe",
         **kwargs: Any,
-    ) -> List["TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None"]:
+    ) -> list["TranscriptionResult | AudioAnalysis | str | list[SpeakerSegment] | None"]:
         """Process multiple audio files in batch.
 
         Args:
@@ -1102,13 +1101,13 @@ Summary:"""
                 f"Invalid operation: {operation}. Must be one of: {', '.join(valid_operations)}"
             )
 
-        results: List[TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None] = []
+        results: list[TranscriptionResult | AudioAnalysis | str | list[SpeakerSegment] | None] = []
 
         for audio_path in audio_paths:
             try:
                 if operation == "transcribe":
                     result: (
-                        TranscriptionResult | AudioAnalysis | str | List[SpeakerSegment] | None
+                        TranscriptionResult | AudioAnalysis | str | list[SpeakerSegment] | None
                     ) = await self.transcribe_audio(audio_path, **kwargs)
                 elif operation == "analyze":
                     result = await self.analyze_audio(audio_path)
@@ -1218,7 +1217,7 @@ Summary:"""
     async def detect_emotion_from_audio(
         self,
         audio_path: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Detect emotions and sentiment from audio.
 
         Analyzes vocal patterns, tone, and speech characteristics to identify
@@ -1326,7 +1325,7 @@ Summary:"""
         num_speakers: Optional[int] = None,
         min_segment_length: float = 1.0,
         include_embeddings: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Perform detailed speaker diarization with embeddings.
 
         Enhanced speaker diarization that identifies different speakers,
@@ -1370,7 +1369,7 @@ Summary:"""
         )
 
         # Analyze segments to build speaker profiles
-        speaker_segments: Dict[str, List[SpeakerSegment]] = {}
+        speaker_segments: dict[str, list[SpeakerSegment]] = {}
         total_speech_time = 0.0
 
         for seg in segments:
@@ -1412,10 +1411,10 @@ Summary:"""
 
     async def transcription_summarization(
         self,
-        transcription: Union[str, TranscriptionResult],
+        transcription: str | TranscriptionResult,
         summary_type: str = "comprehensive",
         max_length: int = 300,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate structured summary of audio transcription.
 
         Enhanced summarization that provides structured output with key points,

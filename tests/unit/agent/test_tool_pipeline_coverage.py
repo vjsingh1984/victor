@@ -18,9 +18,6 @@ These tests target the tool pipeline components to improve coverage
 from ~0% to 20% target.
 """
 
-import pytest
-from dataclasses import dataclass
-from typing import Dict, List
 
 from victor.agent.tool_pipeline import (
     # Data classes

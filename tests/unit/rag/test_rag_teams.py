@@ -14,7 +14,6 @@
 
 """Tests for RAG teams configuration."""
 
-import pytest
 
 from victor.framework.teams import TeamFormation, TeamMemberSpec
 
@@ -34,7 +33,7 @@ class TestRAGTeamSpecProvider:
 
     def test_has_ingest_team(self):
         """Provider should have an ingest team."""
-        from victor.rag.teams import RAGTeamSpecProvider, RAG_TEAM_SPECS
+        from victor.rag.teams import RAG_TEAM_SPECS
 
         # Check team specs dict
         ingest_key = next((k for k in RAG_TEAM_SPECS if "ingest" in k.lower()), None)
@@ -42,14 +41,14 @@ class TestRAGTeamSpecProvider:
 
     def test_has_search_team(self):
         """Provider should have a search team."""
-        from victor.rag.teams import RAGTeamSpecProvider, RAG_TEAM_SPECS
+        from victor.rag.teams import RAG_TEAM_SPECS
 
         search_key = next((k for k in RAG_TEAM_SPECS if "search" in k.lower()), None)
         assert search_key is not None, "Should have a search team"
 
     def test_has_synthesis_team(self):
         """Provider should have a synthesis team."""
-        from victor.rag.teams import RAGTeamSpecProvider, RAG_TEAM_SPECS
+        from victor.rag.teams import RAG_TEAM_SPECS
 
         synthesis_key = next(
             (k for k in RAG_TEAM_SPECS if "synthesis" in k.lower() or "answer" in k.lower()), None

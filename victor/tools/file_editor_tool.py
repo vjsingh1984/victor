@@ -19,7 +19,7 @@ rollback capability to the agent.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from pathlib import Path
 
 
@@ -31,7 +31,7 @@ from pathlib import Path
 # =============================================================================
 
 # Maps alternate parameter names to canonical names for edit operations
-EDIT_PARAMETER_ALIASES: Dict[str, str] = {
+EDIT_PARAMETER_ALIASES: dict[str, str] = {
     # Path aliases
     "file_path": "path",
     "file": "path",
@@ -58,7 +58,7 @@ EDIT_PARAMETER_ALIASES: Dict[str, str] = {
 }
 
 # Maps operation type aliases to canonical types
-EDIT_TYPE_ALIASES: Dict[str, str] = {
+EDIT_TYPE_ALIASES: dict[str, str] = {
     "write": "create",
     "add": "create",
     "new": "create",
@@ -75,7 +75,7 @@ EDIT_TYPE_ALIASES: Dict[str, str] = {
 }
 
 # Keys that indicate an implicit operation type (when 'type' is missing)
-TYPE_INFERENCE_KEYS: Dict[str, str] = {
+TYPE_INFERENCE_KEYS: dict[str, str] = {
     "old_str": "replace",
     "old": "replace",
     "find": "replace",
@@ -86,7 +86,7 @@ TYPE_INFERENCE_KEYS: Dict[str, str] = {
 }
 
 
-def normalize_edit_operation(op: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_edit_operation(op: dict[str, Any]) -> dict[str, Any]:
     """Normalize a single edit operation for provider-agnostic handling.
 
     Handles:
@@ -101,8 +101,8 @@ def normalize_edit_operation(op: Dict[str, Any]) -> Dict[str, Any]:
         Normalized operation dictionary with canonical parameter names
     """
     logger = logging.getLogger(__name__)
-    normalized: Dict[str, Any] = {}
-    applied_aliases: List[str] = []
+    normalized: dict[str, Any] = {}
+    applied_aliases: list[str] = []
 
     # Step 1: Normalize all parameter names
     for key, value in op.items():
@@ -142,7 +142,7 @@ def normalize_edit_operation(op: Dict[str, Any]) -> Dict[str, Any]:
     return normalized
 
 
-def normalize_edit_operations(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def normalize_edit_operations(ops: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Normalize a list of edit operations.
 
     This function should be called after JSON parsing but before validation
@@ -189,7 +189,7 @@ from victor.tools.filesystem import enforce_sandbox_path
     ],
 )
 async def edit(
-    ops: Optional[List[Dict[str, Any]]] = None,
+    ops: Optional[list[dict[str, Any]]] = None,
     preview: bool = False,
     commit: bool = True,
     desc: str = "",
@@ -197,7 +197,7 @@ async def edit(
     validate: bool = True,
     strict_validation: bool = False,
     **kwargs: Any,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Edit files atomically with undo. REQUIRED: 'ops' parameter with operation list.
 
     IMPORTANT: You MUST provide the 'ops' parameter. Example:
@@ -271,7 +271,7 @@ async def edit(
             )
 
             # Build operation from kwargs
-            op: Dict[str, Any] = {}
+            op: dict[str, Any] = {}
 
             # Extract path
             for key in path_keys:
@@ -788,7 +788,7 @@ async def edit(
         if success:
             # Commit the change group for undo/redo
             tracker.commit_change_group()
-            commit_result: Dict[str, Any] = {
+            commit_result: dict[str, Any] = {
                 "success": True,
                 "operations_queued": operations_queued,
                 "operations_applied": operations_queued,

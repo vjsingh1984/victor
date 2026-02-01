@@ -85,10 +85,11 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Set, Type, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, cast
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import VerticalExtensions
@@ -194,7 +195,7 @@ class VerticalExtensionLoader(ABC):
     # Valid values: "middleware", "safety", "prompt", "mode_config", "tool_deps",
     #               "workflow", "service", "rl_config", "team_spec", "enrichment",
     #               "tiered_tools"
-    required_extensions: ClassVar[Set[str]] = set()
+    required_extensions: ClassVar[set[str]] = set()
 
     # Default TTL for extension cache entries (in seconds)
     # None = no expiration, 3600 = 1 hour default
@@ -211,11 +212,11 @@ class VerticalExtensionLoader(ABC):
     _extensions_cache: OrderedDict[str, ExtensionCacheEntry] = OrderedDict()
 
     # Version tracker for cache invalidation
-    _extension_versions: Dict[str, str] = {}
+    _extension_versions: dict[str, str] = {}
 
     # Mapping of extension types to their import path patterns
     # Format: extension_key -> (module_path_suffix, class_name_suffix)
-    _extension_patterns: ClassVar[Dict[str, tuple[str, str]]] = {
+    _extension_patterns: ClassVar[dict[str, tuple[str, str]]] = {
         "safety_extension": ("safety", "SafetyExtension"),
         "prompt_contributor": ("prompts", "PromptContributor"),
         "mode_config_provider": ("mode_config", "ModeConfigProvider"),
@@ -230,7 +231,7 @@ class VerticalExtensionLoader(ABC):
     }
 
     # Extensions that use _get_cached_extension instead of _get_extension_factory
-    _cached_extensions: ClassVar[Set[str]] = {
+    _cached_extensions: ClassVar[set[str]] = {
         "middleware",
         "composed_chains",
         "personas",
@@ -606,7 +607,7 @@ class VerticalExtensionLoader(ABC):
     # - get_tiered_tools()
 
     @classmethod
-    def get_mode_config(cls) -> Dict[str, Any]:
+    def get_mode_config(cls) -> dict[str, Any]:
         """Get mode configurations for this vertical.
 
         Returns operational modes like 'fast', 'thorough', 'explore' with
@@ -643,7 +644,7 @@ class VerticalExtensionLoader(ABC):
         }
 
     @classmethod
-    def get_task_type_hints(cls) -> Dict[str, Any]:
+    def get_task_type_hints(cls) -> dict[str, Any]:
         """Get task-type-specific prompt hints.
 
         Returns hints for common task types (edit, search, explain, etc.)
@@ -882,8 +883,6 @@ class VerticalExtensionLoader(ABC):
         Raises:
             ExtensionLoadError: In strict mode or when a required extension fails
         """
-        from victor.core.errors import ExtensionLoadError
-        from victor.core.verticals.protocols import VerticalExtensions
 
         # Determine if we should use lazy loading
         if use_lazy is None:
@@ -958,7 +957,7 @@ class VerticalExtensionLoader(ABC):
         is_strict = strict if strict is not None else cls.strict_extension_loading
 
         # Collect errors for reporting
-        errors: List["ExtensionLoadError"] = []
+        errors: list["ExtensionLoadError"] = []
 
         def _load_extension(
             extension_type: str,
@@ -1042,7 +1041,7 @@ class VerticalExtensionLoader(ABC):
 
         # Load dynamic extensions from registry (OCP-compliant)
         # This enables third-party extensions without modifying core code
-        dynamic_extensions: Dict[str, List[Any]] = {}
+        dynamic_extensions: dict[str, list[Any]] = {}
         try:
             # Check if this class has ExtensionRegistry integration
             if hasattr(cls, "_get_extension_registry"):
@@ -1208,7 +1207,7 @@ class VerticalExtensionLoader(ABC):
         logger.debug(f"Updated extension version: {cache_key} -> {version}")
 
     @classmethod
-    def get_extension_cache_stats(cls, detailed: bool = False) -> Dict[str, Any]:
+    def get_extension_cache_stats(cls, detailed: bool = False) -> dict[str, Any]:
         """Get cache statistics for this vertical.
 
         Thread Safety:
@@ -1269,7 +1268,7 @@ class VerticalExtensionLoader(ABC):
                 remaining = [max(0, (v.ttl or 0) - v.get_age()) for v in ttl_entries]
                 ttl_remaining = sum(remaining) / len(remaining)
 
-            stats: Dict[str, Any] = {
+            stats: dict[str, Any] = {
                 "vertical": cls.__name__,
                 "total_entries": len(entries),
                 "expired_entries": expired_count,
@@ -1298,7 +1297,7 @@ class VerticalExtensionLoader(ABC):
         return stats
 
     @classmethod
-    def get_global_cache_stats(cls) -> Dict[str, Any]:
+    def get_global_cache_stats(cls) -> dict[str, Any]:
         """Get global cache statistics across all verticals.
 
         Thread Safety:
@@ -1313,7 +1312,7 @@ class VerticalExtensionLoader(ABC):
         """
         with cls._cache_lock:
             # Group entries by vertical
-            vertical_stats: Dict[str, Dict[str, Any]] = {}
+            vertical_stats: dict[str, dict[str, Any]] = {}
             for key, entry in cls._extensions_cache.items():
                 # Extract vertical name from composite key "ClassName:extension_key"
                 parts = key.split(":", 1)

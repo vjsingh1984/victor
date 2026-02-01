@@ -30,9 +30,8 @@ Test Pattern:
 
 import asyncio
 import pytest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 from pathlib import Path
-from typing import Any, Dict
 from dataclasses import dataclass
 
 from victor.agent.coordinators.metrics_coordinator import (
@@ -121,7 +120,7 @@ class TestMetricsCoordinator:
         return tracker
 
     @pytest.fixture
-    def cumulative_token_usage(self) -> Dict[str, int]:
+    def cumulative_token_usage(self) -> dict[str, int]:
         """Create cumulative token usage dict."""
         return {
             "prompt_tokens": 0,
@@ -136,7 +135,7 @@ class TestMetricsCoordinator:
         self,
         mock_metrics_collector: Mock,
         mock_session_cost_tracker: Mock,
-        cumulative_token_usage: Dict[str, int],
+        cumulative_token_usage: dict[str, int],
     ) -> MetricsCoordinator:
         """Create metrics coordinator with default mocks."""
         return MetricsCoordinator(

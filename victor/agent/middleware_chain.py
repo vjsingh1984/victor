@@ -44,10 +44,9 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.core.verticals.protocols import (
-    MiddlewarePriority,
     MiddlewareProtocol,
     MiddlewareResult,
 )
@@ -76,7 +75,7 @@ class MiddlewareChain:
             vertical_context: Optional vertical context for DIP-compliant
                 vertical-specific middleware behavior
         """
-        self._middleware: List[MiddlewareProtocol] = []
+        self._middleware: list[MiddlewareProtocol] = []
         self._enabled: bool = True
         self._sorted: bool = True
         self._vertical_context: Optional["VerticalContext"] = vertical_context
@@ -152,7 +151,7 @@ class MiddlewareChain:
             self._middleware.sort(key=lambda m: m.get_priority().value)
             self._sorted = True
 
-    def _get_applicable_middleware(self, tool_name: str) -> List[MiddlewareProtocol]:
+    def _get_applicable_middleware(self, tool_name: str) -> list[MiddlewareProtocol]:
         """Get middleware applicable to a specific tool.
 
         Args:
@@ -172,7 +171,7 @@ class MiddlewareChain:
     async def process_before(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
     ) -> MiddlewareResult:
         """Process a tool call through all before_tool_call middleware.
 
@@ -194,7 +193,7 @@ class MiddlewareChain:
 
         # Initialize metadata with vertical context info (DIP - provides vertical
         # awareness to middleware without tight coupling)
-        aggregated_metadata: Dict[str, Any] = {}
+        aggregated_metadata: dict[str, Any] = {}
         if self._vertical_context:
             aggregated_metadata["vertical_name"] = self._vertical_context.vertical_name
             aggregated_metadata["vertical_mode"] = getattr(self._vertical_context, "mode", None)
@@ -242,7 +241,7 @@ class MiddlewareChain:
     async def process_after(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Any:
@@ -288,7 +287,7 @@ class MiddlewareChain:
     async def process_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         executor: Any,
     ) -> Any:
         """Process a complete tool call through the middleware chain.
@@ -332,7 +331,7 @@ class MiddlewareChain:
 
         return result
 
-    def get_middleware_info(self) -> List[Dict[str, Any]]:
+    def get_middleware_info(self) -> list[dict[str, Any]]:
         """Get information about registered middleware.
 
         Returns:
@@ -372,7 +371,7 @@ class MiddlewareAbortError(Exception):
 
 
 def create_middleware_chain(
-    middleware_list: Optional[List[MiddlewareProtocol]] = None,
+    middleware_list: Optional[list[MiddlewareProtocol]] = None,
     vertical_context: Optional["VerticalContext"] = None,
 ) -> MiddlewareChain:
     """Create a middleware chain with optional initial middleware.

@@ -14,7 +14,7 @@
 
 """RAG Prompt Contributor - Task hints and prompt contributions for RAG."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from victor.core.vertical_types import TaskTypeHint, StandardTaskHints
 from victor.core.verticals.protocols import PromptContributorProtocol
@@ -26,7 +26,7 @@ class RAGPromptContributor(PromptContributorProtocol):
     Provides task-type hints and prompt contributions for RAG operations.
     """
 
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
         """Get task type hints for RAG operations.
 
         Returns:
@@ -85,7 +85,7 @@ Citation Format:
 - Include the source name when summarizing multiple sources
 """
 
-    def get_context_hints(self, context: Dict[str, Any]) -> List[str]:
+    def get_context_hints(self, context: dict[str, Any]) -> list[str]:
         """Get context-specific hints.
 
         Args:

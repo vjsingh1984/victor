@@ -19,7 +19,7 @@ defined, @runtime_checkable, and can be used for isinstance() checks.
 """
 
 import pytest
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 class TestMiddlewareProvider:
@@ -51,7 +51,7 @@ class TestMiddlewareProvider:
 
         class ValidProvider:
             @classmethod
-            def get_middleware(cls) -> List[Any]:
+            def get_middleware(cls) -> list[Any]:
                 return []
 
         class InvalidProvider:
@@ -144,7 +144,7 @@ class TestWorkflowProvider:
                 return None
 
             @classmethod
-            def get_workflows(cls) -> Dict[str, Any]:
+            def get_workflows(cls) -> dict[str, Any]:
                 return {}
 
         class InvalidProvider:
@@ -194,7 +194,7 @@ class TestTeamProvider:
                 return None
 
             @classmethod
-            def get_team_specs(cls) -> Dict[str, Any]:
+            def get_team_specs(cls) -> dict[str, Any]:
                 return {}
 
         class InvalidProvider:
@@ -242,7 +242,7 @@ class TestRLProvider:
                 return None
 
             @classmethod
-            def get_rl_hooks(cls) -> List[Any]:
+            def get_rl_hooks(cls) -> list[Any]:
                 return []
 
         class InvalidProvider:
@@ -329,7 +329,7 @@ class TestToolProvider:
 
         class ValidProvider:
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read", "write"]
 
             @classmethod
@@ -376,7 +376,7 @@ class TestHandlerProvider:
 
         class ValidProvider:
             @classmethod
-            def get_handlers(cls) -> Dict[str, Any]:
+            def get_handlers(cls) -> dict[str, Any]:
                 return {}
 
         class InvalidProvider:
@@ -469,7 +469,7 @@ class TestModeConfigProvider:
                 return None
 
             @classmethod
-            def get_mode_config(cls) -> Dict[str, Any]:
+            def get_mode_config(cls) -> dict[str, Any]:
                 return {}
 
         class InvalidProvider:
@@ -519,7 +519,7 @@ class TestPromptContributorProvider:
                 return None
 
             @classmethod
-            def get_task_type_hints(cls) -> Dict[str, Any]:
+            def get_task_type_hints(cls) -> dict[str, Any]:
                 return {}
 
         class InvalidProvider:
@@ -754,7 +754,7 @@ class TestCompositeProviderUsage:
             """A vertical implementing multiple provider protocols."""
 
             @classmethod
-            def get_middleware(cls) -> List[Any]:
+            def get_middleware(cls) -> list[Any]:
                 return []
 
             @classmethod
@@ -762,7 +762,7 @@ class TestCompositeProviderUsage:
                 return None
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read", "write"]
 
             @classmethod
@@ -770,7 +770,7 @@ class TestCompositeProviderUsage:
                 return None
 
             @classmethod
-            def get_handlers(cls) -> Dict[str, Any]:
+            def get_handlers(cls) -> dict[str, Any]:
                 return {}
 
         # Verify all protocols are satisfied
@@ -791,7 +791,7 @@ class TestCompositeProviderUsage:
             """A vertical implementing only MiddlewareProvider."""
 
             @classmethod
-            def get_middleware(cls) -> List[Any]:
+            def get_middleware(cls) -> list[Any]:
                 return []
 
         # Should match MiddlewareProvider

@@ -27,15 +27,14 @@ Design Principles:
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Pattern, Tuple
+from typing import Optional
+from re import Pattern
 
 from victor.classification.pattern_registry import (
     PATTERNS,
     ClassificationPattern,
     TaskType,
-    get_patterns_sorted_by_priority,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,7 +101,7 @@ class NudgeEngine:
         # Returns: (TaskType.ANALYZE, 1.0, "read_and_explain")
     """
 
-    def __init__(self, patterns: Optional[Dict[str, ClassificationPattern]] = None):
+    def __init__(self, patterns: Optional[dict[str, ClassificationPattern]] = None):
         """Initialize NudgeEngine.
 
         Args:
@@ -111,7 +110,7 @@ class NudgeEngine:
         self._patterns = patterns or PATTERNS
         self._rules = self._build_rules()
 
-    def _build_rules(self) -> List[NudgeRule]:
+    def _build_rules(self) -> list[NudgeRule]:
         """Build NudgeRule list from patterns.
 
         Returns:
@@ -135,8 +134,8 @@ class NudgeEngine:
         prompt: str,
         embedding_result: TaskType,
         embedding_confidence: float,
-        scores: Optional[Dict[TaskType, float]] = None,
-    ) -> Tuple[TaskType, float, Optional[str]]:
+        scores: Optional[dict[TaskType, float]] = None,
+    ) -> tuple[TaskType, float, Optional[str]]:
         """Apply nudge rules to correct edge cases.
 
         Args:
@@ -176,7 +175,7 @@ class NudgeEngine:
         # No nudge applied
         return embedding_result, embedding_confidence, None
 
-    def get_matching_rules(self, prompt: str) -> List[NudgeRule]:
+    def get_matching_rules(self, prompt: str) -> list[NudgeRule]:
         """Get all rules that match a prompt.
 
         Useful for debugging classification behavior.
@@ -222,17 +221,17 @@ class PatternMatcher:
             print(f"Matched: {pattern.name} → {pattern.task_type}")
     """
 
-    def __init__(self, patterns: Optional[Dict[str, ClassificationPattern]] = None):
+    def __init__(self, patterns: Optional[dict[str, ClassificationPattern]] = None):
         """Initialize PatternMatcher.
 
         Args:
             patterns: Optional pattern dictionary. Uses global PATTERNS if None.
         """
         self._patterns = patterns or PATTERNS
-        self._sorted_patterns: Optional[List[ClassificationPattern]] = None
+        self._sorted_patterns: Optional[list[ClassificationPattern]] = None
 
     @property
-    def sorted_patterns(self) -> List[ClassificationPattern]:
+    def sorted_patterns(self) -> list[ClassificationPattern]:
         """Get patterns sorted by priority (cached)."""
         if self._sorted_patterns is None:
             self._sorted_patterns = sorted(
@@ -257,7 +256,7 @@ class PatternMatcher:
                 return pattern
         return None
 
-    def match_all(self, text: str) -> List[ClassificationPattern]:
+    def match_all(self, text: str) -> list[ClassificationPattern]:
         """Find all matching patterns.
 
         Args:
@@ -272,7 +271,7 @@ class PatternMatcher:
                 matches.append(pattern)
         return sorted(matches, key=lambda p: p.priority, reverse=True)
 
-    def classify_fast(self, text: str) -> Optional[Tuple[TaskType, float, str]]:
+    def classify_fast(self, text: str) -> Optional[tuple[TaskType, float, str]]:
         """Fast classification using only pattern matching.
 
         Args:

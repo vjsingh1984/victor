@@ -31,20 +31,20 @@ Features:
 """
 
 import sqlite3
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 if TYPE_CHECKING:
-    from victor.tools.cache_manager import CacheNamespace
+    pass
 
 # Constants
 _DEFAULT_ALLOW_MODIFICATIONS: bool = False
 _DEFAULT_MAX_ROWS: int = 100
 
 
-def _get_connection_pool(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _get_connection_pool(exec_ctx: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Get the connection pool from DI-injected cache.
 
     Args:
@@ -95,8 +95,8 @@ DANGEROUS_PATTERNS = [
 
 # Helper functions for db-specific connections
 async def _connect_sqlite(
-    database: str, connection_pool: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    database: str, connection_pool: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """Connect to SQLite database.
 
     Args:
@@ -121,8 +121,8 @@ async def _connect_sqlite(
 
 
 async def _connect_postgresql(
-    kwargs: Dict[str, Any], connection_pool: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    kwargs: dict[str, Any], connection_pool: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """Connect to PostgreSQL database.
 
     Args:
@@ -160,8 +160,8 @@ async def _connect_postgresql(
 
 
 async def _connect_mysql(
-    kwargs: Dict[str, Any], connection_pool: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    kwargs: dict[str, Any], connection_pool: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """Connect to MySQL database.
 
     Args:
@@ -199,8 +199,8 @@ async def _connect_mysql(
 
 
 async def _connect_sqlserver(
-    kwargs: Dict[str, Any], connection_pool: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    kwargs: dict[str, Any], connection_pool: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """Connect to SQL Server database.
 
     Args:
@@ -242,8 +242,8 @@ async def _do_connect(
     port: Optional[int],
     username: Optional[str],
     password: Optional[str],
-    connection_pool: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    connection_pool: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Internal connect handler."""
     if db_type == "sqlite":
         return await _connect_sqlite(database, connection_pool)
@@ -283,8 +283,8 @@ async def _do_query(
     sql: str,
     limit: Optional[int] = None,
     allow_modifications: Optional[bool] = None,
-    connection_pool: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    connection_pool: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Internal query handler.
 
     Args:
@@ -360,8 +360,8 @@ async def _do_query(
 
 
 async def _do_tables(
-    connection_id: str, connection_pool: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    connection_id: str, connection_pool: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """Internal list tables handler.
 
     Args:
@@ -399,8 +399,8 @@ async def _do_tables(
 
 
 async def _do_describe(
-    connection_id: str, table: str, connection_pool: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    connection_id: str, table: str, connection_pool: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """Internal describe table handler.
 
     Args:
@@ -470,8 +470,8 @@ async def _do_describe(
 
 
 async def _do_schema(
-    connection_id: str, connection_pool: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    connection_id: str, connection_pool: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """Internal get schema handler.
 
     Args:
@@ -489,7 +489,7 @@ async def _do_schema(
         return tables_result
 
     # Get schema for each table
-    schema_info: Dict[str, List[Dict[str, Any]]] = {"tables": []}
+    schema_info: dict[str, list[dict[str, Any]]] = {"tables": []}
 
     try:
         for table in tables_result["tables"]:
@@ -504,8 +504,8 @@ async def _do_schema(
 
 
 async def _do_disconnect(
-    connection_id: str, connection_pool: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    connection_id: str, connection_pool: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """Internal disconnect handler.
 
     Args:
@@ -548,8 +548,8 @@ async def database(
     table: Optional[str] = None,
     limit: Optional[int] = None,
     allow_modifications: Optional[bool] = None,
-    _exec_ctx: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    _exec_ctx: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """
     Unified database tool for SQL operations. Supports SQLite, PostgreSQL, MySQL, SQL Server.
 

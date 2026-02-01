@@ -14,7 +14,6 @@
 
 """Tests for memory optimization module."""
 
-import asyncio
 import gc
 import pytest
 

@@ -53,16 +53,13 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Tuple,
     runtime_checkable,
 )
 
 if TYPE_CHECKING:
-    from victor.teams import TeamConfig, TeamFormation
+    pass
 
 
 class TeamSuggestionAction(str, Enum):
@@ -149,7 +146,7 @@ class TeamRecommendation:
     reason: str
     formation: Optional[str] = None
     suggested_budget: Optional[int] = None
-    role_distribution: Optional[Dict[str, int]] = None
+    role_distribution: Optional[dict[str, int]] = None
     source: str = "rule"
 
     def __lt__(self, other: "TeamRecommendation") -> bool:
@@ -199,11 +196,11 @@ class CoordinationSuggestion:
     task_type: str
     complexity: ComplexityLevel
     action: TeamSuggestionAction = TeamSuggestionAction.NONE
-    team_recommendations: List[TeamRecommendation] = field(default_factory=list)
-    workflow_recommendations: List[WorkflowRecommendation] = field(default_factory=list)
+    team_recommendations: list[TeamRecommendation] = field(default_factory=list)
+    workflow_recommendations: list[WorkflowRecommendation] = field(default_factory=list)
     system_prompt_additions: str = ""
-    tool_priorities: Dict[str, float] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tool_priorities: dict[str, float] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def has_team_suggestion(self) -> bool:
@@ -316,7 +313,7 @@ class ModeWorkflowTeamCoordinatorProtocol(Protocol):
         self,
         task_type: str,
         complexity: str,
-    ) -> List[TeamRecommendation]:
+    ) -> list[TeamRecommendation]:
         """Get team suggestions without mode context.
 
         Useful for querying available teams for a task type.
@@ -373,7 +370,7 @@ class TeamSelectionStrategyProtocol(Protocol):
         self,
         task_type: str,
         complexity: str,
-        available_teams: Dict[str, Any],
+        available_teams: dict[str, Any],
     ) -> Optional[str]:
         """Select a single team for the task.
 
@@ -392,9 +389,9 @@ class TeamSelectionStrategyProtocol(Protocol):
         self,
         task_type: str,
         complexity: str,
-        available_teams: Dict[str, Any],
+        available_teams: dict[str, Any],
         top_k: int = 3,
-    ) -> List[TeamRecommendation]:
+    ) -> list[TeamRecommendation]:
         """Recommend multiple teams for the task.
 
         Args:
@@ -421,7 +418,7 @@ class WorkflowSelectionStrategyProtocol(Protocol):
         self,
         task_type: str,
         mode: str,
-        available_workflows: Dict[str, Any],
+        available_workflows: dict[str, Any],
     ) -> Optional[str]:
         """Select a workflow for the task.
 
@@ -440,9 +437,9 @@ class WorkflowSelectionStrategyProtocol(Protocol):
         self,
         task_type: str,
         mode: str,
-        available_workflows: Dict[str, Any],
+        available_workflows: dict[str, Any],
         top_k: int = 3,
-    ) -> List[WorkflowRecommendation]:
+    ) -> list[WorkflowRecommendation]:
         """Recommend workflows for the task.
 
         Args:
@@ -465,7 +462,7 @@ class CoordinationConfigProviderProtocol(Protocol):
     """
 
     @abstractmethod
-    def get_mode_config(self, mode: str) -> Dict[str, Any]:
+    def get_mode_config(self, mode: str) -> dict[str, Any]:
         """Get configuration for a mode.
 
         Args:
@@ -477,7 +474,7 @@ class CoordinationConfigProviderProtocol(Protocol):
         ...
 
     @abstractmethod
-    def get_complexity_thresholds(self, mode: str) -> Dict[str, TeamSuggestionAction]:
+    def get_complexity_thresholds(self, mode: str) -> dict[str, TeamSuggestionAction]:
         """Get complexity thresholds for a mode.
 
         Args:
@@ -489,7 +486,7 @@ class CoordinationConfigProviderProtocol(Protocol):
         ...
 
     @abstractmethod
-    def get_default_teams(self, mode: str) -> List[str]:
+    def get_default_teams(self, mode: str) -> list[str]:
         """Get default team names for a mode.
 
         Args:
@@ -501,7 +498,7 @@ class CoordinationConfigProviderProtocol(Protocol):
         ...
 
     @abstractmethod
-    def get_default_workflows(self, mode: str) -> List[str]:
+    def get_default_workflows(self, mode: str) -> list[str]:
         """Get default workflow names for a mode.
 
         Args:

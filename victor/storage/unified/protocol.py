@@ -37,7 +37,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Protocol, Tuple, TypeVar
+from typing import Any, Optional, Protocol
+from collections.abc import Iterable
 
 
 # =============================================================================
@@ -151,10 +152,10 @@ class UnifiedSymbol:
     parent_id: Optional[str] = None  # for nested symbols
 
     # Graph relationships (populated on demand)
-    callers: List[str] = field(default_factory=list)  # unified_ids of callers
-    callees: List[str] = field(default_factory=list)  # unified_ids of callees
-    inherits: List[str] = field(default_factory=list)  # base classes
-    implementors: List[str] = field(default_factory=list)  # classes implementing this
+    callers: list[str] = field(default_factory=list)  # unified_ids of callers
+    callees: list[str] = field(default_factory=list)  # unified_ids of callees
+    inherits: list[str] = field(default_factory=list)  # base classes
+    implementors: list[str] = field(default_factory=list)  # classes implementing this
 
     # Semantic scores (populated during search)
     semantic_score: Optional[float] = None  # 0-1, similarity to query
@@ -162,7 +163,7 @@ class UnifiedSymbol:
     combined_score: Optional[float] = None  # weighted combination
 
     # Metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -173,7 +174,7 @@ class UnifiedEdge:
     dst_id: str  # UnifiedId as string
     type: str  # CALLS, REFERENCES, INHERITS, IMPLEMENTS, CONTAINS
     weight: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -199,8 +200,8 @@ class SearchParams:
     limit: int = 20
 
     # Filters
-    file_patterns: Optional[List[str]] = None  # glob patterns
-    symbol_types: Optional[List[str]] = None  # function, class, etc.
+    file_patterns: Optional[list[str]] = None  # glob patterns
+    symbol_types: Optional[list[str]] = None  # function, class, etc.
 
     # Hybrid search weights
     semantic_weight: float = 0.7  # weight for semantic score
@@ -255,36 +256,36 @@ class VectorStoreProtocol(Protocol):
         """Initialize the store."""
         ...
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding for single text."""
         ...
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for batch of texts."""
         ...
 
     async def upsert(
         self,
         doc_id: str,
-        vector: List[float],
-        metadata: Optional[Dict[str, Any]] = None,
+        vector: list[float],
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Upsert a single vector. No content storage - only ID and vector."""
         ...
 
     async def upsert_batch(
         self,
-        items: List[Tuple[str, List[float], Optional[Dict[str, Any]]]],
+        items: list[tuple[str, list[float], Optional[dict[str, Any]]]],
     ) -> None:
         """Batch upsert vectors. Each tuple is (doc_id, vector, metadata)."""
         ...
 
     async def search(
         self,
-        query_vector: List[float],
+        query_vector: list[float],
         limit: int = 10,
-        filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[Tuple[str, float]]:
+        filter_metadata: Optional[dict[str, Any]] = None,
+    ) -> list[tuple[str, float]]:
         """Search for similar vectors. Returns list of (doc_id, score)."""
         ...
 
@@ -323,7 +324,7 @@ class GraphStoreProtocol(Protocol):
         """Get single node by ID."""
         ...
 
-    async def get_nodes_by_file(self, file_path: str) -> List["GraphNode"]:
+    async def get_nodes_by_file(self, file_path: str) -> list["GraphNode"]:
         """Get all nodes in a file."""
         ...
 
@@ -332,7 +333,7 @@ class GraphStoreProtocol(Protocol):
         name: Optional[str] = None,
         type: Optional[str] = None,
         file: Optional[str] = None,
-    ) -> List["GraphNode"]:
+    ) -> list["GraphNode"]:
         """Find nodes by criteria."""
         ...
 
@@ -340,18 +341,18 @@ class GraphStoreProtocol(Protocol):
         self,
         query: str,
         limit: int = 20,
-        symbol_types: Optional[List[str]] = None,
-    ) -> List["GraphNode"]:
+        symbol_types: Optional[list[str]] = None,
+    ) -> list["GraphNode"]:
         """Full-text search on names, signatures, docstrings."""
         ...
 
     async def get_neighbors(
         self,
         node_id: str,
-        edge_types: Optional[List[str]] = None,
+        edge_types: Optional[list[str]] = None,
         direction: str = "both",  # in, out, both
         max_depth: int = 1,
-    ) -> List["GraphEdge"]:
+    ) -> list["GraphEdge"]:
         """Get edges connected to node."""
         ...
 
@@ -363,7 +364,7 @@ class GraphStoreProtocol(Protocol):
         """Clear entire graph."""
         ...
 
-    async def stats(self) -> Dict[str, Any]:
+    async def stats(self) -> dict[str, Any]:
         """Get graph statistics."""
         ...
 
@@ -417,7 +418,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
 
     async def index_symbols_batch(
         self,
-        symbols: List[Tuple[UnifiedSymbol, str]],  # (symbol, embedding_text)
+        symbols: list[tuple[UnifiedSymbol, str]],  # (symbol, embedding_text)
         batch_size: int = 500,
     ) -> int:
         """Batch index symbols. Returns count indexed."""
@@ -427,12 +428,12 @@ class UnifiedSymbolStoreProtocol(Protocol):
         """Index an edge."""
         ...
 
-    async def index_edges_batch(self, edges: List[UnifiedEdge]) -> int:
+    async def index_edges_batch(self, edges: list[UnifiedEdge]) -> int:
         """Batch index edges. Returns count indexed."""
         ...
 
     # Unified Search (hybrid by default)
-    async def search(self, params: SearchParams) -> List[UnifiedSearchResult]:
+    async def search(self, params: SearchParams) -> list[UnifiedSearchResult]:
         """Unified search combining keyword, semantic, and graph.
 
         Algorithm:
@@ -449,7 +450,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
         query: str,
         limit: int = 20,
         threshold: float = 0.25,
-    ) -> List[UnifiedSearchResult]:
+    ) -> list[UnifiedSearchResult]:
         """Pure semantic search (vector similarity)."""
         ...
 
@@ -457,8 +458,8 @@ class UnifiedSymbolStoreProtocol(Protocol):
         self,
         query: str,
         limit: int = 20,
-        symbol_types: Optional[List[str]] = None,
-    ) -> List[UnifiedSearchResult]:
+        symbol_types: Optional[list[str]] = None,
+    ) -> list[UnifiedSearchResult]:
         """Pure keyword search (FTS)."""
         ...
 
@@ -467,7 +468,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
         """Get symbol by unified ID."""
         ...
 
-    async def get_symbols_in_file(self, rel_path: str) -> List[UnifiedSymbol]:
+    async def get_symbols_in_file(self, rel_path: str) -> list[UnifiedSymbol]:
         """Get all symbols in a file."""
         ...
 
@@ -475,7 +476,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
         self,
         unified_id: str,
         max_depth: int = 1,
-    ) -> List[UnifiedSymbol]:
+    ) -> list[UnifiedSymbol]:
         """Get functions that call this symbol."""
         ...
 
@@ -483,15 +484,15 @@ class UnifiedSymbolStoreProtocol(Protocol):
         self,
         unified_id: str,
         max_depth: int = 1,
-    ) -> List[UnifiedSymbol]:
+    ) -> list[UnifiedSymbol]:
         """Get functions called by this symbol."""
         ...
 
     async def get_related(
         self,
         unified_id: str,
-        edge_types: Optional[List[str]] = None,
-    ) -> List[Tuple[UnifiedSymbol, str]]:
+        edge_types: Optional[list[str]] = None,
+    ) -> list[tuple[UnifiedSymbol, str]]:
         """Get related symbols with relationship type."""
         ...
 
@@ -500,7 +501,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
         self,
         unified_id: str,
         limit: int = 10,
-    ) -> List[UnifiedSearchResult]:
+    ) -> list[UnifiedSearchResult]:
         """Find semantically similar symbols to given symbol."""
         ...
 
@@ -508,7 +509,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
         self,
         unified_id: str,
         similarity_threshold: float = 0.5,
-    ) -> List[UnifiedSearchResult]:
+    ) -> list[UnifiedSearchResult]:
         """Find symbols that might be affected by changes (graph + semantic)."""
         ...
 
@@ -521,7 +522,7 @@ class UnifiedSymbolStoreProtocol(Protocol):
         """Clear entire store."""
         ...
 
-    async def stats(self) -> Dict[str, Any]:
+    async def stats(self) -> dict[str, Any]:
         """Get combined statistics."""
         ...
 

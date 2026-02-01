@@ -11,7 +11,7 @@ with support for:
 import os
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -59,7 +59,7 @@ class GlobalFeatureFlags:
     parallel_processing: bool = True
 
     # Per-language overrides
-    language_overrides: Dict[str, LanguageFeatureFlags] = field(default_factory=dict)
+    language_overrides: dict[str, LanguageFeatureFlags] = field(default_factory=dict)
 
 
 class FeatureFlagManager:
@@ -222,7 +222,7 @@ class FeatureFlagManager:
         """Enable all features for a language (remove override)."""
         self.clear_language_flags(language)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Export current flags as a dictionary."""
         return {
             "global": {

@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import re
 import logging
-from typing import Dict, List, Optional
+from typing import Optional
 
 from victor.workflows.generation.requirements import (
     BranchRequirement,
@@ -297,7 +297,7 @@ class RuleBasedExtractor:
         # Default to sequential
         return "sequential"
 
-    def _extract_tasks(self, text: str) -> List[TaskRequirement]:
+    def _extract_tasks(self, text: str) -> list[TaskRequirement]:
         """Extract tasks using verb-noun patterns.
 
         Args:
@@ -420,7 +420,7 @@ class RuleBasedExtractor:
         # Default
         return "executor"
 
-    def _extract_tools(self, text: str, tasks: List[TaskRequirement]) -> Dict[str, List[str]]:
+    def _extract_tools(self, text: str, tasks: list[TaskRequirement]) -> dict[str, list[str]]:
         """Extract tool names from text.
 
         Args:
@@ -447,7 +447,7 @@ class RuleBasedExtractor:
 
         return tools
 
-    def _detect_branches(self, text: str) -> List[BranchRequirement]:
+    def _detect_branches(self, text: str) -> list[BranchRequirement]:
         """Detect conditional branches from text.
 
         Args:
@@ -479,7 +479,7 @@ class RuleBasedExtractor:
 
         return branches
 
-    def _detect_loops(self, text: str) -> List[LoopRequirement]:
+    def _detect_loops(self, text: str) -> list[LoopRequirement]:
         """Detect loop patterns from text.
 
         Args:
@@ -509,7 +509,7 @@ class RuleBasedExtractor:
 
         return loops
 
-    def _infer_dependencies(self, tasks: List[TaskRequirement]) -> Dict[str, List[str]]:
+    def _infer_dependencies(self, tasks: list[TaskRequirement]) -> dict[str, list[str]]:
         """Infer task dependencies from order.
 
         Args:
@@ -557,7 +557,7 @@ class RuleBasedExtractor:
         # Default to coding
         return "coding"
 
-    def _extract_success_criteria(self, text: str) -> List[str]:
+    def _extract_success_criteria(self, text: str) -> list[str]:
         """Extract success criteria from text.
 
         Args:

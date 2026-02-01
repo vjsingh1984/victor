@@ -54,7 +54,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.types import AgentMessage, MemberResult
@@ -83,7 +83,7 @@ class HierarchyNode:
     """
 
     agent: Any
-    children: List["HierarchyNode"] = field(default_factory=list)
+    children: list["HierarchyNode"] = field(default_factory=list)
     parent: Optional["HierarchyNode"] = None
     level: int = 0
 
@@ -164,10 +164,10 @@ class MultiLevelHierarchyFormation(BaseFormationStrategy):
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute task using hierarchical divide-and-conquer.
 
         Args:
@@ -248,7 +248,7 @@ class MultiLevelHierarchyFormation(BaseFormationStrategy):
         # Aggregate results from children
         return await self._aggregate_results(child_results)
 
-    def _split_task(self, task: str, num_parts: int) -> List[str]:
+    def _split_task(self, task: str, num_parts: int) -> list[str]:
         """Split task into subtasks for children.
 
         Args:
@@ -289,7 +289,7 @@ class MultiLevelHierarchyFormation(BaseFormationStrategy):
             part_size = len(task) // num_parts
             return [task[i : i + part_size] for i in range(0, len(task), part_size)][:num_parts]
 
-    async def _aggregate_results(self, results: List[Any]) -> Any:
+    async def _aggregate_results(self, results: list[Any]) -> Any:
         """Aggregate results from child nodes.
 
         Args:

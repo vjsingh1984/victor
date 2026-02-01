@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Type, TYPE_CHECKING, Union
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.core.verticals.base import VerticalBase
@@ -86,12 +86,12 @@ class VerticalDiscovery:
     """
 
     # Cache for discovered items
-    _prompt_contributors_cache: Optional[List[Any]] = None
-    _escape_hatches_cache: Optional[Dict[str, Dict[str, Any]]] = None
-    _verticals_cache: Optional[Dict[str, Type[VerticalBase]]] = None
+    _prompt_contributors_cache: Optional[list[Any]] = None
+    _escape_hatches_cache: Optional[dict[str, dict[str, Any]]] = None
+    _verticals_cache: Optional[dict[str, type[VerticalBase]]] = None
 
     @staticmethod
-    def discover_prompt_contributors() -> List[Any]:
+    def discover_prompt_contributors() -> list[Any]:
         """Discover all prompt contributors from registered verticals.
 
         Searches for verticals that implement PromptContributorProtocol
@@ -148,7 +148,7 @@ class VerticalDiscovery:
         return contributors
 
     @staticmethod
-    def discover_escape_hatches() -> Dict[str, Dict[str, Any]]:
+    def discover_escape_hatches() -> dict[str, dict[str, Any]]:
         """Discover all escape hatches from registered verticals.
 
         Searches for escape_hatches.py modules in each vertical and loads
@@ -171,7 +171,7 @@ class VerticalDiscovery:
         if VerticalDiscovery._escape_hatches_cache is not None:
             return VerticalDiscovery._escape_hatches_cache
 
-        escape_hatches: Dict[str, Dict[str, Any]] = {}
+        escape_hatches: dict[str, dict[str, Any]] = {}
 
         try:
             # Discover all verticals
@@ -216,7 +216,7 @@ class VerticalDiscovery:
         return escape_hatches
 
     @staticmethod
-    def discover_verticals() -> Dict[str, Type[VerticalBase]]:
+    def discover_verticals() -> dict[str, type[VerticalBase]]:
         """Discover all registered verticals.
 
         Loads verticals from:
@@ -240,7 +240,7 @@ class VerticalDiscovery:
         if VerticalDiscovery._verticals_cache is not None:
             return VerticalDiscovery._verticals_cache
 
-        verticals: Dict[str, Type[VerticalBase]] = {}
+        verticals: dict[str, type[VerticalBase]] = {}
 
         try:
             # Load from entry points first (external verticals)
@@ -312,7 +312,7 @@ class VerticalDiscovery:
         return verticals
 
     @staticmethod
-    def discover_vertical_by_name(vertical_name: str) -> Optional[Type[Any]]:
+    def discover_vertical_by_name(vertical_name: str) -> Optional[type[Any]]:
         """Discover a specific vertical by name.
 
         Args:

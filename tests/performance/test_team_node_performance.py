@@ -41,13 +41,10 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import gc
 import logging
-import time
 import tracemalloc
-from dataclasses import dataclass
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -98,7 +95,7 @@ class MockTeamMember:
         self._fail_rate = fail_rate
         self._call_count = 0
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> str:
         """Execute a task with simulated delay."""
         self._call_count += 1
 

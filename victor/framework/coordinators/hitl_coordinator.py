@@ -32,12 +32,9 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Union,
 )
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.framework.workflow_engine import WorkflowExecutionResult
@@ -114,9 +111,9 @@ class HITLCoordinator:
 
     async def execute(
         self,
-        yaml_path: Union[str, Path],
-        initial_state: Optional[Dict[str, Any]] = None,
-        approval_callback: Optional[Callable[[Dict[str, Any]], bool]] = None,
+        yaml_path: str | Path,
+        initial_state: Optional[dict[str, Any]] = None,
+        approval_callback: Optional[Callable[[dict[str, Any]], bool]] = None,
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
         """Execute workflow with HITL approval nodes.
@@ -138,7 +135,7 @@ class HITLCoordinator:
         from victor.workflows.hitl import HITLExecutor, DefaultHITLHandler
 
         start_time = time.time()
-        hitl_requests: List[Dict[str, Any]] = []
+        hitl_requests: list[dict[str, Any]] = []
 
         try:
             # Load workflow
@@ -182,7 +179,7 @@ class HITLCoordinator:
     async def execute_with_definition(
         self,
         workflow: Any,
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
         """Execute a WorkflowDefinition with HITL nodes.
@@ -199,7 +196,7 @@ class HITLCoordinator:
         from victor.workflows.hitl import HITLExecutor, DefaultHITLHandler
 
         start_time = time.time()
-        hitl_requests: List[Dict[str, Any]] = []
+        hitl_requests: list[dict[str, Any]] = []
 
         try:
             # Create HITL handler

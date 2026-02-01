@@ -31,7 +31,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Tuple, cast
+from typing import Any, Optional, cast
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ class CompactionRecommendation:
     urgency: ContextHealth
     target_reduction_tokens: int
     reason: str
-    specific_actions: List[str] = field(default_factory=list)
+    specific_actions: list[str] = field(default_factory=list)
 
 
 class ContextWindowMonitor:
@@ -138,7 +139,7 @@ class ContextWindowMonitor:
         max_context_tokens: int = 100000,
         response_reserve: int = 4096,
         model_name: Optional[str] = None,
-        thresholds: Optional[Dict[str, float]] = None,
+        thresholds: Optional[dict[str, float]] = None,
         compaction_callback: Optional[Callable[[], int]] = None,
     ):
         self._max_tokens = max_context_tokens - response_reserve
@@ -151,8 +152,8 @@ class ContextWindowMonitor:
         self._metrics = ContextMetrics(max_tokens=self._max_tokens)
 
         # History for trend analysis
-        self._token_history: List[Tuple[int, int]] = []  # (timestamp_ms, tokens)
-        self._compaction_history: List[Dict[str, Any]] = []
+        self._token_history: list[tuple[int, int]] = []  # (timestamp_ms, tokens)
+        self._compaction_history: list[dict[str, Any]] = []
 
     def _get_token_ratio(self) -> float:
         """Get token ratio for current model."""
@@ -170,7 +171,7 @@ class ContextWindowMonitor:
 
     def update_metrics(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         system_prompt: Optional[str] = None,
     ) -> ContextMetrics:
         """Update metrics from message list.
@@ -234,7 +235,7 @@ class ContextWindowMonitor:
         """Get current metrics."""
         return self._metrics
 
-    def should_compact(self) -> Tuple[bool, str]:
+    def should_compact(self) -> tuple[bool, str]:
         """Check if compaction should be triggered.
 
         Returns:
@@ -356,7 +357,7 @@ class ContextWindowMonitor:
         """
         self._compaction_callback = callback
 
-    def get_token_breakdown(self) -> Dict[str, Any]:
+    def get_token_breakdown(self) -> dict[str, Any]:
         """Get detailed token breakdown."""
         metrics = self._metrics
         return {
@@ -374,7 +375,7 @@ class ContextWindowMonitor:
             "message_count": metrics.message_count,
         }
 
-    def get_growth_trend(self) -> Dict[str, Any]:
+    def get_growth_trend(self) -> dict[str, Any]:
         """Get context growth trend analysis."""
         if len(self._token_history) < 2:
             return {"trend": "insufficient_data", "samples": len(self._token_history)}
@@ -422,7 +423,7 @@ class ContextWindowMonitor:
         if growth_rate <= 0:
             return None
 
-        _remaining_tokens = self._metrics.available_tokens  # noqa: F841
+        _remaining_tokens = self._metrics.available_tokens
         overflow_threshold = self._metrics.max_tokens * self._thresholds["overflow"]
         tokens_until_overflow = overflow_threshold - self._metrics.total_tokens
 

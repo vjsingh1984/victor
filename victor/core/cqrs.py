@@ -72,22 +72,15 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Coroutine,
-    Dict,
     Generic,
-    List,
     Optional,
-    Type,
     TypeVar,
-    Union,
     cast,
     TypeAlias,
 )
+from collections.abc import Awaitable, Callable, Coroutine
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -141,7 +134,7 @@ class CommandResult(Generic[TResult]):
     error: Optional[str] = None
     command_id: str = ""
     execution_time_ms: float = 0.0
-    events: List[Any] = field(default_factory=list)
+    events: list[Any] = field(default_factory=list)
 
 
 @dataclass
@@ -192,12 +185,12 @@ QueryHandlerFunc: TypeAlias = Callable[[Query[TResult]], Awaitable[TResult]]
 # =============================================================================
 
 # Global registries for decorator-based registration
-_COMMAND_HANDLERS: Dict[Type[Command], CommandHandlerFunc] = {}
-_QUERY_HANDLERS: Dict[Type[Query[Any]], Callable[[Query[Any]], Awaitable[Any]]] = {}
+_COMMAND_HANDLERS: dict[type[Command], CommandHandlerFunc] = {}
+_QUERY_HANDLERS: dict[type[Query[Any]], Callable[[Query[Any]], Awaitable[Any]]] = {}
 
 
 def command_handler(
-    command_type: Type[Command],
+    command_type: type[Command],
 ) -> Callable[[CommandHandlerFunc], CommandHandlerFunc]:
     """Decorator to register a command handler function.
 
@@ -216,7 +209,7 @@ def command_handler(
 
 
 def query_handler(
-    query_type: Type[Query[Any]],
+    query_type: type[Query[Any]],
 ) -> Callable[[Callable[[Query[Any]], Awaitable[Any]]], Callable[[Query[Any]], Awaitable[Any]]]:
     """Decorator to register a query handler function.
 
@@ -236,13 +229,13 @@ def query_handler(
     return decorator
 
 
-def get_registered_command_handlers() -> Dict[Type[Command], CommandHandlerFunc]:
+def get_registered_command_handlers() -> dict[type[Command], CommandHandlerFunc]:
     """Get all registered command handlers."""
     return _COMMAND_HANDLERS.copy()
 
 
 def get_registered_query_handlers() -> (
-    Dict[Type[Query[Any]], Callable[[Query[Any]], Awaitable[Any]]]
+    dict[type[Query[Any]], Callable[[Query[Any]], Awaitable[Any]]]
 ):
     """Get all registered query handlers."""
     return _QUERY_HANDLERS.copy()
@@ -336,12 +329,12 @@ class ValidationCommandMiddleware(CommandMiddleware):
 
     def __init__(
         self,
-        validators: Optional[Dict[Type[Command], Callable[[Command], None]]] = None,
+        validators: Optional[dict[type[Command], Callable[[Command], None]]] = None,
     ) -> None:
         self._validators = validators or {}
 
     def register_validator(
-        self, command_type: Type[Command], validator: Callable[[Command], None]
+        self, command_type: type[Command], validator: Callable[[Command], None]
     ) -> None:
         """Register a validator for a command type."""
         self._validators[command_type] = validator
@@ -395,10 +388,10 @@ class RetryCommandMiddleware(CommandMiddleware):
 class CachingQueryMiddleware(QueryMiddleware):
     """Caches query results."""
 
-    def __init__(self, cache: Optional[Dict[str, Any]] = None, ttl: float = 60.0) -> None:
+    def __init__(self, cache: Optional[dict[str, Any]] = None, ttl: float = 60.0) -> None:
         self._cache = cache if cache is not None else {}
         self._ttl = ttl
-        self._timestamps: Dict[str, float] = {}
+        self._timestamps: dict[str, float] = {}
 
     def _get_cache_key(self, query: Query[Any]) -> str:
         """Generate cache key from query."""
@@ -429,7 +422,7 @@ class CachingQueryMiddleware(QueryMiddleware):
         self._timestamps[key] = time.time()
         return result
 
-    def invalidate(self, query_type: Optional[Type[Query[Any]]] = None) -> None:
+    def invalidate(self, query_type: Optional[type[Query[Any]]] = None) -> None:
         """Invalidate cache entries."""
         if query_type is None:
             self._cache.clear()
@@ -463,14 +456,14 @@ class CommandBus:
 
     def __init__(self) -> None:
         """Initialize command bus."""
-        self._handlers: Dict[Type[Command], CommandHandlerFunc] = {}
-        self._middleware: List[CommandMiddleware] = []
+        self._handlers: dict[type[Command], CommandHandlerFunc] = {}
+        self._middleware: list[CommandMiddleware] = []
         self._lock = asyncio.Lock()
 
     def register(
         self,
-        command_type: Type[Command],
-        handler: Union[CommandHandlerFunc, CommandHandler[Command]],
+        command_type: type[Command],
+        handler: CommandHandlerFunc | CommandHandler[Command],
     ) -> None:
         """Register a handler for a command type.
 
@@ -582,13 +575,13 @@ class QueryBus:
 
     def __init__(self) -> None:
         """Initialize query bus."""
-        self._handlers: Dict[Type[Query[Any]], Callable[[Query[Any]], Awaitable[Any]]] = {}
-        self._middleware: List[QueryMiddleware] = []
+        self._handlers: dict[type[Query[Any]], Callable[[Query[Any]], Awaitable[Any]]] = {}
+        self._middleware: list[QueryMiddleware] = []
 
     def register(
         self,
-        query_type: Type[Query[Any]],
-        handler: Union[Callable[[Query[Any]], Awaitable[Any]], QueryHandler[Any]],
+        query_type: type[Query[Any]],
+        handler: Callable[[Query[Any]], Awaitable[Any]] | QueryHandler[Any],
     ) -> None:
         """Register a handler for a query type.
 
@@ -729,16 +722,16 @@ class Mediator:
 
     def register_command(
         self,
-        command_type: Type[Command],
-        handler: Union[CommandHandlerFunc, CommandHandler[Any]],
+        command_type: type[Command],
+        handler: CommandHandlerFunc | CommandHandler[Any],
     ) -> None:
         """Register a command handler."""
         self._command_bus.register(command_type, handler)
 
     def register_query(
         self,
-        query_type: Type[Query[TResult]],
-        handler: Union[Callable[[Query[TResult]], Awaitable[TResult]], QueryHandler[TResult]],
+        query_type: type[Query[TResult]],
+        handler: Callable[[Query[TResult]], Awaitable[TResult]] | QueryHandler[TResult],
     ) -> None:
         """Register a query handler."""
         self._query_bus.register(query_type, handler)
@@ -749,8 +742,8 @@ class Mediator:
         self._query_bus.register_from_decorators()
 
     async def send(
-        self, message: Union[Command, Query[TResult]]
-    ) -> Union[CommandResult[Any], QueryResult[TResult]]:
+        self, message: Command | Query[TResult]
+    ) -> CommandResult[Any] | QueryResult[TResult]:
         """Send a command or query for execution.
 
         Args:
@@ -797,13 +790,13 @@ class InMemoryReadModel(ReadModel, Generic[TResult]):
 
     def __init__(self) -> None:
         """Initialize read model."""
-        self.data: Dict[str, TResult] = {}
+        self.data: dict[str, TResult] = {}
 
     async def get(self, id: str) -> Optional[TResult]:
         """Get item by ID."""
         return self.data.get(id)
 
-    async def get_all(self) -> List[TResult]:
+    async def get_all(self) -> list[TResult]:
         """Get all items."""
         return list(self.data.values())
 

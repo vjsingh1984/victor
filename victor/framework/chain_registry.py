@@ -72,7 +72,8 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -103,7 +104,7 @@ class ChainMetadata:
     description: str = ""
     input_type: Optional[str] = None
     output_type: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     is_factory: bool = False
     version: str = "0.5.0"
 
@@ -114,7 +115,7 @@ class ChainMetadata:
             return f"{self.vertical}:{self.name}"
         return self.name
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize metadata to dictionary."""
         return {
             "name": self.name,
@@ -176,9 +177,9 @@ class ChainRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._chains: Dict[str, Any] = {}
-        self._factories: Dict[str, Callable[[], Any]] = {}
-        self._metadata: Dict[str, ChainMetadata] = {}
+        self._chains: dict[str, Any] = {}
+        self._factories: dict[str, Callable[[], Any]] = {}
+        self._metadata: dict[str, ChainMetadata] = {}
         self._lock = threading.RLock()
 
     @classmethod
@@ -213,7 +214,7 @@ class ChainRegistry:
         description: str = "",
         input_type: Optional[str] = None,
         output_type: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         replace: bool = False,
     ) -> None:
         """Register a chain with optional vertical namespace.
@@ -258,7 +259,7 @@ class ChainRegistry:
         description: str = "",
         input_type: Optional[str] = None,
         output_type: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         version: str = "0.5.0",
         replace: bool = False,
     ) -> None:
@@ -434,7 +435,7 @@ class ChainRegistry:
                     return self._metadata[key]
             return self._metadata.get(name)
 
-    def list_chains(self, vertical: Optional[str] = None) -> List[str]:
+    def list_chains(self, vertical: Optional[str] = None) -> list[str]:
         """List all registered chain names.
 
         Args:
@@ -449,7 +450,7 @@ class ChainRegistry:
                 return [k for k in self._chains.keys() if k.startswith(prefix)]
             return list(self._chains.keys())
 
-    def list_metadata(self, vertical: Optional[str] = None) -> List[ChainMetadata]:
+    def list_metadata(self, vertical: Optional[str] = None) -> list[ChainMetadata]:
         """List all chain metadata.
 
         Args:
@@ -464,7 +465,7 @@ class ChainRegistry:
                 return [m for k, m in self._metadata.items() if k.startswith(prefix)]
             return list(self._metadata.values())
 
-    def find_by_vertical(self, vertical: str) -> Dict[str, Any]:
+    def find_by_vertical(self, vertical: str) -> dict[str, Any]:
         """Get all chains for a specific vertical.
 
         Args:
@@ -477,7 +478,7 @@ class ChainRegistry:
         with self._lock:
             return {k: v for k, v in self._chains.items() if k.startswith(prefix)}
 
-    def find_by_tag(self, tag: str) -> Dict[str, Any]:
+    def find_by_tag(self, tag: str) -> dict[str, Any]:
         """Find chains with a specific tag.
 
         Args:
@@ -489,7 +490,7 @@ class ChainRegistry:
         with self._lock:
             return {k: self._chains[k] for k, m in self._metadata.items() if tag in m.tags}
 
-    def find_by_tags(self, tags: List[str], match_all: bool = False) -> Dict[str, Any]:
+    def find_by_tags(self, tags: list[str], match_all: bool = False) -> dict[str, Any]:
         """Find chains matching multiple tags.
 
         Args:
@@ -520,7 +521,7 @@ class ChainRegistry:
             self._metadata.clear()
             logger.debug("Cleared chain registry")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize the registry to a dictionary.
 
         Returns:
@@ -529,7 +530,7 @@ class ChainRegistry:
         with self._lock:
             return {key: meta.to_dict() for key, meta in self._metadata.items()}
 
-    def list_factories(self, vertical: Optional[str] = None) -> List[str]:
+    def list_factories(self, vertical: Optional[str] = None) -> list[str]:
         """List all registered factory names.
 
         Args:
@@ -547,7 +548,7 @@ class ChainRegistry:
     def register_from_vertical(
         self,
         vertical_name: str,
-        chains: Dict[str, Any],
+        chains: dict[str, Any],
         replace: bool = True,
     ) -> int:
         """Register multiple chains from a vertical.
@@ -603,7 +604,7 @@ def register_chain(
     *,
     vertical: Optional[str] = None,
     description: str = "",
-    tags: Optional[List[str]] = None,
+    tags: Optional[list[str]] = None,
     replace: bool = False,
 ) -> None:
     """Register a chain in the global registry.
@@ -662,7 +663,7 @@ def chain(
     description: str = "",
     input_type: Optional[str] = None,
     output_type: Optional[str] = None,
-    tags: Optional[List[str]] = None,
+    tags: Optional[list[str]] = None,
     version: str = "0.5.0",
     replace: bool = False,
 ) -> Callable[[F], F]:

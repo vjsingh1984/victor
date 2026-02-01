@@ -22,14 +22,9 @@ These tests verify that:
 5. Error handling works across vertical boundaries
 """
 
-import asyncio
-from typing import Any, Dict, List
-from unittest.mock import Mock, MagicMock, patch
 import pytest
 
 from tests.fixtures.vertical_workflows import (
-    CrossVerticalScenario,
-    VERTICAL_ISOLATION_TESTS,
     CROSS_VERTICAL_SCENARIOS,
     get_scenario,
     get_vertical_combinations,
@@ -310,7 +305,6 @@ class TestMultiVerticalWorkflowExecution:
         """Test various vertical combinations work correctly."""
         from victor.coding import CodingAssistant
         from victor.research import ResearchAssistant
-        from victor.devops import DevOpsAssistant
 
         combinations = get_vertical_combinations()
 

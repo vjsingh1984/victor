@@ -32,7 +32,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Union, cast
+from typing import Any, Optional, cast
 
 from victor.agent.capabilities.base import CapabilitySpec
 
@@ -90,7 +90,7 @@ class DynamicCapabilityRegistry:
 
     def __init__(self) -> None:
         """Initialize the dynamic capability registry."""
-        self._capabilities: Dict[str, CapabilitySpec] = {}
+        self._capabilities: dict[str, CapabilitySpec] = {}
         self._entry_points_loaded = False
 
         # Load from all sources
@@ -277,7 +277,7 @@ class DynamicCapabilityRegistry:
         """
         return self._capabilities.get(name)
 
-    def list_capabilities(self) -> Dict[str, CapabilitySpec]:
+    def list_capabilities(self) -> dict[str, CapabilitySpec]:
         """List all registered capabilities.
 
         Returns:
@@ -315,7 +315,7 @@ class DynamicCapabilityRegistry:
             return True
         return False
 
-    def get_registry_stats(self) -> Dict[str, Any]:
+    def get_registry_stats(self) -> dict[str, Any]:
         """Get registry statistics.
 
         Returns:

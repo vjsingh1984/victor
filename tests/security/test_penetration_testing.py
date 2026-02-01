@@ -24,8 +24,7 @@ This test suite validates the security testing capabilities including:
 - Session hijacking prevention
 """
 
-from unittest.mock import AsyncMock, MagicMock, Mock
-from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

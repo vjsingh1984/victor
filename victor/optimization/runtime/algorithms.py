@@ -34,20 +34,13 @@ import hashlib
 import logging
 import time
 from collections import OrderedDict
-from dataclasses import dataclass, field
 from typing import (
     Any,
-    Callable,
-    Dict,
     Generic,
-    ItemsView,
-    Iterator,
-    KeysView,
-    List,
     Optional,
     TypeVar,
-    ValuesView,
 )
+from collections.abc import Callable, ItemsView, KeysView, ValuesView
 
 T = TypeVar("T")
 
@@ -161,7 +154,7 @@ class LRUCache(Generic[K, V]):
         total = self._hits + self._misses
         return self._hits / total if total > 0 else 0.0
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         return {
             "size": len(self._cache),
@@ -210,7 +203,7 @@ class BloomFilter:
         self._bit_array = bytearray(self._size)
         self._item_count = 0
 
-    def _hashes(self, item: str) -> List[int]:
+    def _hashes(self, item: str) -> list[int]:
         """Generate hash values for item (non-cryptographic, for Bloom filter only)."""
         # Use double hashing for multiple hash functions
         hash1 = int(hashlib.md5(item.encode(), usedforsecurity=False).hexdigest(), 16)
@@ -289,7 +282,7 @@ class TimedCache(Generic[K, V]):
             ttl_seconds: Time-to-live for cache entries
         """
         self._ttl = ttl_seconds
-        self._cache: Dict[K, tuple[V, float]] = {}
+        self._cache: dict[K, tuple[V, float]] = {}
         self._hits = 0
         self._misses = 0
 
@@ -445,8 +438,8 @@ class AlgorithmOptimizer:
 
     def __init__(self) -> None:
         """Initialize algorithm optimizer."""
-        self._caches: Dict[str, LRUCache[Any, Any]] = {}
-        self._timed_caches: Dict[str, TimedCache[Any, Any]] = {}
+        self._caches: dict[str, LRUCache[Any, Any]] = {}
+        self._timed_caches: dict[str, TimedCache[Any, Any]] = {}
 
     def create_lru_cache(
         self,
@@ -574,7 +567,7 @@ class AlgorithmOptimizer:
 
         return decorator
 
-    def get_cache_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_cache_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics for all caches.
 
         Returns:

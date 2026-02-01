@@ -18,7 +18,6 @@ These tests verify that verticals are properly registered and can be discovered
 by the framework without hardcoded imports.
 """
 
-import pytest
 
 from victor.framework.discovery import VerticalDiscovery
 from victor.framework.escape_hatch_registry import EscapeHatchRegistry
@@ -135,8 +134,6 @@ class TestVerticalRegistrationIntegration:
     def test_multiple_verticals_can_coexist(self):
         """Test that multiple verticals can be loaded simultaneously."""
         # Import multiple verticals
-        from victor.coding import CodingAssistant
-        from victor.research import ResearchAssistant
 
         # Both should be discoverable
         verticals = VerticalDiscovery.discover_verticals()

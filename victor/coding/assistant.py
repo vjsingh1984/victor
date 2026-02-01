@@ -28,7 +28,7 @@ The CodingAssistant provides:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 if TYPE_CHECKING:
     from victor.framework.prompt_builder import PromptBuilder
@@ -41,28 +41,10 @@ from victor.core.verticals.defaults.tool_defaults import (
 )
 from victor.core.verticals.protocols import (
     MiddlewareProtocol,
-    SafetyExtensionProtocol,
-    PromptContributorProtocol,
-    ModeConfigProviderProtocol,
     ToolDependencyProviderProtocol,
-    WorkflowProviderProtocol,
-    ServiceProviderProtocol,
-    TieredToolConfig,
-    VerticalExtensions,
 )
 
 # Import ISP-compliant provider protocols
-from victor.core.verticals.protocols.providers import (
-    CapabilityProvider,
-    HandlerProvider,
-    MiddlewareProvider,
-    ModeConfigProvider,
-    PromptContributorProvider,
-    ServiceProvider,
-    TieredToolConfigProvider,
-    ToolDependencyProvider,
-    ToolProvider,
-)
 
 # Phase 2.1: Protocol auto-registration decorator
 from victor.core.verticals.protocol_decorators import register_protocols
@@ -141,7 +123,7 @@ class CodingAssistant(VerticalBase):
     # Use clear_config_cache() to invalidate all caches.
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         """Get tools optimized for software development.
 
         Uses canonical tool names from victor.tools.tool_names.
@@ -233,7 +215,7 @@ class CodingAssistant(VerticalBase):
         return builder
 
     @classmethod
-    def get_stages(cls) -> Dict[str, StageDefinition]:
+    def get_stages(cls) -> dict[str, StageDefinition]:
         """Get coding-specific stage definitions.
 
         Uses canonical tool names from victor.tools.tool_names.
@@ -351,7 +333,7 @@ class CodingAssistant(VerticalBase):
     # to eliminate ~800 lines of duplication. Only override for custom logic.
 
     @classmethod
-    def get_middleware(cls) -> List[MiddlewareProtocol]:
+    def get_middleware(cls) -> list[MiddlewareProtocol]:
         """Get coding-specific middleware (cached).
 
         Custom implementation for Coding vertical with CodeCorrectionMiddleware
@@ -361,7 +343,7 @@ class CodingAssistant(VerticalBase):
             List of middleware implementations
         """
 
-        def _create_middleware() -> List[MiddlewareProtocol]:
+        def _create_middleware() -> list[MiddlewareProtocol]:
             from victor.coding.middleware import (
                 CodeCorrectionMiddleware,
                 GitSafetyMiddleware,
@@ -395,7 +377,7 @@ class CodingAssistant(VerticalBase):
         return result
 
     @classmethod
-    def get_composed_chains(cls) -> Dict[str, Any]:
+    def get_composed_chains(cls) -> dict[str, Any]:
         """Get pre-built LCEL-composed tool chains (cached).
 
         Custom implementation for Coding vertical with CODING_CHAINS constant.
@@ -415,7 +397,7 @@ class CodingAssistant(VerticalBase):
             Dict mapping chain names to Runnable instances
         """
 
-        def _create() -> Dict[str, Any]:
+        def _create() -> dict[str, Any]:
             from victor.coding.composed_chains import CODING_CHAINS
 
             return CODING_CHAINS
@@ -424,7 +406,7 @@ class CodingAssistant(VerticalBase):
         return result
 
     @classmethod
-    def get_personas(cls) -> Dict[str, Any]:
+    def get_personas(cls) -> dict[str, Any]:
         """Get persona definitions for team members (cached).
 
         Custom implementation for Coding vertical with CODING_PERSONAS constant.
@@ -450,7 +432,7 @@ class CodingAssistant(VerticalBase):
             Dict mapping persona names to CodingPersona instances
         """
 
-        def _create() -> Dict[str, Any]:
+        def _create() -> dict[str, Any]:
             from victor.coding.teams import CODING_PERSONAS
 
             return CODING_PERSONAS
@@ -459,7 +441,7 @@ class CodingAssistant(VerticalBase):
         return result
 
     @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
+    def get_handlers(cls) -> dict[str, Any]:
         """Get compute handlers for workflow execution.
 
         Provides coding-specific handlers for workflow nodes:
@@ -507,7 +489,7 @@ class CodingAssistant(VerticalBase):
         return result
 
     @classmethod
-    def get_capability_configs(cls) -> Dict[str, Any]:
+    def get_capability_configs(cls) -> dict[str, Any]:
         """Get coding capability configurations for centralized storage.
 
         Returns coding capability configurations for VerticalContext storage.

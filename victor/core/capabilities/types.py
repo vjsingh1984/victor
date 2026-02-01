@@ -30,7 +30,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ class CapabilityType(str, Enum):
 
 
 # Type alias for JSON Schema definitions
-ConfigSchema = Dict[str, Any]
+ConfigSchema = dict[str, Any]
 
 
 @dataclass
@@ -123,13 +123,13 @@ class CapabilityDefinition:
     capability_type: CapabilityType
     description: str
     config_schema: ConfigSchema = field(default_factory=dict)
-    default_config: Dict[str, Any] = field(default_factory=dict)
-    dependencies: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    default_config: dict[str, Any] = field(default_factory=dict)
+    dependencies: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     version: str = "0.5.0"
     enabled: bool = True
 
-    def validate_config(self, config: Dict[str, Any]) -> bool:
+    def validate_config(self, config: dict[str, Any]) -> bool:
         """Validate configuration against JSON Schema.
 
         Args:
@@ -157,7 +157,7 @@ class CapabilityDefinition:
             logger.debug(f"Config validation failed for {self.name}: {e.message}")
             return False
 
-    def get_validation_errors(self, config: Dict[str, Any]) -> List[str]:
+    def get_validation_errors(self, config: dict[str, Any]) -> list[str]:
         """Get detailed validation errors for configuration.
 
         Args:
@@ -177,13 +177,13 @@ class CapabilityDefinition:
         except ImportError:
             return []
 
-    def to_yaml_dict(self) -> Dict[str, Any]:
+    def to_yaml_dict(self) -> dict[str, Any]:
         """Convert to YAML-serializable dictionary.
 
         Returns:
             Dictionary suitable for YAML serialization
         """
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "name": self.name,
             "capability_type": self.capability_type.value,
             "description": self.description,
@@ -206,7 +206,7 @@ class CapabilityDefinition:
         return result
 
     @classmethod
-    def from_yaml_dict(cls, data: Dict[str, Any]) -> "CapabilityDefinition":
+    def from_yaml_dict(cls, data: dict[str, Any]) -> "CapabilityDefinition":
         """Create CapabilityDefinition from YAML dictionary.
 
         Args:
@@ -246,8 +246,8 @@ class CapabilityDefinition:
         )
 
     def merge_config(
-        self, stored_config: Dict[str, Any], override_config: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, stored_config: dict[str, Any], override_config: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """Merge stored and override configs with defaults.
 
         Order of precedence (highest to lowest):

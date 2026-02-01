@@ -37,7 +37,6 @@ Usage:
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List
 
 
 class LanguageTier(Enum):
@@ -72,7 +71,7 @@ class TierConfig:
 
 # Language tier registry
 # Maps language identifiers to their tier configurations
-LANGUAGE_TIERS: Dict[str, TierConfig] = {
+LANGUAGE_TIERS: dict[str, TierConfig] = {
     # ==========================================================================
     # Tier 1: Full AST + Tree-sitter + LSP
     # Best support with native AST parsing for deep analysis
@@ -396,7 +395,7 @@ def get_tier(language: str) -> TierConfig:
     return LANGUAGE_TIERS.get(language.lower(), _DEFAULT_TIER)
 
 
-def get_languages_by_tier(tier: LanguageTier) -> List[str]:
+def get_languages_by_tier(tier: LanguageTier) -> list[str]:
     """Get all languages in a specific tier.
 
     Args:
@@ -433,7 +432,7 @@ def has_native_ast(language: str) -> bool:
     return get_tier(language).has_native_ast
 
 
-def get_tier_summary() -> Dict[str, List[str]]:
+def get_tier_summary() -> dict[str, list[str]]:
     """Get a summary of languages by tier.
 
     Returns:

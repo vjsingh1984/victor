@@ -24,9 +24,8 @@ This test suite provides comprehensive coverage for:
 - Error handling
 """
 
-from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -35,10 +34,6 @@ from tests.fixtures.coding_fixtures import (
     SAMPLE_PYTHON_CLASS,
     SAMPLE_PYTHON_COMPLEX,
     SAMPLE_PYTHON_SIMPLE,
-    SAMPLE_PYTHON_WITH_ERRORS,
-    SAMPLE_PYTHON_WITH_SECURITY_ISSUES,
-    CodeReviewScenario,
-    create_sample_file,
     create_sample_project,
 )
 from victor.coding.workflows.review import (
@@ -683,7 +678,7 @@ class TestRegressionIssues:
 # =============================================================================
 
 
-def create_mock_context(code: str, file_path: str = "test.py") -> Dict[str, Any]:
+def create_mock_context(code: str, file_path: str = "test.py") -> dict[str, Any]:
     """Create a mock workflow context."""
     return {
         "code": code,

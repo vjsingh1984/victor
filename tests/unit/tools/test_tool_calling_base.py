@@ -14,7 +14,7 @@
 
 """Tests for tool_calling base module."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.agent.tool_calling.base import (
     ToolCallFormat,
@@ -33,7 +33,7 @@ class ConcreteToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
     def __init__(
         self,
         model: str = "",
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[dict[str, Any]] = None,
         capabilities: Optional[ToolCallingCapabilities] = None,
     ):
         super().__init__(model, config)
@@ -46,13 +46,13 @@ class ConcreteToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
     def get_capabilities(self) -> ToolCallingCapabilities:
         return self._capabilities
 
-    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         return [{"name": t.name, "description": t.description} for t in tools]
 
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
         return ToolCallParseResult()
 

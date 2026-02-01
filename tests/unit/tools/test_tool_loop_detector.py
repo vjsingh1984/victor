@@ -28,9 +28,7 @@ from victor.agent.tool_loop_detector import (
     LoopDetectionResult,
     LoopType,
     LoopSeverity,
-    ToolCallRecord,
     create_loop_detector,
-    LoggingLoopObserver,
 )
 
 

@@ -408,7 +408,7 @@ def mock_team_member():
     Creates a mock TeamMember with executor role for testing
     team coordination without actual agent execution.
     """
-    from unittest.mock import AsyncMock, MagicMock
+    from unittest.mock import MagicMock
     from victor.agent.subagents.base import SubAgentRole
 
     member = MagicMock()

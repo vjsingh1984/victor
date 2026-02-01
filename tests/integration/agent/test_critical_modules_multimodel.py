@@ -28,11 +28,10 @@ Model Families Tested:
 Tests are skipped if Ollama is not available (e.g., in GitHub Actions).
 """
 
-import asyncio
 import socket
 import tempfile
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
 from dataclasses import dataclass
 
 import pytest
@@ -64,7 +63,7 @@ class ModelFamily:
     """Configuration for a model family."""
 
     name: str
-    models: List[str]
+    models: list[str]
     description: str
 
 
@@ -93,7 +92,7 @@ MODEL_FAMILIES = {
 
 # Define model pairs for cross-family testing
 # Each tuple contains (model1, family1, model2, family2)
-MODEL_PAIRS: List[Tuple[str, str, str, str]] = [
+MODEL_PAIRS: list[tuple[str, str, str, str]] = [
     ("qwen2.5-coder:7b", "qwen", "deepseek-coder-v2:16b", "deepseek"),
     ("qwen2.5-coder:7b", "qwen", "gpt-oss:20b", "gpt_oss"),
     ("deepseek-coder-v2:16b", "deepseek", "devstral:latest", "devstral"),
@@ -101,12 +100,12 @@ MODEL_PAIRS: List[Tuple[str, str, str, str]] = [
 ]
 
 # Fast model pairs for quick tests (using smallest models)
-FAST_MODEL_PAIRS: List[Tuple[str, str, str, str]] = [
+FAST_MODEL_PAIRS: list[tuple[str, str, str, str]] = [
     ("qwen2.5-coder:7b", "qwen", "llama3.1:8b", "llama"),
 ]
 
 
-async def get_available_models() -> List[str]:
+async def get_available_models() -> list[str]:
     """Query Ollama for available models."""
     import httpx
 
@@ -207,8 +206,8 @@ def ollama_warmup():
 
 
 async def filter_available_pairs(
-    pairs: List[Tuple[str, str, str, str]],
-) -> List[Tuple[str, str, str, str]]:
+    pairs: list[tuple[str, str, str, str]],
+) -> list[tuple[str, str, str, str]]:
     """Filter model pairs to only include available models."""
     available = await get_available_models()
     return [(m1, f1, m2, f2) for m1, f1, m2, f2 in pairs if m1 in available and m2 in available]
@@ -267,7 +266,7 @@ class MultiModelTestBase:
     @staticmethod
     async def run_cross_family(
         model1: str, family1: str, model2: str, family2: str, test_func
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run a test across two model families and compare results."""
         results = {}
 

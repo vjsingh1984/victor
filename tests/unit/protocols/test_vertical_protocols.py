@@ -3,8 +3,7 @@
 Tests the protocol definitions and extension patterns for vertical-framework integration.
 """
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 import pytest
 
@@ -20,11 +19,8 @@ from victor.core.verticals.protocols import (
     SafetyExtensionProtocol,
     PromptContributorProtocol,
     ModeConfigProviderProtocol,
-    ToolDependencyProviderProtocol,
-    # Composite
     VerticalExtensions,
 )
-from victor.core.verticals.lazy_extensions import LazyVerticalExtensions
 
 # Import SafetyPattern from its canonical location
 from victor.core.security.patterns.types import SafetyPattern
@@ -197,14 +193,14 @@ class TestMiddlewareProtocol:
 
         class SimpleMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
             async def after_tool_call(
                 self,
                 tool_name: str,
-                arguments: Dict[str, Any],
+                arguments: dict[str, Any],
                 result: Any,
                 success: bool,
             ) -> Optional[Any]:
@@ -213,7 +209,7 @@ class TestMiddlewareProtocol:
             def get_priority(self) -> MiddlewarePriority:
                 return MiddlewarePriority.NORMAL
 
-            def get_applicable_tools(self) -> Optional[Set[str]]:
+            def get_applicable_tools(self) -> Optional[set[str]]:
                 return None
 
         middleware = SimpleMiddleware()
@@ -225,7 +221,7 @@ class TestMiddlewareProtocol:
 
         class BlockingMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 if tool_name == "dangerous_tool":
                     return MiddlewareResult(
@@ -250,7 +246,7 @@ class TestSafetyExtensionProtocol:
         """A simple safety extension should work."""
 
         class SimpleSafetyExtension:
-            def get_bash_patterns(self) -> List[SafetyPattern]:
+            def get_bash_patterns(self) -> list[SafetyPattern]:
                 return [
                     SafetyPattern(
                         pattern=r"rm\s+-rf",
@@ -258,10 +254,10 @@ class TestSafetyExtensionProtocol:
                     )
                 ]
 
-            def get_file_patterns(self) -> List[SafetyPattern]:
+            def get_file_patterns(self) -> list[SafetyPattern]:
                 return []
 
-            def get_tool_restrictions(self) -> Dict[str, List[str]]:
+            def get_tool_restrictions(self) -> dict[str, list[str]]:
                 return {}
 
             def get_category(self) -> str:
@@ -281,7 +277,7 @@ class TestPromptContributorProtocol:
         """A simple prompt contributor should work."""
 
         class SimpleContributor:
-            def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+            def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
                 return {
                     "edit": TaskTypeHint(
                         task_type="edit",
@@ -311,7 +307,7 @@ class TestModeConfigProviderProtocol:
         """A simple mode config provider should work."""
 
         class SimpleModeProvider:
-            def get_mode_configs(self) -> Dict[str, ModeConfig]:
+            def get_mode_configs(self) -> dict[str, ModeConfig]:
                 return {
                     "fast": ModeConfig(
                         name="fast",
@@ -353,7 +349,7 @@ class TestVerticalExtensions:
         """get_all_task_hints should merge from all contributors."""
 
         class Contributor1:
-            def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+            def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
                 return {
                     "edit": TaskTypeHint(task_type="edit", hint="Hint 1"),
                 }
@@ -368,7 +364,7 @@ class TestVerticalExtensions:
                 return 100  # Lower priority (executes later)
 
         class Contributor2:
-            def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+            def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
                 return {
                     "edit": TaskTypeHint(task_type="edit", hint="Hint 2"),
                     "search": TaskTypeHint(task_type="search", hint="Search hint"),
@@ -397,17 +393,17 @@ class TestVerticalExtensions:
         """get_all_safety_patterns should collect from all extensions."""
 
         class SafetyExt1:
-            def get_bash_patterns(self) -> List[SafetyPattern]:
+            def get_bash_patterns(self) -> list[SafetyPattern]:
                 return [SafetyPattern(pattern="p1", description="Pattern 1")]
 
-            def get_file_patterns(self) -> List[SafetyPattern]:
+            def get_file_patterns(self) -> list[SafetyPattern]:
                 return []
 
         class SafetyExt2:
-            def get_bash_patterns(self) -> List[SafetyPattern]:
+            def get_bash_patterns(self) -> list[SafetyPattern]:
                 return [SafetyPattern(pattern="p2", description="Pattern 2")]
 
-            def get_file_patterns(self) -> List[SafetyPattern]:
+            def get_file_patterns(self) -> list[SafetyPattern]:
                 return [SafetyPattern(pattern="fp1", description="File pattern")]
 
         ext = VerticalExtensions(safety_extensions=[SafetyExt1(), SafetyExt2()])
@@ -423,7 +419,7 @@ class TestVerticalExtensions:
         """get_all_mode_configs should return provider's configs."""
 
         class ModeProvider:
-            def get_mode_configs(self) -> Dict[str, ModeConfig]:
+            def get_mode_configs(self) -> dict[str, ModeConfig]:
                 return {
                     "fast": ModeConfig(name="fast", tool_budget=5, max_iterations=10),
                     "slow": ModeConfig(name="slow", tool_budget=20, max_iterations=50),
@@ -542,13 +538,9 @@ class TestVerticalRLProviderProtocol:
 
     def test_runtime_checkable(self):
         """Protocol should be runtime checkable."""
-        from victor.core.verticals.protocols import (
-            VerticalRLProviderProtocol,
-            RLConfigProviderProtocol,
-        )
 
         class MockRLConfigProvider:
-            def get_rl_config(self) -> Dict[str, Any]:
+            def get_rl_config(self) -> dict[str, Any]:
                 return {"active_learners": ["tool_selection"]}
 
             def get_rl_hooks(self) -> Optional[Any]:
@@ -589,13 +581,9 @@ class TestVerticalTeamProviderProtocol:
 
     def test_runtime_checkable(self):
         """Protocol should be runtime checkable."""
-        from victor.core.verticals.protocols import (
-            VerticalTeamProviderProtocol,
-            TeamSpecProviderProtocol,
-        )
 
         class MockTeamSpecProvider:
-            def get_team_specs(self) -> Dict[str, Any]:
+            def get_team_specs(self) -> dict[str, Any]:
                 return {"review_team": {"name": "review_team", "agents": []}}
 
             def get_default_team(self) -> Optional[str]:
@@ -629,16 +617,12 @@ class TestVerticalWorkflowProviderProtocol:
 
     def test_runtime_checkable(self):
         """Protocol should be runtime checkable."""
-        from victor.core.verticals.protocols import (
-            VerticalWorkflowProviderProtocol,
-            WorkflowProviderProtocol,
-        )
 
         class MockWorkflowProvider:
-            def get_workflows(self) -> Dict[str, Any]:
+            def get_workflows(self) -> dict[str, Any]:
                 return {"build_workflow": object}
 
-            def get_auto_workflows(self) -> List[Any]:
+            def get_auto_workflows(self) -> list[Any]:
                 return []
 
         class MockVerticalWithWorkflow:
@@ -693,14 +677,14 @@ class TestVerticalIntegrationWithProtocols:
 
         # Create extensions with all providers
         class MockRLProvider:
-            def get_rl_config(self) -> Dict[str, Any]:
+            def get_rl_config(self) -> dict[str, Any]:
                 return {}
 
             def get_rl_hooks(self) -> Optional[Any]:
                 return None
 
         class MockTeamProvider:
-            def get_team_specs(self) -> Dict[str, Any]:
+            def get_team_specs(self) -> dict[str, Any]:
                 return {}
 
             def get_default_team(self) -> Optional[str]:

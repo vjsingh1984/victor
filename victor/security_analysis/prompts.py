@@ -20,7 +20,7 @@ security analysis tasks.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 from victor.core.verticals.protocols import PromptContributorProtocol
 from victor.core.vertical_types import TaskTypeHint
@@ -36,7 +36,7 @@ class SecurityAnalysisPromptContributor(PromptContributorProtocol):
     - Security code review
     """
 
-    def get_task_type_hints(self) -> Dict[str, "TaskTypeHint"]:
+    def get_task_type_hints(self) -> dict[str, "TaskTypeHint"]:
         """Get hints for different security task types.
 
         Returns:
@@ -97,7 +97,7 @@ class SecurityAnalysisPromptContributor(PromptContributorProtocol):
             ),
         }
 
-    def get_context_hints(self, context: Dict[str, Any]) -> List[str]:
+    def get_context_hints(self, context: dict[str, Any]) -> list[str]:
         """Get context-aware hints based on current state.
 
         Args:
@@ -129,7 +129,7 @@ class SecurityAnalysisPromptContributor(PromptContributorProtocol):
 
         return hints
 
-    def get_safety_reminders(self) -> List[str]:
+    def get_safety_reminders(self) -> list[str]:
         """Get security-specific safety reminders.
 
         Returns:

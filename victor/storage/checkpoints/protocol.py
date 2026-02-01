@@ -21,7 +21,7 @@ time-travel debugging, inspired by LangGraph's checkpoint system.
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 import uuid
 
 
@@ -77,7 +77,7 @@ class CheckpointMetadata:
     message_count: int
     parent_id: Optional[str] = None
     description: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     version: int = 1
 
     @classmethod
@@ -89,7 +89,7 @@ class CheckpointMetadata:
         message_count: int,
         parent_id: Optional[str] = None,
         description: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
     ) -> "CheckpointMetadata":
         """Factory method to create a new checkpoint metadata.
 
@@ -117,7 +117,7 @@ class CheckpointMetadata:
             tags=tags or [],
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize metadata to dictionary."""
         return {
             "checkpoint_id": self.checkpoint_id,
@@ -133,7 +133,7 @@ class CheckpointMetadata:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CheckpointMetadata":
+    def from_dict(cls, data: dict[str, Any]) -> "CheckpointMetadata":
         """Deserialize metadata from dictionary."""
         timestamp = data.get("timestamp")
         if isinstance(timestamp, str):
@@ -186,16 +186,16 @@ class CheckpointDiff:
 
     checkpoint_a: str
     checkpoint_b: str
-    metadata_diff: List[FieldDiff] = field(default_factory=list)
+    metadata_diff: list[FieldDiff] = field(default_factory=list)
     messages_added: int = 0
     messages_removed: int = 0
-    tools_added: List[str] = field(default_factory=list)
-    tools_removed: List[str] = field(default_factory=list)
-    files_observed_diff: List[FieldDiff] = field(default_factory=list)
-    files_modified_diff: List[FieldDiff] = field(default_factory=list)
-    stage_changes: List[str] = field(default_factory=list)
+    tools_added: list[str] = field(default_factory=list)
+    tools_removed: list[str] = field(default_factory=list)
+    files_observed_diff: list[FieldDiff] = field(default_factory=list)
+    files_modified_diff: list[FieldDiff] = field(default_factory=list)
+    stage_changes: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize diff to dictionary."""
         return {
             "checkpoint_a": self.checkpoint_a,
@@ -274,7 +274,7 @@ class CheckpointData:
     """
 
     metadata: CheckpointMetadata
-    state_data: Dict[str, Any]
+    state_data: dict[str, Any]
     compressed: bool = False
     checksum: Optional[str] = None
 
@@ -291,7 +291,7 @@ class CheckpointManagerProtocol(Protocol):
     async def save_checkpoint(
         self,
         session_id: str,
-        state_data: Dict[str, Any],
+        state_data: dict[str, Any],
         metadata: CheckpointMetadata,
     ) -> str:
         """Save a checkpoint and return its ID.
@@ -329,7 +329,7 @@ class CheckpointManagerProtocol(Protocol):
         session_id: str,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[CheckpointMetadata]:
+    ) -> list[CheckpointMetadata]:
         """List checkpoints for a session.
 
         Args:

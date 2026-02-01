@@ -19,7 +19,7 @@ and CapabilityProviderProtocol are properly defined and runtime_checkable.
 """
 
 import pytest
-from typing import Dict, Any, Protocol, runtime_checkable
+from typing import Any
 
 
 class TestChainProviderProtocol:
@@ -54,7 +54,7 @@ class TestChainProviderProtocol:
         from victor.core.verticals.protocols import ChainProviderProtocol
 
         class ValidChainProvider:
-            def get_chains(self) -> Dict[str, Any]:
+            def get_chains(self) -> dict[str, Any]:
                 return {"test_chain": {}}
 
         class InvalidProvider:
@@ -103,7 +103,7 @@ class TestPersonaProviderProtocol:
         from victor.core.verticals.protocols import PersonaProviderProtocol
 
         class ValidPersonaProvider:
-            def get_personas(self) -> Dict[str, Any]:
+            def get_personas(self) -> dict[str, Any]:
                 return {"developer": {"name": "Developer"}}
 
         class InvalidProvider:
@@ -152,7 +152,7 @@ class TestCapabilityProviderProtocol:
         from victor.core.verticals.protocols import CapabilityProviderProtocol
 
         class ValidCapabilityProvider:
-            def get_capabilities(self) -> Dict[str, Any]:
+            def get_capabilities(self) -> dict[str, Any]:
                 return {"code_review": True, "refactoring": True}
 
         class InvalidProvider:

@@ -55,13 +55,13 @@ class DevOpsRoleConfig:
     """
 
     base_role: str
-    tools: List[str]
+    tools: list[str]
     tool_budget: int
     description: str = ""
 
 
 # DevOps-specific roles with tool allocations
-DEVOPS_ROLES: Dict[str, DevOpsRoleConfig] = {
+DEVOPS_ROLES: dict[str, DevOpsRoleConfig] = {
     "infrastructure_assessor": DevOpsRoleConfig(
         base_role="researcher",
         tools=[
@@ -152,7 +152,7 @@ DEVOPS_ROLES: Dict[str, DevOpsRoleConfig] = {
 
 
 # Pre-defined team specifications with rich personas
-DEVOPS_TEAM_SPECS: Dict[str, TeamSpec] = {
+DEVOPS_TEAM_SPECS: dict[str, TeamSpec] = {
     "deployment_team": TeamSpec(
         name="Infrastructure Deployment Team",
         vertical="devops",
@@ -526,7 +526,7 @@ def get_role_config(role_name: str) -> Optional[DevOpsRoleConfig]:
     return DEVOPS_ROLES.get(role_name.lower())
 
 
-def list_team_types() -> List[str]:
+def list_team_types() -> list[str]:
     """List all available team types.
 
     Returns:
@@ -535,7 +535,7 @@ def list_team_types() -> List[str]:
     return list(DEVOPS_TEAM_SPECS.keys())
 
 
-def list_roles() -> List[str]:
+def list_roles() -> list[str]:
     """List all available DevOps roles.
 
     Returns:
@@ -551,7 +551,7 @@ class DevOpsTeamSpecProvider:
     ISP compliance across all verticals.
     """
 
-    def get_team_specs(self) -> Dict[str, TeamSpec]:
+    def get_team_specs(self) -> dict[str, TeamSpec]:
         """Get all DevOps team specifications.
 
         Returns:
@@ -570,7 +570,7 @@ class DevOpsTeamSpecProvider:
         """
         return get_team_for_task(task_type)
 
-    def list_team_types(self) -> List[str]:
+    def list_team_types(self) -> list[str]:
         """List all available team types.
 
         Returns:

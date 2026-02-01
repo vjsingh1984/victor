@@ -49,7 +49,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
 
 
 @dataclass
@@ -74,7 +74,7 @@ class CapabilityMutation:
     """
 
     capability: str
-    args: Dict[str, Any]
+    args: dict[str, Any]
     timestamp: float
     source: str = "vertical_integration"
 

@@ -23,7 +23,7 @@ This module tests:
 """
 
 import pytest
-from typing import Any, Dict, Optional, Set
+from typing import Any, Optional
 
 from victor.framework.middleware_protocols import (
     IMiddleware,
@@ -80,14 +80,14 @@ class TestIMiddlewareProtocol:
         # Create a concrete implementation with ALL protocol methods
         class FullMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
             async def after_tool_call(
                 self,
                 tool_name: str,
-                arguments: Dict[str, Any],
+                arguments: dict[str, Any],
                 result: Any,
                 success: bool,
             ) -> Optional[Any]:
@@ -96,7 +96,7 @@ class TestIMiddlewareProtocol:
             def get_priority(self) -> MiddlewarePriority:
                 return MiddlewarePriority.NORMAL
 
-            def get_applicable_tools(self) -> Optional[Set[str]]:
+            def get_applicable_tools(self) -> Optional[set[str]]:
                 return None
 
             def get_phase(self) -> MiddlewarePhase:
@@ -113,14 +113,14 @@ class TestIMiddlewareProtocol:
 
         class ConcreteMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
             def get_priority(self) -> MiddlewarePriority:
                 return MiddlewarePriority.NORMAL
 
-            def get_applicable_tools(self) -> Optional[Set[str]]:
+            def get_applicable_tools(self) -> Optional[set[str]]:
                 return None
 
             def get_phase(self) -> MiddlewarePhase:
@@ -148,7 +148,7 @@ class SimpleTestMiddleware(BaseMiddleware):
         self.before_call_count = 0
         self.after_call_count = 0
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Track before_tool_call invocations."""
         self.before_call_count += 1
         self._logger.info(f"Before call: {tool_name}")
@@ -157,7 +157,7 @@ class SimpleTestMiddleware(BaseMiddleware):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -352,11 +352,11 @@ class TestBaseMiddleware:
 class ValidationTestMiddleware(BaseMiddleware):
     """Test middleware that validates tool calls."""
 
-    def __init__(self, blocked_tools: Optional[Set[str]] = None, **kwargs):
+    def __init__(self, blocked_tools: Optional[set[str]] = None, **kwargs):
         super().__init__(**kwargs)
         self.blocked_tools = blocked_tools or set()
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Block execution for specific tools."""
         if tool_name in self.blocked_tools:
             return MiddlewareResult(
@@ -393,7 +393,7 @@ class TestCustomMiddleware:
 
         class ArgumentTransformingMiddleware(BaseMiddleware):
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 if "path" in arguments:
                     # Normalize path
@@ -419,7 +419,7 @@ class TestCustomMiddleware:
 
         class ResultTransformingMiddleware(BaseMiddleware):
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 # No-op for before_tool_call
                 return MiddlewareResult()
@@ -427,7 +427,7 @@ class TestCustomMiddleware:
             async def after_tool_call(
                 self,
                 tool_name: str,
-                arguments: Dict[str, Any],
+                arguments: dict[str, Any],
                 result: Any,
                 success: bool,
             ) -> Optional[Any]:
@@ -458,7 +458,7 @@ class TestCustomMiddleware:
                 self.processed = False
 
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 self.processed = True
                 return MiddlewareResult()

@@ -21,12 +21,10 @@ Uses a small model (Qwen/Qwen2.5-Coder-1.5B-Instruct) for faster testing.
 """
 
 import pytest
-from httpx import ConnectError, HTTPError
 import httpx
 import subprocess
 import time
 import os
-import signal
 import sys
 import platform
 
@@ -44,8 +42,8 @@ else:
     pytestmark = []
 
 # These imports are intentionally after checking availability
-from victor.providers.base import Message, ToolDefinition  # noqa: E402
-from victor.providers.openai_provider import OpenAIProvider  # noqa: E402
+from victor.providers.base import Message, ToolDefinition
+from victor.providers.openai_provider import OpenAIProvider
 
 
 @pytest.fixture(scope="session")

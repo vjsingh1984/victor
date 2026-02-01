@@ -25,7 +25,7 @@ but these protocols provide type-safe domain-specific methods.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable, Any, Dict, Optional
+from typing import Protocol, runtime_checkable, Any, Optional
 from contextlib import contextmanager
 
 from victor.core.events import MessagingEvent
@@ -81,7 +81,7 @@ class IToolEventEmitter(IEventEmitter, Protocol):
     def tool_start(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         **metadata: Any,
     ) -> None:
         """Emit tool execution start event.
@@ -131,7 +131,7 @@ class IToolEventEmitter(IEventEmitter, Protocol):
     def track_tool(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         **metadata: Any,
     ):
         """Context manager for tracking tool execution.
@@ -322,7 +322,7 @@ class IErrorEventEmitter(IEventEmitter, Protocol):
         self,
         error: Exception,
         recoverable: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         **metadata: Any,
     ) -> None:
         """Emit error event.

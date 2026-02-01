@@ -21,19 +21,17 @@ workflow variants to estimate their performance.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Optional
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
-import numpy as np
 
 from victor.optimization.workflow.models import (
-    NodeStatistics,
     WorkflowProfile,
 )
 from victor.optimization.workflow.generator import (
     WorkflowVariant,
-    WorkflowVariantGenerator,
 )
 
 logger = logging.getLogger(__name__)
@@ -70,14 +68,14 @@ class EvaluationResult:
     quality_score: float
     overall_score: float
     confidence: float
-    metrics: Dict[str, float] = field(default_factory=dict)
+    metrics: dict[str, float] = field(default_factory=dict)
     recommendation: bool = False
 
     def __post_init__(self) -> None:
         # metrics is always initialized by default_factory
         pass
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "variant_id": self.variant_id,
@@ -115,7 +113,7 @@ class VariantEvaluator:
 
     def __init__(
         self,
-        objective_weights: Optional[Dict[str, float]] = None,
+        objective_weights: Optional[dict[str, float]] = None,
         recommendation_threshold: float = 0.1,
     ):
         """Initialize the variant evaluator.
@@ -136,7 +134,7 @@ class VariantEvaluator:
         variant: WorkflowVariant,
         profile: WorkflowProfile,
         mode: EvaluationMode = EvaluationMode.ESTIMATION,
-        test_inputs: Optional[List[Dict[str, Any]]] = None,
+        test_inputs: Optional[list[dict[str, Any]]] = None,
         score_function: Optional[Callable[[WorkflowVariant], float]] = None,
     ) -> EvaluationResult:
         """Evaluate a workflow variant.
@@ -194,7 +192,7 @@ class VariantEvaluator:
     async def _evaluate_dry_run(
         self,
         variant: WorkflowVariant,
-        test_inputs: Optional[List[Dict[str, Any]]],
+        test_inputs: Optional[list[dict[str, Any]]],
     ) -> EvaluationResult:
         """Evaluate variant through dry-run execution.
 
@@ -372,10 +370,10 @@ class VariantEvaluator:
 
     async def compare_variants(
         self,
-        variants: List[WorkflowVariant],
+        variants: list[WorkflowVariant],
         profile: WorkflowProfile,
         mode: EvaluationMode = EvaluationMode.ESTIMATION,
-    ) -> List[EvaluationResult]:
+    ) -> list[EvaluationResult]:
         """Compare multiple workflow variants.
 
         Args:

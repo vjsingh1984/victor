@@ -36,11 +36,11 @@ import logging
 import sys
 import threading
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, cast
+from typing import Any, Optional, cast
+from collections.abc import Callable
 
 
 # Configure logging
@@ -60,10 +60,10 @@ class EventRecord:
     event_type: str
     category: str
     source: Optional[str]
-    data: Dict[str, Any]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "timestamp": self.timestamp,
@@ -93,9 +93,9 @@ class EventStatistics:
     """Statistics about events."""
 
     total_events: int = 0
-    events_by_type: Dict[str, int] = field(default_factory=dict)
-    events_by_category: Dict[str, int] = field(default_factory=dict)
-    events_by_source: Dict[str, int] = field(default_factory=dict)
+    events_by_type: dict[str, int] = field(default_factory=dict)
+    events_by_category: dict[str, int] = field(default_factory=dict)
+    events_by_source: dict[str, int] = field(default_factory=dict)
     first_event_time: Optional[float] = None
     last_event_time: Optional[float] = None
 
@@ -170,7 +170,7 @@ class EventMonitor:
         self.filter_category = filter_category
         self.filter_event_type = filter_event_type
         self.verbose = verbose
-        self.events: List[EventRecord] = []
+        self.events: list[EventRecord] = []
         self.stats = EventStatistics()
         self._running = False
         self._lock = threading.Lock()
@@ -201,7 +201,8 @@ class EventMonitor:
 
             # Subscribe to all events
             import asyncio
-            from typing import Any, Awaitable
+            from typing import Any
+            from collections.abc import Awaitable
             from victor.core.events.protocols import MessagingEvent
 
             async def _subscribe_wrapper() -> None:

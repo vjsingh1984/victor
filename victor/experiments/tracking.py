@@ -20,16 +20,14 @@ and tracking runs, similar to MLflow's tracking API.
 
 from __future__ import annotations
 
-import contextlib
 import logging
-import os
 import platform
 import subprocess
 import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.experiments.artifacts import ArtifactManager
@@ -137,8 +135,8 @@ class ActiveRun:
     def log_artifact(
         self,
         artifact_path: str,
-        artifact_type: Union[ArtifactType, str] = ArtifactType.CUSTOM,
-        metadata: Optional[Dict[str, Any]] = None,
+        artifact_type: ArtifactType | str = ArtifactType.CUSTOM,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> Artifact:
         """Log an artifact for this run.
 
@@ -186,7 +184,7 @@ class ActiveRun:
         logger.debug(f"Logged artifact {artifact_path} for run {self._run.run_id}")
         return artifact
 
-    def set_status(self, status: Union[RunStatus, str]) -> None:
+    def set_status(self, status: RunStatus | str) -> None:
         """Set the status of this run.
 
         Args:
@@ -284,7 +282,7 @@ class ExperimentTracker:
         self._storage = storage or SQLiteStorage()
         self._artifact_manager: Optional[Any] = None  # Will be set later
         self._active_runs_lock = threading.Lock()
-        self._active_runs: Dict[str, ActiveRun] = {}
+        self._active_runs: dict[str, ActiveRun] = {}
 
     def set_artifact_manager(self, artifact_manager: Any) -> None:
         """Set the artifact manager for logging artifacts.
@@ -299,8 +297,8 @@ class ExperimentTracker:
         name: str,
         description: str = "",
         hypothesis: str = "",
-        tags: Optional[List[str]] = None,
-        parameters: Optional[Dict[str, Any]] = None,
+        tags: Optional[list[str]] = None,
+        parameters: Optional[dict[str, Any]] = None,
     ) -> Experiment:
         """Create a new experiment.
 
@@ -344,7 +342,7 @@ class ExperimentTracker:
         """
         return self._storage.get_experiment(experiment_id)
 
-    def list_experiments(self, query: Optional[ExperimentQuery] = None) -> List[Experiment]:
+    def list_experiments(self, query: Optional[ExperimentQuery] = None) -> list[Experiment]:
         """List experiments with optional filtering.
 
         Args:
@@ -373,7 +371,7 @@ class ExperimentTracker:
         self,
         experiment_id: str,
         run_name: str = "",
-        parameters: Optional[Dict[str, Any]] = None,
+        parameters: Optional[dict[str, Any]] = None,
     ) -> ActiveRun:
         """Start a new run for an experiment.
 
@@ -429,7 +427,7 @@ class ExperimentTracker:
         """
         return self._storage.get_run(run_id)
 
-    def list_runs(self, experiment_id: str) -> List[Run]:
+    def list_runs(self, experiment_id: str) -> list[Run]:
         """List all runs for an experiment.
 
         Args:
@@ -454,7 +452,7 @@ class ExperimentTracker:
 
     # Private helper methods
 
-    def _capture_git_info(self) -> Dict[str, Any]:
+    def _capture_git_info(self) -> dict[str, Any]:
         """Capture git repository information.
 
         Returns:
@@ -502,7 +500,7 @@ class ExperimentTracker:
 
         return git_info
 
-    def _capture_environment(self) -> Dict[str, Any]:
+    def _capture_environment(self) -> dict[str, Any]:
         """Capture environment information for reproducibility.
 
         Returns:

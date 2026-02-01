@@ -78,13 +78,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -161,10 +159,10 @@ class EnrichmentContext:
 
     session_id: Optional[str] = None
     task_type: Optional[str] = None
-    file_mentions: List[str] = field(default_factory=list)
-    symbol_mentions: List[str] = field(default_factory=list)
-    tool_history: List[Dict[str, Any]] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    file_mentions: list[str] = field(default_factory=list)
+    symbol_mentions: list[str] = field(default_factory=list)
+    tool_history: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -188,7 +186,7 @@ class ContextEnrichment:
     priority: EnrichmentPriority = EnrichmentPriority.NORMAL
     source: Optional[str] = None
     token_estimate: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Estimate token count if not provided."""
@@ -215,7 +213,7 @@ class EnrichedPrompt:
 
     original_prompt: str
     enriched_prompt: str
-    enrichments: List[ContextEnrichment] = field(default_factory=list)
+    enrichments: list[ContextEnrichment] = field(default_factory=list)
     total_tokens_added: int = 0
     enrichment_time_ms: float = 0.0
     from_cache: bool = False
@@ -226,7 +224,7 @@ class EnrichedPrompt:
         return len(self.enrichments)
 
     @property
-    def enrichment_types(self) -> List[str]:
+    def enrichment_types(self) -> list[str]:
         """Get list of enrichment types applied."""
         return [e.type.value for e in self.enrichments]
 
@@ -296,7 +294,7 @@ class EnrichmentStrategyProtocol(Protocol):
         self,
         prompt: str,
         context: EnrichmentContext,
-    ) -> List[ContextEnrichment]:
+    ) -> list[ContextEnrichment]:
         """Get enrichments for a prompt.
 
         Args:
@@ -359,7 +357,7 @@ class EnrichmentCache:
             ttl_seconds: Cache entry lifetime in seconds (default: 5 minutes)
             max_entries: Maximum cache size (default: 100 entries)
         """
-        self._cache: Dict[str, _CacheEntry] = {}
+        self._cache: dict[str, _CacheEntry] = {}
         self._ttl = ttl_seconds
         self._max_entries = max_entries
 
@@ -512,9 +510,9 @@ class PromptEnrichmentService:
         """
         self._max_tokens = max_tokens
         self._timeout_ms = timeout_ms
-        self._strategies: Dict[str, EnrichmentStrategyProtocol] = {}
+        self._strategies: dict[str, EnrichmentStrategyProtocol] = {}
         self._cache = EnrichmentCache(ttl_seconds=cache_ttl_seconds) if cache_enabled else None
-        self._outcome_callbacks: List[Callable[[EnrichmentOutcome], None]] = []
+        self._outcome_callbacks: list[Callable[[EnrichmentOutcome], None]] = []
 
         logger.debug(
             "PromptEnrichmentService initialized: max_tokens=%d, " "timeout_ms=%.1f, cache=%s",
@@ -684,8 +682,8 @@ class PromptEnrichmentService:
 
     def _apply_token_budget(
         self,
-        enrichments: List[ContextEnrichment],
-    ) -> List[ContextEnrichment]:
+        enrichments: list[ContextEnrichment],
+    ) -> list[ContextEnrichment]:
         """Apply token budget constraints to enrichments.
 
         Sorts by priority and includes enrichments until budget is exhausted.
@@ -730,7 +728,7 @@ class PromptEnrichmentService:
     def _merge_enrichments(
         self,
         prompt: str,
-        enrichments: List[ContextEnrichment],
+        enrichments: list[ContextEnrichment],
     ) -> str:
         """Merge enrichments into the prompt.
 
@@ -748,7 +746,7 @@ class PromptEnrichmentService:
             return prompt
 
         # Group enrichments by type for cleaner formatting
-        sections: Dict[EnrichmentType, List[str]] = {}
+        sections: dict[EnrichmentType, list[str]] = {}
         for enrichment in enrichments:
             if enrichment.type not in sections:
                 sections[enrichment.type] = []
@@ -802,7 +800,7 @@ class PromptEnrichmentService:
         self._timeout_ms = max(0.0, value)
 
     @property
-    def registered_verticals(self) -> List[str]:
+    def registered_verticals(self) -> list[str]:
         """Get list of verticals with registered strategies."""
         return list(self._strategies.keys())
 

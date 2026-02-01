@@ -21,7 +21,6 @@ rather than re-defining common patterns.
 Uses canonical tool names from ToolNames for consistency.
 """
 
-from typing import Dict, List, Set, Tuple
 
 from victor.core.tool_types import ToolDependency
 from victor.framework.tool_naming import ToolNames
@@ -32,7 +31,7 @@ from victor.framework.tool_naming import ToolNames
 # =============================================================================
 
 # Tool clusters that are common across most verticals
-COMMON_TOOL_CLUSTERS: Dict[str, Set[str]] = {
+COMMON_TOOL_CLUSTERS: dict[str, set[str]] = {
     # File operations - applicable to all verticals
     "file_operations": {
         ToolNames.READ,
@@ -58,7 +57,7 @@ COMMON_TOOL_CLUSTERS: Dict[str, Set[str]] = {
 # =============================================================================
 
 # Tool dependencies that are common across most verticals
-COMMON_TOOL_DEPENDENCIES: List[ToolDependency] = [
+COMMON_TOOL_DEPENDENCIES: list[ToolDependency] = [
     # Edit should be preceded by read (universal pattern)
     ToolDependency(
         tool_name=ToolNames.EDIT,
@@ -108,7 +107,7 @@ COMMON_TOOL_DEPENDENCIES: List[ToolDependency] = [
 # =============================================================================
 
 # Transition probabilities that are common across most verticals
-COMMON_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = {
+COMMON_TOOL_TRANSITIONS: dict[str, list[tuple[str, float]]] = {
     # Read typically leads to edit, search, or write
     ToolNames.READ: [
         (ToolNames.EDIT, 0.4),
@@ -153,7 +152,7 @@ COMMON_TOOL_TRANSITIONS: Dict[str, List[Tuple[str, float]]] = {
 # =============================================================================
 
 # Tools required by most verticals
-COMMON_REQUIRED_TOOLS: Set[str] = {
+COMMON_REQUIRED_TOOLS: set[str] = {
     ToolNames.READ,
     ToolNames.WRITE,
     ToolNames.EDIT,
@@ -162,13 +161,13 @@ COMMON_REQUIRED_TOOLS: Set[str] = {
 
 # Read-only tools for analysis-focused verticals (e.g., RAG, Research)
 # These verticals don't modify files, only read and analyze them
-COMMON_READONLY_TOOLS: Set[str] = {
+COMMON_READONLY_TOOLS: set[str] = {
     ToolNames.READ,
     ToolNames.LS,
 }
 
 # Optional tools applicable to most verticals
-COMMON_OPTIONAL_TOOLS: Set[str] = {
+COMMON_OPTIONAL_TOOLS: set[str] = {
     ToolNames.GREP,
     ToolNames.CODE_SEARCH,
     ToolNames.SYMBOL,
@@ -181,9 +180,9 @@ COMMON_OPTIONAL_TOOLS: Set[str] = {
 
 
 def merge_clusters(
-    base: Dict[str, Set[str]],
-    override: Dict[str, Set[str]],
-) -> Dict[str, Set[str]]:
+    base: dict[str, set[str]],
+    override: dict[str, set[str]],
+) -> dict[str, set[str]]:
     """Merge tool cluster definitions.
 
     Combines cluster definitions, unioning sets for the same cluster name.
@@ -207,9 +206,9 @@ def merge_clusters(
 
 
 def merge_dependencies(
-    base: List[ToolDependency],
-    override: List[ToolDependency],
-) -> List[ToolDependency]:
+    base: list[ToolDependency],
+    override: list[ToolDependency],
+) -> list[ToolDependency]:
     """Merge tool dependency definitions.
 
     Combines dependency lists, with override taking precedence for same tool.
@@ -222,7 +221,7 @@ def merge_dependencies(
         Merged dependency list
     """
     # Index by tool name
-    by_tool: Dict[str, ToolDependency] = {dep.tool_name: dep for dep in base}
+    by_tool: dict[str, ToolDependency] = {dep.tool_name: dep for dep in base}
 
     # Override with vertical-specific
     for dep in override:
@@ -232,9 +231,9 @@ def merge_dependencies(
 
 
 def merge_transitions(
-    base: Dict[str, List[Tuple[str, float]]],
-    override: Dict[str, List[Tuple[str, float]]],
-) -> Dict[str, List[Tuple[str, float]]]:
+    base: dict[str, list[tuple[str, float]]],
+    override: dict[str, list[tuple[str, float]]],
+) -> dict[str, list[tuple[str, float]]]:
     """Merge tool transition definitions.
 
     Override completely replaces base for same source tool.
@@ -252,9 +251,9 @@ def merge_transitions(
 
 
 def merge_required_tools(
-    base: Set[str],
-    vertical_tools: List[str],
-) -> List[str]:
+    base: set[str],
+    vertical_tools: list[str],
+) -> list[str]:
     """Merge common required tools with vertical-specific tools.
 
     Combines base required tools (as set) with vertical-specific tools (as list),

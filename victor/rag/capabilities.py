@@ -38,17 +38,17 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 from victor.framework.capabilities.base_vertical_capability_provider import (
     BaseVerticalCapabilityProvider,
     CapabilityDefinition,
 )
-from victor.framework.protocols import CapabilityType, OrchestratorCapability
-from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.protocols import CapabilityType
+from victor.framework.capability_loader import CapabilityEntry
 
 if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def configure_indexing(
     logger.info(f"Configured RAG indexing: chunk_size={chunk_size}, model={embedding_model}")
 
 
-def get_indexing_config(orchestrator: Any) -> Dict[str, Any]:
+def get_indexing_config(orchestrator: Any) -> dict[str, Any]:
     """Get current indexing configuration.
 
     Args:
@@ -115,7 +115,7 @@ def get_indexing_config(orchestrator: Any) -> Dict[str, Any]:
             "store_backend": "lancedb",
         },
     )
-    return cast(Dict[str, Any], config_result)
+    return cast(dict[str, Any], config_result)
 
 
 def configure_retrieval(
@@ -151,7 +151,7 @@ def configure_retrieval(
     logger.info(f"Configured RAG retrieval: top_k={top_k}, search_type={search_type}")
 
 
-def get_retrieval_config(orchestrator: Any) -> Dict[str, Any]:
+def get_retrieval_config(orchestrator: Any) -> dict[str, Any]:
     """Get current retrieval configuration.
 
     Args:
@@ -172,7 +172,7 @@ def get_retrieval_config(orchestrator: Any) -> Dict[str, Any]:
             "max_context_tokens": 4000,
         },
     )
-    return cast(Dict[str, Any], config_result)
+    return cast(dict[str, Any], config_result)
 
 
 def configure_synthesis(
@@ -208,7 +208,7 @@ def configure_synthesis(
     logger.info(f"Configured RAG synthesis: citation_style={citation_style}")
 
 
-def get_synthesis_config(orchestrator: Any) -> Dict[str, Any]:
+def get_synthesis_config(orchestrator: Any) -> dict[str, Any]:
     """Get current synthesis configuration.
 
     Args:
@@ -229,7 +229,7 @@ def get_synthesis_config(orchestrator: Any) -> Dict[str, Any]:
             "require_verification": True,
         },
     )
-    return cast(Dict[str, Any], config_result)
+    return cast(dict[str, Any], config_result)
 
 
 def configure_safety(
@@ -237,7 +237,7 @@ def configure_safety(
     *,
     filter_sensitive_data: bool = True,
     max_document_size_mb: int = 50,
-    allowed_file_types: Optional[List[str]] = None,
+    allowed_file_types: Optional[list[str]] = None,
     validate_sources: bool = True,
 ) -> None:
     """Configure RAG safety settings for the orchestrator.
@@ -330,7 +330,7 @@ class RAGCapabilityProvider(BaseVerticalCapabilityProvider):
         """Initialize the RAG capability provider."""
         super().__init__("rag")
 
-    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+    def _get_capability_definitions(self) -> dict[str, CapabilityDefinition]:
         """Define RAG capability definitions.
 
         Returns:
@@ -447,15 +447,15 @@ class RAGCapabilityProvider(BaseVerticalCapabilityProvider):
         """Configure query enhancement capability."""
         configure_query_enhancement(orchestrator, **kwargs)
 
-    def get_indexing_config(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_indexing_config(self, orchestrator: Any) -> dict[str, Any]:
         """Get indexing configuration."""
         return get_indexing_config(orchestrator)
 
-    def get_retrieval_config(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_retrieval_config(self, orchestrator: Any) -> dict[str, Any]:
         """Get retrieval configuration."""
         return get_retrieval_config(orchestrator)
 
-    def get_synthesis_config(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_synthesis_config(self, orchestrator: Any) -> dict[str, Any]:
         """Get synthesis configuration."""
         return get_synthesis_config(orchestrator)
 
@@ -482,7 +482,7 @@ def _get_provider() -> RAGCapabilityProvider:
 
 
 # Generate CAPABILITIES list from provider
-CAPABILITIES: List[CapabilityEntry] = []
+CAPABILITIES: list[CapabilityEntry] = []
 
 
 def _generate_capabilities_list() -> None:
@@ -501,7 +501,7 @@ _generate_capabilities_list()
 # =============================================================================
 
 
-def get_rag_capabilities() -> List[CapabilityEntry]:
+def get_rag_capabilities() -> list[CapabilityEntry]:
     """Get all RAG capability entries.
 
     Returns:
@@ -516,13 +516,12 @@ def create_rag_capability_loader() -> Any:
     Returns:
         CapabilityLoader with RAG capabilities registered
     """
-    from victor.framework.capability_loader import CapabilityLoader
 
     provider = _get_provider()
     return provider.create_capability_loader()
 
 
-def get_capability_configs() -> Dict[str, Any]:
+def get_capability_configs() -> dict[str, Any]:
     """Get RAG capability configurations for centralized storage.
 
     Returns default RAG configuration for VerticalContext storage.

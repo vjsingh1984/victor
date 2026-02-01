@@ -25,8 +25,6 @@ Tests cover:
 
 from __future__ import annotations
 
-from typing import List, Tuple
-from unittest.mock import Mock, patch
 
 import pytest
 

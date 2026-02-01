@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for workflow resilience facade."""
 
-import pytest
 
 from victor.workflows.resilience import (
     # Re-exported from core
@@ -10,7 +9,6 @@ from victor.workflows.resilience import (
     CircuitBreakerRegistry,
     CircuitState,
     RetryExecutor,
-    RetryResult,
     ExponentialBackoffStrategy,
     FixedDelayStrategy,
     # Workflow-specific adapters

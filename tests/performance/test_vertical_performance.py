@@ -24,10 +24,7 @@ Uses pytest-benchmark to establish performance baselines and catch regressions.
 """
 
 import gc
-import os
-import tempfile
 from pathlib import Path
-from typing import Any, Generator
 
 import pytest
 

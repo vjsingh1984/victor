@@ -41,21 +41,18 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 import uuid
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 from victor.observability.team_metrics import (
     record_team_spawned,
     record_team_completed,
 )
-from victor.agent.subagents.base import SubAgentConfig, SubAgentResult, SubAgentRole
+from victor.agent.subagents.base import SubAgentResult, SubAgentRole
 from victor.agent.subagents.orchestrator import (
-    ROLE_DEFAULT_BUDGETS,
-    ROLE_DEFAULT_CONTEXT,
-    ROLE_DEFAULT_TOOLS,
     SubAgentOrchestrator,
     SubAgentTask,
 )
@@ -105,7 +102,7 @@ class TeamExecution:
         self.team_id = uuid.uuid4().hex[:12]
         self.config = config
         self.status: str = "pending"
-        self.member_statuses: Dict[str, MemberStatus] = {
+        self.member_statuses: dict[str, MemberStatus] = {
             m.id: MemberStatus.IDLE for m in config.members
         }
         self.start_time: Optional[float] = None
@@ -157,11 +154,11 @@ class TeamCoordinator(ITeamCoordinator):
         # Type ignore: SubAgentOrchestrator expects AgentOrchestrator, but we have IAgentOrchestrator
         # At runtime, this will be AgentOrchestrator which satisfies the protocol
         self.sub_agents = sub_agent_orchestrator or SubAgentOrchestrator(orchestrator)  # type: ignore[arg-type]
-        self._active_teams: Dict[str, TeamExecution] = {}
+        self._active_teams: dict[str, TeamExecution] = {}
         self._on_progress: Optional[Callable[[str, str, float], None]] = None
 
         # ITeamCoordinator state
-        self._members: List[ITeamMember] = []
+        self._members: list[ITeamMember] = []
         self._formation: TeamFormation = TeamFormation.SEQUENTIAL
 
         # Execution context for observability
@@ -209,7 +206,7 @@ class TeamCoordinator(ITeamCoordinator):
         self._formation = formation
         return self
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> dict[str, Any]:
         """Execute a task with the team using stored members and formation.
 
         Args:
@@ -270,7 +267,7 @@ class TeamCoordinator(ITeamCoordinator):
 
     async def broadcast(
         self, message: CanonicalAgentMessage
-    ) -> List[Optional[CanonicalAgentMessage]]:
+    ) -> list[Optional[CanonicalAgentMessage]]:
         """Broadcast a message to all team members.
 
         Args:
@@ -570,7 +567,7 @@ class TeamCoordinator(ITeamCoordinator):
             TeamResult with all member results
         """
         config = execution.config
-        member_results: Dict[str, MemberResult] = {}
+        member_results: dict[str, MemberResult] = {}
         total_tool_calls = 0
 
         # Sort by priority
@@ -691,7 +688,7 @@ class TeamCoordinator(ITeamCoordinator):
         )
 
         # Process results
-        member_results: Dict[str, MemberResult] = {}
+        member_results: dict[str, MemberResult] = {}
         for i, (member, sub_result) in enumerate(zip(config.members, fan_out_result.results)):
             result = self._convert_subagent_result(member.id, sub_result)
             member_results[member.id] = result
@@ -738,7 +735,7 @@ class TeamCoordinator(ITeamCoordinator):
         config = execution.config
         manager = config.get_manager()
         workers = config.get_workers()
-        member_results: Dict[str, MemberResult] = {}
+        member_results: dict[str, MemberResult] = {}
         total_tool_calls = 0
 
         if not manager:
@@ -876,7 +873,7 @@ Synthesize these reports into a final comprehensive result that addresses the or
             TeamResult with all member results
         """
         config = execution.config
-        member_results: Dict[str, MemberResult] = {}
+        member_results: dict[str, MemberResult] = {}
         total_tool_calls = 0
 
         # Sort by priority for pipeline order
@@ -1010,7 +1007,7 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
         member: TeamMember,
         config: TeamConfig,
         shared_memory: TeamSharedMemory,
-        previous_results: Dict[str, MemberResult],
+        previous_results: dict[str, MemberResult],
     ) -> str:
         """Build context string for a member.
 
@@ -1142,7 +1139,7 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             error=result.error,
         )
 
-    def _extract_discoveries(self, result: SubAgentResult) -> List[str]:
+    def _extract_discoveries(self, result: SubAgentResult) -> list[str]:
         """Extract discovery statements from a result.
 
         Args:
@@ -1165,7 +1162,7 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
 
     def _synthesize_results(
         self,
-        member_results: Dict[str, MemberResult],
+        member_results: dict[str, MemberResult],
         config: TeamConfig,
     ) -> str:
         """Synthesize final output from member results.
@@ -1191,7 +1188,7 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
 
         return "\n".join(lines)
 
-    def _format_worker_list(self, workers: List[TeamMember]) -> str:
+    def _format_worker_list(self, workers: list[TeamMember]) -> str:
         """Format worker list for manager context.
 
         Includes expertise information to help managers make informed
@@ -1227,7 +1224,7 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             except Exception as e:
                 logger.debug(f"Progress callback failed: {e}")
 
-    def get_team_status(self, team_id: str) -> Optional[Dict[str, Any]]:
+    def get_team_status(self, team_id: str) -> Optional[dict[str, Any]]:
         """Get status of an active team.
 
         Args:
@@ -1251,7 +1248,7 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             "duration": time.time() - execution.start_time if execution.start_time else 0,
         }
 
-    def get_active_teams(self) -> List[str]:
+    def get_active_teams(self) -> list[str]:
         """Get IDs of all active teams.
 
         Returns:

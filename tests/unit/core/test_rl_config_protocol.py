@@ -18,7 +18,6 @@ Verifies that all RL configs implement get_rl_config() per RLConfigProviderProto
 """
 
 import pytest
-from typing import Any, Dict, Optional
 
 
 @pytest.mark.parametrize(
@@ -100,7 +99,6 @@ def test_rl_config_implements_protocol():
     The isinstance() check requires ALL protocol methods to be present, even those
     with defaults. We verify structural compliance by checking the required method.
     """
-    from victor.core.verticals.protocols import RLConfigProviderProtocol
     from victor.coding.rl.config import CodingRLConfig
     from victor.research.rl import ResearchRLConfig
     from victor.devops.rl import DevOpsRLConfig

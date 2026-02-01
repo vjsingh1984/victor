@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 
 @dataclass
@@ -67,13 +67,13 @@ class StateSnapshot:
 
     timestamp: float
     node_id: str
-    state: Dict[str, Any]
-    state_summary: Dict[str, str]  # key -> type
+    state: dict[str, Any]
+    state_summary: dict[str, str]  # key -> type
     size_bytes: int
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def capture(cls, state: Dict[str, Any], node_id: str) -> "StateSnapshot":
+    def capture(cls, state: dict[str, Any], node_id: str) -> "StateSnapshot":
         """Capture a state snapshot.
 
         Args:
@@ -99,7 +99,7 @@ class StateSnapshot:
             size_bytes=size_bytes,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary.
 
         Returns:
@@ -136,15 +136,15 @@ class StateDiff:
         print(diff.changed_keys)  # {"errors": (0, 5)}
     """
 
-    before_keys: Set[str]
-    after_keys: Set[str]
-    added_keys: Set[str]
-    removed_keys: Set[str]
-    changed_keys: Dict[str, tuple[Any, Any]]  # key -> (old, new)
-    unchanged_keys: Set[str]
+    before_keys: set[str]
+    after_keys: set[str]
+    added_keys: set[str]
+    removed_keys: set[str]
+    changed_keys: dict[str, tuple[Any, Any]]  # key -> (old, new)
+    unchanged_keys: set[str]
 
     @classmethod
-    def compare(cls, before: Dict[str, Any], after: Dict[str, Any]) -> "StateDiff":
+    def compare(cls, before: dict[str, Any], after: dict[str, Any]) -> "StateDiff":
         """Compare two state dictionaries.
 
         Args:
@@ -179,7 +179,7 @@ class StateDiff:
             unchanged_keys=unchanged_keys,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary.
 
         Returns:
@@ -231,10 +231,10 @@ class StateInspector:
         Args:
             max_snapshots: Maximum snapshots to keep in memory
         """
-        self._snapshots: List[StateSnapshot] = []
+        self._snapshots: list[StateSnapshot] = []
         self._max_snapshots = max_snapshots
 
-    def capture_snapshot(self, state: Dict[str, Any], node_id: str) -> StateSnapshot:
+    def capture_snapshot(self, state: dict[str, Any], node_id: str) -> StateSnapshot:
         """Capture a state snapshot.
 
         Args:
@@ -254,7 +254,7 @@ class StateInspector:
 
         return snapshot
 
-    def compare_states(self, before: Dict[str, Any], after: Dict[str, Any]) -> StateDiff:
+    def compare_states(self, before: dict[str, Any], after: dict[str, Any]) -> StateDiff:
         """Compare two state dictionaries.
 
         Args:
@@ -266,7 +266,7 @@ class StateInspector:
         """
         return StateDiff.compare(before, after)
 
-    def get_value(self, state: Dict[str, Any], key_path: str, default: Any = None) -> Any:
+    def get_value(self, state: dict[str, Any], key_path: str, default: Any = None) -> Any:
         """Get a value from state by key path.
 
         Supports nested key paths with dot notation:
@@ -293,7 +293,7 @@ class StateInspector:
 
         return value if value is not None else default
 
-    def get_state_summary(self, state: Dict[str, Any]) -> Dict[str, str]:
+    def get_state_summary(self, state: dict[str, Any]) -> dict[str, str]:
         """Get summary of state keys and types.
 
         Args:
@@ -304,7 +304,7 @@ class StateInspector:
         """
         return {k: type(v).__name__ for k, v in state.items()}
 
-    def get_snapshots(self, limit: Optional[int] = None) -> List[StateSnapshot]:
+    def get_snapshots(self, limit: Optional[int] = None) -> list[StateSnapshot]:
         """Get state snapshots.
 
         Args:
@@ -317,7 +317,7 @@ class StateInspector:
             return self._snapshots[-limit:]
         return self._snapshots.copy()
 
-    def get_snapshot_history(self, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_snapshot_history(self, session_id: Optional[str] = None) -> list[dict[str, Any]]:
         """Get snapshot history as dictionaries.
 
         Args:
@@ -332,7 +332,7 @@ class StateInspector:
         """Clear all snapshots."""
         self._snapshots.clear()
 
-    def get_large_state_keys(self, state: Dict[str, Any], threshold_bytes: int = 1024) -> List[str]:
+    def get_large_state_keys(self, state: dict[str, Any], threshold_bytes: int = 1024) -> list[str]:
         """Find state keys with large values.
 
         Args:

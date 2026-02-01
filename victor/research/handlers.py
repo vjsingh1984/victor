@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any
 
 from victor.framework.workflows.base_handler import BaseHandler
 from victor.framework.handler_registry import handler_decorator
@@ -75,14 +75,14 @@ class WebScraperHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute web scraping."""
         url = node.input_mapping.get("url", "")
         if isinstance(url, str) and url.startswith("$ctx."):
             url = context.get(url[5:]) or url
 
         selectors_input: Any = node.input_mapping.get("selectors", {})
-        selectors: Dict[str, Any] = selectors_input if isinstance(selectors_input, dict) else {}
+        selectors: dict[str, Any] = selectors_input if isinstance(selectors_input, dict) else {}
 
         result = await tool_registry.execute(
             "web_fetch",
@@ -127,7 +127,7 @@ class CitationFormatterHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute citation formatting."""
         refs_key = node.input_mapping.get("references")
         references = context.get(refs_key) if refs_key else []
@@ -144,7 +144,7 @@ class CitationFormatterHandler(BaseHandler):
 
         return output, 0
 
-    def _format_citation(self, ref: Dict[str, Any], style: str) -> str:
+    def _format_citation(self, ref: dict[str, Any], style: str) -> str:
         """Format a single citation."""
         if not isinstance(ref, dict):
             return str(ref)  # type: ignore[unreachable]

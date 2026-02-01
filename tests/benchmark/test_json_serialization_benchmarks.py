@@ -26,11 +26,11 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 import pytest
 
 from victor.core.cache import ResponseCache
-from victor.core.batching import RequestBatcher, BatchPriority
+from victor.core.batching import RequestBatcher
 from victor.optimization.core import json_dumps, json_loads
 from victor.providers.base import Message, CompletionResponse
 
@@ -51,7 +51,7 @@ class BenchmarkResult:
     min_time: float
     max_time: float
     throughput: float  # Operations per second
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
     def speedup(self, other: "BenchmarkResult") -> float:
         """Calculate speedup compared to another result.
@@ -64,7 +64,7 @@ class BenchmarkResult:
         """
         return other.avg_time / self.avg_time
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary.
 
         Returns:
@@ -165,7 +165,7 @@ async def run_async_benchmark(func, iterations: int, warmup: int = 0) -> Benchma
     )
 
 
-def print_benchmark_results(results: List[BenchmarkResult]) -> None:
+def print_benchmark_results(results: list[BenchmarkResult]) -> None:
     """Print benchmark results in a formatted table.
 
     Args:
@@ -192,7 +192,7 @@ def print_benchmark_results(results: List[BenchmarkResult]) -> None:
     print("=" * 100 + "\n")
 
 
-def save_benchmark_results(results: List[BenchmarkResult], path: Path) -> None:
+def save_benchmark_results(results: list[BenchmarkResult], path: Path) -> None:
     """Save benchmark results to JSON file.
 
     Args:
@@ -219,7 +219,7 @@ class TestJSONSerializationBenchmarks:
     """Benchmarks for JSON serialization optimizations."""
 
     @staticmethod
-    def create_test_data(size: str = "medium") -> Dict[str, Any]:
+    def create_test_data(size: str = "medium") -> dict[str, Any]:
         """Create test data for serialization.
 
         Args:
@@ -504,7 +504,6 @@ class TestOverallPerformance:
 
 if __name__ == "__main__":
     """Run all benchmarks and generate report."""
-    import sys
 
     print("Running performance optimization benchmarks...\n")
 

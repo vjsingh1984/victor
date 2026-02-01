@@ -20,7 +20,7 @@ concepts, and projects from conversational text.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.storage.memory.entity_types import (
     Entity,
@@ -173,7 +173,7 @@ class TextEntityExtractor(EntityExtractor):
     def __init__(
         self,
         min_confidence: float = 0.5,
-        custom_technologies: Optional[Set[str]] = None,
+        custom_technologies: Optional[set[str]] = None,
     ):
         """Initialize text extractor.
 
@@ -191,7 +191,7 @@ class TextEntityExtractor(EntityExtractor):
         return "text_extractor"
 
     @property
-    def supported_types(self) -> Set[EntityType]:
+    def supported_types(self) -> set[EntityType]:
         return {
             EntityType.PERSON,
             EntityType.ORGANIZATION,
@@ -207,7 +207,7 @@ class TextEntityExtractor(EntityExtractor):
         self,
         content: str,
         source: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ExtractionResult:
         """Extract text entities from content.
 
@@ -219,8 +219,8 @@ class TextEntityExtractor(EntityExtractor):
         Returns:
             ExtractionResult with text entities
         """
-        entities: List[Entity] = []
-        relations: List[EntityRelation] = []
+        entities: list[Entity] = []
+        relations: list[EntityRelation] = []
 
         # Extract technologies
         entities.extend(self._extract_technologies(content, source))
@@ -254,9 +254,9 @@ class TextEntityExtractor(EntityExtractor):
             metadata={"extractor": self.name},
         )
 
-    def _extract_technologies(self, content: str, source: Optional[str]) -> List[Entity]:
+    def _extract_technologies(self, content: str, source: Optional[str]) -> list[Entity]:
         """Extract technology entities."""
-        entities: List[Entity] = []
+        entities: list[Entity] = []
         content_lower = content.lower()
 
         for tech in self._technologies:
@@ -280,9 +280,9 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_organizations(self, content: str, source: Optional[str]) -> List[Entity]:
+    def _extract_organizations(self, content: str, source: Optional[str]) -> list[Entity]:
         """Extract organization entities."""
-        entities: List[Entity] = []
+        entities: list[Entity] = []
 
         for pattern in ORGANIZATION_PATTERNS:
             matches = re.finditer(pattern, content)
@@ -302,9 +302,9 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_projects(self, content: str, source: Optional[str]) -> List[Entity]:
+    def _extract_projects(self, content: str, source: Optional[str]) -> list[Entity]:
         """Extract project entities."""
-        entities: List[Entity] = []
+        entities: list[Entity] = []
 
         for pattern in PROJECT_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
@@ -324,9 +324,9 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_concepts(self, content: str, source: Optional[str]) -> List[Entity]:
+    def _extract_concepts(self, content: str, source: Optional[str]) -> list[Entity]:
         """Extract concept entities."""
-        entities: List[Entity] = []
+        entities: list[Entity] = []
 
         for pattern in CONCEPT_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
@@ -346,9 +346,9 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_requirements(self, content: str, source: Optional[str]) -> List[Entity]:
+    def _extract_requirements(self, content: str, source: Optional[str]) -> list[Entity]:
         """Extract requirement and feature entities."""
-        entities: List[Entity] = []
+        entities: list[Entity] = []
 
         for pattern in REQUIREMENT_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
@@ -368,9 +368,9 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _extract_bugs(self, content: str, source: Optional[str]) -> List[Entity]:
+    def _extract_bugs(self, content: str, source: Optional[str]) -> list[Entity]:
         """Extract bug entities."""
-        entities: List[Entity] = []
+        entities: list[Entity] = []
 
         for pattern in BUG_PATTERNS:
             matches = re.finditer(pattern, content, re.IGNORECASE)
@@ -390,9 +390,9 @@ class TextEntityExtractor(EntityExtractor):
 
         return entities
 
-    def _infer_relationships(self, content: str, entities: List[Entity]) -> List[EntityRelation]:
+    def _infer_relationships(self, content: str, entities: list[Entity]) -> list[EntityRelation]:
         """Infer relationships between entities."""
-        relations: List[EntityRelation] = []
+        relations: list[EntityRelation] = []
 
         # Group entities by type for relationship inference
         techs = [e for e in entities if e.entity_type == EntityType.TECHNOLOGY]
@@ -423,9 +423,9 @@ class TextEntityExtractor(EntityExtractor):
 
         return relations
 
-    def _deduplicate_entities(self, entities: List[Entity]) -> List[Entity]:
+    def _deduplicate_entities(self, entities: list[Entity]) -> list[Entity]:
         """Remove duplicate entities."""
-        seen: Dict[str, Entity] = {}
+        seen: dict[str, Entity] = {}
 
         for entity in entities:
             if entity.id in seen:
@@ -438,7 +438,7 @@ class TextEntityExtractor(EntityExtractor):
 
         return list(seen.values())
 
-    def _calculate_overall_confidence(self, entities: List[Entity]) -> float:
+    def _calculate_overall_confidence(self, entities: list[Entity]) -> float:
         """Calculate overall extraction confidence."""
         if not entities:
             return 0.0

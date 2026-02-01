@@ -16,7 +16,7 @@
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.storage.memory.entity_types import EntityType
 from victor.storage.memory.extractors.base import EntityExtractor, ExtractionResult
@@ -40,7 +40,7 @@ class CompositeExtractor(EntityExtractor):
 
     def __init__(
         self,
-        extractors: Optional[List[EntityExtractor]] = None,
+        extractors: Optional[list[EntityExtractor]] = None,
         parallel: bool = True,
         dedup_strategy: str = "highest_confidence",
     ):
@@ -63,9 +63,9 @@ class CompositeExtractor(EntityExtractor):
         return "composite_extractor"
 
     @property
-    def supported_types(self) -> Set[EntityType]:
+    def supported_types(self) -> set[EntityType]:
         """Union of all extractor supported types."""
-        all_types: Set[EntityType] = set()
+        all_types: set[EntityType] = set()
         for extractor in self._extractors:
             all_types.update(extractor.supported_types)
         return all_types
@@ -86,7 +86,7 @@ class CompositeExtractor(EntityExtractor):
         self,
         content: str,
         source: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ExtractionResult:
         """Extract entities using all configured extractors.
 
@@ -124,15 +124,15 @@ class CompositeExtractor(EntityExtractor):
         self,
         content: str,
         source: Optional[str],
-        context: Optional[Dict[str, Any]],
-    ) -> List[ExtractionResult]:
+        context: Optional[dict[str, Any]],
+    ) -> list[ExtractionResult]:
         """Run extractors in parallel."""
         tasks = [extractor.extract(content, source, context) for extractor in self._extractors]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Filter out exceptions
-        valid_results: List[ExtractionResult] = []
+        valid_results: list[ExtractionResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 logger.warning(f"Extractor {self._extractors[i].name} failed: {result}")
@@ -145,10 +145,10 @@ class CompositeExtractor(EntityExtractor):
         self,
         content: str,
         source: Optional[str],
-        context: Optional[Dict[str, Any]],
-    ) -> List[ExtractionResult]:
+        context: Optional[dict[str, Any]],
+    ) -> list[ExtractionResult]:
         """Run extractors sequentially."""
-        results: List[ExtractionResult] = []
+        results: list[ExtractionResult] = []
 
         for extractor in self._extractors:
             try:
@@ -163,7 +163,7 @@ class CompositeExtractor(EntityExtractor):
         """Apply deduplication strategy to merged results."""
         if self._dedup_strategy == "highest_confidence":
             # Keep highest confidence version of each entity
-            seen: Dict[str, Any] = {}
+            seen: dict[str, Any] = {}
             for entity in result.entities:
                 if entity.id not in seen:
                     seen[entity.id] = entity
@@ -176,7 +176,7 @@ class CompositeExtractor(EntityExtractor):
             # Merge attributes from duplicates
             from victor.storage.memory.entity_types import Entity
 
-            merged: Dict[str, Entity] = {}
+            merged: dict[str, Entity] = {}
             for entity in result.entities:
                 if entity.id in merged:
                     merged[entity.id] = merged[entity.id].merge_with(entity)

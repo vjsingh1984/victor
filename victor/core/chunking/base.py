@@ -22,7 +22,7 @@ This module provides the foundational classes for chunking documents:
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Optional, Protocol
 
 
 @dataclass
@@ -71,7 +71,7 @@ class Chunk:
     start_char: int
     end_char: int
     chunk_type: str = "text"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def length(self) -> int:
@@ -102,12 +102,12 @@ class ChunkingStrategy(ABC):
 
     @property
     @abstractmethod
-    def supported_types(self) -> List[str]:
+    def supported_types(self) -> list[str]:
         """Document types this strategy supports."""
         ...
 
     @abstractmethod
-    def chunk(self, content: str) -> List[Chunk]:
+    def chunk(self, content: str) -> list[Chunk]:
         """Chunk content into semantic pieces.
 
         Args:
@@ -137,8 +137,8 @@ class ChunkingStrategyProtocol(Protocol):
     def name(self) -> str: ...
 
     @property
-    def supported_types(self) -> List[str]: ...
+    def supported_types(self) -> list[str]: ...
 
-    def chunk(self, content: str) -> List[Chunk]: ...
+    def chunk(self, content: str) -> list[Chunk]: ...
 
     def can_handle(self, doc_type: str) -> bool: ...

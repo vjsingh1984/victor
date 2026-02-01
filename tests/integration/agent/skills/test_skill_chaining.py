@@ -22,12 +22,9 @@ from unittest.mock import AsyncMock, Mock
 
 from victor.agent.skills.skill_chaining import (
     ChainExecutionStatus,
-    ChainResult,
     ChainStep,
     SkillChain,
     SkillChainer,
-    StepResult,
-    ValidationResult,
 )
 from victor.agent.skills.skill_discovery import Skill, AvailableTool
 from victor.tools.enums import CostTier

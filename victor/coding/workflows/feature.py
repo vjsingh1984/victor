@@ -18,7 +18,7 @@ Provides a multi-step workflow for implementing new features with
 research, planning, implementation, and review stages.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from victor.workflows.definition import (
     WorkflowBuilder,
@@ -27,7 +27,7 @@ from victor.workflows.definition import (
 )
 
 
-def _check_review_result(ctx: Dict[str, Any]) -> str:
+def _check_review_result(ctx: dict[str, Any]) -> str:
     """Check review result and decide next step.
 
     Args:

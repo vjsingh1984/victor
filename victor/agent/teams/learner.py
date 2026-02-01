@@ -31,11 +31,9 @@ from __future__ import annotations
 import json
 import logging
 import random
-import sqlite3
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.agent.subagents import SubAgentRole
 
@@ -44,7 +42,6 @@ from victor.teams.types import TeamConfig, TeamFormation, TeamMember
 from victor.agent.teams.metrics import (
     TaskCategory,
     TeamMetrics,
-    CompositionStats,
     categorize_task,
 )
 from victor.core.database import get_database
@@ -68,7 +65,7 @@ class TeamRecommendation:
     """
 
     formation: TeamFormation
-    role_distribution: Dict[str, int]
+    role_distribution: dict[str, int]
     suggested_budget: int
     confidence: float
     reason: str
@@ -79,7 +76,7 @@ class TeamRecommendation:
         self,
         name: str,
         goal: str,
-        member_goals: Optional[Dict[str, str]] = None,
+        member_goals: Optional[dict[str, str]] = None,
     ) -> TeamConfig:
         """Convert recommendation to TeamConfig.
 
@@ -136,7 +133,7 @@ class TeamRecommendation:
 
 
 # Default compositions for cold start
-DEFAULT_COMPOSITIONS: Dict[TaskCategory, TeamRecommendation] = {
+DEFAULT_COMPOSITIONS: dict[TaskCategory, TeamRecommendation] = {
     TaskCategory.EXPLORATION: TeamRecommendation(
         formation=TeamFormation.PARALLEL,
         role_distribution={"researcher": 2},
@@ -338,7 +335,7 @@ class TeamCompositionLearner:
     def suggest_team(
         self,
         task_type: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> TeamRecommendation:
         """Suggest optimal team composition for a task.
 
@@ -379,7 +376,7 @@ class TeamCompositionLearner:
     def _exploit_best(
         self,
         category: TaskCategory,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> TeamRecommendation:
         """Get the best known composition for a category.
 
@@ -446,7 +443,7 @@ class TeamCompositionLearner:
     def _explore_composition(
         self,
         category: TaskCategory,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> TeamRecommendation:
         """Explore an alternative composition.
 
@@ -819,7 +816,7 @@ class TeamCompositionLearner:
 
         return max(-1.0, min(1.0, reward))
 
-    def get_stats(self, task_category: Optional[TaskCategory] = None) -> Dict[str, Any]:
+    def get_stats(self, task_category: Optional[TaskCategory] = None) -> dict[str, Any]:
         """Get learner statistics.
 
         Args:

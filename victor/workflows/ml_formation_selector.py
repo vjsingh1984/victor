@@ -59,7 +59,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class TaskFeatures:
     tool_budget: Optional[int] = None
     time_limit_seconds: Optional[float] = None
 
-    def to_feature_vector(self) -> List[float]:
+    def to_feature_vector(self) -> list[float]:
         """Convert to feature vector for ML models.
 
         Returns:
@@ -127,7 +127,7 @@ class TaskFeatures:
             self.ambiguity_score,
         ]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "task_id": self.task_id,
@@ -168,7 +168,7 @@ class TrainingExample:
     efficiency_score: float
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "task_features": self.task_features.to_dict(),
@@ -201,10 +201,10 @@ class ModelMetrics:
     f1_score: float = 0.0
     training_time_seconds: float = 0.0
     inference_time_seconds: float = 0.0
-    formation_distribution: Dict[str, int] = field(default_factory=dict)
-    confusion_matrix: Optional[List[List[int]]] = None
+    formation_distribution: dict[str, int] = field(default_factory=dict)
+    confusion_matrix: Optional[list[list[int]]] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "accuracy": self.accuracy,
@@ -268,7 +268,7 @@ class FeatureExtractor:
         self,
         task: Any,
         context: Any,
-        agents: List[Any],
+        agents: list[Any],
     ) -> TaskFeatures:
         """Extract features from task and context.
 
@@ -819,7 +819,7 @@ class ModelTrainer:
 
         return metrics
 
-    def _load_training_data(self, data_path: str) -> Tuple[List[List[float]], List[int]]:
+    def _load_training_data(self, data_path: str) -> tuple[list[list[float]], list[int]]:
         """Load and preprocess training data.
 
         Args:
@@ -892,7 +892,7 @@ class ModelTrainer:
                 def fit(self, X: Any, y: Any) -> "DummyModel":
                     return self
 
-                def predict(self, X: Any) -> List[int]:
+                def predict(self, X: Any) -> list[int]:
                     return [0] * len(X)
 
                 def predict_proba(self, X: Any) -> Any:
@@ -902,7 +902,7 @@ class ModelTrainer:
 
             return DummyModel()
 
-    def _evaluate_model(self, X_test: List[List[float]], y_test: List[int]) -> ModelMetrics:
+    def _evaluate_model(self, X_test: list[list[float]], y_test: list[int]) -> ModelMetrics:
         """Evaluate model performance.
 
         Args:
@@ -939,7 +939,7 @@ class ModelTrainer:
             f1 = accuracy
 
         # Formation distribution
-        formation_counts: Dict[str, int] = {}
+        formation_counts: dict[str, int] = {}
         for label in y_pred:
             formation = self.FORMATION_LABELS[label]
             formation_counts[formation] = formation_counts.get(formation, 0) + 1
@@ -989,7 +989,7 @@ class ModelTrainer:
 
         logger.info(f"Model loaded from {model_path}")
 
-    def update_model(self, new_examples: List[TrainingExample]) -> ModelMetrics:
+    def update_model(self, new_examples: list[TrainingExample]) -> ModelMetrics:
         """Update model with new examples (online learning).
 
         Args:
@@ -1090,7 +1090,7 @@ class AdaptiveFormationML:
         self.formation_labels = ModelTrainer.FORMATION_LABELS
 
         # Online learning buffer
-        self._execution_buffer: List[TrainingExample] = []
+        self._execution_buffer: list[TrainingExample] = []
         self._trainer: Optional[ModelTrainer] = None
 
         # Load model if path provided
@@ -1121,9 +1121,9 @@ class AdaptiveFormationML:
         self,
         task: Any,
         context: Any,
-        agents: List[Any],
+        agents: list[Any],
         return_scores: bool = False,
-    ) -> Union[str, Tuple[str, Dict[str, float]]]:
+    ) -> str | tuple[str, dict[str, float]]:
         """Predict optimal formation for task.
 
         Args:
@@ -1183,7 +1183,7 @@ class AdaptiveFormationML:
 
     def _heuristic_prediction(
         self, features: TaskFeatures, return_scores: bool = False
-    ) -> Union[str, Tuple[str, Dict[str, float]]]:
+    ) -> str | tuple[str, dict[str, float]]:
         """Heuristic-based formation prediction (fallback).
 
         Args:
@@ -1238,7 +1238,7 @@ class AdaptiveFormationML:
         self,
         task: Any,
         context: Any,
-        agents: List[Any],
+        agents: list[Any],
         formation: str,
         success: bool,
         duration_seconds: float,
@@ -1301,7 +1301,7 @@ class AdaptiveFormationML:
         except Exception as e:
             logger.error(f"Failed to update model: {e}")
 
-    def get_feature_importance(self) -> Dict[str, float]:
+    def get_feature_importance(self) -> dict[str, float]:
         """Get feature importance from model (if available).
 
         Returns:

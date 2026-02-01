@@ -34,7 +34,8 @@ import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ class BatchTask:
     task_id: str
     task_data: Any
     priority: int = 0
-    dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
     timeout_ms: Optional[int] = None
 
 
@@ -122,7 +123,7 @@ class BatchSummary:
     successful_count: int
     failed_count: int
     total_duration_ms: float
-    results: List[TaskResult]
+    results: list[TaskResult]
 
 
 @dataclass
@@ -221,7 +222,7 @@ class BatchProcessorAccelerator:
 
     async def process_batch(
         self,
-        tasks: List[BatchTask],
+        tasks: list[BatchTask],
         executor: Callable[[BatchTask], Any],
         processor: Any,
         progress_callback: Optional[Callable[[BatchProgress], None]] = None,
@@ -312,7 +313,7 @@ class BatchProcessorAccelerator:
 
     async def _python_process_batch(
         self,
-        tasks: List[BatchTask],
+        tasks: list[BatchTask],
         executor: Callable[[BatchTask], Any],
         processor: Any,
         progress_callback: Optional[Callable[[BatchProgress], None]],
@@ -336,7 +337,7 @@ class BatchProcessorAccelerator:
         # Create semaphore for concurrency control
         semaphore = asyncio.Semaphore(max_concurrent)
 
-        results: List[TaskResult] = []
+        results: list[TaskResult] = []
         successful = 0
         failed = 0
 

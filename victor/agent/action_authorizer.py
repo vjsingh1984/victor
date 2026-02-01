@@ -35,7 +35,9 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, List, Optional, Pattern, Set, Tuple
+from typing import Optional
+from re import Pattern
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -124,13 +126,13 @@ class IntentClassification:
 
     intent: ActionIntent
     confidence: float
-    matched_signals: List[str]
-    safe_actions: Set[str]
+    matched_signals: list[str]
+    safe_actions: set[str]
     prompt_guard: str
 
 
 # Signals that indicate "display only" intent
-DISPLAY_SIGNALS: List[Tuple[str, float, str]] = [
+DISPLAY_SIGNALS: list[tuple[str, float, str]] = [
     (r"\bshow\s+me\b", 1.0, "show_me"),
     (r"\bgive\s+me\s+(an?\s+)?(example|code)\b", 0.9, "give_example"),
     (r"\bcreate\s+(a|an)\s+\w*\s*(function|class|method|script)\b", 0.8, "create_function"),
@@ -144,7 +146,7 @@ DISPLAY_SIGNALS: List[Tuple[str, float, str]] = [
 ]
 
 # Signals that explicitly authorize file writing
-WRITE_SIGNALS: List[Tuple[str, float, str]] = [
+WRITE_SIGNALS: list[tuple[str, float, str]] = [
     (r"\b(save|write)\s+(\w+\s+)?(to|as)\s+\w+", 1.0, "save_to_file"),
     (r"\bsave\s+(this|it)\s+(to|as)\b", 1.0, "save_this_to"),
     (r"\bcreate\s+(a\s+)?(new\s+)?file\b", 1.0, "create_file"),
@@ -164,7 +166,7 @@ WRITE_SIGNALS: List[Tuple[str, float, str]] = [
 ]
 
 # Signals that indicate read-only intent (no generation)
-READ_ONLY_SIGNALS: List[Tuple[str, float, str]] = [
+READ_ONLY_SIGNALS: list[tuple[str, float, str]] = [
     (r"\b(list|show)\s+(all\s+)?(files?|directories?)\b", 0.9, "list_files"),
     (r"\bwhat\s+(are|is)\s+(in|inside)\b", 0.8, "what_is_in"),
     (r"\bexplain\s+(the\s+)?(file|code|function)\b", 0.9, "explain"),
@@ -176,7 +178,7 @@ READ_ONLY_SIGNALS: List[Tuple[str, float, str]] = [
 
 # Compound signals: "analyze AND fix" patterns that authorize writes after analysis
 # These take precedence over READ_ONLY signals when both analysis and action words present
-COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
+COMPOUND_WRITE_SIGNALS: list[tuple[str, float, str]] = [
     # Analyze/review + fix/update/modify
     (
         r"\b(analyze|review|check|find)\b.*\b(and|then)\s+(fix|update|modify|correct|improve)\b",
@@ -270,7 +272,7 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
 ]
 
 # Safe actions by intent type
-SAFE_ACTIONS: dict[ActionIntent, Set[str]] = {
+SAFE_ACTIONS: dict[ActionIntent, set[str]] = {
     ActionIntent.READ_ONLY: {"read_file", "list_directory", "code_search", "git_status"},
     ActionIntent.DISPLAY_ONLY: {
         "read_file",
@@ -343,9 +345,9 @@ class IntentDetector:
 
     def __init__(
         self,
-        custom_display_signals: Optional[List[Tuple[str, float, str]]] = None,
-        custom_write_signals: Optional[List[Tuple[str, float, str]]] = None,
-        custom_detectors: Optional[List[Callable[[str], Optional[IntentClassification]]]] = None,
+        custom_display_signals: Optional[list[tuple[str, float, str]]] = None,
+        custom_write_signals: Optional[list[tuple[str, float, str]]] = None,
+        custom_detectors: Optional[list[Callable[[str], Optional[IntentClassification]]]] = None,
         default_intent: ActionIntent = ActionIntent.DISPLAY_ONLY,
     ):
         """Initialize the intent detector.
@@ -360,10 +362,10 @@ class IntentDetector:
         self.custom_detectors = custom_detectors or []
 
         # Compile patterns
-        self._display_patterns: List[Tuple[Pattern[str], float, str]] = []
-        self._write_patterns: List[Tuple[Pattern[str], float, str]] = []
-        self._read_only_patterns: List[Tuple[Pattern[str], float, str]] = []
-        self._compound_write_patterns: List[Tuple[Pattern[str], float, str]] = []
+        self._display_patterns: list[tuple[Pattern[str], float, str]] = []
+        self._write_patterns: list[tuple[Pattern[str], float, str]] = []
+        self._read_only_patterns: list[tuple[Pattern[str], float, str]] = []
+        self._compound_write_patterns: list[tuple[Pattern[str], float, str]] = []
 
         self._compile_patterns(DISPLAY_SIGNALS, self._display_patterns)
         self._compile_patterns(WRITE_SIGNALS, self._write_patterns)
@@ -377,8 +379,8 @@ class IntentDetector:
 
     def _compile_patterns(
         self,
-        signals: List[Tuple[str, float, str]],
-        target: List[Tuple[Pattern[str], float, str]],
+        signals: list[tuple[str, float, str]],
+        target: list[tuple[Pattern[str], float, str]],
     ) -> None:
         """Compile regex patterns."""
         for pattern_str, weight, name in signals:
@@ -454,8 +456,8 @@ class IntentDetector:
     def _score_patterns(
         self,
         message: str,
-        patterns: List[Tuple[Pattern[str], float, str]],
-    ) -> Tuple[float, List[str]]:
+        patterns: list[tuple[Pattern[str], float, str]],
+    ) -> tuple[float, list[str]]:
         """Score patterns against message.
 
         Args:
@@ -525,7 +527,7 @@ def get_prompt_guard(message: str) -> str:
     return result.prompt_guard
 
 
-def get_safe_tools(message: str, all_tools: Set[str]) -> Set[str]:
+def get_safe_tools(message: str, all_tools: set[str]) -> set[str]:
     """Get tools that are safe to use based on intent.
 
     Args:

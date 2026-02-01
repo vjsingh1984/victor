@@ -51,7 +51,8 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, Generic, List, Optional, TypeVar
+from typing import Any, Generic, Optional, TypeVar
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ class PrioritizedRequest(Generic[T]):
     coroutine: Awaitable[T] = field(compare=False, repr=False)
     future: asyncio.Future = field(compare=False, repr=False)
     estimated_tokens: int = field(compare=False, default=1000)
-    metadata: Dict[str, Any] = field(compare=False, default_factory=dict)
+    metadata: dict[str, Any] = field(compare=False, default_factory=dict)
 
 
 class TokenBucketRateLimiter:
@@ -244,7 +245,7 @@ class SlidingWindowRateLimiter:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
 
-        self._requests: List[float] = []
+        self._requests: list[float] = []
         self._lock = asyncio.Lock()
 
         logger.debug(
@@ -452,12 +453,12 @@ class RequestQueue:
         )
 
         # Request tracking
-        self._pending_requests: Dict[str, PrioritizedRequest] = {}
-        self._active_requests: Dict[str, PrioritizedRequest] = {}
+        self._pending_requests: dict[str, PrioritizedRequest] = {}
+        self._active_requests: dict[str, PrioritizedRequest] = {}
         self._lock = asyncio.Lock()
 
         # Worker management
-        self._workers: List[asyncio.Task] = []
+        self._workers: list[asyncio.Task] = []
         self._shutdown_event = asyncio.Event()
         self._started = False
 
@@ -558,7 +559,7 @@ class RequestQueue:
         priority: RequestPriority = RequestPriority.NORMAL,
         estimated_tokens: int = 1000,
         request_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> T:
         """Submit a request for execution.
 
@@ -639,10 +640,10 @@ class RequestQueue:
 
     async def submit_parallel(
         self,
-        coroutines: List[Awaitable[T]],
+        coroutines: list[Awaitable[T]],
         priority: RequestPriority = RequestPriority.NORMAL,
         return_exceptions: bool = True,
-    ) -> List[T | BaseException]:
+    ) -> list[T | BaseException]:
         """Submit multiple requests for parallel execution.
 
         Args:
@@ -659,10 +660,10 @@ class RequestQueue:
 
     async def execute_tool_calls_parallel(
         self,
-        tool_calls: List[Dict[str, Any]],
-        executor: Callable[[Dict[str, Any]], Awaitable[Any]],
+        tool_calls: list[dict[str, Any]],
+        executor: Callable[[dict[str, Any]], Awaitable[Any]],
         max_concurrency: Optional[int] = None,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Execute multiple tool calls in parallel with concurrency control.
 
         Args:
@@ -675,7 +676,7 @@ class RequestQueue:
         """
         semaphore = asyncio.Semaphore(max_concurrency) if max_concurrency else self._tool_semaphore
 
-        async def execute_with_semaphore(tool_call: Dict[str, Any]) -> Any:
+        async def execute_with_semaphore(tool_call: dict[str, Any]) -> Any:
             async with semaphore:
                 return await executor(tool_call)
 
@@ -728,7 +729,7 @@ class RequestQueue:
             async with self._lock:
                 self._pending_requests.pop(request.request_id, None)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get current statistics."""
         return {
             **self._stats,
@@ -763,7 +764,7 @@ class RequestQueue:
 
 
 # Pre-configured rate limits for different providers
-PROVIDER_RATE_LIMITS: Dict[str, Dict[str, ConcurrencyConfig]] = {
+PROVIDER_RATE_LIMITS: dict[str, dict[str, ConcurrencyConfig]] = {
     "anthropic": {
         "claude-3-5-haiku-20241022": ConcurrencyConfig(
             max_concurrent_requests=10,

@@ -21,12 +21,11 @@ import pytest
 
 from victor.agent.coordinators.analytics_coordinator import (
     AnalyticsCoordinator,
-    SessionAnalytics,
     BaseAnalyticsExporter,
     ConsoleAnalyticsExporter,
     FileAnalyticsExporter,
 )
-from victor.protocols import IAnalyticsExporter, ExportResult, AnalyticsQuery
+from victor.protocols import IAnalyticsExporter, ExportResult
 
 
 class MockAnalyticsExporter(BaseAnalyticsExporter):
@@ -294,7 +293,6 @@ class TestFileAnalyticsExporter:
     @pytest.mark.asyncio
     async def test_export_creates_directory(self, tmp_path):
         """Test that export creates parent directories."""
-        import json
 
         file_path = tmp_path / "nested" / "dir" / "analytics.json"
         exporter = FileAnalyticsExporter(str(file_path), format="json", append=False)

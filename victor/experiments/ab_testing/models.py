@@ -20,7 +20,7 @@ and metrics using Pydantic for validation.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal, Optional
 import time
 import uuid
 
@@ -55,10 +55,10 @@ class ExperimentVariant:
 
     # Workflow configuration
     workflow_type: Literal["yaml", "stategraph", "definition"] = "yaml"
-    workflow_config: Dict[str, Any] = field(default_factory=dict)
+    workflow_config: dict[str, Any] = field(default_factory=dict)
 
     # Parameter overrides (optional)
-    parameter_overrides: Dict[str, Any] = field(default_factory=dict)
+    parameter_overrides: dict[str, Any] = field(default_factory=dict)
     # Example: {"model": "claude-opus-4-5", "tool_budget": 20, "temperature": 0.7}
 
     # Traffic allocation
@@ -66,7 +66,7 @@ class ExperimentVariant:
 
     # Variant metadata
     is_control: bool = False
-    tags: Dict[str, str] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -143,11 +143,11 @@ class ExperimentConfig:
     hypothesis: str = ""
 
     # Variants
-    variants: List[ExperimentVariant] = field(default_factory=list)
+    variants: list[ExperimentVariant] = field(default_factory=list)
 
     # Metrics to track
     primary_metric: Optional[ExperimentMetric] = None
-    secondary_metrics: List[ExperimentMetric] = field(default_factory=list)
+    secondary_metrics: list[ExperimentMetric] = field(default_factory=list)
 
     # Experiment constraints
     min_sample_size: int = 100
@@ -164,10 +164,10 @@ class ExperimentConfig:
     early_stopping_threshold: float = 0.99
 
     # Target audience
-    targeting_rules: Dict[str, Any] = field(default_factory=dict)
+    targeting_rules: dict[str, Any] = field(default_factory=dict)
 
     # Metadata
-    tags: Dict[str, str] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
     created_by: str = "system"
 
@@ -205,8 +205,8 @@ class ExperimentStatus:
     total_samples: int = 0
 
     # Variant status
-    variant_samples: Dict[str, int] = field(default_factory=dict)
-    variant_status: Dict[str, Literal["running", "paused", "failed"]] = field(default_factory=dict)
+    variant_samples: dict[str, int] = field(default_factory=dict)
+    variant_status: dict[str, Literal["running", "paused", "failed"]] = field(default_factory=dict)
 
 
 @dataclass
@@ -233,14 +233,14 @@ class VariantResult:
     primary_metric_samples: int = 0
 
     # Secondary metrics
-    secondary_metrics: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    secondary_metrics: dict[str, dict[str, float]] = field(default_factory=dict)
 
     # Performance vs control
     relative_improvement: Optional[float] = None
     absolute_improvement: Optional[float] = None
 
     # Statistical measures
-    confidence_interval: Optional[Tuple[float, float]] = None
+    confidence_interval: Optional[tuple[float, float]] = None
     effect_size: Optional[float] = None
 
 
@@ -272,10 +272,10 @@ class ExperimentResult:
     # Statistical tests
     statistical_significance: bool = False
     p_value: Optional[float] = None
-    confidence_interval: Optional[Tuple[float, float]] = None
+    confidence_interval: Optional[tuple[float, float]] = None
 
     # Per-variant results
-    variant_results: Dict[str, VariantResult] = field(default_factory=dict)
+    variant_results: dict[str, VariantResult] = field(default_factory=dict)
 
     # Recommendations
     recommendation: Literal["deploy_winner", "continue", "inconclusive"] = "inconclusive"
@@ -320,7 +320,7 @@ class ExecutionMetrics:
 
     # Timing
     execution_time: float = 0.0
-    node_times: Dict[str, float] = field(default_factory=dict)
+    node_times: dict[str, float] = field(default_factory=dict)
 
     # Token usage
     prompt_tokens: int = 0
@@ -329,7 +329,7 @@ class ExecutionMetrics:
 
     # Tool usage
     tool_calls_count: int = 0
-    tool_calls_by_name: Dict[str, int] = field(default_factory=dict)
+    tool_calls_by_name: dict[str, int] = field(default_factory=dict)
     tool_errors: int = 0
 
     # Success
@@ -340,7 +340,7 @@ class ExecutionMetrics:
     estimated_cost: float = 0.0
 
     # Custom metrics
-    custom_metrics: Dict[str, Any] = field(default_factory=dict)
+    custom_metrics: dict[str, Any] = field(default_factory=dict)
 
     # Metadata
     timestamp: float = field(default_factory=time.time)
@@ -384,7 +384,7 @@ class AggregatedMetrics:
     execution_time_median: float = 0.0
     execution_time_std: float = 0.0
     execution_time_p95: float = 0.0
-    execution_time_ci: Tuple[float, float] = (0.0, 0.0)
+    execution_time_ci: tuple[float, float] = (0.0, 0.0)
 
     # Token usage
     total_tokens_mean: float = 0.0
@@ -399,11 +399,11 @@ class AggregatedMetrics:
     # Success rate
     success_count: int = 0
     success_rate: float = 0.0
-    success_rate_ci: Tuple[float, float] = (0.0, 0.0)
+    success_rate_ci: tuple[float, float] = (0.0, 0.0)
 
     # Cost
     total_cost: float = 0.0
     cost_per_execution_mean: float = 0.0
 
     # Custom metrics
-    custom_metrics_aggregated: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    custom_metrics_aggregated: dict[str, dict[str, float]] = field(default_factory=dict)

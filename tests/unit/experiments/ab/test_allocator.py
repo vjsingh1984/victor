@@ -14,7 +14,6 @@
 
 """Unit tests for A/B testing allocator."""
 
-import asyncio
 
 import pytest
 

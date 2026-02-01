@@ -21,7 +21,7 @@ Builds provider-specific system prompts based on:
 """
 
 import logging
-from typing import TYPE_CHECKING, Optional, Set, List, Dict, Any
+from typing import TYPE_CHECKING, Optional, Any
 
 from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
 from victor.agent.provider_tool_guidance import (
@@ -40,12 +40,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Deprecated fallback task type hints (kept for backward compatibility)
-_DEPRECATED_TASK_TYPE_HINTS: Dict[str, str] = {}
+_DEPRECATED_TASK_TYPE_HINTS: dict[str, str] = {}
 
 
 # Provider classifications
-CLOUD_PROVIDERS: Set[str] = {"anthropic", "openai", "google", "xai", "moonshot", "kimi", "deepseek"}
-LOCAL_PROVIDERS: Set[str] = {"ollama", "lmstudio", "vllm"}
+CLOUD_PROVIDERS: set[str] = {"anthropic", "openai", "google", "xai", "moonshot", "kimi", "deepseek"}
+LOCAL_PROVIDERS: set[str] = {"ollama", "lmstudio", "vllm"}
 
 # Critical grounding rules to prevent hallucination
 # Concise version for cloud providers - they handle context well
@@ -226,7 +226,7 @@ class SystemPromptBuilder:
         prompt_contributors: Optional[list[Any]] = None,
         tool_guidance_strategy: Optional[ToolGuidanceStrategy] = None,
         task_type: str = "medium",
-        available_tools: Optional[List[str]] = None,
+        available_tools: Optional[list[str]] = None,
         enrichment_service: Optional["PromptEnrichmentService"] = None,
         vertical: Optional[str] = None,
         concise_mode: bool = False,
@@ -396,7 +396,7 @@ class SystemPromptBuilder:
 
         return self._tool_guidance.get_max_exploration_depth(self.task_type)
 
-    def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:
+    def should_consolidate_calls(self, tool_history: list[dict[str, Any]]) -> bool:
         """Check if tool calls should be consolidated based on history.
 
         Args:

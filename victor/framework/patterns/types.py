@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from uuid import uuid4
 
 
@@ -62,11 +62,11 @@ class PatternValidationResult:
     """
 
     is_valid: bool
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     quality_score: float = 0.0
     safety_score: float = 1.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -108,11 +108,11 @@ class TaskContext:
     """
 
     task_description: str
-    required_capabilities: List[str] = field(default_factory=list)
+    required_capabilities: list[str] = field(default_factory=list)
     vertical: str = "coding"
     complexity: str = "medium"  # low, medium, high
-    constraints: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    constraints: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -136,11 +136,11 @@ class CollaborationPattern:
     name: str
     description: str
     category: PatternCategory
-    participants: List[Dict[str, Any]]
-    workflow: Dict[str, Any] = field(default_factory=dict)
+    participants: list[dict[str, Any]]
+    workflow: dict[str, Any] = field(default_factory=dict)
     status: PatternStatus = PatternStatus.DISCOVERED
     metrics: PatternMetrics = field(default_factory=PatternMetrics)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     id: str = field(default_factory=lambda: str(uuid4())[:8])
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
@@ -170,7 +170,7 @@ class CollaborationPattern:
         m.last_used = datetime.now()
         self.updated_at = datetime.now()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "id": self.id,
@@ -192,7 +192,7 @@ class CollaborationPattern:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CollaborationPattern":
+    def from_dict(cls, data: dict[str, Any]) -> "CollaborationPattern":
         """Create from dictionary."""
         metrics_data = data.get("metrics", {})
         metrics = PatternMetrics(
@@ -230,10 +230,10 @@ class PatternRecommendation:
     pattern: CollaborationPattern
     score: float
     rationale: str
-    expected_benefits: List[str] = field(default_factory=list)
-    potential_risks: List[str] = field(default_factory=list)
+    expected_benefits: list[str] = field(default_factory=list)
+    potential_risks: list[str] = field(default_factory=list)
     confidence: float = 0.5
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -252,13 +252,13 @@ class WorkflowExecutionTrace:
 
     workflow_id: str
     execution_id: str
-    nodes_executed: List[str]
-    execution_order: List[str]
+    nodes_executed: list[str]
+    execution_order: list[str]
     success: bool
     duration_ms: float = 0.0
     cost: float = 0.0
     error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.now)
 
 

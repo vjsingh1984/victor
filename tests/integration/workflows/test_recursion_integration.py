@@ -24,12 +24,12 @@ This module tests that RecursionContext properly flows through:
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 from victor.workflows.definition import WorkflowDefinition, AgentNode, TeamNodeWorkflow
 from victor.workflows.yaml_loader import load_workflow_from_yaml
-from victor.workflows.recursion import RecursionContext, RecursionDepthError
+from victor.workflows.recursion import RecursionContext
 
 
 @pytest.fixture

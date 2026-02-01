@@ -24,9 +24,7 @@ Tests cover:
 """
 
 import pytest
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock
+from typing import Any
 
 from victor.storage.checkpoints.protocol import (
     CheckpointData,
@@ -39,9 +37,7 @@ from victor.storage.checkpoints.tree import (
     BranchManager,
     CheckpointNode,
     CheckpointTree,
-    MergeResult,
     MergeStrategy,
-    ReplayStep,
 )
 
 
@@ -54,13 +50,13 @@ class MockCheckpointBackend:
     """Mock checkpoint backend for testing."""
 
     def __init__(self):
-        self._checkpoints: Dict[str, CheckpointData] = {}
-        self._session_checkpoints: Dict[str, List[str]] = {}
+        self._checkpoints: dict[str, CheckpointData] = {}
+        self._session_checkpoints: dict[str, list[str]] = {}
 
     async def save_checkpoint(
         self,
         session_id: str,
-        state_data: Dict[str, Any],
+        state_data: dict[str, Any],
         metadata: CheckpointMetadata,
     ) -> str:
         checkpoint_id = metadata.checkpoint_id
@@ -87,7 +83,7 @@ class MockCheckpointBackend:
         session_id: str,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[CheckpointMetadata]:
+    ) -> list[CheckpointMetadata]:
         if session_id not in self._session_checkpoints:
             return []
 

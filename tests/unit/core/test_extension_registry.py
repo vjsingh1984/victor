@@ -14,7 +14,7 @@ Test Coverage:
 
 import pytest
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from unittest.mock import MagicMock
 
 from victor.core.verticals.protocols import (
@@ -96,7 +96,7 @@ class MockExtension(IExtension):
 
     _extension_type: str
     _name: str
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
     metadata: Optional[ExtensionMetadata] = None
 
     @property
@@ -110,7 +110,7 @@ class MockExtension(IExtension):
     def validate(self) -> bool:
         return bool(self.config) and bool(self._name)
 
-    def get_metadata(self) -> Dict[str, Any]:
+    def get_metadata(self) -> dict[str, Any]:
         if self.metadata:
             return {
                 "version": self.metadata.version,
@@ -506,7 +506,7 @@ class TestOCPCompliance:
             def validate(self) -> bool:
                 return bool(self.api_key)
 
-            def get_metadata(self) -> Dict[str, Any]:
+            def get_metadata(self) -> dict[str, Any]:
                 return {"version": "1.0"}
 
         # Register it without any core modifications
@@ -540,7 +540,7 @@ class TestOCPCompliance:
             def validate(self) -> bool:
                 return self.size_mb > 0
 
-            def get_metadata(self) -> Dict[str, Any]:
+            def get_metadata(self) -> dict[str, Any]:
                 return {}
 
         @dataclass
@@ -560,7 +560,7 @@ class TestOCPCompliance:
             def validate(self) -> bool:
                 return self.endpoint.startswith("http")
 
-            def get_metadata(self) -> Dict[str, Any]:
+            def get_metadata(self) -> dict[str, Any]:
                 return {}
 
         cache_ext = CacheExtension(_extension_type="cache", _name="redis", size_mb=100)

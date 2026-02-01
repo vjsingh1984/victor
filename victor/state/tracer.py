@@ -50,7 +50,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.core.events import ObservabilityBus
 
@@ -75,9 +75,9 @@ class StateTransition:
     old_value: Any
     new_value: Any
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
 
         Returns:
@@ -120,7 +120,7 @@ class StateTracer:
             event_bus: Optional ObservabilityBus instance. If None, uses DI container.
         """
         self._event_bus = event_bus or self._get_default_bus()
-        self._transitions: List[StateTransition] = []
+        self._transitions: list[StateTransition] = []
 
         logger.info("StateTracer initialized")
 
@@ -195,7 +195,7 @@ class StateTracer:
         scope: Optional[str] = None,
         key: Optional[str] = None,
         limit: int = 100,
-    ) -> List[StateTransition]:
+    ) -> list[StateTransition]:
         """Get transition history.
 
         Args:
@@ -234,7 +234,7 @@ class StateTracer:
         """
         return len(self._transitions)
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get statistics about recorded transitions.
 
         Returns:
@@ -244,12 +244,12 @@ class StateTracer:
             return {"total": 0}
 
         # Count transitions by scope
-        by_scope: Dict[str, int] = {}
+        by_scope: dict[str, int] = {}
         for transition in self._transitions:
             by_scope[transition.scope] = by_scope.get(transition.scope, 0) + 1
 
         # Count transitions by key
-        by_key: Dict[str, int] = {}
+        by_key: dict[str, int] = {}
         for transition in self._transitions:
             by_key[transition.key] = by_key.get(transition.key, 0) + 1
 

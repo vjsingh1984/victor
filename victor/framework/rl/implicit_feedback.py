@@ -37,7 +37,7 @@ Sprint 4: Implicit Feedback Enhancement
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 # TYPE_CHECKING: Import QualityResult for orchestrator business logic type hints
 if TYPE_CHECKING:
@@ -92,11 +92,11 @@ class ImplicitFeedback:
     duration_seconds: float = 0.0
     tool_count: int = 0
     iteration_count: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def compute_reward(
         self,
-        weights: Optional[Dict[str, float]] = None,
+        weights: Optional[dict[str, float]] = None,
     ) -> float:
         """Compute composite reward from implicit feedback.
 
@@ -154,7 +154,7 @@ class SessionContext:
     completed: bool = False
 
     # Tool tracking
-    tool_executions: List[ToolExecution] = field(default_factory=list)
+    tool_executions: list[ToolExecution] = field(default_factory=list)
     total_retries: int = 0
 
     # Iteration tracking
@@ -162,15 +162,15 @@ class SessionContext:
     max_iterations: int = 30
 
     # Quality tracking
-    grounding_results: List[float] = field(default_factory=list)
-    quality_results: List[float] = field(default_factory=list)
+    grounding_results: list[float] = field(default_factory=list)
+    quality_results: list[float] = field(default_factory=list)
 
     # Workflow tracking
     workflow_patterns_started: int = 0
     workflow_patterns_completed: int = 0
 
     # Additional metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class ImplicitFeedbackCollector:
@@ -205,8 +205,8 @@ class ImplicitFeedbackCollector:
 
     def __init__(self) -> None:
         """Initialize the feedback collector."""
-        self._active_sessions: Dict[str, SessionContext] = {}
-        self._completed_feedback: List[ImplicitFeedback] = []
+        self._active_sessions: dict[str, SessionContext] = {}
+        self._completed_feedback: list[ImplicitFeedback] = []
 
         # Statistics
         self._total_sessions: int = 0
@@ -437,7 +437,7 @@ class ImplicitFeedbackCollector:
             metadata=session.metadata,
         )
 
-    def get_recent_feedback(self, n: int = 10) -> List[ImplicitFeedback]:
+    def get_recent_feedback(self, n: int = 10) -> list[ImplicitFeedback]:
         """Get most recent feedback records.
 
         Args:
@@ -448,7 +448,7 @@ class ImplicitFeedbackCollector:
         """
         return self._completed_feedback[-n:]
 
-    def get_aggregate_stats(self) -> Dict[str, Any]:
+    def get_aggregate_stats(self) -> dict[str, Any]:
         """Get aggregate statistics from collected feedback.
 
         Returns:
@@ -476,7 +476,7 @@ class ImplicitFeedbackCollector:
             "feedback_count": len(self._completed_feedback),
         }
 
-    def export_for_rl(self) -> List[Dict[str, Any]]:
+    def export_for_rl(self) -> list[dict[str, Any]]:
         """Export feedback data in format suitable for RL learners.
 
         Returns:

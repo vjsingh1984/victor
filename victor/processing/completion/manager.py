@@ -21,7 +21,8 @@ Facade pattern.
 import logging
 import time
 from pathlib import Path
-from typing import AsyncIterator, Optional
+from typing import Optional
+from collections.abc import AsyncIterator
 
 from victor.processing.completion.protocol import (
     CompletionCapabilities,

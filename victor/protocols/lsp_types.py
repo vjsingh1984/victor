@@ -49,7 +49,7 @@ Example usage:
 
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 
 # =============================================================================
@@ -154,12 +154,12 @@ class Position:
     line: int
     character: int
 
-    def to_dict(self) -> Dict[str, int]:
+    def to_dict(self) -> dict[str, int]:
         """Convert to LSP-compatible dictionary."""
         return {"line": self.line, "character": self.character}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, int]) -> "Position":
+    def from_dict(cls, data: dict[str, int]) -> "Position":
         """Create from LSP dictionary."""
         return cls(line=data["line"], character=data["character"])
 
@@ -189,12 +189,12 @@ class Range:
     start: Position
     end: Position
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
         return {"start": self.start.to_dict(), "end": self.end.to_dict()}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Range":
+    def from_dict(cls, data: dict[str, Any]) -> "Range":
         """Create from LSP dictionary."""
         return cls(
             start=Position.from_dict(data["start"]),
@@ -229,12 +229,12 @@ class Location:
     uri: str
     range: Range
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
         return {"uri": self.uri, "range": self.range.to_dict()}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Location":
+    def from_dict(cls, data: dict[str, Any]) -> "Location":
         """Create from LSP dictionary."""
         return cls(uri=data["uri"], range=Range.from_dict(data["range"]))
 
@@ -257,7 +257,7 @@ class LocationLink:
     target_selection_range: Range
     origin_selection_range: Optional[Range] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
         result = {
             "targetUri": self.target_uri,
@@ -269,7 +269,7 @@ class LocationLink:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "LocationLink":
+    def from_dict(cls, data: dict[str, Any]) -> "LocationLink":
         """Create from LSP dictionary."""
         origin = data.get("originSelectionRange")
         return cls(
@@ -300,12 +300,12 @@ class DiagnosticRelatedInformation:
     location: Location
     message: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
         return {"location": self.location.to_dict(), "message": self.message}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DiagnosticRelatedInformation":
+    def from_dict(cls, data: dict[str, Any]) -> "DiagnosticRelatedInformation":
         """Create from LSP dictionary."""
         return cls(
             location=Location.from_dict(data["location"]),
@@ -335,15 +335,15 @@ class Diagnostic:
     message: str
     severity: DiagnosticSeverity = DiagnosticSeverity.ERROR
     source: Optional[str] = None
-    code: Optional[Union[str, int]] = None
+    code: Optional[str | int] = None
     code_description: Optional[str] = None
-    tags: List[DiagnosticTag] = field(default_factory=list)
-    related_information: List[DiagnosticRelatedInformation] = field(default_factory=list)
+    tags: list[DiagnosticTag] = field(default_factory=list)
+    related_information: list[DiagnosticRelatedInformation] = field(default_factory=list)
     data: Optional[Any] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "range": self.range.to_dict(),
             "message": self.message,
             "severity": self.severity.value,
@@ -363,7 +363,7 @@ class Diagnostic:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Diagnostic":
+    def from_dict(cls, data: dict[str, Any]) -> "Diagnostic":
         """Create from LSP dictionary."""
         code_desc = data.get("codeDescription", {})
         tags = [DiagnosticTag(t) for t in data.get("tags", [])]
@@ -426,9 +426,9 @@ class CompletionItem:
     preselect: bool = False
     deprecated: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "label": self.label,
             "kind": self.kind.value,
         }
@@ -449,7 +449,7 @@ class CompletionItem:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CompletionItem":
+    def from_dict(cls, data: dict[str, Any]) -> "CompletionItem":
         """Create from LSP dictionary."""
         doc = data.get("documentation")
         if isinstance(doc, dict):
@@ -486,15 +486,15 @@ class Hover:
     contents: str
     range: Optional[Range] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
-        result: Dict[str, Any] = {"contents": {"kind": "markdown", "value": self.contents}}
+        result: dict[str, Any] = {"contents": {"kind": "markdown", "value": self.contents}}
         if self.range:
             result["range"] = self.range.to_dict()
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Hover":
+    def from_dict(cls, data: dict[str, Any]) -> "Hover":
         """Create from LSP dictionary."""
         contents = data.get("contents", "")
         if isinstance(contents, dict):
@@ -535,12 +535,12 @@ class DocumentSymbol:
     range: Range
     selection_range: Range
     detail: Optional[str] = None
-    children: List["DocumentSymbol"] = field(default_factory=list)
+    children: list["DocumentSymbol"] = field(default_factory=list)
     deprecated: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "name": self.name,
             "kind": self.kind.value,
             "range": self.range.to_dict(),
@@ -555,7 +555,7 @@ class DocumentSymbol:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DocumentSymbol":
+    def from_dict(cls, data: dict[str, Any]) -> "DocumentSymbol":
         """Create from LSP dictionary."""
         children = [DocumentSymbol.from_dict(c) for c in data.get("children", [])]
         return cls(
@@ -589,9 +589,9 @@ class SymbolInformation:
     container_name: Optional[str] = None
     deprecated: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "name": self.name,
             "kind": self.kind.value,
             "location": self.location.to_dict(),
@@ -603,7 +603,7 @@ class SymbolInformation:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SymbolInformation":
+    def from_dict(cls, data: dict[str, Any]) -> "SymbolInformation":
         """Create from LSP dictionary."""
         return cls(
             name=data["name"],
@@ -633,12 +633,12 @@ class TextEdit:
     range: Range
     new_text: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
         return {"range": self.range.to_dict(), "newText": self.new_text}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TextEdit":
+    def from_dict(cls, data: dict[str, Any]) -> "TextEdit":
         """Create from LSP dictionary."""
         return cls(
             range=Range.from_dict(data["range"]),
@@ -656,12 +656,12 @@ class TextDocumentIdentifier:
 
     uri: str
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         """Convert to LSP-compatible dictionary."""
         return {"uri": self.uri}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, str]) -> "TextDocumentIdentifier":
+    def from_dict(cls, data: dict[str, str]) -> "TextDocumentIdentifier":
         """Create from LSP dictionary."""
         return cls(uri=data["uri"])
 
@@ -677,12 +677,12 @@ class VersionedTextDocumentIdentifier(TextDocumentIdentifier):
 
     version: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
         return {"uri": self.uri, "version": self.version}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "VersionedTextDocumentIdentifier":
+    def from_dict(cls, data: dict[str, Any]) -> "VersionedTextDocumentIdentifier":
         """Create from LSP dictionary."""
         return cls(uri=data["uri"], version=data.get("version", 0))
 
@@ -697,9 +697,9 @@ class TextDocumentEdit:
     """
 
     text_document: VersionedTextDocumentIdentifier
-    edits: List[TextEdit]
+    edits: list[TextEdit]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to LSP-compatible dictionary."""
         return {
             "textDocument": self.text_document.to_dict(),
@@ -707,7 +707,7 @@ class TextDocumentEdit:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TextDocumentEdit":
+    def from_dict(cls, data: dict[str, Any]) -> "TextDocumentEdit":
         """Create from LSP dictionary."""
         return cls(
             text_document=VersionedTextDocumentIdentifier.from_dict(data["textDocument"]),

@@ -33,8 +33,8 @@ Usage:
 """
 
 from asyncio import sleep
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional
-from unittest.mock import MagicMock
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 from victor.core.errors import (
     ProviderAuthError,
@@ -91,9 +91,9 @@ class MockBaseProvider(BaseProvider):
         response_delay: float = 0.0,
         supports_streaming: bool = True,
         supports_tools: bool = True,
-        token_usage: Optional[Dict[str, int]] = None,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        token_usage: Optional[dict[str, int]] = None,
+        tool_calls: Optional[list[dict[str, Any]]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ):
         """Initialize mock provider with configurable behavior."""
@@ -106,7 +106,7 @@ class MockBaseProvider(BaseProvider):
         self._tool_calls = tool_calls
         self._metadata = metadata or {}
         self._call_count = 0
-        self._last_request: Optional[Dict[str, Any]] = None
+        self._last_request: Optional[dict[str, Any]] = None
 
     @property
     def name(self) -> str:
@@ -123,12 +123,12 @@ class MockBaseProvider(BaseProvider):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send a chat completion request.
@@ -183,12 +183,12 @@ class MockBaseProvider(BaseProvider):
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream a chat completion response.
@@ -250,7 +250,7 @@ class MockBaseProvider(BaseProvider):
         return self._call_count
 
     @property
-    def last_request(self) -> Optional[Dict[str, Any]]:
+    def last_request(self) -> Optional[dict[str, Any]]:
         """Get the last request parameters."""
         return self._last_request
 
@@ -319,12 +319,12 @@ class FailingProvider(BaseProvider):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send a chat completion request that may fail."""
@@ -344,12 +344,12 @@ class FailingProvider(BaseProvider):
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream a chat completion response that may fail."""
@@ -423,7 +423,7 @@ class StreamingTestProvider(BaseProvider):
 
     def __init__(
         self,
-        chunks: Optional[List[str]] = None,
+        chunks: Optional[list[str]] = None,
         chunk_delay: float = 0.0,
         include_tool_calls: bool = False,
         **kwargs: Any,
@@ -433,7 +433,7 @@ class StreamingTestProvider(BaseProvider):
         self._chunks = chunks or ["chunk1", "chunk2", "chunk3"]
         self._chunk_delay = chunk_delay
         self._include_tool_calls = include_tool_calls
-        self._streamed_chunks: List[StreamChunk] = []
+        self._streamed_chunks: list[StreamChunk] = []
 
     @property
     def name(self) -> str:
@@ -446,12 +446,12 @@ class StreamingTestProvider(BaseProvider):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send a chat completion request (non-streaming)."""
@@ -463,12 +463,12 @@ class StreamingTestProvider(BaseProvider):
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream a chat completion response with controlled chunks."""
@@ -499,7 +499,7 @@ class StreamingTestProvider(BaseProvider):
         pass
 
     @property
-    def streamed_chunks(self) -> List[StreamChunk]:
+    def streamed_chunks(self) -> list[StreamChunk]:
         """Get list of chunks that were streamed."""
         return self._streamed_chunks.copy()
 
@@ -545,8 +545,8 @@ class ToolCallMockProvider(BaseProvider):
     def __init__(
         self,
         response_text: str = "Executing tools...",
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
-        call_sequence: Optional[List[Dict[str, Any]]] = None,
+        tool_calls: Optional[list[dict[str, Any]]] = None,
+        call_sequence: Optional[list[dict[str, Any]]] = None,
         **kwargs: Any,
     ):
         """Initialize tool call mock provider."""
@@ -555,7 +555,7 @@ class ToolCallMockProvider(BaseProvider):
         self._default_tool_calls = tool_calls or []
         self._call_sequence = call_sequence or []
         self._sequence_index = 0
-        self._call_history: List[Dict[str, Any]] = []
+        self._call_history: list[dict[str, Any]] = []
 
     @property
     def name(self) -> str:
@@ -568,12 +568,12 @@ class ToolCallMockProvider(BaseProvider):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send a chat completion request with tool calls."""
@@ -605,12 +605,12 @@ class ToolCallMockProvider(BaseProvider):
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream a chat completion response (not implemented for tool calls)."""
@@ -621,7 +621,7 @@ class ToolCallMockProvider(BaseProvider):
         pass
 
     @property
-    def call_history(self) -> List[Dict[str, Any]]:
+    def call_history(self) -> list[dict[str, Any]]:
         """Get history of all calls made."""
         return self._call_history.copy()
 
@@ -652,7 +652,7 @@ class ProviderTestHelpers:
 
     @staticmethod
     def create_streaming_mock(
-        chunks: Optional[List[str]] = None, chunk_delay: float = 0.0
+        chunks: Optional[list[str]] = None, chunk_delay: float = 0.0
     ) -> StreamingTestProvider:
         """Create a streaming mock provider.
 
@@ -680,7 +680,7 @@ class ProviderTestHelpers:
 
     @staticmethod
     def create_tool_call_mock(
-        tool_calls: List[Dict[str, Any]], response_text: str = "Executing tools..."
+        tool_calls: list[dict[str, Any]], response_text: str = "Executing tools..."
     ) -> ToolCallMockProvider:
         """Create a tool call mock provider.
 
@@ -694,7 +694,7 @@ class ProviderTestHelpers:
         return ToolCallMockProvider(tool_calls=tool_calls, response_text=response_text)
 
     @staticmethod
-    def create_test_messages(content: str = "Test message") -> List[Message]:
+    def create_test_messages(content: str = "Test message") -> list[Message]:
         """Create a list of test messages.
 
         Args:
@@ -710,8 +710,8 @@ class ProviderTestHelpers:
 
     @staticmethod
     def create_test_tool_call(
-        name: str, arguments: Dict[str, Any], call_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+        name: str, arguments: dict[str, Any], call_id: Optional[str] = None
+    ) -> dict[str, Any]:
         """Create a properly formatted tool call dict.
 
         Args:
@@ -736,8 +736,8 @@ class ProviderTestHelpers:
 
     @staticmethod
     async def collect_stream_chunks(
-        provider: BaseProvider, messages: List[Message], model: str = "test-model"
-    ) -> List[StreamChunk]:
+        provider: BaseProvider, messages: list[Message], model: str = "test-model"
+    ) -> list[StreamChunk]:
         """Collect all chunks from a streaming response.
 
         Args:
@@ -770,7 +770,7 @@ class ProviderTestHelpers:
         assert "total_tokens" in response.usage
 
     @staticmethod
-    def assert_valid_stream_chunks(chunks: List[StreamChunk]) -> None:
+    def assert_valid_stream_chunks(chunks: list[StreamChunk]) -> None:
         """Assert that streamed chunks are valid.
 
         Args:
@@ -850,7 +850,7 @@ class LatencySimulationProvider(BaseProvider):
         self._latency_pattern = latency_pattern
         self._response_text = response_text
         self._call_count = 0
-        self._latency_history: List[float] = []
+        self._latency_history: list[float] = []
 
     @property
     def name(self) -> str:
@@ -889,12 +889,12 @@ class LatencySimulationProvider(BaseProvider):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send a chat completion request with simulated latency."""
@@ -922,12 +922,12 @@ class LatencySimulationProvider(BaseProvider):
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream a chat completion response with simulated latency."""
@@ -951,7 +951,7 @@ class LatencySimulationProvider(BaseProvider):
         pass
 
     @property
-    def latency_history(self) -> List[float]:
+    def latency_history(self) -> list[float]:
         """Get history of latencies for all calls."""
         return self._latency_history.copy()
 

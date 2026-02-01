@@ -29,7 +29,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 
 class MessageRole(str, Enum):
@@ -122,7 +122,7 @@ class ToolUseContent:
     type: Literal["tool_use"] = "tool_use"
     id: str = ""
     name: str = ""
-    arguments: Dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -143,7 +143,7 @@ class ErrorContent:
     type: Literal["error"] = "error"
     message: str = ""
     code: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    details: Optional[dict[str, Any]] = None
 
 
 # Union type for all content types
@@ -173,7 +173,7 @@ class ToolCallExecution:
 
     id: str = ""
     name: str = ""
-    arguments: Dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
     status: ToolCallStatus = ToolCallStatus.PENDING
     result: Optional[str] = None
     error: Optional[str] = None
@@ -190,7 +190,7 @@ class ToolCallExecution:
             return int((self.end_time - self.start_time) * 1000)
         return None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -218,10 +218,10 @@ class UnifiedMessage:
 
     id: str = ""
     role: MessageRole = MessageRole.USER
-    content: List[MessageContent] = field(default_factory=list)
+    content: list[MessageContent] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
-    tool_calls: List[ToolCall] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tool_calls: list[ToolCall] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Generate ID if not provided."""
@@ -269,9 +269,9 @@ class UnifiedMessage:
         )
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "UnifiedMessage":
+    def from_dict(cls, data: dict[str, Any]) -> "UnifiedMessage":
         """Create from dictionary."""
-        content: List[MessageContent] = []
+        content: list[MessageContent] = []
         for block in data.get("content", []):
             block_type = block.get("type", "text")
             if block_type == "text":
@@ -310,7 +310,7 @@ class UnifiedMessage:
             metadata=data.get("metadata", {}),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         content_dicts = []
         for block in self.content:
@@ -328,7 +328,7 @@ class UnifiedMessage:
             "metadata": self.metadata,
         }
 
-    def to_api_format(self) -> Dict[str, Any]:
+    def to_api_format(self) -> dict[str, Any]:
         """Convert to API message format (for LLM providers).
 
         Returns a simplified format compatible with most LLM APIs.
@@ -355,7 +355,7 @@ class StreamChunk:
     """
 
     type: str  # "content", "tool_call", "thinking", "done", "error"
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
     @classmethod
@@ -383,7 +383,7 @@ class StreamChunk:
         """Create an error chunk."""
         return cls(type="error", data={"message": message, "code": code, **kwargs})
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "type": self.type,
@@ -393,5 +393,5 @@ class StreamChunk:
 
 
 # Type aliases for convenience
-Messages = List[UnifiedMessage]
-ContentBlocks = List[MessageContent]
+Messages = list[UnifiedMessage]
+ContentBlocks = list[MessageContent]

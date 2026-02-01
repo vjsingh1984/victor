@@ -18,14 +18,11 @@ Tests the new history tracking capabilities added to the state machine
 for Phase 3 observability integration.
 """
 
-import pytest
-import time
 from unittest.mock import patch
 
 from victor.agent.conversation_state import (
     ConversationStateMachine,
     ConversationStage,
-    ConversationState,
 )
 
 

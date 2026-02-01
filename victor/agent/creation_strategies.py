@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
@@ -52,9 +52,9 @@ class AgentCreationContext:
     max_iterations: Optional[int] = None
     mode: Optional[str] = None
     # Additional metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "profile": self.profile,

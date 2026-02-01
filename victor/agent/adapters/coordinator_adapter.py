@@ -32,7 +32,7 @@ Design Patterns:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.streaming_controller import StreamingSession
@@ -149,7 +149,7 @@ class CoordinatorAdapter:
         except Exception as e:
             logger.warning(f"Failed to send RL reward signal: {e}")
 
-    def get_checkpoint_state(self) -> Dict[str, Any]:
+    def get_checkpoint_state(self) -> dict[str, Any]:
         """Build a dictionary representing current conversation state for checkpointing.
 
         Delegates to StateCoordinator for unified state management and merges
@@ -193,7 +193,7 @@ class CoordinatorAdapter:
             logger.warning(f"Failed to get checkpoint state: {e}")
             return {}
 
-    def apply_checkpoint_state(self, state: Dict[str, Any]) -> None:
+    def apply_checkpoint_state(self, state: dict[str, Any]) -> None:
         """Apply a checkpoint state to restore the orchestrator.
 
         Delegates to StateCoordinator for unified state management.

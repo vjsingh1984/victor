@@ -27,13 +27,11 @@ conforming to the SessionRepositoryProtocol.
 
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from victor.protocols.session_repository import SessionRepositoryProtocol
 
 
 class SQLiteSessionRepository:
@@ -75,7 +73,7 @@ class SQLiteSessionRepository:
 
         self._manager = SessionManager(db_path=db_path)
 
-    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_session(self, session_id: str) -> Optional[dict[str, Any]]:
         """Get a session by ID.
 
         Args:
@@ -84,7 +82,6 @@ class SQLiteSessionRepository:
         Returns:
             Session data as dictionary, or None if not found
         """
-        from victor.ui.tui.session import Session
 
         session = self._manager.load(session_id)
         if session is None:
@@ -93,7 +90,7 @@ class SQLiteSessionRepository:
         # Convert Session object to dictionary
         return self._session_to_dict(session)
 
-    async def save_session(self, session: Dict[str, Any]) -> None:
+    async def save_session(self, session: dict[str, Any]) -> None:
         """Save or update a session.
 
         Args:
@@ -102,7 +99,6 @@ class SQLiteSessionRepository:
         Raises:
             ValueError: If session data is invalid
         """
-        from victor.ui.tui.session import Session
 
         # Convert dict to Session object
         session_obj = self._dict_to_session(session)
@@ -110,7 +106,7 @@ class SQLiteSessionRepository:
         # Save using SessionManager
         self._manager.save(session_obj)
 
-    async def list_sessions(self, limit: int = 100) -> List[Dict[str, Any]]:
+    async def list_sessions(self, limit: int = 100) -> list[dict[str, Any]]:
         """List recent sessions with metadata.
 
         Args:
@@ -137,13 +133,12 @@ class SQLiteSessionRepository:
         """
         return self._manager.delete(session_id)
 
-    async def get_latest_session(self) -> Optional[Dict[str, Any]]:
+    async def get_latest_session(self) -> Optional[dict[str, Any]]:
         """Get the most recently updated session.
 
         Returns:
             Session data dictionary, or None if no sessions
         """
-        from victor.ui.tui.session import Session
 
         session = self._manager.get_latest()
         if session is None:
@@ -156,7 +151,7 @@ class SQLiteSessionRepository:
         provider: str = "",
         model: str = "",
         name: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Factory method to create a new session.
 
         Args:
@@ -167,7 +162,6 @@ class SQLiteSessionRepository:
         Returns:
             New session dictionary
         """
-        from victor.ui.tui.session import Session
 
         # Use SessionManager factory method
         session = self._manager.create_session(
@@ -178,7 +172,7 @@ class SQLiteSessionRepository:
 
         return self._session_to_dict(session)
 
-    def _session_to_dict(self, session: Any) -> Dict[str, Any]:
+    def _session_to_dict(self, session: Any) -> dict[str, Any]:
         """Convert Session object to dictionary.
 
         Args:
@@ -191,7 +185,7 @@ class SQLiteSessionRepository:
         if hasattr(session, "to_dict"):
             from typing import cast
 
-            return cast(Dict[str, Any], session.to_dict())
+            return cast(dict[str, Any], session.to_dict())
 
         # Fallback: try to convert manually
         return {
@@ -208,7 +202,7 @@ class SQLiteSessionRepository:
             "metadata": getattr(session, "metadata", {}),
         }
 
-    def _dict_to_session(self, session_dict: Dict[str, Any]) -> Any:
+    def _dict_to_session(self, session_dict: dict[str, Any]) -> Any:
         """Convert dictionary to Session object.
 
         Args:

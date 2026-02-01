@@ -45,19 +45,16 @@ from __future__ import annotations
 
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
     TYPE_CHECKING,
     TypeVar,
     runtime_checkable,
 )
+from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
-    from victor.providers.base import CompletionResponse, Message, StreamChunk
+    pass
 
 
 # Type variables for generic protocols
@@ -98,7 +95,7 @@ class OrchestratorProtocol(Protocol):
         ...
 
     @property
-    def messages(self) -> List[Any]:
+    def messages(self) -> list[Any]:
         """Current conversation message history."""
         ...
 
@@ -149,7 +146,7 @@ class TaskClassificationResultProtocol(Protocol):
         ...
 
     @property
-    def top_matches(self) -> List[Any]:
+    def top_matches(self) -> list[Any]:
         """Top matching phrases with scores."""
         ...
 
@@ -245,7 +242,7 @@ class EmbeddingServiceProtocol(Protocol):
     Allows components to use embeddings without importing heavy dependencies.
     """
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding for text.
 
         Args:
@@ -256,7 +253,7 @@ class EmbeddingServiceProtocol(Protocol):
         """
         ...
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts.
 
         Args:
@@ -267,7 +264,7 @@ class EmbeddingServiceProtocol(Protocol):
         """
         ...
 
-    def embed_text_sync(self, text: str) -> List[float]:
+    def embed_text_sync(self, text: str) -> list[float]:
         """Synchronous embedding generation.
 
         Args:
@@ -291,7 +288,7 @@ class ToolCallingAdapterProtocol(Protocol):
         """Name of the provider this adapter handles."""
         ...
 
-    def convert_tools(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Convert tools to provider-specific format.
 
         Args:
@@ -302,7 +299,7 @@ class ToolCallingAdapterProtocol(Protocol):
         """
         ...
 
-    def parse_tool_calls(self, response: Any) -> List[Dict[str, Any]]:
+    def parse_tool_calls(self, response: Any) -> list[dict[str, Any]]:
         """Parse tool calls from provider response.
 
         Args:
@@ -316,8 +313,8 @@ class ToolCallingAdapterProtocol(Protocol):
     def normalize_arguments(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
         """Normalize tool arguments to expected format.
 
         Args:
@@ -342,7 +339,7 @@ class IntelligentPipelineProtocol(Protocol):
         task: str,
         task_type: str,
         current_mode: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Prepare a request with intelligent optimizations.
 
         Args:
@@ -362,7 +359,7 @@ class IntelligentPipelineProtocol(Protocol):
         tool_calls: int,
         success: bool,
         task_type: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Validate a response for quality and grounding.
 
         Args:
@@ -404,8 +401,8 @@ class ProviderProtocol(Protocol):
 
     async def chat(
         self,
-        messages: List[Any],
-        tools: Optional[List[Dict[str, Any]]] = None,
+        messages: list[Any],
+        tools: Optional[list[dict[str, Any]]] = None,
         **kwargs: Any,
     ) -> Any:
         """Send a chat completion request.
@@ -422,8 +419,8 @@ class ProviderProtocol(Protocol):
 
     async def stream_chat(
         self,
-        messages: List[Any],
-        tools: Optional[List[Dict[str, Any]]] = None,
+        messages: list[Any],
+        tools: Optional[list[dict[str, Any]]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[Any]:
         """Stream a chat completion request.

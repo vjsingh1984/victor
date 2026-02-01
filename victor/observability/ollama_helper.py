@@ -6,11 +6,10 @@ and select the simplest one for testing.
 
 import json
 import socket
-from typing import List, Optional
-from pathlib import Path
+from typing import Optional
 
 
-def get_ollama_models() -> List[str]:
+def get_ollama_models() -> list[str]:
     """Get list of available ollama LLM models from localhost API.
 
     Filters out embedding models to only return text generation models.
@@ -53,7 +52,7 @@ def get_ollama_models() -> List[str]:
         return []
 
 
-def select_simplest_model(models: List[str]) -> Optional[str]:
+def select_simplest_model(models: list[str]) -> Optional[str]:
     """Select the simplest model from a list of ollama models.
 
     Prioritizes:

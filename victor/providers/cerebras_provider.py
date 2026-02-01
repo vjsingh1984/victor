@@ -35,10 +35,10 @@ References:
 
 import json
 import logging
-import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -73,10 +73,10 @@ class StreamingThinkingFilter:
     _in_thinking: bool = field(default=True, init=False)  # Start assuming thinking
     _thinking_content: str = field(default="", init=False)
     _analyzed: bool = field(default=False, init=False)
-    _emit_queue: List[str] = field(default_factory=list, init=False)
+    _emit_queue: list[str] = field(default_factory=list, init=False)
     _gave_up: bool = field(default=False, init=False)  # If we gave up filtering
 
-    def process_chunk(self, content: str) -> Tuple[str, Optional[Dict[str, Any]]]:
+    def process_chunk(self, content: str) -> tuple[str, Optional[dict[str, Any]]]:
         """Process a streaming chunk, filtering thinking content.
 
         Args:
@@ -231,7 +231,7 @@ class StreamingThinkingFilter:
             return True
         return False
 
-    def finalize(self) -> Tuple[str, Optional[Dict[str, Any]]]:
+    def finalize(self) -> tuple[str, Optional[dict[str, Any]]]:
         """Finalize and return any remaining content.
 
         Returns:
@@ -331,7 +331,7 @@ def _is_thinking_model(model: str) -> bool:
     return any(pattern in model_lower for pattern in ["qwen-3", "qwen3"])
 
 
-def _extract_qwen3_thinking(content: str) -> Tuple[str, str]:
+def _extract_qwen3_thinking(content: str) -> tuple[str, str]:
     """Extract thinking content from Qwen-3 model output.
 
     Qwen-3 models output their reasoning inline without special tags.
@@ -455,12 +455,12 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Cerebras."""
@@ -488,12 +488,12 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Cerebras with thinking content filtering."""
@@ -508,7 +508,7 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
 
             async with self.client.stream("POST", "/chat/completions", json=payload) as response:
                 response.raise_for_status()
-                accumulated_tool_calls: List[Dict[str, Any]] = []
+                accumulated_tool_calls: list[dict[str, Any]] = []
 
                 async for line in response.aiter_lines():
                     if not line.strip() or not line.startswith("data: "):
@@ -575,7 +575,7 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def _build_request_payload(
         self, messages, model, temperature, max_tokens, tools, stream, **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         formatted_messages = []
         for msg in messages:
             formatted_msg = {"role": msg.role, "content": msg.content}
@@ -623,7 +623,7 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return payload
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         choices = result.get("choices", [])
         if not choices:
             return CompletionResponse(
@@ -674,7 +674,7 @@ class CerebrasProvider(BaseProvider, HTTPErrorHandlerMixin):
             metadata=metadata if metadata else None,
         )
 
-    def _normalize_tool_calls(self, tool_calls) -> Optional[List[Dict[str, Any]]]:
+    def _normalize_tool_calls(self, tool_calls) -> Optional[list[dict[str, Any]]]:
         if not tool_calls:
             return None
         normalized = []

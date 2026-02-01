@@ -41,7 +41,8 @@ import json
 import logging
 import re
 import typing
-from typing import Any, AsyncIterator, AsyncGenerator, Coroutine, Dict, List, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -117,7 +118,7 @@ def _model_uses_thinking_tags(model: str) -> bool:
     return any(pattern in model_lower for pattern in THINKING_TAG_MODELS)
 
 
-def _extract_thinking_content(response: str) -> Tuple[str, str]:
+def _extract_thinking_content(response: str) -> tuple[str, str]:
     """Extract thinking content from response.
 
     Args:
@@ -133,7 +134,7 @@ def _extract_thinking_content(response: str) -> Tuple[str, str]:
     return (thinking, content)
 
 
-def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]], str]:
+def _extract_tool_calls_from_content(content: str) -> tuple[list[dict[str, Any]], str]:
     """Extract tool calls from content when server doesn't parse them.
 
     Handles cases where vLLM wasn't started with --enable-auto-tool-choice.
@@ -148,7 +149,7 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
     Returns:
         Tuple of (parsed_tool_calls, remaining_content)
     """
-    tool_calls: List[Dict[str, Any]] = []
+    tool_calls: list[dict[str, Any]] = []
     remaining = content
 
     # Pattern 1: JSON code block with tool call
@@ -316,7 +317,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
         """vLLM supports streaming."""
         return True
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List models loaded in vLLM server.
 
         Returns:
@@ -346,12 +347,12 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to vLLM server.
@@ -375,7 +376,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
             model = self._available_model
 
         # Build request payload
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "messages": convert_messages_to_openai_format(messages),
             "temperature": temperature,
@@ -426,12 +427,12 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
     @typing.no_type_check
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from vLLM server.
@@ -450,7 +451,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
         if not model and self._available_model:
             model = self._available_model
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "messages": convert_messages_to_openai_format(messages),
             "temperature": temperature,
@@ -466,7 +467,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
             payload["tool_choice"] = kwargs.get("tool_choice", "auto")
 
         accumulated_content = ""
-        accumulated_tool_calls: List[Dict[str, Any]] = []
+        accumulated_tool_calls: list[dict[str, Any]] = []
         uses_thinking_tags = _model_uses_thinking_tags(model)
 
         try:
@@ -536,7 +537,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
                                     _, final_content = _extract_thinking_content(final_content)
 
                                 # Parse accumulated tool calls
-                                parsed_tool_calls: List[Dict[str, Any]] = []
+                                parsed_tool_calls: list[dict[str, Any]] = []
                                 if accumulated_tool_calls:
                                     for tc in accumulated_tool_calls:
                                         try:
@@ -584,7 +585,7 @@ class VLLMProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         """Parse vLLM API response.
 
         Args:

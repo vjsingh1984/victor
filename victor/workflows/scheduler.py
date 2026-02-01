@@ -64,12 +64,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-import re
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -116,14 +116,14 @@ class CronSchedule:
 
     expression: str
     timezone: str = "UTC"
-    minute: Set[int] = field(default_factory=set)
-    hour: Set[int] = field(default_factory=set)
-    day_of_month: Set[int] = field(default_factory=set)
-    month: Set[int] = field(default_factory=set)
-    day_of_week: Set[int] = field(default_factory=set)
+    minute: set[int] = field(default_factory=set)
+    hour: set[int] = field(default_factory=set)
+    day_of_month: set[int] = field(default_factory=set)
+    month: set[int] = field(default_factory=set)
+    day_of_week: set[int] = field(default_factory=set)
 
     # Aliases for common schedules
-    ALIASES: Dict[str, str] = field(
+    ALIASES: dict[str, str] = field(
         default_factory=lambda: {
             "@hourly": "0 * * * *",
             "@daily": "0 0 * * *",
@@ -156,7 +156,7 @@ class CronSchedule:
         self.month = self._parse_field(parts[3], 1, 12)
         self.day_of_week = self._parse_field(parts[4], 0, 6)
 
-    def _parse_field(self, field: str, min_val: int, max_val: int) -> Set[int]:
+    def _parse_field(self, field: str, min_val: int, max_val: int) -> set[int]:
         """Parse a single cron field.
 
         Supports:
@@ -166,7 +166,7 @@ class CronSchedule:
         - Steps: */5, 1-10/2
         - Lists: 1,3,5
         """
-        result: Set[int] = set()
+        result: set[int] = set()
 
         for part in field.split(","):
             if part == "*":
@@ -252,7 +252,7 @@ class CronSchedule:
             and dt.weekday() in self._convert_weekday(self.day_of_week)
         )
 
-    def _convert_weekday(self, cron_days: Set[int]) -> Set[int]:
+    def _convert_weekday(self, cron_days: set[int]) -> set[int]:
         """Convert cron weekday (0=Sunday) to Python weekday (0=Monday)."""
         # Cron: 0=Sunday, 1=Monday, ..., 6=Saturday
         # Python: 0=Monday, 1=Tuesday, ..., 6=Sunday
@@ -309,13 +309,13 @@ class ScheduledWorkflow:
     workflow_name: str
     schedule: CronSchedule
     workflow_path: Optional[str] = None
-    initial_state: Dict[str, Any] = field(default_factory=dict)
+    initial_state: dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
     catchup: bool = False
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     max_active_runs: int = 1
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
     # Runtime tracking
     last_run: Optional[datetime] = None
@@ -408,13 +408,13 @@ class WorkflowScheduler:
             check_interval: How often to check for due workflows (seconds)
             executor: Optional custom workflow executor function
         """
-        self._schedules: Dict[str, ScheduledWorkflow] = {}
+        self._schedules: dict[str, ScheduledWorkflow] = {}
         self._running = False
         self._task: Optional[asyncio.Task[None]] = None
         self._check_interval = check_interval
         self._executor = executor
         self._lock = threading.RLock()
-        self._execution_history: List[Dict[str, Any]] = []
+        self._execution_history: list[dict[str, Any]] = []
 
     def register(self, scheduled_workflow: ScheduledWorkflow) -> str:
         """Register a scheduled workflow.
@@ -462,7 +462,7 @@ class WorkflowScheduler:
         with self._lock:
             return self._schedules.get(schedule_id)
 
-    def list_schedules(self) -> List[ScheduledWorkflow]:
+    def list_schedules(self) -> list[ScheduledWorkflow]:
         """List all registered schedules.
 
         Returns:
@@ -649,7 +649,7 @@ class WorkflowScheduler:
         self,
         schedule_id: Optional[str] = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get execution history.
 
         Args:
@@ -699,7 +699,7 @@ def schedule_workflow(
     workflow_name: str,
     cron: str,
     workflow_path: Optional[str] = None,
-    initial_state: Optional[Dict[str, Any]] = None,
+    initial_state: Optional[dict[str, Any]] = None,
     **kwargs: Any,
 ) -> str:
     """Schedule a workflow for recurring execution.

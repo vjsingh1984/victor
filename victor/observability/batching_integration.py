@@ -26,9 +26,10 @@ import logging
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Awaitable, Callable, Deque, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class BatchConfig:
     enabled: bool = True
     flush_on_shutdown: bool = True
     max_queue_size: int = 0  # 0 = unlimited
-    drop_handler: Optional[Callable[[Dict[str, Any]], None]] = None
+    drop_handler: Optional[Callable[[dict[str, Any]], None]] = None
 
 
 @dataclass
@@ -82,7 +83,7 @@ class BatchStats:
         self.last_flush_time = time.time()
         self.current_queue_size = 0
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get statistics summary."""
         return {
             "events_queued": self.events_queued,
@@ -106,10 +107,10 @@ class BatchedObservabilityIntegration:
     def __init__(self, config: Optional[BatchConfig] = None):
         """Initialize batched observability integration."""
         self._config = config or BatchConfig()
-        self._queue: Deque[Dict[str, Any]] = deque()
-        self._event_times: Deque[float] = deque()
+        self._queue: deque[dict[str, Any]] = deque()
+        self._event_times: deque[float] = deque()
         self._stats = BatchStats()
-        self._emitter: Optional[Callable[[List[Dict[str, Any]]], Awaitable[None]]] = None
+        self._emitter: Optional[Callable[[list[dict[str, Any]]], Awaitable[None]]] = None
         self._flush_task: Optional[asyncio.Task] = None
         self._flush_lock = asyncio.Lock()
         self._shutdown = False
@@ -117,11 +118,11 @@ class BatchedObservabilityIntegration:
         self._queue_lock = threading.Lock()
         self._flush_event = asyncio.Event()
 
-    def set_emitter(self, emitter: Callable[[List[Dict[str, Any]]], Awaitable[None]]) -> None:
+    def set_emitter(self, emitter: Callable[[list[dict[str, Any]]], Awaitable[None]]) -> None:
         """Set the event emitter backend."""
         self._emitter = emitter
 
-    async def emit_event(self, event: Dict[str, Any]) -> None:
+    async def emit_event(self, event: dict[str, Any]) -> None:
         """Queue an event for batched emission."""
         if self._shutdown:
             logger.warning("Cannot emit event: integration is shut down")
@@ -206,7 +207,7 @@ class BatchedObservabilityIntegration:
                     self._event_times.extendleft(reversed(event_times))
                 raise
 
-    async def _emit_batch(self, events: List[Dict[str, Any]]) -> None:
+    async def _emit_batch(self, events: list[dict[str, Any]]) -> None:
         """Emit a batch of events."""
         if not self._emitter:
             for event in events:

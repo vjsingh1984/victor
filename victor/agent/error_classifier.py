@@ -22,9 +22,9 @@ SOLID Principles:
 - OCP: New error patterns can be added without modifying classification logic
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, FrozenSet, Set
+from typing import Any
 
 
 class ErrorType(Enum):
@@ -108,7 +108,7 @@ class ToolErrorClassifier:
 
     def __init__(self) -> None:
         """Initialize the classifier with empty failure tracking."""
-        self._failed_calls: Set[ToolCallSignature] = set()
+        self._failed_calls: set[ToolCallSignature] = set()
 
     def classify(self, error_message: str) -> ErrorType:
         """Classify an error message.

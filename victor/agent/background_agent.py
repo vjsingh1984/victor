@@ -49,7 +49,8 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Literal, Optional, Set
+from typing import Any, Literal, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ class ToolCallRecord:
     status: str  # pending, running, success, error
     start_time: float
     end_time: Optional[float] = None
-    arguments: Optional[Dict[str, Any]] = None
+    arguments: Optional[dict[str, Any]] = None
     result: Optional[str] = None
     error: Optional[str] = None
 
@@ -97,7 +98,7 @@ class BackgroundAgent:
     progress: int = 0  # 0-100
     start_time: float = field(default_factory=time.time)
     end_time: Optional[float] = None
-    tool_calls: List[ToolCallRecord] = field(default_factory=list)
+    tool_calls: list[ToolCallRecord] = field(default_factory=list)
     output: Optional[str] = None
     error: Optional[str] = None
 
@@ -105,7 +106,7 @@ class BackgroundAgent:
     _task: "Optional[asyncio.Task[None]]" = field(default=None, repr=False)
     _cancelled: bool = field(default=False, repr=False)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -135,7 +136,7 @@ class BackgroundAgent:
 
 
 # Type alias for event callback
-EventCallback = Callable[[str, Dict[str, Any]], None]
+EventCallback = Callable[[str, dict[str, Any]], None]
 
 
 class BackgroundAgentManager:
@@ -174,8 +175,8 @@ class BackgroundAgentManager:
         self._max_concurrent = max_concurrent
         self._event_callback = event_callback
 
-        self._agents: Dict[str, BackgroundAgent] = {}
-        self._running_tasks: Set[str] = set()
+        self._agents: dict[str, BackgroundAgent] = {}
+        self._running_tasks: set[str] = set()
         self._lock = asyncio.Lock()
 
         logger.info(f"BackgroundAgentManager initialized (max_concurrent={max_concurrent})")
@@ -366,7 +367,7 @@ class BackgroundAgentManager:
         """Get an agent by ID."""
         return self._agents.get(agent_id)
 
-    def get_agent_status(self, agent_id: str) -> Optional[Dict[str, Any]]:
+    def get_agent_status(self, agent_id: str) -> Optional[dict[str, Any]]:
         """Get agent status as dictionary."""
         agent = self._agents.get(agent_id)
         return agent.to_dict() if agent else None
@@ -375,7 +376,7 @@ class BackgroundAgentManager:
         self,
         status: Optional[AgentStatus] = None,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List agents, optionally filtered by status.
 
         Args:
@@ -520,7 +521,7 @@ class BackgroundAgentManager:
             async with self._lock:
                 self._running_tasks.discard(agent.id)
 
-    def _emit_event(self, event_type: str, data: Dict[str, Any]) -> None:
+    def _emit_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Emit an event via the callback."""
         if self._event_callback:
             try:

@@ -14,9 +14,8 @@
 
 """Tests for victor.workflows.adapters module."""
 
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch, AsyncMock
 
-import pytest
 
 from victor.workflows.adapters import (
     WorkflowState,
@@ -26,14 +25,8 @@ from victor.workflows.adapters import (
 )
 from victor.workflows.definition import (
     WorkflowDefinition,
-    WorkflowNode,
     WorkflowNodeType,
     AgentNode,
-    ComputeNode,
-    ConditionNode,
-    ParallelNode,
-    TransformNode,
-    TeamNodeWorkflow,
 )
 
 

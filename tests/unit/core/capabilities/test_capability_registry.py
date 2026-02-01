@@ -25,16 +25,13 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import Any, Dict
 from unittest.mock import MagicMock, patch
 
 import pytest
-import yaml
 
 from victor.core.capabilities.types import (
     CapabilityDefinition,
     CapabilityType,
-    ConfigSchema,
 )
 from victor.core.capabilities.registry import CapabilityRegistry
 from victor.core.capabilities.handler import CapabilityHandler

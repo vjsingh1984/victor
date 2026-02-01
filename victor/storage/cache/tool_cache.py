@@ -1,12 +1,12 @@
 import hashlib
 import json
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 from victor.storage.cache.tiered_cache import TieredCache
 from victor.storage.cache.config import CacheConfig
 
 
-def _hash_args(args: Dict[str, Any]) -> str:
+def _hash_args(args: dict[str, Any]) -> str:
     """Create a stable hash for tool arguments."""
     try:
         data = json.dumps(args, sort_keys=True, default=str)
@@ -43,19 +43,19 @@ class ToolCache:
             cache_eviction_learner=cache_eviction_learner,
         )
         # track keys by touched paths for selective invalidation
-        self._path_index: Dict[str, set[str]] = {}
+        self._path_index: dict[str, set[str]] = {}
 
-    def _key(self, tool_name: str, args: Dict[str, Any]) -> Tuple[str, str]:
+    def _key(self, tool_name: str, args: dict[str, Any]) -> tuple[str, str]:
         return tool_name, _hash_args(args)
 
-    def get(self, tool_name: str, args: Dict[str, Any]) -> Optional[Any]:
+    def get(self, tool_name: str, args: dict[str, Any]) -> Optional[Any]:
         if tool_name not in self.allowlist:
             return None
         name, hashed = self._key(tool_name, args)
         # Use RL-aware get if learner is available
         return self.cache.get_with_rl(hashed, namespace=name, tool_name=tool_name)
 
-    def set(self, tool_name: str, args: Dict[str, Any], value: Any) -> None:
+    def set(self, tool_name: str, args: dict[str, Any], value: Any) -> None:
         if tool_name not in self.allowlist:
             return
         name, hashed = self._key(tool_name, args)

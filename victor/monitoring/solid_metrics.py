@@ -45,14 +45,12 @@ Usage:
 """
 
 import os
-import sys
 import time
 import threading
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional, Any
-from pathlib import Path
+from typing import Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +155,7 @@ class ErrorMetrics:
     total_errors: int = 0
     """Total number of errors."""
 
-    errors_by_type: Dict[str, int] = field(default_factory=dict)
+    errors_by_type: dict[str, int] = field(default_factory=dict)
     """Error count by type."""
 
     last_error: Optional[str] = None
@@ -198,8 +196,8 @@ class SolidMetricsCollector:
         """Initialize metrics collector."""
         self._lock = threading.RLock()
         self._startup: StartupMetrics = StartupMetrics()
-        self._caches: Dict[str, CacheMetrics] = {}
-        self._feature_flags: Dict[str, FeatureFlagMetrics] = {}
+        self._caches: dict[str, CacheMetrics] = {}
+        self._feature_flags: dict[str, FeatureFlagMetrics] = {}
         self._errors: ErrorMetrics = ErrorMetrics()
         self._start_time: float = time.time()
         self._collection_count: int = 0
@@ -343,7 +341,7 @@ class SolidMetricsCollector:
         """
         return time.time() - self._start_time
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export all collected metrics.
 
         Returns:
@@ -518,10 +516,6 @@ def measure_startup_time() -> float:
 
     # Import all verticals (this triggers lazy initialization)
     try:
-        from victor.coding import CodingAssistant
-        from victor.research import ResearchAssistant
-        from victor.devops import DevOpsAssistant
-        from victor.dataanalysis import DataAnalysisAssistant
 
         verticals = ["coding", "research", "devops", "dataanalysis"]
     except Exception as e:

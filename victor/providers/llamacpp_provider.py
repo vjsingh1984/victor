@@ -42,7 +42,8 @@ Download models from: https://huggingface.co/models?sort=trending&search=gguf
 import json
 import logging
 import re
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -97,7 +98,7 @@ def _model_supports_tools(model: str) -> bool:
     return any(pattern in model_lower for pattern in TOOL_CAPABLE_PATTERNS)
 
 
-def _extract_thinking_content(response: str) -> Tuple[str, str]:
+def _extract_thinking_content(response: str) -> tuple[str, str]:
     """Extract thinking content from response.
 
     Args:
@@ -113,7 +114,7 @@ def _extract_thinking_content(response: str) -> Tuple[str, str]:
     return (thinking, content)
 
 
-def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]], str]:
+def _extract_tool_calls_from_content(content: str) -> tuple[list[dict[str, Any]], str]:
     """Extract tool calls from content when server doesn't parse them.
 
     Handles cases where model outputs tool calls as JSON text.
@@ -128,7 +129,7 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
     Returns:
         Tuple of (parsed_tool_calls, remaining_content)
     """
-    tool_calls: List[Dict[str, Any]] = []
+    tool_calls: list[dict[str, Any]] = []
     remaining = content
 
     # Pattern 1: JSON code block with tool call
@@ -303,7 +304,7 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
         """llama.cpp supports streaming."""
         return True
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List models loaded in llama.cpp server.
 
         Returns:
@@ -319,7 +320,7 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
             logger.warning(f"Failed to list llama.cpp models: {e}")
             return []
 
-    async def check_health(self) -> Dict[str, Any]:
+    async def check_health(self) -> dict[str, Any]:
         """Check llama.cpp server health.
 
         Returns:
@@ -336,7 +337,7 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    async def get_server_props(self) -> Dict[str, Any]:
+    async def get_server_props(self) -> dict[str, Any]:
         """Get llama.cpp server properties.
 
         Returns:
@@ -352,12 +353,12 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str = "default",
         temperature: float = 0.7,
         max_tokens: int = 2048,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to llama.cpp server.
@@ -381,7 +382,7 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
             model = self._loaded_model
 
         # Build request payload
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "messages": convert_messages_to_openai_format(messages),
             "temperature": temperature,
@@ -436,12 +437,12 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str = "default",
         temperature: float = 0.7,
         max_tokens: int = 2048,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from llama.cpp server.
@@ -460,7 +461,7 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
         if model == "default" and self._loaded_model:
             model = self._loaded_model
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "messages": convert_messages_to_openai_format(messages),
             "temperature": temperature,
@@ -476,7 +477,7 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
             payload["tool_choice"] = kwargs.get("tool_choice", "auto")
 
         accumulated_content = ""
-        accumulated_tool_calls: List[Dict[str, Any]] = []
+        accumulated_tool_calls: list[dict[str, Any]] = []
 
         try:
             async with self.client.stream(
@@ -597,7 +598,7 @@ class LlamaCppProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         """Parse llama.cpp API response.
 
         Args:

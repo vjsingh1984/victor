@@ -43,11 +43,11 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Protocol, Set, Tuple, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ class IPathResolver(Protocol):
         """
         ...
 
-    def suggest_similar(self, path: str, limit: int = 5) -> List[str]:
+    def suggest_similar(self, path: str, limit: int = 5) -> list[str]:
         """Suggest similar paths that exist.
 
         Useful for providing helpful error messages when a path doesn't exist.
@@ -160,7 +160,7 @@ class IPathResolver(Protocol):
 # =============================================================================
 
 
-def strip_cwd_prefix(path: str, cwd: Path) -> Tuple[Optional[str], str]:
+def strip_cwd_prefix(path: str, cwd: Path) -> tuple[Optional[str], str]:
     """Strip redundant cwd prefix from path.
 
     When working in a subdirectory, LLMs sometimes include the directory name
@@ -187,7 +187,7 @@ def strip_cwd_prefix(path: str, cwd: Path) -> Tuple[Optional[str], str]:
     return None, ""
 
 
-def strip_first_component(path: str, cwd: Path) -> Tuple[Optional[str], str]:
+def strip_first_component(path: str, cwd: Path) -> tuple[Optional[str], str]:
     """Try stripping first path component if it matches a cwd component.
 
     Args:
@@ -218,7 +218,7 @@ def strip_first_component(path: str, cwd: Path) -> Tuple[Optional[str], str]:
     return None, ""
 
 
-def strip_common_prefix(path: str, cwd: Path) -> Tuple[Optional[str], str]:
+def strip_common_prefix(path: str, cwd: Path) -> tuple[Optional[str], str]:
     """Strip common prefix if path has nested duplicate.
 
     Handles cases like "src/components/src/components/Button.tsx"
@@ -250,7 +250,7 @@ def strip_common_prefix(path: str, cwd: Path) -> Tuple[Optional[str], str]:
     return None, ""
 
 
-def restore_absolute_path(path: str, cwd: Path) -> Tuple[Optional[str], str]:
+def restore_absolute_path(path: str, cwd: Path) -> tuple[Optional[str], str]:
     """Restore leading slash for Unix absolute paths.
 
     LLMs sometimes drop the leading '/' from absolute paths. This normalizer
@@ -300,7 +300,7 @@ def restore_absolute_path(path: str, cwd: Path) -> Tuple[Optional[str], str]:
     return None, ""
 
 
-def normalize_separators(path: str, cwd: Path) -> Tuple[Optional[str], str]:
+def normalize_separators(path: str, cwd: Path) -> tuple[Optional[str], str]:
     """Normalize path separators and trailing slashes.
 
     Args:
@@ -350,12 +350,12 @@ class PathResolver(IPathResolver):
     """
 
     cwd: Optional[Path] = None
-    additional_roots: List[Path] = field(default_factory=list)
-    normalizers: List[Callable[[str, Path], Tuple[Optional[str], str]]] = field(
+    additional_roots: list[Path] = field(default_factory=list)
+    normalizers: list[Callable[[str, Path], tuple[Optional[str], str]]] = field(
         default_factory=list
     )
-    _cache: Dict[str, PathResolution] = field(default_factory=dict)
-    _known_paths: Optional[Set[str]] = None  # For fuzzy matching
+    _cache: dict[str, PathResolution] = field(default_factory=dict)
+    _known_paths: Optional[set[str]] = None  # For fuzzy matching
 
     def __post_init__(self) -> None:
         """Initialize with defaults if not provided."""
@@ -425,7 +425,7 @@ class PathResolver(IPathResolver):
                     f"added search root: {nested_dir}"
                 )
 
-    def _apply_normalizers(self, path: str) -> Tuple[str, Optional[str]]:
+    def _apply_normalizers(self, path: str) -> tuple[str, Optional[str]]:
         """Apply normalizers in sequence until one succeeds.
 
         Args:
@@ -435,7 +435,7 @@ class PathResolver(IPathResolver):
             Tuple of (normalized_path, description or None)
         """
         current_path = path
-        applied_normalizations: List[str] = []
+        applied_normalizations: list[str] = []
 
         for normalizer in self.normalizers:
             result, description = normalizer(current_path, self._cwd)
@@ -610,7 +610,7 @@ class PathResolver(IPathResolver):
 
         return result
 
-    def suggest_similar(self, path: str, limit: int = 5) -> List[str]:
+    def suggest_similar(self, path: str, limit: int = 5) -> list[str]:
         """Suggest similar paths that exist.
 
         Uses difflib for fuzzy matching against known paths in cwd.
@@ -652,7 +652,7 @@ class PathResolver(IPathResolver):
 
         return matches
 
-    def _scan_directory_names(self, max_depth: int = 3) -> Set[str]:
+    def _scan_directory_names(self, max_depth: int = 3) -> set[str]:
         """Scan directory for file/directory names.
 
         Args:
@@ -661,7 +661,7 @@ class PathResolver(IPathResolver):
         Returns:
             Set of file and directory names
         """
-        names: Set[str] = set()
+        names: set[str] = set()
 
         def _scan(path: Path, depth: int) -> None:
             if depth > max_depth:
@@ -679,7 +679,7 @@ class PathResolver(IPathResolver):
         _scan(self._cwd, 0)
         return names
 
-    def _get_relative_file_paths(self, max_depth: int = 4) -> List[str]:
+    def _get_relative_file_paths(self, max_depth: int = 4) -> list[str]:
         """Get relative file paths from cwd.
 
         Args:
@@ -688,7 +688,7 @@ class PathResolver(IPathResolver):
         Returns:
             List of relative file paths
         """
-        paths: List[str] = []
+        paths: list[str] = []
 
         def _scan(path: Path, depth: int, prefix: str) -> None:
             if depth > max_depth:
@@ -756,7 +756,7 @@ class PathResolver(IPathResolver):
         return False
 
     @property
-    def search_roots(self) -> List[Path]:
+    def search_roots(self) -> list[Path]:
         """Get all search roots (cwd + additional roots)."""
         return [self._cwd] + self.additional_roots
 
@@ -773,7 +773,7 @@ class PathResolver(IPathResolver):
 
 def create_path_resolver(
     cwd: Optional[Path] = None,
-    additional_roots: Optional[List[Path]] = None,
+    additional_roots: Optional[list[Path]] = None,
 ) -> PathResolver:
     """Create a configured PathResolver instance.
 

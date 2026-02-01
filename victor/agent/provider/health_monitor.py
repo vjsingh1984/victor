@@ -23,7 +23,7 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 
 import asyncio
 import logging
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from victor.agent.protocols import IProviderHealthMonitor
 from victor.providers.base import BaseProvider
@@ -164,7 +164,7 @@ class ProviderHealthMonitor(IProviderHealthMonitor):
         """
         return self._health_check_task is not None and not self._health_check_task.done()
 
-    async def get_healthy_providers(self) -> List[str]:
+    async def get_healthy_providers(self) -> list[str]:
         """Get list of healthy providers.
 
         Returns:

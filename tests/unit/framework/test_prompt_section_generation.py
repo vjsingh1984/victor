@@ -18,7 +18,6 @@ Phase 5 implementation: Tests that verticals use centralized prompt sections
 instead of inline prompts for consistency and maintainability.
 """
 
-import pytest
 
 from victor.coding.assistant import CodingAssistant
 from victor.devops.assistant import DevOpsAssistant

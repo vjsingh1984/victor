@@ -57,15 +57,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Type,
     cast,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 from victor.workflows.hitl import (
     HITLMode,
@@ -89,7 +86,7 @@ class BaseTransportConfig:
     timeout: float = 300.0  # Default timeout in seconds
     poll_interval: float = 5.0  # Polling interval for async transports
     callback_url: Optional[str] = None  # URL for webhook callbacks
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -102,8 +99,8 @@ class EmailConfig(BaseTransportConfig):
     smtp_password: Optional[str] = None
     smtp_use_tls: bool = True
     from_address: str = "approvals@example.com"
-    to_addresses: List[str] = field(default_factory=list)
-    cc_addresses: List[str] = field(default_factory=list)
+    to_addresses: list[str] = field(default_factory=list)
+    cc_addresses: list[str] = field(default_factory=list)
     subject_template: str = "[Approval Required] {workflow_name}: {prompt}"
     body_template: Optional[str] = None  # Uses default HTML template if None
 
@@ -128,7 +125,7 @@ class SMSConfig(BaseTransportConfig):
     account_sid: Optional[str] = None  # Twilio Account SID
     auth_token: Optional[str] = None  # Twilio Auth Token
     from_number: Optional[str] = None  # Twilio phone number
-    to_numbers: List[str] = field(default_factory=list)
+    to_numbers: list[str] = field(default_factory=list)
     message_template: str = (
         "{workflow_name}: {prompt}\nApprove: {approve_url}\nReject: {reject_url}"
     )
@@ -152,8 +149,8 @@ class SlackConfig(BaseTransportConfig):
     webhook_url: Optional[str] = None  # Incoming webhook URL
     bot_token: Optional[str] = None  # Bot token for interactive messages
     channel: str = "#approvals"
-    mention_users: List[str] = field(default_factory=list)  # User IDs to mention
-    mention_groups: List[str] = field(default_factory=list)  # Group IDs to mention
+    mention_users: list[str] = field(default_factory=list)  # User IDs to mention
+    mention_groups: list[str] = field(default_factory=list)  # Group IDs to mention
     thread_replies: bool = True  # Reply in thread for updates
 
     @classmethod
@@ -199,7 +196,7 @@ class GitHubConfig(BaseTransportConfig):
 
     # PR-specific
     pr_number: Optional[int] = None  # PR number for approval
-    required_reviewers: List[str] = field(default_factory=list)
+    required_reviewers: list[str] = field(default_factory=list)
 
     # Check-specific
     check_name: str = "Victor Workflow Approval"
@@ -229,7 +226,7 @@ class GitLabConfig(BaseTransportConfig):
 
     # MR-specific
     mr_iid: Optional[int] = None  # Merge request IID
-    required_approvers: List[str] = field(default_factory=list)
+    required_approvers: list[str] = field(default_factory=list)
 
     @classmethod
     def from_env(cls) -> "GitLabConfig":
@@ -432,7 +429,7 @@ class BaseTransport(ABC):
 
         return None
 
-    def _build_callback_urls(self, request_id: str) -> Dict[str, str]:
+    def _build_callback_urls(self, request_id: str) -> dict[str, str]:
         """Build callback URLs for approve/reject actions."""
         base_url = self.config.callback_url or ""
         if not base_url:
@@ -508,7 +505,7 @@ class EmailTransport(BaseTransport):
         self,
         request: HITLRequest,
         workflow_id: str,
-        urls: Dict[str, str],
+        urls: dict[str, str],
     ) -> str:
         """Build HTML email body."""
         context_html = ""
@@ -551,7 +548,7 @@ class SlackTransport(BaseTransport):
     def __init__(self, config: SlackConfig):
         super().__init__(config)
         self.slack_config = config
-        self._message_ts: Dict[str, str] = {}  # request_id -> message_ts
+        self._message_ts: dict[str, str] = {}  # request_id -> message_ts
 
     @property
     def mode(self) -> HITLMode:
@@ -609,8 +606,8 @@ class SlackTransport(BaseTransport):
         self,
         request: HITLRequest,
         workflow_id: str,
-        urls: Dict[str, str],
-    ) -> List[Dict[str, Any]]:
+        urls: dict[str, str],
+    ) -> list[dict[str, Any]]:
         """Build Slack Block Kit blocks."""
         blocks = [
             {"type": "header", "text": {"type": "plain_text", "text": "🔔 Approval Required"}},
@@ -649,7 +646,7 @@ class SlackTransport(BaseTransport):
                 "url": reject_url if reject_url else "",
             },
         ]
-        actions_block: Dict[str, Any] = {
+        actions_block: dict[str, Any] = {
             "type": "actions",
             "block_id": f"hitl_{request.request_id}",
             "elements": button_elements,
@@ -664,7 +661,7 @@ class SlackTransport(BaseTransport):
                 "text": f"⏱️ Timeout: {request.timeout}s | Request ID: `{req_id_short}...`",
             }
         ]
-        context_block: Dict[str, Any] = {
+        context_block: dict[str, Any] = {
             "type": "context",
             "elements": context_elements,
         }
@@ -937,7 +934,7 @@ class GitHubCheckTransport(BaseTransport):
         # This would need a webhook handler to process check_run events
         return None
 
-    def _build_check_details(self, request: HITLRequest, urls: Dict[str, str]) -> str:
+    def _build_check_details(self, request: HITLRequest, urls: dict[str, str]) -> str:
         """Build check run details markdown."""
         context_md = ""
         if request.context:
@@ -1012,7 +1009,7 @@ class CustomHookTransport(BaseTransport):
 
 
 # Registry of transport classes by mode
-_TRANSPORT_REGISTRY: Dict[HITLMode, Type[BaseTransport]] = {
+_TRANSPORT_REGISTRY: dict[HITLMode, type[BaseTransport]] = {
     HITLMode.EMAIL: EmailTransport,
     HITLMode.SMS: SMSTransport,
     HITLMode.SLACK: SlackTransport,
@@ -1022,7 +1019,7 @@ _TRANSPORT_REGISTRY: Dict[HITLMode, Type[BaseTransport]] = {
 }
 
 # Config classes by mode
-_CONFIG_REGISTRY: Dict[HITLMode, Type[BaseTransportConfig]] = {
+_CONFIG_REGISTRY: dict[HITLMode, type[BaseTransportConfig]] = {
     HITLMode.EMAIL: EmailConfig,
     HITLMode.SMS: SMSConfig,
     HITLMode.SLACK: SlackConfig,
@@ -1041,8 +1038,8 @@ _CONFIG_REGISTRY: Dict[HITLMode, Type[BaseTransportConfig]] = {
 
 def register_transport(
     mode: HITLMode,
-    transport_class: Type[BaseTransport],
-    config_class: Optional[Type[BaseTransportConfig]] = None,
+    transport_class: type[BaseTransport],
+    config_class: Optional[type[BaseTransportConfig]] = None,
 ) -> None:
     """Register a custom transport.
 
@@ -1090,7 +1087,7 @@ def get_transport(
     return transport_class(config)
 
 
-def list_available_transports() -> Dict[HITLMode, str]:
+def list_available_transports() -> dict[HITLMode, str]:
     """List available transports with descriptions.
 
     Returns:

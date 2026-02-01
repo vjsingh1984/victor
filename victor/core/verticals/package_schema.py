@@ -10,11 +10,10 @@ The schema uses Pydantic for validation and type safety.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from victor.core.verticals.base import VerticalBase
 
 
 class AuthorInfo(BaseModel):
@@ -29,16 +28,16 @@ class VerticalClassSpec(BaseModel):
 
     module: str
     class_name: str
-    provides_tools: List[str] = Field(default_factory=list)
-    provides_workflows: List[str] = Field(default_factory=list)
-    provides_capabilities: List[str] = Field(default_factory=list)
+    provides_tools: list[str] = Field(default_factory=list)
+    provides_workflows: list[str] = Field(default_factory=list)
+    provides_capabilities: list[str] = Field(default_factory=list)
 
 
 class VerticalDependencies(BaseModel):
     """Dependencies for a vertical package."""
 
-    python: List[str] = Field(default_factory=list)
-    verticals: List[str] = Field(default_factory=list)
+    python: list[str] = Field(default_factory=list)
+    verticals: list[str] = Field(default_factory=list)
 
 
 class VerticalCompatibility(BaseModel):
@@ -46,8 +45,8 @@ class VerticalCompatibility(BaseModel):
 
     min_context_window: Optional[int] = None
     requires_tool_calling: bool = True
-    preferred_providers: List[str] = Field(default_factory=list)
-    platforms: List[str] = Field(default_factory=lambda: ["linux", "macos", "windows"])
+    preferred_providers: list[str] = Field(default_factory=list)
+    platforms: list[str] = Field(default_factory=lambda: ["linux", "macos", "windows"])
     python_version: str = ">=3.10"
 
 
@@ -57,7 +56,7 @@ class VerticalSecurity(BaseModel):
     signed: bool = False
     signature_url: Optional[str] = None
     verified_author: bool = False
-    permissions: List[str] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list)
 
 
 class VerticalPackageMetadata(BaseModel):
@@ -92,7 +91,7 @@ class VerticalPackageMetadata(BaseModel):
     name: str = Field(..., pattern=r"^[a-z][a-z0-9_]*$")
     version: str
     description: str
-    authors: List[AuthorInfo]
+    authors: list[AuthorInfo]
     license: str
     requires_victor: str
     class_spec: VerticalClassSpec
@@ -104,11 +103,11 @@ class VerticalPackageMetadata(BaseModel):
     documentation: Optional[str] = None
     issues: Optional[str] = None
     category: Optional[str] = None
-    tags: List[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
     dependencies: VerticalDependencies = Field(default_factory=VerticalDependencies)
     compatibility: VerticalCompatibility = Field(default_factory=VerticalCompatibility)
     security: VerticalSecurity = Field(default_factory=VerticalSecurity)
-    installation: Dict[str, Any] = Field(default_factory=dict)
+    installation: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("name")
     @classmethod
@@ -201,7 +200,7 @@ class VerticalPackageMetadata(BaseModel):
         try:
             import tomllib
         except ImportError:
-            import tomli as tomllib
+            pass
 
         # Build TOML structure
         data = {"vertical": self.dict(exclude_none=True, by_alias=True)}

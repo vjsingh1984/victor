@@ -28,7 +28,7 @@ Tests exercise the real implementations in:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 import pytest
 
@@ -49,7 +49,6 @@ from victor.framework.agent_roles import (
 )
 from victor.framework.personas import (
     Persona,
-    PERSONA_REGISTRY,
     get_persona,
     list_personas,
     register_persona,
@@ -80,9 +79,9 @@ class CapabilityAwareAgent:
 
         # Tracking
         self.tool_calls_made: int = 0
-        self.capability_checks: List[tuple] = []
-        self.received_messages: List[AgentMessage] = []
-        self.executed_tasks: List[str] = []
+        self.capability_checks: list[tuple] = []
+        self.received_messages: list[AgentMessage] = []
+        self.executed_tasks: list[str] = []
 
     @property
     def id(self) -> str:
@@ -119,7 +118,7 @@ class CapabilityAwareAgent:
         self.tool_calls_made += 1
         return True
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> str:
         """Execute a task using allowed capabilities."""
         self.executed_tasks.append(task)
 
@@ -318,10 +317,10 @@ class TestToolBudgetEnforcement:
         @dataclass
         class SmallBudgetRole:
             name: str = "small_budget"
-            capabilities: Set[AgentCapability] = field(
+            capabilities: set[AgentCapability] = field(
                 default_factory=lambda: {AgentCapability.READ}
             )
-            allowed_tools: Set[str] = field(default_factory=lambda: {"read_file"})
+            allowed_tools: set[str] = field(default_factory=lambda: {"read_file"})
             tool_budget: int = 3
 
             def get_system_prompt_section(self) -> str:

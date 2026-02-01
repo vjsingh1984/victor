@@ -19,7 +19,7 @@ import shutil
 import types
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from urllib.parse import quote
 
 from victor.coding.lsp.client import LSPClient
@@ -41,7 +41,7 @@ class LSPStatus:
     running: bool
     initialized: bool
     open_documents: int
-    capabilities: List[str]
+    capabilities: list[str]
 
 
 class LSPConnectionPool:
@@ -65,7 +65,7 @@ class LSPConnectionPool:
         """
         self._workspace_root = workspace_root or str(Path.cwd())
         self._root_uri = self._path_to_uri(self._workspace_root)
-        self._clients: Dict[str, LSPClient] = {}  # language_id -> client
+        self._clients: dict[str, LSPClient] = {}  # language_id -> client
         self._auto_start = True
 
     async def __aenter__(self) -> "LSPConnectionPool":
@@ -269,7 +269,7 @@ class LSPConnectionPool:
 
     async def get_completions(
         self, file_path: str, line: int, character: int
-    ) -> List[CompletionItem]:
+    ) -> list[CompletionItem]:
         """Get completions at a position.
 
         Args:
@@ -309,7 +309,7 @@ class LSPConnectionPool:
 
     async def get_definition(
         self, file_path: str, line: int, character: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get definition locations.
 
         Args:
@@ -339,7 +339,7 @@ class LSPConnectionPool:
 
     async def get_references(
         self, file_path: str, line: int, character: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get reference locations.
 
         Args:
@@ -367,7 +367,7 @@ class LSPConnectionPool:
             for loc in locations
         ]
 
-    def get_diagnostics(self, file_path: str) -> List[Dict[str, Any]]:
+    def get_diagnostics(self, file_path: str) -> list[dict[str, Any]]:
         """Get diagnostics for a file.
 
         Args:
@@ -397,7 +397,7 @@ class LSPConnectionPool:
             for d in diagnostics
         ]
 
-    def get_status(self) -> Dict[str, LSPStatus]:
+    def get_status(self) -> dict[str, LSPStatus]:
         """Get status of all servers.
 
         Returns:
@@ -426,7 +426,7 @@ class LSPConnectionPool:
 
         return status
 
-    def get_available_servers(self) -> List[Dict[str, Any]]:
+    def get_available_servers(self) -> list[dict[str, Any]]:
         """Get list of available language servers.
 
         Returns:

@@ -35,7 +35,7 @@ Usage:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 # =============================================================================
@@ -64,7 +64,7 @@ class WorkflowProviderProtocol(Protocol):
     """
 
     @abstractmethod
-    def get_workflows(self) -> Dict[str, Any]:
+    def get_workflows(self) -> dict[str, Any]:
         """Get workflow definitions for this vertical.
 
         Returns:
@@ -74,7 +74,7 @@ class WorkflowProviderProtocol(Protocol):
         """
         ...
 
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
+    def get_auto_workflows(self) -> list[tuple[str, str]]:
         """Get automatically triggered workflows.
 
         Returns:

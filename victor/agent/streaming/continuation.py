@@ -58,15 +58,11 @@ import time
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
     TYPE_CHECKING,
 )
+from collections.abc import AsyncIterator, Callable
 
 from victor.agent.streaming.context import StreamingChatContext
 from victor.providers.base import StreamChunk
@@ -74,8 +70,6 @@ from victor.providers.base import StreamChunk
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.protocols.agent import IAgentOrchestrator
-    from victor.agent.streaming.handler import StreamingChatHandler
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -141,11 +135,11 @@ class ContinuationResult:
         state_updates: Dict of state updates to apply to the orchestrator.
     """
 
-    chunks: List[StreamChunk] = field(default_factory=list)
+    chunks: list[StreamChunk] = field(default_factory=list)
     should_return: bool = False
     should_skip_rest: bool = False
     should_continue_loop: bool = True
-    state_updates: Dict[str, Any] = field(default_factory=dict)
+    state_updates: dict[str, Any] = field(default_factory=dict)
 
     def add_chunk(self, chunk: StreamChunk) -> None:
         """Add a chunk to yield."""
@@ -210,7 +204,7 @@ class TokenBudget:
         """
         return tokens_used >= self.hard_limit
 
-    def get_token_status(self, tokens_used: int) -> Dict[str, Any]:
+    def get_token_status(self, tokens_used: int) -> dict[str, Any]:
         """Get token usage status for logging/decisions.
 
         Args:
@@ -261,7 +255,7 @@ class ContinuationSignals:
     estimated_tokens: int = 0
     content_length: int = 0
 
-    def calculate_continuation_score(self) -> Dict[str, Any]:
+    def calculate_continuation_score(self) -> dict[str, Any]:
         """Calculate weighted continuation score combining all signals.
 
         Returns:
@@ -355,7 +349,7 @@ class ContinuationSignals:
             "weights": weights,
         }
 
-    def get_detailed_breakdown(self) -> Dict[str, Any]:
+    def get_detailed_breakdown(self) -> dict[str, Any]:
         """Get detailed breakdown of all signals for debugging/observability.
 
         Returns:
@@ -422,13 +416,13 @@ class ProgressMetrics:
             continue_exploring()
     """
 
-    files_read: Set[str] = field(default_factory=set)
-    files_revisited: Set[str] = field(default_factory=set)
-    tools_used: Set[str] = field(default_factory=set)
+    files_read: set[str] = field(default_factory=set)
+    files_revisited: set[str] = field(default_factory=set)
+    tools_used: set[str] = field(default_factory=set)
     iterations_without_tools: int = 0
     last_tool_call_iteration: int = 0
     total_iterations: int = 0
-    stuck_patterns: List[str] = field(default_factory=list)
+    stuck_patterns: list[str] = field(default_factory=list)
     token_budget: Optional[TokenBudget] = None
 
     def record_file_read(self, file_path: str) -> None:
@@ -523,7 +517,7 @@ class ProgressMetrics:
 
         return no_tool_activity and cycling
 
-    def get_progress_summary(self) -> Dict[str, Any]:
+    def get_progress_summary(self) -> dict[str, Any]:
         """Get a summary of progress metrics for logging/observability.
 
         Returns:
@@ -549,7 +543,7 @@ class ProgressMetrics:
         """
         self.token_budget = TokenBudget(context_window=context_window)
 
-    def check_token_limits(self, tokens_used: int) -> Dict[str, Any]:
+    def check_token_limits(self, tokens_used: int) -> dict[str, Any]:
         """Check token budget limits and get recommendations.
 
         Args:
@@ -606,9 +600,9 @@ class ContinuationHandler:
         model: str = "",
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        messages_getter: Optional[Callable[[], List[Any]]] = None,
+        messages_getter: Optional[Callable[[], list[Any]]] = None,
         unified_tracker: Optional[Any] = None,
-        finalize_metrics: Optional[Callable[[Dict[str, Any]], Any]] = None,
+        finalize_metrics: Optional[Callable[[dict[str, Any]], Any]] = None,
         record_outcome: Optional[Callable[..., None]] = None,
         execute_extracted_tool: Optional[Callable[..., AsyncIterator[StreamChunk]]] = None,
         progress_metrics: Optional[ProgressMetrics] = None,
@@ -652,7 +646,7 @@ class ContinuationHandler:
 
     async def handle_action(
         self,
-        action_result: Dict[str, Any],
+        action_result: dict[str, Any],
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -690,7 +684,7 @@ class ContinuationHandler:
         handler = handlers.get(action, self._handle_finish)
         return await handler(action_result, stream_ctx, full_content)
 
-    def _apply_state_updates(self, action_result: Dict[str, Any]) -> Dict[str, Any]:
+    def _apply_state_updates(self, action_result: dict[str, Any]) -> dict[str, Any]:
         """Apply state updates from action result.
 
         Args:
@@ -716,7 +710,7 @@ class ContinuationHandler:
 
     async def _handle_continue_asking_input(
         self,
-        action_result: Dict[str, Any],
+        action_result: dict[str, Any],
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -732,7 +726,7 @@ class ContinuationHandler:
 
     async def _handle_return_to_user(
         self,
-        action_result: Dict[str, Any],
+        action_result: dict[str, Any],
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -754,7 +748,7 @@ class ContinuationHandler:
 
     async def _handle_prompt_tool_call(
         self,
-        action_result: Dict[str, Any],
+        action_result: dict[str, Any],
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -785,7 +779,7 @@ class ContinuationHandler:
 
     async def _handle_continue_with_synthesis_hint(
         self,
-        action_result: Dict[str, Any],
+        action_result: dict[str, Any],
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -808,7 +802,7 @@ class ContinuationHandler:
 
     async def _handle_request_summary(
         self,
-        action_result: Dict[str, Any],
+        action_result: dict[str, Any],
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -900,7 +894,7 @@ class ContinuationHandler:
 
     async def _handle_request_completion(
         self,
-        action_result: Dict[str, Any],
+        action_result: dict[str, Any],
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -916,7 +910,7 @@ class ContinuationHandler:
 
     async def _handle_execute_extracted_tool(
         self,
-        action_result: Dict[str, Any],
+        action_result: dict[str, Any],
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -940,7 +934,7 @@ class ContinuationHandler:
 
     async def _handle_force_tool_execution(
         self,
-        action_result: Dict[str, Any],
+        action_result: dict[str, Any],
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:
@@ -986,7 +980,7 @@ class ContinuationHandler:
 
     async def _handle_finish(
         self,
-        action_result: Dict[str, Any],
+        action_result: dict[str, Any],
         stream_ctx: StreamingChatContext,
         full_content: str,
     ) -> ContinuationResult:

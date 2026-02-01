@@ -22,7 +22,7 @@ per-pipeline customization.
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional, Type
+from typing import Optional
 
 from victor.integrations.protocols.query_enhancement import (
     EnhancementTechnique,
@@ -44,13 +44,13 @@ class QueryEnhancementRegistry:
 
     def __init__(self) -> None:
         """Initialize empty registry."""
-        self._strategies: Dict[EnhancementTechnique, Type[IQueryEnhancementStrategy]] = {}
-        self._instances: Dict[EnhancementTechnique, IQueryEnhancementStrategy] = {}
+        self._strategies: dict[EnhancementTechnique, type[IQueryEnhancementStrategy]] = {}
+        self._instances: dict[EnhancementTechnique, IQueryEnhancementStrategy] = {}
 
     def register(
         self,
         technique: EnhancementTechnique,
-        strategy_class: Type[IQueryEnhancementStrategy],
+        strategy_class: type[IQueryEnhancementStrategy],
     ) -> None:
         """Register a strategy class for a technique.
 

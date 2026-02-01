@@ -42,7 +42,8 @@ import importlib
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import AsyncIterator, Callable
 
 from victor.core.verticals.protocols import WorkflowProviderProtocol
 from victor.workflows.definition import WorkflowDefinition
@@ -95,7 +96,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
 
     def __init__(self) -> None:
         """Initialize the workflow provider with lazy loading support."""
-        self._workflows: Optional[Dict[str, WorkflowDefinition]] = None
+        self._workflows: Optional[dict[str, WorkflowDefinition]] = None
         self._config: Optional["YAMLWorkflowConfig"] = None
         self._compiler: Optional["UnifiedWorkflowCompiler"] = None
 
@@ -239,9 +240,9 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
             # Fallback: use current file's parent as base
             return Path(__file__).parent
 
-    def _load_escape_hatches(self) -> Tuple[
-        Dict[str, Callable[[Dict[str, Any]], str]],
-        Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]],
+    def _load_escape_hatches(self) -> tuple[
+        dict[str, Callable[[dict[str, Any]], str]],
+        dict[str, Callable[[dict[str, Any]], dict[str, Any]]],
     ]:
         """Dynamically load escape hatches from the vertical-specific module.
 
@@ -293,7 +294,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
 
         return self._config
 
-    def _load_workflows(self) -> Dict[str, WorkflowDefinition]:
+    def _load_workflows(self) -> dict[str, WorkflowDefinition]:
         """Lazy load all YAML workflows from the workflows directory.
 
         Uses escape hatches for complex conditions that can't be expressed in YAML.
@@ -321,7 +322,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
 
         return self._workflows
 
-    def get_workflows(self) -> Dict[str, WorkflowDefinition]:
+    def get_workflows(self) -> dict[str, WorkflowDefinition]:
         """Get all workflow definitions for this vertical.
 
         Returns:
@@ -340,7 +341,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         """
         return self._load_workflows().get(name)
 
-    def get_workflow_names(self) -> List[str]:
+    def get_workflow_names(self) -> list[str]:
         """Get list of all available workflow names.
 
         Returns:
@@ -348,7 +349,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
         """
         return list(self._load_workflows().keys())
 
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
+    def get_auto_workflows(self) -> list[tuple[str, str]]:
         """Get automatic workflow triggers based on query patterns.
 
         Override this method in subclasses to define patterns that
@@ -481,7 +482,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
     async def run_compiled_workflow(
         self,
         workflow_name: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         thread_id: Optional[str] = None,
     ) -> "GraphExecutionResult[Any]":
         """Execute a workflow using the unified compiler.
@@ -514,7 +515,7 @@ class BaseYAMLWorkflowProvider(WorkflowProviderProtocol, ABC):
     async def stream_compiled_workflow(
         self,
         workflow_name: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         thread_id: Optional[str] = None,
     ) -> AsyncIterator[tuple[Any, Any]]:
         """Stream workflow execution using the unified compiler.

@@ -17,7 +17,6 @@
 Tests the ConfigProtocol interface and conformance.
 """
 
-import pytest
 from typing import Any
 
 from victor.protocols.config_agent import ConfigProtocol

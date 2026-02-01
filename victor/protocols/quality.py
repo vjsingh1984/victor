@@ -43,7 +43,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 import re
 
 
@@ -80,7 +80,7 @@ class DimensionScore:
     score: float
     weight: float = 1.0
     reason: str = ""
-    evidence: Dict[str, Any] = field(default_factory=dict)
+    evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -101,9 +101,9 @@ class QualityScore:
     is_acceptable: bool
     threshold: float = 0.80
     provider: str = ""
-    dimension_scores: Dict[ProtocolQualityDimension, DimensionScore] = field(default_factory=dict)
+    dimension_scores: dict[ProtocolQualityDimension, DimensionScore] = field(default_factory=dict)
     feedback: str = ""
-    suggestions: List[str] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
 
     def get_dimension_score(self, dimension: ProtocolQualityDimension) -> float:
         """Get score for a specific dimension."""
@@ -111,7 +111,7 @@ class QualityScore:
             return self.dimension_scores[dimension].score
         return 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "score": self.score,
@@ -141,7 +141,7 @@ class IQualityAssessor(Protocol):
     def assess(
         self,
         response: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> QualityScore:
         """Assess response quality.
 
@@ -155,7 +155,7 @@ class IQualityAssessor(Protocol):
         ...
 
     @property
-    def dimensions(self) -> List[ProtocolQualityDimension]:
+    def dimensions(self) -> list[ProtocolQualityDimension]:
         """Return dimensions this assessor evaluates."""
         ...
 
@@ -165,7 +165,7 @@ class BaseQualityAssessor(ABC):
 
     def __init__(
         self,
-        weights: Optional[Dict[ProtocolQualityDimension, float]] = None,
+        weights: Optional[dict[ProtocolQualityDimension, float]] = None,
         threshold: float = 0.80,
     ):
         """Initialize assessor.
@@ -184,7 +184,7 @@ class BaseQualityAssessor(ABC):
         self._threshold = threshold
 
     @property
-    def dimensions(self) -> List[ProtocolQualityDimension]:
+    def dimensions(self) -> list[ProtocolQualityDimension]:
         """Return dimensions this assessor evaluates."""
         return list(self._weights.keys())
 
@@ -193,7 +193,7 @@ class BaseQualityAssessor(ABC):
         self,
         dimension: ProtocolQualityDimension,
         response: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> DimensionScore:
         """Assess a single quality dimension."""
         ...
@@ -201,7 +201,7 @@ class BaseQualityAssessor(ABC):
     def assess(
         self,
         response: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> QualityScore:
         """Assess response quality across all dimensions."""
         dimension_scores = {}
@@ -233,7 +233,7 @@ class SimpleQualityAssessor(BaseQualityAssessor):
         self,
         dimension: ProtocolQualityDimension,
         response: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> DimensionScore:
         """Assess using simple heuristics."""
         if dimension == ProtocolQualityDimension.CLARITY:
@@ -277,7 +277,7 @@ class SimpleQualityAssessor(BaseQualityAssessor):
             reason="Assessed based on structure and formatting",
         )
 
-    def _assess_conciseness(self, response: str, context: Dict[str, Any]) -> DimensionScore:
+    def _assess_conciseness(self, response: str, context: dict[str, Any]) -> DimensionScore:
         """Assess response conciseness."""
         query = context.get("query", "")
         query_len = len(query.split())
@@ -341,7 +341,7 @@ class SimpleQualityAssessor(BaseQualityAssessor):
             reason="Assessed based on syntax heuristics",
         )
 
-    def _assess_coverage(self, response: str, context: Dict[str, Any]) -> DimensionScore:
+    def _assess_coverage(self, response: str, context: dict[str, Any]) -> DimensionScore:
         """Assess query coverage."""
         query = context.get("query", "")
         score = 0.5
@@ -371,7 +371,7 @@ class SimpleQualityAssessor(BaseQualityAssessor):
             evidence={"key_terms": list(key_terms)},
         )
 
-    def _assess_grounding(self, response: str, context: Dict[str, Any]) -> DimensionScore:
+    def _assess_grounding(self, response: str, context: dict[str, Any]) -> DimensionScore:
         """Assess factual grounding (placeholder for actual verification)."""
         # This is a placeholder - actual grounding uses IGroundingStrategy
         grounding_result = context.get("grounding_result")
@@ -400,7 +400,7 @@ class ProviderAwareQualityAssessor(BaseQualityAssessor):
         self,
         provider_name: str = "",
         provider_threshold: float = 0.80,
-        weights: Optional[Dict[ProtocolQualityDimension, float]] = None,
+        weights: Optional[dict[ProtocolQualityDimension, float]] = None,
     ):
         """Initialize with provider context.
 
@@ -416,7 +416,7 @@ class ProviderAwareQualityAssessor(BaseQualityAssessor):
         self,
         dimension: ProtocolQualityDimension,
         response: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> DimensionScore:
         """Assess with provider-specific adjustments."""
         # Use SimpleQualityAssessor for base assessment
@@ -465,7 +465,7 @@ class ProviderAwareQualityAssessor(BaseQualityAssessor):
     def assess(
         self,
         response: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> QualityScore:
         """Assess with provider context."""
         result = super().assess(response, context)
@@ -481,7 +481,7 @@ class CompositeQualityAssessor:
 
     def __init__(
         self,
-        assessors: Optional[List[IQualityAssessor]] = None,
+        assessors: Optional[list[IQualityAssessor]] = None,
         strategy: str = "weighted",
     ):
         """Initialize composite assessor.
@@ -498,7 +498,7 @@ class CompositeQualityAssessor:
         self._assessors.append(assessor)
 
     @property
-    def dimensions(self) -> List[ProtocolQualityDimension]:
+    def dimensions(self) -> list[ProtocolQualityDimension]:
         """Return all dimensions covered by assessors."""
         all_dims = set()
         for assessor in self._assessors:
@@ -508,7 +508,7 @@ class CompositeQualityAssessor:
     def assess(
         self,
         response: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> QualityScore:
         """Assess using all assessors and combine results."""
         scores = [a.assess(response, context) for a in self._assessors]

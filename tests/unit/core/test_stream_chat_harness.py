@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Dict, List
+from typing import Any
+from collections.abc import AsyncIterator
 
 import pytest
 
 from victor.agent.orchestrator import AgentOrchestrator
-from victor.agent.stream_handler import StreamChunk
 from victor.config.settings import Settings, ProfileConfig
 
 
@@ -20,14 +20,14 @@ from victor.config.settings import Settings, ProfileConfig
 class FakeStreamChunk:
     content: str = ""
     tool_calls: Any = None
-    prompt_cache: Dict[str, int] | None = None
+    prompt_cache: dict[str, int] | None = None
     cache_creation_input_tokens: int | None = None
     cache_read_input_tokens: int | None = None
-    usage: Dict[str, int] | None = None
+    usage: dict[str, int] | None = None
 
 
 class FakeProvider:
-    def __init__(self, *, stream_chunks: List[FakeStreamChunk], supports_tools: bool = True):
+    def __init__(self, *, stream_chunks: list[FakeStreamChunk], supports_tools: bool = True):
         self._stream_chunks = stream_chunks
         self._supports_tools = supports_tools
         self.called_chat = False

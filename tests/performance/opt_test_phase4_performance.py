@@ -33,7 +33,7 @@ import gc
 import pytest
 import time
 import tracemalloc
-from typing import Any, Dict, List
+from typing import Any
 from dataclasses import dataclass
 
 # Try to import pytest-benchmark
@@ -48,12 +48,10 @@ except ImportError:
 from victor.optimization.runtime.lazy_loader import (
     LazyComponentLoader,
     LoadingStrategy,
-    LoadingStats,
 )
 from victor.optimization.runtime.parallel_executor import (
     AdaptiveParallelExecutor,
     OptimizationStrategy,
-    PerformanceMetrics,
 )
 from victor.agent.personas.persona_manager import PersonaManager
 from victor.agent.personas.types import Persona, PersonalityType, CommunicationStyle

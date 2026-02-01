@@ -41,7 +41,7 @@ class ResearchRLConfig(BaseRLConfig):
     # default_patience inherited from BaseRLConfig
 
     # Uses canonical ToolNames constants for consistency
-    task_type_mappings: Dict[str, List[str]] = field(
+    task_type_mappings: dict[str, list[str]] = field(
         default_factory=lambda: {
             "research": [
                 ToolNames.WEB_SEARCH,
@@ -62,7 +62,7 @@ class ResearchRLConfig(BaseRLConfig):
         }
     )
 
-    quality_thresholds: Dict[str, float] = field(
+    quality_thresholds: dict[str, float] = field(
         default_factory=lambda: {
             "research": 0.85,  # High bar for research accuracy
             "fact_check": 0.90,  # Very high bar for fact verification
@@ -78,7 +78,7 @@ class ResearchRLConfig(BaseRLConfig):
     # is_learner_active, get_rl_config, __repr__ all inherited
 
     # Research-specific: prefer providers with web access
-    preferred_providers_by_task: Dict[str, List[str]] = field(
+    preferred_providers_by_task: dict[str, list[str]] = field(
         default_factory=lambda: {
             "research": ["anthropic", "openai", "google"],
             "fact_check": ["anthropic", "openai"],
@@ -87,7 +87,7 @@ class ResearchRLConfig(BaseRLConfig):
     )
 
     # Research-specific method
-    def get_preferred_providers(self, task_type: str) -> List[str]:
+    def get_preferred_providers(self, task_type: str) -> list[str]:
         """Get preferred providers for a task type."""
         return self.preferred_providers_by_task.get(
             task_type.lower(),
@@ -111,8 +111,8 @@ class ResearchRLHooks:
     def get_tool_recommendation(
         self,
         task_type: str,
-        available_tools: Optional[List[str]] = None,
-    ) -> List[str]:
+        available_tools: Optional[list[str]] = None,
+    ) -> list[str]:
         """Get tool recommendations for a task type."""
         config_tools = self._config.get_tools_for_task(task_type)
         if available_tools:
@@ -127,7 +127,7 @@ class ResearchRLHooks:
         """Get quality threshold for task type."""
         return self._config.get_quality_threshold(task_type)
 
-    def get_preferred_providers(self, task_type: str) -> List[str]:
+    def get_preferred_providers(self, task_type: str) -> list[str]:
         """Get preferred providers for task type."""
         return self._config.get_preferred_providers(task_type)
 

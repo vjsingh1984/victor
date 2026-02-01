@@ -24,7 +24,7 @@ import copy
 import logging
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 from uuid import uuid4
 
 from victor.framework.adaptation.types import (
@@ -94,7 +94,7 @@ class AdaptableGraph:
         self,
         graph: "RunnableType",
         config: Optional[AdaptationConfig] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ):
         """Initialize AdaptableGraph.
 
@@ -108,8 +108,8 @@ class AdaptableGraph:
         self._metadata = metadata or {}
 
         # Tracking state
-        self._checkpoints: List[AdaptationCheckpoint] = []
-        self._history: List[AdaptationResult] = []
+        self._checkpoints: list[AdaptationCheckpoint] = []
+        self._history: list[AdaptationResult] = []
         self._modification_count = 0
 
         # Circuit breaker state
@@ -128,12 +128,12 @@ class AdaptableGraph:
         return self._config
 
     @property
-    def checkpoints(self) -> List[AdaptationCheckpoint]:
+    def checkpoints(self) -> list[AdaptationCheckpoint]:
         """Get list of checkpoints."""
         return list(self._checkpoints)
 
     @property
-    def history(self) -> List[AdaptationResult]:
+    def history(self) -> list[AdaptationResult]:
         """Get modification history."""
         return list(self._history)
 
@@ -453,7 +453,7 @@ class AdaptableGraph:
             return node_id in self._graph.nodes
         return True
 
-    def _serialize_graph_state(self) -> Dict[str, Any]:
+    def _serialize_graph_state(self) -> dict[str, Any]:
         """Serialize graph state for checkpointing."""
         # This is a simplified implementation
         # Full implementation would depend on graph structure
@@ -463,7 +463,7 @@ class AdaptableGraph:
             "timestamp": datetime.now().isoformat(),
         }
 
-    def _restore_graph_state(self, state: Dict[str, Any]) -> None:
+    def _restore_graph_state(self, state: dict[str, Any]) -> None:
         """Restore graph state from checkpoint."""
         self._metadata = state.get("metadata", {})
         self._modification_count = state.get("modification_count", 0)

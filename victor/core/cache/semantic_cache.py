@@ -52,7 +52,7 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Optional, cast
 
 import numpy as np
 
@@ -89,7 +89,7 @@ class SemanticCacheEntry:
     access_count: int = 0
     last_access: float = field(default_factory=time.time)
     ttl: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     similarity_score: float = 0.0
 
     def is_expired(self) -> bool:
@@ -211,7 +211,7 @@ class SemanticCache:
 
         return self._embedding_service
 
-    def _generate_key(self, messages: List[Message]) -> str:
+    def _generate_key(self, messages: list[Message]) -> str:
         """Generate exact match cache key from messages.
 
         Args:
@@ -271,8 +271,8 @@ class SemanticCache:
             return 0.0
 
     def _batch_cosine_similarity(
-        self, query_vec: np.ndarray, cache_vecs: List[np.ndarray]
-    ) -> List[float]:
+        self, query_vec: np.ndarray, cache_vecs: list[np.ndarray]
+    ) -> list[float]:
         """Calculate cosine similarity for batch of vectors.
 
         Args:
@@ -294,7 +294,7 @@ class SemanticCache:
             norms[norms == 0] = 1
 
             similarities = dot_products / norms
-            return cast(List[float], similarities.tolist())
+            return cast(list[float], similarities.tolist())
         except Exception as e:
             logger.warning(f"Failed to calculate batch cosine similarity: {e}")
             return [0.0] * len(cache_vecs)
@@ -319,10 +319,10 @@ class SemanticCache:
 
     async def put(
         self,
-        messages: List[Message],
+        messages: list[Message],
         response: CompletionResponse,
         ttl: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> str:
         """Store a response in the semantic cache.
 
@@ -370,7 +370,7 @@ class SemanticCache:
 
         return key
 
-    async def get(self, messages: List[Message]) -> Optional[CompletionResponse]:
+    async def get(self, messages: list[Message]) -> Optional[CompletionResponse]:
         """Get cached response by exact match.
 
         Args:
@@ -404,7 +404,7 @@ class SemanticCache:
 
     async def get_similar(
         self,
-        messages: List[Message],
+        messages: list[Message],
         threshold: Optional[float] = None,
     ) -> Optional[CompletionResponse]:
         """Get cached response by semantic similarity.
@@ -510,7 +510,7 @@ class SemanticCache:
         with self._lock:
             return len(self._cache)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

@@ -22,7 +22,8 @@ Phase 4 - Agent Creation Unification:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import AsyncIterator
 
 from victor.framework.events import (
     AgentExecutionEvent,
@@ -50,7 +51,7 @@ async def create_orchestrator_from_options(
     model: Optional[str],
     temperature: float,
     max_tokens: int,
-    tools: Union[ToolSet, List[str], None],
+    tools: ToolSet | list[str] | None,
     thinking: bool,
     airgapped: bool,
     profile: Optional[str],
@@ -59,7 +60,7 @@ async def create_orchestrator_from_options(
     system_prompt: Optional[str] = None,
     enable_observability: bool = True,
     session_id: Optional[str] = None,
-    vertical: Optional[Union[Type["VerticalBase"], str]] = None,
+    vertical: Optional[type["VerticalBase"] | str] = None,
 ) -> Any:
     """Create an AgentOrchestrator from framework options.
 
@@ -90,7 +91,6 @@ async def create_orchestrator_from_options(
     Returns:
         Configured AgentOrchestrator instance
     """
-    from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.orchestrator_factory import OrchestratorFactory
     from victor.config.settings import load_settings
     from victor.core.bootstrap import ensure_bootstrapped
@@ -167,7 +167,7 @@ async def create_orchestrator_from_options(
 
 def apply_vertical_to_orchestrator(
     orchestrator: Any,
-    vertical: Union[Type["VerticalBase"], str],
+    vertical: type["VerticalBase"] | str,
 ) -> None:
     """Apply vertical configuration to orchestrator using integration pipeline.
 
@@ -180,7 +180,6 @@ def apply_vertical_to_orchestrator(
     """
     from victor.framework.vertical_integration import (
         VerticalIntegrationPipeline,
-        IntegrationResult,
     )
     import logging
 
@@ -274,7 +273,7 @@ def apply_system_prompt(orchestrator: Any, system_prompt: str) -> None:
 
 def configure_tools(
     orchestrator: Any,
-    tools: Union[ToolSet, List[str]],
+    tools: ToolSet | list[str],
     airgapped: bool = False,
 ) -> None:
     """Configure tools on the orchestrator using ToolConfigurator.
@@ -289,7 +288,6 @@ def configure_tools(
     """
     from victor.framework.tool_config import (
         AirgappedFilter,
-        ToolConfigurator,
         ToolConfigMode,
         get_tool_configurator,
     )
@@ -375,7 +373,7 @@ async def stream_with_events(
         yield stream_end_event(success=False, error=str(e))
 
 
-def format_context_message(context: Dict[str, Any]) -> Optional[str]:
+def format_context_message(context: dict[str, Any]) -> Optional[str]:
     """Format context dict into a message string.
 
     Args:
@@ -409,7 +407,7 @@ def format_context_message(context: Dict[str, Any]) -> Optional[str]:
     return "\n".join(parts) if parts else None
 
 
-def collect_tool_calls(events: List[AgentExecutionEvent]) -> List[Dict[str, Any]]:
+def collect_tool_calls(events: list[AgentExecutionEvent]) -> list[dict[str, Any]]:
     """Collect tool calls from a list of events.
 
     Args:

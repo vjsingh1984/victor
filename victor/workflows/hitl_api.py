@@ -69,14 +69,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Set,
     TYPE_CHECKING,
 )
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 
 if TYPE_CHECKING:
@@ -130,7 +126,7 @@ class StoredRequest:
     expires_at: Optional[datetime] = None
     notified: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize for API response."""
         data = {
             "request_id": self.request.request_id,
@@ -163,9 +159,9 @@ class HITLStore:
     """
 
     def __init__(self) -> None:
-        self._requests: Dict[str, StoredRequest] = {}
-        self._events: Dict[str, asyncio.Event] = {}
-        self._subscribers: Dict[str, Set[Callable[..., Any]]] = {}
+        self._requests: dict[str, StoredRequest] = {}
+        self._events: dict[str, asyncio.Event] = {}
+        self._subscribers: dict[str, set[Callable[..., Any]]] = {}
         self._lock = asyncio.Lock()
 
     async def store_request(
@@ -215,7 +211,7 @@ class HITLStore:
         """
         return self._requests.get(request_id)
 
-    async def list_pending(self) -> List[StoredRequest]:
+    async def list_pending(self) -> list[StoredRequest]:
         """List all pending requests.
 
         Returns:
@@ -237,7 +233,7 @@ class HITLStore:
         request_id: str,
         approved: bool,
         value: Optional[Any] = None,
-        modifications: Optional[Dict[str, Any]] = None,
+        modifications: Optional[dict[str, Any]] = None,
         reason: Optional[str] = None,
     ) -> Optional[HITLResponse]:
         """Submit a response to a HITL request.
@@ -450,8 +446,8 @@ class SQLiteHITLStore:
 
         self.db_path = db_path
         self.table_name = table_name
-        self._events: Dict[str, asyncio.Event] = {}
-        self._subscribers: Dict[str, Set[Callable[..., Any]]] = {}
+        self._events: dict[str, asyncio.Event] = {}
+        self._subscribers: dict[str, set[Callable[..., Any]]] = {}
         self._lock = asyncio.Lock()
 
         # Initialize database
@@ -648,7 +644,7 @@ class SQLiteHITLStore:
         finally:
             conn.close()
 
-    async def list_pending(self) -> List[StoredRequest]:
+    async def list_pending(self) -> list[StoredRequest]:
         """List all pending requests.
 
         Returns:
@@ -681,7 +677,7 @@ class SQLiteHITLStore:
         request_id: str,
         approved: bool,
         value: Optional[Any] = None,
-        modifications: Optional[Dict[str, Any]] = None,
+        modifications: Optional[dict[str, Any]] = None,
         reason: Optional[str] = None,
     ) -> Optional[HITLResponse]:
         """Submit a response to a HITL request.
@@ -877,7 +873,7 @@ class SQLiteHITLStore:
         self,
         workflow_id: Optional[str] = None,
         limit: int = 100,
-    ) -> List[StoredRequest]:
+    ) -> list[StoredRequest]:
         """Get request history for audit purposes.
 
         Args:
@@ -1059,7 +1055,7 @@ try:
 
         approved: bool
         value: Optional[Any] = None
-        modifications: Optional[Dict[str, Any]] = None
+        modifications: Optional[dict[str, Any]] = None
         reason: Optional[str] = None
 
 except ImportError:
@@ -1107,7 +1103,7 @@ def create_hitl_router(
             raise HTTPException(status_code=401, detail="Invalid token")
 
     @router.get("/requests")
-    async def list_requests(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    async def list_requests(authorization: Optional[str] = Header(None)) -> dict[str, Any]:
         """List all pending HITL requests."""
         await verify_auth(authorization)
         pending = await hitl_store.list_pending()
@@ -1116,7 +1112,7 @@ def create_hitl_router(
     @router.get("/requests/{request_id}")
     async def get_request(
         request_id: str, authorization: Optional[str] = Header(None)
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get a specific HITL request."""
         await verify_auth(authorization)
         stored = await hitl_store.get_request(request_id)
@@ -1129,7 +1125,7 @@ def create_hitl_router(
         request_id: str,
         body: ResponseSubmit = Body(...),
         authorization: Optional[str] = Header(None),
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Submit a response to a HITL request."""
         await verify_auth(authorization)
         response = await hitl_store.submit_response(
@@ -1158,7 +1154,7 @@ def create_hitl_router(
         workflow_id: Optional[str] = None,
         limit: int = 50,
         authorization: Optional[str] = Header(None),
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get approval history for audit purposes."""
         await verify_auth(authorization)
         if hasattr(hitl_store, "get_request_history"):
@@ -2572,7 +2568,7 @@ def create_hitl_app(
     app.include_router(router, prefix="/hitl")
 
     @app.get("/")
-    async def root() -> Dict[str, Any]:
+    async def root() -> dict[str, Any]:
         return {
             "name": "Victor HITL API",
             "version": "0.5.0",
@@ -2581,7 +2577,7 @@ def create_hitl_app(
         }
 
     @app.get("/health")
-    async def health() -> Dict[str, Any]:
+    async def health() -> dict[str, Any]:
         pending = await hitl_store.list_pending()
         return {"status": "healthy", "pending_requests": len(pending)}
 

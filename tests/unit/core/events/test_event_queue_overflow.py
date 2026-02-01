@@ -21,8 +21,7 @@ Run with: pytest tests/unit/core/events/test_event_queue_overflow.py -v
 """
 
 import asyncio
-from typing import List
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 from enum import Enum
 import time
 
@@ -31,9 +30,6 @@ import pytest
 from victor.core.events import (
     MessagingEvent,
     InMemoryEventBackend,
-    BackendConfig,
-    DeliveryGuarantee,
-    BackendType,
     ObservabilityBus,
     AgentMessageBus,
 )
@@ -155,7 +151,7 @@ def mock_event_producer():
     """Mock event producer for testing."""
     producer = MagicMock()
 
-    async def produce_events(count: int, topic: str = "test.event") -> List[MessagingEvent]:
+    async def produce_events(count: int, topic: str = "test.event") -> list[MessagingEvent]:
         events = []
         for i in range(count):
             event = MessagingEvent(
@@ -516,7 +512,6 @@ class TestOverflowAlerting:
     @pytest.mark.asyncio
     async def test_overflow_logged_as_warning(self, connected_small_backend, caplog):
         """Overflow should be logged as warning."""
-        import logging
 
         # Fill queue
         for i in range(5):

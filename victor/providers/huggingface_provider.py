@@ -40,8 +40,8 @@ References:
 
 import json
 import logging
-import os
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -50,7 +50,6 @@ from victor.providers.base import (
     CompletionResponse,
     Message,
     ProviderError,
-    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
@@ -188,12 +187,12 @@ class HuggingFaceProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Hugging Face."""
@@ -228,12 +227,12 @@ class HuggingFaceProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Hugging Face."""
@@ -246,7 +245,7 @@ class HuggingFaceProvider(BaseProvider, HTTPErrorHandlerMixin):
 
             async with self.client.stream("POST", url, json=payload) as response:
                 response.raise_for_status()
-                accumulated_tool_calls: List[Dict[str, Any]] = []
+                accumulated_tool_calls: list[dict[str, Any]] = []
 
                 async for line in response.aiter_lines():
                     if not line.strip() or not line.startswith("data: "):
@@ -277,7 +276,7 @@ class HuggingFaceProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def _build_request_payload(
         self, messages, model, temperature, max_tokens, tools, stream, **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build OpenAI-compatible request payload."""
         formatted_messages = []
         for msg in messages:
@@ -326,7 +325,7 @@ class HuggingFaceProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return payload
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         """Parse HF response (OpenAI format)."""
         choices = result.get("choices", [])
         if not choices:
@@ -364,7 +363,7 @@ class HuggingFaceProvider(BaseProvider, HTTPErrorHandlerMixin):
             metadata=None,
         )
 
-    def _normalize_tool_calls(self, tool_calls) -> Optional[List[Dict[str, Any]]]:
+    def _normalize_tool_calls(self, tool_calls) -> Optional[list[dict[str, Any]]]:
         """Normalize tool calls to Victor format."""
         if not tool_calls:
             return None

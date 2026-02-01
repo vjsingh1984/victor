@@ -68,11 +68,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 # These imports are intentionally after pytestmark to avoid loading if LMStudio unavailable
-from httpx import ConnectError, HTTPError  # noqa: E402
-import httpx  # noqa: E402
+from httpx import ConnectError, HTTPError
+import httpx
 
-from victor.providers.base import Message, ToolDefinition  # noqa: E402
-from victor.providers.openai_provider import OpenAIProvider  # noqa: E402
+from victor.providers.base import Message, ToolDefinition
+from victor.providers.openai_provider import OpenAIProvider
 
 
 # Module-level flag to track if warmup has been done

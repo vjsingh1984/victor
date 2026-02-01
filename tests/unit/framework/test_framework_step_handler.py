@@ -15,8 +15,8 @@
 """Unit tests for FrameworkStepHandler apply methods."""
 
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
-from typing import Dict, Any, List, Optional
+from unittest.mock import MagicMock, patch
+from typing import Any
 
 from victor.core.verticals.base import VerticalBase
 from victor.agent.vertical_context import VerticalContext
@@ -28,7 +28,7 @@ class MockVerticalWithHandlers(VerticalBase):
     name = "test_vertical"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read"]
 
     @classmethod
@@ -36,7 +36,7 @@ class MockVerticalWithHandlers(VerticalBase):
         return "Test"
 
     @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
+    def get_handlers(cls) -> dict[str, Any]:
         return {
             "test_handler": MagicMock(),
             "another_handler": MagicMock(),
@@ -49,7 +49,7 @@ class MockVerticalWithToolGraph(VerticalBase):
     name = "test_graph_vertical"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read"]
 
     @classmethod
@@ -67,7 +67,7 @@ class MockVerticalWithWorkflows(VerticalBase):
     name = "test_workflow_vertical"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read"]
 
     @classmethod
@@ -90,7 +90,7 @@ class MockVerticalWithTeams(VerticalBase):
     name = "test_team_vertical"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read"]
 
     @classmethod
@@ -98,7 +98,7 @@ class MockVerticalWithTeams(VerticalBase):
         return "Test"
 
     @classmethod
-    def get_team_specs(cls) -> Dict[str, Any]:
+    def get_team_specs(cls) -> dict[str, Any]:
         return {
             "team1": MagicMock(),
             "team2": MagicMock(),

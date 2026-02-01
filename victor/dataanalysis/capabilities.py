@@ -38,17 +38,17 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 from victor.framework.capabilities.base_vertical_capability_provider import (
     BaseVerticalCapabilityProvider,
     CapabilityDefinition,
 )
-from victor.framework.protocols import CapabilityType, OrchestratorCapability
-from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.protocols import CapabilityType
+from victor.framework.capability_loader import CapabilityEntry
 
 if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def configure_data_quality(
     )
 
 
-def get_data_quality(orchestrator: Any) -> Dict[str, Any]:
+def get_data_quality(orchestrator: Any) -> dict[str, Any]:
     """Get current data quality configuration.
 
     Args:
@@ -114,7 +114,7 @@ def get_data_quality(orchestrator: Any) -> Dict[str, Any]:
             "handle_missing": "impute",
         },
     )
-    return cast(Dict[str, Any], config)
+    return cast(dict[str, Any], config)
 
 
 def configure_visualization_style(
@@ -150,7 +150,7 @@ def configure_visualization_style(
     logger.info(f"Configured visualization: backend={default_backend}, theme={theme}")
 
 
-def get_visualization_style(orchestrator: Any) -> Dict[str, Any]:
+def get_visualization_style(orchestrator: Any) -> dict[str, Any]:
     """Get current visualization style configuration.
 
     Args:
@@ -171,7 +171,7 @@ def get_visualization_style(orchestrator: Any) -> Dict[str, Any]:
             "save_format": "png",
         },
     )
-    return cast(Dict[str, Any], config)
+    return cast(dict[str, Any], config)
 
 
 def configure_statistical_analysis(
@@ -206,7 +206,7 @@ def configure_statistical_analysis(
     )
 
 
-def get_statistical_config(orchestrator: Any) -> Dict[str, Any]:
+def get_statistical_config(orchestrator: Any) -> dict[str, Any]:
     """Get current statistical configuration.
 
     Args:
@@ -226,7 +226,7 @@ def get_statistical_config(orchestrator: Any) -> Dict[str, Any]:
             "effect_size_threshold": 0.2,
         },
     )
-    return cast(Dict[str, Any], config)
+    return cast(dict[str, Any], config)
 
 
 def configure_ml_pipeline(
@@ -268,7 +268,7 @@ def configure_ml_pipeline(
     )
 
 
-def get_ml_config(orchestrator: Any) -> Dict[str, Any]:
+def get_ml_config(orchestrator: Any) -> dict[str, Any]:
     """Get current ML configuration.
 
     Args:
@@ -290,14 +290,14 @@ def get_ml_config(orchestrator: Any) -> Dict[str, Any]:
             "tuning_method": "grid",
         },
     )
-    return cast(Dict[str, Any], config)
+    return cast(dict[str, Any], config)
 
 
 def configure_data_privacy(
     orchestrator: Any,
     *,
     anonymize_pii: bool = True,
-    pii_columns: Optional[List[str]] = None,
+    pii_columns: Optional[list[str]] = None,
     hash_identifiers: bool = True,
     log_access: bool = True,
 ) -> None:
@@ -324,7 +324,7 @@ def configure_data_privacy(
     )
 
 
-def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
+def get_privacy_config(orchestrator: Any) -> dict[str, Any]:
     """Get current privacy configuration.
 
     Delegates to framework PrivacyCapabilityProvider for cross-vertical privacy management.
@@ -370,7 +370,7 @@ class DataAnalysisCapabilityProvider(BaseVerticalCapabilityProvider):
         """Initialize the data analysis capability provider."""
         super().__init__("dataanalysis")
 
-    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+    def _get_capability_definitions(self) -> dict[str, CapabilityDefinition]:
         """Define data analysis capability definitions.
 
         Returns:
@@ -479,23 +479,23 @@ class DataAnalysisCapabilityProvider(BaseVerticalCapabilityProvider):
         """Configure data privacy capability."""
         configure_data_privacy(orchestrator, **kwargs)
 
-    def get_data_quality(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_data_quality(self, orchestrator: Any) -> dict[str, Any]:
         """Get data quality configuration."""
         return get_data_quality(orchestrator)
 
-    def get_visualization_style(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_visualization_style(self, orchestrator: Any) -> dict[str, Any]:
         """Get visualization configuration."""
         return get_visualization_style(orchestrator)
 
-    def get_statistical_config(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_statistical_config(self, orchestrator: Any) -> dict[str, Any]:
         """Get statistical analysis configuration."""
         return get_statistical_config(orchestrator)
 
-    def get_ml_config(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_ml_config(self, orchestrator: Any) -> dict[str, Any]:
         """Get ML pipeline configuration."""
         return get_ml_config(orchestrator)
 
-    def get_privacy_config(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_privacy_config(self, orchestrator: Any) -> dict[str, Any]:
         """Get privacy configuration."""
         return get_privacy_config(orchestrator)
 
@@ -518,7 +518,7 @@ def _get_provider() -> DataAnalysisCapabilityProvider:
 
 
 # Generate CAPABILITIES list from provider
-CAPABILITIES: List[CapabilityEntry] = []
+CAPABILITIES: list[CapabilityEntry] = []
 
 
 def _generate_capabilities_list() -> None:
@@ -537,7 +537,7 @@ _generate_capabilities_list()
 # =============================================================================
 
 
-def get_data_analysis_capabilities() -> List[CapabilityEntry]:
+def get_data_analysis_capabilities() -> list[CapabilityEntry]:
     """Get all data analysis capability entries.
 
     Returns:
@@ -552,13 +552,12 @@ def create_data_analysis_capability_loader() -> Any:
     Returns:
         CapabilityLoader with data analysis capabilities registered
     """
-    from victor.framework.capability_loader import CapabilityLoader
 
     provider = _get_provider()
     return provider.create_capability_loader()
 
 
-def get_capability_configs() -> Dict[str, Any]:
+def get_capability_configs() -> dict[str, Any]:
     """Get data analysis capability configurations for centralized storage.
 
     Returns default data analysis configuration for VerticalContext storage.

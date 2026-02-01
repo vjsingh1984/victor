@@ -34,26 +34,21 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Optional,
-    Tuple,
-    Union,
     cast,
 )
+import builtins
 
 if TYPE_CHECKING:
     from victor.workflows.execution_recorder import ExecutionReplayer
-import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -92,13 +87,13 @@ class RecordingQuery:
     success: Optional[bool] = None
     min_duration: Optional[float] = None
     max_duration: Optional[float] = None
-    tags: Optional[List[str]] = None
+    tags: Optional[list[str]] = None
     limit: Optional[int] = None
     offset: int = 0
     sort_by: str = "started_at"
     sort_order: str = "desc"
 
-    def matches(self, metadata: Dict[str, Any]) -> bool:
+    def matches(self, metadata: dict[str, Any]) -> bool:
         """Check if metadata matches this query.
 
         Args:
@@ -161,9 +156,9 @@ class RetentionPolicy:
     max_count: Optional[int] = None
     max_size_gb: Optional[float] = None
     keep_failed: bool = True
-    tags_to_keep: List[str] = field(default_factory=list)
+    tags_to_keep: list[str] = field(default_factory=list)
 
-    def should_keep(self, metadata: Dict[str, Any]) -> bool:
+    def should_keep(self, metadata: dict[str, Any]) -> bool:
         """Check if a recording should be kept.
 
         Args:
@@ -237,7 +232,7 @@ class RecordingStorage(ABC):
         pass
 
     @abstractmethod
-    async def list(self, query: Optional[RecordingQuery] = None) -> List[Dict[str, Any]]:
+    async def list(self, query: Optional[RecordingQuery] = None) -> builtins.list[dict[str, Any]]:
         """List recordings matching query.
 
         Args:
@@ -249,7 +244,7 @@ class RecordingStorage(ABC):
         pass
 
     @abstractmethod
-    async def get_metadata(self, recording_id: str) -> Optional[Dict[str, Any]]:
+    async def get_metadata(self, recording_id: str) -> Optional[dict[str, Any]]:
         """Get recording metadata.
 
         Args:
@@ -264,7 +259,7 @@ class RecordingStorage(ABC):
         self,
         policy: RetentionPolicy,
         dry_run: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Apply retention policy to recordings.
 
         Args:
@@ -317,7 +312,7 @@ class FileRecordingStorage(RecordingStorage):
 
     def __init__(
         self,
-        base_path: Union[str, Path] = "./recordings",
+        base_path: str | Path = "./recordings",
         compress: bool = True,
         auto_create_dir: bool = True,
     ):
@@ -359,7 +354,7 @@ class FileRecordingStorage(RecordingStorage):
         extension = ".json.gz" if self.compress else ".json"
         return self.recordings_dir / f"{recording_id}{extension}"
 
-    async def _load_index(self) -> Dict[str, Any]:
+    async def _load_index(self) -> dict[str, Any]:
         """Load the metadata index.
 
         Returns:
@@ -370,9 +365,9 @@ class FileRecordingStorage(RecordingStorage):
 
         with open(self.index_file, "r") as f:
             data = json.load(f)
-            return cast(Dict[str, Any], data)
+            return cast(dict[str, Any], data)
 
-    async def _save_index(self, index: Dict[str, Any]) -> None:
+    async def _save_index(self, index: dict[str, Any]) -> None:
         """Save the metadata index.
 
         Args:
@@ -396,7 +391,6 @@ class FileRecordingStorage(RecordingStorage):
         Returns:
             Recording ID
         """
-        from victor.workflows.execution_recorder import ExecutionReplayer
 
         # Determine filepath
         if filepath:
@@ -495,7 +489,7 @@ class FileRecordingStorage(RecordingStorage):
 
         return True
 
-    async def list(self, query: Optional[RecordingQuery] = None) -> List[Dict[str, Any]]:
+    async def list(self, query: Optional[RecordingQuery] = None) -> builtins.list[dict[str, Any]]:
         """List recordings matching query.
 
         Args:
@@ -523,7 +517,7 @@ class FileRecordingStorage(RecordingStorage):
 
         return recordings
 
-    async def get_metadata(self, recording_id: str) -> Optional[Dict[str, Any]]:
+    async def get_metadata(self, recording_id: str) -> Optional[dict[str, Any]]:
         """Get recording metadata.
 
         Args:
@@ -534,7 +528,7 @@ class FileRecordingStorage(RecordingStorage):
         """
         index = await self._load_index()
         result = index["recordings"].get(recording_id)
-        return cast(Optional[Dict[str, Any]], result)
+        return cast(Optional[dict[str, Any]], result)
 
     async def cleanup_empty_files(self) -> int:
         """Remove empty or corrupted recording files.
@@ -564,7 +558,7 @@ class FileRecordingStorage(RecordingStorage):
 
         return removed
 
-    async def get_storage_stats(self) -> Dict[str, Any]:
+    async def get_storage_stats(self) -> dict[str, Any]:
         """Get storage statistics.
 
         Returns:
@@ -580,7 +574,7 @@ class FileRecordingStorage(RecordingStorage):
         failed_count = len(recordings) - success_count
 
         # Workflow breakdown
-        workflow_counts: Dict[str, int] = {}
+        workflow_counts: dict[str, int] = {}
         for r in recordings:
             workflow = r.get("workflow_name", "unknown")
             workflow_counts[workflow] = workflow_counts.get(workflow, 0) + 1
@@ -605,7 +599,7 @@ class InMemoryRecordingStorage(RecordingStorage):
 
     def __init__(self) -> None:
         """Initialize in-memory storage."""
-        self._recordings: Dict[str, Tuple[bytes, Dict[str, Any]]] = {}
+        self._recordings: dict[str, tuple[bytes, dict[str, Any]]] = {}
         logger.debug("Initialized InMemoryRecordingStorage")
 
     async def save(
@@ -628,7 +622,6 @@ class InMemoryRecordingStorage(RecordingStorage):
         metadata = recorder.finalize()
 
         # Serialize recording
-        from victor.workflows.execution_recorder import RecordingEvent, StateSnapshot
 
         recording_data = {
             "metadata": metadata.to_dict(),
@@ -724,7 +717,7 @@ class InMemoryRecordingStorage(RecordingStorage):
             return True
         return False
 
-    async def list(self, query: Optional[RecordingQuery] = None) -> List[Dict[str, Any]]:
+    async def list(self, query: Optional[RecordingQuery] = None) -> builtins.list[dict[str, Any]]:
         """List recordings matching query.
 
         Args:
@@ -750,7 +743,7 @@ class InMemoryRecordingStorage(RecordingStorage):
 
         return recordings
 
-    async def get_metadata(self, recording_id: str) -> Optional[Dict[str, Any]]:
+    async def get_metadata(self, recording_id: str) -> Optional[dict[str, Any]]:
         """Get recording metadata.
 
         Args:

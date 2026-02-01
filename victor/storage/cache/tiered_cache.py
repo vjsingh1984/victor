@@ -17,7 +17,7 @@
 import hashlib
 import json
 import logging
-from typing import Any, Optional, Dict
+from typing import Any, Optional
 import threading
 
 try:
@@ -62,7 +62,7 @@ class TieredCache:
         self._cache_eviction_learner = cache_eviction_learner
 
         # Statistics
-        self._stats: Dict[str, float | int] = {
+        self._stats: dict[str, float | int] = {
             "memory_hits": 0,
             "memory_misses": 0,
             "disk_hits": 0,
@@ -73,7 +73,7 @@ class TieredCache:
         }
 
         # Metadata for RL learning (key -> tool_name, set_time, hit_count)
-        self._entry_metadata: Dict[str, Dict[str, Any]] = {}
+        self._entry_metadata: dict[str, dict[str, Any]] = {}
 
         # Initialize L1 memory cache
         if self.config.enable_memory:
@@ -284,7 +284,7 @@ class TieredCache:
             logger.info("Cleared %d cache entries", count)
             return count
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:
@@ -613,7 +613,7 @@ class TieredCache:
 
         return f"{namespace}:{key}"
 
-    def warmup(self, data: Dict[str, Any], namespace: str = "default") -> int:
+    def warmup(self, data: dict[str, Any], namespace: str = "default") -> int:
         """Warm up cache with data.
 
         Args:

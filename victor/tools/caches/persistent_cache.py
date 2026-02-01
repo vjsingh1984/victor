@@ -38,7 +38,6 @@ Example:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import pickle
@@ -47,7 +46,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +78,7 @@ class PersistentCacheEntry:
     last_accessed: float = field(default_factory=time.time)
     access_count: int = 0
     ttl: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def is_expired(self) -> bool:
         """Check if entry has expired.
@@ -268,7 +267,7 @@ class PersistentSelectionCache:
         value: Any,
         namespace: str = "default",
         ttl: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Put value in cache.
 
@@ -420,7 +419,7 @@ class PersistentSelectionCache:
             except Exception as e:
                 logger.warning(f"Failed to save cache: {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

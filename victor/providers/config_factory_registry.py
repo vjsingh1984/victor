@@ -40,8 +40,9 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Type
+from dataclasses import dataclass
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ class ProviderConfigStrategy(ABC):
         self,
         settings: Any,
         endpoint: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List available models for this provider.
 
         Args:
@@ -80,7 +81,7 @@ class ProviderConfigStrategy(ABC):
         """
 
     @abstractmethod
-    def get_config_form(self) -> Type:
+    def get_config_form(self) -> type:
         """Get the config form class for this provider."""
 
 
@@ -111,7 +112,7 @@ class ProviderConfigRegistry:
                 return [...]
     """
 
-    _providers: Dict[str, ProviderRegistration] = {}
+    _providers: dict[str, ProviderRegistration] = {}
     _lock = asyncio.Lock()
 
     @classmethod
@@ -119,7 +120,7 @@ class ProviderConfigRegistry:
         cls,
         provider_name: str,
         priority: int = 0,
-    ) -> Callable[[Type[ProviderConfigStrategy]], Type[ProviderConfigStrategy]]:
+    ) -> Callable[[type[ProviderConfigStrategy]], type[ProviderConfigStrategy]]:
         """Decorator to register a provider strategy.
 
         Args:
@@ -135,7 +136,7 @@ class ProviderConfigRegistry:
                 ...
         """
 
-        def decorator(strategy_class: Type[ProviderConfigStrategy]) -> Type[ProviderConfigStrategy]:
+        def decorator(strategy_class: type[ProviderConfigStrategy]) -> type[ProviderConfigStrategy]:
             # Create instance of the strategy
             instance = strategy_class()
 
@@ -165,7 +166,7 @@ class ProviderConfigRegistry:
         return registration.strategy if registration else None
 
     @classmethod
-    def list_providers(cls) -> List[str]:
+    def list_providers(cls) -> list[str]:
         """List all registered providers.
 
         Returns:
@@ -191,7 +192,7 @@ class ProviderConfigRegistry:
         provider_name: str,
         settings: Any,
         endpoint: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List models for a provider using its registered strategy.
 
         Args:
@@ -215,7 +216,7 @@ class ProviderConfigRegistry:
         return await strategy.list_models(settings, endpoint)
 
     @classmethod
-    def get_config_form(cls, provider_name: str) -> Optional[Type[Any]]:
+    def get_config_form(cls, provider_name: str) -> Optional[type[Any]]:
         """Get the config form class for a provider.
 
         Args:
@@ -230,7 +231,7 @@ class ProviderConfigRegistry:
         return strategy.get_config_form()
 
     @classmethod
-    def get_prioritized_providers(cls) -> List[str]:
+    def get_prioritized_providers(cls) -> list[str]:
         """Get providers sorted by priority (highest first).
 
         Returns:
@@ -262,7 +263,7 @@ class OllamaProviderStrategy(ProviderConfigStrategy):
         self,
         settings: Any,
         endpoint: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List Ollama models."""
         from victor.providers.ollama_provider import OllamaProvider
 
@@ -275,7 +276,7 @@ class OllamaProviderStrategy(ProviderConfigStrategy):
         finally:
             await provider.close()
 
-    def get_config_form(self) -> Type:
+    def get_config_form(self) -> type:
         """Get Ollama config form."""
         try:
             from victor.ui.commands.models import OllamaConfigForm  # type: ignore[attr-defined]
@@ -296,7 +297,7 @@ class LMStudioProviderStrategy(ProviderConfigStrategy):
         self,
         settings: Any,
         endpoint: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List LMStudio models."""
         from victor.providers.lmstudio_provider import LMStudioProvider
 
@@ -309,7 +310,7 @@ class LMStudioProviderStrategy(ProviderConfigStrategy):
         models_list = await provider.list_models()
         return models_list or []
 
-    def get_config_form(self) -> Type:
+    def get_config_form(self) -> type:
         """Get LMStudio config form."""
         try:
             from victor.ui.commands.models import LMStudioConfigForm  # type: ignore[attr-defined]
@@ -330,7 +331,7 @@ class AnthropicProviderStrategy(ProviderConfigStrategy):
         self,
         settings: Any,
         endpoint: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List Anthropic models (static list)."""
         return [
             {"id": "claude-sonnet-4-5-20250514", "name": "Claude Sonnet 4.5"},
@@ -339,7 +340,7 @@ class AnthropicProviderStrategy(ProviderConfigStrategy):
             {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus"},
         ]
 
-    def get_config_form(self) -> Type:
+    def get_config_form(self) -> type:
         """Get Anthropic config form."""
         try:
             from victor.ui.commands.models import AnthropicConfigForm  # type: ignore[attr-defined]
@@ -360,7 +361,7 @@ class OpenAIProviderStrategy(ProviderConfigStrategy):
         self,
         settings: Any,
         endpoint: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List OpenAI models (static list)."""
         return [
             {"id": "gpt-4o", "name": "GPT-4o"},
@@ -369,7 +370,7 @@ class OpenAIProviderStrategy(ProviderConfigStrategy):
             {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo"},
         ]
 
-    def get_config_form(self) -> Type:
+    def get_config_form(self) -> type:
         """Get OpenAI config form."""
         try:
             from victor.ui.commands.models import OpenAIConfigForm  # type: ignore[attr-defined]
@@ -390,7 +391,7 @@ class GoogleProviderStrategy(ProviderConfigStrategy):
         self,
         settings: Any,
         endpoint: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List Google models (static list)."""
         return [
             {"id": "gemini-2.5-pro-exp-03-25", "name": "Gemini 2.5 Pro"},
@@ -398,7 +399,7 @@ class GoogleProviderStrategy(ProviderConfigStrategy):
             {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro"},
         ]
 
-    def get_config_form(self) -> Type:
+    def get_config_form(self) -> type:
         """Get Google config form."""
         try:
             from victor.ui.commands.models import GoogleConfigForm  # type: ignore[attr-defined]
@@ -419,14 +420,14 @@ class GroqProviderStrategy(ProviderConfigStrategy):
         self,
         settings: Any,
         endpoint: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List Groq models (static list)."""
         return [
             {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B Versatile"},
             {"id": "llama-3.1-70b-versatile", "name": "Llama 3.1 70B Versatile"},
         ]
 
-    def get_config_form(self) -> Type:
+    def get_config_form(self) -> type:
         """Get Groq config form."""
         try:
             from victor.ui.commands.models import GroqConfigForm  # type: ignore[attr-defined]
@@ -447,13 +448,13 @@ class CerebrasProviderStrategy(ProviderConfigStrategy):
         self,
         settings: Any,
         endpoint: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List Cerebras models (static list)."""
         return [
             {"id": "llama3.1-70b", "name": "Llama 3.1 70B"},
         ]
 
-    def get_config_form(self) -> Type:
+    def get_config_form(self) -> type:
         """Get Cerebras config form."""
         try:
             from victor.ui.commands.models import CerebrasConfigForm  # type: ignore[attr-defined]
@@ -474,11 +475,11 @@ class LlamaCppProviderStrategy(ProviderConfigStrategy):
         self,
         settings: Any,
         endpoint: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List llama.cpp models (static - needs local file)."""
         return []  # llama.cpp needs a model file path
 
-    def get_config_form(self) -> Type:
+    def get_config_form(self) -> type:
         """Get llama.cpp config form."""
         try:
             from victor.ui.commands.models import LlamaCppConfigForm  # type: ignore[attr-defined]
@@ -499,7 +500,7 @@ class VLLMProviderStrategy(ProviderConfigStrategy):
         self,
         settings: Any,
         endpoint: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List vLLM models."""
         from victor.providers.vllm_provider import VLLMProvider
 
@@ -512,7 +513,7 @@ class VLLMProviderStrategy(ProviderConfigStrategy):
         models_list = await provider.list_models()
         return models_list or []
 
-    def get_config_form(self) -> Type:
+    def get_config_form(self) -> type:
         """Get vLLM config form."""
         try:
             from victor.ui.commands.models import VLLMConfigForm  # type: ignore[attr-defined]
@@ -542,7 +543,7 @@ ProviderConfigRegistry.register("groqcloud", priority=10)(GroqProviderStrategy)
 def register_provider_config(
     provider_name: str,
     priority: int = 0,
-) -> Callable[[Type[ProviderConfigStrategy]], Type[ProviderConfigStrategy]]:
+) -> Callable[[type[ProviderConfigStrategy]], type[ProviderConfigStrategy]]:
     """Register a provider configuration strategy.
 
     This is a convenience function that delegates to the registry.

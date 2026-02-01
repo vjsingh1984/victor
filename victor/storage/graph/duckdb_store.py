@@ -4,7 +4,8 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Optional
+from collections.abc import Iterable
 
 from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
 
@@ -130,7 +131,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
 
     async def get_neighbors(
         self, node_id: str, edge_types: Optional[Iterable[str]] = None, max_depth: int = 1
-    ) -> List[GraphEdge]:
+    ) -> list[GraphEdge]:
         params: list[Any] = [node_id]
         type_clause = ""
         if edge_types:
@@ -157,7 +158,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
 
     async def find_nodes(
         self, *, name: str | None = None, type: str | None = None, file: str | None = None
-    ) -> List[GraphNode]:
+    ) -> list[GraphNode]:
         clauses = []
         params: list[Any] = []
         if name:
@@ -193,7 +194,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
 
     async def search_symbols(
         self, query: str, *, limit: int = 20, symbol_types: Iterable[str] | None = None
-    ) -> List[GraphNode]:
+    ) -> list[GraphNode]:
         """Full-text search across symbol names, signatures, bodies, and docstrings."""
         clauses = ["name LIKE ?"]
         params: list[Any] = [f"%{query}%"]
@@ -251,7 +252,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
             finally:
                 conn.close()
 
-    async def get_nodes_by_file(self, file: str) -> List[GraphNode]:
+    async def get_nodes_by_file(self, file: str) -> list[GraphNode]:
         """Get all symbols in a specific file."""
         async with self._lock:
             conn = self._connect()
@@ -282,7 +283,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
         # For now, we'll skip this implementation
         pass
 
-    async def get_stale_files(self, file_mtimes: Dict[str, float]) -> List[str]:
+    async def get_stale_files(self, file_mtimes: dict[str, float]) -> list[str]:
         """Get files that have changed since last index."""
         # For DuckDB, we'd need to check against file_mtimes table
         # For now, return all files as potentially stale
@@ -315,7 +316,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
             finally:
                 conn.close()
 
-    async def stats(self) -> Dict[str, Any]:
+    async def stats(self) -> dict[str, Any]:
         async with self._lock:
             conn = self._connect()
             try:
@@ -330,7 +331,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
             finally:
                 conn.close()
 
-    async def get_all_edges(self) -> List[GraphEdge]:
+    async def get_all_edges(self) -> list[GraphEdge]:
         """Get all edges in the graph (bulk retrieval for loading into memory)."""
         async with self._lock:
             conn = self._connect()

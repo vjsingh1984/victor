@@ -27,7 +27,7 @@ from victor.coding.review.protocol import (
     ReviewCategory,
     ReviewRule,
     ReviewRuleSet,
-    Severity,
+    ReviewSeverity,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Cyclomatic Complexity",
         description="Checks cyclomatic complexity of functions",
         category=ReviewCategory.COMPLEXITY,
-        severity=Severity.WARNING,
+        severity=ReviewSeverity.WARNING,
         parameters={"max": 10},
         tags=["complexity", "maintainability"],
     ),
@@ -50,7 +50,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Function Length",
         description="Checks function length in lines",
         category=ReviewCategory.COMPLEXITY,
-        severity=Severity.WARNING,
+        severity=ReviewSeverity.WARNING,
         parameters={"max": 50},
         tags=["complexity", "readability"],
     ),
@@ -59,7 +59,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Nesting Depth",
         description="Checks maximum nesting depth",
         category=ReviewCategory.COMPLEXITY,
-        severity=Severity.WARNING,
+        severity=ReviewSeverity.WARNING,
         parameters={"max": 4},
         tags=["complexity", "readability"],
     ),
@@ -68,7 +68,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Function Parameters",
         description="Checks number of function parameters",
         category=ReviewCategory.COMPLEXITY,
-        severity=Severity.INFO,
+        severity=ReviewSeverity.INFO,
         parameters={"max": 5},
         tags=["complexity", "api"],
     ),
@@ -77,7 +77,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Class Methods Count",
         description="Checks number of methods in a class",
         category=ReviewCategory.COMPLEXITY,
-        severity=Severity.INFO,
+        severity=ReviewSeverity.INFO,
         parameters={"max": 20},
         tags=["complexity", "design"],
     ),
@@ -87,7 +87,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Class Naming",
         description="Classes should use PascalCase",
         category=ReviewCategory.NAMING,
-        severity=Severity.WARNING,
+        severity=ReviewSeverity.WARNING,
         tags=["naming", "pep8"],
     ),
     ReviewRule(
@@ -95,7 +95,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Function Naming",
         description="Functions should use snake_case",
         category=ReviewCategory.NAMING,
-        severity=Severity.WARNING,
+        severity=ReviewSeverity.WARNING,
         tags=["naming", "pep8"],
     ),
     ReviewRule(
@@ -103,7 +103,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Variable Naming",
         description="Variables should use snake_case or UPPER_CASE",
         category=ReviewCategory.NAMING,
-        severity=Severity.INFO,
+        severity=ReviewSeverity.INFO,
         tags=["naming", "pep8"],
     ),
     ReviewRule(
@@ -111,7 +111,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Function Name Length",
         description="Function names should be descriptive but not too long",
         category=ReviewCategory.NAMING,
-        severity=Severity.INFO,
+        severity=ReviewSeverity.INFO,
         parameters={"min": 2, "max": 30},
         tags=["naming", "readability"],
     ),
@@ -120,7 +120,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Single Character Variables",
         description="Avoid single character variable names except common ones",
         category=ReviewCategory.NAMING,
-        severity=Severity.INFO,
+        severity=ReviewSeverity.INFO,
         parameters={"allowed": ["i", "j", "k", "x", "y", "z", "_"]},
         tags=["naming", "readability"],
     ),
@@ -130,7 +130,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Module Docstring",
         description="Modules should have a docstring",
         category=ReviewCategory.DOCUMENTATION,
-        severity=Severity.INFO,
+        severity=ReviewSeverity.INFO,
         tags=["documentation"],
     ),
     ReviewRule(
@@ -138,7 +138,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Class Docstring",
         description="Public classes should have a docstring",
         category=ReviewCategory.DOCUMENTATION,
-        severity=Severity.WARNING,
+        severity=ReviewSeverity.WARNING,
         tags=["documentation"],
     ),
     ReviewRule(
@@ -146,7 +146,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Function Docstring",
         description="Public functions should have a docstring",
         category=ReviewCategory.DOCUMENTATION,
-        severity=Severity.WARNING,
+        severity=ReviewSeverity.WARNING,
         tags=["documentation"],
     ),
     ReviewRule(
@@ -154,7 +154,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Document Parameters",
         description="Function parameters should be documented",
         category=ReviewCategory.DOCUMENTATION,
-        severity=Severity.INFO,
+        severity=ReviewSeverity.INFO,
         tags=["documentation"],
     ),
     ReviewRule(
@@ -162,7 +162,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Document Return Value",
         description="Function return values should be documented",
         category=ReviewCategory.DOCUMENTATION,
-        severity=Severity.INFO,
+        severity=ReviewSeverity.INFO,
         tags=["documentation"],
     ),
     # Security rules
@@ -171,7 +171,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Dangerous Function Calls",
         description="Detect potentially dangerous function calls",
         category=ReviewCategory.SECURITY,
-        severity=Severity.ERROR,
+        severity=ReviewSeverity.ERROR,
         tags=["security", "injection"],
     ),
     ReviewRule(
@@ -179,7 +179,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="SQL Injection",
         description="Detect potential SQL injection vulnerabilities",
         category=ReviewCategory.SECURITY,
-        severity=Severity.ERROR,
+        severity=ReviewSeverity.ERROR,
         tags=["security", "injection", "sql"],
     ),
     ReviewRule(
@@ -187,7 +187,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Hardcoded Secrets",
         description="Detect hardcoded passwords, keys, and tokens",
         category=ReviewCategory.SECURITY,
-        severity=Severity.ERROR,
+        severity=ReviewSeverity.ERROR,
         tags=["security", "secrets"],
     ),
     # Best practices rules
@@ -196,7 +196,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Bare Except",
         description="Avoid bare except clauses",
         category=ReviewCategory.BEST_PRACTICES,
-        severity=Severity.WARNING,
+        severity=ReviewSeverity.WARNING,
         tags=["best-practices", "exception"],
     ),
     ReviewRule(
@@ -204,7 +204,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Broad Exception",
         description="Avoid catching broad exceptions silently",
         category=ReviewCategory.BEST_PRACTICES,
-        severity=Severity.WARNING,
+        severity=ReviewSeverity.WARNING,
         tags=["best-practices", "exception"],
     ),
     ReviewRule(
@@ -212,7 +212,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Wildcard Import",
         description="Avoid wildcard imports",
         category=ReviewCategory.BEST_PRACTICES,
-        severity=Severity.WARNING,
+        severity=ReviewSeverity.WARNING,
         tags=["best-practices", "imports"],
     ),
     ReviewRule(
@@ -220,7 +220,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="None Comparison",
         description="Use 'is None' instead of '== None'",
         category=ReviewCategory.BEST_PRACTICES,
-        severity=Severity.INFO,
+        severity=ReviewSeverity.INFO,
         tags=["best-practices", "style"],
     ),
     ReviewRule(
@@ -228,7 +228,7 @@ DEFAULT_RULES: list[ReviewRule] = [
         name="Boolean Comparison",
         description="Avoid explicit True/False comparisons",
         category=ReviewCategory.BEST_PRACTICES,
-        severity=Severity.INFO,
+        severity=ReviewSeverity.INFO,
         tags=["best-practices", "style"],
     ),
 ]
@@ -239,12 +239,12 @@ DEFAULT_RULESETS: dict[str, ReviewRuleSet] = {
     "minimal": ReviewRuleSet(
         name="minimal",
         description="Minimal ruleset for quick checks",
-        rules=[r for r in DEFAULT_RULES if r.severity == Severity.ERROR],
+        rules=[r for r in DEFAULT_RULES if r.severity == ReviewSeverity.ERROR],
     ),
     "standard": ReviewRuleSet(
         name="standard",
         description="Standard ruleset for most projects",
-        rules=[r for r in DEFAULT_RULES if r.severity in (Severity.ERROR, Severity.WARNING)],
+        rules=[r for r in DEFAULT_RULES if r.severity in (ReviewSeverity.ERROR, ReviewSeverity.WARNING)],
     ),
     "strict": ReviewRuleSet(
         name="strict",

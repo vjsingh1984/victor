@@ -60,7 +60,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Optional, Protocol, Set, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
+from collections.abc import Iterator
 
 
 # =============================================================================
@@ -100,7 +101,7 @@ class FileChangeEvent:
     change_type: FileChangeType
     timestamp: str | datetime  # Accept both, normalize to str in __post_init__
     source_path: Optional[str] = None
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         """Validate and normalize the file change event."""
@@ -213,7 +214,7 @@ class IFileWatcher(Protocol):
         """
         ...
 
-    async def get_changes(self) -> List[FileChangeEvent]:
+    async def get_changes(self) -> list[FileChangeEvent]:
         """Get pending file change events.
 
         Returns:
@@ -308,8 +309,8 @@ class IDependencyExtractor(Protocol):
     def extract_file_dependencies(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
-    ) -> Set[str]:
+        arguments: dict[str, Any],
+    ) -> set[str]:
         """Extract file paths from tool arguments.
 
         Analyzes tool arguments and identifies file paths that should
@@ -385,7 +386,7 @@ class CacheNamespace(str, Enum):
     REQUEST = "request"
     TOOL = "tool"
 
-    def get_child_namespaces(self) -> List["CacheNamespace"]:
+    def get_child_namespaces(self) -> list["CacheNamespace"]:
         """Get all child namespaces in the hierarchy.
 
         Returns:
@@ -447,15 +448,15 @@ class CacheEntryMetadata:
 
     tool_name: str
     args_hash: str
-    dependent_tools: Set[str]
-    file_dependencies: Set[str]
+    dependent_tools: set[str]
+    file_dependencies: set[str]
     created_at: str
     expires_at: Optional[str] = None
     access_count: int = 0
     last_accessed: Optional[str] = None
     size_bytes: Optional[int] = None
     namespace: CacheNamespace = CacheNamespace.SESSION
-    tags: Set[str] | None = None
+    tags: set[str] | None = None
 
 
 @dataclass
@@ -475,10 +476,10 @@ class InvalidationResult:
     success: bool
     entries_invalidated: int
     tools_invalidated: int
-    namespaces_invalidated: List[str]
+    namespaces_invalidated: list[str]
     error_message: str | None = None
     cascade_depth: int = 0
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
@@ -503,9 +504,9 @@ class CacheStatistics:
     miss_rate: float
     memory_used: Optional[int]
     eviction_count: int
-    namespace_stats: Dict[str, Dict[str, Any]]
-    tool_stats: Dict[str, Dict[str, Any]]
-    dependency_stats: Dict[str, int]
+    namespace_stats: dict[str, dict[str, Any]]
+    tool_stats: dict[str, dict[str, Any]]
+    dependency_stats: dict[str, int]
 
 
 # =============================================================================
@@ -615,7 +616,7 @@ class ICacheBackend(Protocol):
         """
         ...
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:
@@ -751,7 +752,7 @@ class ICacheInvalidator(Protocol):
 
     async def invalidate_by_tags(
         self,
-        tags: Set[str],
+        tags: set[str],
         operator: str = "OR",  # "OR" or "AND"
     ) -> InvalidationResult:
         """Invalidate cache entries matching tags.
@@ -943,7 +944,7 @@ class ICacheDependencyTracker(Protocol):
         """
         ...
 
-    async def get_dependent_tools(self, tool: str) -> Set[str]:
+    async def get_dependent_tools(self, tool: str) -> set[str]:
         """Get all tools that depend on the given tool.
 
         Returns both direct and transitive dependents.
@@ -963,7 +964,7 @@ class ICacheDependencyTracker(Protocol):
         """
         ...
 
-    async def get_file_dependents(self, file_path: str) -> Set[str]:
+    async def get_file_dependents(self, file_path: str) -> set[str]:
         """Get all tools that depend on the given file.
 
         Args:
@@ -994,7 +995,7 @@ class ICacheDependencyTracker(Protocol):
         """
         ...
 
-    async def get_stats(self) -> Dict[str, int]:
+    async def get_stats(self) -> dict[str, int]:
         """Get statistics about the dependency graph.
 
         Returns:

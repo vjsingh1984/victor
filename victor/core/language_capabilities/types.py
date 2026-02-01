@@ -7,8 +7,8 @@ a language supports.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Optional, List, Dict, Any, Tuple
+from enum import Enum
+from typing import Optional, Any
 
 
 class LanguageTier(Enum):
@@ -86,7 +86,7 @@ class ASTCapability:
     has_semantic_analysis: bool = False
 
     # For subprocess method
-    subprocess_command: Optional[List[str]] = None
+    subprocess_command: Optional[list[str]] = None
     output_format: str = "json"
 
 
@@ -184,13 +184,13 @@ class CodeValidationResult:
     is_valid: bool
     language: str = "unknown"
     tier: Optional[LanguageTier] = None
-    validators_used: List[str] = field(default_factory=list)
-    issues: List[ValidationIssue] = field(default_factory=list)
-    warnings: List[ValidationIssue] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    validators_used: list[str] = field(default_factory=list)
+    issues: list[ValidationIssue] = field(default_factory=list)
+    warnings: list[ValidationIssue] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def errors(self) -> List[ValidationIssue]:
+    def errors(self) -> list[ValidationIssue]:
         """Get only error-level issues."""
         return [i for i in self.issues if i.severity == ValidationSeverity.ERROR]
 
@@ -236,7 +236,7 @@ class ValidationConfig:
     check_types: bool = False
     max_errors: int = 0
     timeout_seconds: float = 0.0
-    custom_rules: Dict[str, Any] = field(default_factory=dict)
+    custom_rules: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -265,8 +265,8 @@ class UnifiedLanguageCapability:
 
     name: str
     tier: LanguageTier
-    extensions: List[str]
-    filenames: List[str] = field(default_factory=list)
+    extensions: list[str]
+    filenames: list[str] = field(default_factory=list)
 
     # Capability modules (all optional)
     native_ast: Optional[ASTCapability] = None
@@ -278,14 +278,14 @@ class UnifiedLanguageCapability:
     validation_enabled: bool = True
 
     # Strategy preferences (ordered by priority)
-    indexing_strategy: List[ASTAccessMethod] = field(
+    indexing_strategy: list[ASTAccessMethod] = field(
         default_factory=lambda: [
             ASTAccessMethod.NATIVE,
             ASTAccessMethod.TREE_SITTER,
             ASTAccessMethod.LSP,
         ]
     )
-    validation_strategy: List[ASTAccessMethod] = field(
+    validation_strategy: list[ASTAccessMethod] = field(
         default_factory=lambda: [
             ASTAccessMethod.NATIVE,
             ASTAccessMethod.TREE_SITTER,
@@ -336,9 +336,9 @@ class UnifiedLanguageCapability:
             return self.tree_sitter is not None
         elif method == ASTAccessMethod.LSP:
             return self.lsp is not None
-        return False  # type: ignore[unreachable]
+        return False
 
-    def get_available_methods(self) -> List[ASTAccessMethod]:
+    def get_available_methods(self) -> list[ASTAccessMethod]:
         """Get all available methods for this language."""
         available = []
         for method in ASTAccessMethod:
@@ -398,11 +398,11 @@ class ExtractedSymbol:
     docstring: Optional[str] = None
     parent_symbol: Optional[str] = None
     return_type: Optional[str] = None
-    parameters: List[str] = field(default_factory=list)
+    parameters: list[str] = field(default_factory=list)
     visibility: Optional[str] = None
     is_async: bool = False
-    decorators: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    decorators: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def qualified_name(self) -> str:

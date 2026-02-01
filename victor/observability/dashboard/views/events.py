@@ -23,18 +23,18 @@ Provides widgets for viewing and filtering events:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
-from textual.widgets import DataTable, RichLog, Select, Static, Switch
+from textual.widgets import DataTable, RichLog, Static, Switch
 from textual.reactive import reactive
 
-from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
+from victor.core.events import MessagingEvent
 
 
 # Color mapping for event categories (topic prefixes)
-CATEGORY_COLORS: Dict[str, str] = {
+CATEGORY_COLORS: dict[str, str] = {
     "tool.": "cyan",
     "state.": "yellow",
     "model.": "green",
@@ -99,7 +99,7 @@ class EventLogWidget(RichLog):
             if data_str:
                 self.write(f"           [dim]{data_str}[/]")
 
-    def _format_data(self, data: Dict[str, Any]) -> str:
+    def _format_data(self, data: dict[str, Any]) -> str:
         """Format event data for display.
 
         Args:
@@ -158,7 +158,7 @@ class EventTableWidget(DataTable):
         """
         super().__init__(*args, **kwargs)
         self._max_rows = max_rows
-        self._events: List[MessagingEvent] = []
+        self._events: list[MessagingEvent] = []
 
     def on_mount(self) -> None:
         """Set up table columns."""
@@ -260,7 +260,7 @@ class EventFilterWidget(Container):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Default enabled topic prefixes (all categories enabled)
-        self._enabled_categories: Set[str] = {
+        self._enabled_categories: set[str] = {
             "tool",
             "state",
             "model",
@@ -324,6 +324,6 @@ class EventFilterWidget(Container):
         return event.topic.split(".")[0] in self._enabled_categories
 
     @property
-    def enabled_categories(self) -> Set[str]:
+    def enabled_categories(self) -> set[str]:
         """Get the set of enabled categories (topic prefixes)."""
         return self._enabled_categories.copy()

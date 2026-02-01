@@ -55,11 +55,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
     TYPE_CHECKING,
 )
 
@@ -70,7 +67,6 @@ if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
 
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.protocols.agent import IAgentOrchestrator
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -93,13 +89,13 @@ class UnifiedTrackerProtocol(Protocol):
     def check_response_loop(self, content: str) -> bool: ...
 
     @property
-    def config(self) -> Dict[str, Any]: ...
+    def config(self) -> dict[str, Any]: ...
 
 
 class ConversationStateProtocol(Protocol):
     """Protocol for conversation state access."""
 
-    def get_state_summary(self) -> Dict[str, Any]: ...
+    def get_state_summary(self) -> dict[str, Any]: ...
 
 
 class SanitizerProtocol(Protocol):
@@ -137,10 +133,10 @@ class IntentClassificationResult:
         content_cleared: Whether full_content was cleared after yielding.
     """
 
-    chunks: List[StreamChunk] = field(default_factory=list)
-    action_result: Dict[str, Any] = field(default_factory=dict)
+    chunks: list[StreamChunk] = field(default_factory=list)
+    action_result: dict[str, Any] = field(default_factory=dict)
     action: str = "finish"
-    state_updates: Dict[str, Any] = field(default_factory=dict)
+    state_updates: dict[str, Any] = field(default_factory=dict)
     content_cleared: bool = False
 
     def add_chunk(self, chunk: StreamChunk) -> None:
@@ -169,9 +165,9 @@ class TrackingState:
     max_prompts_summary_requested: bool = False
     final_summary_requested: bool = False
     force_finalize: bool = False
-    required_files: Set[str] = field(default_factory=set)
-    read_files_session: Set[str] = field(default_factory=set)
-    required_outputs: Set[str] = field(default_factory=set)
+    required_files: set[str] = field(default_factory=set)
+    read_files_session: set[str] = field(default_factory=set)
+    required_outputs: set[str] = field(default_factory=set)
 
 
 # =============================================================================
@@ -242,7 +238,7 @@ class IntentClassificationHandler:
         self._tool_budget = tool_budget
 
         # Intent cache for reducing embedding calls
-        self._intent_cache: Dict[int, Any] = {}
+        self._intent_cache: dict[int, Any] = {}
         self._max_cache_size = 100
 
     def classify_and_determine_action(
@@ -250,7 +246,7 @@ class IntentClassificationHandler:
         stream_ctx: StreamingChatContext,
         full_content: str,
         content_length: int,
-        mentioned_tools: List[str],
+        mentioned_tools: list[str],
         tracking_state: TrackingState,
     ) -> IntentClassificationResult:
         """Classify intent and determine continuation action.
@@ -344,7 +340,7 @@ class IntentClassificationHandler:
 
         return intent_result
 
-    def _build_task_completion_signals(self, tracking_state: TrackingState) -> Dict[str, Any]:
+    def _build_task_completion_signals(self, tracking_state: TrackingState) -> dict[str, Any]:
         """Build task completion signals for early termination detection."""
         # Get cycle count from conversation state
         cycle_count = 0
@@ -380,10 +376,10 @@ class IntentClassificationHandler:
         stream_ctx: StreamingChatContext,
         content_length: int,
         full_content: str,
-        mentioned_tools: List[str],
+        mentioned_tools: list[str],
         tracking_state: TrackingState,
-        task_completion_signals: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        task_completion_signals: dict[str, Any],
+    ) -> dict[str, Any]:
         """Determine continuation action using ContinuationStrategy."""
         from victor.agent.continuation_strategy import ContinuationStrategy
 
@@ -411,7 +407,7 @@ class IntentClassificationHandler:
         )
 
     def _apply_state_updates(
-        self, action_result: Dict[str, Any], result: IntentClassificationResult
+        self, action_result: dict[str, Any], result: IntentClassificationResult
     ) -> None:
         """Apply state updates from action result."""
         updates = action_result.get("updates", {})
@@ -518,7 +514,7 @@ def create_tracking_state(orchestrator: "AgentOrchestrator") -> TrackingState:
 
 def apply_tracking_state_updates(
     orchestrator: "AgentOrchestrator",
-    updates: Dict[str, Any],
+    updates: dict[str, Any],
     force_finalize_used: bool = False,
 ) -> None:
     """Apply tracking state updates back to orchestrator.

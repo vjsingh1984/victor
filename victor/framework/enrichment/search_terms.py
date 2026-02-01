@@ -30,7 +30,7 @@ Example:
 
 import logging
 import re
-from typing import TYPE_CHECKING, Dict, List, Optional, Set
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Type stubs for native extensions (optional)
@@ -55,7 +55,7 @@ except ImportError:
 
 
 # Common question words to remove for cleaner extraction
-QUESTION_WORDS: Set[str] = {
+QUESTION_WORDS: set[str] = {
     "what",
     "how",
     "why",
@@ -79,7 +79,7 @@ QUESTION_WORDS: Set[str] = {
 }
 
 # Stop words to filter out
-STOP_WORDS: Set[str] = {
+STOP_WORDS: set[str] = {
     "the",
     "a",
     "an",
@@ -161,7 +161,7 @@ STOP_WORDS: Set[str] = {
 }
 
 # Patterns for extracting search terms
-SEARCH_TERM_PATTERNS: Dict[str, str] = {
+SEARCH_TERM_PATTERNS: dict[str, str] = {
     # Quoted phrases (highest priority)
     "quoted": r'"([^"]+)"',
     # Capitalized phrases (proper nouns, technical terms)
@@ -173,7 +173,7 @@ SEARCH_TERM_PATTERNS: Dict[str, str] = {
 }
 
 
-def get_search_term_patterns() -> Dict[str, str]:
+def get_search_term_patterns() -> dict[str, str]:
     """Get the search term extraction patterns.
 
     Returns:
@@ -186,7 +186,7 @@ def extract_search_terms(
     prompt: str,
     max_terms: int = 5,
     min_word_length: int = 4,
-) -> List[str]:
+) -> list[str]:
     """Extract potential search terms from a prompt.
 
     Uses pattern matching to identify key terms suitable for web search:
@@ -206,7 +206,7 @@ def extract_search_terms(
     if not prompt or not prompt.strip():
         return []
 
-    terms: List[str] = []
+    terms: list[str] = []
 
     # 1. Extract quoted phrases (highest priority)
     quoted = re.findall(SEARCH_TERM_PATTERNS["quoted"], prompt)
@@ -230,8 +230,8 @@ def extract_search_terms(
     terms.extend(significant[:3])  # Limit significant words
 
     # Deduplicate while preserving order
-    seen: Set[str] = set()
-    unique_terms: List[str] = []
+    seen: set[str] = set()
+    unique_terms: list[str] = []
 
     for term in terms:
         term_lower = term.lower()
@@ -258,7 +258,7 @@ def _clean_prompt(prompt: str) -> str:
     return cleaned
 
 
-def _extract_significant_words(text: str, min_length: int) -> List[str]:
+def _extract_significant_words(text: str, min_length: int) -> list[str]:
     """Extract significant words from text.
 
     Args:
@@ -316,7 +316,7 @@ class SearchTermExtractor:
             logger.warning(f"Failed to initialize native extraction: {e}")
             self._use_native = False
 
-    def extract(self, prompt: str) -> List[str]:
+    def extract(self, prompt: str) -> list[str]:
         """Extract search terms from a prompt.
 
         Args:
@@ -331,7 +331,7 @@ class SearchTermExtractor:
             min_word_length=self._min_word_length,
         )
 
-    def batch_extract(self, prompts: List[str]) -> List[List[str]]:
+    def batch_extract(self, prompts: list[str]) -> list[list[str]]:
         """Extract search terms from multiple prompts.
 
         Args:

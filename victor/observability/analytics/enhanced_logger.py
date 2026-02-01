@@ -21,7 +21,6 @@ Design Principles:
 from __future__ import annotations
 
 import gzip
-import hashlib
 import json
 import logging
 import os
@@ -31,7 +30,8 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Pattern
+from typing import Any, Optional
+from re import Pattern
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class PIIScrubber:
     """Scrubs personally identifiable information from log data."""
 
     # Patterns for common PII
-    PATTERNS: List[tuple[str, Pattern, str]] = [
+    PATTERNS: list[tuple[str, Pattern, str]] = [
         # Email addresses
         ("email", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"), "[EMAIL]"),
         # API keys (common formats)
@@ -67,7 +67,7 @@ class PIIScrubber:
         scrub_paths: bool = True,
         scrub_ips: bool = False,  # Often useful for debugging
         scrub_credit_cards: bool = True,
-        custom_patterns: Optional[List[tuple[str, Pattern, str]]] = None,
+        custom_patterns: Optional[list[tuple[str, Pattern, str]]] = None,
     ):
         """Initialize PII scrubber with configurable scrubbing options.
 
@@ -113,7 +113,7 @@ class PIIScrubber:
             text = pattern.sub(replacement, text)
         return text
 
-    def scrub_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def scrub_dict(self, data: dict[str, Any]) -> dict[str, Any]:
         """Recursively scrub PII from a dictionary.
 
         Args:
@@ -362,7 +362,7 @@ class EnhancedUsageLogger:
         """Returns True if logging is enabled."""
         return self._enabled
 
-    def log_event(self, event_type: str, data: Dict[str, Any]) -> None:
+    def log_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Log a usage event.
 
         Args:
@@ -405,9 +405,9 @@ class EnhancedUsageLogger:
     def read_logs(
         self,
         limit: int = 100,
-        event_types: Optional[List[str]] = None,
+        event_types: Optional[list[str]] = None,
         session_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Read logs with optional filtering.
 
         Args:
@@ -453,7 +453,7 @@ class EnhancedUsageLogger:
             logger.error(f"Failed to read logs: {e}")
             return []
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get logging statistics.
 
         Returns:

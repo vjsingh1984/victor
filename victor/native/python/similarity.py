@@ -20,7 +20,7 @@ Provides vector similarity computation using NumPy.
 from __future__ import annotations
 
 import math
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from victor.native.observability import InstrumentedAccelerator
 
@@ -48,7 +48,7 @@ class PythonSimilarityComputer(InstrumentedAccelerator):
     def get_version(self) -> Optional[str]:
         return self._version
 
-    def cosine(self, a: List[float], b: List[float]) -> float:
+    def cosine(self, a: list[float], b: list[float]) -> float:
         """Compute cosine similarity between two vectors.
 
         Args:
@@ -72,7 +72,7 @@ class PythonSimilarityComputer(InstrumentedAccelerator):
                 return self._cosine_numpy(a, b)
             return self._cosine_pure(a, b)
 
-    def batch_cosine(self, query: List[float], corpus: List[List[float]]) -> List[float]:
+    def batch_cosine(self, query: list[float], corpus: list[list[float]]) -> list[float]:
         """Compute cosine similarity of query against corpus.
 
         Args:
@@ -92,10 +92,10 @@ class PythonSimilarityComputer(InstrumentedAccelerator):
 
     def similarity_matrix(
         self,
-        queries: List[List[float]],
-        corpus: List[List[float]],
+        queries: list[list[float]],
+        corpus: list[list[float]],
         normalize: bool = True,
-    ) -> List[List[float]]:
+    ) -> list[list[float]]:
         """Compute pairwise similarity matrix.
 
         Args:
@@ -121,8 +121,8 @@ class PythonSimilarityComputer(InstrumentedAccelerator):
             return result
 
     def top_k(
-        self, query: List[float], corpus: List[List[float]], k: int
-    ) -> List[Tuple[int, float]]:
+        self, query: list[float], corpus: list[list[float]], k: int
+    ) -> list[tuple[int, float]]:
         """Find top-k most similar vectors.
 
         Args:
@@ -142,7 +142,7 @@ class PythonSimilarityComputer(InstrumentedAccelerator):
             indexed.sort(key=lambda x: x[1], reverse=True)
             return indexed[:k]
 
-    def _cosine_pure(self, a: List[float], b: List[float]) -> float:
+    def _cosine_pure(self, a: list[float], b: list[float]) -> float:
         """Pure Python cosine similarity."""
         dot = sum(x * y for x, y in zip(a, b))
         norm_a = math.sqrt(sum(x * x for x in a))
@@ -153,7 +153,7 @@ class PythonSimilarityComputer(InstrumentedAccelerator):
 
         return dot / (norm_a * norm_b)
 
-    def _cosine_numpy(self, a: List[float], b: List[float]) -> float:
+    def _cosine_numpy(self, a: list[float], b: list[float]) -> float:
         """NumPy cosine similarity."""
         a_arr = np.array(a, dtype=np.float32)
         b_arr = np.array(b, dtype=np.float32)
@@ -167,7 +167,7 @@ class PythonSimilarityComputer(InstrumentedAccelerator):
 
         return float(dot / (norm_a * norm_b))
 
-    def _batch_cosine_numpy(self, query: List[float], corpus: List[List[float]]) -> List[float]:
+    def _batch_cosine_numpy(self, query: list[float], corpus: list[list[float]]) -> list[float]:
         """NumPy batch cosine similarity."""
         query_arr = np.array(query, dtype=np.float32)
         corpus_arr = np.array(corpus, dtype=np.float32)
@@ -190,10 +190,10 @@ class PythonSimilarityComputer(InstrumentedAccelerator):
 
     def _similarity_matrix_numpy(
         self,
-        queries: List[List[float]],
-        corpus: List[List[float]],
+        queries: list[list[float]],
+        corpus: list[list[float]],
         normalize: bool,
-    ) -> List[List[float]]:
+    ) -> list[list[float]]:
         """NumPy similarity matrix computation."""
         queries_arr = np.array(queries, dtype=np.float32)
         corpus_arr = np.array(corpus, dtype=np.float32)

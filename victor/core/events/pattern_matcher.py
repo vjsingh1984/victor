@@ -45,7 +45,6 @@ Example:
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Tuple
 
 
 def matches_topic_pattern(topic: str, pattern: str) -> bool:
@@ -93,13 +92,13 @@ def matches_topic_pattern(topic: str, pattern: str) -> bool:
 
 
 @lru_cache(maxsize=1024)
-def _split_pattern(pattern: str) -> Tuple[str, ...]:
+def _split_pattern(pattern: str) -> tuple[str, ...]:
     """Cache pattern splitting for performance."""
     return tuple(pattern.split("."))
 
 
 @lru_cache(maxsize=4096)
-def _split_topic(topic: str) -> Tuple[str, ...]:
+def _split_topic(topic: str) -> tuple[str, ...]:
     """Cache topic splitting for performance."""
     return tuple(topic.split("."))
 

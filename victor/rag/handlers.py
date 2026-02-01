@@ -38,7 +38,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any
 
 from victor.framework.workflows.base_handler import BaseHandler
 from victor.framework.handler_registry import handler_decorator
@@ -74,7 +74,7 @@ class VectorSearchHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute vector search."""
         query = node.input_mapping.get("query", "")
         if isinstance(query, str) and query.startswith("$ctx."):
@@ -128,7 +128,7 @@ class ChunkProcessorHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute document chunking."""
         docs_key = node.input_mapping.get("documents")
         documents = context.get(docs_key) if docs_key else []
@@ -158,7 +158,7 @@ class ChunkProcessorHandler(BaseHandler):
 
     def _chunk_document(
         self, document: Any, strategy: str, chunk_size: int, overlap: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Chunk a single document."""
         text = str(document) if not isinstance(document, str) else document
         chunks = []

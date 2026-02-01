@@ -51,13 +51,12 @@ Example:
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 
 from victor.core.registries.striped_locks import StripedLockManager
 
@@ -101,7 +100,7 @@ class RegistryEntry(Generic[T]):
     cache_key: str = ""
     created_at: float = field(default_factory=time.time)
     ttl: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     access_count: int = 0
 
     def is_expired(self) -> bool:
@@ -158,7 +157,7 @@ class UniversalRegistry(Generic[T]):
     """
 
     # Class-level registry for singleton instances
-    _instances: Dict[str, "UniversalRegistry[Any]"] = {}
+    _instances: dict[str, "UniversalRegistry[Any]"] = {}
     _lock = threading.RLock()
 
     # Shared striped lock manager for all registries
@@ -180,8 +179,8 @@ class UniversalRegistry(Generic[T]):
         self._registry_type = registry_type
         self._cache_strategy = cache_strategy
         self._max_size = max_size
-        self._entities: Dict[str, RegistryEntry[T]] = {}
-        self._namespaces: Dict[str, Dict[str, T]] = {}
+        self._entities: dict[str, RegistryEntry[T]] = {}
+        self._namespaces: dict[str, dict[str, T]] = {}
         self._lock = threading.RLock()  # Local lock for non-striped operations
 
         logger.debug(
@@ -261,7 +260,7 @@ class UniversalRegistry(Generic[T]):
         value: T,
         namespace: str = "",
         ttl: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Register an entity with namespace and cache control.
 
@@ -354,7 +353,7 @@ class UniversalRegistry(Generic[T]):
             logger.debug(f"UniversalRegistry: Cache hit for '{cache_key}'")
             return entry.value
 
-    def list_keys(self, namespace: str = "") -> List[str]:
+    def list_keys(self, namespace: str = "") -> list[str]:
         """List all keys in namespace or globally.
 
         Args:
@@ -372,7 +371,7 @@ class UniversalRegistry(Generic[T]):
                 return list(self._namespaces.get(namespace, {}).keys())
             return [k for k, v in self._entities.items() if not v.namespace]
 
-    def list_namespaces(self) -> List[str]:
+    def list_namespaces(self) -> list[str]:
         """List all registered namespaces.
 
         Returns:
@@ -445,7 +444,7 @@ class UniversalRegistry(Generic[T]):
 
         return count
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get registry statistics.
 
         Returns:

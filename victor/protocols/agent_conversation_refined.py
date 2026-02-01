@@ -32,7 +32,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 # =============================================================================
@@ -58,7 +58,7 @@ class IMessageStore(Protocol):
         """
         ...
 
-    def get_messages(self, limit: Optional[int] = None) -> List[Any]:
+    def get_messages(self, limit: Optional[int] = None) -> list[Any]:
         """Retrieve messages.
 
         Args:
@@ -166,7 +166,7 @@ class IEmbeddingManager(Protocol):
         """Initialize embedding store."""
         ...
 
-    def semantic_search(self, query: str, k: int = 5) -> List[Any]:
+    def semantic_search(self, query: str, k: int = 5) -> list[Any]:
         """Perform semantic search.
 
         Args:

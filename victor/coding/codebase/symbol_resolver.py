@@ -1,7 +1,8 @@
 # Symbol resolution utilities for graph linking.
 from __future__ import annotations
 
-from typing import Dict, Iterable, List, Optional
+from typing import Optional
+from collections.abc import Iterable
 
 
 class SymbolResolver:
@@ -9,7 +10,7 @@ class SymbolResolver:
 
     def __init__(self) -> None:
         # name -> list of node_ids
-        self._index: Dict[str, List[str]] = {}
+        self._index: dict[str, list[str]] = {}
 
     def ingest(self, node_ids: Iterable[str]) -> None:
         """Ingest symbol node ids (format: symbol:<file>:<name>)."""

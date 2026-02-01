@@ -38,10 +38,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, Set, TYPE_CHECKING, runtime_checkable
+from typing import Any, Optional, Protocol, TYPE_CHECKING, runtime_checkable
 
 if TYPE_CHECKING:
-    from victor.framework.tools import ToolSet
+    pass
 
 
 # =============================================================================
@@ -73,12 +73,12 @@ class StageDefinition:
 
     name: str
     description: str
-    tools: Set[str] = field(default_factory=set)
-    keywords: List[str] = field(default_factory=list)
-    next_stages: Set[str] = field(default_factory=set)
+    tools: set[str] = field(default_factory=set)
+    keywords: list[str] = field(default_factory=list)
+    next_stages: set[str] = field(default_factory=set)
     min_confidence: float = 0.5
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -118,9 +118,9 @@ class TaskTypeHint:
     task_type: str
     hint: str
     tool_budget: Optional[int] = None
-    priority_tools: List[str] = field(default_factory=list)
+    priority_tools: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "task_type": self.task_type,
@@ -189,7 +189,7 @@ class StandardTaskHints:
     )
 
     # Standard hints as a dictionary
-    _STANDARD_HINTS: Dict[str, TaskTypeHint] = {}
+    _STANDARD_HINTS: dict[str, TaskTypeHint] = {}
 
     @classmethod
     def _init_standard_hints(cls) -> None:
@@ -217,7 +217,7 @@ class StandardTaskHints:
         return cls._STANDARD_HINTS.get(task_type.lower())
 
     @classmethod
-    def all(cls) -> Dict[str, TaskTypeHint]:
+    def all(cls) -> dict[str, TaskTypeHint]:
         """Get all standard hints.
 
         Returns:
@@ -227,7 +227,7 @@ class StandardTaskHints:
         return cls._STANDARD_HINTS.copy()
 
     @classmethod
-    def merge_with(cls, vertical_hints: Dict[str, TaskTypeHint]) -> Dict[str, TaskTypeHint]:
+    def merge_with(cls, vertical_hints: dict[str, TaskTypeHint]) -> dict[str, TaskTypeHint]:
         """Merge standard hints with vertical-specific hints.
 
         Vertical-specific hints override standard hints with the same key.
@@ -371,9 +371,9 @@ class MiddlewareResult:
     """
 
     proceed: bool = True
-    modified_arguments: Optional[Dict[str, Any]] = None
+    modified_arguments: Optional[dict[str, Any]] = None
     error_message: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -405,46 +405,46 @@ class TieredToolConfigProtocol(Protocol):
     """
 
     @property
-    def mandatory(self) -> Set[str]:
+    def mandatory(self) -> set[str]:
         """Tools always included regardless of task type."""
         ...
 
     @property
-    def vertical_core(self) -> Set[str]:
+    def vertical_core(self) -> set[str]:
         """Tools always included for this vertical."""
         ...
 
     @property
-    def semantic_pool(self) -> Set[str]:
+    def semantic_pool(self) -> set[str]:
         """DEPRECATED - Tools selected via semantic matching."""
         ...
 
     @property
-    def stage_tools(self) -> Dict[str, Set[str]]:
+    def stage_tools(self) -> dict[str, set[str]]:
         """DEPRECATED - Tools available at specific stages."""
         ...
 
-    def get_base_tools(self) -> Set[str]:
+    def get_base_tools(self) -> set[str]:
         """Get tools always included (mandatory + vertical core)."""
         ...
 
-    def get_all_tools(self) -> Set[str]:
+    def get_all_tools(self) -> set[str]:
         """Get all tools in the configuration."""
         ...
 
-    def get_tools_for_stage(self, stage: str) -> Set[str]:
+    def get_tools_for_stage(self, stage: str) -> set[str]:
         """Get tools for a specific stage."""
         ...
 
-    def get_semantic_pool_from_registry(self) -> Set[str]:
+    def get_semantic_pool_from_registry(self) -> set[str]:
         """Get semantic pool dynamically from ToolMetadataRegistry."""
         ...
 
-    def get_effective_semantic_pool(self) -> Set[str]:
+    def get_effective_semantic_pool(self) -> set[str]:
         """Get effective semantic pool, preferring registry over static."""
         ...
 
-    def get_tools_for_stage_from_registry(self, stage: str) -> Set[str]:
+    def get_tools_for_stage_from_registry(self, stage: str) -> set[str]:
         """Get tools for a stage using @tool decorator metadata."""
         ...
 
@@ -485,26 +485,26 @@ class TieredToolConfig:
         readonly_only_for_analysis: If True, hide write/execute tools for analysis tasks
     """
 
-    mandatory: Set[str] = field(default_factory=set)
-    vertical_core: Set[str] = field(default_factory=set)
-    semantic_pool: Set[str] = field(default_factory=set)  # DEPRECATED: derive from registry
-    stage_tools: Dict[str, Set[str]] = field(
+    mandatory: set[str] = field(default_factory=set)
+    vertical_core: set[str] = field(default_factory=set)
+    semantic_pool: set[str] = field(default_factory=set)  # DEPRECATED: derive from registry
+    stage_tools: dict[str, set[str]] = field(
         default_factory=dict
     )  # DEPRECATED: use @tool(stages=[])
     readonly_only_for_analysis: bool = True
 
-    def get_base_tools(self) -> Set[str]:
+    def get_base_tools(self) -> set[str]:
         """Get tools always included (mandatory + vertical core)."""
         return self.mandatory | self.vertical_core
 
-    def get_all_tools(self) -> Set[str]:
+    def get_all_tools(self) -> set[str]:
         """Get all tools in the configuration."""
         all_tools = self.mandatory | self.vertical_core | self.semantic_pool
         for stage_set in self.stage_tools.values():
             all_tools |= stage_set
         return all_tools
 
-    def get_tools_for_stage(self, stage: str) -> Set[str]:
+    def get_tools_for_stage(self, stage: str) -> set[str]:
         """Get tools for a specific stage.
 
         Args:
@@ -517,7 +517,7 @@ class TieredToolConfig:
         stage_specific = self.stage_tools.get(stage, set())
         return base | stage_specific
 
-    def get_semantic_pool_from_registry(self) -> Set[str]:
+    def get_semantic_pool_from_registry(self) -> set[str]:
         """Get semantic pool dynamically from ToolMetadataRegistry.
 
         This method derives the semantic pool from all registered tools
@@ -534,9 +534,9 @@ class TieredToolConfig:
         all_tools = registry.get_all_tool_names()
         # Semantic pool = all tools - base tools (mandatory + vertical_core)
         base = self.get_base_tools()
-        return cast(Set[str], all_tools - base)
+        return cast(set[str], all_tools - base)
 
-    def get_effective_semantic_pool(self) -> Set[str]:
+    def get_effective_semantic_pool(self) -> set[str]:
         """Get effective semantic pool, preferring registry over static.
 
         Returns:
@@ -546,7 +546,7 @@ class TieredToolConfig:
             return self.semantic_pool
         return self.get_semantic_pool_from_registry()
 
-    def get_tools_for_stage_from_registry(self, stage: str) -> Set[str]:
+    def get_tools_for_stage_from_registry(self, stage: str) -> set[str]:
         """Get tools for a stage using @tool decorator metadata.
 
         Args:
@@ -561,7 +561,7 @@ class TieredToolConfig:
         registry = ToolMetadataRegistry.get_instance()  # type: ignore[attr-defined]
         base = self.get_base_tools()
         registry_stage_tools = registry.get_tools_by_stage(stage)
-        return cast(Set[str], base | registry_stage_tools)
+        return cast(set[str], base | registry_stage_tools)
 
 
 # =============================================================================
@@ -592,10 +592,10 @@ class VerticalConfigBase:
 
     name: str = ""
     system_prompt: str = ""
-    stages: Dict[str, StageDefinition] = field(default_factory=dict)
-    provider_hints: Dict[str, Any] = field(default_factory=dict)
-    evaluation_criteria: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    stages: dict[str, StageDefinition] = field(default_factory=dict)
+    provider_hints: dict[str, Any] = field(default_factory=dict)
+    evaluation_criteria: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -629,10 +629,10 @@ class TieredToolTemplate:
     """
 
     # Standard mandatory tools - essential for any task across all verticals
-    DEFAULT_MANDATORY: Set[str] = {"read", "ls", "grep"}
+    DEFAULT_MANDATORY: set[str] = {"read", "ls", "grep"}
 
     # Pre-configured vertical cores
-    VERTICAL_CORES: Dict[str, Set[str]] = {
+    VERTICAL_CORES: dict[str, set[str]] = {
         "coding": {"edit", "write", "shell", "git", "search", "overview"},
         "research": {"web_search", "web_fetch", "overview"},
         "devops": {"shell", "git", "docker", "overview"},
@@ -641,7 +641,7 @@ class TieredToolTemplate:
     }
 
     # Vertical-specific readonly_only_for_analysis settings
-    VERTICAL_READONLY_DEFAULTS: Dict[str, bool] = {
+    VERTICAL_READONLY_DEFAULTS: dict[str, bool] = {
         "coding": False,  # Coding often needs write tools
         "research": True,  # Research is primarily reading
         "devops": False,  # DevOps needs execution tools
@@ -652,11 +652,11 @@ class TieredToolTemplate:
     @classmethod
     def create(
         cls,
-        vertical_core: Set[str],
-        mandatory: Optional[Set[str]] = None,
+        vertical_core: set[str],
+        mandatory: Optional[set[str]] = None,
         readonly_only_for_analysis: bool = True,
-        semantic_pool: Optional[Set[str]] = None,
-        stage_tools: Optional[Dict[str, Set[str]]] = None,
+        semantic_pool: Optional[set[str]] = None,
+        stage_tools: Optional[dict[str, set[str]]] = None,
     ) -> TieredToolConfig:
         """Create a TieredToolConfig with standard mandatory tools.
 
@@ -725,7 +725,7 @@ class TieredToolTemplate:
     def register_vertical(
         cls,
         name: str,
-        vertical_core: Set[str],
+        vertical_core: set[str],
         readonly_only_for_analysis: bool = True,
     ) -> None:
         """Register a new vertical's tool configuration.
@@ -739,7 +739,7 @@ class TieredToolTemplate:
         cls.VERTICAL_READONLY_DEFAULTS[name] = readonly_only_for_analysis
 
     @classmethod
-    def list_verticals(cls) -> List[str]:
+    def list_verticals(cls) -> list[str]:
         """List all registered verticals."""
         return list(cls.VERTICAL_CORES.keys())
 

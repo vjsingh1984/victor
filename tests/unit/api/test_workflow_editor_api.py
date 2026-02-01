@@ -9,7 +9,7 @@ Tests the FastAPI backend for the workflow editor including:
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 

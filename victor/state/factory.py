@@ -38,7 +38,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from victor.state.global_state_manager import GlobalStateManager
 from victor.state.managers import (
@@ -125,10 +125,10 @@ def get_tracer() -> Optional[StateTracer]:
 
 
 async def initialize_with_existing(
-    workflow_state: Optional[Dict[str, Any]] = None,
-    conversation_state: Optional[Dict[str, Any]] = None,
-    team_state: Optional[Dict[str, Any]] = None,
-    global_state: Optional[Dict[str, Any]] = None,
+    workflow_state: Optional[dict[str, Any]] = None,
+    conversation_state: Optional[dict[str, Any]] = None,
+    team_state: Optional[dict[str, Any]] = None,
+    global_state: Optional[dict[str, Any]] = None,
 ) -> GlobalStateManager:
     """Initialize global state manager with existing state data.
 

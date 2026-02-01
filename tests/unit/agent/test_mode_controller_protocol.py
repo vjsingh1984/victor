@@ -22,15 +22,11 @@ These tests verify:
 4. Backward compatibility with existing orchestrator.current_mode property
 """
 
-import pytest
-from typing import Any
-from unittest.mock import Mock, MagicMock, patch
 
 from victor.agent.mode_controller import (
     AgentMode,
     AgentModeController,
     OperationalModeConfig,
-    MODE_CONFIGS,
 )
 
 
@@ -48,7 +44,6 @@ class TestModeControllerProtocol:
 
     def test_agent_mode_controller_implements_protocol(self):
         """AgentModeController should implement ModeControllerProtocol."""
-        from victor.protocols.mode_controller import ModeControllerProtocol
 
         controller = AgentModeController()
 
@@ -60,7 +55,6 @@ class TestModeControllerProtocol:
 
     def test_protocol_methods_match_implementation(self):
         """Protocol methods should match AgentModeController implementation."""
-        from victor.protocols.mode_controller import ModeControllerProtocol
 
         controller = AgentModeController(initial_mode=AgentMode.BUILD)
 
@@ -334,7 +328,6 @@ class TestModeControllerBackwardCompatibility:
     def test_get_mode_controller_returns_adapter_compatible(self):
         """get_mode_controller() should return protocol-compatible instance."""
         from victor.agent.mode_controller import get_mode_controller, reset_mode_controller
-        from victor.protocols.mode_controller import ModeControllerProtocol
 
         reset_mode_controller()
         controller = get_mode_controller()

@@ -116,7 +116,7 @@ def normalize_block(block: str) -> str:
     return normalized.lower()
 
 
-def rolling_hash_blocks(content: str, min_block_length: int = 50) -> List[Tuple[str, str, bool]]:
+def rolling_hash_blocks(content: str, min_block_length: int = 50) -> list[tuple[str, str, bool]]:
     """Process content and compute hashes for all blocks.
 
     Args:
@@ -128,13 +128,13 @@ def rolling_hash_blocks(content: str, min_block_length: int = 50) -> List[Tuple[
     """
     if _NATIVE_AVAILABLE:
         return cast(
-            List[Tuple[str, str, bool]], _native.rolling_hash_blocks(content, min_block_length)
+            list[tuple[str, str, bool]], _native.rolling_hash_blocks(content, min_block_length)
         )
 
     # Pure Python fallback
     blocks = _split_into_blocks(content)
     seen_hashes: set[str] = set()
-    results: List[Tuple[str, str, bool]] = []
+    results: list[tuple[str, str, bool]] = []
 
     for block in blocks:
         if len(block.strip()) < min_block_length:
@@ -151,7 +151,7 @@ def rolling_hash_blocks(content: str, min_block_length: int = 50) -> List[Tuple[
     return results
 
 
-def find_duplicate_blocks(content: str, min_block_length: int = 50) -> List[Tuple[int, str]]:
+def find_duplicate_blocks(content: str, min_block_length: int = 50) -> list[tuple[int, str]]:
     """Find duplicate blocks in content and return their indices.
 
     Args:
@@ -162,12 +162,12 @@ def find_duplicate_blocks(content: str, min_block_length: int = 50) -> List[Tupl
         List of (block_index, hash) for duplicate blocks
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[Tuple[int, str]], _native.find_duplicate_blocks(content, min_block_length))
+        return cast(list[tuple[int, str]], _native.find_duplicate_blocks(content, min_block_length))
 
     # Pure Python fallback
     blocks = _split_into_blocks(content)
     seen_hashes: set[str] = set()
-    duplicates: List[Tuple[int, str]] = []
+    duplicates: list[tuple[int, str]] = []
 
     for idx, block in enumerate(blocks):
         if len(block.strip()) < min_block_length:
@@ -182,7 +182,7 @@ def find_duplicate_blocks(content: str, min_block_length: int = 50) -> List[Tupl
     return duplicates
 
 
-def _split_into_blocks(content: str) -> List[str]:
+def _split_into_blocks(content: str) -> list[str]:
     """Split content into logical blocks (pure Python)."""
     if not content:
         return []
@@ -221,7 +221,7 @@ def _hash_block(block: str) -> str:
 # =============================================================================
 
 
-def cosine_similarity(a: List[float], b: List[float]) -> float:
+def cosine_similarity(a: list[float], b: list[float]) -> float:
     """Compute cosine similarity between two vectors.
 
     Args:
@@ -252,7 +252,7 @@ def cosine_similarity(a: List[float], b: List[float]) -> float:
     return float(np.dot(a_arr, b_arr) / (norm_a * norm_b))
 
 
-def batch_cosine_similarity(query: List[float], corpus: List[List[float]]) -> List[float]:
+def batch_cosine_similarity(query: list[float], corpus: list[list[float]]) -> list[float]:
     """Compute cosine similarity between a query vector and multiple corpus vectors.
 
     Args:
@@ -266,7 +266,7 @@ def batch_cosine_similarity(query: List[float], corpus: List[List[float]]) -> Li
         ValueError: If query dimension doesn't match corpus dimensions
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[float], _native.batch_cosine_similarity(query, corpus))
+        return cast(list[float], _native.batch_cosine_similarity(query, corpus))
 
     # Pure Python fallback using NumPy
     if not corpus:
@@ -287,12 +287,12 @@ def batch_cosine_similarity(query: List[float], corpus: List[List[float]]) -> Li
 
     # Compute similarities
     similarities = np.dot(corpus_norms, query_norm)
-    return cast(List[float], similarities.tolist())
+    return cast(list[float], similarities.tolist())
 
 
 def top_k_similar(
-    query: List[float], corpus: List[List[float]], k: int = 10
-) -> List[Tuple[int, float]]:
+    query: list[float], corpus: list[list[float]], k: int = 10
+) -> list[tuple[int, float]]:
     """Find top-k most similar vectors from a corpus.
 
     Args:
@@ -304,7 +304,7 @@ def top_k_similar(
         List of (index, similarity) tuples, sorted by similarity descending
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[Tuple[int, float]], _native.top_k_similar(query, corpus, k))
+        return cast(list[tuple[int, float]], _native.top_k_similar(query, corpus, k))
 
     # Pure Python fallback
     similarities = batch_cosine_similarity(query, corpus)
@@ -313,7 +313,7 @@ def top_k_similar(
     return indexed[:k]
 
 
-def batch_normalize_vectors(vectors: List[List[float]]) -> List[List[float]]:
+def batch_normalize_vectors(vectors: list[list[float]]) -> list[list[float]]:
     """Normalize vectors to unit length for efficient similarity computation.
 
     Pre-normalizing vectors allows subsequent similarity computations to
@@ -326,7 +326,7 @@ def batch_normalize_vectors(vectors: List[List[float]]) -> List[List[float]]:
         List of normalized vectors (unit length)
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[List[float]], _native.batch_normalize_vectors(vectors))
+        return cast(list[list[float]], _native.batch_normalize_vectors(vectors))
 
     # Pure Python fallback using NumPy
     if not vectors:
@@ -335,12 +335,12 @@ def batch_normalize_vectors(vectors: List[List[float]]) -> List[List[float]]:
     arr = np.array(vectors, dtype=np.float32)
     norms = np.linalg.norm(arr, axis=1, keepdims=True) + 1e-9
     normalized = arr / norms
-    return cast(List[List[float]], normalized.tolist())
+    return cast(list[list[float]], normalized.tolist())
 
 
 def batch_cosine_similarity_normalized(
-    query: List[float], normalized_corpus: List[List[float]]
-) -> List[float]:
+    query: list[float], normalized_corpus: list[list[float]]
+) -> list[float]:
     """Compute cosine similarities with a pre-normalized corpus.
 
     This is faster than batch_cosine_similarity when the corpus has already
@@ -356,7 +356,7 @@ def batch_cosine_similarity_normalized(
     """
     if _NATIVE_AVAILABLE:
         return cast(
-            List[float], _native.batch_cosine_similarity_normalized(query, normalized_corpus)
+            list[float], _native.batch_cosine_similarity_normalized(query, normalized_corpus)
         )
 
     # Pure Python fallback using NumPy
@@ -371,12 +371,12 @@ def batch_cosine_similarity_normalized(
 
     # For pre-normalized corpus, similarity is just dot product
     similarities = np.dot(corpus_arr, query_normalized)
-    return cast(List[float], similarities.tolist())
+    return cast(list[float], similarities.tolist())
 
 
 def top_k_similar_normalized(
-    query: List[float], normalized_corpus: List[List[float]], k: int = 10
-) -> List[Tuple[int, float]]:
+    query: list[float], normalized_corpus: list[list[float]], k: int = 10
+) -> list[tuple[int, float]]:
     """Find top-k similar vectors from a pre-normalized corpus.
 
     More efficient version of top_k_similar when corpus is already normalized
@@ -392,7 +392,7 @@ def top_k_similar_normalized(
     """
     if _NATIVE_AVAILABLE:
         return cast(
-            List[Tuple[int, float]], _native.top_k_similar_normalized(query, normalized_corpus, k)
+            list[tuple[int, float]], _native.top_k_similar_normalized(query, normalized_corpus, k)
         )
 
     # Pure Python fallback using heap for efficiency
@@ -468,7 +468,7 @@ def repair_json(input_str: str) -> str:
     return "".join(output)
 
 
-def extract_json_objects(text: str) -> List[Tuple[int, int, str]]:
+def extract_json_objects(text: str) -> list[tuple[int, int, str]]:
     """Extract JSON objects from mixed text content.
 
     Args:
@@ -478,10 +478,10 @@ def extract_json_objects(text: str) -> List[Tuple[int, int, str]]:
         List of (start_pos, end_pos, json_string) tuples for each found object
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[Tuple[int, int, str]], _native.extract_json_objects(text))
+        return cast(list[tuple[int, int, str]], _native.extract_json_objects(text))
 
     # Pure Python fallback
-    results: List[Tuple[int, int, str]] = []
+    results: list[tuple[int, int, str]] = []
     i = 0
 
     while i < len(text):
@@ -511,7 +511,7 @@ def extract_json_objects(text: str) -> List[Tuple[int, int, str]]:
     return results
 
 
-def _find_json_end(text: str, start: int) -> Optional[Tuple[int, str]]:
+def _find_json_end(text: str, start: int) -> Optional[tuple[int, str]]:
     """Find the end of a JSON structure starting at given position."""
     open_char = text[start]
     close_char = "}" if open_char == "{" else "]"
@@ -553,7 +553,7 @@ def _find_json_end(text: str, start: int) -> Optional[Tuple[int, str]]:
 # =============================================================================
 
 
-def compute_signature(tool_name: str, arguments: Dict[str, Any]) -> str:
+def compute_signature(tool_name: str, arguments: dict[str, Any]) -> str:
     """Compute a signature hash for a tool call.
 
     Args:
@@ -575,7 +575,7 @@ def compute_signature(tool_name: str, arguments: Dict[str, Any]) -> str:
     return hashlib.md5(combined.encode(), usedforsecurity=False).hexdigest()[:16]
 
 
-def compute_batch_signatures(tool_calls: List[Tuple[str, Dict[str, Any]]]) -> List[str]:
+def compute_batch_signatures(tool_calls: list[tuple[str, dict[str, Any]]]) -> list[str]:
     """Compute signatures for multiple tool calls in batch.
 
     Args:
@@ -585,7 +585,7 @@ def compute_batch_signatures(tool_calls: List[Tuple[str, Dict[str, Any]]]) -> Li
         List of signature strings, one per tool call
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[str], _native.compute_batch_signatures(tool_calls))
+        return cast(list[str], _native.compute_batch_signatures(tool_calls))
 
     # Pure Python fallback
     return [compute_signature(name, args) for name, args in tool_calls]
@@ -699,7 +699,7 @@ def contains_thinking_tokens(content: str) -> bool:
     return any(pattern in content for pattern in _ALL_THINKING_PATTERNS)
 
 
-def find_thinking_tokens(content: str) -> List[Tuple[int, int, int]]:
+def find_thinking_tokens(content: str) -> list[tuple[int, int, int]]:
     """Find all thinking token positions in content.
 
     Args:
@@ -709,7 +709,7 @@ def find_thinking_tokens(content: str) -> List[Tuple[int, int, int]]:
         List of (start, end, pattern_index) tuples
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[Tuple[int, int, int]], _native.find_thinking_tokens(content))
+        return cast(list[tuple[int, int, int]], _native.find_thinking_tokens(content))
 
     # Pure Python fallback
     results = []
@@ -726,7 +726,7 @@ def find_thinking_tokens(content: str) -> List[Tuple[int, int, int]]:
     return results
 
 
-def extract_thinking_content(content: str) -> Tuple[str, str]:
+def extract_thinking_content(content: str) -> tuple[str, str]:
     """Extract thinking content from a complete response.
 
     Args:
@@ -736,7 +736,7 @@ def extract_thinking_content(content: str) -> Tuple[str, str]:
         Tuple of (main_content, thinking_content)
     """
     if _NATIVE_AVAILABLE:
-        return cast(Tuple[str, str], _native.extract_thinking_content(content))
+        return cast(tuple[str, str], _native.extract_thinking_content(content))
 
     # Pure Python fallback
     main_content = []
@@ -963,7 +963,7 @@ def has_negation(text: str) -> bool:
     return any(pattern in text_lower for pattern in negation_patterns)
 
 
-def find_all_keywords(text: str) -> List[Tuple[int, int, str, str]]:
+def find_all_keywords(text: str) -> list[tuple[int, int, str, str]]:
     """Find all keyword matches in text.
 
     Args:
@@ -973,7 +973,7 @@ def find_all_keywords(text: str) -> List[Tuple[int, int, str, str]]:
         List of (start, end, matched_text, category) tuples
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[Tuple[int, int, str, str]], _native.find_all_keywords(text))
+        return cast(list[tuple[int, int, str, str]], _native.find_all_keywords(text))
 
     # Pure Python fallback
     results = []
@@ -1128,7 +1128,7 @@ def count_circular_patterns(text: str) -> int:
     return count
 
 
-def find_circular_patterns(text: str) -> List[Tuple[int, int, str]]:
+def find_circular_patterns(text: str) -> list[tuple[int, int, str]]:
     """Find all circular pattern matches.
 
     Args:
@@ -1138,7 +1138,7 @@ def find_circular_patterns(text: str) -> List[Tuple[int, int, str]]:
         List of (start, end, matched_text) tuples
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[Tuple[int, int, str]], _native.find_circular_patterns(text))
+        return cast(list[tuple[int, int, str]], _native.find_circular_patterns(text))
 
     # Pure Python fallback
     text_lower = text.lower()
@@ -1170,7 +1170,7 @@ else:
 # =============================================================================
 
 
-def chunk_by_sentences(text: str, chunk_size: int = 1344, overlap: int = 128) -> List[str]:
+def chunk_by_sentences(text: str, chunk_size: int = 1344, overlap: int = 128) -> list[str]:
     """Chunk text by sentence boundaries with overlap.
 
     Args:
@@ -1182,7 +1182,7 @@ def chunk_by_sentences(text: str, chunk_size: int = 1344, overlap: int = 128) ->
         List of text chunks
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[str], _native.chunk_by_sentences(text, chunk_size, overlap))
+        return cast(list[str], _native.chunk_by_sentences(text, chunk_size, overlap))
 
     # Pure Python fallback
     import re
@@ -1208,7 +1208,7 @@ def chunk_by_sentences(text: str, chunk_size: int = 1344, overlap: int = 128) ->
     return chunks
 
 
-def chunk_by_chars(text: str, chunk_size: int = 1344, overlap: int = 128) -> List[str]:
+def chunk_by_chars(text: str, chunk_size: int = 1344, overlap: int = 128) -> list[str]:
     """Chunk text by character count with overlap.
 
     Args:
@@ -1220,7 +1220,7 @@ def chunk_by_chars(text: str, chunk_size: int = 1344, overlap: int = 128) -> Lis
         List of text chunks
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[str], _native.chunk_by_chars(text, chunk_size, overlap))
+        return cast(list[str], _native.chunk_by_chars(text, chunk_size, overlap))
 
     # Pure Python fallback
     chunks = []
@@ -1237,7 +1237,7 @@ def chunk_by_chars(text: str, chunk_size: int = 1344, overlap: int = 128) -> Lis
     return chunks
 
 
-def chunk_by_paragraphs(text: str, chunk_size: int = 1344, overlap: int = 128) -> List[str]:
+def chunk_by_paragraphs(text: str, chunk_size: int = 1344, overlap: int = 128) -> list[str]:
     """Chunk text by paragraph boundaries with overlap.
 
     Args:
@@ -1249,7 +1249,7 @@ def chunk_by_paragraphs(text: str, chunk_size: int = 1344, overlap: int = 128) -
         List of text chunks
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[str], _native.chunk_by_paragraphs(text, chunk_size, overlap))
+        return cast(list[str], _native.chunk_by_paragraphs(text, chunk_size, overlap))
 
     # Pure Python fallback
     paragraphs = text.split("\n\n")
@@ -1374,7 +1374,7 @@ _SECRET_PATTERNS = [
 ]
 
 
-def scan_secrets(text: str) -> List[Any]:
+def scan_secrets(text: str) -> list[Any]:
     """Scan text for secrets.
 
     Args:
@@ -1384,7 +1384,7 @@ def scan_secrets(text: str) -> List[Any]:
         List of SecretMatch objects
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[Any], _native.scan_secrets(text))
+        return cast(list[Any], _native.scan_secrets(text))
 
     # Pure Python fallback
     matches = []
@@ -1427,7 +1427,7 @@ def has_secrets(text: str) -> bool:
     return False
 
 
-def get_secret_types(text: str) -> List[str]:
+def get_secret_types(text: str) -> list[str]:
     """Get types of secrets found in text.
 
     Args:
@@ -1437,7 +1437,7 @@ def get_secret_types(text: str) -> List[str]:
         List of secret type names
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[str], _native.get_secret_types(text))
+        return cast(list[str], _native.get_secret_types(text))
 
     # Pure Python fallback
     types = []
@@ -1475,20 +1475,20 @@ def mask_secrets(text: str, mask_char: str = "*", visible_chars: int = 4) -> str
     return result
 
 
-def list_secret_patterns() -> List[str]:
+def list_secret_patterns() -> list[str]:
     """List available secret pattern names.
 
     Returns:
         List of pattern names
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[str], _native.list_secret_patterns())
+        return cast(list[str], _native.list_secret_patterns())
 
     # Pure Python fallback
     return [name for name, _, _ in _SECRET_PATTERNS]
 
 
-def scan_secrets_summary(text: str) -> Dict[str, Any]:
+def scan_secrets_summary(text: str) -> dict[str, Any]:
     """Scan secrets and return summary.
 
     Args:
@@ -1498,12 +1498,12 @@ def scan_secrets_summary(text: str) -> Dict[str, Any]:
         Summary dict with counts
     """
     if _NATIVE_AVAILABLE:
-        return cast(Dict[str, Any], _native.scan_secrets_summary(text))
+        return cast(dict[str, Any], _native.scan_secrets_summary(text))
 
     # Pure Python fallback
     matches = scan_secrets(text)
-    by_type: Dict[str, int] = {}
-    by_severity: Dict[str, int] = {}
+    by_type: dict[str, int] = {}
+    by_severity: dict[str, int] = {}
 
     for m in matches:
         by_type[m.secret_type] = by_type.get(m.secret_type, 0) + 1
@@ -1545,13 +1545,13 @@ class PatternMatchFallback:
 class PatternMatcherFallback:
     """Fallback pattern matcher using Python regex."""
 
-    def __init__(self, patterns: List[str], case_insensitive: bool = True):
+    def __init__(self, patterns: list[str], case_insensitive: bool = True):
         self.patterns = patterns
         self.case_insensitive = case_insensitive
         flags = re.IGNORECASE if case_insensitive else 0
         self._compiled = [(i, re.compile(re.escape(p), flags)) for i, p in enumerate(patterns)]
 
-    def find_all(self, text: str) -> List[PatternMatchFallback]:
+    def find_all(self, text: str) -> list[PatternMatchFallback]:
         matches = []
         for idx, pattern in self._compiled:
             for m in pattern.finditer(text):
@@ -1568,17 +1568,17 @@ class PatternMatcherFallback:
     def count_matches(self, text: str) -> int:
         return len(self.find_all(text))
 
-    def matched_patterns(self, text: str) -> List[int]:
+    def matched_patterns(self, text: str) -> list[int]:
         seen = set()
         for m in self.find_all(text):
             seen.add(m.pattern_idx)
         return sorted(seen)
 
-    def matched_pattern_strings(self, text: str) -> List[str]:
+    def matched_pattern_strings(self, text: str) -> list[str]:
         return [self.patterns[i] for i in self.matched_patterns(text)]
 
-    def count_by_pattern(self, text: str) -> Dict[int, int]:
-        counts: Dict[int, int] = {}
+    def count_by_pattern(self, text: str) -> dict[int, int]:
+        counts: dict[int, int] = {}
         for m in self.find_all(text):
             counts[m.pattern_idx] = counts.get(m.pattern_idx, 0) + 1
         return counts
@@ -1596,7 +1596,7 @@ class PatternMatcherFallback:
         return result
 
 
-def contains_any_pattern(text: str, patterns: List[str], case_insensitive: bool = True) -> bool:
+def contains_any_pattern(text: str, patterns: list[str], case_insensitive: bool = True) -> bool:
     """Check if text contains any pattern.
 
     Args:
@@ -1614,7 +1614,7 @@ def contains_any_pattern(text: str, patterns: List[str], case_insensitive: bool 
     return matcher.contains_any(text)
 
 
-def find_all_patterns(text: str, patterns: List[str], case_insensitive: bool = True) -> List[Any]:
+def find_all_patterns(text: str, patterns: list[str], case_insensitive: bool = True) -> list[Any]:
     """Find all pattern matches in text.
 
     Args:
@@ -1626,13 +1626,13 @@ def find_all_patterns(text: str, patterns: List[str], case_insensitive: bool = T
         List of PatternMatch objects
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[Any], _native.find_all_patterns(text, patterns, case_insensitive))
+        return cast(list[Any], _native.find_all_patterns(text, patterns, case_insensitive))
 
     matcher = PatternMatcherFallback(patterns, case_insensitive)
     return matcher.find_all(text)
 
 
-def count_pattern_matches(text: str, patterns: List[str], case_insensitive: bool = True) -> int:
+def count_pattern_matches(text: str, patterns: list[str], case_insensitive: bool = True) -> int:
     """Count pattern matches in text.
 
     Args:
@@ -1651,8 +1651,8 @@ def count_pattern_matches(text: str, patterns: List[str], case_insensitive: bool
 
 
 def get_matched_pattern_indices(
-    text: str, patterns: List[str], case_insensitive: bool = True
-) -> List[int]:
+    text: str, patterns: list[str], case_insensitive: bool = True
+) -> list[int]:
     """Get indices of matched patterns.
 
     Args:
@@ -1665,7 +1665,7 @@ def get_matched_pattern_indices(
     """
     if _NATIVE_AVAILABLE:
         return cast(
-            List[int], _native.get_matched_pattern_indices(text, patterns, case_insensitive)
+            list[int], _native.get_matched_pattern_indices(text, patterns, case_insensitive)
         )
 
     matcher = PatternMatcherFallback(patterns, case_insensitive)
@@ -1673,8 +1673,8 @@ def get_matched_pattern_indices(
 
 
 def batch_contains_any(
-    texts: List[str], patterns: List[str], case_insensitive: bool = True
-) -> List[bool]:
+    texts: list[str], patterns: list[str], case_insensitive: bool = True
+) -> list[bool]:
     """Check multiple texts for pattern matches.
 
     Args:
@@ -1686,14 +1686,14 @@ def batch_contains_any(
         List of booleans, one per text
     """
     if _NATIVE_AVAILABLE:
-        return cast(List[bool], _native.batch_contains_any(texts, patterns, case_insensitive))
+        return cast(list[bool], _native.batch_contains_any(texts, patterns, case_insensitive))
 
     matcher = PatternMatcherFallback(patterns, case_insensitive)
     return [matcher.contains_any(text) for text in texts]
 
 
 def weighted_pattern_score(
-    text: str, patterns: List[str], weights: List[float], case_insensitive: bool = True
+    text: str, patterns: list[str], weights: list[float], case_insensitive: bool = True
 ) -> float:
     """Calculate weighted score for pattern matches.
 
@@ -1794,7 +1794,7 @@ def extract_file_path(text: str) -> Optional[str]:
     return None
 
 
-def extract_code_blocks(text: str) -> List[str]:
+def extract_code_blocks(text: str) -> list[str]:
     """Extract code blocks from text (fenced and indented).
 
     Uses native Rust implementation when available for ~3x speedup.
@@ -1806,7 +1806,7 @@ def extract_code_blocks(text: str) -> List[str]:
         List of extracted code block contents
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "extract_code_blocks"):
-        return cast(List[str], _native.extract_code_blocks(text))
+        return cast(list[str], _native.extract_code_blocks(text))
 
     # Pure Python fallback
     blocks = []
@@ -1831,7 +1831,7 @@ def extract_code_blocks(text: str) -> List[str]:
     return blocks
 
 
-def extract_shell_commands(text: str) -> List[str]:
+def extract_shell_commands(text: str) -> list[str]:
     """Extract shell commands from text.
 
     Uses native Rust implementation when available for ~3x speedup.
@@ -1843,7 +1843,7 @@ def extract_shell_commands(text: str) -> List[str]:
         List of extracted shell commands
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "extract_shell_commands"):
-        return cast(List[str], _native.extract_shell_commands(text))
+        return cast(list[str], _native.extract_shell_commands(text))
 
     # Pure Python fallback
     commands = []
@@ -1860,11 +1860,11 @@ class ExtractedToolCallResult:
     """Result of tool call extraction."""
 
     tool_name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     confidence: float
     source_text: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "tool": self.tool_name,
             "args": self.arguments,
@@ -1957,7 +1957,7 @@ def extract_tool_call(
     return None
 
 
-def batch_extract_file_paths(texts: List[str]) -> List[Optional[str]]:
+def batch_extract_file_paths(texts: list[str]) -> list[Optional[str]]:
     """Extract file paths from multiple texts.
 
     Uses native Rust implementation when available for ~5x speedup.
@@ -1969,7 +1969,7 @@ def batch_extract_file_paths(texts: List[str]) -> List[Optional[str]]:
         List of extracted paths (None for texts without paths)
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "batch_extract_file_paths"):
-        return cast(List[Optional[str]], _native.batch_extract_file_paths(texts))
+        return cast(list[Optional[str]], _native.batch_extract_file_paths(texts))
 
     return [extract_file_path(text) for text in texts]
 
@@ -2074,7 +2074,7 @@ def is_garbage_content_fast(content: str) -> bool:
     return False
 
 
-def detect_leakage_patterns(text: str) -> List[Tuple[int, int, str]]:
+def detect_leakage_patterns(text: str) -> list[tuple[int, int, str]]:
     """Detect training data leakage patterns in text.
 
     Uses native Rust implementation when available for ~3x speedup.
@@ -2086,7 +2086,7 @@ def detect_leakage_patterns(text: str) -> List[Tuple[int, int, str]]:
         List of (start, end, pattern_name) tuples for matches
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "detect_leakage_patterns"):
-        return cast(List[Tuple[int, int, str]], _native.detect_leakage_patterns(text))
+        return cast(list[tuple[int, int, str]], _native.detect_leakage_patterns(text))
 
     # Pure Python fallback
     matches = []
@@ -2128,7 +2128,7 @@ def strip_markup_fast(text: str) -> str:
     return " ".join(cleaned.split())
 
 
-def validate_tool_name(name: str) -> Tuple[bool, Optional[str]]:
+def validate_tool_name(name: str) -> tuple[bool, Optional[str]]:
     """Validate a tool name is not a hallucination.
 
     Uses native Rust implementation when available for ~3x speedup.
@@ -2140,7 +2140,7 @@ def validate_tool_name(name: str) -> Tuple[bool, Optional[str]]:
         Tuple of (is_valid, rejection_reason)
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "validate_tool_name"):
-        return cast(Tuple[bool, Optional[str]], _native.validate_tool_name(name))
+        return cast(tuple[bool, Optional[str]], _native.validate_tool_name(name))
 
     if not name or not isinstance(name, str):
         return False, "empty_or_invalid_type"
@@ -2177,7 +2177,7 @@ def validate_tool_name(name: str) -> Tuple[bool, Optional[str]]:
 # =============================================================================
 
 
-def coerce_string_type(value: str) -> Tuple[str, str, Optional[str]]:
+def coerce_string_type(value: str) -> tuple[str, str, Optional[str]]:
     """Coerce a string to its appropriate type.
 
     Fast detection and coercion of string values to bool/int/float/null.
@@ -2193,7 +2193,7 @@ def coerce_string_type(value: str) -> Tuple[str, str, Optional[str]]:
         - error_or_none: Error message if coercion failed, else None
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "coerce_string_type"):
-        return cast(Tuple[str, str, Optional[str]], _native.coerce_string_type(value))
+        return cast(tuple[str, str, Optional[str]], _native.coerce_string_type(value))
 
     # Pure Python fallback
     # Check for null
@@ -2507,7 +2507,7 @@ def validate_yaml(yaml_content: str) -> bool:
         return False
 
 
-def extract_workflow_names(yaml_content: str) -> List[str]:
+def extract_workflow_names(yaml_content: str) -> list[str]:
     """Extract workflow names from YAML content.
 
     Fast scan to find workflow names without full parsing.
@@ -2519,7 +2519,7 @@ def extract_workflow_names(yaml_content: str) -> List[str]:
         List of workflow names found
     """
     if _NATIVE_AVAILABLE and hasattr(_native, "extract_workflow_names"):
-        return cast(List[str], _native.extract_workflow_names(yaml_content))
+        return cast(list[str], _native.extract_workflow_names(yaml_content))
 
     import yaml
 
@@ -2584,7 +2584,7 @@ class AcceleratorBenchmark:
 
 
 # Benchmark-based defaults (measured on Apple M-series, 2025-01)
-ACCELERATOR_BENCHMARKS: Dict[str, AcceleratorBenchmark] = {
+ACCELERATOR_BENCHMARKS: dict[str, AcceleratorBenchmark] = {
     # Text processing - Rust wins
     "normalize_block": AcceleratorBenchmark(
         "normalize_block", 0.21, 1.37, "rust", "Whitespace/punctuation normalization"
@@ -2617,7 +2617,7 @@ ACCELERATOR_BENCHMARKS: Dict[str, AcceleratorBenchmark] = {
 }
 
 # User-configurable overrides (can be set at runtime)
-_accelerator_overrides: Dict[str, str] = {}
+_accelerator_overrides: dict[str, str] = {}
 
 
 def set_accelerator_preference(operation: str, preference: str) -> None:
@@ -2671,7 +2671,7 @@ def get_preferred_backend(operation: str) -> str:
     return "rust" if _NATIVE_AVAILABLE else "python"
 
 
-def get_all_benchmarks() -> Dict[str, Dict[str, Any]]:
+def get_all_benchmarks() -> dict[str, dict[str, Any]]:
     """Get all benchmark data for display/debugging.
 
     Returns:

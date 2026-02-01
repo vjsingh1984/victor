@@ -20,11 +20,11 @@ strategies with realistic scenarios and benchmarks against static formations.
 
 import asyncio
 import pytest
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 from victor.coordination.formations.base import TeamContext
-from victor.teams.types import AgentMessage, MemberResult, MessageType
+from victor.teams.types import AgentMessage, MessageType
 from victor.workflows.advanced_formations import (
     DynamicFormation,
     AdaptiveFormation,
@@ -38,7 +38,6 @@ from victor.workflows.advanced_formations_schema import (
     AdaptiveFormationConfig,
     HybridFormationConfig,
     HybridPhaseConfig,
-    AdvancedFormationConfig,
     parse_advanced_formation_from_yaml,
     ValidationError,
 )
@@ -158,7 +157,7 @@ class TestDynamicFormation:
         """Test formation switching when dependencies are detected."""
 
         # Create agents that indicate dependencies
-        async def dependent_execute(task: str, context: Dict[str, Any] = None) -> str:
+        async def dependent_execute(task: str, context: dict[str, Any] = None) -> str:
             return "This task depends on previous results"
 
         for agent in mock_agents:
@@ -206,7 +205,7 @@ class TestDynamicFormation:
         # Create agent that fails initially
         call_count = {"count": 0}
 
-        async def failing_then_succeeding(task: str, context: Dict[str, Any] = None) -> str:
+        async def failing_then_succeeding(task: str, context: dict[str, Any] = None) -> str:
             call_count["count"] += 1
             if call_count["count"] == 1:
                 raise Exception("Simulated failure")
@@ -474,7 +473,7 @@ class TestHybridFormation:
         """Test stop_on_first_failure behavior."""
 
         # Create an agent that fails
-        async def failing_execute(task: str, context: Dict[str, Any] = None) -> str:
+        async def failing_execute(task: str, context: dict[str, Any] = None) -> str:
             raise Exception("Phase failed")
 
         for agent in mock_agents:
@@ -505,7 +504,7 @@ class TestHybridFormation:
     ) -> None:
         """Test phase duration budget enforcement."""
 
-        async def slow_execute(task: str, context: Dict[str, Any] = None) -> str:
+        async def slow_execute(task: str, context: dict[str, Any] = None) -> str:
             await asyncio.sleep(0.2)  # Simulate slow execution
             return "Done"
 
@@ -787,7 +786,7 @@ class TestAdvancedFormationIntegration:
 
         call_count = {"count": 0}
 
-        async def realistic_execute(task: str, context: Dict[str, Any] = None) -> str:
+        async def realistic_execute(task: str, context: dict[str, Any] = None) -> str:
             call_count["count"] += 1
             if call_count["count"] == 1:
                 return "Found potential security issues"

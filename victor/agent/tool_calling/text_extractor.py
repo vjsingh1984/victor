@@ -47,7 +47,7 @@ import ast
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class ExtractedToolCall:
     """
 
     name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     raw_text: str = ""
     start_pos: int = 0
     end_pos: int = 0
@@ -85,11 +85,11 @@ class ExtractionResult:
         warnings: Any warnings during extraction
     """
 
-    tool_calls: List[ExtractedToolCall] = field(default_factory=list)
+    tool_calls: list[ExtractedToolCall] = field(default_factory=list)
     remaining_content: str = ""
     parse_method: str = "python_call"
     confidence: float = 0.0
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def success(self) -> bool:
@@ -179,7 +179,7 @@ class PythonCallExtractor:
 
     def __init__(
         self,
-        known_tools: Optional[Set[str]] = None,
+        known_tools: Optional[set[str]] = None,
         strict_mode: bool = False,
     ):
         """Initialize the extractor.
@@ -194,7 +194,7 @@ class PythonCallExtractor:
     def extract_from_text(
         self,
         content: str,
-        valid_tool_names: Optional[Set[str]] = None,
+        valid_tool_names: Optional[set[str]] = None,
     ) -> ExtractionResult:
         """Extract Python-like function calls from text content.
 
@@ -210,13 +210,13 @@ class PythonCallExtractor:
             return ExtractionResult(remaining_content=content)
 
         # Combine known tools with valid names for filtering
-        filter_names: Set[str] = set(valid_tool_names or self._known_tools)
+        filter_names: set[str] = set(valid_tool_names or self._known_tools)
         if valid_tool_names:
             filter_names |= set(self._known_tools)
 
-        tool_calls: List[ExtractedToolCall] = []
-        warnings: List[str] = []
-        positions_to_remove: List[Tuple[int, int]] = []
+        tool_calls: list[ExtractedToolCall] = []
+        warnings: list[str] = []
+        positions_to_remove: list[tuple[int, int]] = []
 
         # Try simple pattern first
         for match in PYTHON_CALL_PATTERN.finditer(content):
@@ -270,7 +270,7 @@ class PythonCallExtractor:
             warnings=warnings,
         )
 
-    def _is_likely_tool_name(self, name: str, valid_names: Set[str]) -> bool:
+    def _is_likely_tool_name(self, name: str, valid_names: set[str]) -> bool:
         """Check if a name is likely a tool name.
 
         Args:
@@ -353,7 +353,7 @@ class PythonCallExtractor:
 
         return False
 
-    def _parse_arguments(self, args_str: str) -> Tuple[Dict[str, Any], Optional[str]]:
+    def _parse_arguments(self, args_str: str) -> tuple[dict[str, Any], Optional[str]]:
         """Parse Python-style keyword arguments from a string.
 
         Handles formats like:
@@ -437,7 +437,7 @@ class PythonCallExtractor:
             # Unknown node type - return string representation
             return ast.dump(node)
 
-    def _parse_arguments_regex(self, args_str: str) -> Tuple[Dict[str, Any], Optional[str]]:
+    def _parse_arguments_regex(self, args_str: str) -> tuple[dict[str, Any], Optional[str]]:
         """Parse arguments using regex (fallback method).
 
         Args:
@@ -446,7 +446,7 @@ class PythonCallExtractor:
         Returns:
             Tuple of (parsed_dict, warning_message or None)
         """
-        args_dict: Dict[str, Any] = {}
+        args_dict: dict[str, Any] = {}
         warning = None
 
         # Pattern for key=value pairs
@@ -493,8 +493,8 @@ class PythonCallExtractor:
     def _calculate_confidence(
         self,
         name: str,
-        args: Dict[str, Any],
-        valid_names: Set[str],
+        args: dict[str, Any],
+        valid_names: set[str],
     ) -> float:
         """Calculate confidence score for an extracted tool call.
 
@@ -530,7 +530,7 @@ class PythonCallExtractor:
     def _remove_positions(
         self,
         content: str,
-        positions: List[Tuple[int, int]],
+        positions: list[tuple[int, int]],
     ) -> str:
         """Remove specified positions from content.
 
@@ -568,7 +568,7 @@ def get_extractor() -> PythonCallExtractor:
 
 def extract_tool_calls_from_text(
     content: str,
-    valid_tool_names: Optional[Set[str]] = None,
+    valid_tool_names: Optional[set[str]] = None,
 ) -> ExtractionResult:
     """Convenience function to extract tool calls from text.
 

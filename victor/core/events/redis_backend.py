@@ -68,7 +68,8 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
+from typing import Any, Optional
+from collections.abc import Awaitable, Callable
 
 try:
     import redis.asyncio as aioredis
@@ -82,8 +83,6 @@ from victor.core.events.protocols import (
     DeliveryGuarantee,
     EventHandler,
     EventPublishError,
-    EventSubscriptionError,
-    IEventBackend,
     MessagingEvent,
     SubscriptionHandle,
 )
@@ -99,7 +98,7 @@ class _RedisSubscription:
     pattern: str
     handler: EventHandler
     is_active: bool = True
-    stream_keys: List[str] = field(default_factory=list)
+    stream_keys: list[str] = field(default_factory=list)
 
 
 class _BoundSubscriptionHandle(SubscriptionHandle):
@@ -184,9 +183,9 @@ class RedisEventBackend:
         self._is_connected = False
 
         # Subscription management
-        self._subscriptions: Dict[str, _RedisSubscription] = {}
+        self._subscriptions: dict[str, _RedisSubscription] = {}
         self._consumer_task: Optional[asyncio.Task[None]] = None
-        self._known_streams: Set[str] = set()
+        self._known_streams: set[str] = set()
         self._lock = asyncio.Lock()
 
         # Statistics
@@ -365,7 +364,7 @@ class RedisEventBackend:
             logger.error(f"Failed to publish event {event.id}: {e}")
             raise EventPublishError(event, str(e), retryable=True) from e
 
-    async def publish_batch(self, events: List[MessagingEvent]) -> int:
+    async def publish_batch(self, events: list[MessagingEvent]) -> int:
         """Publish multiple events to Redis Streams.
 
         Args:
@@ -538,7 +537,7 @@ class RedisEventBackend:
                 self._error_count += 1
                 await asyncio.sleep(1.0)  # Back off on error
 
-    def _deserialize_event(self, data: Dict[str, str]) -> MessagingEvent:
+    def _deserialize_event(self, data: dict[str, str]) -> MessagingEvent:
         """Deserialize event from Redis stream message.
 
         Args:
@@ -561,7 +560,7 @@ class RedisEventBackend:
             ),
         )
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get backend statistics.
 
         Returns:

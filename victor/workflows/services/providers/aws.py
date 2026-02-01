@@ -40,12 +40,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.workflows.services.definition import (
-    HealthCheckConfig,
-    HealthCheckType,
     ServiceConfig,
     ServiceHandle,
     ServiceHealthError,
@@ -166,7 +163,7 @@ class AWSServiceProvider(BaseServiceProvider):
         self,
         handle: ServiceHandle,
         command: str,
-    ) -> Tuple[int, str]:
+    ) -> tuple[int, str]:
         """Cannot run commands in AWS managed services."""
         raise NotImplementedError("Cannot run commands in AWS managed services")
 
@@ -252,7 +249,7 @@ class AWSServiceProvider(BaseServiceProvider):
         rds: Any,
         config: ServiceConfig,
         instance_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a new RDS instance."""
         loop = asyncio.get_event_loop()
 
@@ -286,7 +283,7 @@ class AWSServiceProvider(BaseServiceProvider):
             None,
             lambda: rds.describe_db_instances(DBInstanceIdentifier=instance_id),
         )
-        result: Dict[str, Any] = response["DBInstances"][0]
+        result: dict[str, Any] = response["DBInstances"][0]
         return result
 
     async def _wait_for_rds_available(
@@ -413,7 +410,7 @@ class AWSServiceProvider(BaseServiceProvider):
         elasticache: Any,
         config: ServiceConfig,
         cluster_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a new ElastiCache cluster."""
         loop = asyncio.get_event_loop()
 
@@ -441,7 +438,7 @@ class AWSServiceProvider(BaseServiceProvider):
                 ShowCacheNodeInfo=True,
             ),
         )
-        result: Dict[str, Any] = response["CacheClusters"][0]
+        result: dict[str, Any] = response["CacheClusters"][0]
         return result
 
     async def _wait_for_elasticache_available(

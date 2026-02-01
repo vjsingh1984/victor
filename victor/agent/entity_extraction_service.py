@@ -22,13 +22,12 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.providers.base import Message
     from victor.storage.memory.entity_memory import EntityMemory
-    from victor.storage.memory.entity_types import Entity, EntityType
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +89,7 @@ class EntityExtractor:
     async def extract_from_message(
         self,
         message: "Message",
-        conversation_context: Optional[Dict[str, Any]] = None,
+        conversation_context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Extract entities from a message and store them in memory.
 
@@ -116,7 +115,7 @@ class EntityExtractor:
     async def _extract_from_user_message(
         self,
         message: "Message",
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Extract entities from user messages.
 
@@ -134,7 +133,7 @@ class EntityExtractor:
     async def _extract_from_assistant_message(
         self,
         message: "Message",
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Extract entities from assistant messages.
 
@@ -150,7 +149,7 @@ class EntityExtractor:
     async def _extract_code_entities(
         self,
         content: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Extract code-related entities from content.
 
@@ -241,7 +240,7 @@ class EntityExtractor:
     async def _extract_natural_language_entities(
         self,
         content: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Extract natural language entities from content.
 
@@ -338,7 +337,7 @@ class EntityExtractor:
         self,
         query: str,
         limit: int = 10,
-    ) -> List[str]:
+    ) -> list[str]:
         """Query entities relevant to a query.
 
         Args:
@@ -378,7 +377,7 @@ class EntityExtractor:
             return "No entities tracked in this conversation."
 
         # Group by type
-        by_type: Dict[str, List[str]] = {}
+        by_type: dict[str, list[str]] = {}
         for entity in entities_list:
             entity_type = entity.entity_type.value
             if entity_type not in by_type:

@@ -26,8 +26,8 @@ The strategies integrate with Q-learning for adaptive behavior:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Optional
 
 from victor.agent.recovery.protocols import (
     FailureType,
@@ -35,7 +35,6 @@ from victor.agent.recovery.protocols import (
     RecoveryAction,
     RecoveryContext,
     RecoveryResult,
-    RecoveryStrategy,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,7 +82,7 @@ class BaseRecoveryStrategy:
         return self.__class__.__name__
 
     @property
-    def handles_failure_types(self) -> List[FailureType]:
+    def handles_failure_types(self) -> list[FailureType]:
         return []  # Override in subclasses
 
     def can_handle(self, context: RecoveryContext) -> bool:
@@ -203,7 +202,7 @@ class EmptyResponseRecovery(BaseRecoveryStrategy):
         self._max_retries = max_retries
 
     @property
-    def handles_failure_types(self) -> List[FailureType]:
+    def handles_failure_types(self) -> list[FailureType]:
         return [FailureType.EMPTY_RESPONSE]
 
     def _matches_action(self, action: RecoveryAction) -> bool:
@@ -294,7 +293,7 @@ class StuckLoopRecovery(BaseRecoveryStrategy):
         self._loop_threshold = loop_threshold
 
     @property
-    def handles_failure_types(self) -> List[FailureType]:
+    def handles_failure_types(self) -> list[FailureType]:
         return [FailureType.STUCK_LOOP, FailureType.REPEATED_RESPONSE]
 
     def _matches_action(self, action: RecoveryAction) -> bool:
@@ -356,7 +355,7 @@ class HallucinatedToolRecovery(BaseRecoveryStrategy):
         self._max_hallucinations = max_hallucinations
 
     @property
-    def handles_failure_types(self) -> List[FailureType]:
+    def handles_failure_types(self) -> list[FailureType]:
         return [FailureType.HALLUCINATED_TOOL]
 
     def _matches_action(self, action: RecoveryAction) -> bool:
@@ -422,7 +421,7 @@ class TimeoutRecovery(BaseRecoveryStrategy):
         self._warning_threshold = warning_threshold
 
     @property
-    def handles_failure_types(self) -> List[FailureType]:
+    def handles_failure_types(self) -> list[FailureType]:
         return [FailureType.TIMEOUT_APPROACHING]
 
     def _matches_action(self, action: RecoveryAction) -> bool:
@@ -464,7 +463,7 @@ class CompositeRecoveryStrategy(BaseRecoveryStrategy):
 
     def __init__(
         self,
-        strategies: Optional[List[BaseRecoveryStrategy]] = None,
+        strategies: Optional[list[BaseRecoveryStrategy]] = None,
         q_store: Optional[QLearningStore] = None,
     ):
         super().__init__(q_store, base_priority=1.0)
@@ -473,7 +472,7 @@ class CompositeRecoveryStrategy(BaseRecoveryStrategy):
     def _create_default_strategies(
         self,
         q_store: Optional[QLearningStore],
-    ) -> List[BaseRecoveryStrategy]:
+    ) -> list[BaseRecoveryStrategy]:
         """Create default set of recovery strategies."""
         return [
             EmptyResponseRecovery(q_store),
@@ -483,7 +482,7 @@ class CompositeRecoveryStrategy(BaseRecoveryStrategy):
         ]
 
     @property
-    def handles_failure_types(self) -> List[FailureType]:
+    def handles_failure_types(self) -> list[FailureType]:
         """Returns all failure types handled by child strategies."""
         types = set()
         for strategy in self._strategies:
@@ -542,7 +541,7 @@ class CompositeRecoveryStrategy(BaseRecoveryStrategy):
         """Add a new recovery strategy."""
         self._strategies.append(strategy)
 
-    def get_strategy_metrics(self) -> Dict[str, Dict[str, Any]]:
+    def get_strategy_metrics(self) -> dict[str, dict[str, Any]]:
         """Get metrics for all strategies."""
         return {
             s.name: {

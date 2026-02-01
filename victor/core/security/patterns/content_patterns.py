@@ -27,7 +27,7 @@ Performance:
 import logging
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Tuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 if TYPE_CHECKING:
     # Type stubs for native extensions (optional)
@@ -72,7 +72,7 @@ class ContentWarningMatch(NamedTuple):
 
 # Content warning patterns - domain-agnostic
 # Format: (pattern, warning_type, description, level)
-CONTENT_WARNING_PATTERNS: List[Tuple[str, str, str, ContentWarningLevel]] = [
+CONTENT_WARNING_PATTERNS: list[tuple[str, str, str, ContentWarningLevel]] = [
     # High-severity content warnings
     (
         r"(?i)graphic\s+content|explicit\s+violence|gore",
@@ -139,7 +139,7 @@ CONTENT_WARNING_PATTERNS: List[Tuple[str, str, str, ContentWarningLevel]] = [
 ]
 
 # Patterns for detecting misinformation risk
-MISINFORMATION_RISK_PATTERNS: List[Tuple[str, str]] = [
+MISINFORMATION_RISK_PATTERNS: list[tuple[str, str]] = [
     (r"(?i)fake\s+news|fabricat.*source|invent.*citation", "Fabricating sources"),
     (r"(?i)always|never|guaranteed|proven\s+fact", "Absolute claims without evidence"),
     (r"(?i)everyone\s+knows|obviously|clearly", "Unsupported generalizations"),
@@ -149,7 +149,7 @@ MISINFORMATION_RISK_PATTERNS: List[Tuple[str, str]] = [
 ]
 
 # Patterns for detecting advice risk (should not be provided by AI)
-ADVICE_RISK_PATTERNS: Dict[str, str] = {
+ADVICE_RISK_PATTERNS: dict[str, str] = {
     "medical": r"(?i)medical\s+advice|diagnos|prescri|symptom\s+of|cure\s+for",
     "legal": r"(?i)legal\s+advice|sue|lawsuit|attorney|file\s+a\s+claim",
     "financial": r"(?i)financial\s+advice|invest\s+in|buy\s+stock|guaranteed\s+return",
@@ -157,7 +157,7 @@ ADVICE_RISK_PATTERNS: Dict[str, str] = {
 }
 
 
-def scan_content_warnings(content: str) -> List[ContentWarningMatch]:
+def scan_content_warnings(content: str) -> list[ContentWarningMatch]:
     """Scan content for warning patterns.
 
     Args:
@@ -193,12 +193,12 @@ def has_content_warnings(content: str) -> bool:
     return len(scan_content_warnings(content)) > 0
 
 
-def get_high_severity_warnings(content: str) -> List[ContentWarningMatch]:
+def get_high_severity_warnings(content: str) -> list[ContentWarningMatch]:
     """Get only high-severity content warnings."""
     return [m for m in scan_content_warnings(content) if m.level == ContentWarningLevel.HIGH]
 
 
-def detect_misinformation_risk(content: str) -> List[Tuple[str, str]]:
+def detect_misinformation_risk(content: str) -> list[tuple[str, str]]:
     """Detect potential misinformation patterns in content.
 
     Args:
@@ -216,7 +216,7 @@ def detect_misinformation_risk(content: str) -> List[Tuple[str, str]]:
     return risks
 
 
-def detect_advice_risk(content: str) -> Dict[str, bool]:
+def detect_advice_risk(content: str) -> dict[str, bool]:
     """Detect potential advice-giving that AI should avoid.
 
     Args:
@@ -231,7 +231,7 @@ def detect_advice_risk(content: str) -> Dict[str, bool]:
     }
 
 
-def get_content_safety_reminders() -> List[str]:
+def get_content_safety_reminders() -> list[str]:
     """Get safety reminders for content handling."""
     return [
         "Add content warnings for sensitive topics",
@@ -256,7 +256,7 @@ class ContentPatternScanner:
         self._advice_patterns = ADVICE_RISK_PATTERNS
         self._use_native = _NATIVE_AVAILABLE
 
-    def scan(self, content: str) -> List[ContentWarningMatch]:
+    def scan(self, content: str) -> list[ContentWarningMatch]:
         """Scan content for all warning patterns.
 
         Args:
@@ -267,7 +267,7 @@ class ContentPatternScanner:
         """
         return scan_content_warnings(content)
 
-    def get_all_risks(self, content: str) -> Dict[str, Any]:
+    def get_all_risks(self, content: str) -> dict[str, Any]:
         """Get comprehensive risk assessment.
 
         Args:

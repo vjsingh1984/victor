@@ -24,7 +24,6 @@ Tests verify that:
 """
 
 import pytest
-from typing import Dict, Any, List, Optional
 
 
 class TestPersonaRegistryBasics:
@@ -138,7 +137,6 @@ class TestVerticalPersonaRegistration:
 
     def test_research_persona_import_and_register(self):
         """Importing research personas triggers registration."""
-        from victor.research.teams import personas
         from victor.framework.persona_registry import get_persona_registry
 
         registry = get_persona_registry()
@@ -149,7 +147,6 @@ class TestVerticalPersonaRegistration:
 
     def test_devops_persona_import_and_register(self):
         """Importing devops personas triggers registration."""
-        from victor.devops.teams import personas
         from victor.framework.persona_registry import get_persona_registry
 
         registry = get_persona_registry()
@@ -160,7 +157,6 @@ class TestVerticalPersonaRegistration:
 
     def test_dataanalysis_persona_import_and_register(self):
         """Importing dataanalysis personas triggers registration."""
-        from victor.dataanalysis.teams import personas
         from victor.framework.persona_registry import get_persona_registry
 
         registry = get_persona_registry()

@@ -10,7 +10,7 @@ This eliminates duplication while maintaining the framework's user-friendly API.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 # Import core error types (single source of truth)
 from victor.core.errors import (
@@ -37,7 +37,7 @@ class AgentError(Exception):
         message: str,
         *,
         recoverable: bool = True,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
     ) -> None:
         super().__init__(message)
         self.message = message
@@ -72,7 +72,7 @@ class ProviderError(CoreProviderError, AgentError):
         provider: Optional[str] = None,
         status_code: Optional[int] = None,
         recoverable: bool = True,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
         # Initialize core ProviderError with all its expected parameters
@@ -114,9 +114,9 @@ class ToolError(CoreToolError, AgentError):
         message: str,
         *,
         tool_name: Optional[str] = None,
-        arguments: Optional[Dict[str, Any]] = None,
+        arguments: Optional[dict[str, Any]] = None,
         recoverable: bool = True,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
         # Initialize core ToolError
@@ -154,9 +154,9 @@ class ConfigurationError(CoreConfigurationError, AgentError):
         self,
         message: str,
         *,
-        invalid_fields: Optional[List[str]] = None,
+        invalid_fields: Optional[list[str]] = None,
         config_key: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
         # Initialize core ConfigurationError

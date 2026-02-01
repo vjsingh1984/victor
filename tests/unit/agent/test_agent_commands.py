@@ -15,7 +15,6 @@
 """Tests for Agent Commands CQRS integration."""
 
 import pytest
-from datetime import datetime, timezone
 
 from victor.core.agent_commands import (
     # Commands
@@ -23,10 +22,6 @@ from victor.core.agent_commands import (
     ExecuteToolCommand,
     StartSessionCommand,
     EndSessionCommand,
-    SwitchProviderCommand,
-    CancelOperationCommand,
-    UpdateConfigCommand,
-    # Queries
     GetSessionQuery,
     GetConversationHistoryQuery,
     GetSessionMetricsQuery,
@@ -35,10 +30,7 @@ from victor.core.agent_commands import (
     ChatMessageSentEvent,
     ChatResponseReceivedEvent,
     ToolExecutedEvent,
-    ProviderSwitchedEvent,
     SessionEndedEvent,
-    ErrorOccurredEvent,
-    # Projection
     SessionProjection,
     # Handlers
     StartSessionHandler,
@@ -47,9 +39,6 @@ from victor.core.agent_commands import (
     EndSessionHandler,
     GetSessionHandler,
     GetConversationHistoryHandler,
-    GetSessionMetricsHandler,
-    # Bus
-    AgentCommandBus,
     create_agent_command_bus,
 )
 from victor.core.event_sourcing import InMemoryEventStore, EventDispatcher

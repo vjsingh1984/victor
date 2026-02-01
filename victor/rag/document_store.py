@@ -45,7 +45,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ class Document:
     content: str
     source: str
     doc_type: str = "text"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
 
     @property
@@ -104,11 +104,11 @@ class DocumentChunk:
     id: str
     doc_id: str
     content: str
-    embedding: List[float]
+    embedding: list[float]
     chunk_index: int = 0
     start_char: int = 0
     end_char: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -127,7 +127,7 @@ class DocumentSearchResult:
 
     chunk: DocumentChunk
     score: float
-    highlights: List[str] = field(default_factory=list)
+    highlights: list[str] = field(default_factory=list)
     doc_source: str = ""
 
     @property
@@ -136,7 +136,7 @@ class DocumentSearchResult:
         return self.chunk.content
 
     @property
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> dict[str, Any]:
         """Convenience property for chunk metadata."""
         return self.chunk.metadata
 
@@ -213,7 +213,7 @@ class DocumentStore:
         self._initialized = False
 
         # Document index for fast lookup
-        self._doc_index: Dict[str, Document] = {}
+        self._doc_index: dict[str, Document] = {}
 
         # Statistics
         self._stats = {
@@ -306,7 +306,7 @@ class DocumentStore:
                 return
 
             # Group by doc_id to reconstruct documents
-            seen_docs: Dict[str, Dict[str, Any]] = {}
+            seen_docs: dict[str, dict[str, Any]] = {}
             for _, row in all_data.iterrows():
                 doc_id = row["doc_id"]
                 if doc_id not in seen_docs:
@@ -340,7 +340,7 @@ class DocumentStore:
         except Exception as e:
             logger.warning(f"Failed to rebuild document index: {e}")
 
-    async def add_document(self, doc: Document) -> List[DocumentChunk]:
+    async def add_document(self, doc: Document) -> list[DocumentChunk]:
         """Add a document to the store.
 
         Chunks the document and stores embeddings.
@@ -368,7 +368,7 @@ class DocumentStore:
 
         return chunks
 
-    async def add_chunks(self, chunks: List[DocumentChunk]) -> int:
+    async def add_chunks(self, chunks: list[DocumentChunk]) -> int:
         """Add chunks to the store.
 
         Args:
@@ -386,7 +386,7 @@ class DocumentStore:
             # In-memory fallback
             for chunk in chunks:
                 if not hasattr(self, "_memory_chunks"):
-                    self._memory_chunks: List[DocumentChunk] = []
+                    self._memory_chunks: list[DocumentChunk] = []
                 self._memory_chunks.append(chunk)
             self._stats["total_chunks"] += len(chunks)
             return len(chunks)
@@ -430,10 +430,10 @@ class DocumentStore:
         self,
         query: str,
         k: int = 10,
-        filter_doc_ids: Optional[List[str]] = None,
-        filter_metadata: Optional[Dict[str, Any]] = None,
+        filter_doc_ids: Optional[list[str]] = None,
+        filter_metadata: Optional[dict[str, Any]] = None,
         use_hybrid: Optional[bool] = None,
-    ) -> List[DocumentSearchResult]:
+    ) -> list[DocumentSearchResult]:
         """Search for relevant chunks.
 
         Args:
@@ -489,22 +489,22 @@ class DocumentStore:
 
         if use_hybrid:
             # Hybrid search: combine vector + FTS
-            def do_hybrid_search() -> List[Any]:
+            def do_hybrid_search() -> list[Any]:
                 assert self._table is not None
                 search_query = self._table.search(query_embedding).limit(fetch_limit)
                 if where_clause:
                     search_query = search_query.where(where_clause)
-                return cast(List[Any], search_query.to_list())
+                return cast(list[Any], search_query.to_list())
 
             results = await asyncio.to_thread(do_hybrid_search)
         else:
             # Vector-only search
-            def do_vector_search() -> List[Any]:
+            def do_vector_search() -> list[Any]:
                 assert self._table is not None
                 search_query = self._table.search(query_embedding).limit(fetch_limit)
                 if where_clause:
                     search_query = search_query.where(where_clause)
-                return cast(List[Any], search_query.to_list())
+                return cast(list[Any], search_query.to_list())
 
             results = await asyncio.to_thread(do_vector_search)
 
@@ -568,18 +568,18 @@ class DocumentStore:
 
     async def _search_memory(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         k: int,
-        filter_doc_ids: Optional[List[str]] = None,
-        filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[DocumentSearchResult]:
+        filter_doc_ids: Optional[list[str]] = None,
+        filter_metadata: Optional[dict[str, Any]] = None,
+    ) -> list[DocumentSearchResult]:
         """In-memory search fallback when LanceDB is not available."""
         if not hasattr(self, "_memory_chunks"):
             return []
 
         import math
 
-        def cosine_similarity(a: List[float], b: List[float]) -> float:
+        def cosine_similarity(a: list[float], b: list[float]) -> float:
             if not a or not b:
                 return 0.0
             dot = sum(x * y for x, y in zip(a, b))
@@ -589,7 +589,7 @@ class DocumentStore:
                 return 0.0
             return dot / (norm_a * norm_b)
 
-        def matches_metadata(chunk_metadata: Dict[str, Any]) -> bool:
+        def matches_metadata(chunk_metadata: dict[str, Any]) -> bool:
             """Check if chunk metadata matches the filter."""
             if not filter_metadata:
                 return True
@@ -627,9 +627,9 @@ class DocumentStore:
     async def _rerank(
         self,
         query: str,
-        results: List[DocumentSearchResult],
+        results: list[DocumentSearchResult],
         k: int,
-    ) -> List[DocumentSearchResult]:
+    ) -> list[DocumentSearchResult]:
         """Rerank results using cross-encoder or simple scoring.
 
         This is a simple lexical reranking. For production, use a cross-encoder.
@@ -645,14 +645,14 @@ class DocumentStore:
         results.sort(key=lambda x: x.score, reverse=True)
         return results[:k]
 
-    async def _get_embedding(self, text: str) -> List[float]:
+    async def _get_embedding(self, text: str) -> list[float]:
         """Get embedding for text.
 
         Uses the embedding service if provided, otherwise uses a fallback.
         """
         if self._embedding_service:
             result = await self._embedding_service.embed(text)
-            return cast(List[float], result)
+            return cast(list[float], result)
 
         # Try to use sentence-transformers with core BGE model
         try:
@@ -664,14 +664,14 @@ class DocumentStore:
                 # Use the same BGE model as core embedding service
                 self._model = SentenceTransformer(DEFAULT_EMBEDDING_MODEL)
             embedding = self._model.encode(text, convert_to_numpy=True)
-            return cast(List[float], embedding.tolist())
+            return cast(list[float], embedding.tolist())
         except ImportError:
             # Simple hash-based fallback for testing
             import hashlib
 
             h = hashlib.sha256(text.encode()).digest()
             # Convert to list of floats
-            embedding_fallback: List[float] = [b / 255.0 for b in h[: self.config.embedding_dim]]
+            embedding_fallback: list[float] = [b / 255.0 for b in h[: self.config.embedding_dim]]
             return embedding_fallback
 
     async def delete_document(self, doc_id: str) -> int:
@@ -704,7 +704,7 @@ class DocumentStore:
 
         return 1  # LanceDB doesn't return count
 
-    async def list_documents(self) -> List[Document]:
+    async def list_documents(self) -> list[Document]:
         """List all documents in the store.
 
         Returns:
@@ -725,7 +725,7 @@ class DocumentStore:
         await self.initialize()
         return self._doc_index.get(doc_id)
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get store statistics.
 
         Returns:

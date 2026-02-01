@@ -43,7 +43,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -132,15 +132,15 @@ class PlanStep:
     id: str
     description: str
     step_type: StepType = StepType.IMPLEMENTATION
-    depends_on: List[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)
     estimated_tool_calls: int = 10
     requires_approval: bool = False
     sub_agent_role: Optional[str] = None  # "researcher", "executor", etc.
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     status: StepStatus = StepStatus.PENDING
     result: Optional["StepResult"] = None
 
-    def is_ready(self, completed_steps: Set[str]) -> bool:
+    def is_ready(self, completed_steps: set[str]) -> bool:
         """Check if this step is ready to execute.
 
         A step is ready when:
@@ -158,7 +158,7 @@ class PlanStep:
             return False
         return all(dep in completed_steps for dep in self.depends_on)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -174,7 +174,7 @@ class PlanStep:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PlanStep":
+    def from_dict(cls, data: dict[str, Any]) -> "PlanStep":
         """Create from dictionary."""
         result_data = data.get("result")
         result = StepResult.from_dict(result_data) if result_data else None
@@ -213,9 +213,9 @@ class StepResult:
     error: Optional[str] = None
     tool_calls_used: int = 0
     duration_seconds: float = 0.0
-    artifacts: List[str] = field(default_factory=list)
+    artifacts: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "success": self.success,
@@ -227,7 +227,7 @@ class StepResult:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "StepResult":
+    def from_dict(cls, data: dict[str, Any]) -> "StepResult":
         """Create from dictionary."""
         return cls(
             success=data["success"],
@@ -258,10 +258,10 @@ class ExecutionPlan:
 
     id: str
     goal: str
-    steps: List[PlanStep] = field(default_factory=list)
+    steps: list[PlanStep] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     approved: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def get_step(self, step_id: str) -> Optional[PlanStep]:
         """Get a step by ID."""
@@ -270,7 +270,7 @@ class ExecutionPlan:
                 return step
         return None
 
-    def get_ready_steps(self) -> List[PlanStep]:
+    def get_ready_steps(self) -> list[PlanStep]:
         """Get all steps that are ready to execute.
 
         Returns:
@@ -279,11 +279,11 @@ class ExecutionPlan:
         completed = {s.id for s in self.steps if s.status == StepStatus.COMPLETED}
         return [s for s in self.steps if s.is_ready(completed)]
 
-    def get_completed_steps(self) -> List[PlanStep]:
+    def get_completed_steps(self) -> list[PlanStep]:
         """Get all completed steps."""
         return [s for s in self.steps if s.status == StepStatus.COMPLETED]
 
-    def get_failed_steps(self) -> List[PlanStep]:
+    def get_failed_steps(self) -> list[PlanStep]:
         """Get all failed steps."""
         return [s for s in self.steps if s.status == StepStatus.FAILED]
 
@@ -352,7 +352,7 @@ class ExecutionPlan:
 
         return "\n".join(lines)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -364,7 +364,7 @@ class ExecutionPlan:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ExecutionPlan":
+    def from_dict(cls, data: dict[str, Any]) -> "ExecutionPlan":
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -400,9 +400,9 @@ class PlanResult:
     total_tool_calls: int = 0
     total_duration: float = 0.0
     final_output: str = ""
-    step_results: Dict[str, StepResult] = field(default_factory=dict)
+    step_results: dict[str, StepResult] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "plan_id": self.plan_id,

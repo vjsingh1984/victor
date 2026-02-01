@@ -30,7 +30,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Optional, Awaitable
+from typing import Any, Optional
+from collections.abc import Callable, Awaitable
 
 from victor.evaluation.protocol import (
     BenchmarkTask,

@@ -39,7 +39,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Type, cast
+from typing import Any, Optional, cast
 
 import yaml
 
@@ -63,7 +63,7 @@ class LinterResult:
         duration_seconds: Time taken to lint
     """
 
-    issues: List[ValidationIssue] = field(default_factory=list)
+    issues: list[ValidationIssue] = field(default_factory=list)
     files_checked: int = 0
     workflow_count: int = 0
     duration_seconds: float = 0.0
@@ -103,15 +103,15 @@ class LinterResult:
         """Whether the workflow is valid (no errors)."""
         return not self.has_errors
 
-    def get_issues_by_severity(self, severity: Severity) -> List[ValidationIssue]:
+    def get_issues_by_severity(self, severity: Severity) -> list[ValidationIssue]:
         """Get issues filtered by severity."""
         return [i for i in self.issues if i.severity == severity]
 
-    def get_issues_by_category(self, category: RuleCategory) -> List[ValidationIssue]:
+    def get_issues_by_category(self, category: RuleCategory) -> list[ValidationIssue]:
         """Get issues filtered by category."""
         return [i for i in self.issues if i.category == category]
 
-    def get_issues_by_location(self, location: str) -> List[ValidationIssue]:
+    def get_issues_by_location(self, location: str) -> list[ValidationIssue]:
         """Get issues filtered by location."""
         return [i for i in self.issues if i.location == location]
 
@@ -296,14 +296,14 @@ class WorkflowLinter:
         linter.set_rule_severity("tool_budget", Severity.INFO)
     """
 
-    def __init__(self, rules: Optional[List[ValidationRule]] = None):
+    def __init__(self, rules: Optional[list[ValidationRule]] = None):
         """Initialize the linter.
 
         Args:
             rules: List of validation rules (uses DEFAULT_RULES if not provided)
         """
-        self.rules: List[ValidationRule] = rules or list(DEFAULT_RULES)
-        self._rule_map: Dict[str, ValidationRule] = {rule.rule_id: rule for rule in self.rules}
+        self.rules: list[ValidationRule] = rules or list(DEFAULT_RULES)
+        self._rule_map: dict[str, ValidationRule] = {rule.rule_id: rule for rule in self.rules}
 
     def add_rule(self, rule: ValidationRule) -> None:
         """Add a validation rule.
@@ -438,7 +438,7 @@ class WorkflowLinter:
             duration_seconds=duration,
         )
 
-    def lint_dict(self, workflow: Dict[str, Any]) -> LinterResult:
+    def lint_dict(self, workflow: dict[str, Any]) -> LinterResult:
         """Lint a workflow dictionary.
 
         Args:
@@ -462,7 +462,7 @@ class WorkflowLinter:
             duration_seconds=duration,
         )
 
-    def _load_workflow(self, file_path: str | Path) -> Dict[str, Any]:
+    def _load_workflow(self, file_path: str | Path) -> dict[str, Any]:
         """Load workflow from YAML file.
 
         Args:
@@ -485,11 +485,11 @@ class WorkflowLinter:
         try:
             with open(path, "r") as f:
                 data = yaml.safe_load(f)
-                return cast(Dict[str, Any], data)
+                return cast(dict[str, Any], data)
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML: {e}")
 
-    def _validate_workflow(self, workflow: Dict[str, Any]) -> List[ValidationIssue]:
+    def _validate_workflow(self, workflow: dict[str, Any]) -> list[ValidationIssue]:
         """Validate workflow against all enabled rules.
 
         Args:
@@ -533,7 +533,7 @@ class WorkflowLinter:
 
         return all_issues
 
-    def get_rules(self) -> List[ValidationRule]:
+    def get_rules(self) -> list[ValidationRule]:
         """Get list of all rules.
 
         Returns:
@@ -541,7 +541,7 @@ class WorkflowLinter:
         """
         return list(self.rules)
 
-    def get_enabled_rules(self) -> List[ValidationRule]:
+    def get_enabled_rules(self) -> list[ValidationRule]:
         """Get list of enabled rules.
 
         Returns:
@@ -580,7 +580,7 @@ def lint_file(file_path: str | Path) -> LinterResult:
     return linter.lint_file(file_path)
 
 
-def lint_dict(workflow: Dict[str, Any]) -> LinterResult:
+def lint_dict(workflow: dict[str, Any]) -> LinterResult:
     """Lint a workflow dictionary with default rules.
 
     Args:

@@ -18,7 +18,7 @@ import os
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch, mock_open
 
 import pytest
 
@@ -50,7 +50,6 @@ from victor.workflows.services.credentials import (
     APIKeyCredentials,
     # Backends
     EnvironmentBackend,
-    KeyringBackend,
     FileBackend,
     # Manager
     CredentialManager,

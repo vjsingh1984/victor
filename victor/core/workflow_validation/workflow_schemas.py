@@ -23,7 +23,7 @@ Example:
 """
 
 from pydantic import BaseModel, Field, field_validator
-from typing import Dict, List, Optional, Any, Literal
+from typing import Optional, Any, Literal
 from enum import Enum
 
 
@@ -81,7 +81,7 @@ class WorkflowNodeSchema(BaseModel):
     )
 
     # Common fields
-    next_nodes: List[str] = Field(default_factory=list, description="Successor node IDs")
+    next_nodes: list[str] = Field(default_factory=list, description="Successor node IDs")
     timeout: Optional[int] = Field(
         None, ge=0, le=3600, description="Node timeout in seconds (max 1 hour)"
     )
@@ -98,7 +98,7 @@ class WorkflowNodeSchema(BaseModel):
     tool_budget: Optional[int] = Field(
         None, ge=0, le=500, description="Tool call budget for this node"
     )
-    tools: Optional[List[str]] = Field(
+    tools: Optional[list[str]] = Field(
         None, description="Specific tools to use (overrides default tool selection)"
     )
 
@@ -107,12 +107,12 @@ class WorkflowNodeSchema(BaseModel):
 
     # Condition node fields
     condition: Optional[str] = Field(None, description="Condition function name for branching")
-    branches: Optional[Dict[str, str]] = Field(
+    branches: Optional[dict[str, str]] = Field(
         None, description="Branch mappings (condition_value -> node_id)"
     )
 
     # Parallel node fields
-    parallel_nodes: Optional[List[str]] = Field(
+    parallel_nodes: Optional[list[str]] = Field(
         None, description="List of parallel node IDs to execute"
     )
     join_strategy: Optional[Literal["all", "any", "merge"]] = Field(
@@ -123,13 +123,13 @@ class WorkflowNodeSchema(BaseModel):
     transform: Optional[str] = Field(None, description="Transform function name")
 
     # Team node fields
-    members: Optional[List[str]] = Field(None, description="Team member roles")
+    members: Optional[list[str]] = Field(None, description="Team member roles")
     team_formation: Optional[
         Literal["sequential", "parallel", "hierarchical", "pipeline", "consensus"]
     ] = Field(None, description="Team coordination pattern")
 
     # Metadata
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional node metadata")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional node metadata")
 
     @field_validator("id")
     @classmethod
@@ -159,7 +159,7 @@ class WorkflowNodeSchema(BaseModel):
 
     @field_validator("branches")
     @classmethod
-    def validate_branches(cls, v: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
+    def validate_branches(cls, v: Optional[dict[str, str]]) -> Optional[dict[str, str]]:
         """Validate branch target format.
 
         Branch target node IDs must follow the same format as node IDs.
@@ -252,10 +252,10 @@ class WorkflowDefinitionSchema(BaseModel):
     entry_point: str = Field(
         ..., min_length=1, description="Entry point node ID (must exist in nodes)"
     )
-    nodes: List[WorkflowNodeSchema] = Field(
+    nodes: list[WorkflowNodeSchema] = Field(
         ..., min_length=1, description="Workflow nodes (must have at least one)"
     )
-    edges: List[WorkflowEdgeSchema] = Field(
+    edges: list[WorkflowEdgeSchema] = Field(
         default_factory=list, description="Workflow edges defining execution flow"
     )
 
@@ -266,13 +266,13 @@ class WorkflowDefinitionSchema(BaseModel):
     max_timeout_seconds: Optional[float] = Field(
         None, ge=0, description="Total workflow timeout in seconds"
     )
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional workflow metadata"
     )
 
     @field_validator("nodes")
     @classmethod
-    def validate_node_ids_unique(cls, v: List[WorkflowNodeSchema]) -> List[WorkflowNodeSchema]:
+    def validate_node_ids_unique(cls, v: list[WorkflowNodeSchema]) -> list[WorkflowNodeSchema]:
         """Ensure all node IDs are unique.
 
         Duplicate node IDs would cause ambiguity in execution and
@@ -345,7 +345,7 @@ class WorkflowDefinitionSchema(BaseModel):
         """
         return {node.id for node in self.nodes}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert workflow to dictionary representation.
 
         Returns:
@@ -417,7 +417,7 @@ def create_simple_agent_workflow(
     )
 
 
-def validate_workflow_dict(data: Dict[str, Any]) -> WorkflowDefinitionSchema:
+def validate_workflow_dict(data: dict[str, Any]) -> WorkflowDefinitionSchema:
     """Validate a workflow from dictionary data.
 
     Convenience function that creates a WorkflowDefinitionSchema

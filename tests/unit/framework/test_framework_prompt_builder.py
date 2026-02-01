@@ -19,7 +19,6 @@ consolidates duplicate prompt construction logic.
 """
 
 import pytest
-from typing import Dict
 from unittest.mock import MagicMock
 
 from victor.framework.prompt_builder import (
@@ -35,7 +34,6 @@ from victor.framework.prompt_sections_legacy import (
     GROUNDING_RULES_MINIMAL,
     GROUNDING_RULES_EXTENDED,
     CODING_IDENTITY,
-    CODING_GUIDELINES,
     DEVOPS_IDENTITY,
     RESEARCH_IDENTITY,
     DATA_ANALYSIS_IDENTITY,

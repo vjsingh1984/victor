@@ -31,7 +31,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Union
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.agent.specs.models import AgentSpec
 
@@ -85,14 +86,14 @@ class EnsembleResult:
 
     ensemble_type: EnsembleType
     status: ExecutionStatus
-    agent_results: List[AgentResult] = field(default_factory=list)
+    agent_results: list[AgentResult] = field(default_factory=list)
     final_output: Any = None
     total_tokens: int = 0
     total_cost_usd: float = 0.0
     total_duration_ms: float = 0.0
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def success(self) -> bool:
@@ -119,7 +120,7 @@ class Ensemble(ABC):
 
     def __init__(
         self,
-        agents: List[AgentSpec],
+        agents: list[AgentSpec],
         name: Optional[str] = None,
         description: Optional[str] = None,
     ):
@@ -144,7 +145,7 @@ class Ensemble(ABC):
     async def execute(
         self,
         task: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         orchestrator: Optional[Any] = None,
     ) -> EnsembleResult:
         """Execute the ensemble on a task.
@@ -159,7 +160,7 @@ class Ensemble(ABC):
         """
         ...
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize ensemble to dictionary."""
         return {
             "type": self.ensemble_type.value,
@@ -182,7 +183,7 @@ class Pipeline(Ensemble):
 
     def __init__(
         self,
-        agents: List[AgentSpec],
+        agents: list[AgentSpec],
         name: Optional[str] = None,
         continue_on_error: bool = False,
     ):
@@ -203,7 +204,7 @@ class Pipeline(Ensemble):
     async def execute(
         self,
         task: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         orchestrator: Optional[Any] = None,
     ) -> EnsembleResult:
         """Execute pipeline sequentially."""
@@ -245,7 +246,7 @@ class Pipeline(Ensemble):
         self,
         agent: AgentSpec,
         task: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         orchestrator: Optional[Any],
     ) -> AgentResult:
         """Execute a single agent."""
@@ -282,7 +283,7 @@ class Pipeline(Ensemble):
         self,
         agent: AgentSpec,
         task: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         orchestrator: Any,
     ) -> Any:
         """Run agent using the orchestrator."""
@@ -297,7 +298,7 @@ class Pipeline(Ensemble):
 
         _prompt = "\n\n".join(
             prompt_parts
-        )  # noqa: F841 - Built for future orchestrator integration
+        )
 
         # NOTE: Ensemble requires orchestrator integration for parallel agent execution
         # Deferred: Ensemble feature pending multi-agent coordination refactor
@@ -321,10 +322,10 @@ class Parallel(Ensemble):
 
     def __init__(
         self,
-        agents: List[AgentSpec],
+        agents: list[AgentSpec],
         name: Optional[str] = None,
         require_all: bool = True,
-        aggregator: Optional[Callable[[List[AgentResult]], Any]] = None,
+        aggregator: Optional[Callable[[list[AgentResult]], Any]] = None,
     ):
         """Initialize parallel ensemble.
 
@@ -345,7 +346,7 @@ class Parallel(Ensemble):
     async def execute(
         self,
         task: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         orchestrator: Optional[Any] = None,
     ) -> EnsembleResult:
         """Execute all agents in parallel."""
@@ -400,7 +401,7 @@ class Parallel(Ensemble):
         self,
         agent: AgentSpec,
         task: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         orchestrator: Optional[Any],
     ) -> AgentResult:
         """Execute a single agent."""
@@ -427,7 +428,7 @@ class Parallel(Ensemble):
                 completed_at=datetime.now(timezone.utc),
             )
 
-    def _default_aggregator(self, results: List[AgentResult]) -> Dict[str, Any]:
+    def _default_aggregator(self, results: list[AgentResult]) -> dict[str, Any]:
         """Default result aggregation."""
         return {r.agent_name: r.output for r in results if r.success}
 
@@ -447,7 +448,7 @@ class Hierarchical(Ensemble):
     def __init__(
         self,
         manager: AgentSpec,
-        workers: List[AgentSpec],
+        workers: list[AgentSpec],
         name: Optional[str] = None,
         max_delegations: int = 10,
     ):
@@ -471,7 +472,7 @@ class Hierarchical(Ensemble):
     async def execute(
         self,
         task: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         orchestrator: Optional[Any] = None,
     ) -> EnsembleResult:
         """Execute with hierarchical delegation."""
@@ -511,7 +512,7 @@ class Hierarchical(Ensemble):
     async def _run_manager(
         self,
         task: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         orchestrator: Optional[Any],
     ) -> AgentResult:
         """Run the manager agent."""
@@ -528,7 +529,7 @@ class Hierarchical(Ensemble):
 
 
 def create_pipeline(
-    agents: List[Union[AgentSpec, str]],
+    agents: list[AgentSpec | str],
     name: Optional[str] = None,
 ) -> Pipeline:
     """Factory to create a pipeline.
@@ -553,7 +554,7 @@ def create_pipeline(
 
 
 def create_parallel(
-    agents: List[Union[AgentSpec, str]],
+    agents: list[AgentSpec | str],
     name: Optional[str] = None,
 ) -> Parallel:
     """Factory to create a parallel ensemble.

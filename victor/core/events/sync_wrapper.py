@@ -37,10 +37,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, TYPE_CHECKING, Awaitable, Callable, cast
+from typing import Any, TYPE_CHECKING, cast
+from collections.abc import Awaitable, Callable
 
 from victor.core.events.protocols import (
-    EventHandler,
     MessagingEvent,
     IEventBackend,
     SubscriptionHandle,

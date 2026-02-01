@@ -18,7 +18,6 @@ These tests verify the base persona template functions and the template
 registry system.
 """
 
-import pytest
 
 from victor.framework.multi_agent.persona_templates import (
     PERSONA_TEMPLATES,

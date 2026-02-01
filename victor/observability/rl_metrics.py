@@ -48,7 +48,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.rl.coordinator import RLCoordinator
@@ -79,7 +79,7 @@ class LearnerMetrics:
     q_value_std: float = 0.0
     last_update_age_seconds: float = 0.0
     contexts_learned: int = 0
-    custom_metrics: Dict[str, float] = field(default_factory=dict)
+    custom_metrics: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -101,7 +101,7 @@ class SystemMetrics:
     avg_reward: float = 0.0
     policy_drift_score: float = 0.0
     staleness_score: float = 0.0
-    curriculum_distribution: Dict[str, int] = field(default_factory=dict)
+    curriculum_distribution: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -116,9 +116,9 @@ class AlertMetrics:
     """
 
     degradation_detected: bool = False
-    degradation_learners: List[str] = field(default_factory=list)
+    degradation_learners: list[str] = field(default_factory=list)
     anomaly_score: float = 0.0
-    stale_learners: List[str] = field(default_factory=list)
+    stale_learners: list[str] = field(default_factory=list)
 
 
 class RLMetricsCollector:
@@ -152,8 +152,8 @@ class RLMetricsCollector:
         self._feedback_integration: Optional[Any] = None
 
         # Historical data for trend analysis
-        self._reward_history: List[float] = []
-        self._success_history: Dict[str, List[bool]] = {}
+        self._reward_history: list[float] = []
+        self._success_history: dict[str, list[bool]] = {}
 
         # Last collection time
         self._last_collection: float = 0.0
@@ -353,7 +353,7 @@ class RLMetricsCollector:
 
         return alerts
 
-    def collect_all(self) -> Dict[str, Any]:
+    def collect_all(self) -> dict[str, Any]:
         """Collect all metrics.
 
         Returns:
@@ -509,7 +509,7 @@ class RLMetricsCollector:
         """
         return json.dumps(self.collect_all(), indent=2)
 
-    def export_dict(self) -> Dict[str, Any]:
+    def export_dict(self) -> dict[str, Any]:
         """Export metrics as dictionary.
 
         Returns:

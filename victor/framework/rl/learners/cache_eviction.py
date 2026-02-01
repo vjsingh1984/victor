@@ -28,7 +28,7 @@ Sprint 3: Cache & Grounding Learners
 import logging
 import math
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -103,13 +103,13 @@ class CacheEvictionLearner(BaseLearner):
         self.epsilon = epsilon
 
         # In-memory caches for fast access
-        self._q_values: Dict[str, Dict[str, float]] = {}  # state_key -> {action -> Q-value}
-        self._visit_counts: Dict[str, Dict[str, int]] = {}  # state_key -> {action -> count}
-        self._tool_value_estimates: Dict[str, float] = {}  # tool_name -> estimated value
+        self._q_values: dict[str, dict[str, float]] = {}  # state_key -> {action -> Q-value}
+        self._visit_counts: dict[str, dict[str, int]] = {}  # state_key -> {action -> count}
+        self._tool_value_estimates: dict[str, float] = {}  # tool_name -> estimated value
         self._total_decisions: int = 0
 
         # Hit rate tracking per tool type
-        self._tool_hit_rates: Dict[str, Tuple[int, int]] = {}  # tool_name -> (hits, misses)
+        self._tool_hit_rates: dict[str, tuple[int, int]] = {}  # tool_name -> (hits, misses)
 
         # Load state from database
         self._load_state()
@@ -416,7 +416,7 @@ class CacheEvictionLearner(BaseLearner):
         age_seconds: float,
         hit_count: int,
         tool_name: str,
-    ) -> Tuple[str, float]:
+    ) -> tuple[str, float]:
         """Get eviction decision for a cache entry.
 
         Convenience method that builds state key and returns decision.
@@ -456,7 +456,7 @@ class CacheEvictionLearner(BaseLearner):
         """Get Q-value for a state-action pair."""
         return self._q_values.get(state_key, {}).get(action, self.DEFAULT_Q_VALUE)
 
-    def _get_all_actions(self, state_key: str) -> Dict[str, float]:
+    def _get_all_actions(self, state_key: str) -> dict[str, float]:
         """Get all Q-values for a state."""
         return self._q_values.get(state_key, {})
 
@@ -553,7 +553,7 @@ class CacheEvictionLearner(BaseLearner):
         else:
             return "other"
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export learner metrics for monitoring.
 
         Returns:

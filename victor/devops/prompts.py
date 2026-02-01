@@ -1,6 +1,6 @@
 """DevOps Prompt Contributor - Task hints and system prompt extensions for infrastructure."""
 
-from typing import Dict, Optional
+from typing import Optional
 
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
 from victor.core.vertical_types import StandardTaskHints
@@ -9,7 +9,7 @@ from victor.core.vertical_types import StandardTaskHints
 # DevOps-specific task type hints
 # Keys align with TaskTypeClassifier task types (infrastructure, ci_cd)
 # Also includes granular hints for specific technologies
-DEVOPS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
+DEVOPS_TASK_TYPE_HINTS: dict[str, TaskTypeHint] = {
     # Classifier task types (matched by TaskTypeClassifier)
     "infrastructure": TaskTypeHint(
         task_type="infrastructure",
@@ -111,7 +111,7 @@ DEVOPS_TASK_TYPE_HINTS = StandardTaskHints.merge_with(DEVOPS_TASK_TYPE_HINTS)
 class DevOpsPromptContributor(PromptContributorProtocol):
     """Contributes DevOps-specific prompts and task hints."""
 
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
         """Return DevOps-specific task type hints.
 
         Returns:

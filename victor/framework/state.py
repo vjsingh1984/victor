@@ -25,7 +25,8 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set, Union
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 # Import canonical ConversationStage from victor.core.state (single source of truth)
 # Moved from victor.agent.conversation_state to enforce layer boundaries
@@ -84,13 +85,13 @@ class StateHooks:
         )
     """
 
-    on_enter: Optional[Callable[[str, Dict[str, Any]], None]] = None
+    on_enter: Optional[Callable[[str, dict[str, Any]], None]] = None
     """Called when entering a stage. Args: (stage_name, context)"""
 
-    on_exit: Optional[Callable[[str, Dict[str, Any]], None]] = None
+    on_exit: Optional[Callable[[str, dict[str, Any]], None]] = None
     """Called when exiting a stage. Args: (stage_name, context)"""
 
-    on_transition: Optional[Callable[[str, str, Dict[str, Any]], None]] = None
+    on_transition: Optional[Callable[[str, str, dict[str, Any]], None]] = None
     """Called on any transition. Args: (old_stage, new_stage, context)"""
 
 
@@ -150,7 +151,7 @@ class State:
         print(f"Files touched: {state.files_observed | state.files_modified}")
     """
 
-    def __init__(self, orchestrator: Union["OrchestratorProtocol", Any]) -> None:
+    def __init__(self, orchestrator: "OrchestratorProtocol" | Any) -> None:
         """Initialize State wrapper.
 
         Args:
@@ -216,7 +217,7 @@ class State:
         return max(0, self.tool_budget - self.tool_calls_used)
 
     @property
-    def files_observed(self) -> Set[str]:
+    def files_observed(self) -> set[str]:
         """Get files that have been read.
 
         Uses protocol method get_observed_files() when available.
@@ -230,7 +231,7 @@ class State:
         return set()
 
     @property
-    def files_modified(self) -> Set[str]:
+    def files_modified(self) -> set[str]:
         """Get files that have been modified.
 
         Uses protocol method get_modified_files() when available.
@@ -337,7 +338,7 @@ class State:
         if _has_protocol_method(self._orchestrator, "reset"):
             self._orchestrator.reset()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
 
         Returns:
@@ -371,7 +372,7 @@ class State:
 
     def subscribe_to_state_changes(
         self,
-        callback: Callable[[str, str, Dict[str, Any]], None],
+        callback: Callable[[str, str, dict[str, Any]], None],
     ) -> Optional[Callable[[], None]]:
         """Subscribe to state machine transitions via ObservabilityBus.
 
@@ -419,7 +420,7 @@ class State:
         return unsubscribe
 
     @property
-    def transition_history(self) -> list[Dict[str, Any]]:
+    def transition_history(self) -> list[dict[str, Any]]:
         """Get state transition history.
 
         Returns:

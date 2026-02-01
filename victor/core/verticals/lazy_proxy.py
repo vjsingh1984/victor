@@ -60,18 +60,15 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
     Generic,
     Optional,
-    Type,
     TypeVar,
 )
+from collections.abc import Callable
 
 # Import VerticalBase at runtime (needed for inheritance)
 from victor.core.verticals.base import VerticalBase
@@ -145,7 +142,7 @@ class LazyProxy(VerticalBase, Generic[T]):  # type: ignore[misc]
     def __init__(
         self,
         vertical_name: str,
-        loader: Callable[[], Type[T]],
+        loader: Callable[[], type[T]],
         proxy_type: LazyProxyType = LazyProxyType.LAZY,
     ) -> None:
         """Initialize the lazy proxy.
@@ -161,7 +158,7 @@ class LazyProxy(VerticalBase, Generic[T]):  # type: ignore[misc]
         self._vertical_name = vertical_name
         self._loader = loader
         self._loaded = False
-        self._instance: Optional[Type[T]] = None
+        self._instance: Optional[type[T]] = None
         self._load_lock = threading.RLock()  # Use RLock for reentrant locking
         self._loading = False
         self.proxy_type = proxy_type
@@ -215,7 +212,7 @@ class LazyProxy(VerticalBase, Generic[T]):  # type: ignore[misc]
             return str(self._instance.description)
         return f"Lazy loading proxy for {self._vertical_name}"
 
-    def load(self) -> Type[T]:
+    def load(self) -> type[T]:
         """Load vertical on first access with thread-safe lazy initialization.
 
         Uses double-checked locking pattern for thread safety:
@@ -362,13 +359,13 @@ class LazyProxyFactory:
 
     def __init__(self) -> None:
         """Initialize the factory."""
-        self._proxies: Dict[str, LazyProxy[Any]] = {}
+        self._proxies: dict[str, LazyProxy[Any]] = {}
 
     def create_proxy(
         self,
         vertical_name: str,
-        loader: Callable[[], Type[T]],
-        vertical_class: Type[T],
+        loader: Callable[[], type[T]],
+        vertical_class: type[T],
         proxy_type: LazyProxyType = LazyProxyType.LAZY,
     ) -> LazyProxy[Any]:
         """Create or retrieve cached LazyProxy for a vertical.

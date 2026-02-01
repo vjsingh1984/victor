@@ -23,12 +23,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from textual.app import ComposeResult
-from textual.containers import Container, ScrollableContainer
+from textual.containers import Container
 from textual.widgets import DataTable, RichLog, Static
-from textual.reactive import reactive
 
 from victor.core.events import MessagingEvent
 
@@ -45,7 +44,7 @@ class ToolStats:
     max_duration_ms: Optional[float] = None
     last_called: Optional[datetime] = None
     last_result: Optional[str] = None
-    error_messages: List[str] = field(default_factory=list)
+    error_messages: list[str] = field(default_factory=list)
 
     @property
     def success_rate(self) -> float:
@@ -105,7 +104,7 @@ class ToolStatsWidget(DataTable):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._stats: Dict[str, ToolStats] = {}
+        self._stats: dict[str, ToolStats] = {}
 
     def on_mount(self) -> None:
         """Set up table columns."""
@@ -206,7 +205,7 @@ class ToolStatsWidget(DataTable):
         """
         return self._stats.get(tool_name)
 
-    def get_all_stats(self) -> Dict[str, ToolStats]:
+    def get_all_stats(self) -> dict[str, ToolStats]:
         """Get all tool statistics.
 
         Returns:
@@ -282,7 +281,7 @@ class ToolHistoryWidget(RichLog):
 
         self._entry_count += 1
 
-    def _format_arguments(self, args: Dict[str, Any]) -> str:
+    def _format_arguments(self, args: dict[str, Any]) -> str:
         """Format tool arguments for display.
 
         Args:

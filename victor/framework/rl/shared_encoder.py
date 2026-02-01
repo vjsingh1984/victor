@@ -44,7 +44,7 @@ import json
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +69,8 @@ class ContextEmbedding:
     provider: str
     model: str
     vertical: str
-    vector: List[float]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    vector: list[float]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def dimension(self) -> int:
@@ -171,11 +171,11 @@ class SharedEncoder:
         self.db = db_connection
 
         # Learned embeddings (updated over time)
-        self._task_embeddings: Dict[str, List[float]] = {}
-        self._model_embeddings: Dict[str, List[float]] = {}
+        self._task_embeddings: dict[str, list[float]] = {}
+        self._model_embeddings: dict[str, list[float]] = {}
 
         # Embedding cache for fast lookup
-        self._cache: Dict[str, ContextEmbedding] = {}
+        self._cache: dict[str, ContextEmbedding] = {}
 
         if db_connection:
             self._ensure_tables()
@@ -281,7 +281,7 @@ class SharedEncoder:
         self._cache[cache_key] = embedding
         return embedding
 
-    def _encode_task_type(self, task_type: str) -> List[float]:
+    def _encode_task_type(self, task_type: str) -> list[float]:
         """Encode task type into embedding.
 
         Uses semantic similarity to known task categories.
@@ -324,7 +324,7 @@ class SharedEncoder:
 
         return category_scores[: self.TASK_DIM]
 
-    def _encode_provider(self, provider: str) -> List[float]:
+    def _encode_provider(self, provider: str) -> list[float]:
         """Encode provider into embedding.
 
         Args:
@@ -342,7 +342,7 @@ class SharedEncoder:
         hash_val = int(hashlib.md5(provider.encode(), usedforsecurity=False).hexdigest()[:8], 16)
         return [0.5 + 0.3 * ((hash_val >> (i * 8)) % 256) / 255.0 for i in range(self.PROVIDER_DIM)]
 
-    def _encode_model(self, model: str, provider: str) -> List[float]:
+    def _encode_model(self, model: str, provider: str) -> list[float]:
         """Encode model into embedding.
 
         Args:
@@ -395,7 +395,7 @@ class SharedEncoder:
 
         return features[: self.MODEL_DIM]
 
-    def _encode_vertical(self, vertical: str) -> List[float]:
+    def _encode_vertical(self, vertical: str) -> list[float]:
         """Encode vertical into embedding.
 
         Args:
@@ -416,7 +416,7 @@ class SharedEncoder:
         embedding: ContextEmbedding,
         top_k: int = 5,
         min_similarity: float = 0.5,
-    ) -> List[Tuple[ContextEmbedding, float]]:
+    ) -> list[tuple[ContextEmbedding, float]]:
         """Find similar contexts from cache.
 
         Args:
@@ -444,7 +444,7 @@ class SharedEncoder:
     def update_task_embedding(
         self,
         task_type: str,
-        gradient: List[float],
+        gradient: list[float],
         learning_rate: float = 0.01,
     ) -> None:
         """Update learned task embedding based on gradient.
@@ -501,7 +501,7 @@ class SharedEncoder:
 
         return max(0.0, similarity)
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export encoder metrics.
 
         Returns:

@@ -15,15 +15,14 @@ These classes implement the protocols defined in victor.workflows.protocols.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, TYPE_CHECKING, Union
+from typing import Any, Optional
+from collections.abc import Awaitable, Callable
 
 from victor.workflows.protocols import (
-    ProtocolNodeStatus,
     RetryPolicy,
     NodeResult,
     IWorkflowNode,
     IWorkflowEdge,
-    IWorkflowGraph,
 )
 
 
@@ -45,13 +44,13 @@ class InvalidEdgeError(Exception):
 class GraphValidationError(Exception):
     """Raised when graph validation fails."""
 
-    def __init__(self, errors: List[str]):
+    def __init__(self, errors: list[str]):
         self.errors = errors
         super().__init__(f"Graph validation failed: {'; '.join(errors)}")
 
 
 # Type alias for handler functions
-NodeHandler = Callable[[Dict[str, Any], Optional[Dict[str, Any]]], NodeResult]
+NodeHandler = Callable[[dict[str, Any], Optional[dict[str, Any]]], NodeResult]
 
 
 @dataclass
@@ -85,12 +84,12 @@ class WorkflowNode:
 
     id: str
     name: str
-    handler: Callable[[Dict[str, Any], Optional[Dict[str, Any]]], NodeResult]
+    handler: Callable[[dict[str, Any], Optional[dict[str, Any]]], NodeResult]
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     async def execute(
-        self, state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+        self, state: dict[str, Any], context: Optional[dict[str, Any]] = None
     ) -> NodeResult:
         """Execute this node with the given state.
 
@@ -124,7 +123,7 @@ class WorkflowEdge:
     source_id: str
     target_id: str
 
-    def should_traverse(self, state: Dict[str, Any]) -> bool:
+    def should_traverse(self, state: dict[str, Any]) -> bool:
         """Check if this edge should be traversed.
 
         Simple edges are always traversable.
@@ -163,9 +162,9 @@ class ConditionalEdge:
 
     source_id: str
     target_id: str
-    condition: Callable[[Dict[str, Any]], bool]
+    condition: Callable[[dict[str, Any]], bool]
 
-    def should_traverse(self, state: Dict[str, Any]) -> bool:
+    def should_traverse(self, state: dict[str, Any]) -> bool:
         """Check if this edge should be traversed.
 
         Evaluates the condition function against the state.
@@ -190,7 +189,7 @@ class _RouterEdge:
         self,
         source_id: str,
         target_id: str,
-        router: Callable[[Dict[str, Any]], str],
+        router: Callable[[dict[str, Any]], str],
         route_key: str,
     ):
         self.source_id = source_id
@@ -214,7 +213,7 @@ class _RouterEdge:
     def target_id(self, value: str) -> None:
         self._target_id = value
 
-    def should_traverse(self, state: Dict[str, Any]) -> bool:
+    def should_traverse(self, state: dict[str, Any]) -> bool:
         """Check if this edge should be traversed.
 
         Compares the router function's output to this edge's route key.
@@ -257,10 +256,10 @@ class BasicWorkflowGraph:
 
     def __init__(self) -> None:
         """Initialize an empty workflow graph."""
-        self._nodes: Dict[str, IWorkflowNode] = {}
-        self._edges: List[IWorkflowEdge] = []
+        self._nodes: dict[str, IWorkflowNode] = {}
+        self._edges: list[IWorkflowEdge] = []
         self._entry_node_id: Optional[str] = None
-        self._exit_node_ids: Set[str] = set()
+        self._exit_node_ids: set[str] = set()
 
     def add_node(self, node: IWorkflowNode) -> "BasicWorkflowGraph":
         """Add a node to the graph.
@@ -304,8 +303,8 @@ class BasicWorkflowGraph:
     def add_conditional_edge(
         self,
         source_id: str,
-        router: Callable[[Dict[str, Any]], str],
-        targets: Dict[str, str],
+        router: Callable[[dict[str, Any]], str],
+        targets: dict[str, str],
     ) -> "BasicWorkflowGraph":
         """Add conditional branching edges based on a router function.
 
@@ -370,7 +369,7 @@ class BasicWorkflowGraph:
         self._entry_node_id = node_id
         return self
 
-    def set_exit_nodes(self, node_ids: List[str]) -> "BasicWorkflowGraph":
+    def set_exit_nodes(self, node_ids: list[str]) -> "BasicWorkflowGraph":
         """Set the exit points of the workflow.
 
         Args:
@@ -410,7 +409,7 @@ class BasicWorkflowGraph:
             return None
         return self._nodes.get(self._entry_node_id)
 
-    def get_exit_nodes(self) -> List[IWorkflowNode]:
+    def get_exit_nodes(self) -> list[IWorkflowNode]:
         """Get all exit nodes of the graph.
 
         Returns:
@@ -418,7 +417,7 @@ class BasicWorkflowGraph:
         """
         return [self._nodes[node_id] for node_id in self._exit_node_ids if node_id in self._nodes]
 
-    def get_next_nodes(self, node_id: str, state: Dict[str, Any]) -> List[IWorkflowNode]:
+    def get_next_nodes(self, node_id: str, state: dict[str, Any]) -> list[IWorkflowNode]:
         """Get the next nodes to execute after the given node.
 
         Evaluates all edges from the node and returns nodes whose
@@ -441,7 +440,7 @@ class BasicWorkflowGraph:
 
         return next_nodes
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Validate the graph structure.
 
         Checks for:
@@ -452,7 +451,7 @@ class BasicWorkflowGraph:
         Returns:
             List of validation error messages (empty if valid).
         """
-        errors: List[str] = []
+        errors: list[str] = []
 
         # Check for entry node
         if self._entry_node_id is None:
@@ -478,7 +477,7 @@ class BasicWorkflowGraph:
 
         return errors
 
-    def _find_reachable_nodes(self) -> Set[str]:
+    def _find_reachable_nodes(self) -> set[str]:
         """Find all nodes reachable from the entry node.
 
         Uses BFS to traverse the graph and collect all reachable node IDs.
@@ -489,7 +488,7 @@ class BasicWorkflowGraph:
         if self._entry_node_id is None:
             return set()
 
-        reachable: Set[str] = set()
+        reachable: set[str] = set()
         queue = [self._entry_node_id]
 
         while queue:
@@ -508,7 +507,7 @@ class BasicWorkflowGraph:
 
         return reachable
 
-    def _find_cycles(self) -> List[List[str]]:
+    def _find_cycles(self) -> list[list[str]]:
         """Find all cycles in the graph.
 
         Uses DFS with coloring to detect cycles.
@@ -520,16 +519,16 @@ class BasicWorkflowGraph:
             List of cycles, each cycle is a list of node IDs.
         """
         WHITE, GRAY, BLACK = 0, 1, 2
-        color: Dict[str, int] = dict.fromkeys(self._nodes, WHITE)
-        cycles: List[List[str]] = []
-        parent: Dict[str, Optional[str]] = dict.fromkeys(self._nodes)
+        color: dict[str, int] = dict.fromkeys(self._nodes, WHITE)
+        cycles: list[list[str]] = []
+        parent: dict[str, Optional[str]] = dict.fromkeys(self._nodes)
 
         # Build adjacency list
-        adjacency: Dict[str, List[str]] = {node_id: [] for node_id in self._nodes}
+        adjacency: dict[str, list[str]] = {node_id: [] for node_id in self._nodes}
         for edge in self._edges:
             adjacency[edge.source_id].append(edge.target_id)
 
-        def dfs(node_id: str, path: List[str]) -> None:
+        def dfs(node_id: str, path: list[str]) -> None:
             color[node_id] = GRAY
             current_path = path + [node_id]
 

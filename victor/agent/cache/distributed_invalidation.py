@@ -78,8 +78,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.agent.cache.backends.redis import RedisCacheBackend
@@ -111,7 +112,7 @@ class DistributedInvalidationConfig:
     key_prefix: str = "victor"
     publish_local_invalidations: bool = True
     listen_for_remote: bool = True
-    invalidation_namespaces: Optional[Set[str]] = None
+    invalidation_namespaces: Optional[set[str]] = None
 
 
 @dataclass
@@ -174,11 +175,11 @@ class DistributedCacheInvalidator:
         self._redis_backend: Optional[RedisCacheBackend] = None
 
         # Registered local caches
-        self._tiered_caches: List[TieredCache] = []
-        self._graph_caches: List[CompiledGraphCache] = []
+        self._tiered_caches: list[TieredCache] = []
+        self._graph_caches: list[CompiledGraphCache] = []
 
         # Custom invalidation callbacks
-        self._callbacks: List[Callable[[str, str], None]] = []
+        self._callbacks: list[Callable[[str, str], None]] = []
 
         # Background listener task
         self._listener_task: Optional[asyncio.Task[None]] = None
@@ -188,7 +189,7 @@ class DistributedCacheInvalidator:
         self._stats = InvalidationStats()
 
         # Track recently published to avoid echo
-        self._recently_published: Set[str] = set()
+        self._recently_published: set[str] = set()
         self._recently_published_lock = asyncio.Lock()
 
     async def connect(self) -> None:
@@ -481,7 +482,7 @@ class DistributedCacheInvalidator:
         async with self._recently_published_lock:
             self._recently_published.discard(cache_key)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get invalidation statistics.
 
         Returns:

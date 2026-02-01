@@ -60,20 +60,19 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Union
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 from uuid import uuid4
 
-from victor.framework.events import AgentExecutionEvent, EventType
+from victor.framework.events import AgentExecutionEvent
 
 if TYPE_CHECKING:
     from victor.core.agent_commands import (
         AgentCommandBus,
         SessionProjection,
     )
-    from victor.core.cqrs import CommandBus, Mediator, QueryBus
     from victor.core.event_sourcing import DomainEvent as CQRSEvent
-    from victor.core.event_sourcing import EventDispatcher, EventStore
+    from victor.core.event_sourcing import EventDispatcher
     from victor.framework.agent import Agent
     from victor.core.events import ObservabilityBus
 
@@ -86,12 +85,9 @@ logger = logging.getLogger(__name__)
 
 # Import conversion functions from EventRegistry - the canonical implementation
 from victor.framework.event_registry import (
-    EventTarget,
     convert_from_cqrs,
-    convert_from_observability,
     convert_to_cqrs,
     convert_to_observability,
-    get_event_registry,
 )
 
 
@@ -99,7 +95,7 @@ from victor.framework.event_registry import (
 # These are kept for backward compatibility with existing callers.
 
 
-def framework_event_to_cqrs(event: AgentExecutionEvent) -> Dict[str, Any]:
+def framework_event_to_cqrs(event: AgentExecutionEvent) -> dict[str, Any]:
     """Convert framework AgentExecutionEvent to CQRS data. Delegates to EventRegistry."""
     return convert_to_cqrs(event)
 
@@ -183,7 +179,7 @@ def cqrs_event_to_framework(cqrs_event: "CQRSEvent") -> AgentExecutionEvent:
 
 
 def observability_event_to_framework(
-    topic: str, data: Dict[str, Any], **metadata: Any
+    topic: str, data: dict[str, Any], **metadata: Any
 ) -> AgentExecutionEvent:
     """Convert an observability event (topic-based) to a framework AgentExecutionEvent.
 
@@ -265,7 +261,7 @@ def observability_event_to_framework(
         )
 
 
-def framework_event_to_observability(event: AgentExecutionEvent) -> Dict[str, Any]:
+def framework_event_to_observability(event: AgentExecutionEvent) -> dict[str, Any]:
     """Convert framework AgentExecutionEvent to observability data. Delegates to EventRegistry."""
     return convert_to_observability(event)
 
@@ -493,7 +489,7 @@ class ObservabilityToCQRSBridge:
         metadata = getattr(event, "headers", {})
         self._handle_event(topic, data, **metadata)
 
-    def _handle_event(self, topic: str, data: Dict[str, Any], **metadata: Any) -> None:
+    def _handle_event(self, topic: str, data: dict[str, Any], **metadata: Any) -> None:
         """Handle an observability event (topic-based)."""
         try:
             from victor.core.event_sourcing import (
@@ -644,9 +640,9 @@ class CQRSBridge:
         self._event_dispatcher = event_dispatcher
         self._projection = projection
         self._event_bus = event_bus
-        self._adapters: Dict[str, FrameworkEventAdapter] = {}
+        self._adapters: dict[str, FrameworkEventAdapter] = {}
         self._obs_bridge: Optional[ObservabilityToCQRSBridge] = None
-        self._connected_agents: Set[str] = set()
+        self._connected_agents: set[str] = set()
 
     @classmethod
     async def create(
@@ -775,8 +771,8 @@ class CQRSBridge:
     async def start_session(
         self,
         session_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """Start a new session via CQRS command.
 
         Args:
@@ -808,7 +804,7 @@ class CQRSBridge:
             # This path should be unreachable based on the isinstance checks above
             return {"error": "Unknown result type"}  # type: ignore[unreachable]
 
-    async def end_session(self, session_id: str) -> Dict[str, Any]:
+    async def end_session(self, session_id: str) -> dict[str, Any]:
         """End a session via CQRS command.
 
         Args:
@@ -838,8 +834,8 @@ class CQRSBridge:
         self,
         session_id: str,
         tool_name: str,
-        arguments: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
         """Execute a tool via CQRS command.
 
         Args:
@@ -877,7 +873,7 @@ class CQRSBridge:
         session_id: str,
         message: str,
         role: str = "user",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Send a chat message via CQRS command.
 
         Args:
@@ -914,7 +910,7 @@ class CQRSBridge:
     # Queries
     # =========================================================================
 
-    async def get_session(self, session_id: str) -> Dict[str, Any]:
+    async def get_session(self, session_id: str) -> dict[str, Any]:
         """Get session details via CQRS query.
 
         Args:
@@ -944,7 +940,7 @@ class CQRSBridge:
         self,
         session_id: str,
         limit: int = 100,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get conversation history via CQRS query.
 
         Args:
@@ -975,7 +971,7 @@ class CQRSBridge:
         self,
         session_id: str,
         filter_category: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get available tools via CQRS query.
 
         Args:
@@ -1002,7 +998,7 @@ class CQRSBridge:
             # This path should be unreachable based on the isinstance checks above
             return {"error": "Unknown result type"}  # type: ignore[unreachable]
 
-    async def get_metrics(self, session_id: str) -> Dict[str, Any]:
+    async def get_metrics(self, session_id: str) -> dict[str, Any]:
         """Get session metrics via CQRS query.
 
         Args:
@@ -1037,7 +1033,7 @@ class CQRSBridge:
         """Get the session projection for direct access."""
         return self._projection
 
-    def get_all_sessions(self) -> List[Dict[str, Any]]:
+    def get_all_sessions(self) -> list[dict[str, Any]]:
         """Get all sessions from projection.
 
         Returns:
@@ -1063,7 +1059,7 @@ class CQRSBridge:
     def subscribe_to_events(
         self,
         handler: Callable[["CQRSEvent"], None],
-        event_types: Optional[List[str]] = None,
+        event_types: Optional[list[str]] = None,
     ) -> Callable[[], None]:
         """Subscribe to CQRS events.
 

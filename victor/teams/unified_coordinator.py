@@ -40,10 +40,9 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.mixins.observability import ObservabilityMixin
@@ -53,18 +52,10 @@ from victor.teams.types import (
     MemberResult,
     MessageType,
     TeamFormation,
-    TeamResult,
 )
 from victor.workflows.recursion import RecursionContext, RecursionGuard
 
 if TYPE_CHECKING:
-    from victor.coordination.formations import (
-        ConsensusFormation,
-        HierarchicalFormation,
-        ParallelFormation,
-        PipelineFormation,
-        SequentialFormation,
-    )
     from victor.teams.protocols import ITeamMember
 
 logger = logging.getLogger(__name__)
@@ -82,7 +73,7 @@ class _TeamMemberAdapter:
     but ITeamMember uses execute_task(task, context) -> str.
     """
 
-    def __init__(self, member: "ITeamMember", coordinator_context: Dict[str, Any]):
+    def __init__(self, member: "ITeamMember", coordinator_context: dict[str, Any]):
         self._member = member
         self._context = coordinator_context
         self.id = member.id
@@ -182,17 +173,17 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
 
         # Core state
         self._orchestrator = orchestrator
-        self._members: List[ITeamMember] = []
+        self._members: list[ITeamMember] = []
         self._formation = TeamFormation.SEQUENTIAL
         self._manager: Optional[ITeamMember] = None
         self._lightweight_mode = lightweight_mode
 
         # Communication
-        self._message_history: List[AgentMessage] = []
-        self._shared_context: Dict[str, Any] = {}
+        self._message_history: list[AgentMessage] = []
+        self._shared_context: dict[str, Any] = {}
 
         # Formation strategies (lazy loaded to avoid circular imports)
-        self._formations: Optional[Dict[TeamFormation, BaseFormationStrategy]] = None
+        self._formations: Optional[dict[TeamFormation, BaseFormationStrategy]] = None
 
         # Recursion tracking
         self._recursion_ctx = recursion_context or RecursionContext()
@@ -239,7 +230,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             self._members.insert(0, manager)
         return self
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> dict[str, Any]:
         """Execute a task with the team.
 
         Dispatches to the appropriate formation executor based on
@@ -348,7 +339,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             "formation": self._formation.value,
         }
 
-    async def broadcast(self, message: AgentMessage) -> List[Optional[AgentMessage]]:
+    async def broadcast(self, message: AgentMessage) -> list[Optional[AgentMessage]]:
         """Broadcast a message to all team members.
 
         Args:
@@ -358,7 +349,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
             List of responses from members
         """
         self._message_history.append(message)
-        responses: List[Optional[AgentMessage]] = []
+        responses: list[Optional[AgentMessage]] = []
 
         for member in self._members:
             if member.id != message.sender_id:  # Don't send to sender
@@ -411,7 +402,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         return self
 
     @property
-    def shared_memory(self) -> Dict[str, Any]:
+    def shared_memory(self) -> dict[str, Any]:
         """Get shared memory context."""
         return self._shared_context
 
@@ -419,7 +410,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
     # Formation Executors
     # =========================================================================
 
-    async def _execute_formation(self, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_formation(self, task: str, context: dict[str, Any]) -> dict[str, Any]:
         """Execute using formation strategies.
 
         This replaces the old per-formation methods with a single method
@@ -463,7 +454,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         member_results_list = await strategy.execute(adapted_members, team_context, agent_task)
 
         # Convert list of MemberResults to dict
-        member_results: Dict[str, MemberResult] = {r.member_id: r for r in member_results_list}
+        member_results: dict[str, MemberResult] = {r.member_id: r for r in member_results_list}
 
         # Build final output
         success = all(r.success for r in member_results_list) if member_results_list else False
@@ -516,7 +507,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         return self
 
     @property
-    def members(self) -> List["ITeamMember"]:
+    def members(self) -> list["ITeamMember"]:
         """Get list of team members."""
         return list(self._members)
 
@@ -530,7 +521,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
         """Get team manager (for hierarchical formation)."""
         return self._manager
 
-    def _get_formations(self) -> Dict[TeamFormation, BaseFormationStrategy]:
+    def _get_formations(self) -> dict[TeamFormation, BaseFormationStrategy]:
         """Get formation strategies, lazy loading to avoid circular imports."""
         if self._formations is None:
             # Lazy import to avoid circular dependency

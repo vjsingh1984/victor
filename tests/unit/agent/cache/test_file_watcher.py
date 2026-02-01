@@ -30,7 +30,6 @@ from __future__ import annotations
 import asyncio
 import time
 from pathlib import Path
-from typing import Any, List, Optional
 
 import pytest
 
@@ -68,7 +67,7 @@ async def wait_for_events(
     min_count: int = 1,
     timeout: float = 5.0,
     poll_interval: float = 0.1,
-) -> List[FileChangeEvent]:
+) -> list[FileChangeEvent]:
     """Wait for expected number of events with timeout.
 
     This helper polls for events instead of using a fixed sleep,
@@ -87,7 +86,7 @@ async def wait_for_events(
         AssertionError: If timeout is reached without enough events
     """
     start_time = time.time()
-    collected_events: List[FileChangeEvent] = []
+    collected_events: list[FileChangeEvent] = []
 
     while time.time() - start_time < timeout:
         # Get any new events

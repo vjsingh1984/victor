@@ -48,14 +48,11 @@ from __future__ import annotations
 import ast
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (
     Any,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Tuple,
     TYPE_CHECKING,
     runtime_checkable,
 )
@@ -84,7 +81,7 @@ class ProcessedResponse:
     """
 
     content: str
-    tool_calls: Optional[List[Dict[str, Any]]] = None
+    tool_calls: Optional[list[dict[str, Any]]] = None
     tokens_used: float = 0.0
     garbage_detected: bool = False
     is_final: bool = False
@@ -125,7 +122,7 @@ class ToolCallValidationResult:
         filtered_count: Number of invalid tool calls filtered out
     """
 
-    tool_calls: Optional[List[Dict[str, Any]]]
+    tool_calls: Optional[list[dict[str, Any]]]
     remaining_content: str
     filtered_count: int = 0
 
@@ -176,7 +173,7 @@ class IResponseCoordinator(Protocol):
 
     def parse_and_validate_tool_calls(
         self,
-        tool_calls: Optional[List[Dict[str, Any]]],
+        tool_calls: Optional[list[dict[str, Any]]],
         content: str,
         enabled_tools: Optional[set[str]] = None,
     ) -> ToolCallValidationResult:
@@ -214,7 +211,7 @@ class IResponseCoordinator(Protocol):
 
     def try_extract_tool_calls_from_text(
         self, content: str, valid_tool_names: set[str]
-    ) -> Optional[List[Dict[str, Any]]]:
+    ) -> Optional[list[dict[str, Any]]]:
         """Try to extract tool calls from text response.
 
         Args:
@@ -227,8 +224,8 @@ class IResponseCoordinator(Protocol):
         ...
 
     def normalize_tool_call_arguments(
-        self, tool_calls: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, tool_calls: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Normalize tool call arguments to dicts.
 
         Args:
@@ -239,7 +236,7 @@ class IResponseCoordinator(Protocol):
         """
         ...
 
-    def aggregate_chunks(self, chunks: List[str]) -> str:
+    def aggregate_chunks(self, chunks: list[str]) -> str:
         """Aggregate response chunks into complete content.
 
         Args:
@@ -398,7 +395,7 @@ class ResponseCoordinator:
 
     def parse_and_validate_tool_calls(
         self,
-        tool_calls: Optional[List[Dict[str, Any]]],
+        tool_calls: Optional[list[dict[str, Any]]],
         content: str,
         enabled_tools: Optional[set[str]] = None,
     ) -> ToolCallValidationResult:
@@ -477,7 +474,7 @@ class ResponseCoordinator:
         )
 
     def _parse_tool_calls_with_adapter(
-        self, content: str, tool_calls: Optional[List[Dict[str, Any]]]
+        self, content: str, tool_calls: Optional[list[dict[str, Any]]]
     ) -> "ToolCallParseResult":
         """Parse tool calls using the configured adapter.
 
@@ -497,8 +494,8 @@ class ResponseCoordinator:
         return ToolCallParseResult(tool_calls=[], remaining_content=content, parse_method="none")
 
     def normalize_tool_call_arguments(
-        self, tool_calls: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, tool_calls: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Normalize tool call arguments to dicts.
 
         Some providers send arguments as JSON strings. This method coerces
@@ -589,7 +586,7 @@ class ResponseCoordinator:
 
     def try_extract_tool_calls_from_text(
         self, content: str, valid_tool_names: set[str]
-    ) -> Optional[List[Dict[str, Any]]]:
+    ) -> Optional[list[dict[str, Any]]]:
         """Try to extract tool calls from text response.
 
         Uses the text extractor to find tool calls embedded in text responses.
@@ -635,7 +632,7 @@ class ResponseCoordinator:
     # Chunk Aggregation
     # =====================================================================
 
-    def aggregate_chunks(self, chunks: List[str]) -> str:
+    def aggregate_chunks(self, chunks: list[str]) -> str:
         """Aggregate response chunks into complete content.
 
         Args:
@@ -651,7 +648,7 @@ class ResponseCoordinator:
         filtered = [c for c in chunks if c]
         return "".join(filtered)
 
-    def aggregate_stream_chunks(self, chunks: List[Any], content_attr: str = "content") -> str:
+    def aggregate_stream_chunks(self, chunks: list[Any], content_attr: str = "content") -> str:
         """Aggregate stream chunk objects into complete content.
 
         Args:
@@ -696,7 +693,7 @@ class ResponseCoordinator:
         return len(stripped) >= min_len
 
     def extract_remaining_content(
-        self, full_content: str, tool_calls: Optional[List[Dict[str, Any]]]
+        self, full_content: str, tool_calls: Optional[list[dict[str, Any]]]
     ) -> str:
         """Extract remaining content after removing tool call artifacts.
 
@@ -725,7 +722,7 @@ class ResponseCoordinator:
     def format_response_for_display(
         self,
         content: str,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        tool_calls: Optional[list[dict[str, Any]]] = None,
         show_tool_calls: bool = False,
     ) -> str:
         """Format response for display to user.
@@ -752,10 +749,10 @@ class ResponseCoordinator:
 
     def parse_and_validate_tool_calls_with_resolution(
         self,
-        tool_calls: Optional[List[Dict[str, Any]]],
+        tool_calls: Optional[list[dict[str, Any]]],
         full_content: str,
         enabled_tools: Optional[set[str]] = None,
-    ) -> Tuple[Optional[List[Dict[str, Any]]], str]:
+    ) -> tuple[Optional[list[dict[str, Any]]], str]:
         """Parse, validate, and normalize tool calls with shell variant resolution.
 
         This is the enhanced version that handles:

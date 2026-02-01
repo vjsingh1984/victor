@@ -39,7 +39,7 @@ Related Protocols:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Dict, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from victor.core.verticals.protocols.mode_provider import (
     ModeConfig,
@@ -87,7 +87,7 @@ class ConfigExtensionsProtocol(Protocol):
         """
         ...
 
-    def get_all_mode_configs(self) -> Dict[str, ModeConfig]:
+    def get_all_mode_configs(self) -> dict[str, ModeConfig]:
         """Get mode configs from provider.
 
         Default implementation that delegates to the mode_config_provider.

@@ -49,7 +49,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.tools.caches.selection_cache import ToolSelectionCache
@@ -99,7 +99,7 @@ class ToolSelectionMetrics:
     rl_utilization: float = 0.0
     overall_utilization: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "hit_rates": {
@@ -161,7 +161,7 @@ class CacheMetrics:
     miss_rate: float = 0.0
     eviction_rate: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "memory": {
@@ -207,7 +207,7 @@ class BootstrapMetrics:
     avg_lazy_load_time_ms: float = 0.0
     first_access_overhead_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "startup_time": {
@@ -256,9 +256,9 @@ class ProviderPoolMetrics:
     rate_limit_hit_rate: float = 0.0
 
     # Per-provider health
-    provider_health: Dict[str, float] = field(default_factory=dict)
+    provider_health: dict[str, float] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "pool": {
@@ -305,12 +305,12 @@ class ToolExecutionMetrics:
     error_rate: float = 0.0
 
     # Top tools by execution count
-    top_tools: List[Dict[str, Any]] = field(default_factory=list)
+    top_tools: list[dict[str, Any]] = field(default_factory=list)
 
     # Per-tool metrics
-    tool_metrics: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    tool_metrics: dict[str, dict[str, Any]] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "executions": {
@@ -355,7 +355,7 @@ class SystemMetrics:
     # Threads
     active_threads: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "memory": {
@@ -733,7 +733,7 @@ class PerformanceMetricsCollector:
     # Metrics Access
     # =========================================================================
 
-    def get_all_metrics(self) -> Dict[str, Any]:
+    def get_all_metrics(self) -> dict[str, Any]:
         """Get all performance metrics.
 
         Returns:

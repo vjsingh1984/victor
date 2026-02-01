@@ -11,7 +11,7 @@ import ast
 import json
 import logging
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple, TypedDict
+from typing import Any, Optional, TypedDict
 
 # Import native extensions with unified availability check
 try:
@@ -42,9 +42,9 @@ class ToolStats(TypedDict):
 
 class NormalizationStats(TypedDict):
     total_calls: int
-    normalizations: Dict[str, int]
+    normalizations: dict[str, int]
     failures: int
-    by_tool: Dict[str, ToolStats]
+    by_tool: dict[str, ToolStats]
 
 
 class NormalizationStrategy(Enum):
@@ -84,7 +84,7 @@ class ArgumentNormalizer:
         )
     """
 
-    def __init__(self, provider_name: str = "unknown", config: Optional[Dict[str, Any]] = None):
+    def __init__(self, provider_name: str = "unknown", config: Optional[dict[str, Any]] = None):
         """
         Initialize argument normalizer.
 
@@ -95,18 +95,18 @@ class ArgumentNormalizer:
         """
         self.provider_name = provider_name
         self.config = config or {}
-        self.parameter_aliases: Dict[str, Dict[str, str]] = self.config.get("parameter_aliases", {})
+        self.parameter_aliases: dict[str, dict[str, str]] = self.config.get("parameter_aliases", {})
         self.stats: NormalizationStats = {
             "total_calls": 0,
             "normalizations": {strategy.value: 0 for strategy in NormalizationStrategy},
             "failures": 0,
             "by_tool": {},
         }
-        self._alias_stats: Dict[str, Any] = {"total": 0, "aliased": 0, "by_tool": {}}
+        self._alias_stats: dict[str, Any] = {"total": 0, "aliased": 0, "by_tool": {}}
 
     def normalize_parameter_aliases(
-        self, arguments: Dict[str, Any], tool_name: str
-    ) -> Tuple[Dict[str, Any], bool]:
+        self, arguments: dict[str, Any], tool_name: str
+    ) -> tuple[dict[str, Any], bool]:
         """
         Normalize model-specific parameter names to standard tool parameter names.
 
@@ -164,8 +164,8 @@ class ArgumentNormalizer:
         return normalized, was_aliased
 
     def normalize_arguments(
-        self, arguments: Dict[str, Any], tool_name: str
-    ) -> Tuple[Dict[str, Any], NormalizationStrategy]:
+        self, arguments: dict[str, Any], tool_name: str
+    ) -> tuple[dict[str, Any], NormalizationStrategy]:
         """
         Normalize tool call arguments through multi-layer pipeline.
 
@@ -344,7 +344,7 @@ class ArgumentNormalizer:
             logger.debug("_is_valid_json_dict: Exception in validation: %s", e)
             return False
 
-    def _normalize_via_ast(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_via_ast(self, arguments: dict[str, Any]) -> dict[str, Any]:
         """
         Convert Python syntax to JSON via AST.
 
@@ -367,7 +367,7 @@ class ArgumentNormalizer:
         Returns:
             Normalized arguments with valid JSON strings or coerced types
         """
-        normalized: Dict[str, Any] = {}
+        normalized: dict[str, Any] = {}
         for key, value in arguments.items():
             if isinstance(value, str):
                 # First, check if the string LOOKS like JSON but may need normalization
@@ -404,7 +404,7 @@ class ArgumentNormalizer:
                 normalized[key] = value
         return normalized
 
-    def _normalize_via_regex(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_via_regex(self, arguments: dict[str, Any]) -> dict[str, Any]:
         """
         Simple quote replacement via regex.
 
@@ -444,8 +444,8 @@ class ArgumentNormalizer:
         return normalized
 
     def _normalize_via_manual_repair(
-        self, arguments: Dict[str, Any], tool_name: str
-    ) -> Dict[str, Any]:
+        self, arguments: dict[str, Any], tool_name: str
+    ) -> dict[str, Any]:
         """
         Tool-specific manual repairs for known patterns.
 
@@ -469,7 +469,7 @@ class ArgumentNormalizer:
 
         return arguments
 
-    def _repair_edit_files_args(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _repair_edit_files_args(self, arguments: dict[str, Any]) -> dict[str, Any]:
         """
         Repair common edit_files argument malformations.
 
@@ -497,7 +497,7 @@ class ArgumentNormalizer:
                     pass
         return arguments
 
-    def _coerce_primitive_types(self, arguments: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
+    def _coerce_primitive_types(self, arguments: dict[str, Any], tool_name: str) -> dict[str, Any]:
         """
         Coerce string values to primitive types (int, float, bool) when appropriate.
 
@@ -613,7 +613,7 @@ class ArgumentNormalizer:
         # No coercion - return original
         return value
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get normalization statistics for monitoring.
 

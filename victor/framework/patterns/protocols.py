@@ -27,7 +27,7 @@ Following the refinement plan, these protocols extend existing Victor
 infrastructure (experiment tracking, team formations, template library).
 """
 
-from typing import Any, Dict, List, Optional, Protocol, cast, runtime_checkable
+from typing import Any, Optional, Protocol, cast, runtime_checkable
 
 from victor.framework.protocols import OrchestratorProtocol
 from victor.teams import TeamFormation
@@ -44,9 +44,9 @@ class PatternValidationResult:
     def __init__(
         self,
         is_valid: bool,
-        errors: Optional[List[str]] = None,
-        warnings: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        errors: Optional[list[str]] = None,
+        warnings: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize validation result.
 
@@ -74,10 +74,10 @@ class CollaborationPattern:
         name: str,
         description: str,
         formation: TeamFormation,
-        participants: List[Dict[str, Any]],
+        participants: list[dict[str, Any]],
         success_rate: float = 0.0,
         usage_count: int = 0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize collaboration pattern.
 
@@ -134,10 +134,10 @@ class TaskContext:
     def __init__(
         self,
         task_description: str,
-        required_capabilities: List[str],
+        required_capabilities: list[str],
         vertical: str,
         complexity: str = "medium",
-        constraints: Optional[Dict[str, Any]] = None,
+        constraints: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize task context.
 
@@ -163,8 +163,8 @@ class PatternRecommendation:
         pattern: CollaborationPattern,
         score: float,
         rationale: str,
-        expected_benefits: List[str],
-        potential_risks: List[str],
+        expected_benefits: list[str],
+        potential_risks: list[str],
     ) -> None:
         """Initialize pattern recommendation.
 
@@ -193,11 +193,11 @@ class WorkflowExecutionTrace:
         self,
         workflow_id: str,
         execution_id: str,
-        nodes_executed: List[str],
-        execution_order: List[str],
+        nodes_executed: list[str],
+        execution_order: list[str],
         duration_ms: int,
         success: bool,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize workflow execution trace.
 
@@ -251,8 +251,8 @@ class PatternMinerProtocol(Protocol):
 
     async def mine_from_traces(
         self,
-        traces: List[WorkflowExecutionTrace],
-    ) -> List[CollaborationPattern]:
+        traces: list[WorkflowExecutionTrace],
+    ) -> list[CollaborationPattern]:
         """Extract patterns from execution traces.
 
         Args:
@@ -266,7 +266,7 @@ class PatternMinerProtocol(Protocol):
     async def analyze_execution_order(
         self,
         trace: WorkflowExecutionTrace,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze execution order patterns.
 
         Args:
@@ -279,8 +279,8 @@ class PatternMinerProtocol(Protocol):
 
     async def detect_formations(
         self,
-        traces: List[WorkflowExecutionTrace],
-    ) -> Dict[TeamFormation, int]:
+        traces: list[WorkflowExecutionTrace],
+    ) -> dict[TeamFormation, int]:
         """Detect team formations from traces.
 
         Args:
@@ -325,7 +325,7 @@ class PatternValidatorProtocol(Protocol):
     async def validate(
         self,
         pattern: CollaborationPattern,
-        test_cases: Optional[List[TaskContext]] = None,
+        test_cases: Optional[list[TaskContext]] = None,
     ) -> PatternValidationResult:
         """Validate pattern structure and correctness.
 
@@ -341,8 +341,8 @@ class PatternValidatorProtocol(Protocol):
     async def test_pattern(
         self,
         pattern: CollaborationPattern,
-        test_tasks: List[TaskContext],
-    ) -> Dict[str, Any]:
+        test_tasks: list[TaskContext],
+    ) -> dict[str, Any]:
         """Test pattern against sample tasks.
 
         Args:
@@ -405,7 +405,7 @@ class PatternRecommenderProtocol(Protocol):
         self,
         task_context: TaskContext,
         top_k: int = 5,
-    ) -> List[PatternRecommendation]:
+    ) -> list[PatternRecommendation]:
         """Recommend patterns for task context.
 
         Args:
@@ -419,9 +419,9 @@ class PatternRecommenderProtocol(Protocol):
 
     async def rank_patterns(
         self,
-        patterns: List[CollaborationPattern],
+        patterns: list[CollaborationPattern],
         task_context: TaskContext,
-    ) -> List[PatternRecommendation]:
+    ) -> list[PatternRecommendation]:
         """Rank patterns by suitability for task.
 
         Args:

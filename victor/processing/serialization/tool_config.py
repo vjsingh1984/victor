@@ -29,7 +29,7 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import yaml
 
@@ -67,7 +67,7 @@ class ToolSerializationConfig:
     preferred_format: Optional[SerializationFormat] = None
 
     # Allowed formats (order = preference)
-    preferred_formats: List[SerializationFormat] = field(
+    preferred_formats: list[SerializationFormat] = field(
         default_factory=lambda: [
             SerializationFormat.TOON,
             SerializationFormat.CSV,
@@ -86,8 +86,8 @@ class ToolSerializationConfig:
     include_format_hint: bool = True
 
     # For tools with multiple operations (like git)
-    serialize_operations: Optional[List[str]] = None
-    skip_operations: Optional[List[str]] = None
+    serialize_operations: Optional[list[str]] = None
+    skip_operations: Optional[list[str]] = None
 
     def should_serialize(self, operation: Optional[str] = None) -> bool:
         """Check if serialization should be applied.
@@ -144,9 +144,9 @@ class ToolSerializationRegistry:
             config_path = Path(__file__).parent.parent.parent / "config" / "model_capabilities.yaml"
 
         self._config_path = config_path
-        self._config: Dict[str, Any] = {}
-        self._cache: Dict[str, ToolSerializationConfig] = {}
-        self._category_map: Dict[str, str] = {}  # tool -> category
+        self._config: dict[str, Any] = {}
+        self._cache: dict[str, ToolSerializationConfig] = {}
+        self._category_map: dict[str, str] = {}  # tool -> category
         self._loaded = False
 
     def _load_config(self) -> None:
@@ -267,7 +267,7 @@ class ToolSerializationRegistry:
     def _parse_config(
         self,
         tool_name: str,
-        config: Dict[str, Any],
+        config: dict[str, Any],
     ) -> ToolSerializationConfig:
         """Parse configuration dict into ToolSerializationConfig.
 
@@ -326,7 +326,7 @@ class ToolSerializationRegistry:
     def _merge_config(
         self,
         base: ToolSerializationConfig,
-        overrides: Dict[str, Any],
+        overrides: dict[str, Any],
     ) -> ToolSerializationConfig:
         """Merge override config into base.
 

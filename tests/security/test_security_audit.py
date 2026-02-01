@@ -29,13 +29,10 @@ This test suite validates:
 
 import os
 import tempfile
-from pathlib import Path
-from unittest.mock import Mock, patch
 
 import pytest
 
 from victor.core.security.patterns import (
-    SecretScanner,
     SecretSeverity,
     detect_secrets,
     mask_secrets,

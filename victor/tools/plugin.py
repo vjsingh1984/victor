@@ -44,7 +44,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.tools.base import BaseTool
 
@@ -60,7 +60,7 @@ class PluginMetadata:
     description: str = ""
     author: str = ""
     homepage: str = ""
-    dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
     path: Optional[Path] = None
     enabled: bool = True
 
@@ -103,9 +103,9 @@ class ToolPlugin(ABC):
     description: str = ""
     author: str = ""
     homepage: str = ""
-    dependencies: List[str] = []
+    dependencies: list[str] = []
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[dict[str, Any]] = None):
         """Initialize plugin with optional configuration.
 
         Args:
@@ -113,10 +113,10 @@ class ToolPlugin(ABC):
         """
         self.config = config or {}
         self._initialized = False
-        self._tools: List[BaseTool] = []
+        self._tools: list[BaseTool] = []
 
     @abstractmethod
-    def get_tools(self) -> List[BaseTool]:
+    def get_tools(self) -> list[BaseTool]:
         """Return list of tools provided by this plugin.
 
         This method must be implemented by each plugin to return
@@ -127,7 +127,7 @@ class ToolPlugin(ABC):
         """
         pass
 
-    def initialize(self) -> None:  # noqa: B027
+    def initialize(self) -> None:
         """Initialize plugin resources.
 
         Called once when the plugin is loaded. Use this to:
@@ -140,7 +140,7 @@ class ToolPlugin(ABC):
         """
         pass
 
-    def cleanup(self) -> None:  # noqa: B027
+    def cleanup(self) -> None:
         """Cleanup plugin resources.
 
         Called when the plugin is unloaded. Use this to:
@@ -153,7 +153,7 @@ class ToolPlugin(ABC):
         """
         pass
 
-    def on_tool_registered(self, tool: BaseTool) -> None:  # noqa: B027
+    def on_tool_registered(self, tool: BaseTool) -> None:
         """Called when a tool from this plugin is registered.
 
         Args:
@@ -163,7 +163,7 @@ class ToolPlugin(ABC):
         """
         pass
 
-    def on_tool_executed(self, tool_name: str, success: bool, result: Any) -> None:  # noqa: B027
+    def on_tool_executed(self, tool_name: str, success: bool, result: Any) -> None:
         """Called after a tool from this plugin is executed.
 
         Useful for logging, metrics, or plugin-specific handling.
@@ -193,7 +193,7 @@ class ToolPlugin(ABC):
             enabled=True,
         )
 
-    def validate_config(self) -> List[str]:
+    def validate_config(self) -> list[str]:
         """Validate plugin configuration.
 
         Override this to check required config values.
@@ -259,9 +259,9 @@ class FunctionToolPlugin(ToolPlugin):
         self,
         name: str,
         version: str,
-        tool_functions: List[Any],
+        tool_functions: list[Any],
         description: str = "",
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[dict[str, Any]] = None,
     ):
         """Initialize function-based plugin.
 
@@ -278,7 +278,7 @@ class FunctionToolPlugin(ToolPlugin):
         self.description = description
         self._tool_functions = tool_functions
 
-    def get_tools(self) -> List[BaseTool]:
+    def get_tools(self) -> list[BaseTool]:
         """Convert @tool decorated functions to BaseTool instances."""
         tools = []
         for func in self._tool_functions:

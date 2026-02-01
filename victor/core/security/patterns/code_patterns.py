@@ -47,7 +47,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 from victor.core.security.patterns.types import SafetyPattern
 
@@ -83,7 +83,7 @@ class RiskLevel(Enum):
 
 
 # Git-specific dangerous patterns
-GIT_PATTERNS: List[SafetyPattern] = [
+GIT_PATTERNS: list[SafetyPattern] = [
     # CRITICAL risk - data loss
     SafetyPattern(
         pattern=r"git\s+reset\s+--hard",
@@ -168,7 +168,7 @@ GIT_PATTERNS: List[SafetyPattern] = [
 
 
 # Refactoring-specific patterns
-REFACTORING_PATTERNS: List[SafetyPattern] = [
+REFACTORING_PATTERNS: list[SafetyPattern] = [
     SafetyPattern(
         pattern=r"refactor.*--all",
         description="Refactor across entire codebase",
@@ -191,7 +191,7 @@ REFACTORING_PATTERNS: List[SafetyPattern] = [
 
 
 # Package manager patterns
-PACKAGE_MANAGER_PATTERNS: List[SafetyPattern] = [
+PACKAGE_MANAGER_PATTERNS: list[SafetyPattern] = [
     # Python
     SafetyPattern(
         pattern=r"pip\s+uninstall",
@@ -261,7 +261,7 @@ PACKAGE_MANAGER_PATTERNS: List[SafetyPattern] = [
 
 
 # Build/deployment patterns
-BUILD_DEPLOY_PATTERNS: List[SafetyPattern] = [
+BUILD_DEPLOY_PATTERNS: list[SafetyPattern] = [
     # Docker
     SafetyPattern(
         pattern=r"docker\s+system\s+prune",
@@ -311,7 +311,7 @@ BUILD_DEPLOY_PATTERNS: List[SafetyPattern] = [
 
 
 # Sensitive file patterns
-SENSITIVE_FILE_PATTERNS: List[SafetyPattern] = [
+SENSITIVE_FILE_PATTERNS: list[SafetyPattern] = [
     SafetyPattern(
         pattern=r"\.env$",
         description="Environment file with secrets",
@@ -370,7 +370,7 @@ SENSITIVE_FILE_PATTERNS: List[SafetyPattern] = [
 
 
 # Shell command injection patterns (dangerous shell operations)
-SHELL_INJECTION_PATTERNS: List[SafetyPattern] = [
+SHELL_INJECTION_PATTERNS: list[SafetyPattern] = [
     # Command separators/chaining
     SafetyPattern(
         pattern=r";\s*rm\s+-rf",
@@ -439,8 +439,8 @@ class SafetyScanResult:
         has_high: Whether any HIGH patterns matched
     """
 
-    matches: List[SafetyPattern] = field(default_factory=list)
-    risk_summary: Dict[str, int] = field(default_factory=dict)
+    matches: list[SafetyPattern] = field(default_factory=list)
+    risk_summary: dict[str, int] = field(default_factory=dict)
     has_critical: bool = False
     has_high: bool = False
 
@@ -489,7 +489,7 @@ class CodePatternScanner:
         include_build: bool = True,
         include_files: bool = True,
         include_shell_injection: bool = True,
-        custom_patterns: Optional[List[SafetyPattern]] = None,
+        custom_patterns: Optional[list[SafetyPattern]] = None,
     ):
         """Initialize the scanner.
 
@@ -502,8 +502,8 @@ class CodePatternScanner:
             include_shell_injection: Include shell injection patterns
             custom_patterns: Additional custom patterns to include
         """
-        self._patterns: List[SafetyPattern] = []
-        self._file_patterns: List[SafetyPattern] = []
+        self._patterns: list[SafetyPattern] = []
+        self._file_patterns: list[SafetyPattern] = []
 
         if include_git:
             self._patterns.extend(GIT_PATTERNS)
@@ -544,7 +544,7 @@ class CodePatternScanner:
                 result.add_match(pattern)
         return result
 
-    def scan_commands(self, commands: List[str]) -> SafetyScanResult:
+    def scan_commands(self, commands: list[str]) -> SafetyScanResult:
         """Scan multiple commands for dangerous patterns.
 
         Args:
@@ -589,7 +589,7 @@ class CodePatternScanner:
                 result.add_match(pattern)
         return result
 
-    def get_patterns_by_category(self, category: CodePatternCategory) -> List[SafetyPattern]:
+    def get_patterns_by_category(self, category: CodePatternCategory) -> list[SafetyPattern]:
         """Get patterns for a specific category.
 
         Args:
@@ -600,7 +600,7 @@ class CodePatternScanner:
         """
         return [p for p in self._patterns if p.category == category.value]
 
-    def get_patterns_by_risk(self, risk_level: str) -> List[SafetyPattern]:
+    def get_patterns_by_risk(self, risk_level: str) -> list[SafetyPattern]:
         """Get patterns by risk level.
 
         Args:
@@ -612,12 +612,12 @@ class CodePatternScanner:
         return [p for p in self._patterns if p.risk_level == risk_level]
 
     @property
-    def all_patterns(self) -> List[SafetyPattern]:
+    def all_patterns(self) -> list[SafetyPattern]:
         """Get all command patterns."""
         return self._patterns.copy()
 
     @property
-    def file_patterns(self) -> List[SafetyPattern]:
+    def file_patterns(self) -> list[SafetyPattern]:
         """Get all file patterns."""
         return self._file_patterns.copy()
 
@@ -627,7 +627,7 @@ class CodePatternScanner:
 # =============================================================================
 
 
-def scan_command(command: str) -> List[SafetyPattern]:
+def scan_command(command: str) -> list[SafetyPattern]:
     """Scan a command for dangerous patterns.
 
     Convenience function for quick scanning.
@@ -657,7 +657,7 @@ def is_sensitive_file(path: str) -> bool:
     return scanner.is_sensitive_file(path)
 
 
-def get_all_patterns() -> List[SafetyPattern]:
+def get_all_patterns() -> list[SafetyPattern]:
     """Get all code safety patterns.
 
     Returns:

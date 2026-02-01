@@ -25,8 +25,7 @@ from ToolCoordinator as part of Track 4 refactoring.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from typing import Set, Dict
+from unittest.mock import Mock, patch
 
 from victor.agent.coordinators.tool_alias_resolver import (
     ToolAliasResolver,

@@ -18,7 +18,6 @@ Tests that DevOps assistant properly uses shared tool defaults from
 victor.core.verticals.defaults to eliminate code duplication.
 """
 
-import pytest
 
 from victor.core.verticals.defaults.tool_defaults import COMMON_REQUIRED_TOOLS
 from victor.framework.tool_naming import ToolNames
@@ -125,7 +124,6 @@ class TestDevOpsSharedDefaultsUsage:
 
     def test_devops_uses_merge_required_tools_in_get_tools(self):
         """DevOps get_tools() should use merge_required_tools()."""
-        import victor.devops.assistant as devops_assistant_module
         import inspect
 
         # Get the source code of get_tools method

@@ -27,7 +27,7 @@ import shutil
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 from rich.console import Console
@@ -60,7 +60,7 @@ class EditTransaction(BaseModel):
     """Represents a transaction of multiple file edits."""
 
     id: str = Field(description="Transaction ID")
-    operations: List[EditOperation] = Field(default_factory=list, description="List of operations")
+    operations: list[EditOperation] = Field(default_factory=list, description="List of operations")
     committed: bool = Field(default=False, description="Whether transaction was committed")
     rolled_back: bool = Field(default=False, description="Whether transaction was rolled back")
     timestamp: datetime = Field(default_factory=datetime.now, description="Transaction timestamp")
@@ -100,7 +100,7 @@ class FileEditor:
         self.console = console or Console()
 
         self.current_transaction: Optional[EditTransaction] = None
-        self.transaction_history: List[EditTransaction] = []
+        self.transaction_history: list[EditTransaction] = []
 
     def start_transaction(self, description: str = "") -> str:
         """Start a new edit transaction.
@@ -497,7 +497,7 @@ class FileEditor:
         self.console.print("\n[bold red]✗ Transaction aborted[/]")
         self.current_transaction = None
 
-    def get_transaction_summary(self) -> Dict[str, Any]:
+    def get_transaction_summary(self) -> dict[str, Any]:
         """Get summary of current transaction.
 
         Returns:

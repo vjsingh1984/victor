@@ -36,9 +36,9 @@ References:
 
 import asyncio
 import logging
-import os
 import time
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -160,12 +160,12 @@ class ReplicateProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Replicate."""
@@ -212,12 +212,12 @@ class ReplicateProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Replicate."""
@@ -283,7 +283,7 @@ class ReplicateProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
-    def _messages_to_prompt(self, messages: List[Message]) -> str:
+    def _messages_to_prompt(self, messages: list[Message]) -> str:
         """Convert messages to a prompt string for Replicate models."""
         prompt_parts = []
         system_prompt = ""
@@ -323,7 +323,7 @@ class ReplicateProvider(BaseProvider, HTTPErrorHandlerMixin):
         max_tokens: int,
         stream: bool = False,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a prediction on Replicate."""
         # Parse model name (owner/model or owner/model:version)
         if ":" in model:
@@ -356,7 +356,7 @@ class ReplicateProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def _wait_for_prediction(
         self, prediction_id: str, poll_interval: float = 0.5
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Wait for a prediction to complete."""
         url = f"{self.base_url}/predictions/{prediction_id}"
         start_time = time.time()

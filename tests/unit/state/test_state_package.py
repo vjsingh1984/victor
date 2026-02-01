@@ -4,25 +4,15 @@ Tests the standalone state machine implementation with protocols,
 generic state machine, and integration with conversation state.
 """
 
-from typing import Any, Dict, List, Optional, Set
-from unittest.mock import MagicMock
+from typing import Any, Optional
 
 import pytest
 
 from victor.storage.state import (
     ConversationStage,
-    ConversationState,
-    ConversationStateMachine,
     StateConfig,
     StateMachine,
     StateTransition,
-    STAGE_KEYWORDS,
-)
-from victor.storage.state.protocols import (
-    StageDetectorProtocol,
-    StateObserverProtocol,
-    StateProtocol,
-    TransitionValidatorProtocol,
 )
 
 
@@ -176,11 +166,11 @@ class TestStateMachine:
     def test_observer_notification(self, basic_config: StateConfig):
         """Observers should be notified of transitions."""
         machine = StateMachine(basic_config)
-        transitions: List[tuple] = []
+        transitions: list[tuple] = []
 
         class TestObserver:
             def on_transition(
-                self, old_stage: str, new_stage: str, context: Dict[str, Any]
+                self, old_stage: str, new_stage: str, context: dict[str, Any]
             ) -> None:
                 transitions.append((old_stage, new_stage))
 
@@ -193,11 +183,11 @@ class TestStateMachine:
     def test_observer_removal(self, basic_config: StateConfig):
         """Observers should be removable."""
         machine = StateMachine(basic_config)
-        transitions: List[tuple] = []
+        transitions: list[tuple] = []
 
         class TestObserver:
             def on_transition(
-                self, old_stage: str, new_stage: str, context: Dict[str, Any]
+                self, old_stage: str, new_stage: str, context: dict[str, Any]
             ) -> None:
                 transitions.append((old_stage, new_stage))
 
@@ -217,7 +207,7 @@ class TestStateMachine:
 
         class BlockingValidator:
             def validate(
-                self, current: str, target: str, context: Dict[str, Any]
+                self, current: str, target: str, context: dict[str, Any]
             ) -> tuple[bool, Optional[str]]:
                 if target == "MIDDLE":
                     return False, "MIDDLE is blocked"

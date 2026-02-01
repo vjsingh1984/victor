@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional
 
 import yaml
 
@@ -147,7 +147,7 @@ class VerticalConfigLoader:
             logger.error(f"Validation failed for {yaml_path}: {e}")
             return None
 
-    def _build_config(self, yaml_data: Dict[str, Any], base_path: Path) -> VerticalConfig:
+    def _build_config(self, yaml_data: dict[str, Any], base_path: Path) -> VerticalConfig:
         """Build VerticalConfig from parsed YAML data.
 
         Args:
@@ -209,7 +209,7 @@ class VerticalConfigLoader:
             metadata=final_metadata,
         )
 
-    def _validate_required_fields(self, yaml_data: Dict[str, Any]) -> None:
+    def _validate_required_fields(self, yaml_data: dict[str, Any]) -> None:
         """Validate that required fields are present.
 
         Args:
@@ -243,7 +243,7 @@ class VerticalConfigLoader:
         if "system_prompt" not in core:
             raise ValueError("Missing required field: core.system_prompt")
 
-    def _parse_tools(self, tools_config: Dict[str, Any]) -> List[str]:
+    def _parse_tools(self, tools_config: dict[str, Any]) -> list[str]:
         """Parse tools configuration.
 
         Args:
@@ -268,7 +268,7 @@ class VerticalConfigLoader:
 
         return tools_list
 
-    def _parse_system_prompt(self, prompt_config: Dict[str, Any], base_path: Path) -> str:
+    def _parse_system_prompt(self, prompt_config: dict[str, Any], base_path: Path) -> str:
         """Parse system prompt configuration.
 
         Args:
@@ -313,7 +313,7 @@ class VerticalConfigLoader:
             logger.warning(f"Unknown prompt source: {source}")
             return ""
 
-    def _parse_stages(self, stages_config: Dict[str, Any]) -> Dict[str, StageDefinition]:
+    def _parse_stages(self, stages_config: dict[str, Any]) -> dict[str, StageDefinition]:
         """Parse stage definitions.
 
         Args:
@@ -345,7 +345,7 @@ class VerticalConfigLoader:
 
         return stages
 
-    def _parse_provider_hints(self, provider_config: Dict[str, Any]) -> Dict[str, Any]:
+    def _parse_provider_hints(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Parse provider hints configuration.
 
         Args:
@@ -366,7 +366,7 @@ class VerticalConfigLoader:
 
         return hints
 
-    def _build_extended_metadata(self, yaml_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_extended_metadata(self, yaml_data: dict[str, Any]) -> dict[str, Any]:
         """Build extended metadata from optional sections.
 
         Args:

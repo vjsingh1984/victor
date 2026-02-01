@@ -25,13 +25,9 @@ Identifies missing features in canonical server and ensures deprecation
 warnings are shown for legacy server.
 """
 
-import asyncio
-import importlib
-import json
 import warnings
 import pytest
 from httpx import AsyncClient, ASGITransport
-from typing import Dict, List, Set, Tuple, Any
 from pathlib import Path
 
 
@@ -114,7 +110,7 @@ async def canonical_http_client(canonical_server_app, mocker):
 # =============================================================================
 
 
-def get_fastapi_routes(app) -> Dict[str, List[str]]:
+def get_fastapi_routes(app) -> dict[str, list[str]]:
     """Extract all routes from a FastAPI app.
 
     Returns:
@@ -536,7 +532,7 @@ class TestFeatureCompletenessMatrix:
     """Document complete feature matrix between servers."""
 
     @pytest.fixture
-    def feature_matrix(self) -> Dict[str, Dict[str, bool]]:
+    def feature_matrix(self) -> dict[str, dict[str, bool]]:
         """Define expected feature matrix.
 
         Returns:

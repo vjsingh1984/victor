@@ -26,8 +26,7 @@ Migration Pattern:
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
-from typing import Any, Dict, List
+from unittest.mock import AsyncMock, Mock
 
 from victor.agent.coordinators.session_coordinator import (
     SessionCoordinator,

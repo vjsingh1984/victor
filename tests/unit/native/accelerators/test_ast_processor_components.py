@@ -18,7 +18,7 @@ Tests individual components and methods without external dependencies.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
 
 from victor.native.accelerators.ast_processor import (
     AstProcessorAccelerator,

@@ -53,12 +53,11 @@ import os
 import sys
 import threading
 import time
-import traceback
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from enum import Enum
 from logging.handlers import RotatingFileHandler
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Optional
 
 # Context variable for correlation ID (async-safe)
 correlation_id_var: ContextVar[Optional[str]] = ContextVar("correlation_id", default=None)
@@ -176,7 +175,7 @@ class PerformanceLogger:
     def track_operation(
         self,
         operation_name: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ):
         """Context manager for tracking operation performance.
 
@@ -195,7 +194,7 @@ class PerformanceLogger:
 
         class OperationTimer:
             def __init__(
-                self, perf_logger: PerformanceLogger, name: str, meta: Optional[Dict[str, Any]]
+                self, perf_logger: PerformanceLogger, name: str, meta: Optional[dict[str, Any]]
             ):
                 self.perf_logger = perf_logger
                 self.name = name
@@ -264,7 +263,7 @@ class RequestLogger:
         self,
         method: str,
         path: str,
-        headers: Optional[Dict[str, str]] = None,
+        headers: Optional[dict[str, str]] = None,
         body: Optional[str] = None,
         correlation_id: Optional[str] = None,
     ):
@@ -299,7 +298,7 @@ class RequestLogger:
         self,
         status_code: int,
         duration_ms: float,
-        headers: Optional[Dict[str, str]] = None,
+        headers: Optional[dict[str, str]] = None,
         body: Optional[str] = None,
         error: Optional[str] = None,
     ):
@@ -335,7 +334,7 @@ class RequestLogger:
             extra={"http": log_data},
         )
 
-    def _sanitize_headers(self, headers: Dict[str, str]) -> Dict[str, str]:
+    def _sanitize_headers(self, headers: dict[str, str]) -> dict[str, str]:
         """Sanitize headers by removing sensitive data.
 
         Args:

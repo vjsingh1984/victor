@@ -48,15 +48,11 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Set,
     TypedDict,
     cast,
 )
+from collections.abc import Awaitable, Callable
 
 from victor.workflows.definition import (
     WorkflowDefinition,
@@ -87,11 +83,11 @@ class WorkflowState(TypedDict, total=False):
         is_complete: Whether workflow has completed
     """
 
-    context: Dict[str, Any]
-    messages: List[Dict[str, Any]]
+    context: dict[str, Any]
+    messages: list[dict[str, Any]]
     current_node: str
-    visited_nodes: List[str]
-    results: Dict[str, Any]
+    visited_nodes: list[str]
+    results: dict[str, Any]
     error: Optional[str]
     is_complete: bool
 
@@ -112,11 +108,11 @@ class AdaptedNode:
 
     name: str
     node_type: WorkflowNodeType
-    handler: Callable[[Dict[str, Any]], Dict[str, Any] | Awaitable[Dict[str, Any]]]
-    next_nodes: List[str] = field(default_factory=list)
-    conditional_edges: Dict[str, str] = field(default_factory=dict)
+    handler: Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
+    next_nodes: list[str] = field(default_factory=list)
+    conditional_edges: dict[str, str] = field(default_factory=dict)
     tool_budget: int = 10
-    allowed_tools: List[str] = field(default_factory=list)
+    allowed_tools: list[str] = field(default_factory=list)
 
 
 class WorkflowToGraphAdapter:
@@ -173,7 +169,7 @@ class WorkflowToGraphAdapter:
 
         # Create StateGraph with workflow state
         # Use Dict[str, Any] instead of WorkflowState TypedDict for compatibility
-        graph: StateGraph[Dict[str, Any]] = StateGraph(Dict[str, Any])
+        graph: StateGraph[dict[str, Any]] = StateGraph(dict[str, Any])
 
         # Convert each node - workflow.nodes is a Dict[str, WorkflowNode]
         nodes_list = list(workflow.nodes.values())
@@ -218,10 +214,10 @@ class WorkflowToGraphAdapter:
 
         def create_handler(
             n: WorkflowNode,
-        ) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
+        ) -> Callable[[dict[str, Any]], dict[str, Any]]:
             """Create a state-updating handler for the node."""
 
-            def handler(state: Dict[str, Any]) -> Dict[str, Any]:
+            def handler(state: dict[str, Any]) -> dict[str, Any]:
                 # Update state with node execution
                 new_state = dict(state)
                 new_state["current_node"] = n.name
@@ -269,7 +265,7 @@ class WorkflowToGraphAdapter:
         self,
         workflow: WorkflowDefinition,
         executor: "WorkflowExecutor",
-    ) -> "StateGraph[Dict[str, Any]]":
+    ) -> "StateGraph[dict[str, Any]]":
         """Adapt with real execution handlers.
 
         This version connects the adapted graph to the actual
@@ -286,7 +282,7 @@ class WorkflowToGraphAdapter:
         from victor.framework.graph import StateGraph, END
 
         # Use Dict[str, Any] for compatibility with StateGraph type constraints
-        graph: StateGraph[Dict[str, Any]] = StateGraph(Dict[str, Any])
+        graph: StateGraph[dict[str, Any]] = StateGraph(dict[str, Any])
 
         # Convert each node with real execution - workflow.nodes is a Dict[str, WorkflowNode]
         nodes_list = list(workflow.nodes.values())
@@ -312,7 +308,7 @@ class WorkflowToGraphAdapter:
         self,
         node: WorkflowNode,
         executor: "WorkflowExecutor",
-    ) -> Callable[[Dict[str, Any]], Dict[str, Any] | Awaitable[Dict[str, Any]]]:
+    ) -> Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]:
         """Create an execution handler that uses the workflow executor.
 
         Args:
@@ -323,9 +319,8 @@ class WorkflowToGraphAdapter:
             Handler function for StateGraph
         """
         # Import here to avoid circular imports
-        from victor.workflows.executor import WorkflowExecutor
 
-        async def async_handler(state: Dict[str, Any]) -> Dict[str, Any]:
+        async def async_handler(state: dict[str, Any]) -> dict[str, Any]:
             """Execute the node using the workflow executor."""
             new_state = dict(state)
             new_state["current_node"] = node.name
@@ -369,7 +364,7 @@ class WorkflowToGraphAdapter:
                 asyncio.set_event_loop(loop)
 
             # Convert WorkflowState to Dict[str, Any] for async_handler
-            state_dict: Dict[str, Any] = dict(state)
+            state_dict: dict[str, Any] = dict(state)
             result_dict = loop.run_until_complete(async_handler(state_dict))
             # Convert result back to WorkflowState
             return cast(WorkflowState, result_dict)
@@ -437,7 +432,7 @@ class GraphToWorkflowAdapter:
         return WorkflowDefinition(
             name=name,
             description="Adapted from StateGraph",
-            nodes=cast(Dict[str, WorkflowNode], workflow_nodes),
+            nodes=cast(dict[str, WorkflowNode], workflow_nodes),
         )
 
 

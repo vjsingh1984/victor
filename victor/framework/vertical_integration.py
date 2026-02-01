@@ -135,30 +135,20 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import inspect
 import logging
-import json
-import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Literal,
     Optional,
     Protocol,
-    Set,
-    Tuple,
-    Type,
-    Union,
     runtime_checkable,
 )
+from collections.abc import Callable
 
-from victor.core.verticals import VerticalContext, create_vertical_context
+from victor.core.verticals import VerticalContext
 from victor.core.verticals.mutable_context import MutableVerticalContext
 
 if TYPE_CHECKING:
@@ -169,7 +159,6 @@ if TYPE_CHECKING:
 # Import protocols for runtime isinstance checks
 
 # Import capability registry protocol for type-safe capability access
-from victor.framework.protocols import CapabilityRegistryProtocol
 
 
 def _check_capability(
@@ -291,7 +280,7 @@ class ExtensionLoadErrorInfo:
     is_required: bool = False
     original_exception_type: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "extension_type": self.extension_type,
@@ -333,7 +322,7 @@ class IntegrationResult:
     success: bool = True
     vertical_name: Optional[str] = None
     context: Optional[VerticalContext] = None
-    tools_applied: Set[str] = field(default_factory=set)
+    tools_applied: set[str] = field(default_factory=set)
     middleware_count: int = 0
     safety_patterns_count: int = 0
     prompt_hints_count: int = 0
@@ -341,11 +330,11 @@ class IntegrationResult:
     workflows_count: int = 0
     rl_learners_count: int = 0
     team_specs_count: int = 0
-    step_status: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    info: List[str] = field(default_factory=list)
-    extension_errors: List[ExtensionLoadErrorInfo] = field(default_factory=list)
+    step_status: dict[str, dict[str, Any]] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    info: list[str] = field(default_factory=list)
+    extension_errors: list[ExtensionLoadErrorInfo] = field(default_factory=list)
     validation_status: ValidationStatus = "success"
 
     def add_error(self, error: str) -> None:
@@ -420,7 +409,7 @@ class IntegrationResult:
         """
         return len(self.extension_errors) > 0
 
-    def get_required_extension_failures(self) -> List[ExtensionLoadErrorInfo]:
+    def get_required_extension_failures(self) -> list[ExtensionLoadErrorInfo]:
         """Get list of required extension failures.
 
         Returns:
@@ -432,7 +421,7 @@ class IntegrationResult:
         self,
         step_name: str,
         status: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
         duration_ms: Optional[float] = None,
     ) -> None:
         """Record the execution status of a step handler.
@@ -454,14 +443,14 @@ class IntegrationResult:
                 duration_ms=5.3,
             )
         """
-        step_record: Dict[str, Any] = {"status": status}
+        step_record: dict[str, Any] = {"status": status}
         if details is not None:
             step_record["details"] = details
         if duration_ms is not None:
             step_record["duration_ms"] = duration_ms
         self.step_status[step_name] = step_record
 
-    def get_step_status(self, step_name: str) -> Optional[Dict[str, Any]]:
+    def get_step_status(self, step_name: str) -> Optional[dict[str, Any]]:
         """Get the status record for a specific step.
 
         Args:
@@ -472,7 +461,7 @@ class IntegrationResult:
         """
         return self.step_status.get(step_name)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization (SRP: data -> dict).
 
         Returns:
@@ -541,7 +530,7 @@ class IntegrationResult:
             return None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "IntegrationResult":
+    def from_dict(cls, data: dict[str, Any]) -> "IntegrationResult":
         """Create IntegrationResult from dictionary (SRP: deserialization).
 
         Args:
@@ -601,15 +590,15 @@ class OrchestratorVerticalProtocol(Protocol):
         """Set the vertical context."""
         ...
 
-    def set_enabled_tools(self, tools: Set[str]) -> None:
+    def set_enabled_tools(self, tools: set[str]) -> None:
         """Set enabled tools from vertical."""
         ...
 
-    def apply_vertical_middleware(self, middleware: List[Any]) -> None:
+    def apply_vertical_middleware(self, middleware: list[Any]) -> None:
         """Apply middleware from vertical."""
         ...
 
-    def apply_vertical_safety_patterns(self, patterns: List[Any]) -> None:
+    def apply_vertical_safety_patterns(self, patterns: list[Any]) -> None:
         """Apply safety patterns from vertical."""
         ...
 
@@ -765,8 +754,8 @@ class VerticalIntegrationPipeline:
     def __init__(
         self,
         strict_mode: bool = False,
-        pre_hooks: Optional[List[Callable[[Any, type[Any]], None]]] = None,
-        post_hooks: Optional[List[Callable[[Any, IntegrationResult], None]]] = None,
+        pre_hooks: Optional[list[Callable[[Any, type[Any]], None]]] = None,
+        post_hooks: Optional[list[Callable[[Any, IntegrationResult], None]]] = None,
         step_registry: Optional["StepHandlerRegistry"] = None,
         use_step_handlers: bool = True,
         enable_cache: bool = True,
@@ -788,10 +777,10 @@ class VerticalIntegrationPipeline:
             cache_service: Optional VerticalIntegrationCache service for SRP compliance
         """
         self._strict_mode: bool = strict_mode
-        self._pre_hooks: List[Callable[[Any, type[Any]], None]] = (
+        self._pre_hooks: list[Callable[[Any, type[Any]], None]] = (
             list(pre_hooks) if pre_hooks else []
         )
-        self._post_hooks: List[Callable[[Any, IntegrationResult], None]] = (
+        self._post_hooks: list[Callable[[Any, IntegrationResult], None]] = (
             list(post_hooks) if post_hooks else []
         )
         self._use_step_handlers: bool = use_step_handlers
@@ -843,8 +832,8 @@ class VerticalIntegrationPipeline:
     def apply(
         self,
         orchestrator: Any,
-        vertical: Union[Type["VerticalBase"], str],
-        config_overrides: Optional[Dict[str, Any]] = None,
+        vertical: type["VerticalBase"] | str,
+        config_overrides: Optional[dict[str, Any]] = None,
     ) -> IntegrationResult:
         """Apply a vertical to an orchestrator.
 
@@ -968,8 +957,8 @@ class VerticalIntegrationPipeline:
     async def apply_async(
         self,
         orchestrator: Any,
-        vertical: Union[Type["VerticalBase"], str],
-        config_overrides: Optional[Dict[str, Any]] = None,
+        vertical: type["VerticalBase"] | str,
+        config_overrides: Optional[dict[str, Any]] = None,
     ) -> IntegrationResult:
         """Apply vertical integration asynchronously (Phase 2.1).
 
@@ -1060,7 +1049,7 @@ class VerticalIntegrationPipeline:
 
         return result
 
-    def _classify_handlers(self, handlers: List[Any]) -> Tuple[List[Any], List[Any]]:
+    def _classify_handlers(self, handlers: list[Any]) -> tuple[list[Any], list[Any]]:
         """Classify handlers into independent and dependent groups (Phase 2.2).
 
         Independent handlers can run in parallel (no shared state):
@@ -1093,7 +1082,7 @@ class VerticalIntegrationPipeline:
     async def _apply_with_step_handlers_parallel(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: VerticalContext,
         result: IntegrationResult,
     ) -> None:
@@ -1152,7 +1141,7 @@ class VerticalIntegrationPipeline:
         self,
         handler: Any,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: VerticalContext,
         result: IntegrationResult,
     ) -> None:
@@ -1205,7 +1194,7 @@ class VerticalIntegrationPipeline:
     def _apply_with_step_handlers(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: VerticalContext,
         result: IntegrationResult,
     ) -> None:
@@ -1248,8 +1237,8 @@ class VerticalIntegrationPipeline:
     # See: victor/framework/step_handlers.py
 
     def _resolve_vertical(
-        self, vertical: Union[Type["VerticalBase"], str]
-    ) -> Optional[Type["VerticalBase"]]:
+        self, vertical: type["VerticalBase"] | str
+    ) -> Optional[type["VerticalBase"]]:
         """Resolve vertical from name or return class.
 
         Args:
@@ -1271,7 +1260,7 @@ class VerticalIntegrationPipeline:
         return vertical
 
     def _create_context(
-        self, vertical: Type["VerticalBase"], result: IntegrationResult
+        self, vertical: type["VerticalBase"], result: IntegrationResult
     ) -> Optional[MutableVerticalContext]:
         """Create the MutableVerticalContext for this vertical (DIP compliant).
 
@@ -1368,7 +1357,7 @@ def create_integration_pipeline(
 
 def create_integration_pipeline_with_handlers(
     strict: bool = False,
-    custom_handlers: Optional[List[Any]] = None,
+    custom_handlers: Optional[list[Any]] = None,
     enable_parallel: bool = False,
 ) -> VerticalIntegrationPipeline:
     """Create a pipeline with custom step handlers.
@@ -1430,7 +1419,7 @@ def create_integration_pipeline_with_handlers(
 
 def apply_vertical(
     orchestrator: Any,
-    vertical: Union[Type["VerticalBase"], str],
+    vertical: type["VerticalBase"] | str,
 ) -> IntegrationResult:
     """Apply a vertical to an orchestrator.
 

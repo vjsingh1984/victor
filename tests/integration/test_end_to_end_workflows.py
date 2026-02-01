@@ -38,11 +38,7 @@ Estimated Runtime: 5-10 minutes (depending on concurrency settings)
 import asyncio
 import pytest
 import time
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
-from dataclasses import dataclass, field
+from unittest.mock import AsyncMock, MagicMock
 
 
 # ============================================================================
@@ -60,7 +56,6 @@ async def full_orchestrator(mock_settings, mock_provider, mock_container):
     - Full integration between all components
     """
     from victor.agent.orchestrator_factory import OrchestratorFactory
-    from victor.config.settings import Settings
 
     # Create factory
     factory = OrchestratorFactory(
@@ -172,7 +167,7 @@ def performance_tracker():
 
     class Tracker:
         def __init__(self):
-            self.metrics: Dict[str, List[float]] = {}
+            self.metrics: dict[str, list[float]] = {}
 
         def start(self, operation: str):
             """Start timing an operation."""
@@ -186,7 +181,7 @@ def performance_tracker():
             self.metrics[operation].append(duration)
             return duration
 
-        def get_stats(self, operation: str) -> Dict[str, float]:
+        def get_stats(self, operation: str) -> dict[str, float]:
             """Get statistics for an operation."""
             if operation not in self.metrics or not self.metrics[operation]:
                 return {"avg": 0.0, "min": 0.0, "max": 0.0, "count": 0}
@@ -199,7 +194,7 @@ def performance_tracker():
                 "count": len(values),
             }
 
-        def get_all_stats(self) -> Dict[str, Dict[str, float]]:
+        def get_all_stats(self) -> dict[str, dict[str, float]]:
             """Get statistics for all operations."""
             return {op: self.get_stats(op) for op in self.metrics.keys()}
 

@@ -68,28 +68,22 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
     TypeVar,
-    Union,
-    cast,
     runtime_checkable,
 )
+from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
-    from victor.framework.graph import CompiledGraph, StateGraph
+    from victor.framework.graph import CompiledGraph
     from victor.framework.coordinators import (
         YAMLWorkflowCoordinator,
         GraphExecutionCoordinator,
         HITLCoordinator,
         CacheCoordinator,
     )
-    from victor.workflows.executor import WorkflowExecutor, WorkflowResult
-    from victor.workflows.streaming import WorkflowStreamChunk
+    from victor.workflows.executor import WorkflowExecutor
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
     from victor.workflows.hitl import HITLHandler, HITLExecutor
     from victor.workflows.cache import WorkflowCacheManager
@@ -99,13 +93,12 @@ if TYPE_CHECKING:
     from victor.workflows.graph_compiler import (
         WorkflowGraphCompiler,
         WorkflowDefinitionCompiler,
-        CompilerConfig,
     )
     from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
 logger = logging.getLogger(__name__)
 
-StateType = TypeVar("StateType", bound=Dict[str, Any])
+StateType = TypeVar("StateType", bound=dict[str, Any])
 
 
 # =============================================================================
@@ -154,12 +147,12 @@ class WorkflowExecutionResult:
     """
 
     success: bool
-    final_state: Dict[str, Any] = field(default_factory=dict)
-    nodes_executed: List[str] = field(default_factory=list)
+    final_state: dict[str, Any] = field(default_factory=dict)
+    nodes_executed: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
     error: Optional[str] = None
-    checkpoints: List[str] = field(default_factory=list)
-    hitl_requests: List[Dict[str, Any]] = field(default_factory=list)
+    checkpoints: list[str] = field(default_factory=list)
+    hitl_requests: list[dict[str, Any]] = field(default_factory=list)
     cached: bool = False
 
 
@@ -178,8 +171,8 @@ class WorkflowEvent:
     event_type: str
     node_id: str
     timestamp: float
-    data: Dict[str, Any] = field(default_factory=dict)
-    state_snapshot: Optional[Dict[str, Any]] = None
+    data: dict[str, Any] = field(default_factory=dict)
+    state_snapshot: Optional[dict[str, Any]] = None
 
 
 # =============================================================================
@@ -193,8 +186,8 @@ class WorkflowEngineProtocol(Protocol):
 
     async def execute_yaml(
         self,
-        yaml_path: Union[str, Path],
-        initial_state: Dict[str, Any],
+        yaml_path: str | Path,
+        initial_state: dict[str, Any],
         **kwargs: Any,
     ) -> WorkflowExecutionResult:
         """Execute a workflow from YAML file."""
@@ -203,7 +196,7 @@ class WorkflowEngineProtocol(Protocol):
     async def execute_graph(
         self,
         graph: "CompiledGraph[Any]",
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         **kwargs: Any,
     ) -> WorkflowExecutionResult:
         """Execute a compiled StateGraph."""
@@ -211,8 +204,8 @@ class WorkflowEngineProtocol(Protocol):
 
     async def stream_yaml(
         self,
-        yaml_path: Union[str, Path],
-        initial_state: Dict[str, Any],
+        yaml_path: str | Path,
+        initial_state: dict[str, Any],
         **kwargs: Any,
     ) -> AsyncIterator[WorkflowEvent]:
         """Stream events from YAML workflow execution."""
@@ -221,7 +214,7 @@ class WorkflowEngineProtocol(Protocol):
     async def stream_graph(
         self,
         graph: "CompiledGraph[Any]",
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         **kwargs: Any,
     ) -> AsyncIterator[WorkflowEvent]:
         """Stream events from StateGraph execution."""
@@ -291,7 +284,7 @@ class WorkflowEngine:
         self,
         event_type: str,
         workflow_id: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> None:
         """Emit a workflow event to the EventBus for observability.
 
@@ -328,11 +321,11 @@ class WorkflowEngine:
 
     async def execute_yaml(
         self,
-        yaml_path: Union[str, Path],
-        initial_state: Optional[Dict[str, Any]] = None,
+        yaml_path: str | Path,
+        initial_state: Optional[dict[str, Any]] = None,
         workflow_name: Optional[str] = None,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
-        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[dict[str, Callable[..., Any]]] = None,
         use_unified_compiler: bool = True,
         **kwargs: Any,
     ) -> WorkflowExecutionResult:
@@ -434,7 +427,7 @@ class WorkflowEngine:
     async def execute_graph(
         self,
         graph: "CompiledGraph[Any]",
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> WorkflowExecutionResult:
         """Execute a compiled StateGraph.
@@ -460,7 +453,7 @@ class WorkflowEngine:
     async def execute_definition(
         self,
         workflow: "WorkflowDefinition",
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> WorkflowExecutionResult:
         """Execute a WorkflowDefinition.
@@ -540,7 +533,7 @@ class WorkflowEngine:
     async def execute_workflow_graph(
         self,
         graph: "WorkflowGraph[Any]",
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
         use_node_runners: bool = False,
         **kwargs: Any,
     ) -> WorkflowExecutionResult:
@@ -585,7 +578,7 @@ class WorkflowEngine:
     async def execute_definition_compiled(
         self,
         workflow: "WorkflowDefinition",
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> WorkflowExecutionResult:
         """Execute a WorkflowDefinition via CompiledGraph (unified execution path).
@@ -632,11 +625,11 @@ class WorkflowEngine:
 
     async def stream_yaml(
         self,
-        yaml_path: Union[str, Path],
-        initial_state: Optional[Dict[str, Any]] = None,
+        yaml_path: str | Path,
+        initial_state: Optional[dict[str, Any]] = None,
         workflow_name: Optional[str] = None,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
-        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[dict[str, Callable[..., Any]]] = None,
         use_unified_compiler: bool = True,
         **kwargs: Any,
     ) -> AsyncIterator[WorkflowEvent]:
@@ -728,7 +721,7 @@ class WorkflowEngine:
     async def stream_graph(
         self,
         graph: "CompiledGraph[Any]",
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[WorkflowEvent]:
         """Stream events from StateGraph execution.
@@ -769,9 +762,9 @@ class WorkflowEngine:
 
     async def execute_with_hitl(
         self,
-        yaml_path: Union[str, Path],
-        initial_state: Optional[Dict[str, Any]] = None,
-        approval_callback: Optional[Callable[[Dict[str, Any]], bool]] = None,
+        yaml_path: str | Path,
+        initial_state: Optional[dict[str, Any]] = None,
+        approval_callback: Optional[Callable[[dict[str, Any]], bool]] = None,
         **kwargs: Any,
     ) -> WorkflowExecutionResult:
         """Execute workflow with HITL approval nodes.
@@ -844,7 +837,7 @@ class WorkflowEngine:
         compiler = self._get_unified_compiler()
         return compiler.clear_cache()
 
-    def get_workflow_cache_stats(self) -> Dict[str, Any]:
+    def get_workflow_cache_stats(self) -> dict[str, Any]:
         """Get workflow cache statistics.
 
         Returns comprehensive cache statistics including:
@@ -858,7 +851,7 @@ class WorkflowEngine:
         compiler = self._get_unified_compiler()
         return compiler.get_cache_stats()
 
-    def invalidate_yaml_cache(self, yaml_path: Union[str, Path]) -> int:
+    def invalidate_yaml_cache(self, yaml_path: str | Path) -> int:
         """Invalidate cached definitions for a specific YAML file.
 
         Use this when a YAML file has been modified and the cache
@@ -1003,8 +996,8 @@ def create_workflow_engine(
 
 
 async def run_yaml_workflow(
-    yaml_path: Union[str, Path],
-    initial_state: Optional[Dict[str, Any]] = None,
+    yaml_path: str | Path,
+    initial_state: Optional[dict[str, Any]] = None,
     **kwargs: Any,
 ) -> WorkflowExecutionResult:
     """Convenience function to run a YAML workflow.
@@ -1023,7 +1016,7 @@ async def run_yaml_workflow(
 
 async def run_graph_workflow(
     graph: "CompiledGraph[Any]",
-    initial_state: Optional[Dict[str, Any]] = None,
+    initial_state: Optional[dict[str, Any]] = None,
     **kwargs: Any,
 ) -> WorkflowExecutionResult:
     """Convenience function to run a StateGraph workflow.

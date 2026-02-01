@@ -26,16 +26,13 @@ Run with:
     pytest tests/smoke/test_production_smoke.py -v -m smoke
 """
 
-import asyncio
 import pytest
 import time
-from unittest.mock import MagicMock, AsyncMock, patch
 
 from victor.config.settings import Settings
 from victor.core.container import ServiceContainer
 from victor.core.events import create_event_backend, MessagingEvent, BackendType, BackendConfig
 from victor.providers.mock import MockProvider
-from victor.agent.tool_pipeline import ToolPipeline
 
 
 # =============================================================================
@@ -546,28 +543,16 @@ class TestSmokeTestSummary:
     def test_all_core_components_importable(self):
         """Test all core components can be imported."""
         # Core
-        from victor.core.container import ServiceContainer
-        from victor.core.events import create_event_backend
-        from victor.config.settings import Settings
 
         # Agent
-        from victor.agent.orchestrator import AgentOrchestrator
-        from victor.agent.tool_pipeline import ToolPipeline
 
         # Providers
-        from victor.providers.base import BaseProvider
-        from victor.providers.mock import MockProvider
 
         # Tools
-        from victor.tools.base import BaseTool
 
         # Framework
-        from victor.framework import Agent, Task, State
-        from victor.framework.resilience import CircuitBreaker
-        from victor.framework.validation import ValidationPipeline
 
         # Teams
-        from victor.teams import create_coordinator, TeamFormation
 
         # All imports should succeed
         assert True

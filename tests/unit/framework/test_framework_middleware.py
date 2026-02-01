@@ -25,17 +25,13 @@ These tests verify the framework-level middleware implementations:
 
 import logging
 import pytest
-from unittest.mock import MagicMock, patch
 
 from victor.core.vertical_types import MiddlewarePriority
 from victor.framework.middleware import (
-    CacheMiddleware,
-    CacheResult,
     GitSafetyMiddleware,
     LoggingMiddleware,
     MetricsMiddleware,
     OutputValidationMiddleware,
-    RateLimitMiddleware,
     SafetyCheckMiddleware,
     SecretMaskingMiddleware,
     ToolMetrics,
@@ -43,7 +39,6 @@ from victor.framework.middleware import (
     ContentValidationResult,
     ValidationMiddleware,
     ValidationSeverity,
-    ValidatorProtocol,
 )
 
 

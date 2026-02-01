@@ -37,7 +37,7 @@ Usage:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Dict, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from victor.core.vertical_types import TaskTypeHint
 
@@ -71,7 +71,7 @@ class PromptContributorProtocol(Protocol):
     """
 
     @abstractmethod
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
         """Get task-type-specific prompt hints.
 
         Returns:

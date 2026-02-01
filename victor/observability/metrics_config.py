@@ -31,14 +31,10 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.observability.metrics import (
     MetricsRegistry,
-    Counter,
-    Gauge,
-    Histogram,
-    MetricLabels,
 )
 
 logger = logging.getLogger(__name__)
@@ -176,7 +172,7 @@ class FeatureMetrics:
         """
         self.users.set(user_count)
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get metrics summary.
 
         Returns:
@@ -224,7 +220,7 @@ class FeatureMetricsRegistry:
         """
         self._base_registry = base_registry or MetricsRegistry.get_instance()
         self._prefix = prefix
-        self._metrics: Dict[str, FeatureMetrics] = {}
+        self._metrics: dict[str, FeatureMetrics] = {}
         self._lock = threading.RLock()
 
     def get_or_create(self, feature_name: str) -> FeatureMetrics:
@@ -245,7 +241,7 @@ class FeatureMetricsRegistry:
                 )
             return self._metrics[feature_name]
 
-    def get_all_summaries(self) -> List[Dict[str, Any]]:
+    def get_all_summaries(self) -> list[dict[str, Any]]:
         """Get summaries for all features.
 
         Returns:

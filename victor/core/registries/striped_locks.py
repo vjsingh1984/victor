@@ -46,7 +46,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class LockMetrics:
     total_contention: int = 0
     total_wait_time_ms: float = 0.0
     max_wait_time_ms: float = 0.0
-    stripe_stats: Dict[int, int] = field(default_factory=dict)
+    stripe_stats: dict[int, int] = field(default_factory=dict)
 
     def record_acquire(self, stripe_index: int, wait_time_ms: float, was_contended: bool) -> None:
         """Record a lock acquisition.
@@ -105,7 +105,7 @@ class LockMetrics:
             return 0.0
         return self.total_wait_time_ms / self.total_acquires
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert metrics to dictionary.
 
         Returns:
@@ -155,7 +155,7 @@ class StripedLockManager:
             raise ValueError(f"num_stripes must be a power of 2, got {num_stripes}")
 
         self._num_stripes = num_stripes
-        self._stripes: List[threading.RLock] = [threading.RLock() for _ in range(num_stripes)]
+        self._stripes: list[threading.RLock] = [threading.RLock() for _ in range(num_stripes)]
         self._enable_metrics = enable_metrics
         self._metrics = LockMetrics() if enable_metrics else None
 
@@ -265,7 +265,7 @@ class StripedLockManager:
         """
         return self._num_stripes
 
-    def get_stripe_distribution(self) -> Dict[int, int]:
+    def get_stripe_distribution(self) -> dict[int, int]:
         """Get distribution of locks across stripes.
 
         Returns:
@@ -426,7 +426,7 @@ class StripedReadWriteLockManager:
             raise ValueError(f"num_stripes must be a power of 2, got {num_stripes}")
 
         self._num_stripes = num_stripes
-        self._stripes: List[ReadWriteLock] = [ReadWriteLock() for _ in range(num_stripes)]
+        self._stripes: list[ReadWriteLock] = [ReadWriteLock() for _ in range(num_stripes)]
 
         logger.debug(f"StripedReadWriteLockManager: Initialized with {num_stripes} stripes")
 

@@ -22,8 +22,7 @@ Tests that BatchedObservabilityIntegration:
 """
 
 import asyncio
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock
+from typing import Any
 
 import pytest
 
@@ -39,7 +38,7 @@ class TestBatchedObservabilityIntegration:
     """Test BatchedObservabilityIntegration class."""
 
     @pytest.fixture
-    def emitted_batches(self) -> List[List[Dict[str, Any]]]:
+    def emitted_batches(self) -> list[list[dict[str, Any]]]:
         """Fixture to track emitted batches."""
         return []
 
@@ -47,7 +46,7 @@ class TestBatchedObservabilityIntegration:
     def mock_emitter(self, emitted_batches):
         """Create a mock emitter that tracks batches."""
 
-        async def emitter(events: List[Dict[str, Any]]) -> None:
+        async def emitter(events: list[dict[str, Any]]) -> None:
             emitted_batches.append(events)
 
         return emitter
@@ -221,7 +220,7 @@ class TestImmediateStrategy:
     """Test immediate (non-batched) strategy."""
 
     @pytest.fixture
-    def emitted_batches(self) -> List[List[Dict[str, Any]]]:
+    def emitted_batches(self) -> list[list[dict[str, Any]]]:
         """Fixture to track emitted batches."""
         return []
 
@@ -229,7 +228,7 @@ class TestImmediateStrategy:
     def mock_emitter(self, emitted_batches):
         """Create a mock emitter that tracks batches."""
 
-        async def emitter(events: List[Dict[str, Any]]) -> None:
+        async def emitter(events: list[dict[str, Any]]) -> None:
             emitted_batches.append(events)
 
         return emitter

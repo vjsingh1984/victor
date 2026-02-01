@@ -69,7 +69,8 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +114,7 @@ class LazyInitializer:
         self,
         vertical_name: str,
         initializer: Optional[Callable[[], T]] = None,
-        initializers: Optional[List[Callable[[], Any]]] = None,
+        initializers: Optional[list[Callable[[], Any]]] = None,
     ) -> None:
         """Initialize the lazy initializer.
 
@@ -126,7 +127,7 @@ class LazyInitializer:
 
         # Support both single initializer and list of initializers
         if initializer is not None:
-            self._initializers: List[Callable[[], Any]] = [initializer]
+            self._initializers: list[Callable[[], Any]] = [initializer]
         else:
             self._initializers = list(initializers) if initializers else []
 
@@ -247,14 +248,14 @@ class LazyInitializer:
 # Factory Functions
 # =============================================================================
 
-_initializers: Dict[str, LazyInitializer] = {}
+_initializers: dict[str, LazyInitializer] = {}
 _initializers_lock = threading.Lock()
 
 
 def get_initializer_for_vertical(
     vertical_name: str,
     initializer: Optional[Callable[[], T]] = None,
-    initializers: Optional[List[Callable[[], Any]]] = None,
+    initializers: Optional[list[Callable[[], Any]]] = None,
 ) -> LazyInitializer:
     """Get or create lazy initializer for a vertical.
 
@@ -307,7 +308,7 @@ def clear_all_initializers() -> None:
         logger.debug("Cleared all lazy initializers")
 
 
-def get_all_initializers() -> Dict[str, LazyInitializer]:
+def get_all_initializers() -> dict[str, LazyInitializer]:
     """Get all cached initializers.
 
     Returns:

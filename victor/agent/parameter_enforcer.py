@@ -14,8 +14,8 @@ SOLID Principles Applied:
 Addresses GAP-9 from Grok/DeepSeek provider testing.
 """
 
-from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, List, Callable, Union
+from typing import Optional, Any
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
@@ -55,8 +55,8 @@ class ParameterValidationError(Exception):
         message: str,
         provided_value: Any = None,
         expected_type: Optional[str] = None,
-        examples: Optional[List[str]] = None,
-        valid_range: Optional[Dict[str, Any]] = None,
+        examples: Optional[list[str]] = None,
+        valid_range: Optional[dict[str, Any]] = None,
     ):
         self.param_name = param_name
         self.provided_value = provided_value
@@ -103,7 +103,7 @@ class ParameterInferenceError(Exception):
         param_name: str,
         tool_name: str,
         inference_strategy: Optional[str] = None,
-        available_context_keys: Optional[List[str]] = None,
+        available_context_keys: Optional[list[str]] = None,
     ):
         self.param_name = param_name
         self.tool_name = tool_name
@@ -142,7 +142,7 @@ class ParameterSpec:
     description: str = ""
     inference_strategy: InferenceStrategy = InferenceStrategy.NONE
     inference_key: Optional[str] = None  # Key to look up in context/previous args
-    inference_keys: Optional[List[str]] = None  # Multiple keys to try
+    inference_keys: Optional[list[str]] = None  # Multiple keys to try
 
 
 @dataclass
@@ -158,9 +158,9 @@ class ParameterValidationResult:
     """
 
     is_valid: bool
-    missing_required: List[str] = field(default_factory=list)
-    type_errors: Dict[str, str] = field(default_factory=dict)
-    warnings: List[str] = field(default_factory=list)
+    missing_required: list[str] = field(default_factory=list)
+    type_errors: dict[str, str] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
 
 class ParameterEnforcer:
@@ -175,13 +175,13 @@ class ParameterEnforcer:
     def __init__(
         self,
         tool_name: str,
-        parameter_specs: List[ParameterSpec],
+        parameter_specs: list[ParameterSpec],
     ) -> None:
         self.tool_name = tool_name
         self.specs = {spec.name: spec for spec in parameter_specs}
         self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
-    def validate(self, args: Dict[str, Any]) -> ParameterValidationResult:
+    def validate(self, args: dict[str, Any]) -> ParameterValidationResult:
         """
         Validate arguments against parameter specifications.
 
@@ -191,8 +191,8 @@ class ParameterEnforcer:
         Returns:
             ParameterValidationResult with validation status and any errors
         """
-        missing_required: List[str] = []
-        type_errors: Dict[str, str] = {}
+        missing_required: list[str] = []
+        type_errors: dict[str, str] = {}
 
         for name, spec in self.specs.items():
             if spec.required:
@@ -210,9 +210,9 @@ class ParameterEnforcer:
 
     def enforce(
         self,
-        args: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        args: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """
         Enforce parameter requirements, filling in missing values where possible.
 
@@ -263,7 +263,7 @@ class ParameterEnforcer:
     def _infer_value(
         self,
         spec: ParameterSpec,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> Optional[Any]:
         """
         Attempt to infer a parameter value based on its inference strategy.
@@ -296,7 +296,7 @@ class ParameterEnforcer:
     def _infer_from_previous_args(
         self,
         spec: ParameterSpec,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> Optional[Any]:
         """
         Infer parameter value from previous tool arguments.
@@ -446,7 +446,7 @@ class ParameterEnforcer:
 
 def enforce_parameters(
     tool_name: str,
-    specs: List[ParameterSpec],
+    specs: list[ParameterSpec],
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     Decorator to enforce parameters on a tool execution function.
@@ -473,7 +473,7 @@ def enforce_parameters(
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
-        def wrapper(*args: Any, context: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
+        def wrapper(*args: Any, context: Optional[dict[str, Any]] = None, **kwargs: Any) -> Any:
             # Enforce parameters
             enforced_kwargs = enforcer.enforce(kwargs, context=context)
             return func(*args, **enforced_kwargs)
@@ -487,7 +487,7 @@ def enforce_parameters(
 
 def create_enforcer_for_tool(
     tool_name: str,
-    schema: Dict[str, Any],
+    schema: dict[str, Any],
 ) -> ParameterEnforcer:
     """
     Factory function to create a ParameterEnforcer from a JSON schema.
@@ -530,7 +530,7 @@ def create_enforcer_for_tool(
 
 
 # Pre-configured enforcers for common tools
-TOOL_ENFORCERS: Dict[str, ParameterEnforcer] = {}
+TOOL_ENFORCERS: dict[str, ParameterEnforcer] = {}
 
 
 def get_enforcer_for_tool(tool_name: str) -> Optional[ParameterEnforcer]:
@@ -540,7 +540,7 @@ def get_enforcer_for_tool(tool_name: str) -> Optional[ParameterEnforcer]:
 
 def register_tool_enforcer(
     tool_name: str,
-    specs: List[ParameterSpec],
+    specs: list[ParameterSpec],
 ) -> None:
     """Register a parameter enforcer for a tool."""
     TOOL_ENFORCERS[tool_name] = ParameterEnforcer(

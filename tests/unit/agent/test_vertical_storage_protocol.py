@@ -19,8 +19,8 @@ ensuring DIP compliance for vertical data storage.
 """
 
 import pytest
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, patch
+from typing import Any
+from unittest.mock import MagicMock
 
 
 class TestVerticalStorageProtocol:
@@ -32,22 +32,22 @@ class TestVerticalStorageProtocol:
 
         # Create a minimal implementation
         class MinimalStorage:
-            def set_middleware(self, middleware: List[Any]) -> None:
+            def set_middleware(self, middleware: list[Any]) -> None:
                 pass
 
-            def get_middleware(self) -> List[Any]:
+            def get_middleware(self) -> list[Any]:
                 return []
 
-            def set_safety_patterns(self, patterns: List[Any]) -> None:
+            def set_safety_patterns(self, patterns: list[Any]) -> None:
                 pass
 
-            def get_safety_patterns(self) -> List[Any]:
+            def get_safety_patterns(self) -> list[Any]:
                 return []
 
-            def set_team_specs(self, specs: Dict[str, Any]) -> None:
+            def set_team_specs(self, specs: dict[str, Any]) -> None:
                 pass
 
-            def get_team_specs(self) -> Dict[str, Any]:
+            def get_team_specs(self) -> dict[str, Any]:
                 return {}
 
         storage = MinimalStorage()
@@ -55,11 +55,10 @@ class TestVerticalStorageProtocol:
 
     def test_protocol_rejects_incomplete_implementation(self):
         """VerticalStorageProtocol should reject incomplete implementations."""
-        from victor.agent.protocols import VerticalStorageProtocol
 
         # Create an incomplete implementation
         class IncompleteStorage:
-            def set_middleware(self, middleware: List[Any]) -> None:
+            def set_middleware(self, middleware: list[Any]) -> None:
                 pass
 
             # Missing other methods
@@ -85,26 +84,26 @@ class TestVerticalStorageProtocolImplementation:
 
         class MockStorage:
             def __init__(self):
-                self._middleware: List[Any] = []
-                self._safety_patterns: List[Any] = []
-                self._team_specs: Dict[str, Any] = {}
+                self._middleware: list[Any] = []
+                self._safety_patterns: list[Any] = []
+                self._team_specs: dict[str, Any] = {}
 
-            def set_middleware(self, middleware: List[Any]) -> None:
+            def set_middleware(self, middleware: list[Any]) -> None:
                 self._middleware = middleware
 
-            def get_middleware(self) -> List[Any]:
+            def get_middleware(self) -> list[Any]:
                 return self._middleware
 
-            def set_safety_patterns(self, patterns: List[Any]) -> None:
+            def set_safety_patterns(self, patterns: list[Any]) -> None:
                 self._safety_patterns = patterns
 
-            def get_safety_patterns(self) -> List[Any]:
+            def get_safety_patterns(self) -> list[Any]:
                 return self._safety_patterns
 
-            def set_team_specs(self, specs: Dict[str, Any]) -> None:
+            def set_team_specs(self, specs: dict[str, Any]) -> None:
                 self._team_specs = specs
 
-            def get_team_specs(self) -> Dict[str, Any]:
+            def get_team_specs(self) -> dict[str, Any]:
                 return self._team_specs
 
         return MockStorage()
@@ -282,7 +281,7 @@ class TestFrameworkStepHandlerUsage:
     def test_protocol_type_hints_work_correctly(self):
         """Test that protocol can be used as type hint."""
         from victor.agent.protocols import VerticalStorageProtocol
-        from typing import Any, Dict, List
+        from typing import Any
 
         def configure_vertical(storage: VerticalStorageProtocol) -> None:
             """Function that accepts any VerticalStorageProtocol implementation."""
@@ -292,22 +291,22 @@ class TestFrameworkStepHandlerUsage:
 
         # Create a conforming implementation
         class ConformingStorage:
-            def set_middleware(self, middleware: List[Any]) -> None:
+            def set_middleware(self, middleware: list[Any]) -> None:
                 pass
 
-            def get_middleware(self) -> List[Any]:
+            def get_middleware(self) -> list[Any]:
                 return []
 
-            def set_safety_patterns(self, patterns: List[Any]) -> None:
+            def set_safety_patterns(self, patterns: list[Any]) -> None:
                 pass
 
-            def get_safety_patterns(self) -> List[Any]:
+            def get_safety_patterns(self) -> list[Any]:
                 return []
 
-            def set_team_specs(self, specs: Dict[str, Any]) -> None:
+            def set_team_specs(self, specs: dict[str, Any]) -> None:
                 pass
 
-            def get_team_specs(self) -> Dict[str, Any]:
+            def get_team_specs(self) -> dict[str, Any]:
                 return {}
 
         storage = ConformingStorage()
@@ -321,7 +320,6 @@ class TestProtocolIntegrationWithAdapter:
 
     def test_adapter_can_use_storage_protocol(self):
         """Test that VerticalIntegrationAdapter can work with storage protocol."""
-        from victor.agent.protocols import VerticalStorageProtocol
         from unittest.mock import MagicMock
 
         # Simulate orchestrator implementing VerticalStorageProtocol

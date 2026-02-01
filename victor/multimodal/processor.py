@@ -28,12 +28,11 @@ Design Principles:
 """
 
 import asyncio
-import base64
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.multimodal.audio_processor import AudioProcessor
@@ -78,13 +77,13 @@ class ProcessingResult:
 
     status: ProcessingStatus
     content: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     confidence: float = 1.0
     error: Optional[str] = None
     media_type: Optional[MediaType] = None
     source: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "status": self.status.value,
@@ -192,7 +191,7 @@ class MultiModalProcessor:
 
     async def process_image(
         self,
-        image_path: Union[str, Path],
+        image_path: str | Path,
         query: Optional[str] = None,
         encode_base64: bool = False,
     ) -> ProcessingResult:
@@ -224,7 +223,7 @@ class MultiModalProcessor:
 
     async def process_document(
         self,
-        document_path: Union[str, Path],
+        document_path: str | Path,
         query: Optional[str] = None,
         extract_images: bool = False,
     ) -> ProcessingResult:
@@ -256,7 +255,7 @@ class MultiModalProcessor:
 
     async def process_audio(
         self,
-        audio_path: Union[str, Path],
+        audio_path: str | Path,
         query: Optional[str] = None,
         diarize: bool = False,
     ) -> ProcessingResult:
@@ -288,7 +287,7 @@ class MultiModalProcessor:
 
     async def process_video(
         self,
-        video_path: Union[str, Path],
+        video_path: str | Path,
         query: Optional[str] = None,
         extract_frames: int = 5,
     ) -> ProcessingResult:
@@ -347,9 +346,9 @@ class MultiModalProcessor:
 
     async def batch_process(
         self,
-        items: List[Dict[str, Any]],
+        items: list[dict[str, Any]],
         max_concurrency: int = 5,
-    ) -> List[ProcessingResult]:
+    ) -> list[ProcessingResult]:
         """Process multiple items concurrently.
 
         Args:
@@ -361,7 +360,7 @@ class MultiModalProcessor:
         """
         semaphore = asyncio.Semaphore(max_concurrency)
 
-        async def process_with_semaphore(item: Dict[str, Any]) -> ProcessingResult:
+        async def process_with_semaphore(item: dict[str, Any]) -> ProcessingResult:
             async with semaphore:
                 media_type = item.get("type", "").lower()
                 path = item["path"]
@@ -386,7 +385,7 @@ class MultiModalProcessor:
         tasks = [process_with_semaphore(item) for item in items]
         return await asyncio.gather(*tasks, return_exceptions=False)
 
-    def get_supported_formats(self) -> Dict[MediaType, List[str]]:
+    def get_supported_formats(self) -> dict[MediaType, list[str]]:
         """Get supported file formats by media type.
 
         Returns:
@@ -399,7 +398,7 @@ class MultiModalProcessor:
             MediaType.VIDEO: self.audio_processor.supported_video_formats,
         }
 
-    def is_supported(self, file_path: Union[str, Path]) -> bool:
+    def is_supported(self, file_path: str | Path) -> bool:
         """Check if file format is supported.
 
         Args:

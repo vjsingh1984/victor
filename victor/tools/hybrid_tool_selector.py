@@ -30,7 +30,8 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 from victor.providers.base import ToolDefinition
 from victor.tools.selection_filters import blend_tool_results, deduplicate_tools
@@ -38,7 +39,6 @@ from victor.config.tool_selection_defaults import HybridSelectorDefaults
 
 if TYPE_CHECKING:
     from victor.agent.protocols import ToolSelectionContext, ToolSelectorFeatures
-    from victor.tools.selection.protocol import ToolSelectionStrategy
     from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
     from victor.protocols.tool_selector import IToolSelector
 
@@ -173,7 +173,7 @@ class HybridToolSelector:
         self,
         prompt: str,
         context: "ToolSelectionContext",
-    ) -> List[ToolDefinition]:
+    ) -> list[ToolDefinition]:
         """Select tools by blending semantic and keyword strategies with RL boost.
 
         Strategy:
@@ -281,9 +281,9 @@ class HybridToolSelector:
 
     def _apply_rl_boost(
         self,
-        tools: List[ToolDefinition],
+        tools: list[ToolDefinition],
         task_type: str,
-    ) -> List[ToolDefinition]:
+    ) -> list[ToolDefinition]:
         """Apply RL-based boost to rerank tools.
 
         Uses learned Q-values to boost tools with higher historical success rates.
@@ -317,7 +317,7 @@ class HybridToolSelector:
 
             # Exploitation: boost based on learned Q-values
             tool_names = [t.name for t in tools]
-            rankings: List[Any] = getattr(learner, "get_tool_rankings", lambda n, t: [])(
+            rankings: list[Any] = getattr(learner, "get_tool_rankings", lambda n, t: [])(
                 tool_names, task_type
             )
 
@@ -382,7 +382,7 @@ class HybridToolSelector:
         self,
         tool_name: str,
         success: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record tool execution (delegates to all selectors including RL).
 
@@ -411,7 +411,7 @@ class HybridToolSelector:
         self,
         tool_name: str,
         success: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record outcome to RL learner for Q-value updates.
 
@@ -527,10 +527,10 @@ class HybridToolSelector:
 
     def _ensure_minimum_tools(
         self,
-        blended: List[ToolDefinition],
-        semantic_tools: List[ToolDefinition],
-        keyword_tools: List[ToolDefinition],
-    ) -> List[ToolDefinition]:
+        blended: list[ToolDefinition],
+        semantic_tools: list[ToolDefinition],
+        keyword_tools: list[ToolDefinition],
+    ) -> list[ToolDefinition]:
         """Ensure minimum tool requirements are met.
 
         If blending doesn't include enough semantic or keyword tools,
@@ -667,7 +667,7 @@ class HybridToolSelector:
         self,
         prompt: str,
         context: "ToolSelectionContext",
-    ) -> Optional[List[ToolDefinition]]:
+    ) -> Optional[list[ToolDefinition]]:
         """Try to get cached selection result.
 
         Args:
@@ -724,7 +724,7 @@ class HybridToolSelector:
         self,
         prompt: str,
         context: "ToolSelectionContext",
-        tools: List[ToolDefinition],
+        tools: list[ToolDefinition],
     ) -> None:
         """Store selection result in cache.
 
@@ -795,7 +795,7 @@ class HybridToolSelector:
         if hasattr(self.keyword, "notify_tools_changed"):
             self.keyword.notify_tools_changed()
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache performance statistics.
 
         Returns:

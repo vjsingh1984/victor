@@ -37,19 +37,17 @@ Usage:
         break
 """
 
-import hashlib
 import logging
 from collections import Counter, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 import yaml
 
 from victor.tools.tool_names import ToolNames, get_canonical_name
-from victor.agent.loop_detector import LoopSignature, LoopContext, OperationPurpose
-from victor.tools.metadata_registry import get_progress_params
+from victor.agent.loop_detector import LoopSignature, LoopContext
 from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
@@ -177,9 +175,9 @@ class TaskConfig:
     tool_budget: int = 50
     loop_repeat_threshold: int = 4  # Warning at 3, block at 4
     needs_tools: bool = True
-    required_tools: List[str] = field(default_factory=list)
-    stage_tools: Dict[str, List[str]] = field(default_factory=dict)
-    force_action_hints: Dict[str, str] = field(default_factory=dict)
+    required_tools: list[str] = field(default_factory=list)
+    stage_tools: dict[str, list[str]] = field(default_factory=dict)
+    force_action_hints: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -189,7 +187,7 @@ class StopDecision:
     should_stop: bool
     reason: TrackerStopReason = TrackerStopReason.NONE
     hint: str = ""
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     is_warning: bool = False
 
 
@@ -212,19 +210,19 @@ class UnifiedTaskProgress:
     tool_budget: int = 50
 
     # Milestone tracking
-    milestones: Set[Milestone] = field(default_factory=set)
-    target_files: Set[str] = field(default_factory=set)
-    target_entities: Set[str] = field(default_factory=set)
-    files_read: Set[str] = field(default_factory=set)
-    files_modified: Set[str] = field(default_factory=set)
+    milestones: set[Milestone] = field(default_factory=set)
+    target_files: set[str] = field(default_factory=set)
+    target_entities: set[str] = field(default_factory=set)
+    files_read: set[str] = field(default_factory=set)
+    files_modified: set[str] = field(default_factory=set)
 
     # Loop detection
-    unique_resources: Set[str] = field(default_factory=set)
-    file_read_ranges: Dict[str, List[FileReadRange]] = field(default_factory=dict)
+    unique_resources: set[str] = field(default_factory=set)
+    file_read_ranges: dict[str, list[FileReadRange]] = field(default_factory=dict)
     signature_history: deque[str] = field(default_factory=lambda: deque(maxlen=10))
     base_resource_counts: Counter[str] = field(default_factory=Counter)
     loop_warning_given: bool = False
-    permanently_blocked: Set[str] = field(
+    permanently_blocked: set[str] = field(
         default_factory=set
     )  # Signatures that are permanently blocked
     warned_signature: Optional[str] = None
@@ -262,7 +260,7 @@ class UnifiedTaskConfigLoader:
     """
 
     # Base configuration template (tool_budget populated dynamically from DEFAULT_TOOL_BUDGETS)
-    BASE_CONFIG_TEMPLATE: Dict[str, Any] = {
+    BASE_CONFIG_TEMPLATE: dict[str, Any] = {
         "task_types": {
             "edit": {
                 "max_exploration_iterations": 10,
@@ -409,7 +407,7 @@ class UnifiedTaskConfigLoader:
     }
 
     @classmethod
-    def _get_default_config(cls) -> Dict[str, Any]:
+    def _get_default_config(cls) -> dict[str, Any]:
         """Get default configuration with tool budgets from centralized settings.
 
         This ensures UnifiedTaskTracker uses the same budget values as
@@ -452,10 +450,10 @@ class UnifiedTaskConfigLoader:
 
         return config
 
-    DEFAULT_CONFIG: Optional[Dict[str, Any]] = None
+    DEFAULT_CONFIG: Optional[dict[str, Any]] = None
 
     _instance: Optional["UnifiedTaskConfigLoader"] = None
-    _config: Optional[Dict[str, Any]] = None
+    _config: Optional[dict[str, Any]] = None
 
     def __new__(cls) -> "UnifiedTaskConfigLoader":
         if cls._instance is None:
@@ -553,7 +551,7 @@ class UnifiedTaskConfigLoader:
             force_action_hints=task_data.get("force_action_hints", {}),
         )
 
-    def get_global_config(self) -> Dict[str, Any]:
+    def get_global_config(self) -> dict[str, Any]:
         """Get global configuration settings."""
         config = self._config or self.DEFAULT_CONFIG
         if config is None:
@@ -563,7 +561,7 @@ class UnifiedTaskConfigLoader:
             return result
         return {}
 
-    def get_model_override(self, model_name: str) -> Dict[str, Any]:
+    def get_model_override(self, model_name: str) -> dict[str, Any]:
         """Get model-specific override settings."""
         config = self._config or self.DEFAULT_CONFIG
         if config is None:
@@ -679,7 +677,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         return max(0, self._progress.tool_budget - self._progress.tool_calls)
 
     @property
-    def milestones(self) -> Set[Milestone]:
+    def milestones(self) -> set[Milestone]:
         """Get achieved milestones."""
         return self._progress.milestones.copy()
 
@@ -743,7 +741,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
             f"multiplier={exploration_multiplier}, patience={continuation_patience}"
         )
 
-    def set_target_files(self, files: Set[str]) -> None:
+    def set_target_files(self, files: set[str]) -> None:
         """Set target files for the task."""
         self._progress.target_files = files
 
@@ -791,11 +789,11 @@ class UnifiedTaskTracker(ModeAwareMixin):
         logger.debug(f"UnifiedTaskTracker: max_total_iterations set to {iterations}")
         self._allow_iteration_override = False
 
-    def set_target_entities(self, entities: Set[str]) -> None:
+    def set_target_entities(self, entities: set[str]) -> None:
         """Set target entities (functions, classes) for the task."""
         self._progress.target_entities = entities
 
-    def get_required_tools(self) -> Set[str]:
+    def get_required_tools(self) -> set[str]:
         """Get the required tools for the current task type.
 
         Returns:
@@ -884,7 +882,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         "rename",
     }
 
-    def record_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def record_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Record a tool call - updates milestones, loops, and budgets.
 
         Classifies tool calls as exploration (read/search) or action (write/modify).
@@ -1115,7 +1113,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         return None
 
-    def is_blocked_after_warning(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+    def is_blocked_after_warning(self, tool_name: str, arguments: dict[str, Any]) -> Optional[str]:
         """Check if a tool call is blocked due to being in the permanent block list.
 
         Once a signature is warned (in check_loop_warning), it's permanently blocked
@@ -1153,7 +1151,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
     # Metrics
     # =========================================================================
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get current progress metrics for logging/monitoring."""
         return {
             "task_type": self._progress.task_type.value,
@@ -1175,7 +1173,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
     # Internal Methods
     # =========================================================================
 
-    def _update_milestones(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def _update_milestones(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Update milestones based on tool call."""
         if tool_name in {"list_directory", "code_search", "semantic_code_search"}:
             self._progress.milestones.add(Milestone.TARGET_IDENTIFIED)
@@ -1204,7 +1202,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
             if Milestone.CHANGE_MADE in self._progress.milestones:
                 self._progress.milestones.add(Milestone.CHANGE_VERIFIED)
 
-    def _update_loop_state(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def _update_loop_state(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Update loop detection state."""
         # Track file reads with offset-aware detection
         if get_canonical_name(tool_name) == CANONICAL_READ_TOOL:
@@ -1233,7 +1231,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         else:
             self._progress.consecutive_research_calls = 0
 
-    def _track_file_read(self, arguments: Dict[str, Any]) -> None:
+    def _track_file_read(self, arguments: dict[str, Any]) -> None:
         """Track file read with offset-aware overlap detection."""
         path = arguments.get("path", "")
         if not path:
@@ -1248,7 +1246,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         self._progress.file_read_ranges[path].append(new_range)
 
-    def _track_resource(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def _track_resource(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Track unique resource access."""
         resource_key = self._get_resource_key(tool_name, arguments)
         if resource_key:
@@ -1455,7 +1453,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
             return "Please complete the task or explain what's blocking you."
 
     def _get_signature(
-        self, tool_name: str, arguments: Dict[str, Any], include_stage: bool = True
+        self, tool_name: str, arguments: dict[str, Any], include_stage: bool = True
     ) -> str:
         """Generate context-aware signature for loop detection.
 
@@ -1489,7 +1487,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         # Use enhanced LoopSignature class
         return LoopSignature.generate(tool_name, arguments, context)
 
-    def _get_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+    def _get_resource_key(self, tool_name: str, arguments: dict[str, Any]) -> Optional[str]:
         """Generate resource key for tracking unique resources."""
         canonical = get_canonical_name(tool_name)
         if canonical == CANONICAL_READ_TOOL:
@@ -1508,7 +1506,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
             return f"bash:{command[:50]}" if command else None
         return None
 
-    def _get_base_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+    def _get_base_resource_key(self, tool_name: str, arguments: dict[str, Any]) -> Optional[str]:
         """Generate base resource key for loop detection."""
         if tool_name == "list_directory":
             path = arguments.get("path", "")
@@ -1528,7 +1526,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
                     return f"bash:{base}"
         return None
 
-    def _get_details(self) -> Dict[str, Any]:
+    def _get_details(self) -> dict[str, Any]:
         """Get details dict for stop decision."""
         return {
             "task_type": self._progress.task_type.value,
@@ -1555,7 +1553,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         return self._progress.iteration_count
 
     @property
-    def unique_resources(self) -> Set[str]:
+    def unique_resources(self) -> set[str]:
         """Get unique resources (LoopDetector compatibility)."""
         return self._progress.unique_resources.copy()
 
@@ -1600,8 +1598,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
     def detect_task_type_with_negation(
         self,
         message: str,
-        history: Optional[List[Dict[str, Any]]] = None,
-    ) -> Tuple[TrackerTaskType, "ClassificationResult"]:
+        history: Optional[list[dict[str, Any]]] = None,
+    ) -> tuple[TrackerTaskType, "ClassificationResult"]:
         """Detect task type using negation-aware keyword classification.
 
         Uses UnifiedTaskClassifier for robust classification that handles:
@@ -1660,8 +1658,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
     def classify_with_negation_awareness(
         self,
         message: str,
-        history: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+        history: Optional[list[dict[str, Any]]] = None,
+    ) -> dict[str, Any]:
         """Classify message with full negation awareness and return detailed results.
 
         Combines UnifiedTaskClassifier (keyword + negation) with UnifiedTaskTracker
@@ -1700,8 +1698,8 @@ class UnifiedTaskTracker(ModeAwareMixin):
     def update_from_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
-        result: Optional[Dict[str, Any]] = None,
+        arguments: dict[str, Any],
+        result: Optional[dict[str, Any]] = None,
     ) -> None:
         """Update tracker from tool call (TaskMilestoneMonitor compatibility).
 
@@ -1723,7 +1721,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
         # Already handled in record_tool_call
         pass
 
-    def should_force_action(self) -> Tuple[bool, Optional[str]]:
+    def should_force_action(self) -> tuple[bool, Optional[str]]:
         """Check if action should be forced (TaskMilestoneMonitor compatibility).
 
         Returns:
@@ -1816,7 +1814,7 @@ def create_tracker_for_task(task_type: TrackerTaskType) -> UnifiedTaskTracker:
     return tracker
 
 
-def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, TrackerTaskType]:
+def create_tracker_from_message(message: str) -> tuple[UnifiedTaskTracker, TrackerTaskType]:
     """Create a tracker by classifying a message.
 
     Args:
@@ -1857,8 +1855,8 @@ def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, Track
 
 def create_tracker_with_negation_awareness(
     message: str,
-    history: Optional[List[Dict[str, Any]]] = None,
-) -> Tuple[UnifiedTaskTracker, TrackerTaskType, Dict[str, Any]]:
+    history: Optional[list[dict[str, Any]]] = None,
+) -> tuple[UnifiedTaskTracker, TrackerTaskType, dict[str, Any]]:
     """Create a tracker using negation-aware keyword classification.
 
     This is the recommended way to create a tracker when negation detection
@@ -1900,8 +1898,8 @@ def create_tracker_with_negation_awareness(
 
 def create_tracker_with_prompt_requirements(
     message: str,
-    history: Optional[List[Dict[str, Any]]] = None,
-) -> Tuple[UnifiedTaskTracker, TrackerTaskType, Dict[str, Any]]:
+    history: Optional[list[dict[str, Any]]] = None,
+) -> tuple[UnifiedTaskTracker, TrackerTaskType, dict[str, Any]]:
     """Create a tracker using prompt requirement extraction.
 
     This function extracts explicit requirements from the prompt (e.g.,

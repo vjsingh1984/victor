@@ -17,8 +17,6 @@
 import asyncio
 import pytest
 import time
-from typing import List
-from unittest.mock import Mock, patch, AsyncMock
 
 from victor.core.cache import (
     ResponseCache,

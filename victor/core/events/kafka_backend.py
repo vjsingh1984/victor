@@ -67,7 +67,8 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
+from typing import Any, Optional
+from collections.abc import Awaitable, Callable
 
 try:
     from aiokafka import AIOKafkaConsumer, AIOKafkaProducer  # type: ignore[import-not-found]
@@ -81,11 +82,8 @@ from victor.core.events.pattern_matcher import matches_topic_pattern
 from victor.core.events.protocols import (
     BackendConfig,
     BackendType,
-    DeliveryGuarantee,
     EventHandler,
     EventPublishError,
-    EventSubscriptionError,
-    IEventBackend,
     MessagingEvent,
     SubscriptionHandle,
 )
@@ -101,7 +99,7 @@ class _KafkaSubscription:
     pattern: str
     handler: EventHandler
     is_active: bool = True
-    topics: List[str] = field(default_factory=list)
+    topics: list[str] = field(default_factory=list)
 
 
 class _BoundSubscriptionHandle(SubscriptionHandle):
@@ -204,9 +202,9 @@ class KafkaEventBackend:
         self._is_connected = False
 
         # Subscription management
-        self._subscriptions: Dict[str, _KafkaSubscription] = {}
+        self._subscriptions: dict[str, _KafkaSubscription] = {}
         self._consumer_task: Optional[asyncio.Task[None]] = None
-        self._subscribed_topics: Set[str] = set()
+        self._subscribed_topics: set[str] = set()
         self._lock = asyncio.Lock()
 
         # Statistics
@@ -224,13 +222,13 @@ class KafkaEventBackend:
         """Check if backend is connected and ready."""
         return self._is_connected
 
-    def _get_common_config(self) -> Dict[str, Any]:
+    def _get_common_config(self) -> dict[str, Any]:
         """Get common Kafka configuration for both producer and consumer.
 
         Returns:
             Dictionary with common Kafka settings
         """
-        config: Dict[str, Any] = {
+        config: dict[str, Any] = {
             "bootstrap_servers": self._bootstrap_servers,
             "client_id": self._client_id,
             "security_protocol": self._security_protocol,
@@ -407,7 +405,7 @@ class KafkaEventBackend:
             logger.error(f"Failed to publish event {event.id}: {e}")
             raise EventPublishError(event, str(e), retryable=True) from e
 
-    async def publish_batch(self, events: List[MessagingEvent]) -> int:
+    async def publish_batch(self, events: list[MessagingEvent]) -> int:
         """Publish multiple events to Kafka.
 
         Uses producer batching for efficiency.
@@ -570,7 +568,7 @@ class KafkaEventBackend:
         if self._consumer_task is None or self._consumer_task.done():
             self._consumer_task = asyncio.create_task(self._consume_loop())
 
-    async def _create_consumer(self, topics: List[str]) -> None:
+    async def _create_consumer(self, topics: list[str]) -> None:
         """Create Kafka consumer for given topics.
 
         Args:
@@ -644,7 +642,7 @@ class KafkaEventBackend:
                 self._error_count += 1
                 await asyncio.sleep(1.0)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get backend statistics.
 
         Returns:

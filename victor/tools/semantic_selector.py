@@ -21,7 +21,7 @@ import pickle
 import re
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Optional
 
 # Disable tokenizers parallelism BEFORE importing sentence_transformers
 # This prevents "bad value(s) in fds_to_keep" errors in async contexts
@@ -49,7 +49,6 @@ from victor.tools.metadata_registry import (
 from victor.config.tool_selection_defaults import (
     SemanticSelectorDefaults,
     FallbackTools,
-    QueryPatterns,
 )
 
 # Import classification protocol to avoid circular imports
@@ -166,7 +165,7 @@ class SemanticToolSelector:
         self.cache_file = self.cache_dir / cache_filename
 
         # In-memory cache: tool_name → embedding vector
-        self._tool_embedding_cache: Dict[str, np.ndarray] = {}
+        self._tool_embedding_cache: dict[str, np.ndarray] = {}
 
         # Tool version hash (to detect when tools change)
         self._tools_hash: Optional[str] = None
@@ -181,7 +180,7 @@ class SemanticToolSelector:
         # PERF-002: Category memberships cache for fast pre-filtering
         # Maps category → set of tool names in that category
         # Expected: 3-5x improvement for category-specific queries
-        self._category_memberships_cache: Dict[str, Set[str]] = {}
+        self._category_memberships_cache: dict[str, set[str]] = {}
 
         # Note: sentence-transformers model is managed by shared EmbeddingService singleton
         # This reduces memory usage by sharing the model with IntentClassifier
@@ -193,12 +192,12 @@ class SemanticToolSelector:
 
         # Phase 3: Tool usage tracking and learning (also project-isolated)
         self._usage_cache_file = self.cache_dir / f"tool_usage_stats_{project_hash}.pkl"
-        self._tool_usage_cache: Dict[str, Dict[str, Any]] = {}
+        self._tool_usage_cache: dict[str, dict[str, Any]] = {}
         self._usage_cache_dirty = False  # Dirty flag - only save when changed
         self._load_usage_cache()
 
         # Phase 6: Store last cost warnings for retrieval
-        self._last_cost_warnings: List[str] = []
+        self._last_cost_warnings: list[str] = []
         # Track which tools have already been warned about (warn once per session)
         self._warned_tools: set = set()
 
@@ -551,7 +550,7 @@ class SemanticToolSelector:
         "audit": ["audit"],
     }
 
-    def get_tools_for_logical_category(self, logical_category: str) -> List[str]:
+    def get_tools_for_logical_category(self, logical_category: str) -> list[str]:
         """Get tools for a logical category using the registry.
 
         Maps logical category names (file_ops, git_ops) to registry categories
@@ -616,16 +615,16 @@ class SemanticToolSelector:
     # Tools for conceptual queries - forces semantic search as primary
     # Excludes ls to prevent LLM from exploring instead of searching
     # Uses centralized FallbackTools from tool_selection_defaults
-    CONCEPTUAL_FALLBACK_TOOLS: List[str] = list(FallbackTools.CONCEPTUAL_FALLBACK_TOOLS)
+    CONCEPTUAL_FALLBACK_TOOLS: list[str] = list(FallbackTools.CONCEPTUAL_FALLBACK_TOOLS)
 
     # Common fallback tools - used when semantic selection returns too few results
     # These are the most universally useful tools
     # Uses centralized FallbackTools from tool_selection_defaults
-    COMMON_FALLBACK_TOOLS: List[str] = list(FallbackTools.COMMON_FALLBACK_TOOLS)
+    COMMON_FALLBACK_TOOLS: list[str] = list(FallbackTools.COMMON_FALLBACK_TOOLS)
 
     def _get_fallback_tools(
         self, tools: "ToolRegistry", max_tools: int = 5, query: str = ""
-    ) -> List[str]:
+    ) -> list[str]:
         """Get fallback tools when semantic selection returns too few results.
 
         Instead of broadcasting ALL tools (which wastes tokens), return a
@@ -680,7 +679,7 @@ class SemanticToolSelector:
                 return True
         return False
 
-    def _get_mandatory_tools(self, query: str) -> List[str]:
+    def _get_mandatory_tools(self, query: str) -> list[str]:
         """Get tools that MUST be included based on keywords.
 
         Uses registry-based lookup. Tools declare mandatory keywords via
@@ -702,7 +701,7 @@ class SemanticToolSelector:
 
         return list(mandatory)
 
-    def _get_relevant_categories(self, query: str) -> List[str]:
+    def _get_relevant_categories(self, query: str) -> list[str]:
         """Determine which tool categories are relevant for this query.
 
         Uses ToolMetadataRegistry dynamically for category lookups, falling
@@ -773,7 +772,7 @@ class SemanticToolSelector:
         analysis_keywords = ["analyze", "analysis", "review", "check", "scan", "audit", "inspect"]
         return any(kw in query_lower for kw in analysis_keywords)
 
-    def _extract_pending_actions(self, conversation_history: List[Dict[str, Any]]) -> List[str]:
+    def _extract_pending_actions(self, conversation_history: list[dict[str, Any]]) -> list[str]:
         """Extract actions mentioned in original request but not yet completed.
 
         Args:
@@ -823,7 +822,7 @@ class SemanticToolSelector:
 
         return pending
 
-    def _was_action_completed(self, action: str, history: List[Dict[str, Any]]) -> bool:
+    def _was_action_completed(self, action: str, history: list[dict[str, Any]]) -> bool:
         """Check if an action was completed based on conversation history.
 
         Checks both tool calls made and text content for completion indicators.
@@ -889,8 +888,8 @@ class SemanticToolSelector:
     def _build_contextual_query(
         self,
         current_query: str,
-        conversation_history: List[Dict[str, Any]],
-        pending_actions: List[str],
+        conversation_history: list[dict[str, Any]],
+        pending_actions: list[str],
     ) -> str:
         """Build enhanced query with conversation context.
 
@@ -963,7 +962,7 @@ class SemanticToolSelector:
         except Exception as e:
             logger.warning(f"Failed to save usage cache: {e}")
 
-    def _initialize_all_tool_stats(self, tools: List[Any]) -> None:
+    def _initialize_all_tool_stats(self, tools: list[Any]) -> None:
         """Pre-initialize usage stats for ALL tools, not just used ones.
 
         This ensures that show_tool_stats.py and other analytics tools can
@@ -992,7 +991,7 @@ class SemanticToolSelector:
             )
             self._usage_cache_dirty = True  # Mark dirty, save on shutdown
 
-    def _build_category_cache(self, tools: List[Any]) -> None:
+    def _build_category_cache(self, tools: list[Any]) -> None:
         """Build category memberships cache for fast pre-filtering (PERF-002).
 
         Populates _category_memberships_cache with all tools in each category.
@@ -1242,8 +1241,8 @@ class SemanticToolSelector:
         return 0.0
 
     def _apply_sequence_boosts(
-        self, similarities: List[Tuple[Any, float]]
-    ) -> List[Tuple[Any, float]]:
+        self, similarities: list[tuple[Any, float]]
+    ) -> list[tuple[Any, float]]:
         """Apply sequence-based boosts to all tool similarity scores.
 
         Args:
@@ -1314,9 +1313,9 @@ class SemanticToolSelector:
     def _try_get_cached_selection(
         self,
         query: str,
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        conversation_history: Optional[list[dict[str, Any]]] = None,
         similarity_threshold: float = SemanticSelectorDefaults.SIMILARITY_THRESHOLD,
-    ) -> Optional[List[ToolDefinition]]:
+    ) -> Optional[list[ToolDefinition]]:
         """Try to get cached tool selection result.
 
         Args:
@@ -1369,8 +1368,8 @@ class SemanticToolSelector:
     def _store_selection_in_cache(
         self,
         query: str,
-        tools: List[ToolDefinition],
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        tools: list[ToolDefinition],
+        conversation_history: Optional[list[dict[str, Any]]] = None,
         similarity_threshold: float = SemanticSelectorDefaults.SIMILARITY_THRESHOLD,
         selection_latency_ms: float = 0.0,
     ) -> None:
@@ -1436,7 +1435,7 @@ class SemanticToolSelector:
         config_str = f"threshold:{similarity_threshold}:model:{self.embedding_model}"
         return hashlib.sha256(config_str.encode()).hexdigest()[:16]
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache performance statistics.
 
         Returns:
@@ -1451,8 +1450,8 @@ class SemanticToolSelector:
             return {"enabled": False}
 
     def _generate_cost_warnings(
-        self, selected_tools: List[Tuple[Any, float]], tools: ToolRegistry
-    ) -> List[str]:
+        self, selected_tools: list[tuple[Any, float]], tools: ToolRegistry
+    ) -> list[str]:
         """Generate user-facing warnings for high-cost tools in selection.
 
         Args:
@@ -1490,7 +1489,7 @@ class SemanticToolSelector:
 
         return warnings
 
-    def get_last_cost_warnings(self) -> List[str]:
+    def get_last_cost_warnings(self) -> list[str]:
         """Get cost warnings from the last tool selection.
 
         Returns:
@@ -1508,10 +1507,10 @@ class SemanticToolSelector:
         self,
         user_message: str,
         tools: ToolRegistry,
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        conversation_history: Optional[list[dict[str, Any]]] = None,
         max_tools: int = 5,
         similarity_threshold: float = SemanticSelectorDefaults.SIMILARITY_THRESHOLD,
-    ) -> List[ToolDefinition]:
+    ) -> list[ToolDefinition]:
         """Select tools with full conversation context awareness (Phase 2).
 
         This method enhances tool selection by:
@@ -1600,7 +1599,7 @@ class SemanticToolSelector:
         candidate_tool_names = set(category_tools) | set(mandatory_tool_names)
 
         # Calculate similarity scores for candidate tools only
-        similarities: List[Tuple[Any, float]] = []
+        similarities: list[tuple[Any, float]] = []
 
         for tool in tools.list_tools():
             # PERF-002: Skip if tool not in candidate set (pre-filtering via cache)
@@ -1732,7 +1731,7 @@ class SemanticToolSelector:
         tools: ToolRegistry,
         max_tools: int = 5,
         similarity_threshold: float = SemanticSelectorDefaults.SIMILARITY_THRESHOLD,
-    ) -> List[ToolDefinition]:
+    ) -> list[ToolDefinition]:
         """Select relevant tools using semantic similarity with category filtering.
 
         Enhanced with Phase 1 features:
@@ -1784,7 +1783,7 @@ class SemanticToolSelector:
         candidate_tool_names = set(category_tools) | set(mandatory_tool_names)
 
         # Calculate similarity scores for candidate tools only
-        similarities: List[Tuple[Any, float]] = []
+        similarities: list[tuple[Any, float]] = []
 
         for tool in tools.list_tools():
             # PERF-002: Skip if tool not in candidate set (pre-filtering via cache)
@@ -1954,7 +1953,7 @@ class SemanticToolSelector:
             logger.warning("Falling back to random embedding")
             return np.random.randn(384).astype(np.float32)
 
-    async def _get_embeddings_batch(self, texts: List[str]) -> List[np.ndarray]:
+    async def _get_embeddings_batch(self, texts: list[str]) -> list[np.ndarray]:
         """Get embeddings for multiple texts efficiently (PERF-003).
 
         Batch embedding generation provides 2-3x speedup for multiple texts.
@@ -1969,7 +1968,7 @@ class SemanticToolSelector:
         if not texts:
             return []
 
-        embeddings: List[np.ndarray | None] = []
+        embeddings: list[np.ndarray | None] = []
         uncached_indices = []
         uncached_texts = []
 
@@ -2143,7 +2142,7 @@ class SemanticToolSelector:
     # Classification-Aware Tool Selection (UnifiedTaskClassifier Integration)
     # ========================================================================
 
-    def _get_tools_for_task_type(self, task_type_str: str) -> List[str]:
+    def _get_tools_for_task_type(self, task_type_str: str) -> list[str]:
         """Get relevant tools based on task type.
 
         Uses registry-based lookup. Tools declare their task types via
@@ -2166,8 +2165,8 @@ class SemanticToolSelector:
 
     def _get_excluded_tools_from_negations(
         self,
-        negated_keywords: List[Any],
-    ) -> Set[str]:
+        negated_keywords: list[Any],
+    ) -> set[str]:
         """Get tools that should be excluded based on negated keywords.
 
         Uses registry-based lookup. When user says "don't analyze", this
@@ -2179,7 +2178,7 @@ class SemanticToolSelector:
         Returns:
             Set of tool names to exclude from selection
         """
-        excluded: Set[str] = set()
+        excluded: set[str] = set()
 
         for match in negated_keywords:
             keyword = match.keyword if hasattr(match, "keyword") else str(match)
@@ -2225,10 +2224,10 @@ class SemanticToolSelector:
         user_message: str,
         tools: ToolRegistry,
         classification_result: IClassificationResult,
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        conversation_history: Optional[list[dict[str, Any]]] = None,
         max_tools: int = 5,
         base_similarity_threshold: float = SemanticSelectorDefaults.SIMILARITY_THRESHOLD,
-    ) -> List[ToolDefinition]:
+    ) -> list[ToolDefinition]:
         """Select tools using classification result for smarter selection.
 
         Integrates with UnifiedTaskClassifier to:
@@ -2292,7 +2291,7 @@ class SemanticToolSelector:
             candidate_tool_names = candidate_tool_names - excluded_tools
 
         # Calculate similarity scores for candidate tools only
-        similarities: List[Tuple[Any, float]] = []
+        similarities: list[tuple[Any, float]] = []
 
         for tool in tools.list_tools():
             # PERF-002: Skip if tool not in candidate set (pre-filtering via cache)
@@ -2398,7 +2397,7 @@ class SemanticToolSelector:
             for tool, _ in selected_tools
         ]
 
-    def get_classification_tool_stats(self) -> Dict[str, Any]:
+    def get_classification_tool_stats(self) -> dict[str, Any]:
         """Get statistics about classification-aware tool selection.
 
         Returns:
@@ -2424,7 +2423,7 @@ class SemanticToolSelector:
 
         return stats
 
-    def get_performance_stats(self) -> Dict[str, Any]:
+    def get_performance_stats(self) -> dict[str, Any]:
         """Get performance statistics for tool selection (PERF-005).
 
         Returns:
@@ -2458,7 +2457,7 @@ class SemanticToolSelector:
             / self._query_cache_max_size,
         }
 
-    def get_next_tool_suggestions(self, top_k: int = 5) -> List[Tuple[str, float]]:
+    def get_next_tool_suggestions(self, top_k: int = 5) -> list[tuple[str, float]]:
         """Get suggested next tools based on workflow patterns (Phase 9).
 
         Uses the ToolSequenceTracker to predict likely next tools based on
@@ -2475,7 +2474,7 @@ class SemanticToolSelector:
 
         return self._sequence_tracker.get_next_suggestions(top_k=top_k)
 
-    def get_current_workflow(self) -> Optional[Tuple[str, float]]:
+    def get_current_workflow(self) -> Optional[tuple[str, float]]:
         """Detect if we're in the middle of a known workflow (Phase 9).
 
         Returns:
@@ -2658,8 +2657,8 @@ class SemanticToolSelector:
     def prioritize_by_stage(
         self,
         user_message: str,
-        tools: Optional[List["ToolDefinition"]],
-    ) -> Optional[List["ToolDefinition"]]:
+        tools: Optional[list["ToolDefinition"]],
+    ) -> Optional[list["ToolDefinition"]]:
         """Stage-aware pruning of tool list to keep it focused per step.
 
         Note: SemanticToolSelector returns tools as-is since stage-based
@@ -2681,7 +2680,7 @@ class SemanticToolSelector:
 
     def _emit_semantic_match_event(
         self,
-        selected_tools: List[Tuple[Any, float]],
+        selected_tools: list[tuple[Any, float]],
         threshold: float,
         task_type: str = "default",
         classification_aware: bool = False,

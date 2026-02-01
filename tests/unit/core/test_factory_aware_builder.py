@@ -15,7 +15,7 @@
 """Test FactoryAwareBuilder class."""
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 from victor.agent.builders.base import FactoryAwareBuilder, ComponentBuilder
 from victor.config.settings import Settings

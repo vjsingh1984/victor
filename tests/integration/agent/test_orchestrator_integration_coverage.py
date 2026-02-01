@@ -34,21 +34,14 @@ Run with:
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from victor.protocols import (
     AnalyticsEvent,
-    CompactionContext,
-    ContextBudget,
-    PromptContext,
 )
-from victor.config.settings import Settings
 from victor.providers.base import Message
 
 

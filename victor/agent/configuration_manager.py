@@ -25,7 +25,7 @@ Design Principles:
 """
 
 import logging
-from typing import Any, Dict, Optional, Set, TYPE_CHECKING, Protocol, cast
+from typing import Any, Optional, TYPE_CHECKING, Protocol, cast
 
 if TYPE_CHECKING:
     from victor.agent.vertical_context import VerticalContext
@@ -97,7 +97,7 @@ class ConfigurationManager:
     def get_enabled_tools(
         self,
         tool_access_controller: Optional["ToolAccessController"] = None,
-    ) -> Set[str]:
+    ) -> set[str]:
         """Get the set of enabled tools.
 
         Args:
@@ -119,7 +119,7 @@ class ConfigurationManager:
                 enabled_tools = controller.get_enabled_tools()
             else:
                 enabled_tools = controller.get_allowed_tools()
-            return cast(Set[str], enabled_tools)
+            return cast(set[str], enabled_tools)
         except Exception as e:
             logger.warning(f"Failed to get enabled tools: {e}")
             return set()
@@ -146,13 +146,13 @@ class ConfigurationManager:
 
         return default
 
-    def get_all_configs(self) -> Dict[str, Any]:
+    def get_all_configs(self) -> dict[str, Any]:
         """Get all configuration values as a dictionary.
 
         Returns:
             Dictionary of all configuration values
         """
-        configs: Dict[str, Any] = {}
+        configs: dict[str, Any] = {}
 
         if self._tiered_config is not None:
             configs["tiered_config"] = self._tiered_config
@@ -195,7 +195,7 @@ class ConfigurationManagerProtocol(Protocol):
         """Get the current tiered tool configuration."""
         raise NotImplementedError("get_tiered_config must be implemented by subclass")
 
-    def get_enabled_tools(self) -> Set[str]:
+    def get_enabled_tools(self) -> set[str]:
         """Get the set of enabled tools."""
         raise NotImplementedError("get_enabled_tools must be implemented by subclass")
 
@@ -203,7 +203,7 @@ class ConfigurationManagerProtocol(Protocol):
         """Get a configuration value from the vertical context."""
         ...
 
-    def get_all_configs(self) -> Dict[str, Any]:
+    def get_all_configs(self) -> dict[str, Any]:
         """Get all configuration values as a dictionary."""
         ...
 

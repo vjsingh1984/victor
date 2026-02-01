@@ -18,26 +18,22 @@ This module provides the main ABTestManager class for creating, managing,
 and analyzing A/B experiments.
 """
 
-import asyncio
 import sqlite3
 import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.experiments.ab_testing.models import (
     AllocationStrategy,
-    AggregatedMetrics,
     ExperimentConfig,
     ExperimentResult,
     ExperimentStatus,
-    ExperimentVariant,
     ExecutionMetrics,
     VariantResult,
 )
 from victor.experiments.ab_testing.allocator import (
     StickyAllocator,
-    TrafficAllocator,
     create_allocator,
 )
 
@@ -95,8 +91,8 @@ class ABTestManager:
         self._init_database()
 
         # In-memory cache for active experiments
-        self._active_experiments: Dict[str, ExperimentConfig] = {}
-        self._experiment_status: Dict[str, ExperimentStatus] = {}
+        self._active_experiments: dict[str, ExperimentConfig] = {}
+        self._experiment_status: dict[str, ExperimentStatus] = {}
 
     def _init_database(self) -> None:
         """Initialize SQLite database with required tables."""
@@ -474,7 +470,7 @@ class ABTestManager:
         self,
         experiment_id: str,
         user_id: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Allocate a user to a variant.
 

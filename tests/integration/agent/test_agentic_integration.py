@@ -32,11 +32,9 @@ Tests ensure:
 """
 
 import pytest
-from typing import Any
-from pathlib import Path
 
 from victor.config.settings import Settings
-from victor.core.container import ServiceContainer, ServiceLifetime
+from victor.core.container import ServiceContainer
 
 
 # =============================================================================

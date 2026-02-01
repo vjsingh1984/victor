@@ -36,14 +36,10 @@ Uses mock search engines to avoid network dependencies.
 
 from __future__ import annotations
 
-import json
-from datetime import datetime
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import httpx
-import respx
 
 from victor.research.handlers import (
     CitationFormatterHandler,
@@ -71,7 +67,7 @@ class MockComputeNode:
     def __init__(
         self,
         node_id: str = "test_node",
-        input_mapping: Dict[str, Any] = None,
+        input_mapping: dict[str, Any] = None,
         output_key: str = None,
     ):
         self.id = node_id
@@ -82,7 +78,7 @@ class MockComputeNode:
 class MockWorkflowContext:
     """Mock workflow context for testing."""
 
-    def __init__(self, data: Dict[str, Any] = None):
+    def __init__(self, data: dict[str, Any] = None):
         self._data = data or {}
 
     def get(self, key: str, default: Any = None) -> Any:

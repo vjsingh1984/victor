@@ -48,7 +48,7 @@ import asyncio
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from watchdog.observers import Observer
 from watchdog.events import (
@@ -214,7 +214,7 @@ class FileWatcher(IFileWatcher):
         self._event_queue: asyncio.Queue[FileChangeEvent] = asyncio.Queue()
         self._event_loop: Optional[asyncio.AbstractEventLoop] = None
         self._event_handler: Optional[FileChangeHandler] = None
-        self._watched_paths: Dict[str, Any] = {}
+        self._watched_paths: dict[str, Any] = {}
         self._running = False
         self._lock = threading.Lock()
 
@@ -357,7 +357,7 @@ class FileWatcher(IFileWatcher):
 
                 self._watched_paths.pop(dir_str, None)
 
-    async def get_changes(self) -> List[FileChangeEvent]:
+    async def get_changes(self) -> list[FileChangeEvent]:
         """Get pending file change events.
 
         Returns:
@@ -367,7 +367,7 @@ class FileWatcher(IFileWatcher):
             This method consumes and returns all pending events.
             Subsequent calls will only return new events.
         """
-        changes: List[FileChangeEvent] = []
+        changes: list[FileChangeEvent] = []
 
         # Drain the queue
         while True:

@@ -20,7 +20,7 @@ enabling clean control flow and testable iteration logic.
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.providers.base import StreamChunk
 
@@ -47,10 +47,10 @@ class IterationResult:
     """
 
     action: IterationAction
-    chunks: List[StreamChunk] = field(default_factory=list)
+    chunks: list[StreamChunk] = field(default_factory=list)
     content: str = ""
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
-    tool_results: List[Dict[str, Any]] = field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    tool_results: list[dict[str, Any]] = field(default_factory=list)
     error: Optional[str] = None
     quality_score: float = 0.5
     tokens_used: float = 0.0
@@ -106,7 +106,7 @@ class ProviderResponseResult:
     """
 
     content: str = ""
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     tokens_used: float = 0.0
     garbage_detected: bool = False
     error: Optional[str] = None
@@ -129,8 +129,8 @@ class ToolExecutionResult:
     Encapsulates the outcomes of tool execution phase.
     """
 
-    results: List[Dict[str, Any]] = field(default_factory=list)
-    chunks: List[StreamChunk] = field(default_factory=list)
+    results: list[dict[str, Any]] = field(default_factory=list)
+    chunks: list[StreamChunk] = field(default_factory=list)
     all_succeeded: bool = True
     blocked_count: int = 0
 
@@ -146,7 +146,7 @@ class ToolExecutionResult:
         result: Any = None,
         error: Optional[str] = None,
         elapsed: float = 0.0,
-        args: Optional[Dict[str, Any]] = None,
+        args: Optional[dict[str, Any]] = None,
     ) -> None:
         """Add a tool result."""
         self.results.append(
@@ -173,7 +173,7 @@ def create_break_result(content: str = "", error: Optional[str] = None) -> Itera
 
 def create_continue_result(
     content: str = "",
-    tool_calls: Optional[List[Dict[str, Any]]] = None,
+    tool_calls: Optional[list[dict[str, Any]]] = None,
     tokens: float = 0.0,
 ) -> IterationResult:
     """Create an iteration result that continues the loop."""

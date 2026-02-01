@@ -21,9 +21,9 @@ the deprecated google-generativeai package.
 """
 
 import logging
-import os
 import warnings
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 # Suppress Google SDK warning about non-text parts (we handle it correctly)
 warnings.filterwarnings(
@@ -64,7 +64,7 @@ logger = logging.getLogger(__name__)
 
 # Safety threshold levels mapping to new SDK string values
 # The new SDK uses string-based category and threshold identifiers
-SAFETY_LEVELS: Dict[str, str] = {
+SAFETY_LEVELS: dict[str, str] = {
     "block_none": "BLOCK_NONE",
     "off": "OFF",
     "block_few": "BLOCK_ONLY_HIGH",
@@ -152,12 +152,12 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Google.
@@ -249,12 +249,12 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Google.
@@ -332,7 +332,7 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
-    def _convert_tools(self, tools: List[ToolDefinition]) -> List[Any]:
+    def _convert_tools(self, tools: list[ToolDefinition]) -> list[Any]:
         """Convert tools to Gemini format using proper SDK types.
 
         Uses google.genai.types for proper native function calling support.
@@ -368,7 +368,7 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
         # Wrap in Tool object - this is the proper way to pass tools
         return [types.Tool(function_declarations=function_declarations)]
 
-    def _clean_schema_for_gemini(self, schema: Dict[str, Any]) -> Dict[str, Any]:
+    def _clean_schema_for_gemini(self, schema: dict[str, Any]) -> dict[str, Any]:
         """Remove unsupported JSON Schema fields for Gemini API compatibility.
 
         Gemini's Schema proto doesn't support certain standard JSON Schema fields
@@ -397,7 +397,7 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return clean_recursive(schema)
 
-    def _convert_messages(self, messages: List[Message]) -> List[Any]:
+    def _convert_messages(self, messages: list[Message]) -> list[Any]:
         """Convert messages to Gemini format.
 
         Args:
@@ -590,7 +590,7 @@ class GoogleProvider(BaseProvider, HTTPErrorHandlerMixin):
             is_final=is_final,
         )
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List available Google Gemini models.
 
         Queries the Google API to list available generative models.

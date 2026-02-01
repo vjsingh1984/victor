@@ -42,12 +42,10 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 import tempfile
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 from victor.framework.workflows.base_handler import BaseHandler
 from victor.framework.handler_registry import handler_decorator
@@ -90,7 +88,7 @@ class BenchmarkTestRunnerHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute test runner."""
         test_file = node.input_mapping.get("test_file", "")
         test_command = node.input_mapping.get("test_command", "")
@@ -131,9 +129,9 @@ class BenchmarkTestRunnerHandler(BaseHandler):
 
         return output, 1
 
-    def _parse_test_output(self, output: str, framework: str) -> Dict[str, Any]:
+    def _parse_test_output(self, output: str, framework: str) -> dict[str, Any]:
         """Parse test output to extract results."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "passed": 0,
             "failed": 0,
             "total": 0,
@@ -202,11 +200,11 @@ class EnvironmentSetupHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute environment setup."""
         language = node.input_mapping.get("language", "python")
         deps_input: Any = node.input_mapping.get("dependencies", [])
-        dependencies: List[str] = (
+        dependencies: list[str] = (
             deps_input if isinstance(deps_input, list) else [deps_input] if deps_input else []
         )
         workspace = node.input_mapping.get("workspace", "")
@@ -218,7 +216,7 @@ class EnvironmentSetupHandler(BaseHandler):
         if not workspace:
             workspace = tempfile.mkdtemp(prefix="benchmark_")
 
-        output: Dict[str, Any] = {
+        output: dict[str, Any] = {
             "workspace": workspace,
             "language": language,
             "ready": False,
@@ -274,7 +272,7 @@ class LiveExecutorHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute live code with real-time feedback."""
         code = node.input_mapping.get("code", "")
         language = node.input_mapping.get("language", "python")
@@ -340,7 +338,7 @@ class LanguageDetectorHandler(BaseHandler):
           output: language_info
     """
 
-    extension_map: Dict[str, str] = field(
+    extension_map: dict[str, str] = field(
         default_factory=lambda: {
             ".py": "python",
             ".js": "javascript",
@@ -366,10 +364,10 @@ class LanguageDetectorHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute language detection."""
         files_input: Any = node.input_mapping.get("files", [])
-        files: List[str] = (
+        files: list[str] = (
             files_input
             if isinstance(files_input, list)
             else [files_input] if isinstance(files_input, str) else []
@@ -388,7 +386,7 @@ class LanguageDetectorHandler(BaseHandler):
         if not files:
             raise ValueError("No files provided")
 
-        language_counts: Dict[str, int] = {}
+        language_counts: dict[str, int] = {}
         for file_path in files:
             ext = Path(file_path).suffix.lower()
             lang = self.extension_map.get(ext, "unknown")
@@ -434,7 +432,7 @@ class PolyglotVerifierHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute polyglot verification."""
         language = node.input_mapping.get("language", "python")
         test_command = node.input_mapping.get("test_command", "")
@@ -443,7 +441,7 @@ class PolyglotVerifierHandler(BaseHandler):
         if isinstance(test_command, str) and test_command.startswith("$ctx."):
             test_command = context.get(test_command[5:]) or ""
 
-        output: Dict[str, Any] = {
+        output: dict[str, Any] = {
             "syntax_valid": False,
             "tests_pass": False,
             "lint_clean": True,
@@ -505,16 +503,16 @@ class MultiSolutionValidatorHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute multi-solution validation."""
         solutions_input: Any = node.input_mapping.get("solutions", [])
-        solutions: List[str] = (
+        solutions: list[str] = (
             solutions_input
             if isinstance(solutions_input, list)
             else [solutions_input] if isinstance(solutions_input, str) else []
         )
         test_cases_input: Any = node.input_mapping.get("test_cases", [])
-        test_cases: List[str] = (
+        test_cases: list[str] = (
             test_cases_input
             if isinstance(test_cases_input, list)
             else [test_cases_input] if isinstance(test_cases_input, str) else []
@@ -529,7 +527,7 @@ class MultiSolutionValidatorHandler(BaseHandler):
 
         passed_solutions = 0
         best_solution = ""
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         for i, solution in enumerate(solutions):
             if not solution or not isinstance(solution, str):
@@ -615,11 +613,11 @@ class CodeTesterHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute code testing."""
         code = node.input_mapping.get("code", "")
         test_cases_input: Any = node.input_mapping.get("test_cases", [])
-        test_cases: List[str] = (
+        test_cases: list[str] = (
             test_cases_input
             if isinstance(test_cases_input, list)
             else [test_cases_input] if isinstance(test_cases_input, str) else []
@@ -688,7 +686,7 @@ class SyntaxCheckHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute syntax check."""
         code = node.input_mapping.get("code", "")
         language = node.input_mapping.get("language", "python")
@@ -700,7 +698,7 @@ class SyntaxCheckHandler(BaseHandler):
         if not code:
             raise ValueError("No code provided")
 
-        output: Dict[str, Any] = {
+        output: dict[str, Any] = {
             "valid": False,
             "language": language,
             "errors": [],

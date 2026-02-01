@@ -20,16 +20,12 @@ for orchestrator_factory.py, testing missing methods and edge cases.
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
-from unittest.mock import AsyncMock, Mock, patch, MagicMock
-from collections import namedtuple
+from unittest.mock import Mock, patch
 
 import pytest
 
 from victor.agent.orchestrator_factory import (
     OrchestratorFactory,
-    create_orchestrator_factory,
 )
 from tests.factories import (
     MockProviderFactory,

@@ -49,13 +49,13 @@ import inspect
 import logging
 import os
 import threading
-from typing import Any, Dict, List, Optional, Set, Type
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 
 # Web tools that should be filtered out in airgapped mode
-WEB_TOOL_NAMES: Set[str] = {
+WEB_TOOL_NAMES: set[str] = {
     "web_search",
     "web_fetch",
     "http_tool",
@@ -100,15 +100,15 @@ class SharedToolRegistry:
                 "to get the singleton instance."
             )
 
-        self._tool_classes: Dict[str, Type[Any]] = {}
-        self._decorated_tools: Dict[str, Any] = {}
+        self._tool_classes: dict[str, type[Any]] = {}
+        self._decorated_tools: dict[str, Any] = {}
         self._initialized: bool = False
         self._discovery_lock: threading.Lock = threading.Lock()
 
         # OPTIMIZATION: Cache tool instances to avoid repeated instantiation
         # This significantly improves performance when get_all_tools_for_registration()
         # is called multiple times
-        self._tool_instances_cache: Optional[Dict[str, Any]] = None
+        self._tool_instances_cache: Optional[dict[str, Any]] = None
 
         logger.debug("SharedToolRegistry instance created")
 
@@ -153,7 +153,7 @@ class SharedToolRegistry:
             cls._instance = None
             logger.debug("SharedToolRegistry instance reset")
 
-    def get_tool_classes(self, airgapped_mode: bool = False) -> Dict[str, Type[Any]]:
+    def get_tool_classes(self, airgapped_mode: bool = False) -> dict[str, type[Any]]:
         """Get all discovered tool classes.
 
         This method returns the cached dictionary of tool classes. If tools
@@ -184,7 +184,7 @@ class SharedToolRegistry:
 
         return self._tool_classes
 
-    def get_decorated_tools(self, airgapped_mode: bool = False) -> Dict[str, Any]:
+    def get_decorated_tools(self, airgapped_mode: bool = False) -> dict[str, Any]:
         """Get all discovered decorated tool functions.
 
         This method returns decorated functions (those using @tool decorator)
@@ -211,7 +211,7 @@ class SharedToolRegistry:
 
         return self._decorated_tools
 
-    def get_tool_names(self, airgapped_mode: bool = False) -> List[str]:
+    def get_tool_names(self, airgapped_mode: bool = False) -> list[str]:
         """Get list of all discovered tool names.
 
         Args:
@@ -333,7 +333,7 @@ class SharedToolRegistry:
             f"({discovered_classes} classes, {discovered_decorated} decorated)"
         )
 
-    def get_all_tools_for_registration(self, airgapped_mode: bool = False) -> List[Any]:
+    def get_all_tools_for_registration(self, airgapped_mode: bool = False) -> list[Any]:
         """Get tool instances and decorated functions for registration.
 
         This method returns a list suitable for registering with ToolRegistry.
@@ -361,7 +361,7 @@ class SharedToolRegistry:
             self._tool_instances_cache = {}
 
         if cache_key not in self._tool_instances_cache:
-            result: List[Any] = []
+            result: list[Any] = []
 
             # Add decorated functions first
             decorated_names = set(self._decorated_tools.keys())
@@ -387,4 +387,4 @@ class SharedToolRegistry:
         else:
             logger.debug(f"Using cached tool instances (mode={cache_key})")
 
-        return cast(List[Any], self._tool_instances_cache.get(cache_key, []))
+        return cast(list[Any], self._tool_instances_cache.get(cache_key, []))

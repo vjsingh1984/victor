@@ -43,7 +43,6 @@ This module provides a single source of truth for all orchestrator-related const
 """
 
 from dataclasses import dataclass, field
-from typing import Dict
 
 
 @dataclass(frozen=True)
@@ -186,11 +185,11 @@ class ToolSelectionPresets:
     - cloud (Claude/GPT): Optimized for commercial models
     """
 
-    tiny: Dict[str, float] = field(default_factory=dict)
-    small: Dict[str, float] = field(default_factory=dict)
-    medium: Dict[str, float] = field(default_factory=dict)
-    large: Dict[str, float] = field(default_factory=dict)
-    cloud: Dict[str, float] = field(default_factory=dict)
+    tiny: dict[str, float] = field(default_factory=dict)
+    small: dict[str, float] = field(default_factory=dict)
+    medium: dict[str, float] = field(default_factory=dict)
+    large: dict[str, float] = field(default_factory=dict)
+    cloud: dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # Use object.__setattr__ since dataclass is frozen

@@ -54,14 +54,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Set
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.agent.budget import (
     BudgetTracker,
-    BudgetState,
     ModeCompletionChecker,
     ModeCompletionConfig,
-    ModeObjective,
     MultiplierCalculator,
     ToolCallClassifier,
 )
@@ -84,7 +83,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 # Export for backward compatibility
-WRITE_TOOLS: Set[str] = DEFAULT_WRITE_TOOLS
+WRITE_TOOLS: set[str] = DEFAULT_WRITE_TOOLS
 
 
 def is_write_tool(tool_name: str) -> bool:
@@ -270,7 +269,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
             raise RuntimeError("BudgetTracker not initialized")
         tracker.reset(budget_type)
 
-    def get_prompt_budget_info(self) -> Dict[str, Any]:
+    def get_prompt_budget_info(self) -> dict[str, Any]:
         """Get budget information for system prompts.
 
         Delegates to BudgetTracker (SRP).
@@ -365,7 +364,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
         multiplier = self.exploration_multiplier
         self.set_mode_multiplier(multiplier)
 
-    def get_diagnostics(self) -> Dict[str, Any]:
+    def get_diagnostics(self) -> dict[str, Any]:
         """Get diagnostic information about all budgets.
 
         Delegates to BudgetTracker (SRP).
@@ -383,7 +382,7 @@ class BudgetManager(IBudgetManager, ModeAwareMixin):
     # =============================================================================
 
     @property
-    def _budgets(self) -> Dict[BudgetType, Any]:
+    def _budgets(self) -> dict[BudgetType, Any]:
         """Backward compatibility property for _budgets.
 
         Deprecated: Use get_status() or get_diagnostics() instead.
@@ -555,7 +554,7 @@ class ExtendedBudgetManager(BudgetManager):
             response_text=response_text,
         )
 
-    def get_mode_progress(self, mode: Optional[str] = None) -> Dict[str, Any]:
+    def get_mode_progress(self, mode: Optional[str] = None) -> dict[str, Any]:
         """Get progress towards mode completion.
 
         Delegates to ModeCompletionChecker (SRP).
@@ -650,7 +649,7 @@ def create_extended_budget_manager(
 
 
 def create_mode_completion_criteria(
-    custom_criteria: Optional[Dict[str, ModeCompletionConfig]] = None,
+    custom_criteria: Optional[dict[str, ModeCompletionConfig]] = None,
 ) -> ModeCompletionCriteria:
     """Create a ModeCompletionCriteria instance.
 

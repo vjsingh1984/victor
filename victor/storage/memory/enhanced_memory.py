@@ -22,16 +22,14 @@ This module extends the existing memory system with:
 - Automatic memory consolidation
 """
 
-import asyncio
 import hashlib
 import json
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -86,11 +84,11 @@ class Memory:
     last_accessed: float = field(default_factory=time.time)
     created_at: float = field(default_factory=time.time)
     expires_at: Optional[float] = None
-    tags: List[str] = field(default_factory=list)
-    embeddings: Optional[List[float]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    embeddings: Optional[list[float]] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "id": self.id,
@@ -107,7 +105,7 @@ class Memory:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Memory":
+    def from_dict(cls, data: dict[str, Any]) -> "Memory":
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -137,8 +135,8 @@ class MemoryCluster:
     """
 
     cluster_id: str
-    memories: List[str]
-    centroid: Optional[List[float]] = None
+    memories: list[str]
+    centroid: Optional[list[float]] = None
     label: Optional[str] = None
     created_at: float = field(default_factory=time.time)
 
@@ -205,8 +203,8 @@ class EnhancedMemory:
             config: Memory configuration
         """
         self.config = config or MemoryConfig()
-        self._memories: Dict[str, Memory] = {}
-        self._clusters: Dict[str, MemoryCluster] = {}
+        self._memories: dict[str, Memory] = {}
+        self._clusters: dict[str, MemoryCluster] = {}
         self._embeddings_service = None
 
         # Load from storage if configured
@@ -218,8 +216,8 @@ class EnhancedMemory:
         content: str,
         memory_type: MemoryType = MemoryType.CONTEXT,
         priority: MemoryPriority = MemoryPriority.MEDIUM,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         ttl_days: Optional[int] = None,
     ) -> Memory:
         """Store memory with metadata.
@@ -302,7 +300,7 @@ class EnhancedMemory:
         limit: int = 10,
         memory_type: Optional[MemoryType] = None,
         min_importance: float = 0.0,
-    ) -> List[Memory]:
+    ) -> list[Memory]:
         """Retrieve relevant memories.
 
         Args:
@@ -346,10 +344,10 @@ class EnhancedMemory:
     async def search(
         self,
         query: str,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         memory_type: Optional[MemoryType] = None,
         limit: int = 10,
-    ) -> List[Memory]:
+    ) -> list[Memory]:
         """Search memories by query and filters.
 
         Args:
@@ -454,8 +452,8 @@ class EnhancedMemory:
         memory_id: str,
         content: Optional[str] = None,
         priority: Optional[MemoryPriority] = None,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        tags: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> bool:
         """Update existing memory.
 
@@ -512,14 +510,14 @@ class EnhancedMemory:
 
         return False
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get memory statistics.
 
         Returns:
             Statistics dict
         """
-        memories_by_type: Dict[str, int] = {}
-        memories_by_priority: Dict[str, int] = {}
+        memories_by_type: dict[str, int] = {}
+        memories_by_priority: dict[str, int] = {}
 
         for memory in self._memories.values():
             memories_by_type[memory.memory_type.value] = (
@@ -558,14 +556,14 @@ class EnhancedMemory:
 
         return min(base_score + length_factor, 1.0)
 
-    async def _generate_embedding(self, text: str) -> Optional[List[float]]:
+    async def _generate_embedding(self, text: str) -> Optional[list[float]]:
         """Generate embedding for text."""
         # Placeholder for embedding generation
         # In production, use actual embedding service
         return None
 
     def _calculate_relevance(
-        self, query: str, memory: Memory, query_embedding: Optional[List[float]]
+        self, query: str, memory: Memory, query_embedding: Optional[list[float]]
     ) -> float:
         """Calculate relevance score."""
         # Simple keyword matching

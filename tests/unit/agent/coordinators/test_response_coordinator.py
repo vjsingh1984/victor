@@ -22,7 +22,6 @@ from unittest.mock import MagicMock, Mock
 
 from victor.agent.coordinators.response_coordinator import (
     ResponseCoordinator,
-    IResponseCoordinator,
     ResponseCoordinatorConfig,
     ProcessedResponse,
     ChunkProcessResult,

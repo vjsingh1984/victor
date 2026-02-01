@@ -29,9 +29,7 @@ Test scenarios:
 
 import asyncio
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 import uuid
 
 import pytest
@@ -39,15 +37,11 @@ import numpy as np
 
 from victor.agent.memory.episodic_memory import Episode, EpisodicMemory
 from victor.agent.memory.semantic_memory import KnowledgeTriple, SemanticMemory
-from victor.agent.personas.persona_manager import PersonaManager
-from victor.agent.personas.persona_repository import PersonaRepository
 from victor.agent.personas.types import (
     AdaptedPersona,
     CommunicationStyle,
     ContextAdjustment,
     Feedback,
-    Persona,
-    PersonalityType,
 )
 
 

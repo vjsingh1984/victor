@@ -40,15 +40,11 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
-import shutil
 import subprocess
-import tempfile
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Optional
 
 from victor.workflows.isolation import IsolationConfig, ResourceLimits
 
@@ -75,7 +71,7 @@ class SandboxExecutionResult:
     duration_seconds: float = 0.0
     sandbox_type: str = "none"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "success": self.success,
             "output": self.output,
@@ -134,10 +130,10 @@ class SandboxedExecutor:
 
     async def execute(
         self,
-        command: List[str],
+        command: list[str],
         isolation: IsolationConfig,
         working_dir: Optional[str] = None,
-        env: Optional[Dict[str, str]] = None,
+        env: Optional[dict[str, str]] = None,
         input_data: Optional[str] = None,
     ) -> SandboxExecutionResult:
         """Execute command with specified isolation.
@@ -176,10 +172,10 @@ class SandboxedExecutor:
 
     async def _execute_inline(
         self,
-        command: List[str],
+        command: list[str],
         isolation: IsolationConfig,
         working_dir: Optional[str],
-        env: Optional[Dict[str, str]],
+        env: Optional[dict[str, str]],
         input_data: Optional[str],
     ) -> SandboxExecutionResult:
         """Execute command inline without isolation.
@@ -236,10 +232,10 @@ class SandboxedExecutor:
 
     async def _execute_process(
         self,
-        command: List[str],
+        command: list[str],
         isolation: IsolationConfig,
         working_dir: Optional[str],
-        env: Optional[Dict[str, str]],
+        env: Optional[dict[str, str]],
         input_data: Optional[str],
     ) -> SandboxExecutionResult:
         """Execute command in sandboxed subprocess with rlimit.
@@ -317,10 +313,10 @@ class SandboxedExecutor:
 
     async def _execute_docker(
         self,
-        command: List[str],
+        command: list[str],
         isolation: IsolationConfig,
         working_dir: Optional[str],
-        env: Optional[Dict[str, str]],
+        env: Optional[dict[str, str]],
         input_data: Optional[str],
     ) -> SandboxExecutionResult:
         """Execute command in Docker container.

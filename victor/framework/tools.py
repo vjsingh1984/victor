@@ -24,7 +24,7 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, List, Optional, Set, Union
+from typing import Optional, Union
 
 
 class ToolCategory(str, Enum):
@@ -210,7 +210,7 @@ class ToolCategoryRegistry:
     def register_category(
         self,
         name: str,
-        tools: Set[str],
+        tools: set[str],
         description: Optional[str] = None,
     ) -> None:
         """Register a new custom category.
@@ -245,7 +245,7 @@ class ToolCategoryRegistry:
         self._custom_categories[name_lower] = set(tools)
         self._invalidate_cache()
 
-    def extend_category(self, name: str, tools: Set[str]) -> None:
+    def extend_category(self, name: str, tools: set[str]) -> None:
         """Extend an existing category with additional tools.
 
         Use this to add vertical-specific tools to built-in categories
@@ -261,7 +261,7 @@ class ToolCategoryRegistry:
         self._category_extensions[name_lower].update(tools)
         self._invalidate_cache()
 
-    def get_tools(self, category: str) -> Set[str]:
+    def get_tools(self, category: str) -> set[str]:
         """Get all tools in a category (merged from all sources, thread-safe).
 
         Lookup priority:
@@ -284,7 +284,7 @@ class ToolCategoryRegistry:
                 return self._cache[category_lower].copy()
 
             # Build result under lock to ensure atomicity
-            result: Set[str] = set()
+            result: set[str] = set()
 
             # 1. Try ToolMetadataRegistry first (decorator-driven)
             try:
@@ -318,7 +318,7 @@ class ToolCategoryRegistry:
             self._cache_valid = True
             return result.copy()
 
-    def get_all_categories(self) -> Set[str]:
+    def get_all_categories(self) -> set[str]:
         """Get all available category names.
 
         Includes built-in categories, custom registrations, and
@@ -327,7 +327,7 @@ class ToolCategoryRegistry:
         Returns:
             Set of all category names
         """
-        categories: Set[str] = set()
+        categories: set[str] = set()
 
         # Built-in categories
         for cat in ToolCategory:
@@ -382,7 +382,7 @@ def get_category_registry() -> ToolCategoryRegistry:
 
 # Legacy alias for backward compatibility
 # DEPRECATED: Use get_category_registry().get_tools(category) instead
-def _get_category_tools(category: ToolCategory) -> Set[str]:
+def _get_category_tools(category: ToolCategory) -> set[str]:
     """Get tools for a category (backward compatible).
 
     DEPRECATED: Use get_category_registry().get_tools() instead.
@@ -418,10 +418,10 @@ class ToolSet:
         tools = ToolSet.default().include("docker").exclude_tools("shell")
     """
 
-    tools: Set[str] = field(default_factory=set)
-    categories: Set[str] = field(default_factory=set)
-    exclude: Set[str] = field(default_factory=set)
-    _resolved_names_cache: Optional[Set[str]] = field(default=None, repr=False, compare=False)
+    tools: set[str] = field(default_factory=set)
+    categories: set[str] = field(default_factory=set)
+    exclude: set[str] = field(default_factory=set)
+    _resolved_names_cache: Optional[set[str]] = field(default=None, repr=False, compare=False)
 
     @classmethod
     def default(cls) -> "ToolSet":
@@ -522,7 +522,7 @@ class ToolSet:
         )
 
     @classmethod
-    def from_categories(cls, categories: List[str]) -> "ToolSet":
+    def from_categories(cls, categories: list[str]) -> "ToolSet":
         """Create ToolSet from category names.
 
         Args:
@@ -534,7 +534,7 @@ class ToolSet:
         return cls(categories=set(categories))
 
     @classmethod
-    def from_tools(cls, tools: List[str]) -> "ToolSet":
+    def from_tools(cls, tools: list[str]) -> "ToolSet":
         """Create ToolSet from specific tool names.
 
         Args:
@@ -590,7 +590,7 @@ class ToolSet:
             exclude=self.exclude | set(tools),
         )
 
-    def get_tool_names(self) -> Set[str]:
+    def get_tool_names(self) -> set[str]:
         """Get all tool names in this set.
 
         Resolves categories to their tool names and applies exclusions.
@@ -609,7 +609,7 @@ class ToolSet:
         # Apply exclusions
         return all_tools - self.exclude
 
-    def _get_resolved_names(self) -> Set[str]:
+    def _get_resolved_names(self) -> set[str]:
         """Get resolved tool names with caching.
 
         This method caches the result of get_tool_names() for O(1)
@@ -641,4 +641,4 @@ class ToolSet:
 Tools = ToolSet
 
 # Type for tools parameter that accepts multiple formats
-ToolsInput = Union[ToolSet, List[str], None]
+ToolsInput = Union[ToolSet, list[str], None]

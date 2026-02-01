@@ -55,10 +55,9 @@ import os
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
-from typing import Dict, Type, Optional, Any, TYPE_CHECKING, cast, List, Union
+from typing import Optional, Any, TYPE_CHECKING, cast, Union
 
 # yaml module may not be available in some environments
 yaml: Optional[Any] = None
@@ -77,7 +76,7 @@ else:
     try:
         from importlib.metadata import entry_points
     except ImportError:
-        from importlib_metadata import entry_points
+        pass
 
 # Try to import yaml, but handle ImportError gracefully at runtime
 try:
@@ -125,9 +124,9 @@ class DiscoveryResult:
         lazy_imports: Dict mapping vertical name to lazy import string ("module:Class")
     """
 
-    verticals: Dict[str, Optional[Type["VerticalBase"]]] = field(default_factory=dict)
-    sources: Dict[str, PluginSource] = field(default_factory=dict)
-    lazy_imports: Dict[str, str] = field(default_factory=dict)
+    verticals: dict[str, Optional[type["VerticalBase"]]] = field(default_factory=dict)
+    sources: dict[str, PluginSource] = field(default_factory=dict)
+    lazy_imports: dict[str, str] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -230,7 +229,7 @@ class PluginDiscovery:
         self.logger = logger
 
         # Simple in-memory cache (not using lru_cache decorator for flexibility)
-        self._cache: Dict[str, DiscoveryResult] = {}
+        self._cache: dict[str, DiscoveryResult] = {}
 
     def discover_from_entry_points(self) -> DiscoveryResult:
         """Discover verticals from Python entry points.
@@ -262,7 +261,7 @@ class PluginDiscovery:
                 # Old API: eps_result is already the iterable
                 eps = eps_result
 
-            for ep in cast(List[Union[Any, "EntryPoint"]], eps):
+            for ep in cast(list[Union[Any, "EntryPoint"]], eps):
                 try:
                     # Load the vertical class
                     vertical_class = ep.load()

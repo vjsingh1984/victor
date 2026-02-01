@@ -74,7 +74,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
+from typing import Any, Optional, TYPE_CHECKING
 
 import networkx as nx  # type: ignore[import-untyped]
 import numpy as np
@@ -115,7 +115,7 @@ class KnowledgeTriple:
     object: str
     weight: float = 0.5
     created_at: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:
         """String representation of triple."""
@@ -180,7 +180,7 @@ class KnowledgeLink:
     relation: str
     weight: float = 0.5
     created_at: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:
         """String representation of link."""
@@ -218,14 +218,14 @@ class Knowledge:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     fact: str = ""
     embedding: Optional[np.ndarray] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
-    links: List[KnowledgeLink] = field(default_factory=list)
+    links: list[KnowledgeLink] = field(default_factory=list)
     access_count: int = 0
     confidence: float = 1.0
     source: str = "unknown"
-    citations: List[str] = field(default_factory=list)
+    citations: list[str] = field(default_factory=list)
 
     def __repr__(self) -> str:
         """String representation of knowledge."""
@@ -241,8 +241,8 @@ class KnowledgeGraph:
         edges: List of KnowledgeLink relationships
     """
 
-    nodes: Dict[str, Knowledge] = field(default_factory=dict)
-    edges: List[KnowledgeLink] = field(default_factory=list)
+    nodes: dict[str, Knowledge] = field(default_factory=dict)
+    edges: list[KnowledgeLink] = field(default_factory=list)
 
     def add_node(self, knowledge: Knowledge) -> None:
         """Add a node to the graph."""
@@ -252,7 +252,7 @@ class KnowledgeGraph:
         """Add an edge to the graph."""
         self.edges.append(link)
 
-    def get_neighbors(self, knowledge_id: str) -> List[Tuple[Knowledge, KnowledgeLink]]:
+    def get_neighbors(self, knowledge_id: str) -> list[tuple[Knowledge, KnowledgeLink]]:
         """Get neighboring nodes and edges.
 
         Args:
@@ -267,7 +267,7 @@ class KnowledgeGraph:
                 neighbors.append((self.nodes[edge.target_id], edge))
         return neighbors
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert graph to dictionary representation.
 
         Returns:
@@ -351,10 +351,10 @@ class SemanticMemory:
         self._max_knowledge = max_knowledge
 
         # Knowledge storage (id -> Knowledge)
-        self._knowledge: Dict[str, Knowledge] = {}
+        self._knowledge: dict[str, Knowledge] = {}
 
         # Embedding storage for similarity search (id -> embedding)
-        self._embeddings: Dict[str, np.ndarray] = {}
+        self._embeddings: dict[str, np.ndarray] = {}
 
         # Knowledge graph
         self._graph = KnowledgeGraph()
@@ -377,8 +377,8 @@ class SemanticMemory:
         fact: str,
         confidence: float = 1.0,
         source: str = "unknown",
-        metadata: Optional[Dict[str, Any]] = None,
-        citations: Optional[List[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+        citations: Optional[list[str]] = None,
     ) -> str:
         """Store a piece of knowledge.
 
@@ -488,9 +488,9 @@ class SemanticMemory:
         query: str,
         k: int = 5,
         min_similarity: float = 0.0,
-        filter_metadata: Optional[Dict[str, Any]] = None,
+        filter_metadata: Optional[dict[str, Any]] = None,
         filter_source: Optional[str] = None,
-    ) -> List[Knowledge]:
+    ) -> list[Knowledge]:
         """Query knowledge by semantic similarity.
 
         Args:
@@ -747,7 +747,7 @@ class SemanticMemory:
 
         return True
 
-    def get_related_knowledge(self, knowledge_id: str, max_depth: int = 1) -> List[Knowledge]:
+    def get_related_knowledge(self, knowledge_id: str, max_depth: int = 1) -> list[Knowledge]:
         """Get knowledge related to the given knowledge ID.
 
         Follows links in the knowledge graph up to max_depth.
@@ -762,8 +762,8 @@ class SemanticMemory:
         if knowledge_id not in self._knowledge:
             return []
 
-        visited: Set[str] = set()
-        related: List[Knowledge] = []
+        visited: set[str] = set()
+        related: list[Knowledge] = []
 
         def dfs(current_id: str, depth: int) -> None:
             """Depth-first search for related knowledge."""
@@ -787,7 +787,7 @@ class SemanticMemory:
 
     def get_related_facts(
         self, fact_id: str, relation_type: Optional[str] = None, max_depth: int = 1
-    ) -> List[Knowledge]:
+    ) -> list[Knowledge]:
         """Get facts related to the given fact ID, optionally filtering by relation type.
 
         This is an alias for get_related_knowledge with additional filtering.
@@ -803,8 +803,8 @@ class SemanticMemory:
         if fact_id not in self._knowledge:
             return []
 
-        visited: Set[str] = set()
-        related: List[Knowledge] = []
+        visited: set[str] = set()
+        related: list[Knowledge] = []
 
         def dfs(current_id: str, depth: int) -> None:
             """Depth-first search for related knowledge."""
@@ -832,7 +832,7 @@ class SemanticMemory:
         return related
 
     async def merge_facts(
-        self, fact_ids: List[str], merge_strategy: str = "weighted_average"
+        self, fact_ids: list[str], merge_strategy: str = "weighted_average"
     ) -> str:
         """Merge multiple facts into a single consolidated fact.
 
@@ -881,7 +881,7 @@ class SemanticMemory:
         merged_source = ", ".join(merged_sources) if merged_sources else "unknown"
 
         # Merge metadata
-        merged_metadata: Dict[str, Any] = {}
+        merged_metadata: dict[str, Any] = {}
         for fact in facts:
             merged_metadata.update(fact.metadata)
         merged_metadata["merged_from"] = fact_ids
@@ -913,7 +913,7 @@ class SemanticMemory:
 
         return merged_id
 
-    def _merge_fact_texts(self, facts: List[Knowledge]) -> str:
+    def _merge_fact_texts(self, facts: list[Knowledge]) -> str:
         """Merge fact texts into a consolidated statement.
 
         Args:
@@ -936,7 +936,7 @@ class SemanticMemory:
         # For longer facts, create a merged statement
         return "Merged knowledge: " + " | ".join(fact_texts)
 
-    def _merge_confidences(self, facts: List[Knowledge], strategy: str) -> float:
+    def _merge_confidences(self, facts: list[Knowledge], strategy: str) -> float:
         """Merge confidence scores based on strategy.
 
         Args:
@@ -1036,7 +1036,7 @@ class SemanticMemory:
 
         return G
 
-    async def export_to_json(self, filepath: Union[str, Path]) -> None:
+    async def export_to_json(self, filepath: str | Path) -> None:
         """Export knowledge base to JSON file.
 
         Args:
@@ -1090,7 +1090,7 @@ class SemanticMemory:
             logger.error(f"Failed to export knowledge to JSON: {e}")
             raise IOError(f"Failed to export to {filepath}: {e}")
 
-    async def import_from_json(self, filepath: Union[str, Path]) -> int:
+    async def import_from_json(self, filepath: str | Path) -> int:
         """Import knowledge base from JSON file.
 
         Args:
@@ -1166,7 +1166,7 @@ class SemanticMemory:
             logger.error(f"Failed to import knowledge from JSON: {e}")
             raise IOError(f"Failed to import from {filepath}: {e}")
 
-    async def save_to_sqlite(self, filepath: Union[str, Path]) -> None:
+    async def save_to_sqlite(self, filepath: str | Path) -> None:
         """Save knowledge base to SQLite database.
 
         Args:
@@ -1267,7 +1267,7 @@ class SemanticMemory:
             logger.error(f"Failed to save to SQLite: {e}")
             raise IOError(f"Failed to save to {filepath}: {e}")
 
-    async def load_from_sqlite(self, filepath: Union[str, Path]) -> int:
+    async def load_from_sqlite(self, filepath: str | Path) -> int:
         """Load knowledge base from SQLite database.
 
         Args:
@@ -1355,7 +1355,7 @@ class SemanticMemory:
             logger.error(f"Failed to load from SQLite: {e}")
             raise IOError(f"Failed to load from {filepath}: {e}")
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get memory system statistics.
 
         Returns:
@@ -1379,7 +1379,7 @@ class SemanticMemory:
         link_counts = [len(k.links) for k in self._knowledge.values()]
 
         # Source breakdown
-        source_counts: Dict[str, int] = {}
+        source_counts: dict[str, int] = {}
         for source in sources:
             source_counts[source] = source_counts.get(source, 0) + 1
 

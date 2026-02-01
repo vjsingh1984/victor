@@ -17,8 +17,7 @@
 Checklist sections provide verification checklists for quality assurance.
 """
 
-from dataclasses import dataclass, field
-from typing import List
+from dataclasses import dataclass
 
 
 @dataclass
@@ -41,7 +40,7 @@ class ChecklistSection:
         # "- [ ] Tests pass\\n- [ ] Code compiles"
     """
 
-    checklist: List[str]
+    checklist: list[str]
     priority: int = 30
 
     def render(self) -> str:

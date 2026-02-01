@@ -17,7 +17,8 @@
 import json
 import logging
 import re
-from typing import Any, AsyncIterator, Dict, List, Optional, Union
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -25,8 +26,6 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderError,
-    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
@@ -42,7 +41,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def __init__(
         self,
-        base_url: Union[str, List[str]] = "http://localhost:11434",
+        base_url: str | list[str] = "http://localhost:11434",
         timeout: int = 300,
         _skip_discovery: bool = False,
         **kwargs: Any,
@@ -60,7 +59,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         import os
 
         # Resolve candidates (logic from _select_base_url but without network I/O)
-        candidates: List[str] = []
+        candidates: list[str] = []
 
         # Check environment variable first
         env_endpoints = os.environ.get("OLLAMA_ENDPOINTS", "")
@@ -91,7 +90,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         super().__init__(base_url=chosen_base, timeout=timeout, **kwargs)
         self._raw_base_urls = base_url
         self._models_without_tools: set = set()  # Cache models that don't support tools
-        self._context_window_cache: Dict[str, int] = {}  # Cache model context windows
+        self._context_window_cache: dict[str, int] = {}  # Cache model context windows
         self.client = httpx.AsyncClient(
             base_url=chosen_base,
             timeout=httpx.Timeout(timeout),
@@ -100,7 +99,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
     @classmethod
     async def create(
         cls,
-        base_url: Union[str, List[str]] = "http://localhost:11434",
+        base_url: str | list[str] = "http://localhost:11434",
         timeout: int = 300,
         **kwargs: Any,
     ) -> "OllamaProvider":
@@ -151,7 +150,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         context_window: Optional[int] = None
         supports_tools = True  # Default: Ollama supports tools for capable models
-        raw_response: Optional[Dict[str, Any]] = None
+        raw_response: Optional[dict[str, Any]] = None
 
         try:
             resp = await self.client.post("/api/show", json={"name": model})
@@ -182,7 +181,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
             raw=raw_response,
         )
 
-    def _parse_context_window(self, response_data: Dict[str, Any]) -> Optional[int]:
+    def _parse_context_window(self, response_data: dict[str, Any]) -> Optional[int]:
         """Extract context window from Ollama /api/show response."""
         parameters = response_data.get("parameters", "")
         if "num_ctx" in parameters:
@@ -219,7 +218,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return False
 
-    def _select_base_url(self, base_url: Union[str, List[str], None], timeout: int) -> str:
+    def _select_base_url(self, base_url: str | list[str] | None, timeout: int) -> str:
         """Pick the first reachable Ollama endpoint from a tiered list.
 
         Priority:
@@ -232,7 +231,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         """
         import os
 
-        candidates: List[str] = []
+        candidates: list[str] = []
 
         # Check environment variable first
         env_endpoints = os.environ.get("OLLAMA_ENDPOINTS", "")
@@ -272,7 +271,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     @classmethod
     async def _select_base_url_async(
-        cls, base_url: Union[str, List[str], None], timeout: int
+        cls, base_url: str | list[str] | None, timeout: int
     ) -> str:
         """Async version of _select_base_url for non-blocking endpoint discovery.
 
@@ -286,7 +285,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         """
         import os
 
-        candidates: List[str] = []
+        candidates: list[str] = []
 
         # Check environment variable first
         env_endpoints = os.environ.get("OLLAMA_ENDPOINTS", "")
@@ -325,12 +324,12 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Ollama.
@@ -414,12 +413,12 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Ollama.
@@ -457,11 +456,11 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def _stream_impl(
         self,
-        messages: List[Message],
+        messages: list[Message],
         model: str,
         temperature: float,
         max_tokens: int,
-        tools: Optional[List[ToolDefinition]],
+        tools: Optional[list[ToolDefinition]],
         retry_without_tools: bool = False,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
@@ -550,14 +549,14 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def _build_request_payload(
         self,
-        messages: List[Message],
+        messages: list[Message],
         model: str,
         temperature: float,
         max_tokens: int,
-        tools: Optional[List[ToolDefinition]],
+        tools: Optional[list[ToolDefinition]],
         stream: bool,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build request payload for Ollama API.
 
         Args:
@@ -572,7 +571,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         Returns:
             Request payload dictionary
         """
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "messages": [{"role": msg.role, "content": msg.content} for msg in messages],
             "stream": stream,
@@ -604,8 +603,8 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         return payload
 
     def _normalize_tool_calls(
-        self, tool_calls: Optional[List[Dict[str, Any]]]
-    ) -> Optional[List[Dict[str, Any]]]:
+        self, tool_calls: Optional[list[dict[str, Any]]]
+    ) -> Optional[list[dict[str, Any]]]:
         """Normalize tool calls from Ollama's OpenAI-compatible format.
 
         Ollama returns tool calls in OpenAI format:
@@ -640,7 +639,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return normalized if normalized else None
 
-    def _parse_json_tool_call_from_content(self, content: str) -> Optional[List[Dict[str, Any]]]:
+    def _parse_json_tool_call_from_content(self, content: str) -> Optional[list[dict[str, Any]]]:
         """Parse tool calls from JSON text in content (fallback for models without native support).
 
         Some Ollama models (like qwen2.5-coder, llama3.1) return tool calls as JSON in content
@@ -700,7 +699,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return None
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         """Parse Ollama API response.
 
         Args:
@@ -750,7 +749,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
             metadata={},  # Add metadata parameter
         )
 
-    def _parse_stream_chunk(self, chunk_data: Dict[str, Any]) -> StreamChunk:
+    def _parse_stream_chunk(self, chunk_data: dict[str, Any]) -> StreamChunk:
         """Parse streaming chunk from Ollama.
 
         Args:
@@ -792,7 +791,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
             is_final=is_done,
         )
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List available models on Ollama server.
 
         Returns:
@@ -809,7 +808,7 @@ class OllamaProvider(BaseProvider, HTTPErrorHandlerMixin):
         except Exception as e:
             raise self._handle_error(e, self.name)
 
-    async def pull_model(self, model: str) -> AsyncIterator[Dict[str, Any]]:
+    async def pull_model(self, model: str) -> AsyncIterator[dict[str, Any]]:
         """Pull a model from Ollama library.
 
         Args:

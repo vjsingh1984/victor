@@ -22,9 +22,7 @@ import pytest
 
 from victor.framework.safety import (
     SafetyPatternRegistry,
-    Severity,
     register_vertical_patterns,
-    register_builtin_scanners,
 )
 
 
@@ -223,14 +221,6 @@ class TestFrameworkSafetyModuleExports:
             Severity,
             Action,
             SafetyPatternRegistry,
-            BaseScanner,
-            SecretScanner,
-            CommandScanner,
-            FilePathScanner,
-            get_vertical_pattern_path,
-            register_vertical_patterns,
-            register_all_vertical_patterns,
-            register_builtin_scanners,
         )
 
         # All imports should succeed

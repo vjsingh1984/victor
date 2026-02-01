@@ -42,7 +42,7 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.providers.base import StreamChunk
 
@@ -124,8 +124,8 @@ class WorkflowStreamChunk:
     node_id: Optional[str] = None
     node_name: Optional[str] = None
     content: str = ""
-    tool_calls: Optional[List[Dict[str, Any]]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tool_calls: Optional[list[dict[str, Any]]] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=_now_utc)
     is_final: bool = False
     progress: Optional[float] = None

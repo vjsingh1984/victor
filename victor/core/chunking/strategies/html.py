@@ -19,9 +19,9 @@ Preserves semantic structure by chunking at paragraph, section, and table bounda
 """
 
 import logging
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
-from victor.core.chunking.base import Chunk, ChunkingConfig, ChunkingStrategy
+from victor.core.chunking.base import Chunk, ChunkingStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +45,10 @@ class HTMLChunkingStrategy(ChunkingStrategy):
         return "html"
 
     @property
-    def supported_types(self) -> List[str]:
+    def supported_types(self) -> list[str]:
         return ["html", "htm", "xhtml"]
 
-    def chunk(self, content: str) -> List[Chunk]:
+    def chunk(self, content: str) -> list[Chunk]:
         """Chunk HTML content preserving semantic structure.
 
         Args:
@@ -87,7 +87,7 @@ class HTMLChunkingStrategy(ChunkingStrategy):
         # Convert to chunks respecting size limits
         return self._build_chunks(semantic_elements)
 
-    def _extract_semantic_elements(self, soup: Any) -> List[Tuple[str, str]]:
+    def _extract_semantic_elements(self, soup: Any) -> list[tuple[str, str]]:
         """Extract semantic elements from parsed HTML.
 
         Args:
@@ -136,7 +136,7 @@ class HTMLChunkingStrategy(ChunkingStrategy):
 
         return elements
 
-    def _build_chunks(self, elements: List[Tuple[str, str]]) -> List[Chunk]:
+    def _build_chunks(self, elements: list[tuple[str, str]]) -> list[Chunk]:
         """Build chunks from semantic elements respecting size limits.
 
         Args:
@@ -148,8 +148,8 @@ class HTMLChunkingStrategy(ChunkingStrategy):
         from victor.core.chunking.strategies.text import TextChunkingStrategy
 
         text_strategy = TextChunkingStrategy(self.config)
-        chunks: List[Chunk] = []
-        current_parts: List[str] = []
+        chunks: list[Chunk] = []
+        current_parts: list[str] = []
         current_size = 0
         pos = 0
 

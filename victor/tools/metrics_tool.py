@@ -25,7 +25,7 @@ Features:
 
 import ast
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 import logging
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -78,11 +78,11 @@ def _calculate_maintainability_index(code: str) -> float:
 )
 async def metrics(
     path: str,
-    metrics_list: Optional[List[str]] = None,
+    metrics_list: Optional[list[str]] = None,
     file_pattern: str = "*.py",
     complexity_threshold: int = 10,
     format: str = "summary",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Comprehensive code metrics and quality analysis.
 
@@ -153,7 +153,7 @@ async def metrics(
         }
 
     # Initialize results
-    results: Dict[str, Any] = {metric: [] for metric in metrics_list}
+    results: dict[str, Any] = {metric: [] for metric in metrics_list}
     total_complexity = 0
     total_maintainability = 0.0
     total_debt_hours = 0

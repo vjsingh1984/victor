@@ -49,17 +49,13 @@ Usage:
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
     runtime_checkable,
 )
 
@@ -146,7 +142,7 @@ class IExtension(Protocol):
         """
         ...
 
-    def get_metadata(self) -> Dict[str, Any]:
+    def get_metadata(self) -> dict[str, Any]:
         """Get optional metadata about this extension.
 
         Returns:
@@ -202,7 +198,7 @@ class IExtensionRegistry(Protocol):
         """
         ...
 
-    def get_extensions_by_type(self, extension_type: str) -> List[IExtension]:
+    def get_extensions_by_type(self, extension_type: str) -> list[IExtension]:
         """Get all extensions of a specific type.
 
         Args:
@@ -213,7 +209,7 @@ class IExtensionRegistry(Protocol):
         """
         ...
 
-    def list_extension_types(self) -> List[str]:
+    def list_extension_types(self) -> list[str]:
         """List all registered extension types.
 
         Returns:
@@ -221,7 +217,7 @@ class IExtensionRegistry(Protocol):
         """
         ...
 
-    def list_extensions(self, extension_type: Optional[str] = None) -> List[str]:
+    def list_extensions(self, extension_type: Optional[str] = None) -> list[str]:
         """List extension names by type.
 
         Args:
@@ -272,8 +268,8 @@ class ExtensionMetadata:
     version: str = "0.5.0"
     description: str = ""
     author: str = ""
-    dependencies: List[str] = field(default_factory=list)
-    tags: Set[str] = field(default_factory=set)
+    dependencies: list[str] = field(default_factory=list)
+    tags: set[str] = field(default_factory=set)
     priority: int = 50
 
 

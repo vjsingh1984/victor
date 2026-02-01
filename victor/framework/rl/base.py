@@ -19,7 +19,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.protocols.provider_adapter import IProviderAdapter
@@ -51,10 +51,10 @@ class RLOutcome:
     success: bool
     quality_score: float
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     vertical: str = "coding"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         return {
             "provider": self.provider,
@@ -68,7 +68,7 @@ class RLOutcome:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "RLOutcome":
+    def from_dict(cls, data: dict[str, Any]) -> "RLOutcome":
         """Create from dictionary."""
         metadata = data.get("metadata", "{}")
         if isinstance(metadata, str):
@@ -224,7 +224,7 @@ class BaseLearner(ABC):
         """
         return f"{provider}:{model}:{task_type}"
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export learner metrics for monitoring.
 
         Returns:

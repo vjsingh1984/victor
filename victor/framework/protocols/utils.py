@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, List, Protocol, Tuple
+from typing import Any
 
 
-def verify_protocol_conformance(obj: Any, protocol: type) -> Tuple[bool, List[str]]:
+def verify_protocol_conformance(obj: Any, protocol: type) -> tuple[bool, list[str]]:
     """Verify that an object conforms to a protocol.
 
     Checks that all required methods/properties are present.

@@ -44,7 +44,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @dataclass
@@ -63,7 +63,7 @@ class ExportResult:
     exporter_type: str
     records_exported: int
     error_message: str | None = None
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @runtime_checkable
@@ -82,7 +82,7 @@ class IAnalyticsExporter(Protocol):
     analytics coverage.
     """
 
-    async def export(self, data: Dict[str, Any]) -> ExportResult:
+    async def export(self, data: dict[str, Any]) -> ExportResult:
         """Export analytics data to external system.
 
         Args:
@@ -159,7 +159,7 @@ class AnalyticsEvent:
     event_type: str
     timestamp: str
     session_id: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
 
 
 @dataclass
@@ -175,7 +175,7 @@ class AnalyticsQuery:
     """
 
     session_id: str | None = None
-    event_types: List[str] | None = None
+    event_types: list[str] | None = None
     start_time: str | None = None
     end_time: str | None = None
     limit: int = 1000
@@ -191,9 +191,9 @@ class AnalyticsResult:
         metadata: Query metadata
     """
 
-    events: List[AnalyticsEvent]
+    events: list[AnalyticsEvent]
     total_count: int
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 __all__ = [

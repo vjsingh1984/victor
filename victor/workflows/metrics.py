@@ -26,7 +26,6 @@ Supports both in-memory and persistent storage (SQLite, JSON).
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import sqlite3
@@ -36,9 +35,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
 )
 
@@ -98,7 +94,7 @@ class NodeMetrics:
 
         self.last_execution = time.time()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "node_id": self.node_id,
@@ -146,7 +142,7 @@ class ToolUsageMetrics:
 
         self.last_used = time.time()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "tool_name": self.tool_name,
@@ -184,8 +180,8 @@ class WorkflowMetrics:
     failed_executions: int = 0
     total_duration: float = 0.0
     avg_duration: float = 0.0
-    node_metrics: Dict[str, NodeMetrics] = field(default_factory=dict)
-    tool_metrics: Dict[str, ToolUsageMetrics] = field(default_factory=dict)
+    node_metrics: dict[str, NodeMetrics] = field(default_factory=dict)
+    tool_metrics: dict[str, ToolUsageMetrics] = field(default_factory=dict)
     cost_tracking: float = 0.0
     first_execution: Optional[float] = None
     last_execution: Optional[float] = None
@@ -218,7 +214,7 @@ class WorkflowMetrics:
             self.first_execution = now
         self.last_execution = now
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "workflow_id": self.workflow_id,
@@ -301,10 +297,10 @@ class WorkflowMetricsCollector:
         self.auto_save = auto_save
 
         # In-memory metrics storage
-        self._workflows: Dict[str, WorkflowMetrics] = {}
+        self._workflows: dict[str, WorkflowMetrics] = {}
 
         # Active execution tracking
-        self._active_executions: Dict[str, Dict[str, Any]] = {}
+        self._active_executions: dict[str, dict[str, Any]] = {}
 
         # Initialize storage
         if storage_backend != "memory":
@@ -459,7 +455,7 @@ class WorkflowMetricsCollector:
         """
         return self._workflows.get(workflow_id)
 
-    def get_all_metrics(self) -> Dict[str, WorkflowMetrics]:
+    def get_all_metrics(self) -> dict[str, WorkflowMetrics]:
         """Get metrics for all workflows.
 
         Returns:

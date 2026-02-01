@@ -19,8 +19,8 @@ duplication across vertical capability providers.
 """
 
 import pytest
-from typing import Any, Dict, Optional
-from unittest.mock import Mock, MagicMock
+from typing import Any
+from unittest.mock import Mock
 
 from victor.framework.capabilities.base_vertical_capability_provider import (
     BaseVerticalCapabilityProvider,
@@ -38,7 +38,7 @@ class MockCapabilityProvider(BaseVerticalCapabilityProvider):
         super().__init__("mock")
         self._orchestrator_config = {}
 
-    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+    def _get_capability_definitions(self) -> dict[str, CapabilityDefinition]:
         return {
             "test_capability": CapabilityDefinition(
                 name="test_capability",
@@ -77,7 +77,7 @@ class MockCapabilityProvider(BaseVerticalCapabilityProvider):
             orchestrator.test_capability_config = {}
         orchestrator.test_capability_config.update(kwargs)
 
-    def get_test_capability(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_test_capability(self, orchestrator: Any) -> dict[str, Any]:
         """Get test capability config."""
         return getattr(orchestrator, "test_capability_config", {"key": "value"})
 

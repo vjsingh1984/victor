@@ -62,11 +62,11 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.framework.rl.coordinator import RLCoordinator
-    from victor.framework.rl.base import RLOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +166,7 @@ class RLEvent:
     similarity_score: Optional[float] = None
 
     # Metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.now)
 
     # Exploration tracking
@@ -178,7 +178,7 @@ class RLEvent:
 
 
 # Mapping from event types to learner names
-EVENT_TO_LEARNER: Dict[RLEventType, List[str]] = {
+EVENT_TO_LEARNER: dict[RLEventType, list[str]] = {
     RLEventType.TOOL_EXECUTED: ["tool_selector"],
     RLEventType.TOOL_SELECTED: ["tool_selector"],
     RLEventType.MODE_TRANSITION: ["mode_transition"],
@@ -218,14 +218,14 @@ class RLHookRegistry:
             coordinator: RL coordinator for accessing learners
         """
         self._coordinator = coordinator
-        self._subscribers: Dict[RLEventType, Set[str]] = {}
-        self._custom_handlers: Dict[RLEventType, List[Callable[[RLEvent], None]]] = {}
+        self._subscribers: dict[RLEventType, set[str]] = {}
+        self._custom_handlers: dict[RLEventType, list[Callable[[RLEvent], None]]] = {}
 
         # Metrics tracking
-        self._event_counts: Dict[RLEventType, int] = {}
-        self._exploration_counts: Dict[str, int] = {}  # learner -> exploration count
-        self._exploitation_counts: Dict[str, int] = {}  # learner -> exploitation count
-        self._epsilon_history: List[Tuple[datetime, str, float]] = (
+        self._event_counts: dict[RLEventType, int] = {}
+        self._exploration_counts: dict[str, int] = {}  # learner -> exploration count
+        self._exploitation_counts: dict[str, int] = {}  # learner -> exploitation count
+        self._epsilon_history: list[tuple[datetime, str, float]] = (
             []
         )  # (timestamp, learner, epsilon)
 
@@ -368,8 +368,6 @@ class RLHookRegistry:
             observability_bus = get_observability_bus()
             if observability_bus is not None:
                 # Convert RLEvent to MessagingEvent format
-                import json
-                from datetime import datetime, timezone
 
                 # Build event data
                 event_data = {
@@ -450,7 +448,7 @@ class RLHookRegistry:
 
         return explore / total
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get registry metrics for observability.
 
         Returns:
@@ -473,7 +471,7 @@ class RLHookRegistry:
 
     def get_epsilon_trend(
         self, learner_name: str, limit: int = 100
-    ) -> List[Tuple[datetime, float]]:
+    ) -> list[tuple[datetime, float]]:
         """Get epsilon value trend for a learner.
 
         Args:

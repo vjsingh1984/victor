@@ -35,7 +35,7 @@ import argparse
 import asyncio
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,9 +54,9 @@ DEFAULT_DOC_PATTERNS = [
 
 async def ingest_project_docs(
     project_path: Optional[Path] = None,
-    patterns: Optional[List[str]] = None,
+    patterns: Optional[list[str]] = None,
     recursive: bool = True,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """Ingest project documentation into RAG store.
 
     Args:
@@ -80,7 +80,7 @@ async def ingest_project_docs(
     store = DocumentStore()
     await store.initialize()
 
-    results: Dict[str, int] = {}
+    results: dict[str, int] = {}
     processed_files: set[str] = set()
 
     for pattern in patterns:
@@ -234,7 +234,7 @@ async def show_stats() -> None:
     docs = await store.list_documents()
     if docs:
         print("\nDocuments by project:")
-        by_project: Dict[str, int] = {}
+        by_project: dict[str, int] = {}
         for doc in docs:
             project = doc.metadata.get("project", "Other")
             by_project[project] = by_project.get(project, 0) + 1
@@ -244,7 +244,7 @@ async def show_stats() -> None:
     print("=" * 50)
 
 
-async def ingest_victor_docs() -> Dict[str, int]:
+async def ingest_victor_docs() -> dict[str, int]:
     """Ingest Victor project documentation."""
     # Find Victor project root
     current = Path(__file__).parent

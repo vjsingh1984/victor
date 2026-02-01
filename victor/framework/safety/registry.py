@@ -51,7 +51,7 @@ from __future__ import annotations
 import logging
 import threading
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
+from typing import Any, Optional, Protocol, TYPE_CHECKING
 
 import yaml
 
@@ -71,12 +71,12 @@ logger = logging.getLogger(__name__)
 class ScannerProtocol(Protocol):
     """Protocol for safety scanners (ISafetyScanner compatible)."""
 
-    def scan(self, content: str) -> List[SafetyViolation]:
+    def scan(self, content: str) -> list[SafetyViolation]:
         """Scan content for safety violations."""
         ...
 
 
-def validate_pattern_yaml(data: Dict[str, Any]) -> List[str]:
+def validate_pattern_yaml(data: dict[str, Any]) -> list[str]:
     """Validate YAML pattern data against schema.
 
     Args:
@@ -85,7 +85,7 @@ def validate_pattern_yaml(data: Dict[str, Any]) -> List[str]:
     Returns:
         List of validation error messages (empty if valid)
     """
-    errors: List[str] = []
+    errors: list[str] = []
 
     if "patterns" not in data:
         # Empty file is valid
@@ -157,8 +157,8 @@ class SafetyPatternRegistry:
 
         Note: Use get_instance() instead of direct instantiation.
         """
-        self._patterns: Dict[str, SafetyPattern] = {}
-        self._scanners: Dict[str, ScannerProtocol] = {}
+        self._patterns: dict[str, SafetyPattern] = {}
+        self._scanners: dict[str, ScannerProtocol] = {}
         self._op_lock = threading.RLock()
 
     @classmethod
@@ -239,7 +239,7 @@ class SafetyPatternRegistry:
         with self._op_lock:
             return self._patterns.get(name)
 
-    def list_patterns(self) -> List[str]:
+    def list_patterns(self) -> list[str]:
         """List all registered pattern names.
 
         Returns:
@@ -248,7 +248,7 @@ class SafetyPatternRegistry:
         with self._op_lock:
             return list(self._patterns.keys())
 
-    def list_by_severity(self, severity: Severity) -> List[str]:
+    def list_by_severity(self, severity: Severity) -> list[str]:
         """List patterns by severity level.
 
         Args:
@@ -262,7 +262,7 @@ class SafetyPatternRegistry:
                 name for name, pattern in self._patterns.items() if pattern.severity == severity
             ]
 
-    def list_by_domain(self, domain: str) -> List[str]:
+    def list_by_domain(self, domain: str) -> list[str]:
         """List patterns that apply to a domain.
 
         Args:
@@ -286,7 +286,7 @@ class SafetyPatternRegistry:
         self,
         content: str,
         domain: str = "all",
-    ) -> List[SafetyViolation]:
+    ) -> list[SafetyViolation]:
         """Scan content for safety violations.
 
         Args:
@@ -296,7 +296,7 @@ class SafetyPatternRegistry:
         Returns:
             List of SafetyViolation instances
         """
-        violations: List[SafetyViolation] = []
+        violations: list[SafetyViolation] = []
 
         with self._op_lock:
             patterns = list(self._patterns.values())
@@ -324,7 +324,7 @@ class SafetyPatternRegistry:
         self,
         scanner_name: str,
         content: str,
-    ) -> List[SafetyViolation]:
+    ) -> list[SafetyViolation]:
         """Scan content with a specific registered scanner.
 
         Args:
@@ -393,7 +393,7 @@ class SafetyPatternRegistry:
         with self._op_lock:
             return self._scanners.get(name)
 
-    def list_scanners(self) -> List[str]:
+    def list_scanners(self) -> list[str]:
         """List all registered scanner names.
 
         Returns:
@@ -475,14 +475,14 @@ class SafetyPatternRegistry:
     # Stats
     # =========================================================================
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get registry statistics.
 
         Returns:
             Dictionary with registry stats
         """
         with self._op_lock:
-            severity_counts: Dict[str, int] = {}
+            severity_counts: dict[str, int] = {}
             for pattern in self._patterns.values():
                 sev = pattern.severity.value
                 severity_counts[sev] = severity_counts.get(sev, 0) + 1

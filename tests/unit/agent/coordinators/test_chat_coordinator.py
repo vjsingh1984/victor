@@ -31,15 +31,12 @@ ChatCoordinator is the highest priority coordinator for testing as all user
 interactions go through it. Current coverage: 4.77%. Target: >75%.
 """
 
-import asyncio
 import pytest
-from unittest.mock import AsyncMock, Mock, MagicMock, patch, PropertyMock
-from typing import Any, List, Optional
+from unittest.mock import AsyncMock, Mock
 
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 from victor.providers.base import CompletionResponse, StreamChunk
 from victor.core.errors import ProviderRateLimitError
-from victor.framework.task import TaskComplexity
 from victor.agent.unified_task_tracker import TrackerTaskType
 
 

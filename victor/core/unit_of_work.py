@@ -53,22 +53,14 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
 from enum import Enum
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    Generic,
-    List,
     Optional,
-    Set,
-    Type,
     TypeVar,
-    Union,
 )
+from collections.abc import AsyncIterator
 
 from victor.core.repository import Entity, Repository
 
@@ -95,7 +87,7 @@ class TrackedEntity:
 
     entity: Entity
     state: EntityState
-    original_data: Optional[Dict[str, Any]] = None  # For dirty checking
+    original_data: Optional[dict[str, Any]] = None  # For dirty checking
 
     def mark_clean(self) -> None:
         """Mark entity as clean (persisted)."""
@@ -178,15 +170,15 @@ class UnitOfWork(UnitOfWorkProtocol):
 
     def __init__(self) -> None:
         """Initialize Unit of Work."""
-        self._identity_map: Dict[str, TrackedEntity] = {}
-        self._repositories: Dict[Type[Entity], Repository[Any]] = {}
-        self._new_entities: List[Entity] = []
-        self._modified_entities: Set[str] = set()
-        self._deleted_entities: Set[str] = set()
+        self._identity_map: dict[str, TrackedEntity] = {}
+        self._repositories: dict[type[Entity], Repository[Any]] = {}
+        self._new_entities: list[Entity] = []
+        self._modified_entities: set[str] = set()
+        self._deleted_entities: set[str] = set()
         self._committed = False
         self._lock = asyncio.Lock()
 
-    def register_repository(self, repository: Repository[T], entity_type: Type[T]) -> None:
+    def register_repository(self, repository: Repository[T], entity_type: type[T]) -> None:
         """Register a repository for an entity type.
 
         Args:
@@ -481,8 +473,8 @@ class CompositeUnitOfWork(UnitOfWorkProtocol):
 
     def __init__(self) -> None:
         """Initialize composite Unit of Work."""
-        self._units: List[UnitOfWork] = []
-        self._prepared: Set[int] = set()
+        self._units: list[UnitOfWork] = []
+        self._prepared: set[int] = set()
 
     def add_unit(self, unit: UnitOfWork) -> None:
         """Add a Unit of Work to coordinate.
@@ -578,7 +570,7 @@ def create_unit_of_work(backend: str = "memory", **kwargs: Any) -> UnitOfWork:
 
 @asynccontextmanager
 async def transactional(
-    *repositories: tuple[Repository[Entity], Type[Entity]]
+    *repositories: tuple[Repository[Entity], type[Entity]]
 ) -> AsyncIterator[UnitOfWork]:
     """Context manager for transactional operations.
 

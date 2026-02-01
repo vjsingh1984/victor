@@ -25,7 +25,7 @@ For persistent storage:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.providers.base import Message
 
@@ -58,11 +58,11 @@ class MessageHistory:
         """
         self._system_prompt = system_prompt
         self._system_added = False
-        self._messages: List[Message] = []
+        self._messages: list[Message] = []
         self._max_history = max_history_messages
 
     @property
-    def messages(self) -> List[Message]:
+    def messages(self) -> list[Message]:
         """Get all messages in conversation history."""
         return self._messages.copy()
 
@@ -97,7 +97,7 @@ class MessageHistory:
         return self.add_message("user", content)
 
     def add_assistant_message(
-        self, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None
+        self, content: str, tool_calls: Optional[list[dict[str, Any]]] = None
     ) -> Message:
         """Add an assistant message to conversation history."""
         return self.add_message("assistant", content, tool_calls=tool_calls)
@@ -125,7 +125,7 @@ class MessageHistory:
             self._messages.insert(0, system_message)
             self._system_added = True
 
-    def get_messages_for_provider(self) -> List[Message]:
+    def get_messages_for_provider(self) -> list[Message]:
         """Get messages formatted for sending to provider.
 
         Ensures system prompt is included and history is within limits.
@@ -177,7 +177,7 @@ class MessageHistory:
         """Get the number of messages in history."""
         return len(self._messages)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize conversation state to dictionary."""
         return {
             "system_prompt": self._system_prompt,
@@ -187,7 +187,7 @@ class MessageHistory:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MessageHistory":
+    def from_dict(cls, data: dict[str, Any]) -> "MessageHistory":
         """Deserialize conversation state from dictionary."""
         manager = cls(
             system_prompt=data.get("system_prompt", ""),

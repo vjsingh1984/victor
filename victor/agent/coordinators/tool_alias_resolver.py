@@ -32,8 +32,9 @@ Design Philosophy:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Dict, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
@@ -115,7 +116,7 @@ class ToolAliasResolver:
     }
 
     # Legacy tool name mappings
-    LEGACY_MAPPINGS: Dict[str, str] = {
+    LEGACY_MAPPINGS: dict[str, str] = {
         # File operations
         "read_file": "read",
         "write_file": "write",

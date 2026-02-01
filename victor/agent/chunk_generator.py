@@ -21,7 +21,7 @@ Extracted from CRITICAL-001 Phase 2B: Extract ChunkGenerator
 """
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.streaming import StreamingChatHandler, StreamingChatContext
@@ -95,7 +95,7 @@ class ChunkGenerator:
     def generate_tool_start_chunk(
         self,
         tool_name: str,
-        tool_args: Dict[str, Any],
+        tool_args: dict[str, Any],
         status_msg: str,
     ) -> StreamChunk:
         """Generate chunk indicating tool execution start.
@@ -129,8 +129,8 @@ class ChunkGenerator:
 
     def generate_tool_result_chunks(
         self,
-        result: Dict[str, Any],
-    ) -> List[StreamChunk]:
+        result: dict[str, Any],
+    ) -> list[StreamChunk]:
         """Generate chunks for tool execution result.
 
         Args:
@@ -260,7 +260,7 @@ class ChunkGenerator:
     def get_budget_exhausted_chunks(
         self,
         stream_ctx: "StreamingChatContext",
-    ) -> List[StreamChunk]:
+    ) -> list[StreamChunk]:
         """Get chunks for budget exhaustion warning.
 
         Args:

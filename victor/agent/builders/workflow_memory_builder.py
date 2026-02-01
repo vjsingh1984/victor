@@ -17,7 +17,7 @@
 Part of HIGH-005: Initialization Complexity reduction.
 """
 
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.builders.base import FactoryAwareBuilder
 from victor.agent.coordinators.workflow_coordinator import WorkflowCoordinator
@@ -43,10 +43,10 @@ class WorkflowMemoryBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> dict[str, Any]:  # type: ignore[override]
         """Build workflow and memory components and attach them to orchestrator."""
         factory = self._ensure_factory()
-        components: Dict[str, Any] = {}
+        components: dict[str, Any] = {}
 
         # Result cache for pure/idempotent tools (via factory)
         orchestrator.tool_cache = factory.create_tool_cache()

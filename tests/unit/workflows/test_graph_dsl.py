@@ -16,12 +16,11 @@
 
 import pytest
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.workflows.graph_dsl import (
     State,
     WorkflowGraph,
-    GraphNode,
     GraphNodeType,
     create_graph,
     compile_graph,
@@ -29,7 +28,6 @@ from victor.workflows.graph_dsl import (
 from victor.workflows.definition import (
     AgentNode,
     ConditionNode,
-    ParallelNode,
     TransformNode,
     WorkflowDefinition,
 )
@@ -48,9 +46,9 @@ class SimpleState(State):
 class CodeReviewState(State):
     """State for code review workflow tests."""
 
-    files: List[str] = field(default_factory=list)
+    files: list[str] = field(default_factory=list)
     analysis: Optional[str] = None
-    issues: List[str] = field(default_factory=list)
+    issues: list[str] = field(default_factory=list)
     has_issues: bool = False
     report: Optional[str] = None
 
@@ -59,8 +57,8 @@ class CodeReviewState(State):
 class ParallelState(State):
     """State for parallel execution tests."""
 
-    inputs: List[str] = field(default_factory=list)
-    results: Dict[str, Any] = field(default_factory=dict)
+    inputs: list[str] = field(default_factory=list)
+    results: dict[str, Any] = field(default_factory=dict)
 
 
 # Test Node Functions

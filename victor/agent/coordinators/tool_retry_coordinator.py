@@ -36,10 +36,9 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.tools.base import BaseTool
     from victor.agent.protocols import ToolExecutorProtocol
 
 
@@ -64,7 +63,7 @@ class ToolRetryConfig:
     max_attempts: int = 3
     base_delay: float = 1.0
     max_delay: float = 10.0
-    non_retryable_errors: List[str] = field(
+    non_retryable_errors: list[str] = field(
         default_factory=lambda: ["Invalid", "Missing required", "Not found", "disabled"]
     )
     cache_enabled: bool = True
@@ -139,8 +138,8 @@ class ToolRetryCoordinator:
     async def execute_tool(
         self,
         tool_name: str,
-        tool_args: Dict[str, Any],
-        context: Dict[str, Any],
+        tool_args: dict[str, Any],
+        context: dict[str, Any],
     ) -> ToolExecutionResult:
         """Execute a tool with retry logic and exponential backoff.
 
@@ -235,7 +234,7 @@ class ToolRetryCoordinator:
     async def _handle_success(
         self,
         tool_name: str,
-        tool_args: Dict[str, Any],
+        tool_args: dict[str, Any],
         tool_result: Any,
         attempt: int,
     ) -> ToolExecutionResult:
@@ -275,7 +274,7 @@ class ToolRetryCoordinator:
             result=tool_result, success=True, error_message=None, attempts=attempt + 1
         )
 
-    async def _invalidate_cache_entries(self, tool_name: str, tool_args: Dict[str, Any]) -> None:
+    async def _invalidate_cache_entries(self, tool_name: str, tool_args: dict[str, Any]) -> None:
         """Invalidate cache entries based on tool execution.
 
         Args:

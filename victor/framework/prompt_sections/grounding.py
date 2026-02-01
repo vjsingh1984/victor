@@ -19,7 +19,7 @@ ensuring prompts are properly grounded in relevant context.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict
+from typing import Any
 
 
 @dataclass
@@ -48,7 +48,7 @@ class GroundingSection:
 
     content: str
     priority: int = 10
-    variables: Dict[str, Any] = field(default_factory=dict)
+    variables: dict[str, Any] = field(default_factory=dict)
 
     def render(self) -> str:
         """Render section with variables substituted.

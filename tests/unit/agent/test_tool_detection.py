@@ -14,7 +14,6 @@
 
 """Unit tests for tool detection utilities."""
 
-import pytest
 
 from victor.agent.utils.tool_detection import (
     get_shell_aliases,

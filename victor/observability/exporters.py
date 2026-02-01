@@ -40,7 +40,8 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Union
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.core.events import MessagingEvent
 
@@ -112,12 +113,12 @@ class JsonLineExporter(BaseExporter):
 
     def __init__(
         self,
-        path: Union[str, Path],
+        path: str | Path,
         *,
         buffer_size: int = 10,
         flush_interval_seconds: int = 60,
-        include_categories: Optional[Set[str]] = None,
-        exclude_categories: Optional[Set[str]] = None,
+        include_categories: Optional[set[str]] = None,
+        exclude_categories: Optional[set[str]] = None,
         append: bool = True,
     ) -> None:
         """Initialize the JSONL exporter.
@@ -142,7 +143,7 @@ class JsonLineExporter(BaseExporter):
         # Open file
         mode = "a" if append else "w"
         self._file = open(self.path, mode, encoding="utf-8")
-        self._buffer: List[str] = []
+        self._buffer: list[str] = []
         self._event_count = 0
         self._last_flush_time = time.time()
 
@@ -261,8 +262,8 @@ class LoggingExporter(BaseExporter):
         self,
         logger_name: str = "victor.events",
         *,
-        include_categories: Optional[Set[str]] = None,
-        exclude_categories: Optional[Set[str]] = None,
+        include_categories: Optional[set[str]] = None,
+        exclude_categories: Optional[set[str]] = None,
         log_level: int = logging.INFO,
         include_data: bool = True,
     ) -> None:
@@ -413,7 +414,7 @@ class CompositeExporter(BaseExporter):
         ])
     """
 
-    def __init__(self, exporters: List[BaseExporter]) -> None:
+    def __init__(self, exporters: list[BaseExporter]) -> None:
         """Initialize composite exporter.
 
         Args:
@@ -496,8 +497,8 @@ class FilteringExporter(BaseExporter):
         self,
         exporter: BaseExporter,
         *,
-        categories: Optional[Set[str]] = None,
-        names: Optional[Set[str]] = None,
+        categories: Optional[set[str]] = None,
+        names: Optional[set[str]] = None,
         predicate: Optional[Callable[[MessagingEvent], bool]] = None,
     ) -> None:
         """Initialize filtering exporter.
@@ -584,7 +585,7 @@ class BufferedExporter(BaseExporter):
         self._exporter = exporter
         self._batch_size = batch_size
         self._flush_interval = flush_interval
-        self._buffer: List[MessagingEvent] = []
+        self._buffer: list[MessagingEvent] = []
         self._last_flush = datetime.now(timezone.utc)
 
     def export(self, event: MessagingEvent) -> None:

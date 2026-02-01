@@ -40,9 +40,9 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 
 # =============================================================================
@@ -130,7 +130,7 @@ class IModeCompletionChecker(Protocol):
     Separated from budget tracking to follow ISP.
     """
 
-    def should_early_exit(self, mode: str, response: str) -> Tuple[bool, str]:
+    def should_early_exit(self, mode: str, response: str) -> tuple[bool, str]:
         """Check if should exit mode early.
 
         Args:
@@ -211,7 +211,7 @@ class DebugLoggerProtocol(Protocol):
     def log_tool_call(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         iteration: int,
     ) -> None:
         """Log tool call."""
@@ -261,8 +261,8 @@ class SafetyCheckerProtocol(Protocol):
     async def check_and_confirm(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
-    ) -> Tuple[bool, Optional[str]]:
+        arguments: dict[str, Any],
+    ) -> tuple[bool, Optional[str]]:
         """Check operation safety and request confirmation if needed.
 
         Returns:
@@ -292,13 +292,13 @@ class AutoCommitterProtocol(Protocol):
         """Check if workspace is a git repository."""
         ...
 
-    def has_changes(self, files: Optional[List[str]] = None) -> bool:
+    def has_changes(self, files: Optional[list[str]] = None) -> bool:
         """Check if there are uncommitted changes."""
         ...
 
     def commit_changes(
         self,
-        files: Optional[List[str]] = None,
+        files: Optional[list[str]] = None,
         description: str = "AI-assisted changes",
         change_type: Optional[str] = None,
         scope: Optional[str] = None,
@@ -324,7 +324,7 @@ class MCPBridgeProtocol(Protocol):
         """
         ...
 
-    def get_tool_definitions(self) -> List[Dict[str, Any]]:
+    def get_tool_definitions(self) -> list[dict[str, Any]]:
         """Return MCP tools as Victor tool definitions with a name prefix."""
         ...
 
@@ -371,9 +371,9 @@ class ParallelExecutorProtocol(Protocol):
 
     async def execute_parallel(
         self,
-        tool_calls: List[Any],
+        tool_calls: list[Any],
         **kwargs: Any,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Execute multiple tool calls in parallel.
 
         Args:
@@ -481,7 +481,7 @@ class UsageLoggerProtocol(Protocol):
         """
         ...
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get usage statistics.
 
         Returns:
@@ -512,7 +512,7 @@ class StreamingMetricsCollectorProtocol(Protocol):
         """
         ...
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get collected metrics.
 
         Returns:
@@ -582,7 +582,7 @@ class RLCoordinatorProtocol(Protocol):
         """Get recommendation from a learner."""
         ...
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export all learned values and metrics for monitoring."""
         ...
 

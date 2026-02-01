@@ -43,9 +43,7 @@ import json
 import logging
 import threading
 import time
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Type, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.vertical_integration import IntegrationResult
@@ -101,7 +99,7 @@ class VerticalIntegrationCache:
         self._max_size = max_size
 
         # Thread-safe in-memory cache
-        self._cache: Dict[str, _CacheEntry] = {}
+        self._cache: dict[str, _CacheEntry] = {}
         self._lock = threading.RLock()
 
         # Statistics
@@ -110,8 +108,8 @@ class VerticalIntegrationCache:
 
     def generate_key(
         self,
-        vertical_class: Type,
-        config_overrides: Optional[Dict[str, Any]],
+        vertical_class: type,
+        config_overrides: Optional[dict[str, Any]],
     ) -> str:
         """Generate cache key for a vertical integration.
 
@@ -140,7 +138,7 @@ class VerticalIntegrationCache:
         key_string = ":".join(key_parts)
         return hashlib.sha256(key_string.encode()).hexdigest()
 
-    def _get_yaml_config_hash(self, vertical_class: Type) -> Optional[str]:
+    def _get_yaml_config_hash(self, vertical_class: type) -> Optional[str]:
         """Get hash of YAML config file if it exists.
 
         Args:
@@ -174,8 +172,8 @@ class VerticalIntegrationCache:
 
     def get(
         self,
-        vertical_class: Type,
-        config_overrides: Optional[Dict[str, Any]],
+        vertical_class: type,
+        config_overrides: Optional[dict[str, Any]],
     ) -> Optional["IntegrationResult"]:
         """Get cached integration result if available and valid.
 
@@ -230,8 +228,8 @@ class VerticalIntegrationCache:
 
     def set(
         self,
-        vertical_class: Type,
-        config_overrides: Optional[Dict[str, Any]],
+        vertical_class: type,
+        config_overrides: Optional[dict[str, Any]],
         result: "IntegrationResult",
     ) -> None:
         """Store integration result in cache.
@@ -271,7 +269,7 @@ class VerticalIntegrationCache:
         self._misses = 0
         logger.info("Vertical integration cache cleared")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:
@@ -289,7 +287,7 @@ class VerticalIntegrationCache:
             "enabled": self._enable_cache,
         }
 
-    def invalidate(self, vertical_class: Type) -> None:
+    def invalidate(self, vertical_class: type) -> None:
         """Invalidate all cache entries for a vertical class.
 
         Args:

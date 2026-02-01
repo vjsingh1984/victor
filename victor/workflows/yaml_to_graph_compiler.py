@@ -53,31 +53,21 @@ import copy
 import logging
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Set,
-    Type,
     TypedDict,
-    Union,
 )
+from collections.abc import Callable
 
 from victor.framework.graph import (
     END,
-    START,
     CheckpointerProtocol,
     CompiledGraph,
-    Edge,
-    EdgeType,
     GraphExecutionResult,
-    GraphConfig,
     MemoryCheckpointer,
-    Node,
     StateGraph,
 )
 from victor.workflows.definition import (
@@ -85,7 +75,6 @@ from victor.workflows.definition import (
     ComputeNode,
     ConditionNode,
     ParallelNode,
-    TaskConstraints,
     TransformNode,
     WorkflowDefinition,
     WorkflowNode,
@@ -140,12 +129,12 @@ class WorkflowState(TypedDict, total=False):
     # Execution metadata (prefixed with _ to avoid conflicts)
     _workflow_id: str
     _current_node: str
-    _node_results: Dict[str, Any]
+    _node_results: dict[str, Any]
     _error: Optional[str]
     _iteration: int
-    _parallel_results: Dict[str, Any]
+    _parallel_results: dict[str, Any]
     _hitl_pending: bool
-    _hitl_response: Optional[Dict[str, Any]]
+    _hitl_response: Optional[dict[str, Any]]
     _recursion_context: Optional[Any]  # RecursionContext (avoid circular import)
 
 
@@ -191,7 +180,7 @@ class NodeExecutorFactory:
     def __init__(
         self,
         orchestrator: Optional["WorkflowAgentProtocol"] = None,
-        orchestrators: Optional[Dict[str, "WorkflowAgentProtocol"]] = None,
+        orchestrators: Optional[dict[str, "WorkflowAgentProtocol"]] = None,
         tool_registry: Optional["ToolRegistry"] = None,
     ):
         """Initialize the factory.
@@ -263,7 +252,7 @@ class NodeExecutorFactory:
                 logger.debug(f"   Timeout: {node.timeout_seconds or 300}s")
 
                 # Build input context from input_mapping
-                input_context: Dict[str, Any] = {}
+                input_context: dict[str, Any] = {}
                 for param_name, context_key in node.input_mapping.items():
                     if context_key in state:
                         input_context[param_name] = state[context_key]  # type: ignore[literal-required]
@@ -323,7 +312,7 @@ class NodeExecutorFactory:
                         f"No orchestrator available for agent node '{node.id}' with profile '{getattr(node, 'profile', None)}', "
                         "using placeholder execution"
                     )
-                    output: Dict[str, Any] = {
+                    output: dict[str, Any] = {
                         "node_id": node.id,
                         "role": node.role,
                         "goal": goal,
@@ -435,7 +424,7 @@ class NodeExecutorFactory:
 
             try:
                 # Build params from input_mapping
-                params: Dict[str, Any] = {}
+                params: dict[str, Any] = {}
                 for param_name, context_key in node.input_mapping.items():
                     # Handle $ctx.key syntax
                     if isinstance(context_key, str) and context_key.startswith("$ctx."):
@@ -560,7 +549,7 @@ class NodeExecutorFactory:
 
             try:
                 # Execute transform function
-                transformed: Dict[str, Any] = node.transform(state)  # type: ignore[arg-type]
+                transformed: dict[str, Any] = node.transform(state)  # type: ignore[arg-type]
 
                 # Merge transformed data back into state
                 for key, value in transformed.items():
@@ -795,7 +784,7 @@ class YAMLToStateGraphCompiler:
     def __init__(
         self,
         orchestrator: Optional["WorkflowAgentProtocol"] = None,
-        orchestrators: Optional[Dict[str, "WorkflowAgentProtocol"]] = None,
+        orchestrators: Optional[dict[str, "WorkflowAgentProtocol"]] = None,
         tool_registry: Optional["ToolRegistry"] = None,
         config: Optional[CompilerConfig] = None,
     ):
@@ -854,12 +843,12 @@ class YAMLToStateGraphCompiler:
         graph = StateGraph(WorkflowState)  # type: ignore[type-var]
 
         # Track nodes and edges
-        nodes_added: Set[str] = set()
-        condition_nodes: Dict[str, ConditionNode] = {}
-        parallel_nodes: Dict[str, ParallelNode] = {}
+        nodes_added: set[str] = set()
+        condition_nodes: dict[str, ConditionNode] = {}
+        parallel_nodes: dict[str, ParallelNode] = {}
 
         # First pass: categorize nodes and find parallel children
-        parallel_children: Set[str] = set()
+        parallel_children: set[str] = set()
         for node_id, node in workflow.nodes.items():
             if isinstance(node, ConditionNode):
                 condition_nodes[node_id] = node
@@ -952,7 +941,7 @@ class YAMLToStateGraphCompiler:
         graph: StateGraph[Any],
         parallel_node: ParallelNode,
         workflow: WorkflowDefinition,
-        nodes_added: Set[str],
+        nodes_added: set[str],
     ) -> None:
         """Add a parallel node group to the graph.
 
@@ -1034,7 +1023,7 @@ class YAMLToStateGraphCompiler:
     async def compile_and_execute(
         self,
         workflow: WorkflowDefinition,
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
         thread_id: Optional[str] = None,
     ) -> GraphExecutionResult[Any]:
         """Convenience method to compile and execute in one step.
@@ -1077,7 +1066,7 @@ class YAMLToStateGraphCompiler:
 def compile_yaml_workflow(
     workflow: WorkflowDefinition,
     orchestrator: Optional["WorkflowAgentProtocol"] = None,
-    orchestrators: Optional[Dict[str, "WorkflowAgentProtocol"]] = None,
+    orchestrators: Optional[dict[str, "WorkflowAgentProtocol"]] = None,
     config: Optional[CompilerConfig] = None,
 ) -> CompiledGraph[Any]:
     """Compile a YAML workflow to a StateGraph.
@@ -1099,9 +1088,9 @@ def compile_yaml_workflow(
 
 async def execute_yaml_workflow(
     workflow: WorkflowDefinition,
-    initial_state: Optional[Dict[str, Any]] = None,
+    initial_state: Optional[dict[str, Any]] = None,
     orchestrator: Optional["WorkflowAgentProtocol"] = None,
-    orchestrators: Optional[Dict[str, "WorkflowAgentProtocol"]] = None,
+    orchestrators: Optional[dict[str, "WorkflowAgentProtocol"]] = None,
     thread_id: Optional[str] = None,
     config: Optional[CompilerConfig] = None,
 ) -> GraphExecutionResult[Any]:

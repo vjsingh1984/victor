@@ -25,10 +25,7 @@ These tests execute real workflows with realistic scenarios and validate
 the complete review process from start to finish.
 """
 
-import asyncio
-from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -36,9 +33,6 @@ from tests.fixtures.coding_fixtures import (
     SAMPLE_PYTHON_CLASS,
     SAMPLE_PYTHON_COMPLEX,
     SAMPLE_PYTHON_SIMPLE,
-    SAMPLE_PYTHON_TYPE_HINTS,
-    SAMPLE_PYTHON_WITH_ERRORS,
-    SAMPLE_PYTHON_WITH_IMPORTS,
     SAMPLE_PYTHON_WITH_SECURITY_ISSUES,
     create_sample_file,
     create_sample_project,

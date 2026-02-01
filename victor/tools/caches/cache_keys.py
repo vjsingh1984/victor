@@ -54,7 +54,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.tools.base import ToolRegistry
@@ -119,8 +119,8 @@ class CacheKeyGenerator:
         self,
         query: str,
         tools_hash: str,
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
-        pending_actions: Optional[List[str]] = None,
+        conversation_history: Optional[list[dict[str, Any]]] = None,
+        pending_actions: Optional[list[str]] = None,
     ) -> str:
         """Generate cache key for context-aware tool selection.
 
@@ -291,7 +291,7 @@ class CacheKeyGenerator:
         full_hash = hashlib.sha256(data.encode()).hexdigest()
         return full_hash[: self.HASH_TRUNCATE_LENGTH]
 
-    def _hash_history(self, history: List[Dict[str, Any]]) -> str:
+    def _hash_history(self, history: list[dict[str, Any]]) -> str:
         """Hash conversation history for context key.
 
         Only includes last N messages to keep cache effective while
@@ -320,7 +320,7 @@ class CacheKeyGenerator:
         combined = "|".join(parts)
         return self._hash(combined)
 
-    def _hash_pending_actions(self, actions: List[str]) -> str:
+    def _hash_pending_actions(self, actions: list[str]) -> str:
         """Hash pending actions for context key.
 
         Args:
@@ -375,8 +375,8 @@ def generate_query_key(
 def generate_context_key(
     query: str,
     tools_hash: str,
-    conversation_history: Optional[List[Dict[str, Any]]] = None,
-    pending_actions: Optional[List[str]] = None,
+    conversation_history: Optional[list[dict[str, Any]]] = None,
+    pending_actions: Optional[list[str]] = None,
 ) -> str:
     """Convenience function to generate context cache key.
 

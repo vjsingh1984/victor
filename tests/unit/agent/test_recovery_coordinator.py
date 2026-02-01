@@ -20,8 +20,7 @@ victor.agent.recovery.coordinator.RecoveryCoordinator (SOLID recovery system).
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, AsyncMock, patch
-from typing import Any, Dict, List, Optional
+from unittest.mock import Mock, AsyncMock
 
 from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator, StreamingRecoveryContext
 from victor.providers.base import StreamChunk
@@ -454,7 +453,6 @@ class TestActionHandling:
     @pytest.mark.asyncio
     async def test_handle_recovery_with_integration_disabled(self, recovery_context):
         """Test handle_recovery_with_integration when disabled."""
-        from victor.agent.orchestrator_recovery import OrchestratorRecoveryAction
 
         mock_integration = Mock()
         mock_integration.enabled = False

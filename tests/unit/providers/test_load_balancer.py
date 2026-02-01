@@ -14,7 +14,6 @@
 
 """Unit tests for load balancing strategies."""
 
-import asyncio
 import pytest
 from unittest.mock import Mock
 

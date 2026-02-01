@@ -49,11 +49,11 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Optional
+from collections.abc import Callable
 from contextlib import contextmanager
 from functools import wraps
 import psutil  # type: ignore[import-untyped]
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +73,9 @@ class CoordinatorExecution:
     duration_ms: float
     success: bool
     error_message: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "coordinator_name": self.coordinator_name,
@@ -102,7 +102,7 @@ class CoordinatorSnapshot:
     cache_hits: int = 0
     cache_misses: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "timestamp": self.timestamp,
@@ -163,19 +163,19 @@ class CoordinatorMetricsCollector:
         self._lock = threading.RLock()
 
         # Execution history
-        self._executions: Dict[str, List[CoordinatorExecution]] = defaultdict(list)
+        self._executions: dict[str, list[CoordinatorExecution]] = defaultdict(list)
 
         # Current metrics (per coordinator)
-        self._execution_counts: Dict[str, int] = defaultdict(int)
-        self._total_durations: Dict[str, float] = defaultdict(float)
-        self._error_counts: Dict[str, int] = defaultdict(int)
+        self._execution_counts: dict[str, int] = defaultdict(int)
+        self._total_durations: dict[str, float] = defaultdict(float)
+        self._error_counts: dict[str, int] = defaultdict(int)
 
         # Cache metrics
-        self._cache_hits: Dict[str, int] = defaultdict(int)
-        self._cache_misses: Dict[str, int] = defaultdict(int)
+        self._cache_hits: dict[str, int] = defaultdict(int)
+        self._cache_misses: dict[str, int] = defaultdict(int)
 
         # Analytics events
-        self._analytics_events: Dict[str, int] = defaultdict(int)
+        self._analytics_events: dict[str, int] = defaultdict(int)
 
         # Process for memory tracking
         self._process = psutil.Process()
@@ -188,7 +188,7 @@ class CoordinatorMetricsCollector:
     # ========================================================================
 
     @contextmanager
-    def track_coordinator(self, coordinator_name: str, metadata: Optional[Dict[str, Any]] = None):
+    def track_coordinator(self, coordinator_name: str, metadata: Optional[dict[str, Any]] = None):
         """Context manager for tracking coordinator execution.
 
         Args:
@@ -232,7 +232,7 @@ class CoordinatorMetricsCollector:
         duration_ms: float,
         success: bool = True,
         error_message: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record a coordinator execution.
 
@@ -264,7 +264,7 @@ class CoordinatorMetricsCollector:
         duration_ms: float,
         success: bool,
         error_message: Optional[str],
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
     ) -> None:
         """Record an execution (internal method)."""
         with self._lock:
@@ -367,7 +367,7 @@ class CoordinatorMetricsCollector:
                 cache_misses=self._cache_misses[coordinator_name],
             )
 
-    def get_all_snapshots(self) -> List[CoordinatorSnapshot]:
+    def get_all_snapshots(self) -> list[CoordinatorSnapshot]:
         """Get snapshots for all coordinators.
 
         Returns:
@@ -390,7 +390,7 @@ class CoordinatorMetricsCollector:
     # Statistics
     # ========================================================================
 
-    def get_coordinator_stats(self, coordinator_name: str) -> Dict[str, Any]:
+    def get_coordinator_stats(self, coordinator_name: str) -> dict[str, Any]:
         """Get statistics for a specific coordinator.
 
         Args:
@@ -445,7 +445,7 @@ class CoordinatorMetricsCollector:
                 "cache_misses": cache_misses,
             }
 
-    def get_overall_stats(self) -> Dict[str, Any]:
+    def get_overall_stats(self) -> dict[str, Any]:
         """Get overall statistics across all coordinators.
 
         Returns:

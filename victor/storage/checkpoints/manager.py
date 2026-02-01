@@ -20,15 +20,12 @@ including save, restore, fork, and diff capabilities.
 
 import logging
 import uuid
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 from victor.storage.checkpoints.protocol import (
-    CheckpointData,
     CheckpointDiff,
     CheckpointManagerProtocol,
     CheckpointMetadata,
-    CheckpointNotFoundError,
     DiffType,
     FieldDiff,
 )
@@ -87,15 +84,15 @@ class ConversationCheckpointManager:
         self.max_checkpoints_per_session = max_checkpoints_per_session
 
         # Track tool count for auto-checkpointing
-        self._tool_counts: Dict[str, int] = {}
-        self._last_auto_checkpoint: Dict[str, int] = {}
+        self._tool_counts: dict[str, int] = {}
+        self._last_auto_checkpoint: dict[str, int] = {}
 
     async def save_checkpoint(
         self,
         session_id: str,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         description: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         parent_id: Optional[str] = None,
     ) -> str:
         """Save a checkpoint of the current conversation state.
@@ -140,7 +137,7 @@ class ConversationCheckpointManager:
 
         return checkpoint_id
 
-    async def restore_checkpoint(self, checkpoint_id: str) -> Dict[str, Any]:
+    async def restore_checkpoint(self, checkpoint_id: str) -> dict[str, Any]:
         """Restore conversation state from a checkpoint.
 
         Args:
@@ -165,7 +162,7 @@ class ConversationCheckpointManager:
         self,
         checkpoint_id: str,
         new_session_id: Optional[str] = None,
-    ) -> Tuple[str, Dict[str, Any]]:
+    ) -> tuple[str, dict[str, Any]]:
         """Create a new session fork from a checkpoint.
 
         This allows exploring alternative paths from a previous state
@@ -270,10 +267,10 @@ class ConversationCheckpointManager:
 
     def _compute_set_diff(
         self,
-        set_a: Set[str],
-        set_b: Set[str],
+        set_a: set[str],
+        set_b: set[str],
         field_prefix: str,
-        diff_list: List[FieldDiff],
+        diff_list: list[FieldDiff],
     ) -> None:
         """Compute differences between two sets."""
         for item in set_b - set_a:
@@ -298,7 +295,7 @@ class ConversationCheckpointManager:
         session_id: str,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[CheckpointMetadata]:
+    ) -> list[CheckpointMetadata]:
         """List checkpoints for a session.
 
         Args:
@@ -339,7 +336,7 @@ class ConversationCheckpointManager:
     async def maybe_auto_checkpoint(
         self,
         session_id: str,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         force: bool = False,
     ) -> Optional[str]:
         """Create an auto-checkpoint if enough tools have been executed.
@@ -378,7 +375,7 @@ class ConversationCheckpointManager:
         self,
         session_id: str,
         include_forks: bool = True,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get a timeline view of checkpoints for visualization.
 
         Args:
@@ -407,7 +404,7 @@ class ConversationCheckpointManager:
 
         return timeline
 
-    def format_timeline_ascii(self, timeline: List[Dict[str, Any]]) -> str:
+    def format_timeline_ascii(self, timeline: list[dict[str, Any]]) -> str:
         """Format timeline as ASCII art for CLI display.
 
         Args:

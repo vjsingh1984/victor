@@ -39,9 +39,9 @@ Example:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, cast
+from dataclasses import field
+from typing import Any, TYPE_CHECKING, cast
+from collections.abc import Callable
 
 from victor.config.settings import VERSION
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
@@ -49,7 +49,7 @@ from victor.framework.capability_loader import CapabilityEntry, capability
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ def configure_passk_evaluation(
     orchestrator: Any,
     *,
     k_value: int = 10,
-    temperature_range: List[float] = field(default_factory=lambda: [0.2, 0.4, 0.6, 0.8]),
+    temperature_range: list[float] = field(default_factory=lambda: [0.2, 0.4, 0.6, 0.8]),
     max_samples: int = 100,
     enable_early_stopping: bool = True,
     stop_after_n_success: int = 5,
@@ -135,7 +135,7 @@ def configure_passk_evaluation(
     logger.info(f"Configured Pass@k evaluation: k={k_value}, max_samples={max_samples}")
 
 
-def get_passk_config(orchestrator: Any) -> Dict[str, Any]:
+def get_passk_config(orchestrator: Any) -> dict[str, Any]:
     """Get current pass@k evaluation configuration.
 
     Args:
@@ -159,7 +159,7 @@ def get_passk_config(orchestrator: Any) -> Dict[str, Any]:
             "stop_after_n_success": 5,
         },
     )
-    return cast(Dict[str, Any], result)
+    return cast(dict[str, Any], result)
 
 
 def configure_metrics_collection(
@@ -196,7 +196,7 @@ def configure_metrics_collection(
     logger.info(f"Configured metrics collection: format={output_format}")
 
 
-def get_metrics_config(orchestrator: Any) -> Dict[str, Any]:
+def get_metrics_config(orchestrator: Any) -> dict[str, Any]:
     """Get current metrics collection configuration.
 
     Args:
@@ -509,9 +509,9 @@ class BenchmarkCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
 
     def __init__(self) -> None:
         """Initialize the capability provider."""
-        self._applied: Set[str] = set()
+        self._applied: set[str] = set()
         # Map capability names to their handler functions
-        self._capabilities: Dict[str, Callable[..., None]] = {
+        self._capabilities: dict[str, Callable[..., None]] = {
             "swe_bench_execution": configure_swe_bench_execution,
             "passk_evaluation": configure_passk_evaluation,
             "metrics_collection": configure_metrics_collection,
@@ -520,7 +520,7 @@ class BenchmarkCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
             "performance_benchmarking": configure_performance_benchmarking,
         }
         # Capability metadata for discovery
-        self._metadata: Dict[str, CapabilityMetadata] = {
+        self._metadata: dict[str, CapabilityMetadata] = {
             "swe_bench_execution": CapabilityMetadata(
                 name="swe_bench_execution",
                 description="SWE-bench task execution configuration",
@@ -562,7 +562,7 @@ class BenchmarkCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
             ),
         }
 
-    def get_capabilities(self) -> Dict[str, Callable[..., None]]:
+    def get_capabilities(self) -> dict[str, Callable[..., None]]:
         """Return all registered capabilities.
 
         Returns:
@@ -570,7 +570,7 @@ class BenchmarkCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
         """
         return self._capabilities.copy()
 
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+    def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
         """Return metadata for all registered capabilities.
 
         Returns:
@@ -680,7 +680,7 @@ class BenchmarkCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
         self.apply_code_quality_checks(orchestrator)
         self.apply_performance_benchmarking(orchestrator)
 
-    def get_applied(self) -> Set[str]:
+    def get_applied(self) -> set[str]:
         """Get set of applied capability names.
 
         Returns:
@@ -694,7 +694,7 @@ class BenchmarkCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
 # =============================================================================
 
 
-CAPABILITIES: List[CapabilityEntry] = [
+CAPABILITIES: list[CapabilityEntry] = [
     CapabilityEntry(
         capability=OrchestratorCapability(
             name="benchmark_swe_bench",
@@ -767,7 +767,7 @@ CAPABILITIES: List[CapabilityEntry] = [
 # =============================================================================
 
 
-def get_benchmark_capabilities() -> List[CapabilityEntry]:
+def get_benchmark_capabilities() -> list[CapabilityEntry]:
     """Get all Benchmark capability entries.
 
     Returns:
@@ -803,7 +803,7 @@ def create_benchmark_capability_loader() -> Any:
 # =============================================================================
 
 
-def get_capability_configs() -> Dict[str, Any]:
+def get_capability_configs() -> dict[str, Any]:
     """Get Benchmark capability configurations for centralized storage.
 
     Returns default Benchmark configuration for VerticalContext storage.

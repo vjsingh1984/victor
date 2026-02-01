@@ -17,7 +17,7 @@
 import asyncio
 import platform
 import shlex
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.config.timeouts import ProcessTimeouts
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
@@ -47,7 +47,7 @@ DANGEROUS_PATTERNS = [
 
 # Platform-specific readonly commands - safe for exploration/analysis
 # These commands cannot modify state, only read
-READONLY_COMMANDS_UNIX: Set[str] = {
+READONLY_COMMANDS_UNIX: set[str] = {
     # Navigation & listing
     "pwd",
     "ls",
@@ -113,7 +113,7 @@ READONLY_COMMANDS_UNIX: Set[str] = {
     "node",  # Will filter for -e, --version, etc
 }
 
-READONLY_COMMANDS_WINDOWS: Set[str] = {
+READONLY_COMMANDS_WINDOWS: set[str] = {
     # Navigation & listing
     "cd",
     "dir",
@@ -138,7 +138,7 @@ READONLY_COMMANDS_WINDOWS: Set[str] = {
 }
 
 # Git subcommands that are readonly
-GIT_READONLY_SUBCOMMANDS: Set[str] = {
+GIT_READONLY_SUBCOMMANDS: set[str] = {
     "status",
     "log",
     "show",
@@ -169,7 +169,7 @@ GIT_READONLY_SUBCOMMANDS: Set[str] = {
 }
 
 # pip subcommands that are readonly
-PIP_READONLY_SUBCOMMANDS: Set[str] = {
+PIP_READONLY_SUBCOMMANDS: set[str] = {
     "list",
     "show",
     "freeze",
@@ -182,7 +182,7 @@ PIP_READONLY_SUBCOMMANDS: Set[str] = {
 }
 
 # npm subcommands that are readonly
-NPM_READONLY_SUBCOMMANDS: Set[str] = {
+NPM_READONLY_SUBCOMMANDS: set[str] = {
     "list",
     "ls",
     "view",
@@ -201,7 +201,7 @@ NPM_READONLY_SUBCOMMANDS: Set[str] = {
 }
 
 
-def _get_readonly_commands() -> Set[str]:
+def _get_readonly_commands() -> set[str]:
     """Get platform-specific readonly commands."""
     if platform.system() == "Windows":
         return READONLY_COMMANDS_WINDOWS
@@ -279,7 +279,7 @@ def _is_readonly_command(cmd: str) -> bool:
     return True
 
 
-def get_allowed_readonly_commands() -> List[str]:
+def get_allowed_readonly_commands() -> list[str]:
     """Return list of allowed readonly commands for LLM reference."""
     commands = list(_get_readonly_commands())
     commands.sort()
@@ -340,7 +340,7 @@ async def shell(
     cwd: Optional[str] = None,
     timeout: Optional[int] = None,
     dangerous: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run shell command with safety checks. Returns stdout/stderr/return_code.
 
     Args:
@@ -510,7 +510,7 @@ async def shell_readonly(
     cmd: str,
     cwd: Optional[str] = None,
     timeout: Optional[int] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Execute readonly shell commands for exploration (pwd, ls, cat, grep, git status, etc).
 
     This tool only allows safe, readonly commands that cannot modify files or state.

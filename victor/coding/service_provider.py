@@ -21,7 +21,7 @@ enabling the framework to resolve coding vertical dependencies.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, List, Type
+from typing import TYPE_CHECKING, Any
 
 from victor.core.verticals.protocols import ServiceProviderProtocol
 
@@ -72,7 +72,6 @@ class CodingServiceProvider(ServiceProviderProtocol):
             container: DI container to register services in
             settings: Application settings
         """
-        from victor.core.container import ServiceLifetime
 
         # Register CodeCorrectionMiddleware
         self._register_middleware(container, settings)
@@ -97,7 +96,6 @@ class CodingServiceProvider(ServiceProviderProtocol):
         settings: "Settings",
     ) -> None:
         """Register coding middleware services."""
-        from typing import Any
         from victor.core.container import ServiceLifetime
 
         def create_middleware(_: Any) -> Any:
@@ -119,7 +117,6 @@ class CodingServiceProvider(ServiceProviderProtocol):
         settings: "Settings",
     ) -> None:
         """Register coding safety extension."""
-        from typing import Any
         from victor.core.container import ServiceLifetime
 
         def create_safety(_: Any) -> Any:
@@ -139,7 +136,6 @@ class CodingServiceProvider(ServiceProviderProtocol):
         settings: "Settings",
     ) -> None:
         """Register coding prompt contributor."""
-        from typing import Any
         from victor.core.container import ServiceLifetime
 
         def create_prompts(_: Any) -> Any:
@@ -161,7 +157,6 @@ class CodingServiceProvider(ServiceProviderProtocol):
         settings: "Settings",
     ) -> None:
         """Register mode configuration provider."""
-        from typing import Any
         from victor.core.container import ServiceLifetime
         from victor.core.verticals.protocols import ModeConfigProviderProtocol
 
@@ -182,7 +177,6 @@ class CodingServiceProvider(ServiceProviderProtocol):
         settings: "Settings",
     ) -> None:
         """Register tool dependency provider."""
-        from typing import Any
         from victor.core.container import ServiceLifetime
         from victor.core.verticals.protocols import ToolDependencyProviderProtocol
 
@@ -199,7 +193,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
             ServiceLifetime.SINGLETON,
         )
 
-    def get_required_services(self) -> List[type[Any]]:
+    def get_required_services(self) -> list[type[Any]]:
         """Get list of required service types.
 
         Returns:
@@ -207,7 +201,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         """
         return []  # No hard requirements
 
-    def get_optional_services(self) -> List[type[Any]]:
+    def get_optional_services(self) -> list[type[Any]]:
         """Get list of optional service types.
 
         Returns:

@@ -46,7 +46,7 @@ import ctypes
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import yaml
 
@@ -56,7 +56,7 @@ def _get_registry_path() -> Path:
     return Path(__file__).parent / "api_keys_registry.yaml"
 
 
-def _load_registry() -> Dict[str, Any]:
+def _load_registry() -> dict[str, Any]:
     """Load the API keys registry from YAML.
 
     Returns cached version if already loaded.
@@ -80,7 +80,7 @@ def _load_registry() -> Dict[str, Any]:
     return _REGISTRY_CACHE
 
 
-def _build_env_vars_from_registry(section: str) -> Dict[str, str]:
+def _build_env_vars_from_registry(section: str) -> dict[str, str]:
     """Build environment variable mapping from registry section.
 
     Args:
@@ -106,7 +106,7 @@ def _build_env_vars_from_registry(section: str) -> Dict[str, str]:
 
 
 # Cache for loaded registry
-_REGISTRY_CACHE: Optional[Dict[str, Any]] = None
+_REGISTRY_CACHE: Optional[dict[str, Any]] = None
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ DEFAULT_KEYS_FILE = _get_secure_keys_file()
 
 # Hardcoded fallback for provider environment variables
 # These are used if api_keys_registry.yaml is not found or fails to load
-_PROVIDER_ENV_VARS_FALLBACK: Dict[str, str] = {
+_PROVIDER_ENV_VARS_FALLBACK: dict[str, str] = {
     # Premium API providers
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
@@ -164,7 +164,7 @@ _PROVIDER_ENV_VARS_FALLBACK: Dict[str, str] = {
 }
 
 
-def _get_provider_env_vars() -> Dict[str, str]:
+def _get_provider_env_vars() -> dict[str, str]:
     """Get provider to environment variable mapping.
 
     Loads from registry if available, falls back to hardcoded values.
@@ -176,7 +176,7 @@ def _get_provider_env_vars() -> Dict[str, str]:
 
 
 # Provider to environment variable mapping (lazy-loaded from registry)
-PROVIDER_ENV_VARS: Dict[str, str] = _get_provider_env_vars()
+PROVIDER_ENV_VARS: dict[str, str] = _get_provider_env_vars()
 
 # Providers that don't require API keys
 LOCAL_PROVIDERS = {"ollama", "lmstudio", "vllm"}
@@ -185,7 +185,7 @@ LOCAL_PROVIDERS = {"ollama", "lmstudio", "vllm"}
 # SERVICE API KEYS (External Data Services - not LLM providers)
 # ============================================================================
 # Hardcoded fallback for service environment variables
-_SERVICE_ENV_VARS_FALLBACK: Dict[str, str] = {
+_SERVICE_ENV_VARS_FALLBACK: dict[str, str] = {
     # Market Data & Financial Services
     "finnhub": "FINNHUB_API_KEY",  # Stock data, news sentiment, analyst estimates
     "fred": "FRED_API_KEY",  # Federal Reserve Economic Data
@@ -206,7 +206,7 @@ _SERVICE_ENV_VARS_FALLBACK: Dict[str, str] = {
 }
 
 
-def _get_service_env_vars() -> Dict[str, str]:
+def _get_service_env_vars() -> dict[str, str]:
     """Get service to environment variable mapping.
 
     Loads from registry if available, falls back to hardcoded values.
@@ -218,10 +218,10 @@ def _get_service_env_vars() -> Dict[str, str]:
 
 
 # Service to environment variable mapping (lazy-loaded from registry)
-SERVICE_ENV_VARS: Dict[str, str] = _get_service_env_vars()
+SERVICE_ENV_VARS: dict[str, str] = _get_service_env_vars()
 
 
-def get_all_key_types() -> Dict[str, Dict[str, str]]:
+def get_all_key_types() -> dict[str, dict[str, str]]:
     """Get all known key types (providers + services)."""
     return {
         "provider": PROVIDER_ENV_VARS,
@@ -447,7 +447,7 @@ class APIKeyManager:
             keys_file = _get_secure_keys_file()
         self.keys_file = keys_file
         # Use SecureString for cached credentials
-        self._cache: Dict[str, Optional[SecureString]] = {}
+        self._cache: dict[str, Optional[SecureString]] = {}
 
     def get_key(self, provider: str) -> Optional[str]:
         """Get API key for a specific provider.
@@ -651,7 +651,7 @@ class APIKeyManager:
             self.keys_file.parent.mkdir(parents=True, exist_ok=True)
 
             # Load existing keys
-            existing_data: Dict[str, Any] = {}
+            existing_data: dict[str, Any] = {}
             if self.keys_file.exists():
                 with open(self.keys_file, "r") as f:
                     existing_data = yaml.safe_load(f) or {}
@@ -980,7 +980,7 @@ def set_service_key(service: str, key: str, use_keyring: bool = False) -> bool:
     try:
         _manager.keys_file.parent.mkdir(parents=True, exist_ok=True)
 
-        existing_data: Dict[str, Any] = {}
+        existing_data: dict[str, Any] = {}
         if _manager.keys_file.exists():
             with open(_manager.keys_file, "r") as f:
                 existing_data = yaml.safe_load(f) or {}
@@ -1130,11 +1130,11 @@ class APIKeysProxy:
         configured = self._get_manager().list_configured_providers()
         return f"APIKeysProxy(configured={configured})"
 
-    def keys(self) -> List[str]:
+    def keys(self) -> list[str]:
         """Return list of providers with configured keys."""
         return self._get_manager().list_configured_providers()
 
-    def values(self) -> List[str]:
+    def values(self) -> list[str]:
         """Return list of configured API key values."""
         result = []
         for provider in self._get_manager().list_configured_providers():
@@ -1144,7 +1144,7 @@ class APIKeysProxy:
                 result.append(f"{key[:8]}...{key[-4:]}")
         return result
 
-    def items(self) -> List[Tuple[str, str]]:
+    def items(self) -> list[tuple[str, str]]:
         """Return list of (provider, masked_key) tuples."""
         result = []
         for provider in self._get_manager().list_configured_providers():

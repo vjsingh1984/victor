@@ -17,13 +17,12 @@
 import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from victor.coding.testgen.manager import TestGenManager, reset_testgen_manager
 from victor.coding.testgen.protocol import GeneratedTest, TestSuite, TestCase
 from victor.core.language_capabilities.hooks import (
     CodeGroundingHook,
-    validate_code_before_write,
 )
 from victor.core.language_capabilities.types import CodeValidationResult
 

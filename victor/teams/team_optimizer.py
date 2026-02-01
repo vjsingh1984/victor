@@ -36,12 +36,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from victor.teams.team_predictor import TaskFeatures, TeamPredictor
+    from victor.teams.team_predictor import TeamPredictor
     from victor.teams.types import TeamConfig, TeamFormation, TeamMember
 
 logger = logging.getLogger(__name__)
@@ -81,8 +81,8 @@ class OptimizationConstraints:
     min_members: int = 1
     max_budget: int = 500
     min_budget: int = 10
-    required_expertise: List[str] = field(default_factory=list)
-    allowed_formations: List[str] = field(default_factory=list)
+    required_expertise: list[str] = field(default_factory=list)
+    allowed_formations: list[str] = field(default_factory=list)
     max_execution_time: Optional[float] = None
     min_success_probability: Optional[float] = None
 
@@ -135,10 +135,10 @@ class OptimizationResult:
 
     optimal_config: "TeamConfig"
     score: float
-    predicted_metrics: Dict[str, Any]
-    alternative_configs: List[Tuple["TeamConfig", float]] = field(default_factory=list)
+    predicted_metrics: dict[str, Any]
+    alternative_configs: list[tuple["TeamConfig", float]] = field(default_factory=list)
     optimization_time: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -202,10 +202,10 @@ class TeamOptimizer:
     def optimize_team(
         self,
         task: str,
-        available_members: List["TeamMember"],
+        available_members: list["TeamMember"],
         objective: OptimizationObjective = OptimizationObjective.BALANCED,
         constraints: Optional[OptimizationConstraints] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> OptimizationResult:
         """Optimize team configuration for task.
 
@@ -247,10 +247,10 @@ class TeamOptimizer:
     def _greedy_optimize(
         self,
         task: str,
-        available_members: List["TeamMember"],
+        available_members: list["TeamMember"],
         objective: OptimizationObjective,
         constraints: OptimizationConstraints,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> OptimizationResult:
         """Greedy optimization strategy.
 
@@ -270,7 +270,7 @@ class TeamOptimizer:
         alternatives = []
 
         # Greedy approach: iteratively add members
-        current_members: List["TeamMember"] = []
+        current_members: list["TeamMember"] = []
 
         for _ in range(min(len(available_members), constraints.max_members)):
             # Try adding each remaining member
@@ -316,10 +316,10 @@ class TeamOptimizer:
     def _genetic_optimize(
         self,
         task: str,
-        available_members: List["TeamMember"],
+        available_members: list["TeamMember"],
         objective: OptimizationObjective,
         constraints: OptimizationConstraints,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> OptimizationResult:
         """Genetic algorithm optimization.
 
@@ -348,7 +348,7 @@ class TeamOptimizer:
             for individual in population:
                 if not constraints.validate(individual):
                     score = -1.0
-                    metrics: Dict[str, float] = {}
+                    metrics: dict[str, float] = {}
                 else:
                     score, metrics = self._evaluate_config(individual, task, objective, context)
 
@@ -400,10 +400,10 @@ class TeamOptimizer:
     def _bayesian_optimize(
         self,
         task: str,
-        available_members: List["TeamMember"],
+        available_members: list["TeamMember"],
         objective: OptimizationObjective,
         constraints: OptimizationConstraints,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> OptimizationResult:
         """Bayesian optimization strategy (simplified placeholder).
 
@@ -425,10 +425,10 @@ class TeamOptimizer:
     def _random_optimize(
         self,
         task: str,
-        available_members: List["TeamMember"],
+        available_members: list["TeamMember"],
         objective: OptimizationObjective,
         constraints: OptimizationConstraints,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> OptimizationResult:
         """Random search optimization.
 
@@ -479,8 +479,8 @@ class TeamOptimizer:
         config: "TeamConfig",
         task: str,
         objective: OptimizationObjective,
-        context: Dict[str, Any],
-    ) -> Tuple[float, Dict[str, Any]]:
+        context: dict[str, Any],
+    ) -> tuple[float, dict[str, Any]]:
         """Evaluate team configuration.
 
         Args:
@@ -492,7 +492,7 @@ class TeamOptimizer:
         Returns:
             Tuple of (score, metrics)
         """
-        metrics: Dict[str, float] = {}
+        metrics: dict[str, float] = {}
 
         # Use predictor if available
         if self.predictor:
@@ -552,10 +552,10 @@ class TeamOptimizer:
 
     def _create_config(
         self,
-        members: List["TeamMember"],
+        members: list["TeamMember"],
         formation: "TeamFormation",
         constraints: OptimizationConstraints,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> "TeamConfig":
         """Create team configuration.
 
@@ -579,7 +579,7 @@ class TeamOptimizer:
         )
 
     def _create_default_config(
-        self, available_members: List["TeamMember"], constraints: OptimizationConstraints
+        self, available_members: list["TeamMember"], constraints: OptimizationConstraints
     ) -> "TeamConfig":
         """Create default configuration.
 
@@ -603,7 +603,7 @@ class TeamOptimizer:
 
     def _get_formations_to_test(
         self, constraints: OptimizationConstraints
-    ) -> List["TeamFormation"]:
+    ) -> list["TeamFormation"]:
         """Get formations to test.
 
         Args:
@@ -625,8 +625,8 @@ class TeamOptimizer:
         ]
 
     def _initialize_population(
-        self, available_members: List["TeamMember"], constraints: OptimizationConstraints
-    ) -> List["TeamConfig"]:
+        self, available_members: list["TeamMember"], constraints: OptimizationConstraints
+    ) -> list["TeamConfig"]:
         """Initialize population for genetic algorithm.
 
         Args:
@@ -636,7 +636,7 @@ class TeamOptimizer:
         Returns:
             Initial population
         """
-        population: List["TeamConfig"] = []
+        population: list["TeamConfig"] = []
 
         while len(population) < self.population_size:
             config = self._random_config(available_members, constraints)
@@ -645,7 +645,7 @@ class TeamOptimizer:
         return population
 
     def _random_config(
-        self, available_members: List["TeamMember"], constraints: OptimizationConstraints
+        self, available_members: list["TeamMember"], constraints: OptimizationConstraints
     ) -> "TeamConfig":
         """Generate random configuration.
 
@@ -658,7 +658,7 @@ class TeamOptimizer:
         """
         import random
 
-        from victor.teams.types import TeamConfig, TeamFormation
+        from victor.teams.types import TeamConfig
 
         # Random team size
         team_size = random.randint(
@@ -684,7 +684,7 @@ class TeamOptimizer:
         )
 
     def _tournament_selection(
-        self, scored_population: List[Tuple["TeamConfig", float, Dict[str, Any]]]
+        self, scored_population: list[tuple["TeamConfig", float, dict[str, Any]]]
     ) -> "TeamConfig":
         """Tournament selection for genetic algorithm.
 
@@ -701,7 +701,7 @@ class TeamOptimizer:
         return max(tournament, key=lambda x: x[1])[0]
 
     def _crossover(
-        self, parent1: "TeamConfig", parent2: "TeamConfig", available_members: List["TeamMember"]
+        self, parent1: "TeamConfig", parent2: "TeamConfig", available_members: list["TeamMember"]
     ) -> "TeamConfig":
         """Crossover two parent configurations.
 
@@ -739,7 +739,7 @@ class TeamOptimizer:
     def _mutate(
         self,
         individual: "TeamConfig",
-        available_members: List["TeamMember"],
+        available_members: list["TeamMember"],
         constraints: OptimizationConstraints,
     ) -> "TeamConfig":
         """Mutate individual configuration.
@@ -754,7 +754,6 @@ class TeamOptimizer:
         """
         import random
 
-        from victor.teams.types import TeamFormation
 
         # Random mutation type
         mutation_type = random.choice(

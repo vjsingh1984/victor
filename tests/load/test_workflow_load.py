@@ -22,8 +22,7 @@ import asyncio
 import pytest
 import time
 import statistics
-from typing import Any, Dict, List
-from datetime import datetime
+from typing import Any
 
 import httpx
 from pytest import mark
@@ -83,7 +82,7 @@ class TestWorkflowLoad:
             "Document the codebase",
         ]
 
-        async def execute_workflow(client: httpx.AsyncClient, wf_id: int) -> Dict[str, Any]:
+        async def execute_workflow(client: httpx.AsyncClient, wf_id: int) -> dict[str, Any]:
             """Execute a workflow."""
             try:
                 start = time.time()
@@ -141,7 +140,7 @@ class TestWorkflowLoad:
 
         async def execute_workflow_with_state(
             client: httpx.AsyncClient, wf_id: int
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             """Execute workflow and verify state isolation."""
             try:
                 # Multi-step workflow
@@ -238,7 +237,7 @@ class TestWorkflowLoad:
         """
         num_workflows = 10
 
-        async def execute_nested_workflow(client: httpx.AsyncClient, wf_id: int) -> Dict[str, Any]:
+        async def execute_nested_workflow(client: httpx.AsyncClient, wf_id: int) -> dict[str, Any]:
             """Execute nested workflow."""
             try:
                 start = time.time()
@@ -348,7 +347,7 @@ class TestWorkflowLoad:
 
         async def execute_workflow_with_error(
             client: httpx.AsyncClient, wf_id: int
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             """Execute workflow that may encounter errors."""
             try:
                 # Request that might cause intermediate errors

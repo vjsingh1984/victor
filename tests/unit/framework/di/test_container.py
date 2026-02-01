@@ -18,10 +18,8 @@ import pytest
 
 from victor.framework.di import (
     DIContainer,
-    DIScope,
     ServiceLifetime,
     ServiceNotFoundError,
-    CircularDependencyError,
     ServiceAlreadyRegisteredError,
     DIError,
     create_container,

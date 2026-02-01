@@ -35,19 +35,15 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Union,
 )
+from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
     from victor.framework.workflow_engine import WorkflowExecutionResult, WorkflowEvent
     from victor.workflows.cache import WorkflowDefinitionCache
     from victor.workflows.definition import WorkflowDefinition
-    from victor.workflows.executor import WorkflowExecutor, WorkflowResult
+    from victor.workflows.executor import WorkflowExecutor
     from victor.workflows.streaming_executor import StreamingWorkflowExecutor
     from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
@@ -104,7 +100,6 @@ class YAMLWorkflowCoordinator:
         """Get or create workflow executor."""
         if self._executor is None:
             from victor.workflows.executor import WorkflowExecutor
-            from victor.core.protocols import OrchestratorProtocol
 
             # Create a mock orchestrator for the executor
             class MockOrchestrator:
@@ -118,7 +113,6 @@ class YAMLWorkflowCoordinator:
         """Get or create streaming executor."""
         if self._streaming_executor is None:
             from victor.workflows.streaming_executor import StreamingWorkflowExecutor
-            from victor.core.protocols import OrchestratorProtocol
 
             # Create a mock orchestrator for the executor
             class MockOrchestrator:
@@ -154,8 +148,8 @@ class YAMLWorkflowCoordinator:
 
     def _compute_config_hash(
         self,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]],
-        transform_registry: Optional[Dict[str, Callable[..., Any]]],
+        condition_registry: Optional[dict[str, Callable[..., Any]]],
+        transform_registry: Optional[dict[str, Callable[..., Any]]],
     ) -> int:
         """Compute hash for cache key based on registries.
 
@@ -173,10 +167,10 @@ class YAMLWorkflowCoordinator:
 
     def load_workflow(
         self,
-        yaml_path: Union[str, Path],
+        yaml_path: str | Path,
         workflow_name: Optional[str] = None,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
-        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[dict[str, Callable[..., Any]]] = None,
     ) -> "WorkflowDefinition":
         """Load a workflow definition from a YAML file.
 
@@ -240,11 +234,11 @@ class YAMLWorkflowCoordinator:
 
     async def execute(
         self,
-        yaml_path: Union[str, Path],
-        initial_state: Optional[Dict[str, Any]] = None,
+        yaml_path: str | Path,
+        initial_state: Optional[dict[str, Any]] = None,
         workflow_name: Optional[str] = None,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
-        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[dict[str, Callable[..., Any]]] = None,
         thread_id: Optional[str] = None,
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
@@ -265,7 +259,7 @@ class YAMLWorkflowCoordinator:
         from victor.framework.workflow_engine import WorkflowExecutionResult
 
         start_time = time.time()
-        hitl_requests: List[Dict[str, Any]] = []
+        hitl_requests: list[dict[str, Any]] = []
 
         try:
             if self._use_unified_compiler:
@@ -321,7 +315,6 @@ class YAMLWorkflowCoordinator:
                 return exec_result
             else:
                 # Legacy path: Use old WorkflowExecutor
-                from victor.workflows.executor import WorkflowContext
 
                 # Load workflow (uses cache)
                 workflow_def = self.load_workflow(
@@ -362,11 +355,11 @@ class YAMLWorkflowCoordinator:
 
     async def stream(
         self,
-        yaml_path: Union[str, Path],
-        initial_state: Optional[Dict[str, Any]] = None,
+        yaml_path: str | Path,
+        initial_state: Optional[dict[str, Any]] = None,
         workflow_name: Optional[str] = None,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
-        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[dict[str, Callable[..., Any]]] = None,
         thread_id: Optional[str] = None,
         **kwargs: Any,
     ) -> AsyncIterator["WorkflowEvent"]:

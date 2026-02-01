@@ -46,7 +46,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.workflows.generation.clarifier import (
     AmbiguityDetector,
@@ -55,7 +55,6 @@ from victor.workflows.generation.clarifier import (
 )
 from victor.workflows.generation.extractor import RequirementExtractor
 from victor.workflows.generation.requirements import (
-    ExtractionMetadata,
     WorkflowRequirements,
 )
 from victor.workflows.generation.rule_extractor import RuleBasedExtractor
@@ -135,7 +134,7 @@ class RequirementPipeline:
     async def extract_and_validate(
         self,
         description: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         resolve_ambiguities: str = "assumptions",
         validate: bool = True,
     ) -> Optional[WorkflowRequirements]:
@@ -225,7 +224,7 @@ class RequirementPipeline:
     async def extract_and_validate_interactive(
         self,
         description: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         validate: bool = True,
     ) -> Optional[WorkflowRequirements]:
         """Extract and validate with interactive clarification.
@@ -269,7 +268,7 @@ class RequirementPipeline:
     async def _extract_requirements(
         self,
         description: str,
-        context: Optional[Dict[str, Any]],
+        context: Optional[dict[str, Any]],
     ) -> WorkflowRequirements:
         """Extract requirements using available methods.
 
@@ -306,7 +305,7 @@ class RequirementPipeline:
     def extract_sync(
         self,
         description: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> WorkflowRequirements:
         """Synchronous extraction (no validation).
 
@@ -365,7 +364,7 @@ class HybridExtractor:
     async def extract(
         self,
         description: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> WorkflowRequirements:
         """Extract requirements using hybrid approach.
 
@@ -401,7 +400,7 @@ class HybridExtractor:
             # Fallback to rule-based
             return self._rule_extractor.extract(description)
 
-    def _validate_with_rules(self, requirements: WorkflowRequirements) -> List[str]:
+    def _validate_with_rules(self, requirements: WorkflowRequirements) -> list[str]:
         """Validate LLM output with rule-based checks.
 
         Args:
@@ -448,7 +447,7 @@ class HybridExtractor:
     def _correct_with_rules(
         self,
         requirements: WorkflowRequirements,
-        errors: List[str],
+        errors: list[str],
     ) -> WorkflowRequirements:
         """Correct LLM output using rules.
 

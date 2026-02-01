@@ -14,7 +14,6 @@
 
 """Unit tests for helper utilities."""
 
-import pytest
 
 from victor.agent.utils.helpers import (
     extract_file_paths_from_text,

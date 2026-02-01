@@ -20,7 +20,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 
 class EventType(str, Enum):
@@ -121,7 +121,7 @@ class AgentExecutionEvent:
     # Tool fields
     tool_name: Optional[str] = None
     tool_id: Optional[str] = None
-    arguments: Dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
     result: Optional[str] = None
     success: bool = True
 
@@ -138,7 +138,7 @@ class AgentExecutionEvent:
     milestone: Optional[str] = None
 
     # Metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
     @property
@@ -165,7 +165,7 @@ class AgentExecutionEvent:
         """Check if this is a lifecycle event."""
         return self.type in (EventType.STREAM_START, EventType.STREAM_END)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "type": self.type.value,
@@ -219,7 +219,7 @@ def thinking_event(content: str, **kwargs: Any) -> AgentExecutionEvent:
 
 def tool_call_event(
     tool_name: str,
-    arguments: Dict[str, Any],
+    arguments: dict[str, Any],
     tool_id: Optional[str] = None,
     **kwargs: Any,
 ) -> AgentExecutionEvent:

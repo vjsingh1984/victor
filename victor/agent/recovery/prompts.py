@@ -28,13 +28,12 @@ Template evolution:
 from __future__ import annotations
 
 import fnmatch
-import hashlib
 import logging
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.agent.recovery.protocols import (
     FailureType,
@@ -91,7 +90,7 @@ class ModelSpecificPromptRegistry:
     """
 
     # Default templates for each failure type
-    DEFAULT_TEMPLATES: List[PromptTemplate] = [
+    DEFAULT_TEMPLATES: list[PromptTemplate] = [
         # Empty Response Templates
         PromptTemplate(
             id="empty_gentle_v1",
@@ -236,8 +235,8 @@ class ModelSpecificPromptRegistry:
         db_path: Optional[Path] = None,
     ):
         self._q_store = q_store
-        self._templates: Dict[str, PromptTemplate] = {}
-        self._stats: Dict[str, TemplateStats] = {}
+        self._templates: dict[str, PromptTemplate] = {}
+        self._stats: dict[str, TemplateStats] = {}
         self._db_path = db_path
 
         # Register default templates
@@ -258,7 +257,7 @@ class ModelSpecificPromptRegistry:
         self,
         context: RecoveryContext,
         escalation_level: int = 0,
-    ) -> Tuple[PromptTemplate, Dict[str, str]]:
+    ) -> tuple[PromptTemplate, dict[str, str]]:
         """Get best template for context.
 
         Args:
@@ -273,7 +272,7 @@ class ModelSpecificPromptRegistry:
         model = context.model_name.lower()
 
         # Find matching templates
-        candidates: List[Tuple[PromptTemplate, float]] = []
+        candidates: list[tuple[PromptTemplate, float]] = []
 
         for template in self._templates.values():
             if failure_type not in template.failure_types:
@@ -341,7 +340,7 @@ class ModelSpecificPromptRegistry:
             or "force" in c[0].name.lower()
             or "final" in c[0].name.lower()
         ]
-        _other = [c for c in candidates if c not in gentle + specific + assertive]  # noqa: F841
+        _other = [c for c in candidates if c not in gentle + specific + assertive]
 
         # Select based on escalation level
         if escalation_level == 0 and gentle:
@@ -358,9 +357,9 @@ class ModelSpecificPromptRegistry:
 
         return selected, format_kwargs
 
-    def _prepare_format_kwargs(self, context: RecoveryContext) -> Dict[str, str]:
+    def _prepare_format_kwargs(self, context: RecoveryContext) -> dict[str, str]:
         """Prepare format kwargs for template."""
-        kwargs: Dict[str, str] = {}
+        kwargs: dict[str, str] = {}
 
         # Mentioned tools
         if context.mentioned_tools:
@@ -439,7 +438,7 @@ class ModelSpecificPromptRegistry:
             f"total_uses={stats.usage_count}, success_rate={stats.success_rate:.2f}"
         )
 
-    def get_template_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_template_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics for all templates."""
         return {
             tid: {
@@ -459,7 +458,7 @@ class ModelSpecificPromptRegistry:
         self,
         failure_type: FailureType,
         limit: int = 5,
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """Get best performing templates for a failure type.
 
         Returns:

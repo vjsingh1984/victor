@@ -24,15 +24,14 @@ from __future__ import annotations
 
 import asyncio
 import pytest
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock
+from typing import Optional
+from unittest.mock import MagicMock
 
 from victor.workflows.team_collaboration import (
     CommunicationType,
     ConflictResolutionStrategy,
     NegotiationFramework,
     NegotiationType,
-    Proposal,
     SharedTeamContext,
     TeamCommunicationProtocol,
     VotingStrategy,
@@ -59,7 +58,7 @@ class MockTeamMember:
         self.role.value = "assistant"
         self._response_content = response_content or f"Response from {member_id}"
         self._delay = delay
-        self.messages_received: List[AgentMessage] = []
+        self.messages_received: list[AgentMessage] = []
 
     async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
         """Receive and respond to a message."""

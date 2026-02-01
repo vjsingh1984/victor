@@ -63,7 +63,7 @@ __license__ = "Apache-2.0"
 from victor.config.settings import Settings
 
 
-def __getattr__(name: str) -> Any:  # noqa: ANN401
+def __getattr__(name: str) -> Any:
     """Lazy import AgentOrchestrator to improve startup time.
 
     The recommended API is `from victor import Agent`, which is imported immediately.
@@ -103,7 +103,7 @@ from victor.framework import (
     ToolError,
     Tools,
     ToolSet,
-)  # noqa: F401
+)
 
 __all__ = [
     # Framework API (5 core concepts + supporting classes)

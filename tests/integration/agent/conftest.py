@@ -21,9 +21,8 @@ and both legacy and refactored orchestrator instances.
 import asyncio
 import os
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, Mock
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -238,7 +237,6 @@ def legacy_orchestrator(legacy_orchestrator_factory, test_container):
 
     Returns an AgentOrchestrator instance without coordinators.
     """
-    from victor.agent.orchestrator import AgentOrchestrator
 
     # Access factory attributes using public properties
     settings = legacy_orchestrator_factory.settings
@@ -375,7 +373,6 @@ def sample_messages():
 @pytest.fixture
 def mock_tools():
     """Create multiple mock tools for testing."""
-    from victor.tools.base import CostTier
 
     read_tool = MagicMock()
     read_tool.name = "read_file"
@@ -624,7 +621,7 @@ def performance_monitor():
 
     class PerformanceMonitor:
         def __init__(self):
-            self.metrics: Dict[str, List[float]] = {}
+            self.metrics: dict[str, list[float]] = {}
 
         def track(self, operation: str):
             """Decorator to track operation timing."""
@@ -682,12 +679,12 @@ def test_helpers():
                 await asyncio.sleep(interval)
 
         @staticmethod
-        def create_mock_message(role: str, content: str) -> Dict[str, Any]:
+        def create_mock_message(role: str, content: str) -> dict[str, Any]:
             """Create a mock message for testing."""
             return {"role": role, "content": content}
 
         @staticmethod
-        def create_mock_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        def create_mock_tool_call(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             """Create a mock tool call for testing."""
             return {
                 "id": f"call_{tool_name}_123",

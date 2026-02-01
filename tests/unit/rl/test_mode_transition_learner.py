@@ -20,7 +20,6 @@ AdaptiveModeController with the RLCoordinator framework.
 
 import pytest
 from pathlib import Path
-from typing import Dict, Tuple
 from unittest.mock import patch
 
 from victor.framework.rl.base import RLOutcome
@@ -84,7 +83,7 @@ def _get_q_value_from_db(
     coordinator: RLCoordinator,
     state_key: str,
     action_key: str,
-) -> Tuple[float, int]:
+) -> tuple[float, int]:
     """Helper to retrieve Q-value and visit count from the database."""
     cursor = coordinator.db.cursor()
     cursor.execute(

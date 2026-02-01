@@ -31,9 +31,8 @@ Addresses GAP-8: Missing task completion signal
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, Set
+from typing import Any, Optional
 from dataclasses import dataclass, field
-import time
 import logging
 
 logger = logging.getLogger(__name__)
@@ -47,7 +46,7 @@ class CheckpointResult:
     reason: str
     suggested_prompt: Optional[str] = None
     priority: int = 0  # Higher = more urgent
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class SynthesisCheckpoint(ABC):
@@ -66,7 +65,7 @@ class SynthesisCheckpoint(ABC):
 
     @abstractmethod
     def check(
-        self, tool_history: List[Dict[str, Any]], task_context: Dict[str, Any]
+        self, tool_history: list[dict[str, Any]], task_context: dict[str, Any]
     ) -> CheckpointResult:
         """
         Evaluate whether synthesis should be triggered.
@@ -92,7 +91,7 @@ class ToolCountCheckpoint(SynthesisCheckpoint):
         return "tool_count"
 
     def check(
-        self, tool_history: List[Dict[str, Any]], task_context: Dict[str, Any]
+        self, tool_history: list[dict[str, Any]], task_context: dict[str, Any]
     ) -> CheckpointResult:
         if len(tool_history) >= self.max_calls:
             return CheckpointResult(
@@ -122,7 +121,7 @@ class DuplicateToolCheckpoint(SynthesisCheckpoint):
         return "duplicate_tool"
 
     def check(
-        self, tool_history: List[Dict[str, Any]], task_context: Dict[str, Any]
+        self, tool_history: list[dict[str, Any]], task_context: dict[str, Any]
     ) -> CheckpointResult:
         if len(tool_history) < self.threshold:
             return CheckpointResult(
@@ -162,7 +161,7 @@ class SimilarArgsCheckpoint(SynthesisCheckpoint):
         return "similar_args"
 
     def check(
-        self, tool_history: List[Dict[str, Any]], task_context: Dict[str, Any]
+        self, tool_history: list[dict[str, Any]], task_context: dict[str, Any]
     ) -> CheckpointResult:
         if len(tool_history) < 3:
             return CheckpointResult(
@@ -172,8 +171,8 @@ class SimilarArgsCheckpoint(SynthesisCheckpoint):
         recent = tool_history[-self.window_size :]
 
         # Extract path-like arguments for comparison
-        paths_seen: List[str] = []
-        queries_seen: List[str] = []
+        paths_seen: list[str] = []
+        queries_seen: list[str] = []
 
         for h in recent:
             args = h.get("args", {})
@@ -230,7 +229,7 @@ class TimeoutApproachingCheckpoint(SynthesisCheckpoint):
         return "timeout_approaching"
 
     def check(
-        self, tool_history: List[Dict[str, Any]], task_context: Dict[str, Any]
+        self, tool_history: list[dict[str, Any]], task_context: dict[str, Any]
     ) -> CheckpointResult:
         elapsed = task_context.get("elapsed_time", 0)
         timeout = task_context.get("timeout", 180)
@@ -282,7 +281,7 @@ class NoProgressCheckpoint(SynthesisCheckpoint):
         return "no_progress"
 
     def check(
-        self, tool_history: List[Dict[str, Any]], task_context: Dict[str, Any]
+        self, tool_history: list[dict[str, Any]], task_context: dict[str, Any]
     ) -> CheckpointResult:
         if len(tool_history) < self.window_size:
             return CheckpointResult(
@@ -340,7 +339,7 @@ class ErrorRateCheckpoint(SynthesisCheckpoint):
         return "error_rate"
 
     def check(
-        self, tool_history: List[Dict[str, Any]], task_context: Dict[str, Any]
+        self, tool_history: list[dict[str, Any]], task_context: dict[str, Any]
     ) -> CheckpointResult:
         if len(tool_history) < self.min_calls:
             return CheckpointResult(
@@ -371,7 +370,7 @@ class ErrorRateCheckpoint(SynthesisCheckpoint):
 class CompositeSynthesisCheckpoint(SynthesisCheckpoint):
     """Combines multiple checkpoints with priority-based selection."""
 
-    def __init__(self, checkpoints: Optional[List[SynthesisCheckpoint]] = None) -> None:
+    def __init__(self, checkpoints: Optional[list[SynthesisCheckpoint]] = None) -> None:
         self._checkpoints = checkpoints or []
 
     @property
@@ -384,9 +383,9 @@ class CompositeSynthesisCheckpoint(SynthesisCheckpoint):
         return self
 
     def check(
-        self, tool_history: List[Dict[str, Any]], task_context: Dict[str, Any]
+        self, tool_history: list[dict[str, Any]], task_context: dict[str, Any]
     ) -> CheckpointResult:
-        triggered: List[CheckpointResult] = []
+        triggered: list[CheckpointResult] = []
 
         for checkpoint in self._checkpoints:
             try:

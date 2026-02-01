@@ -39,32 +39,19 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Set,
-    Union,
     cast,
 )
+from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
     from victor.workflows.definition import (
         WorkflowDefinition,
-        WorkflowNode,
-        AgentNode,
-        ComputeNode,
-        ConditionNode,
-        ParallelNode,
-        TransformNode,
-        TeamNodeWorkflow,
     )
     from victor.framework.graph import CompiledGraph
     from victor.workflows.unified_compiler import CachedCompiledGraph
@@ -143,11 +130,11 @@ class NodeExecutionEvent:
     event_type: ExecutionEventType
     timestamp: float
     status: NodeStatus
-    input_state: Dict[str, Any] = field(default_factory=dict)
-    output_state: Dict[str, Any] = field(default_factory=dict)
+    input_state: dict[str, Any] = field(default_factory=dict)
+    output_state: dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
     duration_seconds: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -162,7 +149,7 @@ class Breakpoint:
     """
 
     node_id: str
-    condition: Optional[Callable[[Dict[str, Any]], bool]] = None
+    condition: Optional[Callable[[dict[str, Any]], bool]] = None
     hit_count: int = 0
     enabled: bool = True
 
@@ -184,10 +171,10 @@ class ExecutionSnapshot:
     execution_id: str
     timestamp: float
     current_node: Optional[str]
-    executed_nodes: List[str]
-    state: Dict[str, Any]
-    breakpoints_hit: List[str]
-    errors: List[str]
+    executed_nodes: list[str]
+    state: dict[str, Any]
+    breakpoints_hit: list[str]
+    errors: list[str]
 
 
 @dataclass
@@ -239,10 +226,10 @@ class ExecutionContext:
     start_time: float
     debug_mode: bool = False
     trace_mode: bool = False
-    breakpoints: Dict[str, Breakpoint] = field(default_factory=dict)
-    current_state: Dict[str, Any] = field(default_factory=dict)
-    events: List[NodeExecutionEvent] = field(default_factory=list)
-    snapshots: List[ExecutionSnapshot] = field(default_factory=list)
+    breakpoints: dict[str, Breakpoint] = field(default_factory=dict)
+    current_state: dict[str, Any] = field(default_factory=dict)
+    events: list[NodeExecutionEvent] = field(default_factory=list)
+    snapshots: list[ExecutionSnapshot] = field(default_factory=list)
     metrics: ExecutionMetrics = field(default_factory=ExecutionMetrics)
 
 
@@ -265,7 +252,7 @@ class ExecutionTrace:
             execution_id: Execution identifier
         """
         self.execution_id = execution_id
-        self.events: List[NodeExecutionEvent] = []
+        self.events: list[NodeExecutionEvent] = []
         self.start_time = time.time()
         self.end_time: Optional[float] = None
 
@@ -281,7 +268,7 @@ class ExecutionTrace:
             f"({event.duration_seconds:.3f}s)"
         )
 
-    def get_events_by_node(self, node_id: str) -> List[NodeExecutionEvent]:
+    def get_events_by_node(self, node_id: str) -> list[NodeExecutionEvent]:
         """Get all events for a specific node.
 
         Args:
@@ -292,7 +279,7 @@ class ExecutionTrace:
         """
         return [e for e in self.events if e.node_id == node_id]
 
-    def get_events_by_type(self, event_type: ExecutionEventType) -> List[NodeExecutionEvent]:
+    def get_events_by_type(self, event_type: ExecutionEventType) -> list[NodeExecutionEvent]:
         """Get all events of a specific type.
 
         Args:
@@ -339,17 +326,17 @@ class ExecutionTrace:
 
         return json_str
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get trace summary.
 
         Returns:
             Summary dictionary
         """
-        event_counts: Dict[str, int] = {}
+        event_counts: dict[str, int] = {}
         for event in self.events:
             event_counts[event.event_type.value] = event_counts.get(event.event_type.value, 0) + 1
 
-        node_counts: Dict[str, int] = {}
+        node_counts: dict[str, int] = {}
         error_count = 0
         total_duration = 0.0
 
@@ -384,10 +371,10 @@ class StateManager:
 
     @staticmethod
     def capture_state(
-        state: Dict[str, Any],
+        state: dict[str, Any],
         node_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """Capture a snapshot of workflow state.
 
         Args:
@@ -413,7 +400,7 @@ class StateManager:
         return snapshot
 
     @staticmethod
-    def visualize_state(state: Dict[str, Any]) -> str:
+    def visualize_state(state: dict[str, Any]) -> str:
         """Visualize workflow state as formatted string.
 
         Args:
@@ -444,9 +431,9 @@ class StateManager:
 
     @staticmethod
     def diff_states(
-        state1: Dict[str, Any],
-        state2: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        state1: dict[str, Any],
+        state2: dict[str, Any],
+    ) -> dict[str, Any]:
         """Compute difference between two states.
 
         Args:
@@ -456,7 +443,7 @@ class StateManager:
         Returns:
             Dictionary of differences
         """
-        diff: Dict[str, Any] = {
+        diff: dict[str, Any] = {
             "added": {},
             "removed": {},
             "changed": {},
@@ -482,7 +469,7 @@ class StateManager:
 
     @staticmethod
     def query_state(
-        state: Dict[str, Any],
+        state: dict[str, Any],
         query: str,
     ) -> Any:
         """Query state using JSONPath-like syntax.
@@ -679,7 +666,7 @@ class ExecutionHistory:
     def get_execution(
         self,
         execution_id: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Get execution history by ID.
 
         Args:
@@ -690,7 +677,7 @@ class ExecutionHistory:
         """
         # Search for execution file
         for file_path in self.storage_path.glob(f"*_{execution_id}.json"):
-            return cast("Dict[str, Any]", json.loads(file_path.read_text()))
+            return cast("dict[str, Any]", json.loads(file_path.read_text()))
 
         return None
 
@@ -698,7 +685,7 @@ class ExecutionHistory:
         self,
         workflow_name: Optional[str] = None,
         limit: int = 10,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List recent executions.
 
         Args:
@@ -708,7 +695,7 @@ class ExecutionHistory:
         Returns:
             List of execution summaries
         """
-        executions: List[Dict[str, Any]] = []
+        executions: list[dict[str, Any]] = []
 
         for file_path in sorted(self.storage_path.glob("*.json"), reverse=True):
             if len(executions) >= limit:
@@ -792,7 +779,7 @@ class WorkflowExecutor:
     def set_breakpoint(
         self,
         node_id: str,
-        condition: Optional[Callable[[Dict[str, Any]], bool]] = None,
+        condition: Optional[Callable[[dict[str, Any]], bool]] = None,
     ) -> None:
         """Set a breakpoint on a node.
 
@@ -820,7 +807,7 @@ class WorkflowExecutor:
             del self._context.breakpoints[node_id]
             logger.info(f"Breakpoint cleared on node: {node_id}")
 
-    def list_breakpoints(self) -> List[str]:
+    def list_breakpoints(self) -> list[str]:
         """List active breakpoints.
 
         Returns:
@@ -854,7 +841,7 @@ class WorkflowExecutor:
     # State Inspection
     # =========================================================================
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         """Get current workflow state.
 
         Returns:
@@ -865,7 +852,7 @@ class WorkflowExecutor:
 
         return self._context.current_state.copy()
 
-    def get_variables(self) -> Dict[str, Any]:
+    def get_variables(self) -> dict[str, Any]:
         """Get current workflow variables.
 
         Returns:
@@ -874,7 +861,7 @@ class WorkflowExecutor:
         state = self.get_state()
         return {k: v for k, v in state.items() if not k.startswith("_")}
 
-    def get_stack_trace(self) -> List[str]:
+    def get_stack_trace(self) -> list[str]:
         """Get execution stack trace.
 
         Returns:
@@ -892,10 +879,10 @@ class WorkflowExecutor:
 
     async def execute(
         self,
-        workflow: Union["CachedCompiledGraph", "WorkflowDefinition", "CompiledGraph[Any]"],
-        inputs: Optional[Dict[str, Any]] = None,
-        breakpoints: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        workflow: "CachedCompiledGraph" | "WorkflowDefinition" | "CompiledGraph[Any]",
+        inputs: Optional[dict[str, Any]] = None,
+        breakpoints: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         """Execute a workflow.
 
         Args:
@@ -949,11 +936,11 @@ class WorkflowExecutor:
 
             # Handle polymorphic result
             if hasattr(result, "state"):
-                final_state = cast("Dict[str, Any]", result.state)
+                final_state = cast("dict[str, Any]", result.state)
             elif isinstance(result, dict):
-                final_state = cast("Dict[str, Any]", result)
+                final_state = cast("dict[str, Any]", result)
             else:
-                final_state = cast("Dict[str, Any]", {"result": result})
+                final_state = cast("dict[str, Any]", {"result": result})
 
             self._context.current_state = final_state
 
@@ -999,8 +986,8 @@ class WorkflowExecutor:
 
     async def execute_stream(
         self,
-        workflow: Union["CachedCompiledGraph", "WorkflowDefinition"],
-        inputs: Optional[Dict[str, Any]] = None,
+        workflow: "CachedCompiledGraph" | "WorkflowDefinition",
+        inputs: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[NodeExecutionEvent]:
         """Execute workflow with streaming events.
 
@@ -1068,9 +1055,9 @@ class WorkflowExecutor:
                     result = await workflow.invoke(inputs or {})  # type: ignore[attr-defined]
 
                 if hasattr(result, "state"):
-                    final_state = cast("Dict[str, Any]", result.state)
+                    final_state = cast("dict[str, Any]", result.state)
                 else:
-                    final_state = cast("Dict[str, Any]", {"result": result})
+                    final_state = cast("dict[str, Any]", {"result": result})
 
                 self._context.current_state = final_state
 
@@ -1150,7 +1137,7 @@ class WorkflowExecutor:
 
         self._trace.export_json(output_path)
 
-    def get_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_history(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get execution history.
 
         Args:
@@ -1179,12 +1166,12 @@ class WorkflowExecutor:
 
 
 async def execute_workflow(
-    workflow: Union["CachedCompiledGraph", "WorkflowDefinition"],
-    inputs: Optional[Dict[str, Any]] = None,
+    workflow: "CachedCompiledGraph" | "WorkflowDefinition",
+    inputs: Optional[dict[str, Any]] = None,
     debug: bool = False,
     trace: bool = False,
-    breakpoints: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    breakpoints: Optional[list[str]] = None,
+) -> dict[str, Any]:
     """Convenience function to execute a workflow.
 
     Args:
@@ -1202,8 +1189,8 @@ async def execute_workflow(
 
 
 async def execute_workflow_stream(
-    workflow: Union["CachedCompiledGraph", "WorkflowDefinition"],
-    inputs: Optional[Dict[str, Any]] = None,
+    workflow: "CachedCompiledGraph" | "WorkflowDefinition",
+    inputs: Optional[dict[str, Any]] = None,
 ) -> AsyncIterator[NodeExecutionEvent]:
     """Convenience function to execute workflow with streaming.
 

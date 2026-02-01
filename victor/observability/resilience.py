@@ -62,13 +62,12 @@ import random
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Callable, Dict, Generic, Optional, TypeVar, Union, TYPE_CHECKING
+from typing import Any, Optional, TypeVar, TYPE_CHECKING
+from collections.abc import Callable
 
 # Import canonical types from circuit_breaker.py to avoid duplication
 from victor.providers.circuit_breaker import (
     CircuitState as _CircuitState,
-    CircuitBreakerConfig as CanonicalCircuitBreakerConfig,
     CircuitBreakerError,
 )
 
@@ -489,7 +488,7 @@ class ObservableCircuitBreaker:
         self._last_failure_time = None
         self._half_open_calls = 0
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get circuit breaker metrics."""
         return {
             "name": self._name,
@@ -626,7 +625,7 @@ class Bulkhead:
         """Exit bulkhead context."""
         await self.release()
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get bulkhead metrics."""
         return {
             "name": self._name,
@@ -769,7 +768,7 @@ class RateLimiter:
                 wait_time = tokens_needed / self._rate
             await asyncio.sleep(wait_time)
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get rate limiter metrics."""
         return {
             "name": self._name,
@@ -917,9 +916,9 @@ class ResiliencePolicy:
 
         return await execute_once()
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get all resilience metrics."""
-        metrics: Dict[str, Any] = {"name": self._name}
+        metrics: dict[str, Any] = {"name": self._name}
 
         if self._circuit_breaker:
             metrics["circuit_breaker"] = self._circuit_breaker.get_metrics()

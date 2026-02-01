@@ -9,7 +9,7 @@ Covers:
 
 import pytest
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 from victor.tools.base import (
     BaseTool,

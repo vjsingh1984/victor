@@ -59,16 +59,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
-    Callable,
-    Dict,
     Generic,
-    Mapping,
     Optional,
-    Type,
     TypeVar,
-    cast,
-    get_type_hints,
 )
+from collections.abc import Callable, Mapping
 from functools import wraps
 
 logger = logging.getLogger(__name__)
@@ -135,7 +130,7 @@ class ServiceAlreadyRegisteredError(DIError):
 class ServiceDescriptor(Generic[T]):
     """Describes how to create and manage a service with auto-resolution."""
 
-    service_type: Type[T]
+    service_type: type[T]
     lifetime: ServiceLifetime
     factory: Optional[Callable[..., T]] = None
     instance: Optional[T] = None
@@ -172,7 +167,7 @@ class ServiceDescriptor(Generic[T]):
 class ResolutionContext:
     """Tracks state during dependency resolution."""
 
-    resolving: set[Type[Any]] = field(default_factory=set)
+    resolving: set[type[Any]] = field(default_factory=set)
     depth: int = 0
     max_depth: int = 50
 
@@ -201,17 +196,17 @@ class DIContainer:
 
     def __init__(self) -> None:
         """Initialize empty container."""
-        self._descriptors: Dict[type[Any], ServiceDescriptor[Any]] = {}
+        self._descriptors: dict[type[Any], ServiceDescriptor[Any]] = {}
         self._lock = threading.RLock()
         self._disposed = False
         self._resolution_stack: list[type[Any]] = []
 
     def register(
         self,
-        service_type: Type[T],
+        service_type: type[T],
         factory: Optional[Callable[..., T]] = None,
         lifetime: ServiceLifetime = ServiceLifetime.TRANSIENT,
-        implementation: Optional[Type[T]] = None,
+        implementation: Optional[type[T]] = None,
         as_interfaces: Optional[list[type[Any]]] = None,
     ) -> "DIContainer":
         """Register a service with optional auto-resolution.
@@ -283,7 +278,7 @@ class DIContainer:
 
     def register_instance(
         self,
-        service_type: Type[T],
+        service_type: type[T],
         instance: T,
     ) -> "DIContainer":
         """Register an existing instance as a singleton.
@@ -312,7 +307,7 @@ class DIContainer:
 
     def register_factory(
         self,
-        service_type: Type[T],
+        service_type: type[T],
         factory: Callable[["DIContainer"], T],
         lifetime: ServiceLifetime = ServiceLifetime.TRANSIENT,
     ) -> "DIContainer":
@@ -357,7 +352,7 @@ class DIContainer:
 
         return self
 
-    def get(self, service_type: Type[T]) -> T:
+    def get(self, service_type: type[T]) -> T:
         """Get a service instance with auto-injected dependencies.
 
         Args:
@@ -381,7 +376,7 @@ class DIContainer:
                 descriptor.instance = descriptor.create_instance(self)
             return descriptor.instance
 
-    def get_optional(self, service_type: Type[T]) -> Optional[T]:
+    def get_optional(self, service_type: type[T]) -> Optional[T]:
         """Get a service instance, or None if not registered.
 
         Args:
@@ -395,7 +390,7 @@ class DIContainer:
         except ServiceNotFoundError:
             return None
 
-    def is_registered(self, service_type: Type[Any]) -> bool:
+    def is_registered(self, service_type: type[Any]) -> bool:
         """Check if a service type is registered.
 
         Args:
@@ -406,7 +401,7 @@ class DIContainer:
         """
         return service_type in self._descriptors
 
-    def _get_descriptor(self, service_type: Type[T]) -> ServiceDescriptor[T]:
+    def _get_descriptor(self, service_type: type[T]) -> ServiceDescriptor[T]:
         """Get the descriptor for a service type.
 
         Args:
@@ -428,7 +423,7 @@ class DIContainer:
     def _create_with_auto_resolution(
         self,
         factory: Callable[..., T],
-        target_type: Type[T],
+        target_type: type[T],
     ) -> T:
         """Create instance with auto-injected constructor dependencies.
 
@@ -517,7 +512,7 @@ class DIContainer:
         """
         return DIScope(self)
 
-    def get_registered_types(self) -> list[Type[Any]]:
+    def get_registered_types(self) -> list[type[Any]]:
         """Get list of all registered service types.
 
         Returns:
@@ -557,11 +552,11 @@ class DIScope:
             parent: Parent container to inherit singleton services from
         """
         self._parent = parent
-        self._scoped_instances: Dict[Type[Any], Any] = {}
+        self._scoped_instances: dict[type[Any], Any] = {}
         self._disposed = False
         self._lock = threading.Lock()
 
-    def get(self, service_type: Type[T]) -> T:
+    def get(self, service_type: type[T]) -> T:
         """Get a service instance within this scope.
 
         Args:

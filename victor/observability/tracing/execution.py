@@ -46,9 +46,8 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +77,8 @@ class ExecutionSpan:
     start_time: float
     end_time: Optional[float] = None
     status: str = "running"
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    children: List[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    children: list[str] = field(default_factory=list)
 
     @property
     def duration_ms(self) -> Optional[float]:
@@ -92,7 +91,7 @@ class ExecutionSpan:
             return None
         return (self.end_time - self.start_time) * 1000
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
 
         Returns:
@@ -152,8 +151,8 @@ class ExecutionTracer:
             event_bus: EventBus instance for emitting span events
         """
         self._event_bus = event_bus
-        self._spans: Dict[str, ExecutionSpan] = {}
-        self._root_spans: List[str] = []
+        self._spans: dict[str, ExecutionSpan] = {}
+        self._root_spans: list[str] = []
 
         logger.info("ExecutionTracer initialized")
 
@@ -162,7 +161,7 @@ class ExecutionTracer:
         agent_id: str,
         span_type: str,
         parent_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> str:
         """Start a new execution span.
 
@@ -281,7 +280,7 @@ class ExecutionTracer:
         """
         return self._spans.get(span_id)
 
-    def get_span_tree(self, root_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_span_tree(self, root_id: Optional[str] = None) -> dict[str, Any]:
         """Get span tree as nested dictionary.
 
         Args:
@@ -300,7 +299,7 @@ class ExecutionTracer:
 
         return self._build_tree(root_id)
 
-    def _build_tree(self, span_id: str) -> Dict[str, Any]:
+    def _build_tree(self, span_id: str) -> dict[str, Any]:
         """Build tree recursively from a span.
 
         Args:
@@ -318,7 +317,7 @@ class ExecutionTracer:
 
         return tree
 
-    def get_all_spans(self) -> List[ExecutionSpan]:
+    def get_all_spans(self) -> list[ExecutionSpan]:
         """Get all recorded spans.
 
         Returns:
@@ -326,7 +325,7 @@ class ExecutionTracer:
         """
         return list(self._spans.values())
 
-    def get_spans_by_agent(self, agent_id: str) -> List[ExecutionSpan]:
+    def get_spans_by_agent(self, agent_id: str) -> list[ExecutionSpan]:
         """Get all spans for a specific agent.
 
         Args:
@@ -337,7 +336,7 @@ class ExecutionTracer:
         """
         return [span for span in self._spans.values() if span.agent_id == agent_id]
 
-    def get_spans_by_type(self, span_type: str) -> List[ExecutionSpan]:
+    def get_spans_by_type(self, span_type: str) -> list[ExecutionSpan]:
         """Get all spans of a specific type.
 
         Args:
@@ -348,7 +347,7 @@ class ExecutionTracer:
         """
         return [span for span in self._spans.values() if span.span_type == span_type]
 
-    def get_active_spans(self) -> List[ExecutionSpan]:
+    def get_active_spans(self) -> list[ExecutionSpan]:
         """Get all currently running spans.
 
         Returns:
@@ -374,7 +373,7 @@ class ExecutionTracer:
         self._root_spans.clear()
         logger.info(f"Cleared {count} spans from tracer")
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get statistics about recorded spans.
 
         Returns:
@@ -384,12 +383,12 @@ class ExecutionTracer:
             return {"total": 0}
 
         # Count by type
-        by_type: Dict[str, int] = {}
+        by_type: dict[str, int] = {}
         for span in self._spans.values():
             by_type[span.span_type] = by_type.get(span.span_type, 0) + 1
 
         # Count by status
-        by_status: Dict[str, int] = {}
+        by_status: dict[str, int] = {}
         for span in self._spans.values():
             by_status[span.status] = by_status.get(span.status, 0) + 1
 

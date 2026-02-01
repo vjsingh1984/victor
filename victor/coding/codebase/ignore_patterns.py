@@ -25,12 +25,13 @@ Design Principles:
 """
 
 from pathlib import Path
-from typing import Iterable, Optional, Set
+from typing import Optional
+from collections.abc import Iterable
 
 
 # Default directories to skip (non-hidden only)
 # Hidden directories (starting with '.') are excluded automatically by should_ignore_path()
-DEFAULT_SKIP_DIRS: Set[str] = {
+DEFAULT_SKIP_DIRS: set[str] = {
     # Python
     "__pycache__",
     "venv",
@@ -74,7 +75,7 @@ def is_hidden_path(path: Path) -> bool:
 
 def should_ignore_path(
     path: Path,
-    skip_dirs: Optional[Set[str]] = None,
+    skip_dirs: Optional[set[str]] = None,
     extra_skip_dirs: Optional[Iterable[str]] = None,
 ) -> bool:
     """Check if a path should be ignored during indexing.
@@ -117,9 +118,9 @@ def should_ignore_path(
 
 
 def get_effective_skip_dirs(
-    base_skip_dirs: Optional[Set[str]] = None,
+    base_skip_dirs: Optional[set[str]] = None,
     extra_skip_dirs: Optional[Iterable[str]] = None,
-) -> Set[str]:
+) -> set[str]:
     """Get the effective set of directories to skip.
 
     Args:

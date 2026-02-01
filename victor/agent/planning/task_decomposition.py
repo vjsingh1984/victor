@@ -36,9 +36,9 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
-import networkx as nx  # type: ignore[import-untyped]
+import networkx as nx
 
 
 @dataclass
@@ -58,7 +58,7 @@ class SimpleTask:
 
     id: str
     description: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 class TaskStatus(enum.Enum):
@@ -113,8 +113,8 @@ class TaskNode:
     status: TaskStatus = TaskStatus.PENDING
     complexity: int = 5
     estimated_time: float = 0.0
-    resource_requirements: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    resource_requirements: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __hash__(self) -> int:
         """Hash based on task ID for use in sets and as dict keys."""
@@ -126,7 +126,7 @@ class TaskNode:
             return False
         return self.task.id == other.task.id
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "task_id": self.task.id,
@@ -152,9 +152,9 @@ class DependencyEdge:
 
     dependency_type: DependencyType = DependencyType.STRONG
     strength: float = 1.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "dependency_type": self.dependency_type.value,
@@ -196,17 +196,17 @@ class TaskDecomposition:
     def __init__(self) -> None:
         """Initialize an empty task decomposition graph."""
         self._graph: nx.DiGraph = nx.DiGraph()
-        self._task_nodes: Dict[str, TaskNode] = {}
-        self._dependency_edges: Dict[Tuple[str, str], DependencyEdge] = {}
+        self._task_nodes: dict[str, TaskNode] = {}
+        self._dependency_edges: dict[tuple[str, str], DependencyEdge] = {}
 
     def add_task(
         self,
         task: SimpleTask,
-        dependencies: List[str],
+        dependencies: list[str],
         complexity: int = 5,
         estimated_time: float = 0.0,
-        resource_requirements: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        resource_requirements: Optional[dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """
         Add a task to the decomposition graph.
@@ -308,7 +308,7 @@ class TaskDecomposition:
     # Note: get_ready_tasks() and validate_plan() methods are now below
     # with legacy API compatibility. The old methods are removed to avoid conflicts.
 
-    def get_task_dependencies(self, task_id: str) -> List[str]:
+    def get_task_dependencies(self, task_id: str) -> list[str]:
         """
         Get the list of task IDs that a task depends on.
 
@@ -330,7 +330,7 @@ class TaskDecomposition:
 
         return list(self._graph.predecessors(task_id))
 
-    def get_task_dependents(self, task_id: str) -> List[str]:
+    def get_task_dependents(self, task_id: str) -> list[str]:
         """
         Get the list of task IDs that depend on a task.
 
@@ -356,7 +356,7 @@ class TaskDecomposition:
         self,
         task_id: str,
         status: TaskStatus,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """
         Update the status of a task.
@@ -386,7 +386,7 @@ class TaskDecomposition:
         if metadata:
             self._task_nodes[task_id].metadata.update(metadata)
 
-    def get_execution_order(self) -> List[str]:
+    def get_execution_order(self) -> list[str]:
         """
         Get a valid topological execution order for all tasks.
 
@@ -414,7 +414,7 @@ class TaskDecomposition:
                 f"Detected cycles: {cycle_str}"
             )
 
-    def detect_cycles(self) -> List[List[str]]:
+    def detect_cycles(self) -> list[list[str]]:
         """
         Detect cycles in the task dependency graph.
 
@@ -444,7 +444,7 @@ class TaskDecomposition:
 
         return cycles
 
-    def get_parallel_execution_groups(self) -> List[List[str]]:
+    def get_parallel_execution_groups(self) -> list[list[str]]:
         """
         Identify groups of tasks that can be executed in parallel.
 
@@ -463,8 +463,8 @@ class TaskDecomposition:
             ...     print(f"Group {i}: {len(group)} tasks can run in parallel")
         """
         execution_order = self.get_execution_order()
-        groups: List[List[str]] = []
-        assigned: Set[str] = set()
+        groups: list[list[str]] = []
+        assigned: set[str] = set()
 
         for task_id in execution_order:
             if task_id in assigned:
@@ -531,7 +531,7 @@ class TaskDecomposition:
 
         return True
 
-    def get_critical_path(self) -> List[str]:
+    def get_critical_path(self) -> list[str]:
         """
         Calculate the critical path through the task graph.
 
@@ -574,7 +574,7 @@ class TaskDecomposition:
             return []
 
         # Find longest path from any source to any sink
-        longest_path: List[str] = []
+        longest_path: list[str] = []
         max_length = float("-inf")
 
         for source in sources:
@@ -648,7 +648,7 @@ class TaskDecomposition:
 
         return max_depth
 
-    def get_execution_levels(self) -> List[List[str]]:
+    def get_execution_levels(self) -> list[list[str]]:
         """
         Group tasks by their depth in the dependency graph.
 
@@ -664,7 +664,7 @@ class TaskDecomposition:
             >>> for i, level in enumerate(levels):
             ...     print(f"Level {i}: {len(level)} tasks")
         """
-        task_depths: Dict[int, List[str]] = {}
+        task_depths: dict[int, list[str]] = {}
 
         for task_id in self._task_nodes:
             depth = self.get_task_depth(task_id)
@@ -696,7 +696,7 @@ class TaskDecomposition:
 
         return (completed / len(self._task_nodes)) * 100.0
 
-    def get_failed_tasks(self) -> List[SimpleTask]:
+    def get_failed_tasks(self) -> list[SimpleTask]:
         """
         Get all tasks that have failed.
 
@@ -710,7 +710,7 @@ class TaskDecomposition:
         """
         return [node.task for node in self._task_nodes.values() if node.status == TaskStatus.FAILED]
 
-    def get_blocked_tasks(self) -> List[SimpleTask]:
+    def get_blocked_tasks(self) -> list[SimpleTask]:
         """
         Get tasks that are blocked by failed dependencies.
 
@@ -726,7 +726,7 @@ class TaskDecomposition:
             >>> if blocked:
             ...     print(f"{len(blocked)} tasks are blocked by failures")
         """
-        blocked_tasks: List[SimpleTask] = []
+        blocked_tasks: list[SimpleTask] = []
 
         for task_id, node in self._task_nodes.items():
             if node.status != TaskStatus.PENDING:
@@ -752,7 +752,7 @@ class TaskDecomposition:
 
         return blocked_tasks
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         Get comprehensive statistics about the task decomposition.
 
@@ -859,7 +859,7 @@ class TaskDecomposition:
 
         # Use graphviz layout if available, otherwise spring layout
         try:
-            import pygraphviz  # type: ignore[import-not-found]
+            import pygraphviz
 
             pos = nx.nx_agraph.graphviz_layout(self._graph, prog="dot")
         except (ImportError, AttributeError):
@@ -957,7 +957,7 @@ class TaskDecomposition:
     # Legacy API Compatibility Methods for HierarchicalPlanner Integration
     # ========================================================================
 
-    def to_execution_graph(self, tasks: Optional[List["TaskLegacy"]] = None) -> "TaskGraph":
+    def to_execution_graph(self, tasks: Optional[list["TaskLegacy"]] = None) -> "TaskGraph":
         """Convert tasks to legacy TaskGraph for backward compatibility.
 
         This method provides compatibility with the legacy API used by HierarchicalPlanner.
@@ -1006,7 +1006,7 @@ class TaskDecomposition:
 
         return legacy_graph
 
-    def get_ready_tasks(self, task_graph: Optional["TaskGraph"] = None) -> List[Any]:
+    def get_ready_tasks(self, task_graph: Optional["TaskGraph"] = None) -> list[Any]:
         """Get tasks that are ready to execute.
 
         This method provides compatibility with both legacy and new APIs.
@@ -1048,7 +1048,7 @@ class TaskDecomposition:
             return ready_tasks
 
         # New API: use internal state
-        ready_tasks_new: List[SimpleTask] = []
+        ready_tasks_new: list[SimpleTask] = []
 
         for task_id, node in self._task_nodes.items():
             if node.status != TaskStatus.PENDING:
@@ -1215,12 +1215,12 @@ class TaskLegacy:
 
     id: str
     description: str
-    depends_on: List[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)
     estimated_complexity: int = 5
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     status: str = "pending"  # pending, in_progress, completed, failed
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -1232,7 +1232,7 @@ class TaskLegacy:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TaskLegacy":
+    def from_dict(cls, data: dict[str, Any]) -> "TaskLegacy":
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -1251,9 +1251,9 @@ class TaskGraph:
     Deprecated: Use TaskDecomposition with NetworkX instead.
     """
 
-    nodes: Dict[str, TaskLegacy] = field(default_factory=dict)
-    edges: Dict[str, List[str]] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    nodes: dict[str, TaskLegacy] = field(default_factory=dict)
+    edges: dict[str, list[str]] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     root_task_id: Optional[str] = None
 
     def add_node(self, task: TaskLegacy) -> None:
@@ -1272,7 +1272,7 @@ class TaskGraph:
         if to_id not in self.edges[from_id]:
             self.edges[from_id].append(to_id)
 
-    def get_dependencies(self, task_id: str) -> List[str]:
+    def get_dependencies(self, task_id: str) -> list[str]:
         """Get dependencies for a task (tasks that must complete before this one)."""
         # Return tasks that this task depends on (predecessors)
         # With edges[dep] = [task], we need to find all dep where task_id in edges[dep]
@@ -1282,13 +1282,13 @@ class TaskGraph:
                 dependencies.append(from_id)
         return dependencies
 
-    def get_dependents(self, task_id: str) -> List[str]:
+    def get_dependents(self, task_id: str) -> list[str]:
         """Get tasks that depend on this task (tasks that require this task to complete)."""
         # Return tasks that depend on this task (successors)
         # With edges[task_id] = [successors], we can return edges[task_id] directly
         return self.edges.get(task_id, [])
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "nodes": {tid: task.to_dict() for tid, task in self.nodes.items()},
@@ -1298,7 +1298,7 @@ class TaskGraph:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TaskGraph":
+    def from_dict(cls, data: dict[str, Any]) -> "TaskGraph":
         """Create from dictionary."""
         graph = cls()
         graph.nodes = {
@@ -1316,10 +1316,10 @@ class ComplexityScore:
 
     score: float
     confidence: float
-    factors: List[str] = field(default_factory=list)
+    factors: list[str] = field(default_factory=list)
     estimated_steps: int = 5
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "score": self.score,
@@ -1334,11 +1334,11 @@ class ValidationResult:
     """Result of validating a task graph."""
 
     is_valid: bool
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     has_cycles: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "is_valid": self.is_valid,
@@ -1353,12 +1353,12 @@ class UpdatedPlan:
     """Result of updating a plan after task execution."""
 
     graph: TaskGraph
-    new_ready_tasks: List[TaskLegacy] = field(default_factory=list)
-    completed_tasks: List[str] = field(default_factory=list)
-    failed_tasks: List[str] = field(default_factory=list)
+    new_ready_tasks: list[TaskLegacy] = field(default_factory=list)
+    completed_tasks: list[str] = field(default_factory=list)
+    failed_tasks: list[str] = field(default_factory=list)
     can_proceed: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "graph": self.graph.to_dict(),

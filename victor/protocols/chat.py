@@ -26,7 +26,8 @@ Design Principles:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from collections.abc import AsyncIterator
 
 if TYPE_CHECKING:
     from victor.providers.base import StreamChunk

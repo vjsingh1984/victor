@@ -42,18 +42,14 @@ Usage:
 import asyncio
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
     TypeVar,
 )
+from collections.abc import AsyncIterator, Callable
 
-from victor.agent.model_switcher import SwitchReason
 from victor.agent.provider_manager import ProviderManager, ProviderState
 from victor.agent.tool_calling import ToolCallingCapabilities
 from victor.providers.base import BaseProvider
@@ -138,7 +134,7 @@ class ProviderCoordinator:
         self._capabilities_override = capabilities
 
         # Post-switch hooks
-        self._post_switch_hooks: List[Callable[[ProviderState], None]] = []
+        self._post_switch_hooks: list[Callable[[ProviderState], None]] = []
 
         # Health monitoring state
         self._health_task: Optional[asyncio.Task[None]] = None
@@ -270,7 +266,7 @@ class ProviderCoordinator:
 
         return result
 
-    def get_current_info(self) -> Dict[str, Any]:
+    def get_current_info(self) -> dict[str, Any]:
         """Get information about current provider and model.
 
         Returns:
@@ -285,7 +281,7 @@ class ProviderCoordinator:
 
         return info
 
-    async def get_health(self) -> Dict[str, Any]:
+    async def get_health(self) -> dict[str, Any]:
         """Get health status of current provider.
 
         Returns:

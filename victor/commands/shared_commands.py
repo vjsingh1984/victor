@@ -30,7 +30,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 
 class CommandCategory(str, Enum):
@@ -65,12 +66,12 @@ class CommandParameter:
     description: str
     required: bool = False
     default: Optional[Any] = None
-    choices: Optional[List[str]] = None
+    choices: Optional[list[str]] = None
     validation_pattern: Optional[str] = None
 
-    def to_json_schema(self) -> Dict[str, Any]:
+    def to_json_schema(self) -> dict[str, Any]:
         """Convert to JSON Schema format."""
-        schema: Dict[str, Any] = {
+        schema: dict[str, Any] = {
             "description": self.description,
         }
 
@@ -104,13 +105,13 @@ class CommandDefinition:
     name: str
     description: str
     category: CommandCategory
-    parameters: List[CommandParameter] = field(default_factory=list)
-    aliases: List[str] = field(default_factory=list)
+    parameters: list[CommandParameter] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
     shortcut: Optional[str] = None
-    examples: List[str] = field(default_factory=list)
+    examples: list[str] = field(default_factory=list)
     hidden: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "name": self.name,
@@ -133,7 +134,7 @@ class CommandDefinition:
             "hidden": self.hidden,
         }
 
-    def to_json_schema(self) -> Dict[str, Any]:
+    def to_json_schema(self) -> dict[str, Any]:
         """Convert to JSON Schema format for MCP."""
         properties = {}
         required = []
@@ -151,7 +152,7 @@ class CommandDefinition:
 
 
 # Built-in command definitions
-SHARED_COMMANDS: List[CommandDefinition] = [
+SHARED_COMMANDS: list[CommandDefinition] = [
     # Session commands
     CommandDefinition(
         name="clear",
@@ -422,9 +423,9 @@ class CommandRegistry:
 
     def __init__(self) -> None:
         """Initialize registry with built-in commands."""
-        self._commands: Dict[str, CommandDefinition] = {}
-        self._aliases: Dict[str, str] = {}
-        self._handlers: Dict[str, Callable[..., Any]] = {}
+        self._commands: dict[str, CommandDefinition] = {}
+        self._aliases: dict[str, str] = {}
+        self._handlers: dict[str, Callable[..., Any]] = {}
 
         # Register built-in commands
         for cmd in SHARED_COMMANDS:
@@ -448,7 +449,7 @@ class CommandRegistry:
     def register_handler(
         self,
         name: str,
-        handler: Callable[[Dict[str, Any]], Any],
+        handler: Callable[[dict[str, Any]], Any],
     ) -> None:
         """Register an execution handler for a command."""
         self._handlers[name] = handler
@@ -465,7 +466,7 @@ class CommandRegistry:
         self,
         category: Optional[CommandCategory] = None,
         include_hidden: bool = False,
-    ) -> List[CommandDefinition]:
+    ) -> list[CommandDefinition]:
         """List all commands, optionally filtered by category."""
         commands = list(self._commands.values())
 
@@ -477,7 +478,7 @@ class CommandRegistry:
 
         return sorted(commands, key=lambda c: (c.category.value, c.name))
 
-    def parse_command(self, input_text: str) -> Optional[Dict[str, Any]]:
+    def parse_command(self, input_text: str) -> Optional[dict[str, Any]]:
         """Parse a command string into name and arguments.
 
         Args:
@@ -508,9 +509,9 @@ class CommandRegistry:
         self,
         command: CommandDefinition,
         args_str: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Parse argument string into dict."""
-        args: Dict[str, Any] = {}
+        args: dict[str, Any] = {}
 
         if not command.parameters:
             return args
@@ -538,7 +539,7 @@ class CommandRegistry:
     async def execute(
         self,
         name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
     ) -> Any:
         """Execute a command with the registered handler."""
         handler = self._handlers.get(name)
@@ -547,7 +548,7 @@ class CommandRegistry:
 
         return await handler(args)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Export all commands as a dictionary."""
         return {
             "commands": [cmd.to_dict() for cmd in self.list_commands(include_hidden=True)],

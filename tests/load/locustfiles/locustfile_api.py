@@ -23,7 +23,6 @@ Or headless: locust -f tests/load/locustfiles/locustfile_api.py --headless --use
 import random
 import time
 from datetime import datetime
-from typing import Dict, List
 
 from locust import HttpUser, task, between, events, tag
 

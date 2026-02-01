@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 class SearchType(Enum):
@@ -68,8 +68,8 @@ class SearchContext:
     vertical: str
     file_path: Optional[str] = None
     project_root: Optional[str] = None
-    filters: Dict[str, Any] | None = None
-    metadata: Dict[str, Any] | None = None
+    filters: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
@@ -85,12 +85,12 @@ class SearchResult:
         metadata: Additional search metadata
     """
 
-    results: List[Dict[str, Any]]
+    results: list[dict[str, Any]]
     search_type: SearchType
     backend_used: str
     total_results: int
     query_time_ms: float
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @runtime_checkable
@@ -163,7 +163,7 @@ class ISearchBackend(Protocol):
         query: str,
         search_type: SearchType,
         context: SearchContext,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Perform search operation.
 
         Args:
@@ -183,7 +183,7 @@ class ISearchBackend(Protocol):
         """
         ...
 
-    def supported_search_types(self) -> List[SearchType]:
+    def supported_search_types(self) -> list[SearchType]:
         """Get list of supported search types.
 
         Returns:

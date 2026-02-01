@@ -5,14 +5,13 @@ Validates that the staging environment is properly configured
 for pre-production validation and UAT.
 """
 
-import os
 import pytest
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 
 @pytest.fixture
-def staging_env_vars() -> Dict[str, str]:
+def staging_env_vars() -> dict[str, str]:
     """Staging environment variables."""
     return {
         "VICTOR_PROFILE": "staging",
@@ -31,7 +30,7 @@ def staging_env_vars() -> Dict[str, str]:
 
 
 @pytest.fixture
-def staging_kubernetes_config() -> Dict[str, Any]:
+def staging_kubernetes_config() -> dict[str, Any]:
     """Expected Kubernetes configuration for staging."""
     return {
         "namespace": "victor-ai-staging",

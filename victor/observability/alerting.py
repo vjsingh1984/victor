@@ -59,15 +59,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import smtplib
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
-from urllib.parse import urlparse
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from email.mime.multipart import MIMEMultipart
@@ -124,13 +122,13 @@ class Alert:
     severity: AlertSeverity
     status: AlertStatus
     message: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     fired_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     resolved_at: Optional[datetime] = None
     acknowledged_at: Optional[datetime] = None
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary.
 
         Returns:
@@ -187,11 +185,11 @@ class AlertRule:
     condition: str | Callable[[], bool]
     severity: AlertSeverity = AlertSeverity.WARNING
     enabled: bool = True
-    notification_channels: List[str] = field(default_factory=list)
+    notification_channels: list[str] = field(default_factory=list)
     cooldown_seconds: float = 300.0  # 5 minutes default
     threshold: Optional[float] = None
     evaluation_interval_seconds: float = 60.0
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
     last_fired: Optional[datetime] = None
 
     def should_fire(self) -> bool:
@@ -218,7 +216,7 @@ class AlertRule:
             logger.warning(f"String conditions not yet supported: {self.condition}")
             return False
 
-    def fire(self, message: str, details: Optional[Dict[str, Any]] = None) -> Alert:
+    def fire(self, message: str, details: Optional[dict[str, Any]] = None) -> Alert:
         """Fire alert.
 
         Args:
@@ -267,11 +265,11 @@ class AlertRuleBuilder:
     _description: str = ""
     _condition: Optional[str | Callable[[], bool]] = None
     _severity: AlertSeverity = AlertSeverity.WARNING
-    _notification_channels: List[str] = field(default_factory=list)
+    _notification_channels: list[str] = field(default_factory=list)
     _cooldown_seconds: float = 300.0
     _threshold: Optional[float] = None
     _evaluation_interval_seconds: float = 60.0
-    _labels: Dict[str, str] = field(default_factory=dict)
+    _labels: dict[str, str] = field(default_factory=dict)
 
     def name(self, name: str) -> "AlertRuleBuilder":
         """Set rule name."""
@@ -293,7 +291,7 @@ class AlertRuleBuilder:
         self._severity = severity
         return self
 
-    def notification_channels(self, channels: List[str]) -> "AlertRuleBuilder":
+    def notification_channels(self, channels: list[str]) -> "AlertRuleBuilder":
         """Set notification channels."""
         self._notification_channels = channels
         return self
@@ -313,7 +311,7 @@ class AlertRuleBuilder:
         self._evaluation_interval_seconds = seconds
         return self
 
-    def labels(self, labels: Dict[str, str]) -> "AlertRuleBuilder":
+    def labels(self, labels: dict[str, str]) -> "AlertRuleBuilder":
         """Set labels."""
         self._labels = labels
         return self
@@ -477,7 +475,7 @@ class EmailNotifier(NotificationChannel):
         username: Optional[str] = None,
         password: Optional[str] = None,
         from_address: str = "alerts@victor.ai",
-        to_addresses: List[str] | None = None,
+        to_addresses: list[str] | None = None,
         use_tls: bool = True,
     ) -> None:
         """Initialize email notifier.
@@ -509,7 +507,6 @@ class EmailNotifier(NotificationChannel):
             True if sent successfully
         """
         try:
-            import smtplib
             from email.mime.text import MIMEText
             from email.mime.multipart import MIMEMultipart
 
@@ -587,7 +584,7 @@ class WebhookNotifier(NotificationChannel):
     def __init__(
         self,
         webhook_url: str,
-        headers: Optional[Dict[str, str]] = None,
+        headers: Optional[dict[str, str]] = None,
         method: str = "POST",
     ) -> None:
         """Initialize webhook notifier.
@@ -665,9 +662,9 @@ class AlertManager:
 
     def __init__(self) -> None:
         """Initialize alert manager."""
-        self._rules: Dict[str, AlertRule] = {}
-        self._notifiers: Dict[str, NotificationChannel] = {}
-        self._active_alerts: Dict[str, Alert] = {}
+        self._rules: dict[str, AlertRule] = {}
+        self._notifiers: dict[str, NotificationChannel] = {}
+        self._active_alerts: dict[str, Alert] = {}
 
     def add_rule(self, rule: AlertRule) -> None:
         """Add alert rule.
@@ -704,7 +701,7 @@ class AlertManager:
         if name in self._notifiers:
             del self._notifiers[name]
 
-    async def check_and_alert(self) -> List[Alert]:
+    async def check_and_alert(self) -> list[Alert]:
         """Check all rules and fire alerts if needed.
 
         Returns:
@@ -731,7 +728,7 @@ class AlertManager:
 
         return new_alerts
 
-    def get_active_alerts(self) -> List[Alert]:
+    def get_active_alerts(self) -> list[Alert]:
         """Get all active alerts.
 
         Returns:

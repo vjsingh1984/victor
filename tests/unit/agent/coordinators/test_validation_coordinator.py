@@ -30,8 +30,7 @@ Test Strategy:
 """
 
 import pytest
-from unittest.mock import Mock, AsyncMock, MagicMock, patch
-from typing import Any, Dict, List, Optional
+from unittest.mock import Mock, AsyncMock, patch
 
 from victor.agent.coordinators.validation_coordinator import (
     ValidationCoordinator,
@@ -40,10 +39,6 @@ from victor.agent.coordinators.validation_coordinator import (
     IntelligentValidationResult,
     ToolCallValidationResult,
     ContextValidationResult,
-    IIntelligentValidationProtocol,
-    IContextValidationProtocol,
-    IResponseValidationProtocol,
-    ICancellationProtocol,
 )
 
 

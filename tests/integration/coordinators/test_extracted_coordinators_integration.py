@@ -33,11 +33,8 @@ Test Strategy:
 - Ensure coordinator isolation and single responsibility
 """
 
-import asyncio
 import pytest
-from unittest.mock import Mock, MagicMock, AsyncMock, patch
-from typing import Any, Dict, List, Optional
-from dataclasses import dataclass
+from unittest.mock import Mock, MagicMock
 
 from victor.agent.coordinators.conversation_coordinator import ConversationCoordinator
 from victor.agent.coordinators.search_coordinator import SearchCoordinator

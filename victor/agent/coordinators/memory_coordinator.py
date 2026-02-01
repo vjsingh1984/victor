@@ -34,8 +34,8 @@ Design Patterns:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.conversation_memory import ConversationStore
@@ -128,7 +128,7 @@ class MemoryCoordinator:
         self._session_id = session_id
         self._conversation_store = conversation_store
 
-    def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_memory_context(self, max_tokens: Optional[int] = None) -> list[dict[str, Any]]:
         """Get token-aware context messages from memory manager.
 
         Uses intelligent pruning to select the most relevant messages
@@ -154,7 +154,7 @@ class MemoryCoordinator:
 
         # Delegate to MemoryManager with exception handling
         try:
-            messages: List[Dict[str, Any]] = self._memory_manager.get_context(max_tokens=max_tokens)
+            messages: list[dict[str, Any]] = self._memory_manager.get_context(max_tokens=max_tokens)
             return messages
         except Exception as e:
             logger.warning(f"Failed to get memory context, falling back to in-memory: {e}")
@@ -218,7 +218,7 @@ class MemoryCoordinator:
                 error=str(e),
             )
 
-    def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_sessions(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent conversation sessions for recovery.
 
         Args:
@@ -236,7 +236,7 @@ class MemoryCoordinator:
 
         # Delegate to MemoryManager with exception handling
         try:
-            sessions: List[Dict[str, Any]] = self._memory_manager.get_recent_sessions(limit=limit)
+            sessions: list[dict[str, Any]] = self._memory_manager.get_recent_sessions(limit=limit)
             return sessions
         except Exception as e:
             logger.warning(f"Failed to get recent sessions: {e}")
@@ -299,7 +299,7 @@ class MemoryCoordinator:
         """
         return self._memory_manager is not None and self._session_id is not None
 
-    def _get_in_memory_messages(self) -> List[Dict[str, Any]]:
+    def _get_in_memory_messages(self) -> list[dict[str, Any]]:
         """Get messages from in-memory conversation store.
 
         Returns:

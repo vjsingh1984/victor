@@ -54,13 +54,13 @@ class RAGRoleConfig:
     """
 
     base_role: str
-    tools: List[str]
+    tools: list[str]
     tool_budget: int
     description: str = ""
 
 
 # RAG-specific roles with tool allocations
-RAG_ROLES: Dict[str, RAGRoleConfig] = {
+RAG_ROLES: dict[str, RAGRoleConfig] = {
     "document_parser": RAGRoleConfig(
         base_role="researcher",
         tools=["read", "ls", "web_fetch"],
@@ -116,13 +116,13 @@ class RAGTeamSpec:
     name: str
     description: str
     formation: TeamFormation
-    members: List[TeamMemberSpec]
+    members: list[TeamMemberSpec]
     total_tool_budget: int = 100
     max_iterations: int = 50
 
 
 # Pre-defined team specifications with rich personas
-RAG_TEAM_SPECS: Dict[str, RAGTeamSpec] = {
+RAG_TEAM_SPECS: dict[str, RAGTeamSpec] = {
     "ingest_team": RAGTeamSpec(
         name="Document Ingestion Team",
         description="Parallel document processing for efficient ingestion",
@@ -357,7 +357,7 @@ def get_role_config(role_name: str) -> Optional[RAGRoleConfig]:
     return RAG_ROLES.get(role_name.lower())
 
 
-def list_team_types() -> List[str]:
+def list_team_types() -> list[str]:
     """List all available team types.
 
     Returns:
@@ -366,7 +366,7 @@ def list_team_types() -> List[str]:
     return list(RAG_TEAM_SPECS.keys())
 
 
-def list_roles() -> List[str]:
+def list_roles() -> list[str]:
     """List all available RAG roles.
 
     Returns:
@@ -382,7 +382,7 @@ class RAGTeamSpecProvider:
     ISP compliance across all verticals.
     """
 
-    def get_team_specs(self) -> Dict[str, RAGTeamSpec]:
+    def get_team_specs(self) -> dict[str, RAGTeamSpec]:
         """Get all RAG team specifications.
 
         Returns:
@@ -401,7 +401,7 @@ class RAGTeamSpecProvider:
         """
         return get_team_for_task(task_type)
 
-    def list_team_types(self) -> List[str]:
+    def list_team_types(self) -> list[str]:
         """List all available team types.
 
         Returns:

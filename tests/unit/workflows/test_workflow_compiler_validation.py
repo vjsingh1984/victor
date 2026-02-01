@@ -8,7 +8,6 @@ Target: 65%+ coverage for victor/workflows/unified_compiler.py
 """
 
 import pytest
-from pathlib import Path
 from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
 

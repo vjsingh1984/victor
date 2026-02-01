@@ -49,7 +49,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.framework.module_loader import get_entry_point_cache
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
@@ -82,15 +82,15 @@ class VerticalLoader:
 
     def __init__(self) -> None:
         """Initialize the vertical loader."""
-        self._active_vertical: Optional[Type[VerticalBase]] = None
+        self._active_vertical: Optional[type[VerticalBase]] = None
         self._extensions: Optional["VerticalExtensions"] = None
         self._registered_services: bool = False
-        self._discovered_verticals: Optional[Dict[str, Type[VerticalBase]]] = None
-        self._discovered_tools: Optional[Dict[str, Type[Any]]] = None
+        self._discovered_verticals: Optional[dict[str, type[VerticalBase]]] = None
+        self._discovered_tools: Optional[dict[str, type[Any]]] = None
         self._lazy_mode: bool = False  # Track if lazy loading is enabled
 
     @property
-    def active_vertical(self) -> Optional[Type[VerticalBase]]:
+    def active_vertical(self) -> Optional[type[VerticalBase]]:
         """Get the currently active vertical."""
         return self._active_vertical
 
@@ -123,7 +123,7 @@ class VerticalLoader:
         else:
             logger.debug(f"Eager loading enabled for verticals (mode: {mode})")
 
-    def load(self, name: str, lazy: Optional[bool] = None) -> Union[Type[VerticalBase], Any]:
+    def load(self, name: str, lazy: Optional[bool] = None) -> type[VerticalBase] | Any:
         """Load and activate a vertical by name.
 
         Searches for verticals in this order:
@@ -159,7 +159,7 @@ class VerticalLoader:
         if use_lazy:
             from victor.core.verticals.lazy_proxy import LazyProxy, LazyProxyType
 
-            def _load_vertical() -> Type[VerticalBase]:
+            def _load_vertical() -> type[VerticalBase]:
                 self._activate(vertical)
                 return vertical
 
@@ -173,7 +173,7 @@ class VerticalLoader:
         self._activate(vertical)
         return vertical
 
-    def _import_from_entrypoint(self, name: str) -> Optional[Type[VerticalBase]]:
+    def _import_from_entrypoint(self, name: str) -> Optional[type[VerticalBase]]:
         """Import a vertical from entry points.
 
         Args:
@@ -188,7 +188,7 @@ class VerticalLoader:
     def discover_verticals(
         self,
         force_refresh: bool = False,
-    ) -> Dict[str, Type[VerticalBase]]:
+    ) -> dict[str, type[VerticalBase]]:
         """Discover verticals from installed packages via entry points.
 
         Scans the 'victor.verticals' entry point group for installed
@@ -232,7 +232,7 @@ class VerticalLoader:
     async def discover_verticals_async(
         self,
         force_refresh: bool = False,
-    ) -> Dict[str, Type[VerticalBase]]:
+    ) -> dict[str, type[VerticalBase]]:
         """Discover verticals asynchronously (non-blocking).
 
         Async version of discover_verticals() that offloads entry point
@@ -263,7 +263,7 @@ class VerticalLoader:
 
         return self._discovered_verticals
 
-    def _load_vertical_entries(self, ep_entries: Dict[str, str]) -> None:
+    def _load_vertical_entries(self, ep_entries: dict[str, str]) -> None:
         """Load vertical classes from entry point entries.
 
         Args:
@@ -288,7 +288,7 @@ class VerticalLoader:
             except Exception as e:
                 logger.warning("Failed to load vertical entry point '%s': %s", name, e)
 
-    def _load_entry_point(self, name: str, value: str) -> Type[Any]:  # noqa: ANN401
+    def _load_entry_point(self, name: str, value: str) -> type[Any]:
         """Load an entry point by its value string.
 
         Args:
@@ -313,7 +313,7 @@ class VerticalLoader:
     def discover_tools(
         self,
         force_refresh: bool = False,
-    ) -> Dict[str, Type[Any]]:
+    ) -> dict[str, type[Any]]:
         """Discover tools from installed packages via entry points.
 
         Scans the 'victor.tools' entry point group for installed
@@ -357,7 +357,7 @@ class VerticalLoader:
     async def discover_tools_async(
         self,
         force_refresh: bool = False,
-    ) -> Dict[str, Type[Any]]:
+    ) -> dict[str, type[Any]]:
         """Discover tools asynchronously (non-blocking).
 
         Async version of discover_tools() that offloads entry point
@@ -388,7 +388,7 @@ class VerticalLoader:
 
         return self._discovered_tools
 
-    def _load_tool_entries(self, ep_entries: Dict[str, str]) -> None:
+    def _load_tool_entries(self, ep_entries: dict[str, str]) -> None:
         """Load tool classes from entry point entries.
 
         Args:
@@ -426,7 +426,7 @@ class VerticalLoader:
 
         logger.info("Plugin cache cleared, will re-discover on next access")
 
-    def _activate(self, vertical: Type[VerticalBase]) -> None:
+    def _activate(self, vertical: type[VerticalBase]) -> None:
         """Activate a vertical.
 
         Args:
@@ -437,7 +437,7 @@ class VerticalLoader:
         self._registered_services = False
         logger.info("Activated vertical: %s", vertical.name)
 
-    def _get_available_names(self) -> List[str]:
+    def _get_available_names(self) -> list[str]:
         """Get list of available vertical names.
 
         Includes:
@@ -506,7 +506,7 @@ class VerticalLoader:
             return None
         return self._active_vertical.get_config()
 
-    def get_tools(self) -> List[str]:
+    def get_tools(self) -> list[str]:
         """Get tools from active vertical.
 
         Returns:
@@ -549,7 +549,7 @@ def get_vertical_loader() -> VerticalLoader:
     return _loader
 
 
-def load_vertical(name: str, lazy: Optional[bool] = None) -> Union[Type[VerticalBase], Any]:
+def load_vertical(name: str, lazy: Optional[bool] = None) -> type[VerticalBase] | Any:
     """Load a vertical by name (convenience function).
 
     Args:
@@ -562,7 +562,7 @@ def load_vertical(name: str, lazy: Optional[bool] = None) -> Union[Type[Vertical
     return get_vertical_loader().load(name, lazy=lazy)
 
 
-def get_active_vertical() -> Optional[Type[VerticalBase]]:
+def get_active_vertical() -> Optional[type[VerticalBase]]:
     """Get the currently active vertical (convenience function).
 
     Returns:
@@ -580,7 +580,7 @@ def get_vertical_extensions() -> Optional["VerticalExtensions"]:
     return get_vertical_loader().get_extensions()
 
 
-def discover_vertical_plugins() -> Dict[str, Type[VerticalBase]]:
+def discover_vertical_plugins() -> dict[str, type[VerticalBase]]:
     """Discover vertical plugins from entry points (convenience function).
 
     Returns:
@@ -589,7 +589,7 @@ def discover_vertical_plugins() -> Dict[str, Type[VerticalBase]]:
     return get_vertical_loader().discover_verticals()
 
 
-def discover_tool_plugins() -> Dict[str, Type[Any]]:
+def discover_tool_plugins() -> dict[str, type[Any]]:
     """Discover tool plugins from entry points (convenience function).
 
     Returns:
@@ -598,7 +598,7 @@ def discover_tool_plugins() -> Dict[str, Type[Any]]:
     return get_vertical_loader().discover_tools()
 
 
-async def discover_vertical_plugins_async() -> Dict[str, Type[VerticalBase]]:
+async def discover_vertical_plugins_async() -> dict[str, type[VerticalBase]]:
     """Discover vertical plugins asynchronously (convenience function).
 
     Non-blocking version that offloads entry point scanning to thread pool.
@@ -609,7 +609,7 @@ async def discover_vertical_plugins_async() -> Dict[str, Type[VerticalBase]]:
     return await get_vertical_loader().discover_verticals_async()
 
 
-async def discover_tool_plugins_async() -> Dict[str, Type[Any]]:
+async def discover_tool_plugins_async() -> dict[str, type[Any]]:
     """Discover tool plugins asynchronously (convenience function).
 
     Non-blocking version that offloads entry point scanning to thread pool.

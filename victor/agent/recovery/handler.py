@@ -47,7 +47,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.recovery.coordinator import RecoveryCoordinator, RecoveryOutcome
 from victor.agent.recovery.protocols import FailureType, RecoveryAction
@@ -94,7 +94,7 @@ class RecoveryHandler:
         self._session_id: Optional[str] = None
 
         # Track recent responses for loop detection
-        self._recent_responses: List[str] = []
+        self._recent_responses: list[str] = []
         self._max_recent_responses = 5
 
         # Track consecutive failures for escalation
@@ -164,13 +164,13 @@ class RecoveryHandler:
     def detect_failure(
         self,
         content: str = "",
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
-        mentioned_tools: Optional[List[str]] = None,
+        tool_calls: Optional[list[dict[str, Any]]] = None,
+        mentioned_tools: Optional[list[str]] = None,
         elapsed_time: float = 0.0,
         session_idle_timeout: float = 180.0,
         quality_score: float = 0.5,
         consecutive_failures: int = 0,
-        recent_responses: Optional[List[str]] = None,
+        recent_responses: Optional[list[str]] = None,
         context_utilization: Optional[float] = None,
     ) -> Optional[FailureType]:
         """Detect failure type from response characteristics.
@@ -228,8 +228,8 @@ class RecoveryHandler:
         session_idle_timeout: float = 180.0,
         current_temperature: float = 0.7,
         consecutive_failures: int = 0,
-        mentioned_tools: Optional[List[str]] = None,
-        recent_responses: Optional[List[str]] = None,
+        mentioned_tools: Optional[list[str]] = None,
+        recent_responses: Optional[list[str]] = None,
         quality_score: float = 0.5,
         task_type: str = "general",
         is_analysis_task: bool = False,
@@ -331,7 +331,7 @@ class RecoveryHandler:
         if self._coordinator:
             self._coordinator.reset_session(session_id)
 
-    def get_diagnostics(self) -> Dict[str, Any]:
+    def get_diagnostics(self) -> dict[str, Any]:
         """Get diagnostic information about recovery system."""
         diagnostics = {
             "enabled": self._enabled,

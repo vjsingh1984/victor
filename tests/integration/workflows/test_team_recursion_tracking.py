@@ -23,11 +23,9 @@ to ensure proper tracking of nested team and workflow execution.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 from victor.core.errors import RecursionDepthError
-from victor.teams import UnifiedTeamCoordinator, TeamFormation
-from victor.teams.protocols import ITeamMember
+from victor.teams import UnifiedTeamCoordinator
 from victor.teams.types import AgentMessage
 from victor.workflows.recursion import RecursionContext, RecursionGuard
 

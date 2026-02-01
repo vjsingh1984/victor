@@ -4,8 +4,6 @@ Tests the RedisEventBackend and KafkaEventBackend implementations
 for distributed event messaging.
 """
 
-import asyncio
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -13,7 +11,6 @@ import pytest
 from victor.core.events.protocols import (
     BackendConfig,
     BackendType,
-    DeliveryGuarantee,
     MessagingEvent,
 )
 

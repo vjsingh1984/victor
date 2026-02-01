@@ -8,7 +8,8 @@ This protocol defines the minimal interface for extension providers,
 enabling type-safe extension access without hasattr() checks.
 """
 
-from typing import Protocol, runtime_checkable, List, Callable, Any
+from typing import Protocol, runtime_checkable, Any
+from collections.abc import Callable
 
 
 @runtime_checkable
@@ -30,7 +31,7 @@ class ExtensionProviderProtocol(Protocol):
         ```
     """
 
-    def get_extensions(self) -> List[Callable[..., Any]]:
+    def get_extensions(self) -> list[Callable[..., Any]]:
         """Get all available extensions.
 
         Returns:

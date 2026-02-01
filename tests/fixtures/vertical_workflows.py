@@ -21,7 +21,7 @@ This module provides:
 - Expected results for validation
 """
 
-from typing import Any, Dict, List
+from typing import Any
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -43,11 +43,11 @@ class CrossVerticalScenario:
 
     name: str
     description: str
-    verticals: List[VerticalType]
-    input_data: Dict[str, Any]
-    expected_tools: List[str]
+    verticals: list[VerticalType]
+    input_data: dict[str, Any]
+    expected_tools: list[str]
     expected_outcome: str
-    workflow_steps: List[Dict[str, Any]] = field(default_factory=list)
+    workflow_steps: list[dict[str, Any]] = field(default_factory=list)
     performance_baseline_ms: float = 1000.0  # Expected execution time
 
 
@@ -57,15 +57,15 @@ class VerticalIsolationTestCase:
 
     vertical: VerticalType
     test_operation: str
-    dependencies: List[str]  # Expected dependencies
-    forbidden_dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str]  # Expected dependencies
+    forbidden_dependencies: list[str] = field(default_factory=list)
 
 
 # ============================================================================
 # Cross-Vertical Workflow Scenarios
 # ============================================================================
 
-CROSS_VERTICAL_SCENARIOS: Dict[str, CrossVerticalScenario] = {
+CROSS_VERTICAL_SCENARIOS: dict[str, CrossVerticalScenario] = {
     "coding_research_analysis": CrossVerticalScenario(
         name="Code Analysis with Web Research",
         description="Analyze code quality and research best practices online",
@@ -266,7 +266,7 @@ def calculate_fibonacci(n):
 # Vertical Isolation Test Cases
 # ============================================================================
 
-VERTICAL_ISOLATION_TESTS: List[VerticalIsolationTestCase] = [
+VERTICAL_ISOLATION_TESTS: list[VerticalIsolationTestCase] = [
     VerticalIsolationTestCase(
         vertical=VerticalType.CODING,
         test_operation="Analyze Python code",
@@ -427,7 +427,7 @@ def get_scenario(name: str) -> CrossVerticalScenario:
     return CROSS_VERTICAL_SCENARIOS[name]
 
 
-def list_all_scenarios() -> List[str]:
+def list_all_scenarios() -> list[str]:
     """List all available cross-vertical scenarios.
 
     Returns:
@@ -436,7 +436,7 @@ def list_all_scenarios() -> List[str]:
     return list(CROSS_VERTICAL_SCENARIOS.keys())
 
 
-def get_vertical_combinations() -> List[tuple]:
+def get_vertical_combinations() -> list[tuple]:
     """Get all possible 2-vertical combinations for testing.
 
     Returns:
@@ -462,7 +462,7 @@ def get_mock_code_snippet(name: str) -> str:
     return MOCK_CODE_SNIPPETS.get(name, "")
 
 
-def get_mock_research_result(topic: str) -> Dict[str, Any]:
+def get_mock_research_result(topic: str) -> dict[str, Any]:
     """Get mock research result by topic.
 
     Args:
@@ -477,7 +477,7 @@ def get_mock_research_result(topic: str) -> Dict[str, Any]:
 
 def create_mock_workflow_result(
     scenario: CrossVerticalScenario, success: bool = True
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a mock workflow execution result.
 
     Args:

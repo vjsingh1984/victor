@@ -20,8 +20,7 @@ for coordinator-based orchestrator.
 
 import json
 import logging
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -530,7 +529,6 @@ class TestIntegration:
 
     def test_logging_integration(self):
         """Test logging with coordinator tracking."""
-        from victor.observability.coordinator_metrics import CoordinatorMetricsCollector
 
         # Setup logging
         setup_coordinator_logging(

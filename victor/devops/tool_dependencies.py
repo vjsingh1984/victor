@@ -52,8 +52,7 @@ Example:
     dockerfile_pattern = DEVOPS_COMPOSED_PATTERNS["dockerfile_pipeline"]
 """
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 from victor.framework.tool_naming import ToolNames
@@ -76,7 +75,7 @@ DevOpsToolDependencyProvider = create_vertical_tool_dependency_provider()
 
 
 # Uses canonical ToolNames constants for consistency
-DEVOPS_COMPOSED_PATTERNS: Dict[str, Dict[str, Any]] = {
+DEVOPS_COMPOSED_PATTERNS: dict[str, dict[str, Any]] = {
     "dockerfile_pipeline": {
         "description": "Create and validate Dockerfile",
         "sequence": [ToolNames.READ, ToolNames.WRITE, ToolNames.DOCKER, ToolNames.SHELL],
@@ -218,7 +217,7 @@ def reset_devops_tool_graph() -> None:
     _devops_tool_graph = None
 
 
-def get_devops_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
+def get_devops_composed_pattern(pattern_name: str) -> Optional[dict[str, Any]]:
     """Get a DevOps composed tool pattern by name.
 
     Args:
@@ -236,7 +235,7 @@ def get_devops_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
     return DEVOPS_COMPOSED_PATTERNS.get(pattern_name)
 
 
-def list_devops_composed_patterns() -> List[str]:
+def list_devops_composed_patterns() -> list[str]:
     """List all available DevOps composed tool patterns.
 
     Returns:

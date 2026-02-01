@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -124,7 +124,7 @@ class TeamNodeRunner:
     async def execute(
         self,
         node: TeamNodeWorkflow,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         recursion_ctx: RecursionContext,
     ) -> NodeResult:
         """Execute a team node.
@@ -320,8 +320,8 @@ class TeamNodeRunner:
     def _add_member_to_coordinator(
         self,
         coordinator: Any,
-        member_config: Dict[str, Any],
-        context: Dict[str, Any],
+        member_config: dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         """Add a member to the team coordinator.
 

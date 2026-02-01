@@ -19,7 +19,7 @@ including role-specific tool sets, budgets, and prompts.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -43,12 +43,12 @@ class AgentPreset:
     description: str
     goal_template: str
     default_tool_budget: int = 15
-    allowed_tools: Optional[List[str]] = None
+    allowed_tools: Optional[list[str]] = None
     system_prompt_template: Optional[str] = None
-    llm_config: Optional[Dict[str, Any]] = None
-    example_goals: List[str] = field(default_factory=list)
+    llm_config: Optional[dict[str, Any]] = None
+    example_goals: list[str] = field(default_factory=list)
 
-    def to_workflow_builder_params(self, goal: str) -> Dict[str, Any]:
+    def to_workflow_builder_params(self, goal: str) -> dict[str, Any]:
         """Convert to WorkflowBuilder.add_agent() parameters.
 
         Args:
@@ -375,7 +375,7 @@ TEST_TRIAGER = AgentPreset(
 # PRESET REGISTRY
 # =============================================================================()
 
-_AGENT_PRESETS: Dict[str, AgentPreset] = {
+_AGENT_PRESETS: dict[str, AgentPreset] = {
     # Researchers
     "code_researcher": CODE_RESEARCHER,
     "documentation_researcher": DOCUMENTATION_RESEARCHER,
@@ -413,7 +413,7 @@ def get_agent_preset(name: str) -> Optional[AgentPreset]:
     return _AGENT_PRESETS.get(name)
 
 
-def list_agent_presets() -> List[str]:
+def list_agent_presets() -> list[str]:
     """List all available agent preset names.
 
     Returns:
@@ -428,7 +428,7 @@ def list_agent_presets() -> List[str]:
     return list(_AGENT_PRESETS.keys())
 
 
-def list_agent_presets_by_role() -> Dict[str, List[str]]:
+def list_agent_presets_by_role() -> dict[str, list[str]]:
     """List agent presets grouped by role.
 
     Returns:
@@ -439,7 +439,7 @@ def list_agent_presets_by_role() -> Dict[str, List[str]]:
         for role, presets in by_role.items():
             print(f"{role}: {', '.join(presets)}")
     """
-    by_role: Dict[str, List[str]] = {}
+    by_role: dict[str, list[str]] = {}
     for name, preset in _AGENT_PRESETS.items():
         if preset.role not in by_role:
             by_role[preset.role] = []

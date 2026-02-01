@@ -37,13 +37,13 @@ Sources:
 - Enterprise coding assistant logs (anonymized patterns)
 """
 
-from typing import Any, List, Tuple
+from typing import Any
 
 # =============================================================================
 # FUNCTION COMPLETION PROMPTS (~250 entries)
 # =============================================================================
 
-FUNCTION_COMPLETION_PROMPTS: List[Tuple[str, str]] = [
+FUNCTION_COMPLETION_PROMPTS: list[tuple[str, str]] = [
     # HumanEval-style prompts
     (
         "Write a function that takes a string of nested parentheses and returns a list of separate balanced groups",
@@ -353,7 +353,7 @@ FUNCTION_COMPLETION_PROMPTS: List[Tuple[str, str]] = [
 # CODE DEBUGGING PROMPTS (~200 entries)
 # =============================================================================
 
-CODE_DEBUGGING_PROMPTS: List[Tuple[str, str]] = [
+CODE_DEBUGGING_PROMPTS: list[tuple[str, str]] = [
     # Index/Key errors
     ("Fix the IndexError when the list is empty", "realworld"),
     ("Debug the KeyError when accessing dictionary key", "realworld"),
@@ -568,7 +568,7 @@ CODE_DEBUGGING_PROMPTS: List[Tuple[str, str]] = [
 # CODE EXPLANATION PROMPTS (~120 entries)
 # =============================================================================
 
-CODE_EXPLANATION_PROMPTS: List[Tuple[str, str]] = [
+CODE_EXPLANATION_PROMPTS: list[tuple[str, str]] = [
     # General explanations
     ("Explain what this recursive function does", "realworld"),
     ("Explain the time and space complexity of this algorithm", "realworld"),
@@ -707,7 +707,7 @@ CODE_EXPLANATION_PROMPTS: List[Tuple[str, str]] = [
 # CODE REFACTORING PROMPTS (~100 entries)
 # =============================================================================
 
-CODE_REFACTORING_PROMPTS: List[Tuple[str, str]] = [
+CODE_REFACTORING_PROMPTS: list[tuple[str, str]] = [
     # Basic refactoring
     ("Refactor this function to use list comprehension", "realworld"),
     ("Refactor this code to use dictionary comprehension", "realworld"),
@@ -824,7 +824,7 @@ CODE_REFACTORING_PROMPTS: List[Tuple[str, str]] = [
 # TESTING PROMPTS (~80 entries)
 # =============================================================================
 
-TESTING_PROMPTS: List[Tuple[str, str]] = [
+TESTING_PROMPTS: list[tuple[str, str]] = [
     # Unit tests
     ("Write unit tests for this function", "realworld"),
     ("Write tests that cover edge cases", "realworld"),
@@ -919,7 +919,7 @@ TESTING_PROMPTS: List[Tuple[str, str]] = [
 # ALGORITHM IMPLEMENTATION PROMPTS (~70 entries)
 # =============================================================================
 
-ALGORITHM_IMPLEMENTATION_PROMPTS: List[Tuple[str, str]] = [
+ALGORITHM_IMPLEMENTATION_PROMPTS: list[tuple[str, str]] = [
     # Sorting algorithms
     ("Implement quicksort algorithm", "algorithm"),
     ("Implement mergesort algorithm", "algorithm"),
@@ -1003,7 +1003,7 @@ ALGORITHM_IMPLEMENTATION_PROMPTS: List[Tuple[str, str]] = [
 # API INTEGRATION PROMPTS (~60 entries)
 # =============================================================================
 
-API_INTEGRATION_PROMPTS: List[Tuple[str, str]] = [
+API_INTEGRATION_PROMPTS: list[tuple[str, str]] = [
     # HTTP clients
     ("Write HTTP GET request with requests", "realworld"),
     ("Write HTTP POST with JSON body", "realworld"),
@@ -1076,7 +1076,7 @@ API_INTEGRATION_PROMPTS: List[Tuple[str, str]] = [
 # DATA STRUCTURE PROMPTS (~50 entries)
 # =============================================================================
 
-DATA_STRUCTURE_PROMPTS: List[Tuple[str, str]] = [
+DATA_STRUCTURE_PROMPTS: list[tuple[str, str]] = [
     # List operations
     ("Write function to reverse a list in place", "realworld"),
     ("Write function to rotate list by k positions", "realworld"),
@@ -1138,7 +1138,7 @@ DATA_STRUCTURE_PROMPTS: List[Tuple[str, str]] = [
 # FILE I/O PROMPTS (~30 entries)
 # =============================================================================
 
-FILE_IO_PROMPTS: List[Tuple[str, str]] = [
+FILE_IO_PROMPTS: list[tuple[str, str]] = [
     # Reading files
     ("Write function to read CSV file to dict", "realworld"),
     ("Write function to parse JSON file", "realworld"),
@@ -1178,7 +1178,7 @@ FILE_IO_PROMPTS: List[Tuple[str, str]] = [
 # STRING MANIPULATION PROMPTS (~20 entries)
 # =============================================================================
 
-STRING_MANIPULATION_PROMPTS: List[Tuple[str, str]] = [
+STRING_MANIPULATION_PROMPTS: list[tuple[str, str]] = [
     ("Write function to validate email format", "realworld"),
     ("Write function to extract URLs from text", "realworld"),
     ("Write function to parse phone numbers", "realworld"),
@@ -1205,7 +1205,7 @@ STRING_MANIPULATION_PROMPTS: List[Tuple[str, str]] = [
 # MATHEMATICAL PROMPTS (~10 entries)
 # =============================================================================
 
-MATHEMATICAL_PROMPTS: List[Tuple[str, str]] = [
+MATHEMATICAL_PROMPTS: list[tuple[str, str]] = [
     ("Write function to calculate mean absolute deviation", "realworld"),
     ("Write function to find prime factorization", "realworld"),
     ("Write function to calculate GCD and LCM", "realworld"),
@@ -1222,7 +1222,7 @@ MATHEMATICAL_PROMPTS: List[Tuple[str, str]] = [
 # GENERAL CODING PROMPTS (~10 entries)
 # =============================================================================
 
-GENERAL_CODING_PROMPTS: List[Tuple[str, str]] = [
+GENERAL_CODING_PROMPTS: list[tuple[str, str]] = [
     ("Write a CLI tool with argparse", "realworld"),
     ("Write a config file parser", "realworld"),
     ("Write a logging setup function", "realworld"),
@@ -1382,7 +1382,7 @@ def get_corpus_stats() -> dict[str, Any]:
 # =============================================================================
 
 
-def load_humaneval_prompts() -> List[Tuple[str, str, str]]:
+def load_humaneval_prompts() -> list[tuple[str, str, str]]:
     """Load prompts from HumanEval benchmark via HuggingFace.
 
     HumanEval contains 164 programming problems with docstrings.
@@ -1412,7 +1412,7 @@ def load_humaneval_prompts() -> List[Tuple[str, str, str]]:
         raise ImportError("datasets library required. Install with: pip install datasets")
 
 
-def load_mbpp_prompts() -> List[Tuple[str, str, str]]:
+def load_mbpp_prompts() -> list[tuple[str, str, str]]:
     """Load prompts from MBPP benchmark via HuggingFace.
 
     MBPP (Mostly Basic Python Problems) contains ~1000 programming problems.
@@ -1549,7 +1549,7 @@ def _classify_mbpp_prompt(prompt: str) -> str:
 def build_extended_corpus_with_benchmarks(
     include_humaneval: bool = True,
     include_mbpp: bool = True,
-) -> List[Tuple[str, str, str]]:
+) -> list[tuple[str, str, str]]:
     """Build an extended corpus that includes benchmark datasets.
 
     This function loads the static corpus and optionally adds prompts

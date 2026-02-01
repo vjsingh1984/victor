@@ -25,9 +25,7 @@ These tests cover:
 """
 
 import pytest
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set, AsyncIterator
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 # =============================================================================
@@ -480,7 +478,7 @@ class TestAgentChat:
     @pytest.mark.asyncio
     async def test_chat_session_send(self, mock_orchestrator):
         """ChatSession.send should delegate to AgentSession."""
-        from victor.framework.agent import Agent, ChatSession
+        from victor.framework.agent import Agent
         from victor.framework.task import TaskResult
 
         agent = Agent(mock_orchestrator)
@@ -497,7 +495,7 @@ class TestAgentChat:
     @pytest.mark.asyncio
     async def test_chat_session_stream(self, mock_orchestrator):
         """ChatSession.stream should delegate to AgentSession."""
-        from victor.framework.agent import Agent, ChatSession
+        from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
 
         agent = Agent(mock_orchestrator)
@@ -517,7 +515,7 @@ class TestAgentChat:
 
     def test_chat_session_turn_count(self, mock_orchestrator):
         """ChatSession.turn_count should return delegate's turn count."""
-        from victor.framework.agent import Agent, ChatSession
+        from victor.framework.agent import Agent
 
         agent = Agent(mock_orchestrator)
         session = agent.chat("Initial prompt")
@@ -527,7 +525,7 @@ class TestAgentChat:
 
     def test_chat_session_history(self, mock_orchestrator):
         """ChatSession.history should return delegate's history."""
-        from victor.framework.agent import Agent, ChatSession
+        from victor.framework.agent import Agent
 
         agent = Agent(mock_orchestrator)
         session = agent.chat("Initial prompt")
@@ -546,7 +544,7 @@ class TestAgentChat:
 
     def test_chat_session_get_session(self, mock_orchestrator):
         """ChatSession.get_session should return the underlying AgentSession."""
-        from victor.framework.agent import Agent, ChatSession
+        from victor.framework.agent import Agent
         from victor.framework.agent_components import AgentSession
 
         agent = Agent(mock_orchestrator)

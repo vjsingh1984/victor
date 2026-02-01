@@ -62,17 +62,11 @@ Usage:
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Set,
-    Tuple,
 )
 
 from victor.protocols.coordination import (
@@ -83,7 +77,6 @@ from victor.protocols.coordination import (
     TeamSelectionStrategyProtocol,
     TeamSuggestionAction,
     WorkflowRecommendation,
-    WorkflowSelectionStrategyProtocol,
 )
 
 if TYPE_CHECKING:
@@ -113,10 +106,10 @@ class ModeCoordinationConfig:
     """
 
     mode_name: str
-    default_workflows: List[str] = field(default_factory=list)
-    default_teams: List[str] = field(default_factory=list)
+    default_workflows: list[str] = field(default_factory=list)
+    default_teams: list[str] = field(default_factory=list)
     team_suggestion_enabled: bool = True
-    complexity_thresholds: Dict[str, TeamSuggestionAction] = field(
+    complexity_thresholds: dict[str, TeamSuggestionAction] = field(
         default_factory=lambda: {
             "trivial": TeamSuggestionAction.NONE,
             "low": TeamSuggestionAction.NONE,
@@ -125,12 +118,12 @@ class ModeCoordinationConfig:
             "extreme": TeamSuggestionAction.AUTO_SPAWN,
         }
     )
-    tool_priorities: Dict[str, float] = field(default_factory=dict)
+    tool_priorities: dict[str, float] = field(default_factory=dict)
     system_prompt_addition: str = ""
 
 
 # Default configurations for each mode
-DEFAULT_MODE_CONFIGS: Dict[str, ModeCoordinationConfig] = {
+DEFAULT_MODE_CONFIGS: dict[str, ModeCoordinationConfig] = {
     "explore": ModeCoordinationConfig(
         mode_name="explore",
         default_workflows=[],  # No workflows in explore mode
@@ -186,7 +179,7 @@ class RuleBasedTeamSelector:
     """
 
     # Task type to team name mapping patterns
-    TASK_TEAM_PATTERNS: Dict[str, List[str]] = {
+    TASK_TEAM_PATTERNS: dict[str, list[str]] = {
         "feature": ["feature_team", "implementation_team"],
         "bugfix": ["bug_fix_team", "debugging_team"],
         "bug": ["bug_fix_team", "debugging_team"],
@@ -208,7 +201,7 @@ class RuleBasedTeamSelector:
         self,
         task_type: str,
         complexity: str,
-        available_teams: Dict[str, Any],
+        available_teams: dict[str, Any],
     ) -> Optional[str]:
         """Select a team based on task type matching."""
         task_lower = task_type.lower()
@@ -232,9 +225,9 @@ class RuleBasedTeamSelector:
         self,
         task_type: str,
         complexity: str,
-        available_teams: Dict[str, Any],
+        available_teams: dict[str, Any],
         top_k: int = 3,
-    ) -> List[TeamRecommendation]:
+    ) -> list[TeamRecommendation]:
         """Recommend teams with confidence scores."""
         recommendations = []
         task_lower = task_type.lower()
@@ -303,7 +296,7 @@ class LearningBasedTeamSelector:
         self,
         task_type: str,
         complexity: str,
-        available_teams: Dict[str, Any],
+        available_teams: dict[str, Any],
     ) -> Optional[str]:
         """Select team using learner recommendations."""
         if self._learner is None:
@@ -327,9 +320,9 @@ class LearningBasedTeamSelector:
         self,
         task_type: str,
         complexity: str,
-        available_teams: Dict[str, Any],
+        available_teams: dict[str, Any],
         top_k: int = 3,
-    ) -> List[TeamRecommendation]:
+    ) -> list[TeamRecommendation]:
         """Recommend teams using learner."""
         if self._learner is None:
             return []
@@ -361,7 +354,7 @@ class LearningBasedTeamSelector:
     def _find_team_for_recommendation(
         self,
         recommendation: Any,
-        available_teams: Dict[str, Any],
+        available_teams: dict[str, Any],
     ) -> Optional[str]:
         """Find team matching learner recommendation.
 
@@ -427,7 +420,7 @@ class HybridTeamSelector:
         self,
         task_type: str,
         complexity: str,
-        available_teams: Dict[str, Any],
+        available_teams: dict[str, Any],
     ) -> Optional[str]:
         """Select team using hybrid approach."""
         # Try learning first (if learner has data)
@@ -442,9 +435,9 @@ class HybridTeamSelector:
         self,
         task_type: str,
         complexity: str,
-        available_teams: Dict[str, Any],
+        available_teams: dict[str, Any],
         top_k: int = 3,
-    ) -> List[TeamRecommendation]:
+    ) -> list[TeamRecommendation]:
         """Recommend teams using hybrid approach."""
         # Get recommendations from both
         rule_recs = self._rule_selector.recommend(task_type, complexity, available_teams, top_k)
@@ -453,7 +446,7 @@ class HybridTeamSelector:
         )
 
         # Blend recommendations
-        combined: Dict[str, TeamRecommendation] = {}
+        combined: dict[str, TeamRecommendation] = {}
 
         for rec in rule_recs:
             combined[rec.team_name] = TeamRecommendation(
@@ -505,7 +498,7 @@ class RuleBasedWorkflowSelector:
     """
 
     # Task type to workflow mapping
-    TASK_WORKFLOW_PATTERNS: Dict[str, List[str]] = {
+    TASK_WORKFLOW_PATTERNS: dict[str, list[str]] = {
         "feature": ["feature_implementation", "quick_feature"],
         "bugfix": ["bug_fix", "quick_fix"],
         "bug": ["bug_fix", "quick_fix"],
@@ -518,7 +511,7 @@ class RuleBasedWorkflowSelector:
         self,
         task_type: str,
         mode: str,
-        available_workflows: Dict[str, Any],
+        available_workflows: dict[str, Any],
     ) -> Optional[str]:
         """Select workflow based on task type and mode."""
         task_lower = task_type.lower()
@@ -536,9 +529,9 @@ class RuleBasedWorkflowSelector:
         self,
         task_type: str,
         mode: str,
-        available_workflows: Dict[str, Any],
+        available_workflows: dict[str, Any],
         top_k: int = 3,
-    ) -> List[WorkflowRecommendation]:
+    ) -> list[WorkflowRecommendation]:
         """Recommend workflows with confidence."""
         recommendations = []
         task_lower = task_type.lower()
@@ -606,7 +599,7 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         vertical_context: Optional["VerticalContext"] = None,
         team_selector: Optional[Any] = None,
         workflow_selector: Optional[Any] = None,
-        mode_configs: Optional[Dict[str, ModeCoordinationConfig]] = None,
+        mode_configs: Optional[dict[str, ModeCoordinationConfig]] = None,
     ):
         """Initialize coordinator.
 
@@ -673,7 +666,7 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         action = self.get_action_for_complexity(complexity, mode)
 
         # Get team recommendations if enabled
-        team_recommendations: List[TeamRecommendation] = []
+        team_recommendations: list[TeamRecommendation] = []
         if mode_config.team_suggestion_enabled:
             team_recommendations = self.get_suggested_teams(task_type, complexity)
 
@@ -726,7 +719,7 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         self,
         task_type: str,
         complexity: str,
-    ) -> List[TeamRecommendation]:
+    ) -> list[TeamRecommendation]:
         """Get team suggestions for a task.
 
         Args:
@@ -780,7 +773,7 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
 
         return default_actions.get(complexity_level, TeamSuggestionAction.NONE)
 
-    def _get_available_teams(self) -> Dict[str, Any]:
+    def _get_available_teams(self) -> dict[str, Any]:
         """Get available team specs from context.
 
         Returns:
@@ -790,7 +783,7 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
             return self._vertical_context.team_specs or {}
         return {}
 
-    def _get_available_workflows(self) -> Dict[str, Any]:
+    def _get_available_workflows(self) -> dict[str, Any]:
         """Get available workflows from context.
 
         Returns:
@@ -804,7 +797,7 @@ class ModeWorkflowTeamCoordinator(ModeWorkflowTeamCoordinatorProtocol):
         self,
         task_type: str,
         mode: str,
-    ) -> List[WorkflowRecommendation]:
+    ) -> list[WorkflowRecommendation]:
         """Get workflow recommendations.
 
         Args:

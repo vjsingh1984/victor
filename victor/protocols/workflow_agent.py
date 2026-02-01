@@ -23,7 +23,7 @@ Phase 2 of decoupling workflows from AgentOrchestrator implementation details.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 @runtime_checkable

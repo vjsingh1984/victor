@@ -15,8 +15,6 @@
 """Tests for VerticalBase class - LSP compliance and core functionality."""
 
 import pytest
-from typing import List
-from unittest.mock import patch, MagicMock
 
 from victor.core.verticals.base import VerticalBase, VerticalConfig
 
@@ -28,7 +26,7 @@ class ConcreteVertical(VerticalBase):
     description = "A test vertical for unit testing"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read", "write", "grep"]
 
     @classmethod
@@ -84,7 +82,7 @@ class TestGetExtensionsLSPCompliance:
             description = "A vertical that fails during extension loading"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read"]
 
             @classmethod
@@ -117,7 +115,6 @@ class TestGetExtensionsLSPCompliance:
 
         All fields should have sensible defaults (empty lists, None for optionals).
         """
-        from victor.core.verticals.protocols import VerticalExtensions
 
         extensions = ConcreteVertical.get_extensions(use_cache=False)
 
@@ -173,7 +170,7 @@ class TestGetExtensionsLSPCompliance:
             description = "Another test vertical"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read"]
 
             @classmethod
@@ -250,7 +247,7 @@ class TestGetCachedExtension:
             description = "Another"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return []
 
             @classmethod
@@ -359,7 +356,7 @@ class TestStrictExtensionLoading:
             strict_extension_loading = True  # Enable strict mode at class level
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read"]
 
             @classmethod
@@ -392,7 +389,7 @@ class TestStrictExtensionLoading:
             strict_extension_loading = False  # Disabled at class level
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read"]
 
             @classmethod
@@ -433,7 +430,7 @@ class TestStrictExtensionLoading:
             required_extensions = {"safety"}  # Safety is required
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read"]
 
             @classmethod
@@ -466,7 +463,7 @@ class TestStrictExtensionLoading:
             strict_extension_loading = False
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read", "write"]
 
             @classmethod
@@ -561,7 +558,7 @@ class TestStrictExtensionLoading:
             strict_extension_loading = True  # All failures are critical
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read"]
 
             @classmethod

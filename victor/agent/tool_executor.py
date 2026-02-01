@@ -26,7 +26,7 @@ import asyncio
 import logging
 import time
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from typing import TYPE_CHECKING
 
@@ -146,7 +146,7 @@ class ToolExecutionResult:
         self.correlation_id = correlation_id
         self.error_info = error_info
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization/logging.
 
         Returns:
@@ -216,7 +216,7 @@ class ToolExecutor:
         max_retries: int = 3,
         retry_delay: float = 1.0,
         retry_strategy: Optional[BaseRetryStrategy] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         code_correction_middleware: Optional["CodeCorrectionMiddleware"] = None,
         enable_code_correction: bool = False,
         validation_mode: ValidationMode = ValidationMode.LENIENT,
@@ -265,10 +265,10 @@ class ToolExecutor:
         self._tool_call_tracer = tool_call_tracer  # Tool call tracer for debugging
 
         # Execution statistics
-        self._stats: Dict[str, Dict[str, Any]] = {}
-        self._failed_signatures: set[Tuple[str, str]] = set()
+        self._stats: dict[str, dict[str, Any]] = {}
+        self._failed_signatures: set[tuple[str, str]] = set()
         self._validation_failures: int = 0  # Track validation failures for metrics
-        self._errors_by_category: Dict[str, int] = {}  # Track errors by category
+        self._errors_by_category: dict[str, int] = {}  # Track errors by category
 
     def update_context(self, **kwargs: Any) -> None:
         """Update the shared context passed to tools."""
@@ -296,7 +296,7 @@ class ToolExecutor:
         self,
         tool: BaseTool,
         tool_name: str,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, Optional[str]]:
         """Check RBAC permissions for tool execution.
 
         Uses the tool's declared access_mode and category to determine
@@ -341,8 +341,8 @@ class ToolExecutor:
     def _check_unknown_arguments(
         self,
         tool: BaseTool,
-        arguments: Dict[str, Any],
-    ) -> Tuple[bool, List[str]]:
+        arguments: dict[str, Any],
+    ) -> tuple[bool, list[str]]:
         """Check for unknown/hallucinated arguments before execution.
 
         This provides clear, actionable error messages when models invent
@@ -376,8 +376,8 @@ class ToolExecutor:
     def _validate_arguments(
         self,
         tool: BaseTool,
-        arguments: Dict[str, Any],
-    ) -> Tuple[bool, Optional[ToolValidationResult]]:
+        arguments: dict[str, Any],
+    ) -> tuple[bool, Optional[ToolValidationResult]]:
         """Validate tool arguments against JSON Schema before execution.
 
         Performs pre-execution validation based on the configured validation_mode:
@@ -466,9 +466,9 @@ class ToolExecutor:
     async def execute(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         skip_cache: bool = False,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         skip_normalization: bool = False,
         parent_span_id: Optional[str] = None,  # For linking to execution spans
     ) -> ToolExecutionResult:
@@ -679,7 +679,7 @@ class ToolExecutor:
             error_info=error_info,
         )
 
-    def _run_before_hooks(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def _run_before_hooks(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Run before hooks for a tool execution.
 
         Args:
@@ -732,7 +732,7 @@ class ToolExecutor:
         tool_name: str,
         success: bool,
         execution_time: float,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         """Emit RL event for tool execution to activate tool_selector learner.
 
@@ -795,9 +795,9 @@ class ToolExecutor:
     async def _execute_with_retry(
         self,
         tool: BaseTool,
-        arguments: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Tuple[Any, bool, Optional[str], int, Optional[ErrorInfo]]:
+        arguments: dict[str, Any],
+        context: dict[str, Any],
+    ) -> tuple[Any, bool, Optional[str], int, Optional[ErrorInfo]]:
         """Execute a tool with retry logic from unified BaseRetryStrategy.
 
         Uses the configured retry strategy for exponential backoff and
@@ -979,7 +979,7 @@ class ToolExecutor:
         key = category.value
         self._errors_by_category[key] = self._errors_by_category.get(key, 0) + 1
 
-    def has_failed_before(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
+    def has_failed_before(self, tool_name: str, arguments: dict[str, Any]) -> bool:
         """Check if this exact tool call has failed before."""
         sig = (tool_name, str(sorted(arguments.items())))
         return sig in self._failed_signatures
@@ -988,7 +988,7 @@ class ToolExecutor:
         """Clear the record of failed tool calls."""
         self._failed_signatures.clear()
 
-    def get_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_stats(self) -> dict[str, dict[str, Any]]:
         """Get execution statistics for all tools.
 
         Returns:
@@ -1004,7 +1004,7 @@ class ToolExecutor:
         }
         return stats
 
-    def get_error_summary(self) -> Dict[str, Any]:
+    def get_error_summary(self) -> dict[str, Any]:
         """Get a summary of recent errors for debugging.
 
         Returns:
@@ -1024,7 +1024,7 @@ class ToolExecutor:
             ],
         }
 
-    def get_tool_stats(self, tool_name: str) -> Dict[str, Any]:
+    def get_tool_stats(self, tool_name: str) -> dict[str, Any]:
         """Get execution statistics for a specific tool."""
         return self._stats.get(tool_name, {}).copy()
 
@@ -1032,7 +1032,7 @@ class ToolExecutor:
         """Reset all execution statistics."""
         self._stats.clear()
 
-    def invalidate_cache_for_paths(self, paths: List[str]) -> None:
+    def invalidate_cache_for_paths(self, paths: list[str]) -> None:
         """Invalidate cache entries for modified paths.
 
         Called when files are modified to ensure stale cache is cleared.
@@ -1048,7 +1048,7 @@ class ToolExecutor:
         if self.cache:
             self.cache.clear_all()
 
-    def _invalidate_cache_for_write_tool(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def _invalidate_cache_for_write_tool(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Invalidate cache entries affected by write operations.
 
         Args:
@@ -1059,7 +1059,7 @@ class ToolExecutor:
             return
 
         # Extract paths from arguments based on tool type
-        paths_to_invalidate: List[str] = []
+        paths_to_invalidate: list[str] = []
 
         if tool_name == "write_file":
             if "path" in arguments:
@@ -1089,13 +1089,13 @@ class ToolExecutor:
 
     async def execute_batch(
         self,
-        tool_calls: List[Tuple[str, Dict[str, Any]]],
+        tool_calls: list[tuple[str, dict[str, Any]]],
         max_concurrency: int = 5,
         skip_cache: bool = False,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         skip_normalization: bool = False,
         group_dependent: bool = True,
-    ) -> List[ToolExecutionResult]:
+    ) -> list[ToolExecutionResult]:
         """Execute multiple tools in parallel with bounded concurrency.
 
         This method provides significant performance improvements for independent
@@ -1140,7 +1140,7 @@ class ToolExecutor:
 
         async def execute_with_semaphore(
             tool_name: str,
-            arguments: Dict[str, Any],
+            arguments: dict[str, Any],
         ) -> ToolExecutionResult:
             """Execute a single tool call with semaphore protection."""
             async with semaphore:
@@ -1153,7 +1153,7 @@ class ToolExecutor:
                 )
 
         # Execute each group sequentially, but tools within group in parallel
-        all_results: List[ToolExecutionResult] = []
+        all_results: list[ToolExecutionResult] = []
 
         for group in independent_groups:
             # Execute all tools in this group in parallel
@@ -1181,8 +1181,8 @@ class ToolExecutor:
 
     def _group_independent_tools(
         self,
-        tool_calls: List[Tuple[str, Dict[str, Any]]],
-    ) -> List[List[Tuple[str, Dict[str, Any]]]]:
+        tool_calls: list[tuple[str, dict[str, Any]]],
+    ) -> list[list[tuple[str, dict[str, Any]]]]:
         """Group tool calls into independent batches.
 
         Tools that modify state (cache-invalidating) cannot be parallelized
@@ -1197,8 +1197,8 @@ class ToolExecutor:
         if not tool_calls:
             return []
 
-        groups: List[List[Tuple[str, Dict[str, Any]]]] = []
-        current_group: List[Tuple[str, Dict[str, Any]]] = []
+        groups: list[list[tuple[str, dict[str, Any]]]] = []
+        current_group: list[tuple[str, dict[str, Any]]] = []
         has_write_tool_in_current_group = False
 
         for tool_name, args in tool_calls:

@@ -41,7 +41,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.core.vertical_types import TaskTypeHint
 
@@ -75,10 +75,10 @@ class PromptExtensions:
         sections = prompt_ext.get_combined_system_prompt_sections()
     """
 
-    prompt_contributors: List[Any] = field(default_factory=list)  # List[PromptContributorProtocol]
+    prompt_contributors: list[Any] = field(default_factory=list)  # List[PromptContributorProtocol]
     enrichment_strategy: Optional[Any] = None  # EnrichmentStrategyProtocol
 
-    def get_all_task_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_all_task_hints(self) -> dict[str, TaskTypeHint]:
         """Merge task hints from all contributors.
 
         Contributors are sorted by priority, and later contributors
@@ -87,7 +87,7 @@ class PromptExtensions:
         Returns:
             Dict mapping task types to their hints
         """
-        merged: Dict[str, TaskTypeHint] = {}
+        merged: dict[str, TaskTypeHint] = {}
         sorted_contributors = sorted(
             self.prompt_contributors,
             key=lambda c: c.get_priority() if hasattr(c, "get_priority") else 50,
@@ -118,7 +118,7 @@ class PromptExtensions:
         Returns:
             Combined system prompt text
         """
-        sections: List[str] = []
+        sections: list[str] = []
         sorted_contributors = sorted(
             self.prompt_contributors,
             key=lambda c: c.get_priority() if hasattr(c, "get_priority") else 50,
@@ -161,7 +161,7 @@ class PromptExtensions:
         self,
         prompt: str,
         context: Any,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Get prompt enrichments if enrichment strategy is configured.
 
         Args:

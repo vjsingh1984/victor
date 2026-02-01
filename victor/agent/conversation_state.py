@@ -89,8 +89,7 @@ Migration Example:
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from victor.tools.metadata_registry import get_tools_by_stage as registry_get_tools_by_stage
 from victor.core.events import ObservabilityBus
@@ -103,13 +102,13 @@ logger = logging.getLogger(__name__)
 
 # Import canonical ConversationStage from victor.core.state (single source of truth)
 # This import enforces layer boundaries - Framework should not depend on Agent
-from victor.core.state import ConversationStage  # noqa: F401
+from victor.core.state import ConversationStage
 
 __all__ = ["ConversationStage"]
 
 
 # Stage ordering for adjacency calculations (since values are strings, not ints)
-STAGE_ORDER: Dict[ConversationStage, int] = {
+STAGE_ORDER: dict[ConversationStage, int] = {
     stage: idx for idx, stage in enumerate(ConversationStage)
 }
 
@@ -119,7 +118,7 @@ STAGE_ORDER: Dict[ConversationStage, int] = {
 # Use registry_get_tools_by_stage() to get tools for a stage.
 
 # Keywords that suggest specific stages
-STAGE_KEYWORDS: Dict[ConversationStage, List[str]] = {
+STAGE_KEYWORDS: dict[ConversationStage, list[str]] = {
     ConversationStage.INITIAL: ["what", "how", "where", "explain", "help", "can you"],
     ConversationStage.PLANNING: ["plan", "approach", "strategy", "design", "architect"],
     ConversationStage.READING: ["show", "read", "look at", "check", "find"],
@@ -154,14 +153,14 @@ class ConversationState:
     """
 
     stage: ConversationStage = ConversationStage.INITIAL
-    tool_history: List[str] = field(default_factory=list)
-    observed_files: Set[str] = field(default_factory=set)
-    modified_files: Set[str] = field(default_factory=set)
+    tool_history: list[str] = field(default_factory=list)
+    observed_files: set[str] = field(default_factory=set)
+    modified_files: set[str] = field(default_factory=set)
     message_count: int = 0
-    last_tools: List[str] = field(default_factory=list)
+    last_tools: list[str] = field(default_factory=list)
     _stage_confidence: float = 0.5
 
-    def record_tool_execution(self, tool_name: str, args: Dict[str, Any]) -> None:
+    def record_tool_execution(self, tool_name: str, args: dict[str, Any]) -> None:
         """Record a tool execution and update state.
 
         Args:
@@ -185,7 +184,7 @@ class ConversationState:
         """Record a new message in the conversation."""
         self.message_count += 1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize the conversation state to a dictionary.
 
         Returns:
@@ -202,7 +201,7 @@ class ConversationState:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ConversationState":
+    def from_dict(cls, data: dict[str, Any]) -> "ConversationState":
         """Restore conversation state from a dictionary.
 
         Args:
@@ -290,7 +289,7 @@ class ConversationStateMachine:
         self._hooks = hooks
         self._track_history = track_history
         self._max_history_size = max_history_size
-        self._transition_history: List[Dict[str, Any]] = []
+        self._transition_history: list[dict[str, Any]] = []
         self._event_bus = event_bus or self._get_default_bus()
         self._state_manager = state_manager  # Optional canonical state manager
 
@@ -360,7 +359,7 @@ class ConversationStateMachine:
         except Exception as e:
             logger.warning(f"Failed to sync state to manager: {e}")
 
-    def record_tool_execution(self, tool_name: str, args: Dict[str, Any]) -> None:
+    def record_tool_execution(self, tool_name: str, args: dict[str, Any]) -> None:
         """Record tool execution and potentially transition stage.
 
         Args:
@@ -402,7 +401,7 @@ class ConversationStateMachine:
         """Backward-compatible alias for orchestrator integrations."""
         return self.get_stage()
 
-    def get_valid_transitions(self) -> List[ConversationStage]:
+    def get_valid_transitions(self) -> list[ConversationStage]:
         """Get list of valid transition targets from current stage.
 
         Returns:
@@ -410,7 +409,7 @@ class ConversationStateMachine:
         """
         if self._transition_engine:
             result = self._transition_engine.get_valid_transitions()
-            return cast(List[ConversationStage], result)
+            return cast(list[ConversationStage], result)
         # Fallback: all stages
         return list(ConversationStage)
 
@@ -430,7 +429,7 @@ class ConversationStateMachine:
         # Fallback: always allow
         return True
 
-    def get_stage_tools(self) -> Set[str]:
+    def get_stage_tools(self) -> set[str]:
         """Get tools relevant to the current stage.
 
         Tools define their stages via @tool(stages=["reading", "execution"]) decorator.
@@ -441,7 +440,7 @@ class ConversationStateMachine:
         """
         return self._get_tools_for_stage(self.state.stage)
 
-    def _get_tools_for_stage(self, stage: ConversationStage) -> Set[str]:
+    def _get_tools_for_stage(self, stage: ConversationStage) -> set[str]:
         """Get tools for a specific stage from the metadata registry.
 
         Tools define their stages via @tool(stages=["reading", "execution"]) decorator.
@@ -456,7 +455,7 @@ class ConversationStateMachine:
         stage_name = stage.name.lower()
         return registry_get_tools_by_stage(stage_name)
 
-    def get_state_summary(self) -> Dict[str, Any]:
+    def get_state_summary(self) -> dict[str, Any]:
         """Get a summary of the current conversation state.
 
         Returns:
@@ -485,7 +484,7 @@ class ConversationStateMachine:
         content_lower = content.lower()
 
         # Score each stage based on keyword matches
-        scores: Dict[ConversationStage, int] = {}
+        scores: dict[ConversationStage, int] = {}
 
         for stage, keywords in STAGE_KEYWORDS.items():
             score = sum(1 for kw in keywords if kw in content_lower)
@@ -511,7 +510,7 @@ class ConversationStateMachine:
             return None
 
         # Score stages based on tool overlap (uses registry + static fallback)
-        scores: Dict[ConversationStage, int] = {}
+        scores: dict[ConversationStage, int] = {}
 
         for stage in ConversationStage:
             stage_tools = self._get_tools_for_stage(stage)
@@ -747,7 +746,7 @@ class ConversationStateMachine:
                     old_stage, new_stage, confidence, current_time, hook_context
                 )
 
-    def _build_hook_context(self, confidence: float) -> Dict[str, Any]:
+    def _build_hook_context(self, confidence: float) -> dict[str, Any]:
         """Build context dictionary for hook callbacks.
 
         Args:
@@ -772,7 +771,7 @@ class ConversationStateMachine:
         new_stage: ConversationStage,
         confidence: float,
         timestamp: float,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         """Record a transition in history.
 
@@ -803,7 +802,7 @@ class ConversationStateMachine:
             self._transition_history.pop(0)
 
     @property
-    def transition_history(self) -> List[Dict[str, Any]]:
+    def transition_history(self) -> list[dict[str, Any]]:
         """Get the transition history.
 
         Returns:
@@ -820,7 +819,7 @@ class ConversationStateMachine:
         """
         return self._transition_count
 
-    def get_transitions_summary(self) -> Dict[str, Any]:
+    def get_transitions_summary(self) -> dict[str, Any]:
         """Get a summary of all transitions.
 
         Returns:
@@ -835,8 +834,8 @@ class ConversationStateMachine:
             }
 
         # Count transitions by path
-        path_counts: Dict[str, int] = {}
-        stage_entries: Dict[str, int] = {}
+        path_counts: dict[str, int] = {}
+        stage_entries: dict[str, int] = {}
         total_confidence = 0.0
 
         for record in self._transition_history:
@@ -934,7 +933,7 @@ class ConversationStateMachine:
 
         return 0.0  # No boost
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize the state machine to a dictionary.
 
         Returns:
@@ -945,7 +944,7 @@ class ConversationStateMachine:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ConversationStateMachine":
+    def from_dict(cls, data: dict[str, Any]) -> "ConversationStateMachine":
         """Restore state machine from a dictionary.
 
         Args:

@@ -16,7 +16,7 @@
 
 import pytest
 import asyncio
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 from victor.agent.stream_handler import (
     StreamHandler,
     StreamResult,

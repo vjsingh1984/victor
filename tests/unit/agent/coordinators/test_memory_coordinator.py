@@ -18,14 +18,11 @@ Tests memory management, context retrieval, session statistics, and recovery.
 """
 
 from unittest.mock import MagicMock
-from typing import Any, Dict
 
 import pytest
 
 from victor.agent.coordinators.memory_coordinator import (
     MemoryCoordinator,
-    MemoryStats,
-    SessionInfo,
     create_memory_coordinator,
 )
 

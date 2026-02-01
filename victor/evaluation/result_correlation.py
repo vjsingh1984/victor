@@ -28,7 +28,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Collection, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.evaluation.test_runners import TestResult
 from victor.evaluation.baseline_validator import (

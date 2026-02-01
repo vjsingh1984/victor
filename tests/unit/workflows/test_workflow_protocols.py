@@ -4,9 +4,7 @@ These tests verify that the workflow protocols are properly defined
 and that implementations can be validated at runtime.
 """
 
-import pytest
-from typing import Any, Dict, List, Optional
-from dataclasses import dataclass
+from typing import Any, Optional
 
 from victor.workflows.protocols import (
     ProtocolNodeStatus,
@@ -114,7 +112,6 @@ class TestIWorkflowNode:
 
     def test_protocol_is_runtime_checkable(self):
         """IWorkflowNode should be runtime checkable."""
-        from typing import runtime_checkable, Protocol
 
         assert hasattr(IWorkflowNode, "__protocol_attrs__") or isinstance(IWorkflowNode, type)
 
@@ -135,7 +132,7 @@ class TestIWorkflowNode:
                 return RetryPolicy()
 
             async def execute(
-                self, state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+                self, state: dict[str, Any], context: Optional[dict[str, Any]] = None
             ) -> NodeResult:
                 return NodeResult(status=ProtocolNodeStatus.COMPLETED, output=state)
 
@@ -171,7 +168,7 @@ class TestIWorkflowEdge:
             def target_id(self) -> str:
                 return "node_2"
 
-            def should_traverse(self, state: Dict[str, Any]) -> bool:
+            def should_traverse(self, state: dict[str, Any]) -> bool:
                 return True
 
         edge = MockEdge()
@@ -189,7 +186,7 @@ class TestIWorkflowEdge:
             def target_id(self) -> str:
                 return "success_node"
 
-            def should_traverse(self, state: Dict[str, Any]) -> bool:
+            def should_traverse(self, state: dict[str, Any]) -> bool:
                 return state.get("success", False)
 
         edge = ConditionalMockEdge()
@@ -216,10 +213,10 @@ class TestIWorkflowGraph:
             def get_entry_node(self) -> Optional[IWorkflowNode]:
                 return None
 
-            def get_next_nodes(self, node_id: str, state: Dict[str, Any]) -> List[IWorkflowNode]:
+            def get_next_nodes(self, node_id: str, state: dict[str, Any]) -> list[IWorkflowNode]:
                 return []
 
-            def validate(self) -> List[str]:
+            def validate(self) -> list[str]:
                 return []
 
         graph = MockGraph()
@@ -237,15 +234,15 @@ class TestICheckpointStore:
                 self,
                 workflow_id: str,
                 checkpoint_id: str,
-                state: Dict[str, Any],
-                metadata: Optional[Dict[str, Any]] = None,
+                state: dict[str, Any],
+                metadata: Optional[dict[str, Any]] = None,
             ) -> None:
                 pass
 
-            async def load(self, workflow_id: str, checkpoint_id: str) -> Optional[Dict[str, Any]]:
+            async def load(self, workflow_id: str, checkpoint_id: str) -> Optional[dict[str, Any]]:
                 return None
 
-            async def list_checkpoints(self, workflow_id: str) -> List[str]:
+            async def list_checkpoints(self, workflow_id: str) -> list[str]:
                 return []
 
             async def delete(self, workflow_id: str, checkpoint_id: str) -> bool:
@@ -265,9 +262,9 @@ class TestIWorkflowExecutor:
             async def execute(
                 self,
                 graph: IWorkflowGraph,
-                initial_state: Dict[str, Any],
+                initial_state: dict[str, Any],
                 checkpoint_store: Optional[ICheckpointStore] = None,
-            ) -> Dict[str, Any]:
+            ) -> dict[str, Any]:
                 return initial_state
 
             async def resume(
@@ -276,7 +273,7 @@ class TestIWorkflowExecutor:
                 checkpoint_store: ICheckpointStore,
                 workflow_id: str,
                 checkpoint_id: str,
-            ) -> Dict[str, Any]:
+            ) -> dict[str, Any]:
                 return {}
 
             def cancel(self) -> None:

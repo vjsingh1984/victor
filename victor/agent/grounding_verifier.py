@@ -45,7 +45,7 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.protocols.provider_adapter import IProviderAdapter
@@ -709,10 +709,10 @@ class GroundingVerificationResult:
 
     is_grounded: bool
     confidence: float
-    issues: List[GroundingIssue] = field(default_factory=list)
-    verified_references: List[str] = field(default_factory=list)
-    unverified_references: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    issues: list[GroundingIssue] = field(default_factory=list)
+    verified_references: list[str] = field(default_factory=list)
+    unverified_references: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def add_issue(self, issue: GroundingIssue) -> None:
         """Add an issue and update confidence."""
@@ -873,7 +873,7 @@ class VerifierConfig:
     verify_code_snippets: bool = True
     verify_symbols: bool = True
     max_files_to_check: int = 20
-    ignore_patterns: List[str] = field(
+    ignore_patterns: list[str] = field(
         default_factory=lambda: [
             "node_modules",
             ".git",
@@ -886,7 +886,7 @@ class VerifierConfig:
     )
     strict_mode: bool = False
     skip_generated_code: bool = True  # Skip verification for generated code
-    generated_code_patterns: List[str] = field(
+    generated_code_patterns: list[str] = field(
         default_factory=lambda: [
             r"test_\w+\.py",  # Test files being created
             r"tests?/",  # Test directories
@@ -962,8 +962,8 @@ class GroundingVerifier:
             )
 
         self.config = config or VerifierConfig()
-        self._file_cache: Dict[str, str] = {}
-        self._existing_files: Optional[Set[str]] = None
+        self._file_cache: dict[str, str] = {}
+        self._existing_files: Optional[set[str]] = None
         self._provider_adapter = provider_adapter
         self._grounding_threshold_learner = grounding_threshold_learner
 
@@ -1048,7 +1048,7 @@ class GroundingVerifier:
         except Exception as e:
             logger.debug(f"RL: Failed to record grounding outcome: {e}")
 
-    def _get_existing_files(self) -> Set[str]:
+    def _get_existing_files(self) -> set[str]:
         """Get set of existing files in project (cached)."""
         if self._existing_files is None:
             self._existing_files = set()
@@ -1089,7 +1089,7 @@ class GroundingVerifier:
             logger.debug(f"Error reading {path}: {e}")
             return None
 
-    def extract_file_references(self, response: str) -> List[str]:
+    def extract_file_references(self, response: str) -> list[str]:
         """Extract file path references from response.
 
         Args:
@@ -1120,7 +1120,7 @@ class GroundingVerifier:
 
         return list(paths)
 
-    def extract_code_snippets(self, response: str) -> List[Dict[str, Any]]:
+    def extract_code_snippets(self, response: str) -> list[dict[str, Any]]:
         """Extract code snippets from response.
 
         Args:
@@ -1142,7 +1142,7 @@ class GroundingVerifier:
                 )
         return snippets
 
-    def extract_symbols(self, response: str) -> List[str]:
+    def extract_symbols(self, response: str) -> list[str]:
         """Extract symbol references (functions, classes) from response.
 
         Args:
@@ -1154,7 +1154,7 @@ class GroundingVerifier:
         matches = self.SYMBOL_PATTERN.findall(response)
         return list(set(matches))
 
-    async def verify_file_paths(self, paths: List[str], result: VerificationResult) -> None:
+    async def verify_file_paths(self, paths: list[str], result: VerificationResult) -> None:
         """Verify file path references exist.
 
         Args:
@@ -1259,7 +1259,7 @@ class GroundingVerifier:
                 )
                 result.unverified_references.append(path)
 
-    def _is_generated_code_context(self, context: Optional[Dict[str, Any]]) -> bool:
+    def _is_generated_code_context(self, context: Optional[dict[str, Any]]) -> bool:
         """Check if the context indicates code generation task.
 
         Args:
@@ -1374,8 +1374,8 @@ class GroundingVerifier:
 
     async def verify_code_snippets(
         self,
-        snippets: List[Dict[str, Any]],
-        file_paths: List[str],
+        snippets: list[dict[str, Any]],
+        file_paths: list[str],
         result: VerificationResult,
         is_code_generation: bool = False,
     ) -> None:
@@ -1548,8 +1548,8 @@ class GroundingVerifier:
 
     async def verify_symbols(
         self,
-        symbols: List[str],
-        file_paths: List[str],
+        symbols: list[str],
+        file_paths: list[str],
         result: VerificationResult,
     ) -> None:
         """Verify symbol references exist in codebase.
@@ -1560,7 +1560,7 @@ class GroundingVerifier:
             result: Verification result to update
         """
         # Build symbol index from referenced files
-        known_symbols: Set[str] = set()
+        known_symbols: set[str] = set()
 
         for path in file_paths:
             content = self._read_file_cached(path)
@@ -1626,7 +1626,7 @@ class GroundingVerifier:
     async def verify(
         self,
         response: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> VerificationResult:
         """Verify a response for grounding.
 

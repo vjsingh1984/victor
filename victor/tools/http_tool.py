@@ -24,7 +24,7 @@ Features:
 """
 
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -35,14 +35,14 @@ from victor.tools.decorators import tool
 async def _make_request(
     method: str,
     url: str,
-    headers: Optional[Dict[str, Any]],
-    params: Optional[Dict[str, Any]],
-    json_body: Optional[Dict[str, Any]],
-    data: Optional[Dict[str, Any]],
+    headers: Optional[dict[str, Any]],
+    params: Optional[dict[str, Any]],
+    json_body: Optional[dict[str, Any]],
+    data: Optional[dict[str, Any]],
     auth: Optional[str],
     follow_redirects: bool,
     timeout: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Internal: Make HTTP request and return response data."""
     method_upper = method.upper()
     request_headers = headers or {}
@@ -83,14 +83,14 @@ async def _make_request(
 async def _http_request(
     method: str,
     url: str,
-    headers: Optional[Dict[str, Any]],
-    params: Optional[Dict[str, Any]],
-    json_body: Optional[Dict[str, Any]],
-    data: Optional[Dict[str, Any]],
+    headers: Optional[dict[str, Any]],
+    params: Optional[dict[str, Any]],
+    json_body: Optional[dict[str, Any]],
+    data: Optional[dict[str, Any]],
     auth: Optional[str],
     follow_redirects: bool,
     timeout: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Internal: Standard HTTP request mode."""
     result = await _make_request(
         method, url, headers, params, json_body, data, auth, follow_redirects, timeout
@@ -111,15 +111,15 @@ async def _http_request(
 async def _http_test(
     method: str,
     url: str,
-    headers: Optional[Dict[str, Any]],
-    params: Optional[Dict[str, Any]],
-    json_body: Optional[Dict[str, Any]],
-    data: Optional[Dict[str, Any]],
+    headers: Optional[dict[str, Any]],
+    params: Optional[dict[str, Any]],
+    json_body: Optional[dict[str, Any]],
+    data: Optional[dict[str, Any]],
     auth: Optional[str],
     follow_redirects: bool,
     timeout: int,
     expected_status: Optional[int],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Internal: API test mode with validation."""
     result = await _make_request(
         method, url, headers, params, json_body, data, auth, follow_redirects, timeout
@@ -167,15 +167,15 @@ async def http(
     method: str,
     url: str,
     mode: str = "request",
-    headers: Optional[Dict[str, Any]] = None,
-    params: Optional[Dict[str, Any]] = None,
-    json: Optional[Dict[str, Any]] = None,
-    data: Optional[Dict[str, Any]] = None,
+    headers: Optional[dict[str, Any]] = None,
+    params: Optional[dict[str, Any]] = None,
+    json: Optional[dict[str, Any]] = None,
+    data: Optional[dict[str, Any]] = None,
     auth: Optional[str] = None,
     follow_redirects: bool = True,
     timeout: int = 30,
     expected_status: Optional[int] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Unified HTTP operations for requests and API testing.
 
     Modes:

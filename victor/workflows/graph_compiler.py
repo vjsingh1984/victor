@@ -54,21 +54,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
     Generic,
-    List,
     Optional,
-    Set,
-    Type,
     TypeVar,
-    Union,
     cast,
 )
+from collections.abc import Callable
 
 from victor.framework.graph import (
     CompiledGraph,
@@ -77,15 +72,12 @@ from victor.framework.graph import (
     Node,
     END,
 )
-from victor.workflows.context import ExecutionContext, create_execution_context
-from victor.workflows.protocols import NodeRunner, NodeRunnerResult
+from victor.workflows.protocols import NodeRunner
 
 if TYPE_CHECKING:
     from victor.workflows.graph_dsl import (
         WorkflowGraph,
         GraphNode,
-        GraphNodeType,
-        State,
     )
     from victor.workflows.definition import WorkflowDefinition, WorkflowNode
     from victor.workflows.node_runners import NodeRunnerRegistry
@@ -148,7 +140,7 @@ class NodeRunnerWrapper:
     def __init__(
         self,
         node_id: str,
-        node_config: Dict[str, Any],
+        node_config: dict[str, Any],
         runner: NodeRunner,
         emitter: Optional[Any] = None,  # ObservabilityEmitter
     ):
@@ -165,7 +157,7 @@ class NodeRunnerWrapper:
         self._runner = runner
         self._emitter = emitter
 
-    async def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    async def __call__(self, state: dict[str, Any]) -> dict[str, Any]:
         """Execute the node via NodeRunner.
 
         Args:
@@ -186,7 +178,7 @@ class NodeRunnerWrapper:
         # Convert state to ExecutionContext if needed
         if "_workflow_id" not in state:
             # Wrap in ExecutionContext structure
-            context: Dict[str, Any] = {
+            context: dict[str, Any] = {
                 "data": state.copy(),
                 "_workflow_id": state.get("_workflow_id", ""),
                 "_current_node": self._node_id,
@@ -226,7 +218,7 @@ class NodeRunnerWrapper:
             if "_workflow_id" not in state:
                 # Return just the data for simple state
                 result = updated_context.get("data", state)
-                return cast(Dict[str, Any], result)
+                return cast(dict[str, Any], result)
             return updated_context
 
         except Exception as e:
@@ -300,7 +292,7 @@ class WorkflowGraphCompiler(Generic[S]):
         from victor.workflows.graph_dsl import GraphNodeType
 
         # Build nodes
-        nodes: Dict[str, Node] = {}
+        nodes: dict[str, Node] = {}
         for node_name, graph_node in graph._nodes.items():
             node_func = self._create_node_function(graph_node, GraphNodeType, graph.state_type)
             nodes[node_name] = Node(
@@ -313,7 +305,7 @@ class WorkflowGraphCompiler(Generic[S]):
             )
 
         # Build edges
-        edges: Dict[str, List[Edge]] = {}
+        edges: dict[str, list[Edge]] = {}
 
         # Normal edges
         for from_node, targets in graph._edges.items():
@@ -343,9 +335,9 @@ class WorkflowGraphCompiler(Generic[S]):
             state_type = graph.state_type
 
             def make_router(
-                r: Callable[[S], str], st: Type[Any]
-            ) -> Callable[[Dict[str, Any]], str]:
-                def wrapped_router(state: Dict[str, Any]) -> str:
+                r: Callable[[S], str], st: type[Any]
+            ) -> Callable[[dict[str, Any]], str]:
+                def wrapped_router(state: dict[str, Any]) -> str:
                     # Convert dict state to typed state for router
                     if hasattr(st, "from_dict"):
                         typed_state = st.from_dict(state)
@@ -379,8 +371,8 @@ class WorkflowGraphCompiler(Generic[S]):
     def _create_node_function(
         self,
         graph_node: "GraphNode[S]",
-        GraphNodeType: Type[Any],
-        state_type: Type[S],
+        GraphNodeType: type[Any],
+        state_type: type[S],
     ) -> Callable[[Any], Any]:
         """Create a node function for CompiledGraph.
 
@@ -410,7 +402,7 @@ class WorkflowGraphCompiler(Generic[S]):
             return noop
 
         # Create wrapper that handles dict <-> typed state conversion
-        async def state_converting_wrapper(state: Dict[str, Any]) -> Dict[str, Any]:
+        async def state_converting_wrapper(state: dict[str, Any]) -> dict[str, Any]:
             # Convert dict to typed state
             if hasattr(state_type, "from_dict"):
                 typed_state: Any = state_type.from_dict(state)
@@ -447,8 +439,8 @@ class WorkflowGraphCompiler(Generic[S]):
     def _extract_node_config(
         self,
         graph_node: "GraphNode[S]",
-        GraphNodeType: Type[Any],
-    ) -> Dict[str, Any]:
+        GraphNodeType: type[Any],
+    ) -> dict[str, Any]:
         """Extract node configuration for NodeRunner.
 
         Args:
@@ -458,7 +450,7 @@ class WorkflowGraphCompiler(Generic[S]):
         Returns:
             Configuration dict for NodeRunner.
         """
-        config: Dict[str, Any] = {
+        config: dict[str, Any] = {
             "type": graph_node.node_type.value,
             "name": graph_node.name,
         }
@@ -534,15 +526,11 @@ class WorkflowDefinitionCompiler:
             CompiledGraph ready for execution.
         """
         from victor.workflows.definition import (
-            AgentNode as DefAgentNode,
-            ComputeNode as DefComputeNode,
             ConditionNode as DefConditionNode,
-            ParallelNode as DefParallelNode,
-            TransformNode as DefTransformNode,
         )
 
-        nodes: Dict[str, Node] = {}
-        edges: Dict[str, List[Edge]] = {}
+        nodes: dict[str, Node] = {}
+        edges: dict[str, list[Edge]] = {}
 
         # Convert nodes
         for node_id, workflow_node in definition.nodes.items():
@@ -615,10 +603,7 @@ class WorkflowDefinitionCompiler:
             Async callable for node execution.
         """
         from victor.workflows.definition import (
-            AgentNode as DefAgentNode,
-            ComputeNode as DefComputeNode,
             ConditionNode as DefConditionNode,
-            ParallelNode as DefParallelNode,
             TransformNode as DefTransformNode,
         )
 
@@ -634,7 +619,7 @@ class WorkflowDefinitionCompiler:
         if isinstance(workflow_node, DefTransformNode):
             transform_fn = workflow_node.transform
 
-            async def transform_exec(state: Dict[str, Any]) -> Dict[str, Any]:
+            async def transform_exec(state: dict[str, Any]) -> dict[str, Any]:
                 result = transform_fn(state)
                 if asyncio.iscoroutine(result):
                     result = await result
@@ -647,13 +632,13 @@ class WorkflowDefinitionCompiler:
         if isinstance(workflow_node, DefConditionNode):
             # Condition nodes just pass through state
             # Routing is handled by edges
-            async def condition_exec(state: Dict[str, Any]) -> Dict[str, Any]:
+            async def condition_exec(state: dict[str, Any]) -> dict[str, Any]:
                 return state
 
             return condition_exec
 
         # Default pass-through
-        async def passthrough(state: Dict[str, Any]) -> Dict[str, Any]:
+        async def passthrough(state: dict[str, Any]) -> dict[str, Any]:
             return state
 
         return passthrough
@@ -680,7 +665,7 @@ class WorkflowDefinitionCompiler:
             return "transform"
         return "unknown"
 
-    def _extract_config(self, workflow_node: "WorkflowNode") -> Dict[str, Any]:
+    def _extract_config(self, workflow_node: "WorkflowNode") -> dict[str, Any]:
         """Extract configuration from workflow node."""
         from victor.workflows.definition import (
             AgentNode as DefAgentNode,
@@ -688,7 +673,7 @@ class WorkflowDefinitionCompiler:
             TransformNode as DefTransformNode,
         )
 
-        config: Dict[str, Any] = {
+        config: dict[str, Any] = {
             "id": workflow_node.id,
             "name": workflow_node.name,
         }

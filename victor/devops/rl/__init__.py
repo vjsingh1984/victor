@@ -38,7 +38,7 @@ class DevOpsRLConfig(BaseRLConfig):
     # default_patience inherited from BaseRLConfig
 
     # Uses canonical ToolNames constants for consistency
-    task_type_mappings: Dict[str, List[str]] = field(
+    task_type_mappings: dict[str, list[str]] = field(
         default_factory=lambda: {
             "deployment": [
                 ToolNames.SHELL,
@@ -59,7 +59,7 @@ class DevOpsRLConfig(BaseRLConfig):
         }
     )
 
-    quality_thresholds: Dict[str, float] = field(
+    quality_thresholds: dict[str, float] = field(
         default_factory=lambda: {
             "deployment": 0.90,  # High bar for deployments
             "containerization": 0.85,
@@ -87,8 +87,8 @@ class DevOpsRLHooks:
     def get_tool_recommendation(
         self,
         task_type: str,
-        available_tools: Optional[List[str]] = None,
-    ) -> List[str]:
+        available_tools: Optional[list[str]] = None,
+    ) -> list[str]:
         config_tools = self._config.get_tools_for_task(task_type)
         if available_tools:
             return [t for t in config_tools if t in available_tools]

@@ -48,7 +48,7 @@ Example:
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 # Re-export core naming utilities from tools module
 from victor.tools.tool_names import (
@@ -87,7 +87,7 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
-def canonicalize_tool_set(tools: Set[str]) -> Set[str]:
+def canonicalize_tool_set(tools: set[str]) -> set[str]:
     """Convert a set of tool names to canonical form.
 
     Transforms all tool names in the set to their canonical (short) form,
@@ -106,7 +106,7 @@ def canonicalize_tool_set(tools: Set[str]) -> Set[str]:
     return {get_canonical_name(t) for t in tools}
 
 
-def canonicalize_tool_dict(mapping: Dict[str, Any]) -> Dict[str, Any]:
+def canonicalize_tool_dict(mapping: dict[str, Any]) -> dict[str, Any]:
     """Canonicalize tool names in dictionary keys.
 
     Transforms all dictionary keys (tool names) to their canonical form.
@@ -125,7 +125,7 @@ def canonicalize_tool_dict(mapping: Dict[str, Any]) -> Dict[str, Any]:
     return {get_canonical_name(k): v for k, v in mapping.items()}
 
 
-def canonicalize_tool_list(tools: List[str]) -> List[str]:
+def canonicalize_tool_list(tools: list[str]) -> list[str]:
     """Convert a list of tool names to canonical form.
 
     Preserves order and duplicates (unlike canonicalize_tool_set).
@@ -145,8 +145,8 @@ def canonicalize_tool_list(tools: List[str]) -> List[str]:
 
 
 def canonicalize_transitions(
-    transitions: Dict[str, List[Tuple[str, float]]],
-) -> Dict[str, List[Tuple[str, float]]]:
+    transitions: dict[str, list[tuple[str, float]]],
+) -> dict[str, list[tuple[str, float]]]:
     """Canonicalize tool names in transition probability mappings.
 
     Transforms both the outer dict keys and the tool names within
@@ -165,7 +165,7 @@ def canonicalize_transitions(
         >>> canonicalize_transitions(transitions)
         {"read": [("edit", 0.4), ("shell", 0.3)]}
     """
-    result: Dict[str, List[Tuple[str, float]]] = {}
+    result: dict[str, list[tuple[str, float]]] = {}
     for tool, next_tools in transitions.items():
         canonical_tool = get_canonical_name(tool)
         canonical_next = [(get_canonical_name(t), p) for t, p in next_tools]
@@ -174,8 +174,8 @@ def canonicalize_transitions(
 
 
 def canonicalize_dependencies(
-    dependencies: List[Any],
-) -> List[Any]:
+    dependencies: list[Any],
+) -> list[Any]:
     """Canonicalize tool names in ToolDependency objects.
 
     Creates new ToolDependency objects with canonical tool names.
@@ -215,10 +215,10 @@ def canonicalize_dependencies(
 
 
 def validate_tool_names(
-    tools: Set[str] | List[str] | Dict[str, Any],
+    tools: set[str] | list[str] | dict[str, Any],
     context: str = "",
     warn: bool = True,
-) -> List[str]:
+) -> list[str]:
     """Validate tool names and optionally warn about legacy names.
 
     Checks all tool names and identifies any that are legacy (non-canonical).
@@ -240,7 +240,7 @@ def validate_tool_names(
         # Logs: "Legacy tool name 'execute_bash' in coding config, use 'shell' instead"
         # Returns: ["execute_bash", "edit_files"]
     """
-    legacy_found: List[str] = []
+    legacy_found: list[str] = []
 
     # Extract tool names based on input type
     if isinstance(tools, dict):
@@ -263,8 +263,8 @@ def validate_tool_names(
 
 
 def get_legacy_names_report(
-    tools: Set[str] | List[str] | Dict[str, Any],
-) -> Dict[str, str]:
+    tools: set[str] | list[str] | dict[str, Any],
+) -> dict[str, str]:
     """Get a report mapping legacy names to their canonical equivalents.
 
     Useful for migration and debugging. Does not log warnings.
@@ -279,7 +279,7 @@ def get_legacy_names_report(
         >>> get_legacy_names_report({"read", "execute_bash", "edit_files"})
         {"execute_bash": "shell", "edit_files": "edit"}
     """
-    result: Dict[str, str] = {}
+    result: dict[str, str] = {}
 
     # Extract tool names based on input type
     if isinstance(tools, dict):

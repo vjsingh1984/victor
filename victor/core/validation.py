@@ -60,18 +60,11 @@ from enum import Enum
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
-    Dict,
-    Generic,
-    List,
     Optional,
-    Pattern,
-    Set,
-    Type,
     TypeVar,
-    Union,
     cast,
 )
+from re import Pattern
 
 from pydantic import (
     AliasChoices,
@@ -127,7 +120,7 @@ class ConfigValidationResult:
     Implements the Result Pattern for handling validation outcomes.
     """
 
-    issues: List[ValidationIssue] = field(default_factory=list)
+    issues: list[ValidationIssue] = field(default_factory=list)
 
     @property
     def is_valid(self) -> bool:
@@ -135,12 +128,12 @@ class ConfigValidationResult:
         return not any(i.severity == ValidationSeverity.ERROR for i in self.issues)
 
     @property
-    def errors(self) -> List[ValidationIssue]:
+    def errors(self) -> list[ValidationIssue]:
         """Get all errors."""
         return [i for i in self.issues if i.severity == ValidationSeverity.ERROR]
 
     @property
-    def warnings(self) -> List[ValidationIssue]:
+    def warnings(self) -> list[ValidationIssue]:
         """Get all warnings."""
         return [i for i in self.issues if i.severity == ValidationSeverity.WARNING]
 
@@ -185,7 +178,7 @@ class ConfigValidationResult:
         self.issues.extend(other.issues)
         return self
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "is_valid": self.is_valid,
@@ -212,7 +205,7 @@ class ValidationRule(ABC):
     """Abstract base for validation rules."""
 
     @abstractmethod
-    def validate(self, value: Any, context: Dict[str, Any]) -> ConfigValidationResult:
+    def validate(self, value: Any, context: dict[str, Any]) -> ConfigValidationResult:
         """Validate a value.
 
         Args:
@@ -230,7 +223,7 @@ class RegexRule(ValidationRule):
 
     def __init__(
         self,
-        pattern: Union[str, Pattern[str]],
+        pattern: str | Pattern[str],
         message: str = "Value does not match expected pattern",
         code: str = "regex_mismatch",
     ) -> None:
@@ -245,7 +238,7 @@ class RegexRule(ValidationRule):
         self._message = message
         self._code = code
 
-    def validate(self, value: Any, context: Dict[str, Any]) -> ConfigValidationResult:
+    def validate(self, value: Any, context: dict[str, Any]) -> ConfigValidationResult:
         """Validate value matches pattern."""
         result = ConfigValidationResult()
 
@@ -282,7 +275,7 @@ class RangeRule(ValidationRule):
         self._max = max_value
         self._exclusive = exclusive
 
-    def validate(self, value: Any, context: Dict[str, Any]) -> ConfigValidationResult:
+    def validate(self, value: Any, context: dict[str, Any]) -> ConfigValidationResult:
         """Validate value is in range."""
         result = ConfigValidationResult()
 
@@ -313,7 +306,7 @@ class EnumRule(ValidationRule):
 
     def __init__(
         self,
-        allowed: Set[Any],
+        allowed: set[Any],
         case_insensitive: bool = False,
     ) -> None:
         """Initialize enum rule.
@@ -325,7 +318,7 @@ class EnumRule(ValidationRule):
         self._allowed = allowed
         self._case_insensitive = case_insensitive
 
-    def validate(self, value: Any, context: Dict[str, Any]) -> ConfigValidationResult:
+    def validate(self, value: Any, context: dict[str, Any]) -> ConfigValidationResult:
         """Validate value is allowed."""
         result = ConfigValidationResult()
 
@@ -369,7 +362,7 @@ class PathRule(ValidationRule):
         self._must_be_dir = must_be_dir
         self._writable = writable
 
-    def validate(self, value: Any, context: Dict[str, Any]) -> ConfigValidationResult:
+    def validate(self, value: Any, context: dict[str, Any]) -> ConfigValidationResult:
         """Validate path."""
         result = ConfigValidationResult()
 
@@ -403,7 +396,7 @@ class DependencyRule(ValidationRule):
 
     def __init__(
         self,
-        required_if: Dict[str, Any],
+        required_if: dict[str, Any],
         message: Optional[str] = None,
     ) -> None:
         """Initialize dependency rule.
@@ -415,7 +408,7 @@ class DependencyRule(ValidationRule):
         self._required_if = required_if
         self._message = message
 
-    def validate(self, value: Any, context: Dict[str, Any]) -> ConfigValidationResult:
+    def validate(self, value: Any, context: dict[str, Any]) -> ConfigValidationResult:
         """Validate dependencies."""
         result = ConfigValidationResult()
 
@@ -628,11 +621,11 @@ class ModeConfigSchema(BaseModel):
     tool_budget: int = Field(default=15, ge=1, le=500)
     max_iterations: int = Field(default=10, ge=1, le=500)
     exploration_multiplier: float = Field(default=1.0, ge=0.1, le=10.0)
-    allowed_tools: Optional[Set[Any]] = None
+    allowed_tools: Optional[set[Any]] = None
 
     @field_validator("allowed_tools", mode="before")
     @classmethod
-    def convert_list_to_set(cls, v: Any) -> Optional[Set[str]]:
+    def convert_list_to_set(cls, v: Any) -> Optional[set[str]]:
         """Convert list to set for allowed_tools."""
         if v is None:
             return None
@@ -679,19 +672,19 @@ class ModeDefinitionSchema(BaseModel):
     exploration_multiplier: float = Field(default=1.0, ge=0.1, le=10.0)
 
     # Tool access
-    allowed_tools: Optional[Set[Any]] = None
-    disallowed_tools: Optional[Set[Any]] = None
+    allowed_tools: Optional[set[Any]] = None
+    disallowed_tools: Optional[set[Any]] = None
 
     # Stage controls
-    allowed_stages: List[str] = Field(default_factory=list)
-    priority_tools: List[str] = Field(default_factory=list)
+    allowed_stages: list[str] = Field(default_factory=list)
+    priority_tools: list[str] = Field(default_factory=list)
 
     # Limits
     max_files_per_operation: int = Field(default=10, ge=1, le=100)
     max_context_chars: int = Field(default=100000, ge=1000, le=500000)
 
     # Additional config
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_tool_sets_disjoint(self) -> "ModeDefinitionSchema":
@@ -704,7 +697,7 @@ class ModeDefinitionSchema(BaseModel):
 
     @field_validator("allowed_tools", "disallowed_tools", mode="before")
     @classmethod
-    def convert_to_set(cls, v: Any) -> Optional[Set[str]]:
+    def convert_to_set(cls, v: Any) -> Optional[set[str]]:
         """Convert list to set for tool sets."""
         if v is None:
             return None
@@ -741,17 +734,17 @@ class VerticalModeConfigSchema(BaseModel):
     """
 
     vertical_name: str = Field(min_length=1, max_length=50)
-    modes: Dict[str, ModeDefinitionSchema] = Field(default_factory=dict)
-    task_budgets: Dict[str, int] = Field(default_factory=dict)
+    modes: dict[str, ModeDefinitionSchema] = Field(default_factory=dict)
+    task_budgets: dict[str, int] = Field(default_factory=dict)
     default_mode: str = Field(default="standard", min_length=1, max_length=50)
     default_budget: int = Field(default=10, ge=1, le=500)
 
     @field_validator("task_budgets", mode="before")
     @classmethod
-    def validate_task_budgets(cls, v: Any) -> Dict[str, int]:
+    def validate_task_budgets(cls, v: Any) -> dict[str, int]:
         """Validate task budget values are within range."""
         if not isinstance(v, dict):
-            return cast(Dict[str, int], v)
+            return cast(dict[str, int], v)
         for task, budget in v.items():
             if not isinstance(budget, int):
                 raise ValueError(f"Budget for task '{task}' must be an integer")
@@ -759,7 +752,7 @@ class VerticalModeConfigSchema(BaseModel):
                 raise ValueError(
                     f"Budget for task '{task}' must be between 1 and 500, got {budget}"
                 )
-        return cast(Dict[str, int], v)
+        return cast(dict[str, int], v)
 
     model_config = {"extra": "forbid"}
 
@@ -781,7 +774,7 @@ class ConfigValidator:
 
     def __init__(self) -> None:
         """Initialize validator."""
-        self._custom_rules: Dict[str, List[ValidationRule]] = {}
+        self._custom_rules: dict[str, list[ValidationRule]] = {}
 
     def add_rule(
         self,
@@ -804,8 +797,8 @@ class ConfigValidator:
 
     def validate(
         self,
-        data: Dict[str, Any],
-        schema: Type[T],
+        data: dict[str, Any],
+        schema: type[T],
     ) -> ConfigValidationResult:
         """Validate data against schema.
 
@@ -843,7 +836,7 @@ class ConfigValidator:
 
         return result
 
-    def _get_nested(self, data: Dict[str, Any], path: str) -> Any:
+    def _get_nested(self, data: dict[str, Any], path: str) -> Any:
         """Get nested value by dot-separated path."""
         parts = path.split(".")
         current: Any = data
@@ -878,7 +871,7 @@ class ConfigurationBuilder:
 
     def __init__(self) -> None:
         """Initialize builder."""
-        self._config: Dict[str, Any] = {
+        self._config: dict[str, Any] = {
             "provider": {},
             "model": {},
         }
@@ -918,27 +911,27 @@ class ConfigurationBuilder:
         self._config["model"]["max_tokens"] = tokens
         return self
 
-    def with_tools(self, config: Dict[str, Any]) -> "ConfigurationBuilder":
+    def with_tools(self, config: dict[str, Any]) -> "ConfigurationBuilder":
         """Set tool configuration."""
         self._config["tools"] = config
         return self
 
-    def with_cache(self, config: Dict[str, Any]) -> "ConfigurationBuilder":
+    def with_cache(self, config: dict[str, Any]) -> "ConfigurationBuilder":
         """Set cache configuration."""
         self._config["cache"] = config
         return self
 
-    def with_resilience(self, config: Dict[str, Any]) -> "ConfigurationBuilder":
+    def with_resilience(self, config: dict[str, Any]) -> "ConfigurationBuilder":
         """Set resilience configuration."""
         self._config["resilience"] = config
         return self
 
-    def with_observability(self, config: Dict[str, Any]) -> "ConfigurationBuilder":
+    def with_observability(self, config: dict[str, Any]) -> "ConfigurationBuilder":
         """Set observability configuration."""
         self._config["observability"] = config
         return self
 
-    def build(self) -> Dict[str, Any]:
+    def build(self) -> dict[str, Any]:
         """Build the configuration dictionary."""
         return self._config.copy()
 
@@ -959,7 +952,7 @@ class ConfigurationBuilder:
 # =============================================================================
 
 
-def validate_provider_config(config: Dict[str, Any]) -> ConfigValidationResult:
+def validate_provider_config(config: dict[str, Any]) -> ConfigValidationResult:
     """Validate provider configuration.
 
     Args:
@@ -972,7 +965,7 @@ def validate_provider_config(config: Dict[str, Any]) -> ConfigValidationResult:
     return validator.validate(config, ProviderConfigSchema)
 
 
-def validate_model_config(config: Dict[str, Any]) -> ConfigValidationResult:
+def validate_model_config(config: dict[str, Any]) -> ConfigValidationResult:
     """Validate model configuration.
 
     Args:
@@ -985,7 +978,7 @@ def validate_model_config(config: Dict[str, Any]) -> ConfigValidationResult:
     return validator.validate(config, ModelConfigSchema)
 
 
-def validate_agent_config(config: Dict[str, Any]) -> ConfigValidationResult:
+def validate_agent_config(config: dict[str, Any]) -> ConfigValidationResult:
     """Validate complete agent configuration.
 
     Args:
@@ -998,7 +991,7 @@ def validate_agent_config(config: Dict[str, Any]) -> ConfigValidationResult:
     return validator.validate(config, AgentConfigSchema)
 
 
-def validate_mode_config_dict(config: Dict[str, Any]) -> ModeConfigSchema:
+def validate_mode_config_dict(config: dict[str, Any]) -> ModeConfigSchema:
     """Validate and create ModeConfigSchema from dict.
 
     Args:
@@ -1013,7 +1006,7 @@ def validate_mode_config_dict(config: Dict[str, Any]) -> ModeConfigSchema:
     return ModeConfigSchema.model_validate(config)
 
 
-def validate_mode_definition_dict(definition: Dict[str, Any]) -> ModeDefinitionSchema:
+def validate_mode_definition_dict(definition: dict[str, Any]) -> ModeDefinitionSchema:
     """Validate and create ModeDefinitionSchema from dict.
 
     Args:
@@ -1028,7 +1021,7 @@ def validate_mode_definition_dict(definition: Dict[str, Any]) -> ModeDefinitionS
     return ModeDefinitionSchema.model_validate(definition)
 
 
-def validate_vertical_mode_config_dict(config: Dict[str, Any]) -> VerticalModeConfigSchema:
+def validate_vertical_mode_config_dict(config: dict[str, Any]) -> VerticalModeConfigSchema:
     """Validate and create VerticalModeConfigSchema from dict.
 
     Args:

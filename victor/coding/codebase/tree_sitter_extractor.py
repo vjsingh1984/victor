@@ -23,17 +23,15 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 from tree_sitter import Query, QueryCursor
 
-from victor.coding.languages.base import TreeSitterQueries
 from victor.coding.languages.registry import LanguageRegistry, get_language_registry
 
 if TYPE_CHECKING:
-    from tree_sitter import Language, Node, Parser, Tree
+    from tree_sitter import Node, Parser, Tree
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +102,8 @@ class TreeSitterExtractor:
         self.registry = registry or get_language_registry()
         if auto_discover and not self.registry._plugins:
             self.registry.discover_plugins()
-        self._parsers: Dict[str, "Parser"] = {}
-        self._query_cache: Dict[Tuple[str, str], Query] = {}
+        self._parsers: dict[str, "Parser"] = {}
+        self._query_cache: dict[tuple[str, str], Query] = {}
 
     def _get_parser(self, language: str) -> Optional["Parser"]:
         """Get tree-sitter parser for a language.
@@ -129,7 +127,7 @@ class TreeSitterExtractor:
             logger.debug(f"Could not get parser for {language}: {e}")
             return None
 
-    def _run_query(self, tree: "Tree", query_src: str, parser: "Parser") -> Dict[str, List["Node"]]:
+    def _run_query(self, tree: "Tree", query_src: str, parser: "Parser") -> dict[str, list["Node"]]:
         """Run a tree-sitter query using the new QueryCursor API.
 
         Args:
@@ -171,7 +169,7 @@ class TreeSitterExtractor:
 
     def extract_symbols(
         self, file_path: Path, language: Optional[str] = None
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract symbols from a file using registered queries.
 
         Args:
@@ -206,7 +204,7 @@ class TreeSitterExtractor:
             logger.debug(f"Failed to parse {file_path}: {e}")
             return []
 
-        symbols: List[ExtractedSymbol] = []
+        symbols: list[ExtractedSymbol] = []
         relative_path = str(file_path)
 
         for pattern in queries.symbols:
@@ -271,7 +269,7 @@ class TreeSitterExtractor:
 
     def extract_call_edges(
         self, file_path: Path, language: Optional[str] = None
-    ) -> List[ExtractedEdge]:
+    ) -> list[ExtractedEdge]:
         """Extract caller->callee edges from a file.
 
         Args:
@@ -307,7 +305,7 @@ class TreeSitterExtractor:
             return []
 
         relative_path = str(file_path)
-        edges: List[ExtractedEdge] = []
+        edges: list[ExtractedEdge] = []
 
         captures = self._run_query(tree, queries.calls, parser)
         for capture_name, nodes in captures.items():
@@ -331,7 +329,7 @@ class TreeSitterExtractor:
 
     def extract_inheritance_edges(
         self, file_path: Path, language: Optional[str] = None
-    ) -> List[ExtractedEdge]:
+    ) -> list[ExtractedEdge]:
         """Extract class inheritance edges from a file.
 
         Args:
@@ -367,7 +365,7 @@ class TreeSitterExtractor:
             return []
 
         relative_path = str(file_path)
-        edges: List[ExtractedEdge] = []
+        edges: list[ExtractedEdge] = []
 
         captures = self._run_query(tree, queries.inheritance, parser)
 
@@ -396,7 +394,7 @@ class TreeSitterExtractor:
 
     def extract_implements_edges(
         self, file_path: Path, language: Optional[str] = None
-    ) -> List[ExtractedEdge]:
+    ) -> list[ExtractedEdge]:
         """Extract interface implementation edges from a file.
 
         Args:
@@ -432,7 +430,7 @@ class TreeSitterExtractor:
             return []
 
         relative_path = str(file_path)
-        edges: List[ExtractedEdge] = []
+        edges: list[ExtractedEdge] = []
 
         captures = self._run_query(tree, queries.implements, parser)
 
@@ -458,7 +456,7 @@ class TreeSitterExtractor:
 
     def extract_composition_edges(
         self, file_path: Path, language: Optional[str] = None
-    ) -> List[ExtractedEdge]:
+    ) -> list[ExtractedEdge]:
         """Extract composition/has-a relationship edges from a file.
 
         Args:
@@ -494,7 +492,7 @@ class TreeSitterExtractor:
             return []
 
         relative_path = str(file_path)
-        edges: List[ExtractedEdge] = []
+        edges: list[ExtractedEdge] = []
 
         captures = self._run_query(tree, queries.composition, parser)
 
@@ -520,7 +518,7 @@ class TreeSitterExtractor:
 
     def extract_references(
         self, file_path: Path, language: Optional[str] = None
-    ) -> List[ExtractedReference]:
+    ) -> list[ExtractedReference]:
         """Extract all identifier references from a file.
 
         This is useful for building "find references" functionality and
@@ -559,7 +557,7 @@ class TreeSitterExtractor:
             return []
 
         relative_path = str(file_path)
-        references: List[ExtractedReference] = []
+        references: list[ExtractedReference] = []
 
         captures = self._run_query(tree, queries.references, parser)
         for capture_name, nodes in captures.items():
@@ -582,7 +580,7 @@ class TreeSitterExtractor:
 
     def extract_all(
         self, file_path: Path, language: Optional[str] = None
-    ) -> Tuple[List[ExtractedSymbol], List[ExtractedEdge]]:
+    ) -> tuple[list[ExtractedSymbol], list[ExtractedEdge]]:
         """Extract all symbols and edges from a file.
 
         This is the main entry point for comprehensive file analysis.
@@ -620,8 +618,8 @@ class TreeSitterExtractor:
             return [], []
 
         relative_path = str(file_path)
-        symbols: List[ExtractedSymbol] = []
-        edges: List[ExtractedEdge] = []
+        symbols: list[ExtractedSymbol] = []
+        edges: list[ExtractedEdge] = []
 
         # Extract symbols using cached tree
         if queries.symbols:
@@ -765,7 +763,7 @@ class TreeSitterExtractor:
 
     def extract_all_with_references(
         self, file_path: Path, language: Optional[str] = None
-    ) -> Tuple[List[ExtractedSymbol], List[ExtractedEdge], List[ExtractedReference]]:
+    ) -> tuple[list[ExtractedSymbol], list[ExtractedEdge], list[ExtractedReference]]:
         """Extract all symbols, edges, and references from a file.
 
         Extended version of extract_all that also includes references.
@@ -789,7 +787,7 @@ class TreeSitterExtractor:
         return symbols, edges, references
 
     def _find_enclosing_symbol(
-        self, node: "Node", enclosing_scopes: List[Tuple[str, str]]
+        self, node: "Node", enclosing_scopes: list[tuple[str, str]]
     ) -> Optional[str]:
         """Find the name of the enclosing function/method for a node.
 

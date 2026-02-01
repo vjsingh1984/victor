@@ -17,8 +17,8 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
-from functools import lru_cache
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional
+from collections.abc import Callable
 
 # Try to import Rust native Graph class
 try:
@@ -54,8 +54,8 @@ class Graph:
     directed: bool
     node_count: int
     edge_count: int
-    edges: List[Tuple[int, int, float]]
-    adjacency: Dict[int, List[Tuple[int, float]]]
+    edges: list[tuple[int, int, float]]
+    adjacency: dict[int, list[tuple[int, float]]]
 
 
 @dataclass
@@ -69,10 +69,10 @@ class CentralityScores:
         degree: Degree centrality scores
     """
 
-    pagerank: List[float]
-    betweenness: List[float]
-    closeness: List[float]
-    degree: List[float]
+    pagerank: list[float]
+    betweenness: list[float]
+    closeness: list[float]
+    degree: list[float]
 
 
 @dataclass
@@ -85,7 +85,7 @@ class PathResult:
         hops: Number of hops in the path
     """
 
-    path: List[int]
+    path: list[int]
     distance: float
     hops: int
 
@@ -103,7 +103,7 @@ def _time_function(func: Callable[..., Any]) -> Callable:
     return wrapper
 
 
-def _get_graph_info(graph: Union[Graph, Any]) -> Dict[str, Any]:
+def _get_graph_info(graph: Graph | Any) -> dict[str, Any]:
     """Extract graph information from either custom Graph or NetworkX graph.
 
     Args:
@@ -162,7 +162,7 @@ class GraphAlgorithmsAccelerator:
             force_python: If True, force Python fallback even if Rust is available
         """
         self._use_rust = _RUST_AVAILABLE and not force_python
-        self._graph_cache: Dict[str, Any] = {}
+        self._graph_cache: dict[str, Any] = {}
         self._cache_lock = threading.Lock()
         self._cache_ttl = 3600  # 1 hour TTL
 
@@ -178,10 +178,10 @@ class GraphAlgorithmsAccelerator:
 
     def create_graph(
         self,
-        edge_list: List[Tuple[int, int, float]],
+        edge_list: list[tuple[int, int, float]],
         node_count: int,
         directed: bool = True,
-    ) -> Union[Graph, Any]:
+    ) -> Graph | Any:
         """Create graph from edge list.
 
         Args:
@@ -242,7 +242,7 @@ class GraphAlgorithmsAccelerator:
                 )
 
         # Build custom Graph for Rust backend
-        adjacency: Dict[int, List[Tuple[int, float]]] = {i: [] for i in range(node_count)}
+        adjacency: dict[int, list[tuple[int, float]]] = {i: [] for i in range(node_count)}
         for src, tgt, weight in edge_list:
             adjacency[src].append((tgt, weight))
             if not directed:
@@ -266,11 +266,11 @@ class GraphAlgorithmsAccelerator:
     @_time_function
     def pagerank(
         self,
-        graph: Union[Graph, Any],
+        graph: Graph | Any,
         damping_factor: float = 0.85,
         iterations: int = 100,
         tolerance: Optional[float] = None,
-    ) -> List[float]:
+    ) -> list[float]:
         """Compute PageRank scores.
 
         Args:
@@ -328,10 +328,10 @@ class GraphAlgorithmsAccelerator:
 
     def _python_pagerank(
         self,
-        graph: Union[Graph, Any],
+        graph: Graph | Any,
         damping_factor: float,
         iterations: int,
-    ) -> List[float]:
+    ) -> list[float]:
         """Python fallback for PageRank using NetworkX.
 
         Args:
@@ -385,10 +385,10 @@ class GraphAlgorithmsAccelerator:
     @_time_function
     def shortest_path(
         self,
-        graph: Union[Graph, Any],
+        graph: Graph | Any,
         source: int,
         target: int,
-    ) -> Union[PathResult, List[int]]:
+    ) -> PathResult | list[int]:
         """Find shortest path using Dijkstra's algorithm.
 
         Args:
@@ -439,10 +439,10 @@ class GraphAlgorithmsAccelerator:
 
     def _python_shortest_path(
         self,
-        graph: Union[Graph, Any],
+        graph: Graph | Any,
         source: int,
         target: int,
-    ) -> List[int]:
+    ) -> list[int]:
         """Python fallback for shortest path using NetworkX.
 
         Args:
@@ -487,9 +487,9 @@ class GraphAlgorithmsAccelerator:
     @_time_function
     def betweenness_centrality(
         self,
-        graph: Union[Graph, Any],
+        graph: Graph | Any,
         normalized: bool = True,
-    ) -> List[float]:
+    ) -> list[float]:
         """Compute betweenness centrality (4-6x faster).
 
         Args:
@@ -541,9 +541,9 @@ class GraphAlgorithmsAccelerator:
 
     def _python_betweenness_centrality(
         self,
-        graph: Union[Graph, Any],
+        graph: Graph | Any,
         normalized: bool,
-    ) -> List[float]:
+    ) -> list[float]:
         """Python fallback for betweenness centrality using NetworkX.
 
         Args:
@@ -591,8 +591,8 @@ class GraphAlgorithmsAccelerator:
     @_time_function
     def connected_components(
         self,
-        graph: Union[Graph, Any],
-    ) -> List[List[int]]:
+        graph: Graph | Any,
+    ) -> list[list[int]]:
         """Find connected components.
 
         Args:
@@ -633,8 +633,8 @@ class GraphAlgorithmsAccelerator:
 
     def _python_connected_components(
         self,
-        graph: Union[Graph, Any],
-    ) -> List[List[int]]:
+        graph: Graph | Any,
+    ) -> list[list[int]]:
         """Python fallback for connected components using NetworkX.
 
         Args:
@@ -718,7 +718,7 @@ class GraphAlgorithmsAccelerator:
         self,
         graph: Graph,
         normalized: bool,
-    ) -> List[float]:
+    ) -> list[float]:
         """Compute closeness centrality."""
         try:
             import networkx as nx
@@ -740,7 +740,7 @@ class GraphAlgorithmsAccelerator:
                 "NetworkX is required for Python fallback. " "Install with: pip install networkx"
             )
 
-    def _compute_degree_centrality(self, graph: Graph) -> List[float]:
+    def _compute_degree_centrality(self, graph: Graph) -> list[float]:
         """Compute degree centrality."""
         try:
             import networkx as nx
@@ -768,7 +768,7 @@ class GraphAlgorithmsAccelerator:
             self._graph_cache.clear()
         logger.debug("Graph metrics cache cleared")
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

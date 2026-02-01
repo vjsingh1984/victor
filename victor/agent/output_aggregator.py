@@ -31,8 +31,7 @@ Addresses GAP-6: Missing output consolidation
 Addresses GAP-8: Missing task completion signal
 """
 
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Protocol, List, Dict, Any, Optional, Set
+from typing import TYPE_CHECKING, Protocol, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 import time
@@ -63,7 +62,7 @@ class ToolOutput:
     result: Any
     success: bool = True
     timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     args_hash: str = ""  # Hash of arguments for deduplication
 
     def __post_init__(self) -> None:
@@ -71,7 +70,7 @@ class ToolOutput:
             self.args_hash = self._compute_hash(self.metadata["args"])
 
     @staticmethod
-    def _compute_hash(args: Dict[str, Any]) -> str:
+    def _compute_hash(args: dict[str, Any]) -> str:
         """Compute a hash of tool arguments for deduplication."""
         import json
 
@@ -88,11 +87,11 @@ class AggregatedResult:
     """Result of output aggregation."""
 
     state: AggregationState
-    results: List[ToolOutput] = field(default_factory=list)
+    results: list[ToolOutput] = field(default_factory=list)
     synthesis_prompt: str = ""
     confidence: float = 0.0
     summary: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def tool_count(self) -> int:
@@ -100,7 +99,7 @@ class AggregatedResult:
         return len(self.results)
 
     @property
-    def unique_tools(self) -> Set[str]:
+    def unique_tools(self) -> set[str]:
         """Set of unique tool names used."""
         return {r.tool_name for r in self.results}
 
@@ -150,8 +149,8 @@ class MetricsObserver:
     """Observer that collects aggregation metrics."""
 
     def __init__(self) -> None:
-        self.state_changes: List[tuple[AggregationState, float]] = []
-        self.results_by_tool: Dict[str, int] = {}
+        self.state_changes: list[tuple[AggregationState, float]] = []
+        self.results_by_tool: dict[str, int] = {}
         self.synthesis_count: int = 0
 
     def on_state_change(self, new_state: AggregationState) -> None:
@@ -163,7 +162,7 @@ class MetricsObserver:
     def on_synthesis_ready(self, aggregated: AggregatedResult) -> None:
         self.synthesis_count += 1
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get collected metrics."""
         return {
             "state_transitions": len(self.state_changes),
@@ -197,14 +196,14 @@ class OutputAggregator:
             loop_detection_window: Number of recent results to check for loops
             presentation: Optional presentation adapter for icons (creates default if None)
         """
-        self._results: List[ToolOutput] = []
-        self._observers: List[OutputAggregatorObserver] = []
+        self._results: list[ToolOutput] = []
+        self._observers: list[OutputAggregatorObserver] = []
         self._state = AggregationState.COLLECTING
         self._last_result_time: float = time.time()
         self._max_results = max_results
         self._stale_threshold = stale_threshold_seconds
         self._loop_detection_window = loop_detection_window
-        self._seen_hashes: Set[str] = set()
+        self._seen_hashes: set[str] = set()
         self._logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
         # Lazy init for backward compatibility
@@ -221,7 +220,7 @@ class OutputAggregator:
         return self._state
 
     @property
-    def results(self) -> List[ToolOutput]:
+    def results(self) -> list[ToolOutput]:
         """List of collected results."""
         return list(self._results)
 
@@ -239,7 +238,7 @@ class OutputAggregator:
         tool_name: str,
         result: Any,
         success: bool = True,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """
         Add a tool result to the aggregator.

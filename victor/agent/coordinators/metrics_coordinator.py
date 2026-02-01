@@ -30,7 +30,7 @@ as part of the SOLID refactoring initiative.
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.metrics_collector import MetricsCollector
@@ -103,7 +103,7 @@ class MetricsCoordinator:
         self,
         metrics_collector: "MetricsCollector",
         session_cost_tracker: "SessionCostTracker",
-        cumulative_token_usage: Dict[str, int],
+        cumulative_token_usage: dict[str, int],
     ) -> None:
         """Initialize the metrics coordinator.
 
@@ -122,7 +122,7 @@ class MetricsCoordinator:
     # ========================================================================
 
     def finalize_stream_metrics(
-        self, usage_data: Optional[Dict[str, int]] = None
+        self, usage_data: Optional[dict[str, int]] = None
     ) -> Optional["StreamMetrics"]:
         """Finalize stream metrics at end of streaming session.
 
@@ -161,7 +161,7 @@ class MetricsCoordinator:
         """
         return self._metrics_collector.get_last_stream_metrics()
 
-    def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
+    def get_streaming_metrics_summary(self) -> Optional[dict[str, Any]]:
         """Get comprehensive streaming metrics summary.
 
         Returns:
@@ -169,7 +169,7 @@ class MetricsCoordinator:
         """
         return self._metrics_collector.get_streaming_metrics_summary()
 
-    def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_streaming_metrics_history(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent streaming metrics history.
 
         Args:
@@ -184,7 +184,7 @@ class MetricsCoordinator:
     # Cost Tracking
     # ========================================================================
 
-    def get_session_cost_summary(self) -> Dict[str, Any]:
+    def get_session_cost_summary(self) -> dict[str, Any]:
         """Get session cost summary.
 
         Returns:
@@ -245,7 +245,7 @@ class MetricsCoordinator:
         for key in self._cumulative_token_usage:
             self._cumulative_token_usage[key] = 0
 
-    def update_cumulative_token_usage(self, usage_data: Dict[str, int]) -> None:
+    def update_cumulative_token_usage(self, usage_data: dict[str, int]) -> None:
         """Update cumulative token usage from provider response.
 
         Args:
@@ -260,8 +260,8 @@ class MetricsCoordinator:
     # ========================================================================
 
     def get_tool_usage_stats(
-        self, conversation_state_summary: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, conversation_state_summary: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """Get comprehensive tool usage statistics.
 
         Args:
@@ -321,7 +321,7 @@ class MetricsCoordinator:
         """
         self._metrics_collector.record_tool_execution(tool_name, success, elapsed_ms)
 
-    def on_tool_start(self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0) -> None:
+    def on_tool_start(self, tool_name: str, arguments: dict[str, Any], iteration: int = 0) -> None:
         """Callback when tool execution starts (from ToolPipeline).
 
         Args:
@@ -465,7 +465,7 @@ class MetricsCoordinator:
 def create_metrics_coordinator(
     metrics_collector: "MetricsCollector",
     session_cost_tracker: "SessionCostTracker",
-    cumulative_token_usage: Optional[Dict[str, int]] = None,
+    cumulative_token_usage: Optional[dict[str, int]] = None,
 ) -> MetricsCoordinator:
     """Factory function to create a MetricsCoordinator.
 

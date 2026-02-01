@@ -15,7 +15,7 @@
 """Tests for tools/base.py module."""
 
 import pytest
-from typing import Dict, Any
+from typing import Any
 
 from victor.tools.base import (
     ToolParameter,
@@ -103,11 +103,11 @@ class ConcreteTool(BaseTool):
         return self._description
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         """Return tool parameters."""
         return self._parameters
 
-    async def execute(self, context: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(self, context: dict[str, Any], **kwargs: Any) -> ToolResult:
         """Execute the tool."""
         return ToolResult(success=True, output=kwargs)
 
@@ -392,7 +392,7 @@ class TestToolRegistry:
         """Test registering before-execution hook."""
         registry = ToolRegistry()
 
-        def before_hook(name: str, kwargs: Dict[str, Any]) -> None:
+        def before_hook(name: str, kwargs: dict[str, Any]) -> None:
             pass
 
         registry.register_before_hook(before_hook)
@@ -424,7 +424,7 @@ class TestToolRegistry:
         before_called = []
         after_called = []
 
-        def before_hook(name: str, kwargs: Dict[str, Any]) -> None:
+        def before_hook(name: str, kwargs: dict[str, Any]) -> None:
             before_called.append((name, kwargs))
 
         def after_hook(result: ToolResult) -> None:

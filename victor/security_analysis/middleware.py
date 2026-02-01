@@ -21,7 +21,7 @@ including secret detection and security validation.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from victor.core.verticals.protocols import MiddlewareProtocol
 from victor.core.vertical_types import MiddlewareResult
@@ -46,7 +46,7 @@ class SecurityAnalysisMiddleware(MiddlewareProtocol):
         """
         self._enable_secret_detection = enable_secret_detection
 
-    def process_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def process_input(self, input_data: dict[str, Any]) -> dict[str, Any]:
         """Process input before tool execution.
 
         Args:
@@ -60,7 +60,7 @@ class SecurityAnalysisMiddleware(MiddlewareProtocol):
             logger.debug(f"Security analysis on: {input_data['file_path']}")
         return input_data
 
-    def process_output(self, output_data: Dict[str, Any]) -> Dict[str, Any]:
+    def process_output(self, output_data: dict[str, Any]) -> dict[str, Any]:
         """Process output after tool execution.
 
         Args:
@@ -107,7 +107,7 @@ class SecurityAnalysisMiddleware(MiddlewareProtocol):
         return False
 
     async def before_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
+        self, tool_name: str, arguments: dict[str, Any]
     ) -> "MiddlewareResult":
         """Called before a tool is executed.
 

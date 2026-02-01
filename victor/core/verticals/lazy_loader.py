@@ -37,7 +37,8 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Set, Type, TypeVar
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -223,8 +224,8 @@ class LazyVerticalLoader:
             load_trigger: When to load verticals
         """
         self._load_trigger = self._resolve_trigger(load_trigger)
-        self._proxies: Dict[str, LazyVerticalProxy] = {}
-        self._loaded_verticals: Set[str] = set()
+        self._proxies: dict[str, LazyVerticalProxy] = {}
+        self._loaded_verticals: set[str] = set()
         logger.info(f"Initialized LazyVerticalLoader with trigger: {self._load_trigger.value}")
 
     def _resolve_trigger(self, trigger: LoadTrigger) -> LoadTrigger:
@@ -329,7 +330,7 @@ class LazyVerticalLoader:
         """
         return vertical_name in self._loaded_verticals
 
-    def list_loaded(self) -> Set[str]:
+    def list_loaded(self) -> set[str]:
         """List all currently loaded verticals.
 
         Returns:

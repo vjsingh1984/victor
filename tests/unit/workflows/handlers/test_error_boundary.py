@@ -4,7 +4,7 @@
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Set
+from typing import Any, Optional
 from unittest.mock import MagicMock
 
 import pytest
@@ -22,15 +22,15 @@ class MockComputeNode:
 
     id: str
     handler: str = "test_handler"
-    tools: Set[str] = field(default_factory=set)
-    input_mapping: Dict[str, str] = field(default_factory=dict)
+    tools: set[str] = field(default_factory=set)
+    input_mapping: dict[str, str] = field(default_factory=dict)
     output_key: Optional[str] = None
 
 
 class MockContext:
     """Mock workflow context for testing."""
 
-    def __init__(self, data: Optional[Dict[str, Any]] = None):
+    def __init__(self, data: Optional[dict[str, Any]] = None):
         self.data = data or {}
 
     def get(self, key: str) -> Any:
@@ -144,7 +144,7 @@ class TestHandlerErrorBoundary:
     @pytest.mark.asyncio
     async def test_execute_timeout_error(self):
         """Should handle asyncio.TimeoutError."""
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
+        from victor.workflows.executor import ExecutorNodeStatus
 
         node = MockComputeNode(id="timeout_node")
         context = MockContext()

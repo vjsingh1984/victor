@@ -20,11 +20,11 @@ code duplication across tool implementations.
 
 import os
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import Optional
 
 
 # Directories to exclude when walking/searching codebases
-EXCLUDE_DIRS: Set[str] = {
+EXCLUDE_DIRS: set[str] = {
     ".git",
     "node_modules",
     "venv",
@@ -41,7 +41,7 @@ EXCLUDE_DIRS: Set[str] = {
 }
 
 # Default file extensions for code search
-DEFAULT_CODE_EXTENSIONS: Set[str] = {
+DEFAULT_CODE_EXTENSIONS: set[str] = {
     ".py",
     ".md",
     ".txt",
@@ -83,9 +83,9 @@ DEFAULT_CODE_EXTENSIONS: Set[str] = {
 
 def safe_walk(
     root: str,
-    exclude_dirs: Optional[Set[str]] = None,
-    extensions: Optional[Set[str]] = None,
-) -> List[str]:
+    exclude_dirs: Optional[set[str]] = None,
+    extensions: Optional[set[str]] = None,
+) -> list[str]:
     """Walk directory tree safely, excluding common non-code directories.
 
     Args:
@@ -97,7 +97,7 @@ def safe_walk(
         List of file paths relative to root
     """
     exclude = exclude_dirs if exclude_dirs is not None else EXCLUDE_DIRS
-    files: List[str] = []
+    files: list[str] = []
 
     for dirpath, dirnames, filenames in os.walk(root):
         # Filter out excluded directories in-place to prevent descent
@@ -121,9 +121,9 @@ def safe_walk(
 
 def gather_code_files(
     root: str,
-    extensions: Optional[Set[str]] = None,
-    exclude_dirs: Optional[Set[str]] = None,
-) -> List[str]:
+    extensions: Optional[set[str]] = None,
+    exclude_dirs: Optional[set[str]] = None,
+) -> list[str]:
     """Gather code files from directory tree.
 
     Args:
@@ -141,8 +141,8 @@ def gather_code_files(
 def gather_files_by_pattern(
     root: Path,
     pattern: str = "*",
-    exclude_dirs: Optional[Set[str]] = None,
-) -> List[Path]:
+    exclude_dirs: Optional[set[str]] = None,
+) -> list[Path]:
     """Gather files matching a glob pattern, excluding common non-code directories.
 
     This is the canonical function for file gathering. All tools should use this
@@ -164,7 +164,7 @@ def gather_files_by_pattern(
         files = gather_files_by_pattern(Path("src"), "*.json", {"tests"})
     """
     exclude = exclude_dirs if exclude_dirs is not None else EXCLUDE_DIRS
-    files: List[Path] = []
+    files: list[Path] = []
 
     for path in root.rglob(pattern):
         if not path.is_file():
@@ -190,7 +190,7 @@ def gather_files_by_pattern(
     return files
 
 
-def latest_mtime(root: Path, exclude_dirs: Optional[Set[str]] = None) -> float:
+def latest_mtime(root: Path, exclude_dirs: Optional[set[str]] = None) -> float:
     """Find latest modification time under root, respecting exclusions.
 
     Args:

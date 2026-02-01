@@ -227,8 +227,6 @@ class TestYAMLOnlyVerticalPattern:
     def test_yaml_only_vertical_loads_tools_from_yaml(self, tmp_path):
         """A minimal class with YAML config should work without method overrides."""
         import yaml
-        from pathlib import Path
-        import sys
 
         # Create a temporary YAML config
         config_dir = tmp_path / "test_vertical" / "config"

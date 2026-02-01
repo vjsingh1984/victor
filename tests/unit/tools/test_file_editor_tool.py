@@ -15,7 +15,6 @@
 """Tests for file_editor_tool module - TEXT-BASED file editing."""
 
 import pytest
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from victor.tools.file_editor_tool import edit

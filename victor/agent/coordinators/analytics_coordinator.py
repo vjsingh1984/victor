@@ -47,7 +47,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.protocols import (
     IAnalyticsExporter,
@@ -60,8 +60,6 @@ from victor.protocols import (
 if TYPE_CHECKING:
     from victor.agent.coordinators.evaluation_coordinator import EvaluationCoordinator
     from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
-    from victor.agent.memory.memory_manager import MemoryManager  # type: ignore[import-not-found]
-    from victor.agent.stream_handler import StreamMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +77,8 @@ class SessionAnalytics:
     """
 
     session_id: str
-    events: List[AnalyticsEvent] = field(default_factory=list)
-    metadata: Dict[str, Any] | None = None
+    events: list[AnalyticsEvent] = field(default_factory=list)
+    metadata: dict[str, Any] | None = None
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -103,7 +101,7 @@ class AnalyticsCoordinator:
 
     def __init__(
         self,
-        exporters: Optional[List[IAnalyticsExporter]] = None,
+        exporters: Optional[list[IAnalyticsExporter]] = None,
         enable_memory_storage: bool = True,
         metrics_coordinator: Optional["MetricsCoordinator"] = None,
     ) -> None:
@@ -117,7 +115,7 @@ class AnalyticsCoordinator:
         self._exporters = exporters or []
         self._enable_memory_storage = enable_memory_storage
         self._metrics_coordinator = metrics_coordinator
-        self._session_analytics: Dict[str, SessionAnalytics] = {}
+        self._session_analytics: dict[str, SessionAnalytics] = {}
 
     async def track_event(
         self,
@@ -154,7 +152,7 @@ class AnalyticsCoordinator:
     async def export_analytics(
         self,
         session_id: str,
-        exporters: Optional[List[IAnalyticsExporter]] = None,
+        exporters: Optional[list[IAnalyticsExporter]] = None,
     ) -> ExportResult:
         """Export analytics for a session.
 
@@ -294,7 +292,7 @@ class AnalyticsCoordinator:
     async def get_session_stats(
         self,
         session_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get statistics for a session.
 
         Args:
@@ -316,7 +314,7 @@ class AnalyticsCoordinator:
         session_analytics = self._session_analytics[session_id]
 
         # Count events by type
-        event_counts: Dict[str, int] = {}
+        event_counts: dict[str, int] = {}
         for event in session_analytics.events:
             event_type = event.event_type
             event_counts[event_type] = event_counts.get(event_type, 0) + 1
@@ -339,7 +337,7 @@ class AnalyticsCoordinator:
         safety_checker: Optional[Any] = None,
         auto_committer: Optional[Any] = None,
         search_router: Optional[Any] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get comprehensive status of all integrated optimization components.
 
         Provides visibility into the health and statistics of all optimization
@@ -366,7 +364,7 @@ class AnalyticsCoordinator:
         """
         import time
 
-        status: Dict[str, Any] = {
+        status: dict[str, Any] = {
             "timestamp": time.time(),
             "components": {},
         }
@@ -449,7 +447,7 @@ class AnalyticsCoordinator:
         self,
         evaluation_coordinator: Optional["EvaluationCoordinator"] = None,
         tool_cache: Optional[Any] = None,
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """Flush all analytics data to persistent storage.
 
         This method provides a unified flush interface that:
@@ -541,7 +539,7 @@ class AnalyticsCoordinator:
     async def _export_to_destination(
         self,
         exporter: IAnalyticsExporter,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> ExportResult:
         """Export to a specific destination.
 
@@ -585,7 +583,7 @@ class BaseAnalyticsExporter(IAnalyticsExporter):
         """
         self._exporter_type = exporter_type
 
-    async def export(self, data: Dict[str, Any]) -> ExportResult:
+    async def export(self, data: dict[str, Any]) -> ExportResult:
         """Export analytics data.
 
         Subclasses must implement this method.
@@ -622,7 +620,7 @@ class ConsoleAnalyticsExporter(BaseAnalyticsExporter):
         super().__init__("console")
         self._verbose = verbose
 
-    async def export(self, data: Dict[str, Any]) -> ExportResult:
+    async def export(self, data: dict[str, Any]) -> ExportResult:
         """Export analytics to console.
 
         Args:
@@ -689,7 +687,7 @@ class FileAnalyticsExporter(BaseAnalyticsExporter):
         self._format = format
         self._append = append
 
-    async def export(self, data: Dict[str, Any]) -> ExportResult:
+    async def export(self, data: dict[str, Any]) -> ExportResult:
         """Export analytics to file.
 
         Args:
@@ -698,7 +696,6 @@ class FileAnalyticsExporter(BaseAnalyticsExporter):
         Returns:
             ExportResult with export status
         """
-        import json
         from pathlib import Path
 
         events = data.get("events", [])
@@ -733,7 +730,7 @@ class FileAnalyticsExporter(BaseAnalyticsExporter):
                 error_message=str(e),
             )
 
-    def _export_json(self, data: Dict[str, Any], file_path: Path) -> None:
+    def _export_json(self, data: dict[str, Any], file_path: Path) -> None:
         """Export data to JSON format.
 
         Args:
@@ -762,7 +759,7 @@ class FileAnalyticsExporter(BaseAnalyticsExporter):
         with open(file_path, "w") as f:
             json.dump(existing_data, f, indent=2)
 
-    def _export_csv(self, data: Dict[str, Any], file_path: Path) -> None:
+    def _export_csv(self, data: dict[str, Any], file_path: Path) -> None:
         """Export data to CSV format.
 
         Args:

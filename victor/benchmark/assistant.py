@@ -19,7 +19,7 @@ protocols actually implemented by the vertical are registered, rather than
 inheriting from all possible protocol interfaces.
 """
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, cast
 
 from victor.config.settings import VERSION
 from victor.core.vertical_types import StageDefinition
@@ -27,16 +27,8 @@ from victor.core.verticals.base import VerticalBase, VerticalConfig
 from victor.tools.tool_names import ToolNames
 
 # Import ISP-compliant provider protocols
-from victor.core.verticals.protocols.providers import (
-    HandlerProvider,
-    ModeConfigProvider,
-    TieredToolConfigProvider,
-    ToolProvider,
-    WorkflowProvider,
-)
 
 # Phase 3: Import framework capabilities
-from victor.framework.capabilities import FileOperationsCapability
 
 # Phase 2.1: Protocol auto-registration decorator
 from victor.core.verticals.protocol_decorators import register_protocols
@@ -84,7 +76,7 @@ class BenchmarkVertical(VerticalBase):
     STAGE_VERIFICATION = "VERIFICATION"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         """Tools optimized for benchmark task execution.
 
         Uses framework FileOperationsCapability via DI for common file operations
@@ -153,7 +145,7 @@ You are being evaluated on:
 """
 
     @classmethod
-    def get_stages(cls) -> Dict[str, StageDefinition]:
+    def get_stages(cls) -> dict[str, StageDefinition]:
         """Benchmark-specific conversation stages.
 
         Stages map to benchmark task phases and influence tool selection.
@@ -227,7 +219,7 @@ You are being evaluated on:
         }
 
     @classmethod
-    def get_provider_hints(cls) -> Dict[str, Any]:
+    def get_provider_hints(cls) -> dict[str, Any]:
         """Hints for LLM provider configuration."""
         return {
             "temperature": 0.2,  # Lower temperature for deterministic coding
@@ -236,7 +228,7 @@ You are being evaluated on:
         }
 
     @classmethod
-    def get_evaluation_criteria(cls) -> List[str]:
+    def get_evaluation_criteria(cls) -> list[str]:
         """Evaluation criteria for benchmark tasks."""
         return [
             "Correctness: Solution passes all provided tests",
@@ -313,7 +305,7 @@ You are being evaluated on:
         return BenchmarkWorkflowProvider()
 
     @classmethod
-    def get_workflows(cls) -> Dict[str, Any]:
+    def get_workflows(cls) -> dict[str, Any]:
         """Get benchmark workflow definitions.
 
         Returns available workflows from BenchmarkWorkflowProvider.
@@ -344,7 +336,7 @@ You are being evaluated on:
         return cast(Optional["ModeConfigProviderProtocol"], provider)
 
     @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
+    def get_handlers(cls) -> dict[str, Any]:
         """Get benchmark compute handlers for workflow execution.
 
         Provides handlers for benchmark-specific workflow nodes like:

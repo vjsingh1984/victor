@@ -20,7 +20,7 @@ real tool-like objects and validates lazy loading behavior.
 
 import pytest
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 from victor.tools.composition import LazyToolRunnable, ToolCompositionBuilder
 
@@ -37,12 +37,12 @@ class MockTool:
     name: str
     initialized: bool = field(default=False, repr=False)
     call_count: int = field(default=0, repr=False)
-    call_history: List[Dict[str, Any]] = field(default_factory=list, repr=False)
+    call_history: list[dict[str, Any]] = field(default_factory=list, repr=False)
 
     def __post_init__(self):
         self.initialized = True
 
-    def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def run(self, inputs: dict[str, Any]) -> dict[str, Any]:
         """Execute the tool synchronously."""
         self.call_count += 1
         self.call_history.append(inputs.copy())
@@ -52,7 +52,7 @@ class MockTool:
             "result": f"Processed {inputs}",
         }
 
-    async def arun(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    async def arun(self, inputs: dict[str, Any]) -> dict[str, Any]:
         """Execute the tool asynchronously."""
         self.call_count += 1
         self.call_history.append(inputs.copy())
@@ -74,7 +74,7 @@ class ExpensiveTool:
         self.creation_order = ExpensiveTool.init_count
         self.name = f"expensive_tool_{self.creation_order}"
 
-    def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def run(self, inputs: dict[str, Any]) -> dict[str, Any]:
         return {
             "success": True,
             "tool": self.name,
@@ -82,7 +82,7 @@ class ExpensiveTool:
             "inputs": inputs,
         }
 
-    async def arun(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    async def arun(self, inputs: dict[str, Any]) -> dict[str, Any]:
         return await self.run(inputs)
 
     @classmethod
@@ -96,7 +96,7 @@ class StatefulTool:
     def __init__(self, initial_value: int = 0):
         self.state = initial_value
 
-    def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def run(self, inputs: dict[str, Any]) -> dict[str, Any]:
         operation = inputs.get("operation", "get")
         if operation == "increment":
             self.state += inputs.get("amount", 1)

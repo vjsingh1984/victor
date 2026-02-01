@@ -16,9 +16,7 @@
 
 import os
 import sys
-from unittest import mock
 
-import pytest
 
 from victor.core.verticals.base import VerticalRegistry
 
@@ -179,7 +177,6 @@ class TestLazyLoading:
 
     def test_lazy_loading_performance_improvement(self):
         """Test that lazy loading improves startup performance."""
-        import time
         import subprocess
 
         # Test eager loading by running in a subprocess

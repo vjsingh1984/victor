@@ -25,16 +25,10 @@ Total: 20 integration tests
 These tests execute real tools and verify safety checks work end-to-end.
 """
 
-import asyncio
 import pytest
-import tempfile
-from pathlib import Path
-from typing import Dict, Any, List
 
 from victor.agent.tool_pipeline import ToolPipeline, ToolPipelineConfig
 from victor.agent.tool_executor import ToolExecutor
-from victor.tools.base import BaseTool
-from victor.tools.registry import ToolRegistry
 
 
 # =============================================================================

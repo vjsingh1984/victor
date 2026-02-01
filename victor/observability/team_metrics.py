@@ -53,8 +53,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +68,7 @@ class MetricValue:
     """Single metric value with labels."""
 
     value: float
-    labels: Dict[str, str]
+    labels: dict[str, str]
     timestamp: float = field(default_factory=time.time)
 
 
@@ -80,13 +79,13 @@ class MetricSeries:
     name: str
     description: str
     metric_type: str  # "counter", "gauge", "histogram"
-    values: List[MetricValue] = field(default_factory=list)
+    values: list[MetricValue] = field(default_factory=list)
 
-    def add(self, value: float, labels: Dict[str, str]) -> None:
+    def add(self, value: float, labels: dict[str, str]) -> None:
         """Add a value to the series."""
         self.values.append(MetricValue(value=value, labels=labels))
 
-    def get_total(self, labels: Optional[Dict[str, str]] = None) -> float:
+    def get_total(self, labels: Optional[dict[str, str]] = None) -> float:
         """Get total value, optionally filtered by labels."""
         if labels is None:
             return sum(v.value for v in self.values)
@@ -105,7 +104,7 @@ class MetricsRegistry:
 
     def __init__(self):
         """Initialize registry."""
-        self._metrics: Dict[str, MetricSeries] = {}
+        self._metrics: dict[str, MetricSeries] = {}
         self._prometheus_available = self._check_prometheus()
 
         # Initialize Prometheus metrics if available
@@ -219,7 +218,7 @@ class MetricsRegistry:
         self,
         name: str,
         value: float,
-        labels: Dict[str, str],
+        labels: dict[str, str],
     ) -> None:
         """Record a metric value.
 
@@ -248,7 +247,7 @@ class MetricsRegistry:
 
         return "\n".join(lines)
 
-    def export_json(self) -> Dict[str, Any]:
+    def export_json(self) -> dict[str, Any]:
         """Export metrics as JSON.
 
         Returns:

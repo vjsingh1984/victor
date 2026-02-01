@@ -38,7 +38,7 @@ def _register_escape_hatches() -> None:
         from victor.framework.escape_hatch_registry import EscapeHatchRegistry
 
         # Import escape hatches module to trigger side-effect registration
-        from victor.research import escape_hatches  # noqa: F401
+        from victor.research import escape_hatches
 
         # Register with global registry
         registry = EscapeHatchRegistry.get_instance()

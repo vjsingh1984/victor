@@ -39,7 +39,8 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.cache.dependency_extractor import DependencyExtractor
@@ -60,9 +61,7 @@ from victor.agent.output_aggregator import (
     AggregationState,
 )
 from victor.agent.synthesis_checkpoint import (
-    SynthesisCheckpoint,
     CompositeSynthesisCheckpoint,
-    CheckpointResult,
     get_checkpoint_for_complexity,
 )
 from victor.config.tool_selection_defaults import (
@@ -89,7 +88,6 @@ except ImportError:
     native_compute_signature = None  # type: ignore
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator import AgentOrchestrator
     from victor.tools.registry import ToolRegistry
     from victor.storage.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
@@ -143,9 +141,9 @@ class ExecutionMetrics:
     total_execution_time: float = 0.0
     min_execution_time: float = float("inf")
     max_execution_time: float = 0.0
-    execution_times: List[float] = field(default_factory=list)
-    tool_counts: Dict[str, int] = field(default_factory=dict)
-    tool_errors: Dict[str, int] = field(default_factory=dict)
+    execution_times: list[float] = field(default_factory=list)
+    tool_counts: dict[str, int] = field(default_factory=dict)
+    tool_errors: dict[str, int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Initialize the lock after dataclass initialization."""
@@ -258,7 +256,7 @@ class ExecutionMetrics:
         idx = int(len(sorted_times) * 0.95)
         return sorted_times[min(idx, len(sorted_times) - 1)]
 
-    def get_top_tools(self, n: int = 5) -> List[tuple[str, int]]:
+    def get_top_tools(self, n: int = 5) -> list[tuple[str, int]]:
         """Get top N most used tools.
 
         Thread-safe: Returns snapshot of current top tools.
@@ -287,7 +285,7 @@ class ExecutionMetrics:
             self.tool_counts.clear()
             self.tool_errors.clear()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert metrics to dictionary.
 
         Thread-safe: Returns snapshot of current metrics.
@@ -508,7 +506,7 @@ class LRUToolCache:
             ttl_seconds: Time-to-live in seconds
         """
         self._cache: OrderedDict[str, Any] = OrderedDict()
-        self._timestamps: Dict[str, float] = {}
+        self._timestamps: dict[str, float] = {}
         self._max_size = max_size
         self._ttl_seconds = ttl_seconds
         self._lock = threading.Lock()
@@ -640,7 +638,7 @@ class LRUToolCache:
                 return True
             return False
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics for monitoring.
 
         Thread-safe: Returns snapshot of current stats.
@@ -664,7 +662,7 @@ class ToolCallResult:
     """Result of a single tool call through the pipeline."""
 
     tool_name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     success: bool
     result: Any = None
     error: Optional[str] = None
@@ -676,14 +674,14 @@ class ToolCallResult:
 
     # Code correction tracking
     code_corrected: bool = False
-    code_validation_errors: Optional[List[str]] = None
+    code_validation_errors: Optional[list[str]] = None
 
 
 @dataclass
 class PipelineExecutionResult:
     """Result of executing multiple tool calls."""
 
-    results: List[ToolCallResult] = field(default_factory=list)
+    results: list[ToolCallResult] = field(default_factory=list)
     total_calls: int = 0
     successful_calls: int = 0
     failed_calls: int = 0
@@ -735,7 +733,7 @@ class ToolPipeline:
         argument_normalizer: Optional[ArgumentNormalizer] = None,
         code_correction_middleware: Optional["CodeCorrectionMiddleware"] = None,
         signature_store: Optional["SignatureStore"] = None,
-        on_tool_start: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        on_tool_start: Optional[Callable[[str, dict[str, Any]], None]] = None,
         on_tool_complete: Optional[Callable[[ToolCallResult], None]] = None,
         deduplication_tracker: Optional[Any] = None,
         middleware_chain: Optional["MiddlewareChain"] = None,
@@ -794,11 +792,11 @@ class ToolPipeline:
         self._calls_used = 0
         # In-memory failed signatures for session-only tracking (backward compatible)
         # When signature_store is provided, it's used for persistent cross-session tracking
-        self._failed_signatures: Set[str] = set()
-        self._executed_tools: List[str] = []
+        self._failed_signatures: set[str] = set()
+        self._executed_tools: list[str] = []
 
         # Analytics
-        self._tool_stats: Dict[str, Dict[str, Any]] = {}
+        self._tool_stats: dict[str, dict[str, Any]] = {}
         # Enhanced execution metrics with cache performance tracking
         self._execution_metrics: ExecutionMetrics = ExecutionMetrics()
 
@@ -822,7 +820,7 @@ class ToolPipeline:
 
         # File read timestamp tracking for deduplication (prompting loop fix)
         # Prevents re-reading identical files within TTL window
-        self._read_file_timestamps: Dict[str, float] = {}
+        self._read_file_timestamps: dict[str, float] = {}
 
         # Initialize signature accelerator for 10x faster deduplication
         self._signature_accelerator: Optional["SignatureAccelerator"] = None
@@ -856,7 +854,7 @@ class ToolPipeline:
         return max(0, self.config.tool_budget - self._calls_used)
 
     @property
-    def executed_tools(self) -> List[str]:
+    def executed_tools(self) -> list[str]:
         """List of executed tool names."""
         return list(self._executed_tools)
 
@@ -931,8 +929,8 @@ class ToolPipeline:
         return bool(self.VALID_TOOL_NAME_PATTERN.match(name))
 
     def _normalize_arguments(
-        self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
-    ) -> tuple[Dict[str, Any], NormalizationStrategy]:
+        self, tool_name: str, arguments: Any, context: Optional[dict[str, Any]] = None
+    ) -> tuple[dict[str, Any], NormalizationStrategy]:
         """Normalize tool arguments with parameter enforcement.
 
         Args:
@@ -983,7 +981,7 @@ class ToolPipeline:
 
         return normalized_args, strategy
 
-    def _get_call_signature(self, tool_name: str, args: Dict[str, Any]) -> str:
+    def _get_call_signature(self, tool_name: str, args: dict[str, Any]) -> str:
         """Generate signature for deduplication.
 
         Uses signature accelerator with xxHash3-based computation when available
@@ -1018,7 +1016,7 @@ class ToolPipeline:
             args_str = str(args)
         return f"{tool_name}:{args_str}"
 
-    def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
+    def is_known_failure(self, tool_name: str, args: dict[str, Any]) -> bool:
         """Check if a tool call is known to fail.
 
         Uses persistent SignatureStore when available for cross-session learning,
@@ -1049,7 +1047,7 @@ class ToolPipeline:
         signature = self._get_call_signature(tool_name, args)
         return signature in self._failed_signatures
 
-    def record_failure(self, tool_name: str, args: Dict[str, Any], error_message: str) -> None:
+    def record_failure(self, tool_name: str, args: dict[str, Any], error_message: str) -> None:
         """Record a failed tool call.
 
         Uses persistent SignatureStore when available for cross-session learning,
@@ -1077,7 +1075,7 @@ class ToolPipeline:
         signature = self._get_call_signature(tool_name, args)
         self._failed_signatures.add(signature)
 
-    def clear_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
+    def clear_failure(self, tool_name: str, args: dict[str, Any]) -> bool:
         """Clear a specific failure signature (e.g., after a fix).
 
         Args:
@@ -1122,7 +1120,7 @@ class ToolPipeline:
         """
         return tool_name in IDEMPOTENT_TOOLS
 
-    def get_cached_result(self, tool_name: str, args: Dict[str, Any]) -> Optional[ToolCallResult]:
+    def get_cached_result(self, tool_name: str, args: dict[str, Any]) -> Optional[ToolCallResult]:
         """Get cached result for an idempotent tool call.
 
         Args:
@@ -1145,7 +1143,7 @@ class ToolPipeline:
             logger.debug(f"Cache hit for {tool_name}: {signature[:100]}...")
         return cached
 
-    def cache_result(self, tool_name: str, args: Dict[str, Any], result: ToolCallResult) -> None:
+    def cache_result(self, tool_name: str, args: dict[str, Any], result: ToolCallResult) -> None:
         """Cache result for an idempotent tool call.
 
         Only successful results from idempotent tools are cached.
@@ -1203,7 +1201,7 @@ class ToolPipeline:
 
         return count
 
-    def invalidate_files_cache(self, file_paths: List[str]) -> int:
+    def invalidate_files_cache(self, file_paths: list[str]) -> int:
         """Invalidate cached results for multiple files.
 
         More efficient than calling invalidate_file_cache multiple times.
@@ -1235,13 +1233,13 @@ class ToolPipeline:
         """
         return self.tools.list_tools(only_enabled=only_enabled)
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:
             Dict with idempotent cache stats, semantic cache stats, and decision cache stats
         """
-        stats: Dict[str, Any] = {
+        stats: dict[str, Any] = {
             "cache_hits": self._cache_hits,
             "cache_misses": self._cache_misses,
             "cache_size": len(self._idempotent_cache),
@@ -1289,8 +1287,8 @@ class ToolPipeline:
 
     def deduplicate_tool_calls(
         self,
-        tool_calls: List[Dict[str, Any]],
-    ) -> Tuple[List[Dict[str, Any]], List[Tuple[int, str]]]:
+        tool_calls: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], list[tuple[int, str]]]:
         """Deduplicate identical tool calls within a batch.
 
         Some providers (DeepSeek, Ollama) sometimes issue duplicate tool calls
@@ -1308,9 +1306,9 @@ class ToolPipeline:
         if not self.config.enable_batch_deduplication:
             return tool_calls, []
 
-        seen_signatures: Dict[str, int] = {}  # signature -> index in unique_calls
-        unique_calls: List[Dict[str, Any]] = []
-        duplicate_indices: List[Tuple[int, str]] = []  # (original_index, signature)
+        seen_signatures: dict[str, int] = {}  # signature -> index in unique_calls
+        unique_calls: list[dict[str, Any]] = []
+        duplicate_indices: list[tuple[int, str]] = []  # (original_index, signature)
 
         for i, tc in enumerate(tool_calls):
             # Skip invalid structures - let execute_tool_calls handle them
@@ -1350,8 +1348,8 @@ class ToolPipeline:
 
     async def execute_tool_calls(
         self,
-        tool_calls: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None,
+        tool_calls: list[dict[str, Any]],
+        context: Optional[dict[str, Any]] = None,
         use_graph: bool = False,
     ) -> PipelineExecutionResult:
         """Execute multiple tool calls.
@@ -1374,7 +1372,7 @@ class ToolPipeline:
         return await self._execute_imperative(tool_calls, context)
 
     async def _execute_with_graph(
-        self, tool_calls: List[Dict[str, Any]], context: Dict[str, Any]
+        self, tool_calls: list[dict[str, Any]], context: dict[str, Any]
     ) -> PipelineExecutionResult:
         """Execute using compiled graph (fast path).
 
@@ -1411,7 +1409,7 @@ class ToolPipeline:
         return result
 
     async def _execute_imperative(
-        self, tool_calls: List[Dict[str, Any]], context: Dict[str, Any]
+        self, tool_calls: list[dict[str, Any]], context: dict[str, Any]
     ) -> PipelineExecutionResult:
         """Execute using existing imperative logic (backward compatible).
 
@@ -1429,10 +1427,10 @@ class ToolPipeline:
         unique_calls, duplicate_info = self.deduplicate_tool_calls(tool_calls)
 
         # Track results by signature for duplicate resolution
-        results_by_signature: Dict[str, ToolCallResult] = {}
+        results_by_signature: dict[str, ToolCallResult] = {}
 
         # Build tool history for synthesis checkpoint
-        tool_history: List[Dict[str, Any]] = []
+        tool_history: list[dict[str, Any]] = []
 
         for tool_call in unique_calls:
             call_result = await self._execute_single_call(tool_call, context)
@@ -1440,7 +1438,7 @@ class ToolPipeline:
 
             # Store result by signature for duplicate resolution (only for dict items)
             tool_name = ""
-            raw_args: Dict[str, Any] = {}
+            raw_args: dict[str, Any] = {}
             if isinstance(tool_call, dict):
                 tool_name = tool_call.get("name", "")
                 args_value = tool_call.get("arguments", {})
@@ -1543,8 +1541,8 @@ class ToolPipeline:
 
     async def execute_tool_calls_parallel(
         self,
-        tool_calls: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None,
+        tool_calls: list[dict[str, Any]],
+        context: Optional[dict[str, Any]] = None,
         force_parallel: bool = False,
     ) -> PipelineExecutionResult:
         """Execute tool calls with parallelization when beneficial.
@@ -1685,8 +1683,8 @@ class ToolPipeline:
 
     async def _execute_single_call(
         self,
-        tool_call: Dict[str, Any],
-        context: Dict[str, Any],
+        tool_call: dict[str, Any],
+        context: dict[str, Any],
     ) -> ToolCallResult:
         """Execute a single tool call.
 
@@ -1866,7 +1864,7 @@ class ToolPipeline:
 
         # Code correction middleware - validate and fix code arguments
         code_corrected = False
-        code_validation_errors: Optional[List[str]] = None
+        code_validation_errors: Optional[list[str]] = None
 
         if (
             self.config.enable_code_correction
@@ -2149,7 +2147,7 @@ class ToolPipeline:
             stats["failures"] += 1
         stats["total_time_ms"] += result.execution_time_ms
 
-    def get_analytics(self) -> Dict[str, Any]:
+    def get_analytics(self) -> dict[str, Any]:
         """Get tool execution analytics.
 
         Returns:
@@ -2174,7 +2172,7 @@ class ToolPipeline:
         """
         return self._execution_metrics
 
-    def get_execution_metrics_dict(self) -> Dict[str, Any]:
+    def get_execution_metrics_dict(self) -> dict[str, Any]:
         """Get execution metrics as a dictionary.
 
         Returns:

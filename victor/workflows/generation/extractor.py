@@ -39,7 +39,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional, cast
 
 from victor.framework.protocols import OrchestratorProtocol
 from victor.workflows.generation.requirements import (
@@ -170,7 +170,7 @@ Output:
 # =============================================================================
 
 
-def build_requirements_schema() -> Dict[str, Any]:
+def build_requirements_schema() -> dict[str, Any]:
     """Build JSON schema for LLM structured output.
 
     This schema is passed to the LLM to ensure it returns valid
@@ -395,7 +395,7 @@ class RequirementExtractor:
     async def extract(
         self,
         description: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> WorkflowRequirements:
         """Extract structured requirements from natural language.
 
@@ -458,7 +458,7 @@ class RequirementExtractor:
 
         return requirements
 
-    def _build_extraction_prompt(self, description: str, context: Optional[Dict[str, Any]]) -> str:
+    def _build_extraction_prompt(self, description: str, context: Optional[dict[str, Any]]) -> str:
         """Build the extraction prompt.
 
         Args:
@@ -477,7 +477,7 @@ class RequirementExtractor:
             schema=schema_str,
         )
 
-    async def _call_llm_with_schema(self, prompt: str) -> Dict[str, Any]:
+    async def _call_llm_with_schema(self, prompt: str) -> dict[str, Any]:
         """Call LLM with JSON schema for structured output.
 
         Args:
@@ -513,14 +513,14 @@ Do not include any explanatory text outside the JSON structure."""
             response = response.strip()
 
             data = json.loads(response)
-            return cast(Dict[str, Any], data)
+            return cast(dict[str, Any], data)
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}")
             logger.debug(f"Response content: {response[:500]}")
             raise RuntimeError(f"LLM returned invalid JSON: {e}") from e
 
-    def _parse_requirements(self, data: Dict[str, Any]) -> WorkflowRequirements:
+    def _parse_requirements(self, data: dict[str, Any]) -> WorkflowRequirements:
         """Parse LLM output into WorkflowRequirements.
 
         Args:
@@ -629,8 +629,8 @@ Do not include any explanatory text outside the JSON structure."""
         )
 
     def _calculate_confidence(
-        self, requirements: WorkflowRequirements, raw_data: Dict[str, Any]
-    ) -> Dict[str, float]:
+        self, requirements: WorkflowRequirements, raw_data: dict[str, Any]
+    ) -> dict[str, float]:
         """Calculate confidence scores for each requirement section.
 
         Args:

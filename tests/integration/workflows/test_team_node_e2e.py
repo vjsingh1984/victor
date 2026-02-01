@@ -24,19 +24,14 @@ Tests the full integration of team nodes in workflows, including:
 
 from __future__ import annotations
 
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from victor.core.errors import RecursionDepthError
 from victor.teams import TeamFormation, create_coordinator
-from victor.teams.protocols import ITeamMember
-from victor.teams.types import AgentMessage, MemberResult, TeamResult
+from victor.teams.types import AgentMessage
 from victor.workflows.definition import TeamNodeWorkflow
 from victor.workflows.recursion import RecursionContext, RecursionGuard
-from victor.framework.teams import TeamMemberSpec
-from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
 
 # =============================================================================

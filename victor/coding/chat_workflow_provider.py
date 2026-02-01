@@ -40,7 +40,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Tuple
 
 from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider
 
@@ -103,7 +102,7 @@ class CodingChatWorkflowProvider(BaseYAMLWorkflowProvider):
         # Use parent directory of this file
         return Path(__file__).parent / "workflows"
 
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
+    def get_auto_workflows(self) -> list[tuple[str, str]]:
         """Get automatic workflow triggers based on user input patterns.
 
         These patterns are used to automatically select the appropriate

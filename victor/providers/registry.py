@@ -14,7 +14,7 @@
 
 """Provider registry for managing and discovering LLM providers."""
 
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Optional
 
 from victor.core.registry import BaseRegistry
 from victor.providers.base import BaseProvider, ProviderNotFoundError
@@ -22,7 +22,7 @@ from victor.providers.base import BaseProvider, ProviderNotFoundError
 __all__ = ["ProviderRegistry", "ProviderNotFoundError"]
 
 
-class _ProviderRegistryImpl(BaseRegistry[str, Type[BaseProvider]]):
+class _ProviderRegistryImpl(BaseRegistry[str, type[BaseProvider]]):
     """Internal registry implementation for provider management.
 
     Extends BaseRegistry to provide provider-specific functionality including:
@@ -31,7 +31,7 @@ class _ProviderRegistryImpl(BaseRegistry[str, Type[BaseProvider]]):
     - Raises ProviderNotFoundError on missing providers
     """
 
-    def get_or_raise(self, name: str) -> Type[BaseProvider]:
+    def get_or_raise(self, name: str) -> type[BaseProvider]:
         """Get a provider class by name, raising if not found.
 
         This method implements lazy loading - provider classes are only imported
@@ -97,7 +97,7 @@ class _ProviderRegistryImpl(BaseRegistry[str, Type[BaseProvider]]):
         provider_class = self.get_or_raise(name)
         return provider_class(**kwargs)
 
-    def list_all(self) -> List[str]:
+    def list_all(self) -> list[str]:
         """List all available provider names (including lazy-loaded providers).
 
         Returns:
@@ -124,7 +124,7 @@ class ProviderRegistry:
     """
 
     @classmethod
-    def register(cls, name: str, provider_class: Type[BaseProvider]) -> None:
+    def register(cls, name: str, provider_class: type[BaseProvider]) -> None:
         """Register a provider.
 
         Args:
@@ -134,7 +134,7 @@ class ProviderRegistry:
         _registry_instance.register(name, provider_class)
 
     @classmethod
-    def get(cls, name: str) -> Type[BaseProvider]:
+    def get(cls, name: str) -> type[BaseProvider]:
         """Get a provider class by name.
 
         Args:
@@ -149,7 +149,7 @@ class ProviderRegistry:
         return _registry_instance.get_or_raise(name)
 
     @classmethod
-    def get_optional(cls, name: str) -> Optional[Type[BaseProvider]]:
+    def get_optional(cls, name: str) -> Optional[type[BaseProvider]]:
         """Get a provider class by name, returning None if not found.
 
         Args:
@@ -177,7 +177,7 @@ class ProviderRegistry:
         return _registry_instance.create(name, **kwargs)
 
     @classmethod
-    def list_providers(cls) -> List[str]:
+    def list_providers(cls) -> list[str]:
         """List all registered provider names.
 
         Returns:
@@ -230,7 +230,7 @@ def get_provider_registry() -> _ProviderRegistryImpl:
 # Lazy provider import map for startup performance optimization
 # Maps provider names to their (module_path, class_name) tuples
 # Providers are only imported when actually requested via ProviderRegistry.get()
-_PROVIDER_IMPORTS: Dict[str, tuple[str, str]] = {
+_PROVIDER_IMPORTS: dict[str, tuple[str, str]] = {
     # Local providers
     "ollama": ("victor.providers.ollama_provider", "OllamaProvider"),
     "lmstudio": ("victor.providers.lmstudio_provider", "LMStudioProvider"),
@@ -273,7 +273,7 @@ _PROVIDER_IMPORTS: Dict[str, tuple[str, str]] = {
 }
 
 # Reverse alias map to canonical name (for listing providers)
-_PROVIDER_ALIASES: Dict[str, str] = {
+_PROVIDER_ALIASES: dict[str, str] = {
     "claude": "anthropic",
     "gemini": "google",
     "grok": "xai",

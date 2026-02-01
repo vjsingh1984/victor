@@ -14,7 +14,6 @@
 
 """Tests for built-in capability implementations."""
 
-import pytest
 
 from victor.agent.capabilities.builtin import (
     EnabledToolsCapability,

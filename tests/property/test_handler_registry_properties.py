@@ -24,13 +24,10 @@ Uses Hypothesis to test invariants across many iterations:
 """
 
 import pytest
-from hypothesis import given, strategies as st, settings, Phase, assume
-from typing import List, Optional
+from hypothesis import given, strategies as st, settings, Phase
 from unittest.mock import Mock
 
 from victor.framework.handler_registry import (
-    HandlerRegistry,
-    HandlerEntry,
     get_handler_registry,
 )
 
@@ -90,7 +87,7 @@ class TestRegistrationProperties:
         vertical=vertical_name_strategy,
     )
     @settings(max_examples=30, phases=[Phase.generate])
-    def test_list_handlers_contains_all_registered(self, names: List[str], vertical: str):
+    def test_list_handlers_contains_all_registered(self, names: list[str], vertical: str):
         """list_handlers() should return all registered handler names."""
         registry = get_handler_registry()
 
@@ -107,7 +104,7 @@ class TestRegistrationProperties:
         verticals=st.lists(vertical_name_strategy, min_size=1, max_size=10),
     )
     @settings(max_examples=30, phases=[Phase.generate])
-    def test_list_by_vertical_filters_correctly(self, names: List[str], verticals: List[str]):
+    def test_list_by_vertical_filters_correctly(self, names: list[str], verticals: list[str]):
         """list_by_vertical() should only return handlers for that vertical."""
         registry = get_handler_registry()
 
@@ -167,7 +164,7 @@ class TestClearProperties:
         vertical=vertical_name_strategy,
     )
     @settings(max_examples=30, phases=[Phase.generate])
-    def test_clear_removes_all_handlers(self, names: List[str], vertical: str):
+    def test_clear_removes_all_handlers(self, names: list[str], vertical: str):
         """clear() should remove all registered handlers."""
         registry = get_handler_registry()
 

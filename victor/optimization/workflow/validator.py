@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from enum import Enum
 
 from victor.optimization.workflow.models import (
@@ -56,7 +56,7 @@ class ConstraintViolation:
     description: str
     severity: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "type": self.type,
@@ -84,10 +84,10 @@ class OptimizationValidationResult:
     speedup: float
     cost_reduction: float
     error_rate: float = 0.0
-    violations: List[ConstraintViolation] = field(default_factory=list)
+    violations: list[ConstraintViolation] = field(default_factory=list)
     recommendation: ValidationRecommendation = ValidationRecommendation.APPROVE
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "is_valid": self.is_valid,
@@ -143,10 +143,10 @@ class OptimizationValidator:
 
     def validate_optimization(
         self,
-        original_workflow: Dict[str, Any],
+        original_workflow: dict[str, Any],
         optimization: OptimizationOpportunity,
         profile: WorkflowProfile,
-        constraints: Optional[Dict[str, Any]] = None,
+        constraints: Optional[dict[str, Any]] = None,
     ) -> OptimizationValidationResult:
         """Validate an optimization opportunity.
 
@@ -253,7 +253,7 @@ class OptimizationValidator:
         self,
         optimization: OptimizationOpportunity,
         profile: WorkflowProfile,
-    ) -> List[ConstraintViolation]:
+    ) -> list[ConstraintViolation]:
         """Validate strategy-specific constraints.
 
         Args:
@@ -305,8 +305,8 @@ class OptimizationValidator:
     def _check_constraints(
         self,
         optimization: OptimizationOpportunity,
-        constraints: Dict[str, Any],
-    ) -> List[ConstraintViolation]:
+        constraints: dict[str, Any],
+    ) -> list[ConstraintViolation]:
         """Check custom constraints.
 
         Args:
@@ -355,7 +355,7 @@ class OptimizationValidator:
         is_valid: bool,
         speedup: float,
         cost_reduction: float,
-        violations: List[ConstraintViolation],
+        violations: list[ConstraintViolation],
     ) -> ValidationRecommendation:
         """Make validation recommendation.
 

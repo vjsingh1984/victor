@@ -70,11 +70,10 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -104,12 +103,12 @@ class MemberExecutionMetrics:
     success: bool = True
     duration_seconds: float = 0.0
     tool_calls_used: int = 0
-    tools_used: Set[str] = field(default_factory=set)
+    tools_used: set[str] = field(default_factory=set)
     error_message: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "member_id": self.member_id,
@@ -150,15 +149,15 @@ class TeamExecutionMetrics:
     recursion_depth: int = 0
     success: bool = True
     duration_seconds: float = 0.0
-    member_metrics: Dict[str, MemberExecutionMetrics] = field(default_factory=dict)
+    member_metrics: dict[str, MemberExecutionMetrics] = field(default_factory=dict)
     total_tool_calls: int = 0
-    unique_tools_used: Set[str] = field(default_factory=set)
+    unique_tools_used: set[str] = field(default_factory=set)
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     consensus_achieved: Optional[bool] = None
     consensus_rounds: Optional[int] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "team_id": self.team_id,
@@ -239,8 +238,8 @@ class TeamMetricsCollector:
         """
         self._enabled = enabled
         self._priority_threshold = priority_threshold
-        self._team_metrics: Dict[str, TeamExecutionMetrics] = {}
-        self._active_teams: Set[str] = set()
+        self._team_metrics: dict[str, TeamExecutionMetrics] = {}
+        self._active_teams: set[str] = set()
         self._lock = threading.RLock()
         self._registry: Any = None  # Will be MetricsRegistry if available
 
@@ -368,7 +367,7 @@ class TeamMetricsCollector:
         success: bool,
         duration_seconds: float,
         tool_calls_used: int,
-        tools_used: Optional[Set[str]] = None,
+        tools_used: Optional[set[str]] = None,
         error_message: Optional[str] = None,
         role: str = "assistant",
     ) -> None:
@@ -490,7 +489,7 @@ class TeamMetricsCollector:
         with self._lock:
             return self._team_metrics.get(team_id)
 
-    def get_active_teams(self) -> Set[str]:
+    def get_active_teams(self) -> set[str]:
         """Get set of currently executing team IDs.
 
         Returns:
@@ -499,7 +498,7 @@ class TeamMetricsCollector:
         with self._lock:
             return self._active_teams.copy()
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get summary statistics for all team executions.
 
         Returns:
@@ -528,7 +527,7 @@ class TeamMetricsCollector:
             member_counts = [m.member_count for m in self._team_metrics.values()]
             total_tool_calls = sum(m.total_tool_calls for m in self._team_metrics.values())
 
-            formation_distribution: Dict[str, int] = defaultdict(int)
+            formation_distribution: dict[str, int] = defaultdict(int)
             for metrics in self._team_metrics.values():
                 formation_distribution[metrics.formation] += 1
 
@@ -544,7 +543,7 @@ class TeamMetricsCollector:
                 "formation_distribution": dict(formation_distribution),
             }
 
-    def get_formation_stats(self, formation: str) -> Dict[str, Any]:
+    def get_formation_stats(self, formation: str) -> dict[str, Any]:
         """Get statistics for a specific formation type.
 
         Args:
@@ -579,7 +578,7 @@ class TeamMetricsCollector:
                 "average_member_count": sum(member_counts) / len(member_counts),
             }
 
-    def get_recursion_depth_stats(self) -> Dict[str, Any]:
+    def get_recursion_depth_stats(self) -> dict[str, Any]:
         """Get statistics about recursion depth.
 
         Returns:
@@ -597,7 +596,7 @@ class TeamMetricsCollector:
             max_depth = max(depths)
             avg_depth = sum(depths) / len(depths)
 
-            depth_distribution: Dict[int, int] = defaultdict(int)
+            depth_distribution: dict[int, int] = defaultdict(int)
             for depth in depths:
                 depth_distribution[depth] += 1
 
@@ -666,7 +665,7 @@ def record_team_execution(
     recursion_depth: int,
     duration_seconds: float,
     success: bool,
-    member_results: Optional[Dict[str, Dict[str, Any]]] = None,
+    member_results: Optional[dict[str, dict[str, Any]]] = None,
 ) -> None:
     """Record a complete team execution in one call.
 

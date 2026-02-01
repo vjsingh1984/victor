@@ -27,11 +27,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 import yaml
 
-from victor.agent.conversation_state import ConversationStage  # noqa: TC002
+from victor.agent.conversation_state import ConversationStage
 from victor.tools.enums import SchemaLevel, AccessMode, ExecutionCategory
 from victor.protocols.mode_aware import ModeAwareMixin
 
@@ -49,11 +50,6 @@ if TYPE_CHECKING:
     from victor.agent.task_tool_config_loader import TaskToolConfigLoader
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.agent.vertical_context import VerticalContext
-    from victor.core.verticals.protocols import (
-        ToolSelectionContext,
-        ToolSelectionResult,
-        ToolSelectionStrategyProtocol,
-    )
     from victor.providers.base import ToolDefinition
     from victor.tools.registry import ToolRegistry
     from victor.tools.semantic_selector import SemanticToolSelector
@@ -63,7 +59,7 @@ logger = logging.getLogger(__name__)
 
 # Fallback critical tools for cases where registry is unavailable.
 # Critical tools are detected via priority=Priority.CRITICAL in @tool decorator.
-_FALLBACK_CRITICAL_TOOLS: Set[str] = {
+_FALLBACK_CRITICAL_TOOLS: set[str] = {
     "read",  # read_file → read
     "write",  # write_file → write
     "ls",  # list_directory → ls
@@ -73,7 +69,7 @@ _FALLBACK_CRITICAL_TOOLS: Set[str] = {
 }
 
 
-def get_critical_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
+def get_critical_tools(registry: Optional["ToolRegistry"] = None) -> set[str]:
     """Dynamically discover critical tools from registry using priority-based detection.
 
     Critical tools are those with priority=Priority.CRITICAL in their @tool decorator.
@@ -89,7 +85,7 @@ def get_critical_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
     if registry is None:
         return _FALLBACK_CRITICAL_TOOLS.copy()
 
-    critical_tools: Set[str] = set()
+    critical_tools: set[str] = set()
     for tool in registry.list_tools(only_enabled=True):
         # Use is_critical property which checks priority=Priority.CRITICAL
         if hasattr(tool, "is_critical") and tool.is_critical:
@@ -108,7 +104,7 @@ def get_critical_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
 
 def get_tools_by_category(
     registry: Optional["ToolRegistry"] = None, category: str = ""
-) -> Set[str]:
+) -> set[str]:
     """Dynamically discover tools in a specific category from registry.
 
     Tools declare their category via @tool(category="...") decorator.
@@ -123,7 +119,7 @@ def get_tools_by_category(
     if registry is None or not category:
         return set()
 
-    tools: Set[str] = set()
+    tools: set[str] = set()
     for tool in registry.list_tools(only_enabled=True):
         if hasattr(tool, "category") and tool.category == category:
             tools.add(tool.name)
@@ -131,7 +127,7 @@ def get_tools_by_category(
     return tools
 
 
-def get_all_categories(registry: Optional["ToolRegistry"] = None) -> Set[str]:
+def get_all_categories(registry: Optional["ToolRegistry"] = None) -> set[str]:
     """Get all unique categories from tools in registry.
 
     Args:
@@ -143,7 +139,7 @@ def get_all_categories(registry: Optional["ToolRegistry"] = None) -> Set[str]:
     if registry is None:
         return set()
 
-    categories: Set[str] = set()
+    categories: set[str] = set()
     for tool in registry.list_tools(only_enabled=True):
         if hasattr(tool, "category") and tool.category:
             categories.add(tool.category)
@@ -153,7 +149,7 @@ def get_all_categories(registry: Optional["ToolRegistry"] = None) -> Set[str]:
 
 def get_category_to_tools_map(
     registry: Optional["ToolRegistry"] = None,
-) -> Dict[str, Set[str]]:
+) -> dict[str, set[str]]:
     """Build a mapping from categories to tool names.
 
     Dynamically discovers categories from tool metadata. Tools must declare
@@ -176,7 +172,7 @@ def get_category_to_tools_map(
         )
         return {}
 
-    category_map: Dict[str, Set[str]] = {}
+    category_map: dict[str, set[str]] = {}
     for tool in registry.list_tools(only_enabled=True):
         if hasattr(tool, "category") and tool.category:
             category = tool.category
@@ -197,7 +193,7 @@ def get_category_to_tools_map(
 # NOTE: This is a FALLBACK when registry.detect_categories_from_text() is unavailable.
 # The registry-based approach dynamically builds categories from @tool(keywords=[...])
 # decorators and is preferred. This static list is only used when registry is None.
-_FALLBACK_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
+_FALLBACK_CATEGORY_KEYWORDS: dict[str, set[str]] = {
     "security": {"security", "vulnerability", "scan", "audit", "cve", "exploit", "owasp"},
     "metrics": {"metrics", "complexity", "coverage", "analyze", "statistics", "cyclomatic"},
     "testing": {"test", "unittest", "pytest", "spec", "coverage", "mock"},
@@ -210,7 +206,7 @@ _FALLBACK_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
 CATEGORY_KEYWORDS = _FALLBACK_CATEGORY_KEYWORDS
 
 
-def detect_categories_from_message(message: str) -> Set[str]:
+def detect_categories_from_message(message: str) -> set[str]:
     """Detect relevant tool categories from keywords in a message.
 
     Merges registry-based detection (decorator-driven keywords) with
@@ -228,7 +224,7 @@ def detect_categories_from_message(message: str) -> Set[str]:
         >>> detect_categories_from_message("analyze code complexity and metrics")
         {'metrics'}
     """
-    detected: Set[str] = set()
+    detected: set[str] = set()
 
     # Try registry-based detection (decorator-driven)
     try:
@@ -262,8 +258,8 @@ def detect_categories_from_message(message: str) -> Set[str]:
 
 
 def get_tools_for_categories(
-    categories: Set[str], registry: Optional["ToolRegistry"] = None
-) -> Set[str]:
+    categories: set[str], registry: Optional["ToolRegistry"] = None
+) -> set[str]:
     """Get tool names for a set of categories.
 
     Aggregates tools from multiple categories into a single set.
@@ -276,7 +272,7 @@ def get_tools_for_categories(
     Returns:
         Set of tool names belonging to any of the specified categories
     """
-    tools: Set[str] = set()
+    tools: set[str] = set()
 
     # Try registry-based lookup first
     if registry is not None:
@@ -298,7 +294,7 @@ def get_tools_for_categories(
     return tools
 
 
-def get_web_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
+def get_web_tools(registry: Optional["ToolRegistry"] = None) -> set[str]:
     """Get web-related tools from registry.
 
     Web tools are those with category='web'. Tools must declare their category
@@ -323,8 +319,8 @@ def get_web_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
 
 def get_tools_with_keywords(
     registry: Optional["ToolRegistry"] = None,
-    match_keywords: Optional[Set[str]] = None,
-) -> Set[str]:
+    match_keywords: Optional[set[str]] = None,
+) -> set[str]:
     """Find tools that have any of the specified keywords in their metadata.
 
     Args:
@@ -337,7 +333,7 @@ def get_tools_with_keywords(
     if registry is None or not match_keywords:
         return set()
 
-    matching_tools: Set[str] = set()
+    matching_tools: set[str] = set()
     match_keywords_lower = {k.lower() for k in match_keywords}
 
     for tool in registry.list_tools(only_enabled=True):
@@ -359,10 +355,10 @@ def get_tools_with_keywords(
 
 
 # Web-related keywords for explicit web tool inclusion
-WEB_KEYWORDS: List[str] = ["search", "web", "online", "lookup", "http", "https"]
+WEB_KEYWORDS: list[str] = ["search", "web", "online", "lookup", "http", "https"]
 
 # Small model indicators (for limiting tools)
-SMALL_MODEL_INDICATORS: List[str] = [":0.5b", ":1.5b", ":3b"]
+SMALL_MODEL_INDICATORS: list[str] = [":0.5b", ":1.5b", ":3b"]
 
 # Default thresholds for semantic selection
 DEFAULT_THRESHOLD: float = 0.18
@@ -403,7 +399,7 @@ class ToolSelectionStats:
         """Record a tool execution event."""
         self.total_tools_executed += 1
 
-    def to_dict(self) -> Dict[str, int]:
+    def to_dict(self) -> dict[str, int]:
         """Convert to dictionary."""
         return {
             "semantic_selections": self.semantic_selections,
@@ -414,7 +410,7 @@ class ToolSelectionStats:
         }
 
 
-def get_tools_from_message(message: str) -> Set[str]:
+def get_tools_from_message(message: str) -> set[str]:
     """Get tool names that match keywords in the user message.
 
     Uses ToolMetadataRegistry to find tools whose @tool(keywords=[...])
@@ -444,7 +440,7 @@ def get_tools_from_message_scored(
     message: str,
     min_score: float = 0.0,
     max_results: Optional[int] = None,
-) -> List[Tuple[str, float]]:
+) -> list[tuple[str, float]]:
     """Get tool names with relevance scores from the user message.
 
     Enhanced version of get_tools_from_message() that returns scored results.
@@ -481,7 +477,7 @@ def get_tools_from_message_scored(
         return []
 
 
-def get_keyword_matching_metrics() -> Optional[Dict[str, Any]]:
+def get_keyword_matching_metrics() -> Optional[dict[str, Any]]:
     """Get keyword matching metrics for observability.
 
     Returns:
@@ -534,7 +530,7 @@ def calculate_adaptive_threshold(
     conversation_depth: int,
     base_threshold: float = DEFAULT_THRESHOLD,
     base_max_tools: int = DEFAULT_MAX_TOOLS,
-) -> Tuple[float, int]:
+) -> tuple[float, int]:
     """Calculate adaptive threshold and max_tools based on context.
 
     Args:
@@ -584,10 +580,10 @@ def calculate_adaptive_threshold(
 
 def select_tools_by_keywords(
     message: str,
-    all_tool_names: Set[str],
+    all_tool_names: set[str],
     is_small: bool = False,
     max_tools_for_small: int = 10,
-) -> Set[str]:
+) -> set[str]:
     """Select tools using keyword matching via ToolMetadataRegistry.
 
     Uses keywords defined in @tool decorators for tool selection.
@@ -678,7 +674,7 @@ class ToolSelector(ModeAwareMixin):
         task_tracker: Optional["UnifiedTaskTracker"] = None,
         model: str = "",
         provider_name: str = "",
-        tool_selection_config: Optional[Dict[str, Any]] = None,
+        tool_selection_config: Optional[dict[str, Any]] = None,
         fallback_max_tools: int = 8,
         on_selection_recorded: Optional[Callable[[str, int], None]] = None,
         vertical_context: Optional["VerticalContext"] = None,
@@ -732,15 +728,15 @@ class ToolSelector(ModeAwareMixin):
         self.stats = ToolSelectionStats()
 
         # Cache last selection to avoid redundant logging
-        self._last_selection: Optional[Set[str]] = None
+        self._last_selection: Optional[set[str]] = None
 
         # Cached core and web tools (lazy loaded for dynamic discovery)
-        self._cached_core_tools: Optional[Set[str]] = None
-        self._cached_core_readonly: Optional[Set[str]] = None
-        self._cached_web_tools: Optional[Set[str]] = None
+        self._cached_core_tools: Optional[set[str]] = None
+        self._cached_core_readonly: Optional[set[str]] = None
+        self._cached_web_tools: Optional[set[str]] = None
 
         # Enabled tools filter (set by vertical, None = all tools)
-        self._enabled_tools: Optional[Set[str]] = None
+        self._enabled_tools: Optional[set[str]] = None
 
         # Populate global metadata registry for keyword-based tool selection
         self._populate_metadata_registry()
@@ -767,14 +763,14 @@ class ToolSelector(ModeAwareMixin):
         except Exception as e:
             logger.warning(f"Failed to populate metadata registry: {e}")
 
-    def _load_vertical_config(self) -> Dict[str, Any]:
+    def _load_vertical_config(self) -> dict[str, Any]:
         """Load vertical tool configurations from YAML.
 
         Returns:
             Dict with vertical configurations, or empty dict if not found
         """
         if not hasattr(self, "_vertical_config_cache"):
-            self._vertical_config_cache: Optional[Dict[str, Any]] = None
+            self._vertical_config_cache: Optional[dict[str, Any]] = None
 
         if self._vertical_config_cache is not None:
             return self._vertical_config_cache
@@ -793,7 +789,7 @@ class ToolSelector(ModeAwareMixin):
 
         return self._vertical_config_cache
 
-    def _get_vertical_core_tools(self, vertical: Optional[str] = None) -> Set[str]:
+    def _get_vertical_core_tools(self, vertical: Optional[str] = None) -> set[str]:
         """Get core tools for a specific vertical.
 
         Args:
@@ -819,7 +815,7 @@ class ToolSelector(ModeAwareMixin):
         self,
         user_message: str,
         vertical: Optional[str] = None,
-    ) -> Dict[str, SchemaLevel]:
+    ) -> dict[str, SchemaLevel]:
         """Return tools with their schema levels for token-efficient broadcasting.
 
         This method implements tiered schema selection:
@@ -855,7 +851,7 @@ class ToolSelector(ModeAwareMixin):
         max_semantic = vert_config.get("max_semantic_pool", 5)
 
         # Build levels dict
-        levels: Dict[str, SchemaLevel] = {}
+        levels: dict[str, SchemaLevel] = {}
 
         # FULL for core tools only
         for tool in core_tools:
@@ -916,7 +912,7 @@ class ToolSelector(ModeAwareMixin):
         self,
         user_message: str,
         vertical: Optional[str] = None,
-    ) -> List[Tuple["ToolDefinition", SchemaLevel]]:
+    ) -> list[tuple["ToolDefinition", SchemaLevel]]:
         """Get tools with their schema levels for LLM broadcasting.
 
         This is the main entry point for token-efficient tool broadcasting.
@@ -934,7 +930,7 @@ class ToolSelector(ModeAwareMixin):
 
         levels = self.get_tools_with_levels(user_message, vertical)
 
-        result: List[Tuple[ToolDefinition, SchemaLevel]] = []
+        result: list[tuple[ToolDefinition, SchemaLevel]] = []
         all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
 
         for tool_name, level in levels.items():
@@ -952,7 +948,7 @@ class ToolSelector(ModeAwareMixin):
 
         return result
 
-    def _get_core_tools_cached(self) -> Set[str]:
+    def _get_core_tools_cached(self) -> set[str]:
         """Get core tools with caching for performance.
 
         Uses dynamic discovery via get_critical_tools() on first call,
@@ -965,7 +961,7 @@ class ToolSelector(ModeAwareMixin):
             self._cached_core_tools = get_critical_tools(self.tools)
         return self._cached_core_tools
 
-    def _get_core_readonly_cached(self) -> Set[str]:
+    def _get_core_readonly_cached(self) -> set[str]:
         """Get core read-only tools with caching."""
         if self._cached_core_readonly is None:
             try:
@@ -977,7 +973,7 @@ class ToolSelector(ModeAwareMixin):
                 self._cached_core_readonly = set()
         return self._cached_core_readonly
 
-    def _get_stage_core_tools(self, stage: Optional[ConversationStage]) -> Set[str]:
+    def _get_stage_core_tools(self, stage: Optional[ConversationStage]) -> set[str]:
         """Choose core set based on stage (safe for exploration/analysis)."""
         if stage in {
             ConversationStage.INITIAL,
@@ -1004,8 +1000,8 @@ class ToolSelector(ModeAwareMixin):
             return False
 
     def _filter_tools_for_stage(
-        self, tools: List["ToolDefinition"], stage: Optional[ConversationStage]
-    ) -> List["ToolDefinition"]:
+        self, tools: list["ToolDefinition"], stage: Optional[ConversationStage]
+    ) -> list["ToolDefinition"]:
         """Remove write/execute tools during exploration/analysis stages.
 
         Note: Vertical core tools (from TieredToolConfig) are ALWAYS preserved
@@ -1045,7 +1041,7 @@ class ToolSelector(ModeAwareMixin):
             return tools
 
         # Get vertical core tools that should be preserved regardless of stage
-        preserved_tools: Set[str] = set()
+        preserved_tools: set[str] = set()
         tiered_config = getattr(self, "_tiered_config", None)
         if tiered_config:
             # Always preserve mandatory and vertical_core tools
@@ -1074,7 +1070,7 @@ class ToolSelector(ModeAwareMixin):
 
         # Fallback to core readonly if filtering removed everything
         readonly_core = self._get_stage_core_tools(stage)
-        fallback: List["ToolDefinition"] = []
+        fallback: list["ToolDefinition"] = []
         for tool in self.tools.list_tools():
             if tool.name in readonly_core:
                 from victor.providers.base import ToolDefinition
@@ -1087,8 +1083,8 @@ class ToolSelector(ModeAwareMixin):
         return self._apply_stage_limit(fallback, stage) if fallback else tools
 
     def _apply_stage_limit(
-        self, tools: List["ToolDefinition"], stage: Optional[ConversationStage]
-    ) -> List["ToolDefinition"]:
+        self, tools: list["ToolDefinition"], stage: Optional[ConversationStage]
+    ) -> list["ToolDefinition"]:
         """Apply stage-based tool limit.
 
         Args:
@@ -1131,7 +1127,7 @@ class ToolSelector(ModeAwareMixin):
         )
         return result
 
-    def _get_web_tools_cached(self) -> Set[str]:
+    def _get_web_tools_cached(self) -> set[str]:
         """Get web tools with caching for performance.
 
         Uses dynamic discovery via get_web_tools() on first call,
@@ -1160,7 +1156,7 @@ class ToolSelector(ModeAwareMixin):
         self._cached_web_tools = None
         logger.debug("Tool selection cache invalidated - will re-discover on next access")
 
-    def set_enabled_tools(self, tools: Optional[Set[str]]) -> None:
+    def set_enabled_tools(self, tools: Optional[set[str]]) -> None:
         """Set which tools are enabled for selection (vertical filter).
 
         When set, only tools in this set will be considered for selection.
@@ -1175,7 +1171,7 @@ class ToolSelector(ModeAwareMixin):
         else:
             logger.debug("Tool selector enabled tools filter cleared")
 
-    def get_enabled_tools(self) -> Optional[Set[str]]:
+    def get_enabled_tools(self) -> Optional[set[str]]:
         """Get the enabled tools filter.
 
         Returns:
@@ -1224,10 +1220,10 @@ class ToolSelector(ModeAwareMixin):
 
     def _apply_vertical_strategy(
         self,
-        tools: List["ToolDefinition"],
+        tools: list["ToolDefinition"],
         user_message: str,
         task_type: str = "unknown",
-    ) -> List["ToolDefinition"]:
+    ) -> list["ToolDefinition"]:
         """Apply vertical-specific tool selection strategy to reorder/filter tools.
 
         This implements the Strategy Pattern (OCP) allowing verticals to customize
@@ -1314,7 +1310,7 @@ class ToolSelector(ModeAwareMixin):
         user_message: str,
         stage: Optional[str] = None,
         is_analysis_task: bool = False,
-    ) -> List["ToolDefinition"]:
+    ) -> list["ToolDefinition"]:
         """Select tools using tiered configuration.
 
         This method provides context-efficient tool selection by using:
@@ -1340,7 +1336,7 @@ class ToolSelector(ModeAwareMixin):
             return self.select_keywords(user_message)
 
         all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
-        selected: Dict[str, ToolDefinition] = {}
+        selected: dict[str, ToolDefinition] = {}
 
         # Tier 1: Mandatory tools (always included)
         for name in config.mandatory:
@@ -1439,7 +1435,7 @@ class ToolSelector(ModeAwareMixin):
         self._record_selection("tiered", len(result))
         return result
 
-    def _filter_by_enabled(self, tools: List["ToolDefinition"]) -> List["ToolDefinition"]:
+    def _filter_by_enabled(self, tools: list["ToolDefinition"]) -> list["ToolDefinition"]:
         """Filter tools by the enabled tools set.
 
         Args:
@@ -1472,7 +1468,7 @@ class ToolSelector(ModeAwareMixin):
 
     def get_adaptive_threshold(
         self, user_message: str, conversation_depth: int = 0
-    ) -> Tuple[float, int]:
+    ) -> tuple[float, int]:
         """Calculate adaptive similarity threshold and max_tools based on context.
 
         Adapts based on:
@@ -1555,10 +1551,10 @@ class ToolSelector(ModeAwareMixin):
         self,
         user_message: str,
         use_semantic: bool = True,
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        conversation_history: Optional[list[dict[str, Any]]] = None,
         conversation_depth: int = 0,
-        planned_tools: Optional[List["ToolDefinition"]] = None,
-    ) -> List["ToolDefinition"]:
+        planned_tools: Optional[list["ToolDefinition"]] = None,
+    ) -> list["ToolDefinition"]:
         """Select tools using the best available method.
 
         Main entry point for tool selection. Uses semantic selection if available
@@ -1587,10 +1583,10 @@ class ToolSelector(ModeAwareMixin):
     async def select_semantic(
         self,
         user_message: str,
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        conversation_history: Optional[list[dict[str, Any]]] = None,
         conversation_depth: int = 0,
-        planned_tools: Optional[List["ToolDefinition"]] = None,
-    ) -> List["ToolDefinition"]:
+        planned_tools: Optional[list["ToolDefinition"]] = None,
+    ) -> list["ToolDefinition"]:
         """Select tools using embedding-based semantic similarity.
 
         Args:
@@ -1659,7 +1655,7 @@ class ToolSelector(ModeAwareMixin):
                     )
 
         # Deduplicate
-        dedup: Dict[str, ToolDefinition] = {}
+        dedup: dict[str, ToolDefinition] = {}
         for t in tools:
             dedup[t.name] = t
         tools = list(dedup.values())
@@ -1703,9 +1699,9 @@ class ToolSelector(ModeAwareMixin):
     def select_keywords(
         self,
         user_message: str,
-        planned_tools: Optional[List["ToolDefinition"]] = None,
+        planned_tools: Optional[list["ToolDefinition"]] = None,
         _record: bool = True,
-    ) -> List["ToolDefinition"]:
+    ) -> list["ToolDefinition"]:
         """Select tools using keyword-based category matching.
 
         If enabled_tools filter is set (from vertical), returns all enabled tools.
@@ -1724,7 +1720,7 @@ class ToolSelector(ModeAwareMixin):
         all_tools = list(self.tools.list_tools())
 
         # Start with planned tools if provided
-        selected_tools: List[ToolDefinition] = list(planned_tools) if planned_tools else []
+        selected_tools: list[ToolDefinition] = list(planned_tools) if planned_tools else []
         existing_names = {t.name for t in selected_tools}
 
         # If vertical has set enabled tools, use those directly
@@ -1816,8 +1812,8 @@ class ToolSelector(ModeAwareMixin):
     def prioritize_by_stage(
         self,
         user_message: str,
-        tools: Optional[List["ToolDefinition"]],
-    ) -> Optional[List["ToolDefinition"]]:
+        tools: Optional[list["ToolDefinition"]],
+    ) -> Optional[list["ToolDefinition"]]:
         """Stage-aware pruning of tool list to keep it focused per step.
 
         Uses ConversationStateMachine for intelligent stage detection.
@@ -1866,7 +1862,7 @@ class ToolSelector(ModeAwareMixin):
                 keep.add(tool.name)
 
         # Apply priority boost based on stage
-        boosted_tools: List[Tuple["ToolDefinition", float]] = []
+        boosted_tools: list[tuple["ToolDefinition", float]] = []
         for tool in tools:
             boost = self.conversation_state.get_tool_priority_boost(tool.name)
             if tool.name in keep or boost > 0:
@@ -1901,7 +1897,7 @@ class ToolSelector(ModeAwareMixin):
     def get_task_aware_tools(
         self,
         stage: str = "initial",
-    ) -> Set[str]:
+    ) -> set[str]:
         """Get tools appropriate for the current task type and stage.
 
         Uses UnifiedTaskTracker to determine task type and TaskToolConfigLoader
@@ -1958,9 +1954,9 @@ class ToolSelector(ModeAwareMixin):
 
     def prioritize_by_task(
         self,
-        tools: List["ToolDefinition"],
+        tools: list["ToolDefinition"],
         stage: str = "initial",
-    ) -> List["ToolDefinition"]:
+    ) -> list["ToolDefinition"]:
         """Filter and prioritize tools based on task type and stage.
 
         Args:
@@ -2009,7 +2005,7 @@ class ToolSelector(ModeAwareMixin):
         logger.warning("Task-aware filtering removed all tools, keeping originals")
         return tools
 
-    def _get_fallback_tools(self, user_message: str) -> List["ToolDefinition"]:
+    def _get_fallback_tools(self, user_message: str) -> list["ToolDefinition"]:
         """Get fallback tools when semantic selection returns 0 results.
 
         Args:
@@ -2021,7 +2017,7 @@ class ToolSelector(ModeAwareMixin):
         from victor.providers.base import ToolDefinition
 
         all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
-        tools: List[ToolDefinition] = []
+        tools: list[ToolDefinition] = []
 
         stage = self.conversation_state.get_stage() if self.conversation_state else None
         # Add core tools first (dynamic discovery)

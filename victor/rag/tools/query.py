@@ -16,7 +16,7 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.framework.enrichment import EnrichmentContext
 from victor.tools.base import BaseTool, ToolResult
@@ -140,7 +140,7 @@ class RAGQueryTool(BaseTool):
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any] | None = None,
+        _exec_ctx: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> ToolResult:
         """Execute RAG query with optional LLM synthesis.
@@ -158,7 +158,6 @@ class RAGQueryTool(BaseTool):
         Returns:
             ToolResult with synthesized answer or formatted context
         """
-        from victor.rag.document_store import DocumentStore
 
         question = kwargs.get("question", "")
         k = kwargs.get("k", 5)
@@ -178,7 +177,6 @@ class RAGQueryTool(BaseTool):
             # Initialize enrichment strategy with document store for entity resolution
             from victor.rag.enrichment import (
                 get_rag_enrichment_strategy,
-                reset_rag_enrichment_strategy,
             )
 
             # Get or create enrichment strategy with document store
@@ -331,10 +329,10 @@ class RAGQueryTool(BaseTool):
         self,
         question: str,
         context: str,
-        sources: List[str],
+        sources: list[str],
         provider: Optional[str] = None,
         model: Optional[str] = None,
-        enrichments: Optional[List[Any]] = None,
+        enrichments: Optional[list[Any]] = None,
     ) -> str:
         """Synthesize an answer using an LLM provider with enrichment.
 
@@ -433,7 +431,7 @@ class RAGQueryTool(BaseTool):
         self,
         store: Any,
         question: str,
-        entities: List[Any],
+        entities: list[Any],
         k: int,
     ) -> Any:
         """Search for multiple entities and combine results.
@@ -559,7 +557,7 @@ class RAGQueryTool(BaseTool):
 
         if sec_docs:
             # Group by ticker
-            by_ticker: Dict[str, List[Any]] = {}
+            by_ticker: dict[str, list[Any]] = {}
             for doc in sec_docs:
                 symbol = doc.metadata.get("symbol", "UNKNOWN")
                 if symbol not in by_ticker:
@@ -574,7 +572,7 @@ class RAGQueryTool(BaseTool):
             output_parts.append(f"  {', '.join(tickers)}")
 
             # Group by sector
-            by_sector: Dict[str, int] = {}
+            by_sector: dict[str, int] = {}
             for doc in sec_docs:
                 sector = doc.metadata.get("sector", "Other")
                 by_sector[sector] = by_sector.get(sector, 0) + 1

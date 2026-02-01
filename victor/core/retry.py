@@ -36,14 +36,11 @@ from enum import Enum
 from functools import wraps
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     Optional,
-    Set,
-    Type,
     TypeVar,
     cast,
 )
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +126,7 @@ class BaseRetryStrategy(ABC):
         """
         pass
 
-    def on_retry(self, context: RetryContext) -> None:  # noqa: B027
+    def on_retry(self, context: RetryContext) -> None:
         """Hook called before each retry attempt.
 
         Override to add logging, metrics, or other side effects.
@@ -138,14 +135,14 @@ class BaseRetryStrategy(ABC):
             context: Current retry context
         """
 
-    def on_success(self, context: RetryContext) -> None:  # noqa: B027
+    def on_success(self, context: RetryContext) -> None:
         """Hook called on successful completion.
 
         Args:
             context: Final retry context
         """
 
-    def on_failure(self, context: RetryContext) -> None:  # noqa: B027
+    def on_failure(self, context: RetryContext) -> None:
         """Hook called when all retries exhausted.
 
         Args:
@@ -170,8 +167,8 @@ class ExponentialBackoffStrategy(BaseRetryStrategy):
         max_delay: float = 60.0,
         multiplier: float = 2.0,
         jitter: float = 0.1,
-        retryable_exceptions: Optional[Set[Type[Exception]]] = None,
-        non_retryable_exceptions: Optional[Set[Type[Exception]]] = None,
+        retryable_exceptions: Optional[set[type[Exception]]] = None,
+        non_retryable_exceptions: Optional[set[type[Exception]]] = None,
     ):
         """Initialize exponential backoff strategy.
 

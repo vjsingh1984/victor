@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 from victor.core.query_enhancement import (
     # Types
@@ -811,14 +811,6 @@ class TestIntegration:
             EnhancementContext,
             EnhancementTechnique,
             EnhancedQuery,
-            QueryEnhancementConfig,
-            EnhancementMetrics,
-            EnhancementResult,
-            EntityExpandStrategy,
-            RewriteStrategy,
-            DecompositionStrategy,
-            get_default_registry,
-            get_domain_config,
         )
 
         # All imports should work
@@ -829,7 +821,6 @@ class TestIntegration:
 
     def test_strategy_protocol_compliance(self):
         """Test that strategies comply with protocol."""
-        from victor.core.query_enhancement import IQueryEnhancementStrategy
 
         # EntityExpandStrategy should comply
         strategy = EntityExpandStrategy()

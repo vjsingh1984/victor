@@ -68,7 +68,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 
 @dataclass
@@ -86,8 +86,8 @@ class ToolDependency:
     """
 
     tool_name: str
-    depends_on: List[str] = field(default_factory=list)
-    enables: List[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)
+    enables: list[str] = field(default_factory=list)
     transition_weight: float = 1.0
 
 
@@ -106,12 +106,12 @@ class ToolNode:
     """
 
     name: str
-    depends_on: Set[str] = field(default_factory=set)
-    enables: Set[str] = field(default_factory=set)
-    inputs: Set[str] = field(default_factory=set)
-    outputs: Set[str] = field(default_factory=set)
+    depends_on: set[str] = field(default_factory=set)
+    enables: set[str] = field(default_factory=set)
+    inputs: set[str] = field(default_factory=set)
+    outputs: set[str] = field(default_factory=set)
     weight: float = 1.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dependency(cls, dep: ToolDependency) -> "ToolNode":
@@ -163,11 +163,11 @@ class ToolExecutionGraph:
             name: Graph identifier (e.g., vertical name)
         """
         self.name = name
-        self._nodes: Dict[str, ToolNode] = {}
-        self._transitions: Dict[str, List[ToolTransition]] = defaultdict(list)
-        self._reverse_deps: Dict[str, Set[str]] = defaultdict(set)
-        self._sequences: List[List[str]] = []
-        self._clusters: Dict[str, Set[str]] = {}
+        self._nodes: dict[str, ToolNode] = {}
+        self._transitions: dict[str, list[ToolTransition]] = defaultdict(list)
+        self._reverse_deps: dict[str, set[str]] = defaultdict(set)
+        self._sequences: list[list[str]] = []
+        self._clusters: dict[str, set[str]] = {}
 
     # =========================================================================
     # Node Management
@@ -176,10 +176,10 @@ class ToolExecutionGraph:
     def add_node(
         self,
         name: str,
-        depends_on: Optional[Set[str]] = None,
-        enables: Optional[Set[str]] = None,
-        inputs: Optional[Set[str]] = None,
-        outputs: Optional[Set[str]] = None,
+        depends_on: Optional[set[str]] = None,
+        enables: Optional[set[str]] = None,
+        inputs: Optional[set[str]] = None,
+        outputs: Optional[set[str]] = None,
         weight: float = 1.0,
     ) -> ToolNode:
         """Add or update a tool node.
@@ -248,8 +248,8 @@ class ToolExecutionGraph:
     def add_dependency(
         self,
         tool_name_or_dep: str | ToolDependency,
-        depends_on: Optional[Set[str]] = None,
-        enables: Optional[Set[str]] = None,
+        depends_on: Optional[set[str]] = None,
+        enables: Optional[set[str]] = None,
         weight: float = 1.0,
     ) -> None:
         """Add tool dependency (coding format).
@@ -280,7 +280,7 @@ class ToolExecutionGraph:
 
     def add_dependencies(
         self,
-        dependencies: List[Tuple[str, Set[str], Set[str], float]],
+        dependencies: list[tuple[str, set[str], set[str], float]],
     ) -> None:
         """Add multiple dependencies.
 
@@ -322,7 +322,7 @@ class ToolExecutionGraph:
 
     def add_transitions(
         self,
-        transitions: Dict[str, List[Tuple[str, float]]],
+        transitions: dict[str, list[tuple[str, float]]],
     ) -> None:
         """Add transitions (devops format).
 
@@ -344,7 +344,7 @@ class ToolExecutionGraph:
     # Sequence Format
     # =========================================================================
 
-    def add_sequence(self, sequence: List[str], weight: float = 0.7) -> None:
+    def add_sequence(self, sequence: list[str], weight: float = 0.7) -> None:
         """Add a tool sequence pattern.
 
         Args:
@@ -358,7 +358,7 @@ class ToolExecutionGraph:
             next_tool = sequence[i + 1]
             self._add_transition(tool, next_tool, weight, "sequence")
 
-    def add_sequences(self, sequences: List[List[str]], weight: float = 0.7) -> None:
+    def add_sequences(self, sequences: list[list[str]], weight: float = 0.7) -> None:
         """Add multiple sequences.
 
         Args:
@@ -375,8 +375,8 @@ class ToolExecutionGraph:
     def add_io_tool(
         self,
         name: str,
-        inputs: Set[str],
-        outputs: Set[str],
+        inputs: set[str],
+        outputs: set[str],
         weight: float = 1.0,
     ) -> None:
         """Add tool with IO relationships (planning format).
@@ -409,7 +409,7 @@ class ToolExecutionGraph:
     # Cluster Management
     # =========================================================================
 
-    def add_cluster(self, name: str, tools: Set[str]) -> None:
+    def add_cluster(self, name: str, tools: set[str]) -> None:
         """Add a tool cluster (tools that work well together).
 
         Args:
@@ -418,7 +418,7 @@ class ToolExecutionGraph:
         """
         self._clusters[name] = tools
 
-    def get_cluster_tools(self, tool_name: str) -> Set[str]:
+    def get_cluster_tools(self, tool_name: str) -> set[str]:
         """Get tools in the same cluster as a given tool.
 
         Args:
@@ -438,7 +438,7 @@ class ToolExecutionGraph:
     # Query Methods
     # =========================================================================
 
-    def get_prerequisites(self, tool_name: str) -> Set[str]:
+    def get_prerequisites(self, tool_name: str) -> set[str]:
         """Get prerequisite tools.
 
         Args:
@@ -452,7 +452,7 @@ class ToolExecutionGraph:
             return node.depends_on.copy()
         return set()
 
-    def get_enabled_tools(self, tool_name: str) -> Set[str]:
+    def get_enabled_tools(self, tool_name: str) -> set[str]:
         """Get tools enabled by a tool.
 
         Args:
@@ -466,7 +466,7 @@ class ToolExecutionGraph:
             return node.enables.copy()
         return set()
 
-    def get_dependents(self, tool_name: str) -> Set[str]:
+    def get_dependents(self, tool_name: str) -> set[str]:
         """Get tools that depend on a tool.
 
         Args:
@@ -480,10 +480,10 @@ class ToolExecutionGraph:
     def suggest_next_tools(
         self,
         current_tool: str,
-        history: Optional[List[str]] = None,
-        available_tools: Optional[Set[str]] = None,
+        history: Optional[list[str]] = None,
+        available_tools: Optional[set[str]] = None,
         max_suggestions: int = 5,
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """Suggest next tools based on current state.
 
         Args:
@@ -498,7 +498,7 @@ class ToolExecutionGraph:
         history = history or []
         recent_set = set(history[-3:]) if len(history) >= 3 else set(history)
 
-        candidates: Dict[str, float] = {}
+        candidates: dict[str, float] = {}
 
         # 1. Add transition-based candidates
         for transition in self._transitions.get(current_tool, []):
@@ -568,10 +568,10 @@ class ToolExecutionGraph:
 
     def plan_for_goal(
         self,
-        goal_tools: Set[str],
-        available_tools: Optional[Set[str]] = None,
-        current_state: Optional[Set[str]] = None,
-    ) -> List[str]:
+        goal_tools: set[str],
+        available_tools: Optional[set[str]] = None,
+        current_state: Optional[set[str]] = None,
+    ) -> list[str]:
         """Plan tool sequence to achieve goal.
 
         Uses simple dependency-based planning with transitive dependency resolution.
@@ -585,10 +585,10 @@ class ToolExecutionGraph:
             Ordered list of tools to execute
         """
         current_state = current_state or set()
-        plan: List[str] = []
+        plan: list[str] = []
 
         # Expand goals to include all transitive dependencies
-        all_needed: Set[str] = set()
+        all_needed: set[str] = set()
         to_process = list(goal_tools)
         while to_process:
             tool = to_process.pop()
@@ -628,8 +628,8 @@ class ToolExecutionGraph:
         return plan
 
     def validate_execution(
-        self, tool_name: str, executed_tools: Set[str]
-    ) -> Tuple[bool, List[str]]:
+        self, tool_name: str, executed_tools: set[str]
+    ) -> tuple[bool, list[str]]:
         """Validate if a tool can be executed.
 
         Args:
@@ -643,7 +643,7 @@ class ToolExecutionGraph:
         missing = prereqs - executed_tools
         return len(missing) == 0, list(missing)
 
-    def get_next_tools(self, current_tool: str) -> List[Tuple[str, float]]:
+    def get_next_tools(self, current_tool: str) -> list[tuple[str, float]]:
         """Get enabled tools with their transition weights.
 
         Returns tools that can be called after the current tool based on
@@ -655,7 +655,7 @@ class ToolExecutionGraph:
         Returns:
             List of (tool_name, weight) tuples sorted by weight descending
         """
-        candidates: Dict[str, float] = {}
+        candidates: dict[str, float] = {}
 
         # 1. Add tools enabled by this tool
         node = self._nodes.get(current_tool)
@@ -680,7 +680,7 @@ class ToolExecutionGraph:
         # Sort by weight descending
         return sorted(candidates.items(), key=lambda x: x[1], reverse=True)
 
-    def validate_sequence(self, sequence: List[str]) -> bool:
+    def validate_sequence(self, sequence: list[str]) -> bool:
         """Validate if a tool sequence respects dependencies.
 
         Checks that each tool in the sequence has its dependencies
@@ -693,7 +693,7 @@ class ToolExecutionGraph:
             True if the sequence is valid (all dependencies satisfied),
             False if any tool's dependencies are not met
         """
-        executed: Set[str] = set()
+        executed: set[str] = set()
 
         for tool_name in sequence:
             prereqs = self.get_prerequisites(tool_name)
@@ -738,7 +738,7 @@ class ToolExecutionGraph:
         # Merge clusters
         self._clusters.update(other._clusters)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Export graph as dictionary.
 
         Returns:
@@ -765,7 +765,7 @@ class ToolExecutionGraph:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ToolExecutionGraph":
+    def from_dict(cls, data: dict[str, Any]) -> "ToolExecutionGraph":
         """Create graph from dictionary.
 
         Args:
@@ -799,7 +799,7 @@ class ToolExecutionGraph:
         return graph
 
     @property
-    def all_tools(self) -> Set[str]:
+    def all_tools(self) -> set[str]:
         """Get all tool names in the graph."""
         return set(self._nodes.keys())
 
@@ -829,7 +829,7 @@ class ToolGraphRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._graphs: Dict[str, ToolExecutionGraph] = {}
+        self._graphs: dict[str, ToolExecutionGraph] = {}
         self._default_graph = ToolExecutionGraph("default")
 
     @classmethod
@@ -864,7 +864,7 @@ class ToolGraphRegistry:
         """
         return self._graphs.get(name, self._default_graph)
 
-    def get_merged_graph(self, names: List[str]) -> ToolExecutionGraph:
+    def get_merged_graph(self, names: list[str]) -> ToolExecutionGraph:
         """Get merged graph from multiple verticals.
 
         Args:
@@ -879,7 +879,7 @@ class ToolGraphRegistry:
                 merged.merge(self._graphs[name])
         return merged
 
-    def list_graphs(self) -> List[str]:
+    def list_graphs(self) -> list[str]:
         """List registered graph names."""
         return list(self._graphs.keys())
 

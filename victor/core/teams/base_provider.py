@@ -22,9 +22,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import yaml
 
@@ -69,9 +68,9 @@ class AgentRole:
     description: str
     persona: str = ""
     system_prompt_template: str = ""
-    tool_categories: List[str] = field(default_factory=list)
-    capabilities: List[str] = field(default_factory=list)
-    config: Dict[str, Any] = field(default_factory=dict)
+    tool_categories: list[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
+    config: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:
         return f"AgentRole(name={self.name}, display_name={self.display_name})"
@@ -96,7 +95,7 @@ class TeamSpecification:
     display_name: str
     description: str
     formation: str
-    roles: List[AgentRole]
+    roles: list[AgentRole]
     communication_style: str = "structured"
     voting_strategy: Optional[str] = None
     max_iterations: int = 10
@@ -115,7 +114,7 @@ class TeamSpecification:
                 return role
         return None
 
-    def list_roles(self) -> List[str]:
+    def list_roles(self) -> list[str]:
         """List all role names.
 
         Returns:
@@ -139,7 +138,7 @@ class BaseYAMLTeamProvider:
         review_team = provider.get_team("code_review_team")
     """
 
-    _instances: Dict[str, "BaseYAMLTeamProvider"] = {}
+    _instances: dict[str, "BaseYAMLTeamProvider"] = {}
 
     def __init__(self, vertical_name: str, config_dir: Path | None = None):
         """Initialize team provider.
@@ -152,7 +151,7 @@ class BaseYAMLTeamProvider:
         if config_dir is None:
             config_dir = Path(__file__).parent.parent.parent / "config" / "teams"
         self._config_dir = Path(config_dir)
-        self._teams: Dict[str, TeamSpecification] = {}
+        self._teams: dict[str, TeamSpecification] = {}
 
     @classmethod
     def get_provider(cls, vertical_name: str) -> "BaseYAMLTeamProvider":
@@ -168,7 +167,7 @@ class BaseYAMLTeamProvider:
             cls._instances[vertical_name] = cls(vertical_name)
         return cls._instances[vertical_name]
 
-    def load_teams(self) -> Dict[str, TeamSpecification]:
+    def load_teams(self) -> dict[str, TeamSpecification]:
         """Load all teams from YAML files.
 
         Returns:
@@ -186,7 +185,7 @@ class BaseYAMLTeamProvider:
 
         return self._teams
 
-    def _load_from_yaml(self, path: Path) -> Dict[str, TeamSpecification]:
+    def _load_from_yaml(self, path: Path) -> dict[str, TeamSpecification]:
         """Load teams from YAML file.
 
         Args:
@@ -245,7 +244,7 @@ class BaseYAMLTeamProvider:
         teams = self.load_teams()
         return teams.get(team_name)
 
-    def list_teams(self) -> List[str]:
+    def list_teams(self) -> list[str]:
         """List available teams.
 
         Returns:
@@ -254,7 +253,7 @@ class BaseYAMLTeamProvider:
         teams = self.load_teams()
         return list(teams.keys())
 
-    def get_all_teams(self) -> Dict[str, TeamSpecification]:
+    def get_all_teams(self) -> dict[str, TeamSpecification]:
         """Get all team specifications.
 
         Returns:

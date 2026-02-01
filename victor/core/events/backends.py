@@ -47,8 +47,9 @@ import queue
 import random
 import threading
 import uuid
-from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import Any, Optional
+from collections.abc import Awaitable, Callable
 
 from victor.core.events.protocols import (
     BackendConfig,
@@ -57,7 +58,6 @@ from victor.core.events.protocols import (
     MessagingEvent,
     EventHandler,
     EventPublishError,
-    EventSubscriptionError,
     IEventBackend,
     SubscriptionHandle,
 )
@@ -159,7 +159,7 @@ class InMemoryEventBackend:
         critical_reserve: int = 0,
         auto_start_dispatcher: bool = True,
         sampling_rate: float = 1.0,
-        sampling_whitelist: Optional[Set[str]] = None,
+        sampling_whitelist: Optional[set[str]] = None,
     ) -> None:
         """Initialize the in-memory backend.
 
@@ -174,7 +174,7 @@ class InMemoryEventBackend:
         self._config = config or BackendConfig()
         self._queue_maxsize = queue_maxsize
         self._critical_reserve = critical_reserve
-        self._subscriptions: Dict[str, _Subscription] = {}
+        self._subscriptions: dict[str, _Subscription] = {}
         # Use thread-safe queue.Queue for cross-thread publishing
         self._event_queue: queue.Queue[MessagingEvent] = queue.Queue(maxsize=queue_maxsize)
         self._is_connected = False
@@ -182,10 +182,10 @@ class InMemoryEventBackend:
         self._auto_start_dispatcher = auto_start_dispatcher
         # Use threading.Lock for thread-safe subscription management
         self._lock: threading.Lock = threading.Lock()
-        self._pending_tasks: Set[asyncio.Task[None]] = set()
+        self._pending_tasks: set[asyncio.Task[None]] = set()
         self._dropped_event_count = 0
         # AT_LEAST_ONCE delivery tracking
-        self._pending_events: Dict[str, MessagingEvent] = {}  # event_id -> event
+        self._pending_events: dict[str, MessagingEvent] = {}  # event_id -> event
         self._delivery_guarantee = self._config.delivery_guarantee
 
         # Event sampling (Phase 4: Observability Backpressure)
@@ -310,7 +310,7 @@ class InMemoryEventBackend:
             )
             return False
 
-    async def publish_batch(self, events: List[MessagingEvent]) -> int:
+    async def publish_batch(self, events: list[MessagingEvent]) -> int:
         """Publish multiple events.
 
         Args:
@@ -533,7 +533,6 @@ class InMemoryEventBackend:
         """
         try:
             # Check if handler is a coroutine function
-            import inspect
 
             if asyncio.iscoroutinefunction(handler):
                 await handler(event)
@@ -574,7 +573,7 @@ class InMemoryEventBackend:
         """Get total number of events published (including sampled)."""
         return self._total_event_count
 
-    def get_sampling_statistics(self) -> Dict[str, Any]:
+    def get_sampling_statistics(self) -> dict[str, Any]:
         """Get comprehensive sampling statistics.
 
         Returns:
@@ -609,7 +608,7 @@ class InMemoryEventBackend:
 # =============================================================================
 
 # Registry of backend factories
-_backend_factories: Dict[BackendType, Callable[[BackendConfig], IEventBackend]] = {}
+_backend_factories: dict[BackendType, Callable[[BackendConfig], IEventBackend]] = {}
 
 
 def register_backend_factory(
@@ -786,9 +785,9 @@ class ObservabilityBus:
             self._backend = create_event_backend(cfg)
 
         # Track exporters (for compatibility with old EventBus API)
-        self._exporters: List[Any] = []
-        self._exporter_handles: List[tuple[Any, SubscriptionHandle]] = []
-        self._pending_exporters: List[tuple[Any, EventHandler]] = (
+        self._exporters: list[Any] = []
+        self._exporter_handles: list[tuple[Any, SubscriptionHandle]] = []
+        self._pending_exporters: list[tuple[Any, EventHandler]] = (
             []
         )  # (exporter, handler) awaiting subscription
 
@@ -887,7 +886,7 @@ class ObservabilityBus:
     async def emit(
         self,
         topic: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         *,
         source: str = "victor",
         correlation_id: Optional[str] = None,
@@ -950,7 +949,7 @@ class ObservabilityBus:
     def emit_error(
         self,
         error: Exception,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         recoverable: bool = True,
     ) -> None:
         """Emit an error event (fire-and-forget).
@@ -1067,7 +1066,7 @@ class AgentMessageBus:
     async def send(
         self,
         topic: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         *,
         to_agent: str,
         from_agent: str = "coordinator",
@@ -1107,7 +1106,7 @@ class AgentMessageBus:
     async def broadcast(
         self,
         topic: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         *,
         from_agent: str = "coordinator",
         correlation_id: Optional[str] = None,

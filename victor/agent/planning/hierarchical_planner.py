@@ -54,7 +54,7 @@ import hashlib
 import json
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.agent.planning.task_decomposition import (
     ComplexityScore,
@@ -208,9 +208,9 @@ class HierarchicalPlanner:
         self._decomposer = TaskDecomposition()
 
         # Cache for decomposition results
-        self._decomposition_cache: Dict[str, TaskGraph] = {}
+        self._decomposition_cache: dict[str, TaskGraph] = {}
 
-    async def _emit_event(self, event_type: str, data: Dict[str, Any]) -> None:
+    async def _emit_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Emit a planning event.
 
         Args:
@@ -239,7 +239,7 @@ class HierarchicalPlanner:
         return hashlib.sha256(task.encode()).hexdigest()
 
     async def _call_llm_for_decomposition(
-        self, complex_task: str, context: Optional[Dict[str, Any]] = None
+        self, complex_task: str, context: Optional[dict[str, Any]] = None
     ) -> str:
         """Call LLM to decompose a task.
 
@@ -288,7 +288,7 @@ class HierarchicalPlanner:
 
         raise RuntimeError("No LLM provider available for task decomposition")
 
-    def _parse_decomposition_response(self, response: str, root_task: str) -> List[Task]:
+    def _parse_decomposition_response(self, response: str, root_task: str) -> list[Task]:
         """Parse LLM decomposition response into tasks.
 
         Args:
@@ -332,7 +332,7 @@ class HierarchicalPlanner:
     async def decompose_task(
         self,
         complex_task: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         use_cache: bool = True,
     ) -> TaskGraph:
         """Decompose a complex task into a hierarchical execution graph.
@@ -397,8 +397,8 @@ class HierarchicalPlanner:
     async def update_plan(
         self,
         task_graph: TaskGraph,
-        completed_tasks: List[str],
-        failed_tasks: Optional[List[str]] = None,
+        completed_tasks: list[str],
+        failed_tasks: Optional[list[str]] = None,
     ) -> UpdatedPlan:
         """Update a task graph after execution progress.
 
@@ -515,7 +515,7 @@ class HierarchicalPlanner:
     async def suggest_next_tasks(
         self,
         task_graph: TaskGraph,
-    ) -> List[Task]:
+    ) -> list[Task]:
         """Suggest next tasks to execute based on graph state.
 
         Returns ready tasks sorted by priority (complexity, dependencies).
@@ -541,7 +541,7 @@ class HierarchicalPlanner:
     def estimate_complexity(
         self,
         task: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ComplexityScore:
         """Estimate the complexity of a task.
 
@@ -676,7 +676,7 @@ class HierarchicalPlanner:
         self._decomposition_cache.clear()
         logger.debug("Decomposition cache cleared")
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get statistics about the decomposition cache.
 
         Returns:

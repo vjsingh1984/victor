@@ -23,24 +23,22 @@ Test areas:
 Total: 20+ tests
 """
 
-import asyncio
 import pytest
-from typing import List, Dict, Any
+from typing import Any
 
 from tests.mocks.provider_mocks import (
     FailingProvider,
     MockBaseProvider,
     ProviderTestHelpers,
 )
-from victor.providers.base import BaseProvider, Message, CompletionResponse, StreamChunk
+from victor.providers.base import Message, CompletionResponse, StreamChunk
 from victor.providers.provider_pool import (
     ProviderPool,
     ProviderPoolConfig,
-    PoolStrategy,
     create_provider_pool,
 )
 from victor.providers.load_balancer import LoadBalancerType
-from victor.core.errors import ProviderConnectionError, ProviderTimeoutError
+from victor.core.errors import ProviderConnectionError
 
 
 # =============================================================================
@@ -88,7 +86,7 @@ class SwitchableMockProvider(MockBaseProvider):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
@@ -119,7 +117,7 @@ class SwitchableMockProvider(MockBaseProvider):
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
@@ -142,7 +140,7 @@ class SwitchableMockProvider(MockBaseProvider):
         return len(self._call_history)
 
     @property
-    def call_history(self) -> List[Dict[str, Any]]:
+    def call_history(self) -> list[dict[str, Any]]:
         return self._call_history.copy()
 
     def reset_history(self) -> None:

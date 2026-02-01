@@ -42,7 +42,7 @@ class RAGRLConfig(BaseRLConfig):
     """
 
     # RAG uses different active learners (QUALITY_WEIGHTS instead of CONTINUATION_PATIENCE)
-    active_learners: List[LearnerType] = field(
+    active_learners: list[LearnerType] = field(
         default_factory=lambda: [
             LearnerType.TOOL_SELECTOR,
             LearnerType.GROUNDING_THRESHOLD,
@@ -51,7 +51,7 @@ class RAGRLConfig(BaseRLConfig):
     )
 
     # Uses canonical ToolNames constants and RAG-specific tool names
-    task_type_mappings: Dict[str, List[str]] = field(
+    task_type_mappings: dict[str, list[str]] = field(
         default_factory=lambda: {
             "search": [
                 "rag_search",
@@ -82,7 +82,7 @@ class RAGRLConfig(BaseRLConfig):
         }
     )
 
-    quality_thresholds: Dict[str, float] = field(
+    quality_thresholds: dict[str, float] = field(
         default_factory=lambda: {
             "search": 0.80,  # Search relevance threshold
             "synthesis": 0.85,  # Answer quality threshold (higher for factual)
@@ -93,7 +93,7 @@ class RAGRLConfig(BaseRLConfig):
     )
 
     # RAG-specific: lower default patience for RAG tasks (3 instead of 4)
-    default_patience: Dict[str, int] = field(
+    default_patience: dict[str, int] = field(
         default_factory=lambda: {
             "anthropic": 3,
             "openai": 3,
@@ -129,8 +129,8 @@ class RAGRLHooks:
     def get_tool_recommendation(
         self,
         task_type: str,
-        available_tools: Optional[List[str]] = None,
-    ) -> List[str]:
+        available_tools: Optional[list[str]] = None,
+    ) -> list[str]:
         """Get tool recommendations for a task type.
 
         Args:

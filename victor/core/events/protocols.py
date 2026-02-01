@@ -40,22 +40,15 @@ from __future__ import annotations
 
 import uuid
 import time
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    Generic,
-    List,
     Optional,
     Protocol,
-    TypeVar,
-    Union,
     runtime_checkable,
 )
+from collections.abc import Awaitable, Callable
 
 
 class DeliveryGuarantee(str, Enum):
@@ -126,13 +119,13 @@ class MessagingEvent:
     """
 
     topic: str
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:16])
     timestamp: float = field(default_factory=time.time)
     source: str = "victor"
     correlation_id: Optional[str] = None
     partition_key: Optional[str] = None
-    headers: Dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = field(default_factory=dict)
     delivery_guarantee: DeliveryGuarantee = DeliveryGuarantee.AT_MOST_ONCE
 
     # Delivery tracking fields (not serialized)
@@ -177,7 +170,7 @@ class MessagingEvent:
 
         return datetime.fromtimestamp(self.timestamp)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize event to dictionary for transport."""
         return {
             "id": self.id,
@@ -192,7 +185,7 @@ class MessagingEvent:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MessagingEvent":
+    def from_dict(cls, data: dict[str, Any]) -> "MessagingEvent":
         """Deserialize event from dictionary."""
         return cls(
             id=data.get("id", uuid.uuid4().hex[:16]),
@@ -341,7 +334,7 @@ class BackendConfig:
     flush_interval_ms: float = 1000.0
     max_retries: int = 3
     retry_delay_ms: float = 100.0
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def for_observability(cls) -> "BackendConfig":
@@ -394,7 +387,7 @@ class IEventPublisher(Protocol):
         """
         ...
 
-    async def publish_batch(self, events: List[MessagingEvent]) -> int:
+    async def publish_batch(self, events: list[MessagingEvent]) -> int:
         """Publish multiple events in a batch.
 
         Args:

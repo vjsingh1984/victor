@@ -16,7 +16,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.framework.multi_agent.personas import PersonaTraits
 
@@ -88,7 +88,7 @@ class TeamMember:
     role_in_team: str
     is_leader: bool = False
     max_concurrent_tasks: int = 1
-    tool_access: List[str] = field(default_factory=list)
+    tool_access: list[str] = field(default_factory=list)
 
     @property
     def name(self) -> str:
@@ -135,11 +135,11 @@ class TeamTemplate:
     description: str
     topology: TeamTopology = TeamTopology.HIERARCHY
     assignment_strategy: TaskAssignmentStrategy = TaskAssignmentStrategy.SKILL_MATCH
-    member_slots: Dict[str, int] = field(default_factory=dict)
-    shared_context_keys: List[str] = field(default_factory=list)
+    member_slots: dict[str, int] = field(default_factory=dict)
+    shared_context_keys: list[str] = field(default_factory=list)
     escalation_threshold: float = 0.8
     max_iterations: int = 10
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate template values after initialization."""
@@ -151,7 +151,7 @@ class TeamTemplate:
         if self.max_iterations < 1:
             raise ValueError(f"max_iterations must be >= 1, got {self.max_iterations}")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert template to dictionary for serialization.
 
         Returns:
@@ -198,7 +198,7 @@ class TeamSpec:
     """
 
     template: TeamTemplate
-    members: List[TeamMember] = field(default_factory=list)
+    members: list[TeamMember] = field(default_factory=list)
 
     @property
     def leader(self) -> Optional[TeamMember]:
@@ -222,7 +222,7 @@ class TeamSpec:
         """Get the team topology from template."""
         return self.template.topology
 
-    def get_members_by_role(self, role: str) -> List[TeamMember]:
+    def get_members_by_role(self, role: str) -> list[TeamMember]:
         """Get all members with a specific role.
 
         Args:
@@ -233,14 +233,14 @@ class TeamSpec:
         """
         return [m for m in self.members if m.role_in_team == role]
 
-    def validate_slots(self) -> List[str]:
+    def validate_slots(self) -> list[str]:
         """Validate that member assignments match template slots.
 
         Returns:
             List of validation error messages (empty if valid).
         """
         errors = []
-        role_counts: Dict[str, int] = {}
+        role_counts: dict[str, int] = {}
         for member in self.members:
             role_counts[member.role_in_team] = role_counts.get(member.role_in_team, 0) + 1
 
@@ -253,7 +253,7 @@ class TeamSpec:
 
         return errors
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert spec to dictionary for serialization.
 
         Returns:

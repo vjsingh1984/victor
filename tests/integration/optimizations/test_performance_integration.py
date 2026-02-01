@@ -30,12 +30,8 @@ Test scenarios:
 
 import asyncio
 import time
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Callable
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
-import tempfile
+from typing import Optional, Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -65,7 +61,7 @@ class MockLazyComponent:
         """Check if component is initialized."""
         return self._initialized
 
-    async def execute(self, task: str) -> Dict[str, Any]:
+    async def execute(self, task: str) -> dict[str, Any]:
         """Execute task."""
         if not self._initialized:
             await self.initialize()
@@ -81,7 +77,7 @@ class MockParallelTask:
         self.executed = False
         self.execution_time = None
 
-    async def execute(self) -> Dict[str, Any]:
+    async def execute(self) -> dict[str, Any]:
         """Execute task."""
         await asyncio.sleep(self.duration)
         self.executed = True
@@ -137,7 +133,7 @@ class MockCache:
         if key in self._storage:
             del self._storage[key]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         total_accesses = self._hits + self._misses
         hit_rate = self._hits / total_accesses if total_accesses > 0 else 0
@@ -204,7 +200,7 @@ def mock_orchestrator():
             await asyncio.sleep(0.2)  # Simulate init time
             orchestrator.init_time = time.time()
 
-    async def mock_execute(task: str) -> Dict[str, Any]:
+    async def mock_execute(task: str) -> dict[str, Any]:
         """Mock task execution."""
         start_time = time.time()
         await asyncio.sleep(0.1)  # Simulate execution
@@ -567,7 +563,6 @@ async def test_memory_optimization_with_lazy_loading_and_caching(lazy_components
     - Lazy loading memory savings
     - Cache memory management
     """
-    import sys
 
     # Create many lazy components
     many_components = {

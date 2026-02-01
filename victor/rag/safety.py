@@ -37,13 +37,11 @@ Example:
 """
 
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from victor.core.verticals.protocols import SafetyExtensionProtocol
 from victor.core.security.patterns.types import SafetyPattern
 from victor.core.security.patterns.pii import (
-    PIIScanner,
-    PIIType,
     PIISeverity,
     PII_CONTENT_PATTERNS,
     detect_pii_in_content,
@@ -57,7 +55,7 @@ LOW = "LOW"
 
 
 # RAG-specific dangerous patterns
-RAG_DANGER_PATTERNS: List[SafetyPattern] = [
+RAG_DANGER_PATTERNS: list[SafetyPattern] = [
     # Bulk deletion patterns
     SafetyPattern(
         pattern=r"rag_delete\s+.*\*",
@@ -101,7 +99,7 @@ RAG_DANGER_PATTERNS: List[SafetyPattern] = [
 
 # RAG-specific secret detection patterns (not standard PII)
 # Standard PII patterns are delegated to victor.security.safety.pii
-SECRET_PATTERNS: Dict[str, Tuple[str, str, str]] = {
+SECRET_PATTERNS: dict[str, tuple[str, str, str]] = {
     "aws_key": (
         r"(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}",
         "AWS access key detected",
@@ -130,7 +128,7 @@ SECRET_PATTERNS: Dict[str, Tuple[str, str, str]] = {
 }
 
 # Document ingestion safety patterns
-INGESTION_SAFETY_PATTERNS: List[SafetyPattern] = [
+INGESTION_SAFETY_PATTERNS: list[SafetyPattern] = [
     SafetyPattern(
         pattern=r"\.(?:exe|dll|bat|cmd|sh|ps1)$",
         description="Executable file type - should not be ingested as document",
@@ -185,7 +183,7 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
         self._include_pii_detection = include_pii_detection
         self._include_ingestion_safety = include_ingestion_safety
 
-    def get_bash_patterns(self) -> List[SafetyPattern]:
+    def get_bash_patterns(self) -> list[SafetyPattern]:
         """Return RAG-specific bash patterns.
 
         Returns:
@@ -196,7 +194,7 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
             patterns.extend(INGESTION_SAFETY_PATTERNS)
         return patterns
 
-    def get_danger_patterns(self) -> List[Tuple[str, str, str]]:
+    def get_danger_patterns(self) -> list[tuple[str, str, str]]:
         """Return RAG-specific danger patterns (legacy format).
 
         Returns:
@@ -204,7 +202,7 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
         """
         return [(p.pattern, p.description, p.risk_level) for p in self.get_bash_patterns()]
 
-    def get_file_patterns(self) -> List[SafetyPattern]:
+    def get_file_patterns(self) -> list[SafetyPattern]:
         """Return file operation patterns for RAG.
 
         Returns:
@@ -212,7 +210,7 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
         """
         return INGESTION_SAFETY_PATTERNS if self._include_ingestion_safety else []
 
-    def get_blocked_operations(self) -> List[str]:
+    def get_blocked_operations(self) -> list[str]:
         """Return operations that should be blocked in RAG context.
 
         Returns:
@@ -225,7 +223,7 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
             "ingest_system_files",
         ]
 
-    def get_pii_patterns(self) -> Dict[str, Tuple[str, str, str]]:
+    def get_pii_patterns(self) -> dict[str, tuple[str, str, str]]:
         """Return patterns for detecting PII and secrets in documents.
 
         Combines framework PII patterns with RAG-specific secret patterns.
@@ -234,7 +232,7 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
             Dict of pii_type -> (regex_pattern, description, risk_level).
         """
         # Start with framework PII patterns (canonical source)
-        patterns: Dict[str, Tuple[str, str, str]] = {}
+        patterns: dict[str, tuple[str, str, str]] = {}
         for pii_type, (pattern, severity) in PII_CONTENT_PATTERNS.items():
             risk = (
                 HIGH
@@ -251,7 +249,7 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
         patterns.update(SECRET_PATTERNS)
         return patterns
 
-    def scan_for_pii(self, content: str) -> List[Dict[str, Any]]:
+    def scan_for_pii(self, content: str) -> list[dict[str, Any]]:
         """Scan content for PII and secrets.
 
         Delegates to framework PIIScanner for standard PII detection,
@@ -328,7 +326,7 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
             return "*" * len(value)
         return value[:2] + "*" * (len(value) - 4) + value[-2:]
 
-    def validate_ingestion_source(self, source: str) -> List[str]:
+    def validate_ingestion_source(self, source: str) -> list[str]:
         """Validate an ingestion source for safety issues.
 
         Args:
@@ -351,7 +349,7 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
 
         return warnings
 
-    def get_safety_reminders(self) -> List[str]:
+    def get_safety_reminders(self) -> list[str]:
         """Return safety reminders for RAG output.
 
         Returns:
@@ -373,7 +371,7 @@ class RAGSafetyExtension(SafetyExtensionProtocol):
         """
         return "rag"
 
-    def get_tool_restrictions(self) -> Dict[str, List[str]]:
+    def get_tool_restrictions(self) -> dict[str, list[str]]:
         """Get tool-specific argument restrictions.
 
         Returns:
@@ -432,7 +430,7 @@ Example:
         print(f"Blocked: {reason}")
 """
 
-from victor.framework.config import SafetyEnforcer, SafetyRule, SafetyLevel
+from victor.framework.config import SafetyEnforcer
 
 
 def create_rag_deletion_safety_rules(

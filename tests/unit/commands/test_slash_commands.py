@@ -16,7 +16,7 @@
 
 import io
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 
 from rich.console import Console
 
@@ -26,7 +26,6 @@ from victor.ui.slash import (
     CommandContext,
     BaseSlashCommand,
     get_command_registry,
-    register_command,
 )
 
 

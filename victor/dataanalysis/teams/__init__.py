@@ -54,13 +54,13 @@ class DataAnalysisRoleConfig:
     """
 
     base_role: str
-    tools: List[str]
+    tools: list[str]
     tool_budget: int
     description: str = ""
 
 
 # Data Analysis-specific roles with tool allocations
-DATA_ANALYSIS_ROLES: Dict[str, DataAnalysisRoleConfig] = {
+DATA_ANALYSIS_ROLES: dict[str, DataAnalysisRoleConfig] = {
     "data_loader": DataAnalysisRoleConfig(
         base_role="researcher",
         tools=["read_file", "bash", "code_search"],
@@ -116,13 +116,13 @@ class DataAnalysisTeamSpec:
     name: str
     description: str
     formation: TeamFormation
-    members: List[TeamMemberSpec]
+    members: list[TeamMemberSpec]
     total_tool_budget: int = 100
     max_iterations: int = 50
 
 
 # Pre-defined team specifications with rich personas
-DATA_ANALYSIS_TEAM_SPECS: Dict[str, DataAnalysisTeamSpec] = {
+DATA_ANALYSIS_TEAM_SPECS: dict[str, DataAnalysisTeamSpec] = {
     "eda_team": DataAnalysisTeamSpec(
         name="Exploratory Data Analysis Team",
         description="Comprehensive data exploration with profiling and visualization",
@@ -556,7 +556,7 @@ def get_role_config(role_name: str) -> Optional[DataAnalysisRoleConfig]:
     return DATA_ANALYSIS_ROLES.get(role_name.lower())
 
 
-def list_team_types() -> List[str]:
+def list_team_types() -> list[str]:
     """List all available team types.
 
     Returns:
@@ -565,7 +565,7 @@ def list_team_types() -> List[str]:
     return list(DATA_ANALYSIS_TEAM_SPECS.keys())
 
 
-def list_roles() -> List[str]:
+def list_roles() -> list[str]:
     """List all available Data Analysis roles.
 
     Returns:
@@ -581,7 +581,7 @@ class DataAnalysisTeamSpecProvider:
     ISP compliance across all verticals.
     """
 
-    def get_team_specs(self) -> Dict[str, DataAnalysisTeamSpec]:
+    def get_team_specs(self) -> dict[str, DataAnalysisTeamSpec]:
         """Get all Data Analysis team specifications.
 
         Returns:
@@ -600,7 +600,7 @@ class DataAnalysisTeamSpecProvider:
         """
         return get_team_for_task(task_type)
 
-    def list_team_types(self) -> List[str]:
+    def list_team_types(self) -> list[str]:
         """List all available team types.
 
         Returns:

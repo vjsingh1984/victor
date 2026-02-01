@@ -58,19 +58,14 @@ import time
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Set,
-    Tuple,
     TYPE_CHECKING,
 )
+from collections.abc import Callable
 
 if TYPE_CHECKING:
-    from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
-    from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
+    from victor.agent.tool_executor import ToolExecutor
+    from victor.agent.argument_normalizer import ArgumentNormalizer
     from victor.agent.tool_calling import BaseToolCallingAdapter
     from victor.storage.cache.tool_cache import ToolCache
     from victor.tools.registry import ToolRegistry
@@ -162,8 +157,8 @@ class ToolExecutionStats:
     skipped_calls: int = 0
     budget_used: int = 0
     budget_remaining: int = 50
-    failed_signatures: Set[Tuple[str, str]] = field(default_factory=set)
-    execution_times_ms: List[float] = field(default_factory=list)
+    failed_signatures: set[tuple[str, str]] = field(default_factory=set)
+    execution_times_ms: list[float] = field(default_factory=list)
 
     def get_success_rate(self) -> float:
         """Calculate success rate."""
@@ -253,7 +248,7 @@ class ToolExecutionCoordinator:
         formatter: Optional["ToolOutputFormatter"] = None,
         config: Optional[ToolExecutionConfig] = None,
         # Callbacks
-        on_tool_start: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        on_tool_start: Optional[Callable[[str, dict[str, Any]], None]] = None,
         on_tool_complete: Optional[Callable[[ToolCallResult], None]] = None,
         on_budget_warning: Optional[Callable[[int, int], None]] = None,
         # Tool access control
@@ -304,9 +299,9 @@ class ToolExecutionCoordinator:
 
     async def handle_tool_calls(
         self,
-        tool_calls: List[Dict[str, Any]],
+        tool_calls: list[dict[str, Any]],
         context: Optional[ExecutionContext] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Handle tool calls from the model.
 
         This is the main entry point that orchestrates the complete flow:
@@ -327,7 +322,7 @@ class ToolExecutionCoordinator:
             return []
 
         context = context or ExecutionContext()
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         for tool_call in tool_calls:
             result = await self._handle_single_call(tool_call, context)
@@ -347,9 +342,9 @@ class ToolExecutionCoordinator:
 
     async def _handle_single_call(
         self,
-        tool_call: Dict[str, Any],
+        tool_call: dict[str, Any],
         context: ExecutionContext,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Handle a single tool call.
 
         Args:
@@ -421,10 +416,10 @@ class ToolExecutionCoordinator:
     async def _execute_tool(
         self,
         tool_name: str,
-        tool_args: Dict[str, Any],
+        tool_args: dict[str, Any],
         context: ExecutionContext,
-        signature: Tuple[str, str],
-    ) -> Dict[str, Any]:
+        signature: tuple[str, str],
+    ) -> dict[str, Any]:
         """Execute a tool with error handling.
 
         Args:
@@ -518,9 +513,9 @@ class ToolExecutionCoordinator:
     async def _execute_with_retry(
         self,
         tool_name: str,
-        tool_args: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Tuple[Any, bool, Optional[str]]:
+        tool_args: dict[str, Any],
+        context: dict[str, Any],
+    ) -> tuple[Any, bool, Optional[str]]:
         """Execute a tool with retry logic and exponential backoff.
 
         Args:
@@ -666,7 +661,7 @@ class ToolExecutionCoordinator:
         self,
         tool_name: str,
         tool_args: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Normalize tool arguments.
 
         Args:
@@ -696,10 +691,10 @@ class ToolExecutionCoordinator:
         # Apply adapter-based normalization
         normalized_args = self._tool_adapter.normalize_arguments(normalized_args, tool_name)
 
-        result: Dict[str, Any] = normalized_args
+        result: dict[str, Any] = normalized_args
         return result
 
-    def _build_exec_context(self, context: ExecutionContext) -> Dict[str, Any]:
+    def _build_exec_context(self, context: ExecutionContext) -> dict[str, Any]:
         """Build execution context dict for tool executor.
 
         Args:
@@ -717,7 +712,7 @@ class ToolExecutionCoordinator:
             "settings": context.settings,
         }
 
-    def _get_call_signature(self, tool_name: str, args: Dict[str, Any]) -> Tuple[str, str]:
+    def _get_call_signature(self, tool_name: str, args: dict[str, Any]) -> tuple[str, str]:
         """Get call signature for failure tracking.
 
         Args:
@@ -732,7 +727,7 @@ class ToolExecutionCoordinator:
         except Exception:
             return (tool_name, str(args))
 
-    def _invalidate_related_cache(self, tool_name: str, tool_args: Dict[str, Any]) -> None:
+    def _invalidate_related_cache(self, tool_name: str, tool_args: dict[str, Any]) -> None:
         """Invalidate related cache entries after a mutating tool.
 
         Args:
@@ -767,7 +762,7 @@ class ToolExecutionCoordinator:
                 ]
                 self._cache.clear_namespaces(namespaces_to_clear)
 
-    def _create_error_result(self, tool_name: str, error: str) -> Dict[str, Any]:
+    def _create_error_result(self, tool_name: str, error: str) -> dict[str, Any]:
         """Create an error result dictionary.
 
         Args:
@@ -795,7 +790,7 @@ class ToolExecutionCoordinator:
     def format_tool_output(
         self,
         tool_name: str,
-        tool_args: Dict[str, Any],
+        tool_args: dict[str, Any],
         output: Any,
     ) -> str:
         """Format tool output with clear boundaries.

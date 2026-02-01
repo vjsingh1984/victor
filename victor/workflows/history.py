@@ -54,12 +54,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
 )
-from uuid import uuid4
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -89,13 +86,13 @@ class ExecutionRecord:
     execution_id: str
     workflow_name: str
     timestamp: float
-    inputs: Dict[str, Any]
-    outputs: Optional[Dict[str, Any]]
+    inputs: dict[str, Any]
+    outputs: Optional[dict[str, Any]]
     success: bool
     duration_seconds: float
     error: Optional[str] = None
-    nodes_executed: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    nodes_executed: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -112,9 +109,9 @@ class ExecutionComparison:
 
     execution_1_id: str
     execution_2_id: str
-    output_diff: Dict[str, Any]
-    performance_diff: Dict[str, Any]
-    node_diff: Dict[str, Any]
+    output_diff: dict[str, Any]
+    performance_diff: dict[str, Any]
+    node_diff: dict[str, Any]
 
 
 # =============================================================================
@@ -150,8 +147,8 @@ class WorkflowExecutionHistory:
         self.storage_path.mkdir(parents=True, exist_ok=True)
 
         # In-memory records
-        self._records: Dict[str, ExecutionRecord] = {}
-        self._record_order: List[str] = []
+        self._records: dict[str, ExecutionRecord] = {}
+        self._record_order: list[str] = []
 
         # Load existing records
         self._load_records()
@@ -164,13 +161,13 @@ class WorkflowExecutionHistory:
         self,
         execution_id: str,
         workflow_name: str,
-        inputs: Dict[str, Any],
-        outputs: Optional[Dict[str, Any]],
+        inputs: dict[str, Any],
+        outputs: Optional[dict[str, Any]],
         success: bool,
         duration_seconds: float,
         error: Optional[str] = None,
-        nodes_executed: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        nodes_executed: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> ExecutionRecord:
         """Record a workflow execution.
 
@@ -236,7 +233,7 @@ class WorkflowExecutionHistory:
         success_only: bool = False,
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
-    ) -> List[ExecutionRecord]:
+    ) -> list[ExecutionRecord]:
         """List execution records.
 
         Args:
@@ -249,7 +246,7 @@ class WorkflowExecutionHistory:
         Returns:
             List of execution records
         """
-        records: List[ExecutionRecord] = []
+        records: list[ExecutionRecord] = []
 
         for exec_id in reversed(self._record_order):
             if len(records) >= limit:
@@ -282,7 +279,7 @@ class WorkflowExecutionHistory:
         self,
         execution_id: str,
         executor: Optional[Callable[..., Any]] = None,
-        override_inputs: Optional[Dict[str, Any]] = None,
+        override_inputs: Optional[dict[str, Any]] = None,
     ) -> Any:
         """Replay a previous execution.
 
@@ -390,9 +387,9 @@ class WorkflowExecutionHistory:
 
     def _compare_outputs(
         self,
-        outputs_1: Dict[str, Any],
-        outputs_2: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        outputs_1: dict[str, Any],
+        outputs_2: dict[str, Any],
+    ) -> dict[str, Any]:
         """Compare two output dictionaries.
 
         Args:
@@ -426,7 +423,7 @@ class WorkflowExecutionHistory:
     def get_workflow_stats(
         self,
         workflow_name: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get execution statistics for a workflow.
 
         Args:
@@ -468,7 +465,7 @@ class WorkflowExecutionHistory:
         self,
         workflow_name: str,
         window_size: int = 10,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get execution trends over time.
 
         Args:
@@ -525,7 +522,7 @@ class WorkflowExecutionHistory:
         workflow_name: Optional[str] = None,
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Generate audit trail of executions.
 
         Args:

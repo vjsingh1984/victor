@@ -13,12 +13,12 @@
 # limitations under the License.
 
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from pathlib import Path
 
 from tree_sitter import Query, QueryCursor
 from victor.coding.codebase.tree_sitter_manager import get_parser, get_language
-from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 
@@ -70,7 +70,7 @@ PYTHON_QUERIES = {
         "find definition",
     ],  # From MANDATORY_TOOL_KEYWORDS "find" -> ["symbol", "refs"]
 )
-async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
+async def symbol(file_path: str, symbol_name: str) -> Optional[dict[str, Any]]:
     """[AST-AWARE] Get FULL CODE of a function/class definition in a specific file.
 
     Returns the complete code block (not just a reference). Use when you KNOW:
@@ -169,7 +169,7 @@ async def symbol(file_path: str, symbol_name: str) -> Optional[Dict[str, Any]]:
         "find usages",
     ],  # From MANDATORY_TOOL_KEYWORDS "find" -> ["symbol", "refs"]
 )
-async def refs(symbol_name: str, search_path: str = ".") -> List[Dict[str, Any]]:
+async def refs(symbol_name: str, search_path: str = ".") -> list[dict[str, Any]]:
     """[AST-AWARE] Find all USAGES of a symbol across the project.
 
     Project-wide scan using AST parsing. More accurate than grep (exact identifier

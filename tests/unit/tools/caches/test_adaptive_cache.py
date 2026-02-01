@@ -14,7 +14,6 @@
 
 """Unit tests for adaptive cache sizing."""
 
-import pytest
 import time
 from victor.tools.caches import AdaptiveLRUCache, AdaptiveMetrics
 

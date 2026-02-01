@@ -22,7 +22,7 @@ This tool provides:
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 try:
     from jira import JIRA, JIRAError  # type: ignore[import-not-found]
@@ -39,7 +39,7 @@ from victor.tools.decorators import tool
 logger = logging.getLogger(__name__)
 
 
-def _get_jira_client(context: Optional[Dict[str, Any]] = None) -> Optional["JIRA"]:
+def _get_jira_client(context: Optional[dict[str, Any]] = None) -> Optional["JIRA"]:
     """Get Jira client from execution context.
 
     Args:
@@ -53,7 +53,7 @@ def _get_jira_client(context: Optional[Dict[str, Any]] = None) -> Optional["JIRA
     return None
 
 
-def is_jira_configured(context: Optional[Dict[str, Any]] = None) -> bool:
+def is_jira_configured(context: Optional[dict[str, Any]] = None) -> bool:
     """Check if Jira client is configured and connected."""
     return _get_jira_client(context) is not None
 
@@ -81,8 +81,8 @@ async def jira(
     description: Optional[str] = None,
     comment: Optional[str] = None,
     max_results: int = 10,
-    context: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    context: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Perform operations on Jira issues.
 
     Args:
@@ -138,7 +138,7 @@ async def jira(
                     "error": "Missing required parameters: project and summary",
                 }
             logger.info(f"[jira] Creating issue in project '{project}' with summary '{summary}'")
-            issue_dict: Dict[str, Any] = {
+            issue_dict: dict[str, Any] = {
                 "project": {"key": project},
                 "summary": summary,
                 "issuetype": {"name": issue_type},

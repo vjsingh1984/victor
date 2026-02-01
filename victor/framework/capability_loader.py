@@ -68,7 +68,8 @@ import logging
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.framework.module_loader import DynamicModuleLoader
 from victor.framework.protocols import (
@@ -104,7 +105,7 @@ class CapabilityEntry:
     handler: Optional[Callable[..., Any]] = None
     getter_handler: Optional[Callable[..., Any]] = None
     source_module: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def name(self) -> str:
@@ -187,7 +188,7 @@ class CapabilityLoader(DynamicModuleLoader):
     def __init__(
         self,
         auto_discover: bool = False,
-        plugin_dirs: Optional[List[Path]] = None,
+        plugin_dirs: Optional[list[Path]] = None,
     ) -> None:
         """Initialize the capability loader.
 
@@ -198,10 +199,10 @@ class CapabilityLoader(DynamicModuleLoader):
         # Initialize base class with watch_dirs
         super().__init__(watch_dirs=plugin_dirs or [])
 
-        self._capabilities: Dict[str, CapabilityEntry] = {}
-        self._module_capabilities: Dict[str, Set[str]] = {}  # module -> capability names
+        self._capabilities: dict[str, CapabilityEntry] = {}
+        self._module_capabilities: dict[str, set[str]] = {}  # module -> capability names
         self._plugin_dirs = plugin_dirs or []
-        self._watchers: List[Callable[[str, str], None]] = []  # change callbacks
+        self._watchers: list[Callable[[str, str], None]] = []  # change callbacks
 
         if auto_discover:
             self.discover_capabilities()
@@ -214,7 +215,7 @@ class CapabilityLoader(DynamicModuleLoader):
         self,
         module_name: str,
         force_reload: bool = False,
-    ) -> List[str]:
+    ) -> list[str]:
         """Load capabilities from a Python module.
 
         The module should define capabilities using one of these patterns:
@@ -328,9 +329,9 @@ class CapabilityLoader(DynamicModuleLoader):
 
     def load_from_path(
         self,
-        path: Union[str, Path],
+        path: str | Path,
         module_name: Optional[str] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """Load capabilities from a file path.
 
         Args:
@@ -397,7 +398,7 @@ class CapabilityLoader(DynamicModuleLoader):
 
     def _register_from_entry(
         self,
-        entry: Union[CapabilityEntry, OrchestratorCapability, Dict[str, Any]],
+        entry: CapabilityEntry | OrchestratorCapability | dict[str, Any],
         source_module: str,
     ) -> Optional[str]:
         """Register capability from an entry definition.
@@ -443,7 +444,7 @@ class CapabilityLoader(DynamicModuleLoader):
     def _register_from_meta(
         self,
         func: Callable[..., Any],
-        meta: Dict[str, Any],
+        meta: dict[str, Any],
         source_module: str,
     ) -> Optional[str]:
         """Register capability from decorator metadata.
@@ -476,7 +477,7 @@ class CapabilityLoader(DynamicModuleLoader):
         handler: Optional[Callable[..., Any]] = None,
         getter_handler: Optional[Callable[..., Any]] = None,
         source_module: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> Optional[str]:
         """Internal capability registration.
 
@@ -602,7 +603,7 @@ class CapabilityLoader(DynamicModuleLoader):
     # Hot Reload
     # =========================================================================
 
-    def reload_module(self, module_name: str) -> List[str]:
+    def reload_module(self, module_name: str) -> list[str]:
         """Hot-reload a module and re-register its capabilities.
 
         This performs proper module cache invalidation to ensure
@@ -697,7 +698,7 @@ class CapabilityLoader(DynamicModuleLoader):
     # Discovery
     # =========================================================================
 
-    def discover_capabilities(self) -> Dict[str, List[str]]:
+    def discover_capabilities(self) -> dict[str, list[str]]:
         """Discover and load capabilities from plugin directories.
 
         Searches configured plugin directories for capability modules
@@ -706,7 +707,7 @@ class CapabilityLoader(DynamicModuleLoader):
         Returns:
             Dict mapping module path to list of loaded capability names
         """
-        results: Dict[str, List[str]] = {}
+        results: dict[str, list[str]] = {}
 
         for plugin_dir in self._plugin_dirs:
             plugin_dir = Path(plugin_dir).expanduser()
@@ -728,7 +729,7 @@ class CapabilityLoader(DynamicModuleLoader):
         )
         return results
 
-    def add_plugin_dir(self, path: Union[str, Path]) -> None:
+    def add_plugin_dir(self, path: str | Path) -> None:
         """Add a plugin directory for discovery.
 
         Args:
@@ -743,7 +744,7 @@ class CapabilityLoader(DynamicModuleLoader):
     # Query
     # =========================================================================
 
-    def list_capabilities(self) -> List[str]:
+    def list_capabilities(self) -> list[str]:
         """Get list of all registered capability names.
 
         Returns:
@@ -773,7 +774,7 @@ class CapabilityLoader(DynamicModuleLoader):
         """
         return name in self._capabilities
 
-    def get_capabilities_by_type(self, capability_type: CapabilityType) -> List[CapabilityEntry]:
+    def get_capabilities_by_type(self, capability_type: CapabilityType) -> list[CapabilityEntry]:
         """Get all capabilities of a specific type.
 
         Args:
@@ -788,7 +789,7 @@ class CapabilityLoader(DynamicModuleLoader):
             if entry.capability_type == capability_type
         ]
 
-    def get_capabilities_by_module(self, module_name: str) -> List[CapabilityEntry]:
+    def get_capabilities_by_module(self, module_name: str) -> list[CapabilityEntry]:
         """Get all capabilities from a specific module.
 
         Args:
@@ -800,7 +801,7 @@ class CapabilityLoader(DynamicModuleLoader):
         cap_names = self._module_capabilities.get(module_name, set())
         return [self._capabilities[name] for name in cap_names if name in self._capabilities]
 
-    def list_loaded_modules(self) -> List[str]:
+    def list_loaded_modules(self) -> list[str]:
         """Get list of all loaded module names.
 
         Returns:
@@ -815,8 +816,8 @@ class CapabilityLoader(DynamicModuleLoader):
     def apply_to(
         self,
         orchestrator: Any,
-        capability_names: Optional[List[str]] = None,
-    ) -> List[str]:
+        capability_names: Optional[list[str]] = None,
+    ) -> list[str]:
         """Apply loaded capabilities to an orchestrator.
 
         This registers all loaded capabilities with the orchestrator's
@@ -1038,7 +1039,7 @@ def capability(
 
 
 def create_capability_loader(
-    plugin_dirs: Optional[List[Union[str, Path]]] = None,
+    plugin_dirs: Optional[list[str | Path]] = None,
     auto_discover: bool = False,
 ) -> CapabilityLoader:
     """Create a CapabilityLoader with standard configuration.

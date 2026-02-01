@@ -14,7 +14,6 @@
 
 """Unit tests for victor.framework.prompts.prompt_templates module."""
 
-import pytest
 
 from victor.framework.prompts.prompt_templates import (
     ANALYSIS_WORKFLOW_TEMPLATE,

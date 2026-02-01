@@ -38,14 +38,13 @@ from __future__ import annotations
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from victor.framework.parallel import ParallelExecutor, JoinStrategy, ParallelConfig, ResourceLimit
+from victor.framework.parallel import ParallelExecutor, ParallelConfig, ResourceLimit
 from victor.framework.graph import StateGraph
-from victor.framework.task import Task
 
 
 # =============================================================================
@@ -283,7 +282,7 @@ class TestStateGraphThroughput:
         """
         from victor.framework.graph import END
 
-        graph = StateGraph(state_schema=Dict[str, Any])
+        graph = StateGraph(state_schema=dict[str, Any])
 
         # Add 5 linear nodes
         graph.add_node("node1", lambda state: {"value": state.get("value", 0) + 1})
@@ -316,9 +315,9 @@ class TestStateGraphThroughput:
         """
         from victor.framework.graph import END
 
-        graph = StateGraph(state_schema=Dict[str, Any])
+        graph = StateGraph(state_schema=dict[str, Any])
 
-        def route_fn(state: Dict[str, Any]) -> str:
+        def route_fn(state: dict[str, Any]) -> str:
             return "branch_a" if state.get("value", 0) > 0 else "branch_b"
 
         graph.add_node("process", lambda state: {"value": state.get("value", 0) + 1})
@@ -346,9 +345,9 @@ class TestStateGraphThroughput:
 
         Expected: 20% faster than sequential execution
         """
-        from victor.framework.graph import START, END
+        from victor.framework.graph import END
 
-        graph = StateGraph(state_schema=Dict[str, Any])
+        graph = StateGraph(state_schema=dict[str, Any])
 
         # Add parallel branches
         graph.add_node("branch1", lambda state: {"b1": state.get("b1", 0) + 1})
@@ -584,7 +583,7 @@ class TestPerformanceAssertions:
         """
         from victor.framework.graph import END
 
-        graph = StateGraph(state_schema=Dict[str, Any])
+        graph = StateGraph(state_schema=dict[str, Any])
 
         # Create a 10-node linear graph
         nodes = []

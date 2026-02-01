@@ -14,7 +14,6 @@
 
 """Test VerticalConfigRegistry."""
 
-import pytest
 
 from victor.core.verticals.config_registry import VerticalConfigRegistry
 

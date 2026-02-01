@@ -43,7 +43,8 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 from victor.framework.protocols import (
     CapabilityType,
@@ -92,7 +93,7 @@ def get_capability_registry() -> "DynamicCapabilityRegistry":
 
 # Maps capability names to their setter method names.
 # DEPRECATED: Use get_capability_registry().get_method_for_capability() instead
-CAPABILITY_METHOD_MAPPINGS: Dict[str, str] = {
+CAPABILITY_METHOD_MAPPINGS: dict[str, str] = {
     # Tool capabilities
     "enabled_tools": "set_enabled_tools",
     "tool_dependencies": "set_tool_dependencies",
@@ -159,9 +160,9 @@ class CapabilityRegistryMixin:
 
         Call this at the end of __init__ after all components are initialized.
         """
-        self._capabilities: Dict[str, OrchestratorCapability] = {}
-        self._capability_methods: Dict[str, Callable[..., Any]] = {}
-        self._dynamic_capabilities: Set[str] = set()  # Track dynamically loaded caps
+        self._capabilities: dict[str, OrchestratorCapability] = {}
+        self._capability_methods: dict[str, Callable[..., Any]] = {}
+        self._dynamic_capabilities: set[str] = set()  # Track dynamically loaded caps
         self._register_default_capabilities()
 
     def _register_capability(
@@ -414,7 +415,7 @@ class CapabilityRegistryMixin:
     # CapabilityRegistryProtocol implementation
     # =========================================================================
 
-    def get_capabilities(self) -> Dict[str, OrchestratorCapability]:
+    def get_capabilities(self) -> dict[str, OrchestratorCapability]:
         """Get all registered capabilities.
 
         Returns:
@@ -609,7 +610,7 @@ class CapabilityRegistryMixin:
 
     def get_capabilities_by_type(
         self, capability_type: CapabilityType
-    ) -> Dict[str, OrchestratorCapability]:
+    ) -> dict[str, OrchestratorCapability]:
         """Get all capabilities of a specific type.
 
         Args:
@@ -650,7 +651,7 @@ class CapabilityRegistryMixin:
                     return str(result)
         return None
 
-    def _set_task_type_hints_via_builder(self, hints: Dict[str, Any]) -> None:
+    def _set_task_type_hints_via_builder(self, hints: dict[str, Any]) -> None:
         """Set task type hints via prompt_builder."""
         if hasattr(self, "prompt_builder") and self.prompt_builder:
             if hasattr(self.prompt_builder, "set_task_type_hints"):
@@ -672,7 +673,7 @@ class CapabilityRegistryMixin:
             elif hasattr(self._safety_checker, "_custom_patterns"):
                 self._safety_checker._custom_patterns.extend(patterns)
 
-    def _set_mode_configs(self, configs: Dict[str, Any]) -> None:
+    def _set_mode_configs(self, configs: dict[str, Any]) -> None:
         """Set mode configurations."""
         if hasattr(self, "adaptive_mode_controller"):
             controller = getattr(self, "adaptive_mode_controller", None)
@@ -686,7 +687,7 @@ class CapabilityRegistryMixin:
             if controller and hasattr(controller, "set_default_budget"):
                 controller.set_default_budget(budget)
 
-    def _set_tool_dependencies(self, dependencies: Dict[str, Set[str]]) -> None:
+    def _set_tool_dependencies(self, dependencies: dict[str, set[str]]) -> None:
         """Set tool dependencies."""
         if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
             if hasattr(self._sequence_tracker, "set_dependencies"):
@@ -705,7 +706,7 @@ class CapabilityRegistryMixin:
         else:
             self._rl_hooks = hooks
 
-    def _set_team_specs(self, specs: Dict[str, Any]) -> None:
+    def _set_team_specs(self, specs: dict[str, Any]) -> None:
         """Set team specifications."""
         if hasattr(self, "_team_specs"):
             self._team_specs = specs
@@ -807,7 +808,7 @@ class CapabilityRegistryMixin:
         logger.info(f"Unregistered dynamic capability: {name}")
         return True
 
-    def get_dynamic_capabilities(self) -> Set[str]:
+    def get_dynamic_capabilities(self) -> set[str]:
         """Get names of all dynamically loaded capabilities.
 
         Returns:

@@ -66,7 +66,8 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Union
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 from uuid import uuid4
 
 from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
@@ -99,7 +100,7 @@ class EventMappingRule:
 
     source_pattern: str
     target_name: str
-    transform: Optional[Callable[[Any], Dict[str, Any]]] = None
+    transform: Optional[Callable[[Any], dict[str, Any]]] = None
     enabled: bool = True
 
     def matches(self, event_name: str) -> bool:
@@ -133,8 +134,8 @@ class AdapterConfig:
 
     enable_observability_to_cqrs: bool = True
     enable_cqrs_to_observability: bool = True
-    filter_categories: Optional[Set[str]] = None
-    exclude_patterns: Set[str] = field(default_factory=lambda: {"metric.*", "audit.*"})
+    filter_categories: Optional[set[str]] = None
+    exclude_patterns: set[str] = field(default_factory=lambda: {"metric.*", "audit.*"})
     include_metadata: bool = True
     batch_size: int = 100
 
@@ -177,8 +178,8 @@ class CQRSEventAdapter:
         self._config = config or AdapterConfig()
         self._event_bus = event_bus
         self._event_dispatcher = event_dispatcher
-        self._mapping_rules: List[EventMappingRule] = []
-        self._unsubscribers: List[Callable[[], None]] = []
+        self._mapping_rules: list[EventMappingRule] = []
+        self._unsubscribers: list[Callable[[], None]] = []
         self._is_active = False
 
         # Metrics
@@ -187,7 +188,7 @@ class CQRSEventAdapter:
         self._events_filtered = 0
 
         # Circular loop prevention
-        self._processing_ids: Set[str] = set()
+        self._processing_ids: set[str] = set()
 
         # Initialize default mappings
         self._setup_default_mappings()
@@ -526,7 +527,7 @@ class CQRSEventAdapter:
         event_type = type(event).__name__
 
         # Build data from event attributes
-        event_data: Dict[str, Any] = {}
+        event_data: dict[str, Any] = {}
 
         # Extract common attributes from concrete event types
         if hasattr(event, "task_id"):
@@ -608,7 +609,7 @@ class CQRSEventAdapter:
             return name.endswith(pattern[1:])
         return name == pattern
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get adapter metrics.
 
         Returns:

@@ -13,16 +13,15 @@ from __future__ import annotations
 
 import logging
 import time
-import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.protocols.agent import IAgentOrchestrator
     from victor.protocols.ui_agent import UIAgentProtocol
 
 logger = logging.getLogger(__name__)

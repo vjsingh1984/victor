@@ -36,7 +36,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -84,7 +84,7 @@ class SessionRepositoryProtocol(Protocol):
                 return self._session_repo.get_session(session_id)
     """
 
-    async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_session(self, session_id: str) -> Optional[dict[str, Any]]:
         """Get a session by ID.
 
         Args:
@@ -111,7 +111,7 @@ class SessionRepositoryProtocol(Protocol):
         """
         ...
 
-    async def save_session(self, session: Dict[str, Any]) -> None:
+    async def save_session(self, session: dict[str, Any]) -> None:
         """Save or update a session.
 
         Args:
@@ -139,7 +139,7 @@ class SessionRepositoryProtocol(Protocol):
     async def list_sessions(
         self,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List recent sessions with metadata only (not full messages).
 
         Args:
@@ -179,7 +179,7 @@ class SessionRepositoryProtocol(Protocol):
         """
         ...
 
-    async def get_latest_session(self) -> Optional[Dict[str, Any]]:
+    async def get_latest_session(self) -> Optional[dict[str, Any]]:
         """Get the most recently updated session.
 
         Returns:
@@ -197,7 +197,7 @@ class SessionRepositoryProtocol(Protocol):
         provider: str = "",
         model: str = "",
         name: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Factory method to create a new session instance.
 
         This is a synchronous factory method that creates a session

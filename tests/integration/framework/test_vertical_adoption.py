@@ -24,7 +24,6 @@ Tests verify that verticals properly adopt and integrate framework components:
 """
 
 import pytest
-from typing import Dict, Any, List
 from unittest.mock import MagicMock
 
 
@@ -416,7 +415,7 @@ class TestBackwardCompatibility:
         """Capability provider import paths remain stable."""
         # These imports should not break
         from victor.research.capabilities import ResearchCapabilityProvider
-        from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
+        from victor.framework.capabilities import BaseCapabilityProvider
 
         # Should instantiate without errors
         research_provider = ResearchCapabilityProvider()

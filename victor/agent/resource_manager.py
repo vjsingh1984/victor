@@ -29,7 +29,8 @@ import weakref
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, Generator, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
+from collections.abc import Callable, Generator
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class ManagedResource:
     priority: int = 0  # Higher priority = cleanup first
     state: ResourceState = ResourceState.ACTIVE
     cleanup_error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def cleanup(self) -> bool:
         """Execute cleanup for this resource.
@@ -92,7 +93,7 @@ class IResourceManager(Protocol):
         """Register a resource for cleanup."""
         ...
 
-    def cleanup_all(self) -> Dict[str, bool]:
+    def cleanup_all(self) -> dict[str, bool]:
         """Run all cleanup callbacks."""
         ...
 
@@ -135,8 +136,8 @@ class ResourceManager:
 
     def _init(self) -> None:
         """Initialize the resource manager."""
-        self._cleanup_callbacks: List[tuple[int, Callable[..., Any]]] = []
-        self._resources: Dict[str, ManagedResource] = {}
+        self._cleanup_callbacks: list[tuple[int, Callable[..., Any]]] = []
+        self._resources: dict[str, ManagedResource] = {}
         self._callback_lock = threading.Lock()
         self._resource_lock = threading.Lock()
         self._cleanup_done = False
@@ -223,7 +224,7 @@ class ResourceManager:
 
             return success
 
-    def cleanup_all(self) -> Dict[str, bool]:
+    def cleanup_all(self) -> dict[str, bool]:
         """Run all cleanup callbacks and resource cleanups.
 
         Returns:
@@ -233,7 +234,7 @@ class ResourceManager:
             logger.debug("Cleanup already completed, skipping")
             return {}
 
-        results: Dict[str, bool] = {}
+        results: dict[str, bool] = {}
 
         # Cleanup resources first (sorted by priority)
         with self._resource_lock:
@@ -273,7 +274,7 @@ class ResourceManager:
 
     def _cleanup_all_silent(self) -> None:
         """Silent cleanup for atexit - no logging to avoid closed file errors."""
-        results: Dict[str, bool] = {}
+        results: dict[str, bool] = {}
 
         # Clean up resources
         with self._resource_lock:
@@ -318,7 +319,7 @@ class ResourceManager:
                 pass  # Logging system already shut down
             self._cleanup_all_silent()
 
-    def get_resource_status(self) -> Dict[str, Dict[str, Any]]:
+    def get_resource_status(self) -> dict[str, dict[str, Any]]:
         """Get status of all registered resources.
 
         Returns:
@@ -336,7 +337,7 @@ class ResourceManager:
                 for name, managed in self._resources.items()
             }
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get manager statistics.
 
         Returns:

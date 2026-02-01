@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Set
+from typing import Any, Optional
 
 from victor.framework.middleware_protocols import (
     IMiddleware,
@@ -105,7 +105,7 @@ class BaseMiddleware(ABC, IMiddleware):
     def __init__(
         self,
         enabled: bool = True,
-        applicable_tools: Optional[Set[str]] = None,
+        applicable_tools: Optional[set[str]] = None,
         priority: MiddlewarePriority = MiddlewarePriority.NORMAL,
         phase: MiddlewarePhase = MiddlewarePhase.PRE,
         logger_name: Optional[str] = None,
@@ -147,7 +147,7 @@ class BaseMiddleware(ABC, IMiddleware):
         self._logger.debug(f"{self.__class__.__name__} disabled")
 
     @abstractmethod
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Process tool call before execution.
 
         Subclasses must implement this method to define their
@@ -166,7 +166,7 @@ class BaseMiddleware(ABC, IMiddleware):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -194,7 +194,7 @@ class BaseMiddleware(ABC, IMiddleware):
         """
         return self._priority
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get applicable tools.
 
         Returns:

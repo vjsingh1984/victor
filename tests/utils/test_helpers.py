@@ -14,8 +14,8 @@
 
 """Test helper functions for creating test data and mocks."""
 
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, Mock
+from typing import Any, Optional
+from unittest.mock import AsyncMock, Mock
 
 from victor.agent.protocols import ToolExecutorProtocol
 from victor.providers.base import BaseProvider, Message, StreamChunk
@@ -26,8 +26,8 @@ def create_test_completion_response(
     role: str = "assistant",
     model: str = "test-model",
     stop_reason: str = "stop",
-    tool_calls: Optional[List[Dict[str, Any]]] = None,
-    usage: Optional[Dict[str, int]] = None,
+    tool_calls: Optional[list[dict[str, Any]]] = None,
+    usage: Optional[dict[str, int]] = None,
 ) -> Mock:
     """Create a mock CompletionResponse for testing.
 
@@ -58,7 +58,7 @@ def create_test_stream_chunk(
     content: str = "chunk",
     is_final: bool = False,
     stop_reason: Optional[str] = None,
-    usage: Optional[Dict[str, int]] = None,
+    usage: Optional[dict[str, int]] = None,
 ) -> StreamChunk:
     """Create a StreamChunk for testing streaming responses.
 
@@ -82,8 +82,8 @@ def create_test_stream_chunk(
 def create_test_messages(
     user_message: str = "Hello, assistant!",
     system_prompt: Optional[str] = None,
-    conversation_history: Optional[List[Dict[str, str]]] = None,
-) -> List[Message]:
+    conversation_history: Optional[list[dict[str, str]]] = None,
+) -> list[Message]:
     """Create test messages for provider chat calls.
 
     Args:
@@ -110,8 +110,8 @@ def create_test_messages(
 def create_test_tool_definition(
     name: str = "test_tool",
     description: str = "A test tool",
-    parameters: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    parameters: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Create a test tool definition.
 
     Args:
@@ -220,7 +220,7 @@ def create_mock_orchestrator(
 
 def create_mock_tool_result(
     tool_name: str = "test_tool", result: Any = "success"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a mock tool execution result.
 
     Args:
@@ -301,7 +301,7 @@ def assert_tool_called(mock_tool: Mock, call_count: int = 1) -> None:
     ), f"Expected {call_count} calls, got {mock_tool.call_count}"
 
 
-def create_test_conversation() -> List[Dict[str, str]]:
+def create_test_conversation() -> list[dict[str, str]]:
     """Create a test conversation history.
 
     Returns:
@@ -356,7 +356,7 @@ def create_mock_event_bus() -> Mock:
     return event_bus
 
 
-def create_mock_tool_registry(tools: Optional[List[str]] = None) -> Mock:
+def create_mock_tool_registry(tools: Optional[list[str]] = None) -> Mock:
     """Create a mock tool registry.
 
     Args:

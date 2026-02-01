@@ -14,7 +14,6 @@
 
 """Tests for framework comparison module."""
 
-import pytest
 from victor.evaluation.benchmarks.framework_comparison import (
     Framework,
     FrameworkCapabilities,

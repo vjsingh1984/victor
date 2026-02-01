@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from typing import Optional
 
 from victor.tools.base import CostTier
 
@@ -7,8 +7,8 @@ from victor.tools.base import CostTier
 @dataclass
 class ToolSpec:
     name: str
-    inputs: Set[str] = field(default_factory=set)
-    outputs: Set[str] = field(default_factory=set)
+    inputs: set[str] = field(default_factory=set)
+    outputs: set[str] = field(default_factory=set)
     cost_tier: CostTier = CostTier.FREE
 
 
@@ -20,15 +20,15 @@ class ToolDependencyGraph:
     """
 
     def __init__(self, cost_aware: bool = True) -> None:
-        self.tools: Dict[str, ToolSpec] = {}
-        self.output_index: Dict[str, Set[str]] = {}
+        self.tools: dict[str, ToolSpec] = {}
+        self.output_index: dict[str, set[str]] = {}
         self.cost_aware = cost_aware
 
     def add_tool(
         self,
         name: str,
-        inputs: List[str],
-        outputs: List[str],
+        inputs: list[str],
+        outputs: list[str],
         cost_tier: Optional[CostTier] = None,
     ) -> None:
         spec = ToolSpec(
@@ -41,7 +41,7 @@ class ToolDependencyGraph:
         for out in spec.outputs:
             self.output_index.setdefault(out, set()).add(name)
 
-    def _select_provider(self, providers: Set[str]) -> str:
+    def _select_provider(self, providers: set[str]) -> str:
         """Select the best provider tool, preferring lower-cost options.
 
         Args:
@@ -63,7 +63,7 @@ class ToolDependencyGraph:
         )
         return ranked[0]
 
-    def plan(self, goals: List[str], available: List[str]) -> List[str]:
+    def plan(self, goals: list[str], available: list[str]) -> list[str]:
         """Return a tool execution order to satisfy goals or [] if impossible.
 
         Uses cost-aware selection to prefer lower-cost tools when multiple
@@ -76,10 +76,10 @@ class ToolDependencyGraph:
         Returns:
             Ordered list of tool names to execute, or [] if impossible
         """
-        plan: List[str] = []
+        plan: list[str] = []
         satisfied = set(available)
-        visiting: Set[str] = set()
-        memo: Dict[str, bool] = {}
+        visiting: set[str] = set()
+        memo: dict[str, bool] = {}
 
         def resolve(goal: str) -> bool:
             if goal in satisfied:
@@ -112,7 +112,7 @@ class ToolDependencyGraph:
 
         return plan
 
-    def get_total_plan_cost(self, plan: List[str]) -> float:
+    def get_total_plan_cost(self, plan: list[str]) -> float:
         """Calculate total cost weight for a plan.
 
         Args:

@@ -26,9 +26,7 @@ Tests cover:
 
 from __future__ import annotations
 
-from typing import Dict, List, Set
 
-import pytest
 
 from victor.core.verticals.base import StageDefinition
 from victor.research.assistant import ResearchAssistant

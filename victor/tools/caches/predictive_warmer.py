@@ -45,7 +45,8 @@ import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -64,10 +65,10 @@ class QueryPattern:
     """
 
     query: str
-    tools: List[str]
+    tools: list[str]
     frequency: int = 1
     last_seen: float = field(default_factory=time.time)
-    transitions: Dict[str, int] = field(default_factory=dict)
+    transitions: dict[str, int] = field(default_factory=dict)
     avg_similarity: float = 0.0
 
 
@@ -82,9 +83,9 @@ class PredictionResult:
         total_confidence: Combined confidence score
     """
 
-    queries: List[str]
-    confidences: List[float]
-    tools: List[List[str]]
+    queries: list[str]
+    confidences: list[float]
+    tools: list[list[str]]
     total_confidence: float
 
 
@@ -154,14 +155,14 @@ class PredictiveCacheWarmer:
         self._enabled = enabled
 
         # Pattern storage
-        self._patterns: Dict[str, QueryPattern] = {}
+        self._patterns: dict[str, QueryPattern] = {}
         self._query_history: deque = deque(maxlen=self.MAX_HISTORY)
 
         # N-gram transitions (query_sequence -> {next_query: frequency})
-        self._ngrams: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self._ngrams: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
         # Time-based patterns (hour_of_day -> [queries])
-        self._time_patterns: Dict[int, List[str]] = defaultdict(list)
+        self._time_patterns: dict[int, list[str]] = defaultdict(list)
 
         # Lock for thread safety
         self._lock = threading.RLock()
@@ -176,7 +177,7 @@ class PredictiveCacheWarmer:
             f"ngram_size={ngram_size}"
         )
 
-    def record_query(self, query: str, tools: List[str]) -> None:
+    def record_query(self, query: str, tools: list[str]) -> None:
         """Record a query for pattern analysis.
 
         Args:
@@ -255,7 +256,7 @@ class PredictiveCacheWarmer:
                     return PredictionResult([], [], [], 0.0)
 
             # Collect predictions from multiple strategies
-            predictions: Dict[str, float] = defaultdict(float)
+            predictions: dict[str, float] = defaultdict(float)
 
             # Strategy 1: Transition patterns from current query
             if current_query in self._patterns:
@@ -324,7 +325,7 @@ class PredictiveCacheWarmer:
         self,
         predictions: PredictionResult,
         embedding_fn: Optional[Callable[[str], Any]] = None,
-        selection_fn: Optional[Callable[[str], List[str]]] = None,
+        selection_fn: Optional[Callable[[str], list[str]]] = None,
     ) -> int:
         """Prewarm cache for predicted queries.
 
@@ -369,9 +370,9 @@ class PredictiveCacheWarmer:
     async def _prewarm_single_query(
         self,
         query: str,
-        tools: List[str],
+        tools: list[str],
         embedding_fn: Optional[Callable[[str], Any]],
-        selection_fn: Optional[Callable[[str], List[str]]],
+        selection_fn: Optional[Callable[[str], list[str]]],
     ) -> bool:
         """Prewarm cache for a single query.
 
@@ -441,7 +442,7 @@ class PredictiveCacheWarmer:
 
             return False
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get warmer statistics.
 
         Returns:

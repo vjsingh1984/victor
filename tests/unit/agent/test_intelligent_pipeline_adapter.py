@@ -18,7 +18,7 @@ Tests adapter for intelligent pipeline integration.
 """
 
 import pytest
-from unittest.mock import AsyncMock, Mock, MagicMock
+from unittest.mock import AsyncMock, Mock
 from dataclasses import dataclass, field
 
 from victor.agent.adapters.intelligent_pipeline_adapter import (

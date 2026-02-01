@@ -15,15 +15,14 @@
 """OpenAI GPT provider implementation."""
 
 import logging
-import os
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 from victor.core.errors import (
     ProviderConnectionError as CoreProviderConnectionError,
-    ProviderTimeoutError as CoreProviderTimeoutError,
 )
 from victor.providers.base import (
     BaseProvider,
@@ -125,12 +124,12 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to OpenAI.
@@ -200,12 +199,12 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from OpenAI.
@@ -256,8 +255,8 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                     request_params["tool_choice"] = "auto"
 
             # Accumulate tool calls across streaming deltas to avoid emitting partial JSON
-            tool_call_accumulator: Dict[str, Dict[str, Any]] = {}
-            tool_call_indices: Dict[int, str] = {}
+            tool_call_accumulator: dict[str, dict[str, Any]] = {}
+            tool_call_indices: dict[int, str] = {}
 
             # Stream response
             stream = await self.client.chat.completions.create(**request_params)
@@ -282,7 +281,7 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             # Catch-all for truly unexpected errors
             raise self._handle_error(e, self.name)
 
-    def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def _convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert standard tools to OpenAI format."""
         return convert_tools_to_openai_format(tools)
 
@@ -335,8 +334,8 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
     def _parse_stream_chunk(
         self,
         chunk: ChatCompletionChunk,
-        tool_call_accumulator: Optional[Dict[str, Dict[str, Any]]] = None,
-        tool_call_indices: Optional[Dict[int, str]] = None,
+        tool_call_accumulator: Optional[dict[str, dict[str, Any]]] = None,
+        tool_call_indices: Optional[dict[int, str]] = None,
     ) -> Optional[StreamChunk]:
         """Parse streaming chunk from OpenAI.
 
@@ -349,7 +348,7 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             StreamChunk or None
         """
         # Parse usage from final chunk (sent when stream_options.include_usage=True)
-        usage: Optional[Dict[str, int]] = None
+        usage: Optional[dict[str, int]] = None
         if hasattr(chunk, "usage") and chunk.usage:
             usage = {
                 "prompt_tokens": chunk.usage.prompt_tokens or 0,
@@ -369,7 +368,7 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         content = delta.content or ""
         finish_reason = choice.finish_reason
         is_final = finish_reason is not None
-        tool_calls: Optional[List[Dict[str, Any]]] = None
+        tool_calls: Optional[list[dict[str, Any]]] = None
 
         # Aggregate tool call deltas so the orchestrator receives complete JSON
         if getattr(delta, "tool_calls", None):
@@ -424,7 +423,7 @@ class OpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             model_name=None,
         )
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List available OpenAI models.
 
         Queries the OpenAI API to get available models, filtered to chat-capable models.

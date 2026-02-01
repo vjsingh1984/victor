@@ -37,8 +37,7 @@ Example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from victor.framework.multi_agent.personas import (
     CommunicationStyle,
@@ -157,7 +156,7 @@ def get_reviewer_template() -> PersonaTraits:
 # =============================================================================
 
 
-PERSONA_TEMPLATES: Dict[str, PersonaTraits] = {
+PERSONA_TEMPLATES: dict[str, PersonaTraits] = {
     "researcher": get_researcher_template(),
     "planner": get_planner_template(),
     "executor": get_executor_template(),
@@ -177,7 +176,7 @@ def get_persona_template(name: str) -> Optional[PersonaTraits]:
     return PERSONA_TEMPLATES.get(name)
 
 
-def list_persona_templates() -> List[str]:
+def list_persona_templates() -> list[str]:
     """List all available persona templates.
 
     Returns:

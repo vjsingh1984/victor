@@ -18,7 +18,7 @@ Part of HIGH-005: Initialization Complexity reduction.
 """
 
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.builders.base import FactoryAwareBuilder
 from victor.agent.coordinators.response_coordinator import ResponseCoordinator
@@ -47,10 +47,10 @@ class PromptingBuilder(FactoryAwareBuilder):
         orchestrator: "AgentOrchestrator",
         model: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build prompting components and attach them to orchestrator."""
         factory = self._ensure_factory()
-        components: Dict[str, Any] = {}
+        components: dict[str, Any] = {}
 
         # Response sanitizer for cleaning model output (via factory - DI with fallback)
         orchestrator.sanitizer = factory.create_sanitizer()

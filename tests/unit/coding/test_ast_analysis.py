@@ -24,8 +24,6 @@ Tests cover:
 - Reference extraction
 """
 
-from pathlib import Path
-from typing import List
 
 import pytest
 

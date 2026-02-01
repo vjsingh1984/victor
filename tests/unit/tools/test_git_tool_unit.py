@@ -554,7 +554,6 @@ class TestGitCreatePR:
     async def test_push_failure(self):
         """Test pr when push fails."""
         from victor.tools.git_tool import pr
-        from victor.tools.subprocess_executor import CommandResult, CommandErrorType
 
         with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.side_effect = [

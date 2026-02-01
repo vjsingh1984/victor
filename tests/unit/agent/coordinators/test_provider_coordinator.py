@@ -19,10 +19,8 @@ LLM provider operations and switching. Tests cover provider management,
 health monitoring, rate limiting, and capability discovery.
 """
 
-import asyncio
 import pytest
-from unittest.mock import AsyncMock, Mock, MagicMock, patch
-from typing import Any, Dict, Optional
+from unittest.mock import AsyncMock, Mock, patch
 
 from victor.agent.coordinators.provider_coordinator import (
     ProviderCoordinator,

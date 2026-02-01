@@ -157,7 +157,7 @@ class IConversationStateManager(Protocol):
         """
         ...
 
-    def record_tool_execution(self, tool_name: str, args: Dict[str, Any]) -> None:
+    def record_tool_execution(self, tool_name: str, args: dict[str, Any]) -> None:
         """Record a tool execution for stage detection.
 
         Args:
@@ -166,7 +166,7 @@ class IConversationStateManager(Protocol):
         """
         ...
 
-    def get_stage_tools(self) -> List[str]:
+    def get_stage_tools(self) -> list[str]:
         """Get tools relevant to current stage.
 
         Returns:
@@ -199,7 +199,7 @@ class ISubAgentCoordinator(Protocol):
         self,
         role: "SubAgentRole",
         task: str,
-        allowed_tools: List[str],
+        allowed_tools: list[str],
         tool_budget: int = 15,
         context_limit: int = 30000,
         system_prompt_override: Optional[str] = None,
@@ -223,10 +223,10 @@ class ISubAgentCoordinator(Protocol):
         self,
         role: "SubAgentRole",
         task: str,
-        allowed_tools: List[str],
+        allowed_tools: list[str],
         tool_budget: int = 15,
         context_limit: int = 30000,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a sub-agent and return the result.
 
         Args:
@@ -285,7 +285,7 @@ class IToolAccessProvider(Protocol):
         """
         ...
 
-    def list_tools(self) -> List[str]:
+    def list_tools(self) -> list[str]:
         """List all available tools.
 
         Returns:
@@ -304,7 +304,7 @@ class IToolAccessProvider(Protocol):
         """
         ...
 
-    def get_tools_by_category(self, category: str) -> List[Any]:
+    def get_tools_by_category(self, category: str) -> list[Any]:
         """Get all tools in a category.
 
         Args:
@@ -394,7 +394,7 @@ class IMessageHistoryProvider(Protocol):
         """
         ...
 
-    def get_messages(self) -> List[Any]:
+    def get_messages(self) -> list[Any]:
         """Get all messages in the conversation.
 
         Returns:
@@ -402,7 +402,7 @@ class IMessageHistoryProvider(Protocol):
         """
         ...
 
-    def get_last_n_messages(self, n: int) -> List[Any]:
+    def get_last_n_messages(self, n: int) -> list[Any]:
         """Get the last N messages.
 
         Args:
@@ -520,7 +520,7 @@ class IOrchestratorBridge(
         """
         ...
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get orchestrator status information.
 
         Returns:

@@ -41,7 +41,7 @@ class DataAnalysisRLConfig(BaseRLConfig):
     # default_patience inherited from BaseRLConfig
 
     # Uses canonical ToolNames constants for consistency
-    task_type_mappings: Dict[str, List[str]] = field(
+    task_type_mappings: dict[str, list[str]] = field(
         default_factory=lambda: {
             "eda": [ToolNames.READ, ToolNames.SHELL, ToolNames.WRITE, ToolNames.LS],
             "cleaning": [ToolNames.SHELL, ToolNames.READ, ToolNames.WRITE],
@@ -53,7 +53,7 @@ class DataAnalysisRLConfig(BaseRLConfig):
         }
     )
 
-    quality_thresholds: Dict[str, float] = field(
+    quality_thresholds: dict[str, float] = field(
         default_factory=lambda: {
             "eda": 0.75,  # Exploratory, lower bar
             "cleaning": 0.85,  # Data quality matters
@@ -70,7 +70,7 @@ class DataAnalysisRLConfig(BaseRLConfig):
     # is_learner_active, get_rl_config, __repr__ all inherited
 
     # Data analysis often needs larger outputs for code
-    preferred_output_length: Dict[str, str] = field(
+    preferred_output_length: dict[str, str] = field(
         default_factory=lambda: {
             "eda": "medium",
             "cleaning": "medium",
@@ -104,8 +104,8 @@ class DataAnalysisRLHooks:
     def get_tool_recommendation(
         self,
         task_type: str,
-        available_tools: Optional[List[str]] = None,
-    ) -> List[str]:
+        available_tools: Optional[list[str]] = None,
+    ) -> list[str]:
         """Get tool recommendations for a task type."""
         config_tools = self._config.get_tools_for_task(task_type)
         if available_tools:
@@ -125,7 +125,7 @@ class DataAnalysisRLHooks:
         # Data analysis almost always needs code
         return True
 
-    def get_preferred_libraries(self, task_type: str) -> List[str]:
+    def get_preferred_libraries(self, task_type: str) -> list[str]:
         """Get preferred Python libraries for task type."""
         libraries = {
             "eda": ["pandas", "numpy", "seaborn", "matplotlib"],

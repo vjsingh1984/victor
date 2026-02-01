@@ -27,7 +27,7 @@ Features:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 if TYPE_CHECKING:
     from victor.core.vertical_types import StageDefinition
@@ -37,33 +37,17 @@ if TYPE_CHECKING:
 
 from victor.core.verticals.base import (
     VerticalBase,
-    VerticalConfig,
 )  # StageDefinition is not exported
 from victor.core.verticals.defaults.tool_defaults import (
     COMMON_READONLY_TOOLS,
     merge_required_tools,
 )
 from victor.core.verticals.protocols import (
-    MiddlewareProtocol,
-    SafetyExtensionProtocol,
-    PromptContributorProtocol,
-    ModeConfigProviderProtocol,
-    ToolDependencyProviderProtocol,
     TieredToolConfig,
-    VerticalExtensions,
 )
 from victor.framework.tool_naming import ToolNames
 
 # Import ISP-compliant provider protocols
-from victor.core.verticals.protocols.providers import (
-    CapabilityProvider,
-    HandlerProvider,
-    PromptContributorProvider,
-    TieredToolConfigProvider,
-    ToolDependencyProvider,
-    ToolProvider,
-    WorkflowProvider,
-)
 
 # Phase 2.1: Protocol auto-registration decorator
 from victor.core.verticals.protocol_decorators import register_protocols
@@ -111,7 +95,7 @@ class RAGAssistant(VerticalBase):
     version: ClassVar[str] = "0.5.0"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         """Get tools for RAG operations.
 
         Uses canonical tool names from victor.tools.tool_names.
@@ -186,7 +170,7 @@ class RAGAssistant(VerticalBase):
         return builder
 
     @classmethod
-    def get_stages(cls) -> Dict[str, StageDefinition]:
+    def get_stages(cls) -> dict[str, StageDefinition]:
         """Get RAG-specific workflow stages.
 
         Uses canonical tool names from victor.tools.tool_names.
@@ -272,7 +256,7 @@ class RAGAssistant(VerticalBase):
     # to eliminate ~800 lines of duplication. Only override for custom logic.
 
     @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
+    def get_handlers(cls) -> dict[str, Any]:
         """Get compute handlers for RAG workflows.
 
         Returns handlers from victor.rag.handlers for workflow execution.
@@ -298,7 +282,7 @@ class RAGAssistant(VerticalBase):
         return handlers
 
     @classmethod
-    def get_capability_configs(cls) -> Dict[str, Any]:
+    def get_capability_configs(cls) -> dict[str, Any]:
         """Get RAG capability configurations for centralized storage.
 
         Returns default RAG configuration for VerticalContext storage.

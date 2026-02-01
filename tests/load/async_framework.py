@@ -26,7 +26,7 @@ import asyncio
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aiohttp
 
@@ -43,15 +43,15 @@ class AsyncLoadTestFramework:
 
     def __init__(self, base_url: str = DEFAULT_HOST):
         self.base_url = base_url
-        self.results: List[Dict[str, Any]] = []
+        self.results: list[dict[str, Any]] = []
 
     async def execute_concurrent_requests(
         self,
         num_requests: int,
         concurrency: int,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         endpoint: str = "/chat",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute concurrent requests with specified concurrency level.
 
         Args:
@@ -72,7 +72,7 @@ class AsyncLoadTestFramework:
         async with aiohttp.ClientSession() as session:
             semaphore = asyncio.Semaphore(concurrency)
 
-            async def make_request(request_id: int) -> Dict[str, Any]:
+            async def make_request(request_id: int) -> dict[str, Any]:
                 async with semaphore:
                     req_start = time.time()
                     try:
@@ -132,7 +132,7 @@ class AsyncLoadTestFramework:
         self,
         duration_seconds: int,
         requests_per_second: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Test for memory leaks over extended period.
 
         Args:
@@ -197,7 +197,7 @@ class AsyncLoadTestFramework:
 
 
 def generate_scalability_report(
-    results: Dict[str, Any], output_path: str = "scalability_report.json"
+    results: dict[str, Any], output_path: str = "scalability_report.json"
 ):
     """Generate a detailed scalability report from test results.
 
@@ -226,7 +226,7 @@ def generate_scalability_report(
     return report
 
 
-def generate_recommendations(results: Dict[str, Any]) -> List[str]:
+def generate_recommendations(results: dict[str, Any]) -> list[str]:
     """Generate scaling recommendations based on test results."""
     recommendations = []
 

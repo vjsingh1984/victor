@@ -32,7 +32,8 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
+from typing import Any, Optional
+from collections.abc import Iterator
 
 from victor.core.database import get_database
 from victor.core.schema import Tables
@@ -132,7 +133,7 @@ class SignatureStore:
         self._local = threading.local()
 
         # In-memory cache for frequent lookups
-        self._cache: Dict[str, float] = {}  # signature -> expires_at
+        self._cache: dict[str, float] = {}  # signature -> expires_at
         self._cache_ttl = 300  # 5 minutes
         self._cache_time = 0.0
 
@@ -168,7 +169,7 @@ class SignatureStore:
                     )
                 conn.commit()
 
-    def _compute_hash(self, args: Dict[str, Any]) -> str:
+    def _compute_hash(self, args: dict[str, Any]) -> str:
         """Compute deterministic hash of arguments.
 
         Args:
@@ -211,7 +212,7 @@ class SignatureStore:
     def is_known_failure(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
     ) -> bool:
         """Check if a tool call is known to fail.
 
@@ -249,7 +250,7 @@ class SignatureStore:
     def record_failure(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         error_message: str,
         custom_ttl: Optional[int] = None,
     ) -> None:
@@ -303,7 +304,7 @@ class SignatureStore:
     def clear_signature(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
     ) -> bool:
         """Clear a specific failure signature (e.g., after a fix).
 
@@ -421,7 +422,7 @@ class SignatureStore:
         self,
         tool_name: Optional[str] = None,
         limit: int = 100,
-    ) -> List[FailedSignature]:
+    ) -> list[FailedSignature]:
         """Get recorded failures.
 
         Args:
@@ -457,7 +458,7 @@ class SignatureStore:
                 for row in cursor
             ]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get signature store statistics.
 
         Returns:

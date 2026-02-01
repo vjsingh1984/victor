@@ -23,13 +23,10 @@ Tests cover:
 3. XSS prevention (Jinja2 autoescape enabled)
 """
 
-import ast
 import hashlib
-import os
 import re
 import subprocess
 from pathlib import Path
-from typing import List, Tuple
 
 import pytest
 

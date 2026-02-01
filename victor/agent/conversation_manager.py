@@ -51,7 +51,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.conversation_controller import (
     ConversationController,
@@ -275,7 +275,7 @@ class ConversationManager:
     def add_assistant_message(
         self,
         content: str,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> "Message":
         """Add an assistant message with optional tool calls.
 
@@ -327,7 +327,7 @@ class ConversationManager:
     # =========================================================================
 
     @property
-    def messages(self) -> List["Message"]:
+    def messages(self) -> list["Message"]:
         """Get all messages in the conversation.
 
         Delegates to MessageStore (SRP).
@@ -419,7 +419,7 @@ class ConversationManager:
             return self.message_count() - metrics.message_count
         return 0
 
-    def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_memory_context(self, max_tokens: Optional[int] = None) -> list[dict[str, Any]]:
         """Get token-aware context for LLM calls.
 
         Delegates to ContextOverflowHandler (SRP).
@@ -452,7 +452,7 @@ class ConversationManager:
         """
         return self._controller.stage
 
-    def get_stage_recommended_tools(self) -> Set[str]:
+    def get_stage_recommended_tools(self) -> set[str]:
         """Get tools recommended for current conversation stage.
 
         Returns:
@@ -479,7 +479,7 @@ class ConversationManager:
         self,
         limit: int = 10,
         project_path: Optional[str] = None,
-    ) -> List["ConversationSession"]:
+    ) -> list["ConversationSession"]:
         """List recent conversation sessions.
 
         Delegates to SessionManager (SRP).
@@ -543,7 +543,7 @@ class ConversationManager:
         logger.info(f"Recovered session {session_id} with {len(session.messages)} messages")
         return True
 
-    def get_session_stats(self) -> Dict[str, Any]:
+    def get_session_stats(self) -> dict[str, Any]:
         """Get statistics for current session.
 
         Delegates to SessionManager (SRP).
@@ -625,7 +625,7 @@ class ConversationManager:
         query: str,
         limit: int = 10,
         min_similarity: float = 0.3,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search for semantically similar messages.
 
         Delegates to EmbeddingManager (SRP).
@@ -702,7 +702,7 @@ class ConversationManager:
         """
         self._controller.set_system_prompt(prompt)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Export conversation state as dictionary.
 
         Returns:

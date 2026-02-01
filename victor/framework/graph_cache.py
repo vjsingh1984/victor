@@ -41,15 +41,12 @@ import json
 import logging
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Optional,
-    Tuple,
     TypeVar,
-    cast,
 )
 
 from cachetools import TTLCache  # type: ignore[import-untyped]
@@ -63,7 +60,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-StateType = TypeVar("StateType", bound=Dict[str, Any])
+StateType = TypeVar("StateType", bound=dict[str, Any])
 
 
 @dataclass
@@ -133,7 +130,7 @@ class CompiledGraphCache:
         self._lock = threading.RLock()
 
         # Statistics tracking
-        self._stats: Dict[str, int] = {
+        self._stats: dict[str, int] = {
             "hits": 0,
             "misses": 0,
             "compilations": 0,
@@ -170,7 +167,7 @@ class CompiledGraphCache:
             SHA-256 hash string of graph structure
         """
         # Build hash data from graph structure
-        hash_data: Dict[str, Any] = {
+        hash_data: dict[str, Any] = {
             "nodes": {},
             "edges": {},
             "entry_point": graph._entry_point,
@@ -347,7 +344,7 @@ class CompiledGraphCache:
             logger.info(f"Cleared {count} compiled graph cache entries")
             return count
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

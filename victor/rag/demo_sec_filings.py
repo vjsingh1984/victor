@@ -52,7 +52,7 @@ import os
 import re
 import warnings
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import aiohttp
 
@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 
 # Top 100 S&P 500 companies by market cap (as of 2025) with SEC CIK numbers
 # CIK numbers are padded to 10 digits with leading zeros
-SP500_COMPANIES: Dict[str, Dict[str, str]] = {
+SP500_COMPANIES: dict[str, dict[str, str]] = {
     # === Magnificent 7 / Big Tech ===
     "AAPL": {"name": "Apple Inc", "cik": "0000320193", "sector": "Technology"},
     "MSFT": {"name": "Microsoft Corporation", "cik": "0000789019", "sector": "Technology"},
@@ -189,7 +189,7 @@ SP500_COMPANIES: Dict[str, Dict[str, str]] = {
 }
 
 # Preset company groups
-COMPANY_PRESETS: Dict[str, List[str]] = {
+COMPANY_PRESETS: dict[str, list[str]] = {
     "faang": ["META", "AMZN", "AAPL", "NFLX", "GOOGL"],
     "mag7": ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"],
     "top10": ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK.B", "JPM", "V"],
@@ -289,7 +289,7 @@ class SECFilingFetcher:
         cik: str,
         filing_type: str = "10-K",
         count: int = 1,
-    ) -> List[Filing]:
+    ) -> list[Filing]:
         """Get recent filings for a company.
 
         Args:
@@ -323,7 +323,7 @@ class SECFilingFetcher:
         accessions = recent.get("accessionNumber", [])
         primary_docs = recent.get("primaryDocument", [])
 
-        filings: List[Filing] = []
+        filings: list[Filing] = []
         for i, form in enumerate(forms):
             if form == filing_type and len(filings) < count:
                 accession = accessions[i].replace("-", "")
@@ -422,12 +422,12 @@ async def clear_sec_filings() -> int:
 
 
 async def ingest_sec_filings(
-    companies: Optional[List[str]] = None,
+    companies: Optional[list[str]] = None,
     filing_type: str = "10-K",
     count: int = 1,
     max_concurrent: int = 5,
     verify_ssl: bool = True,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """Ingest SEC filings into RAG store.
 
     Args:
@@ -464,7 +464,7 @@ async def ingest_sec_filings(
     results = {}
     semaphore = asyncio.Semaphore(max_concurrent)
 
-    async def process_company(symbol: str) -> Tuple[str, int]:
+    async def process_company(symbol: str) -> tuple[str, int]:
         async with semaphore:
             company_info = SP500_COMPANIES[symbol]
             logger.info(f"Fetching {filing_type} filings for {company_info['name']}...")
@@ -567,7 +567,7 @@ async def query_filings(
         metadata_filter["symbol"] = filter_symbol.upper()
 
     # Create a dict for the execution context
-    exec_ctx: Dict[str, Any] = {}
+    exec_ctx: dict[str, Any] = {}
 
     result = await tool.execute(
         _exec_ctx=exec_ctx,
@@ -611,7 +611,7 @@ async def show_stats() -> None:
         print(f"\nSEC Filings: {len(sec_docs)} documents")
 
         # By company
-        by_company: Dict[str, int] = {}
+        by_company: dict[str, int] = {}
         for doc in sec_docs:
             symbol = doc.metadata.get("symbol", "Other")
             by_company[symbol] = by_company.get(symbol, 0) + 1
@@ -622,7 +622,7 @@ async def show_stats() -> None:
             print(f"  {symbol}: {count} filings - {name}")
 
         # By sector
-        by_sector: Dict[str, int] = {}
+        by_sector: dict[str, int] = {}
         for doc in sec_docs:
             sector = doc.metadata.get("sector", "Other")
             by_sector[sector] = by_sector.get(sector, 0) + 1

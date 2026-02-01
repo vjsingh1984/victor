@@ -55,14 +55,11 @@ import json
 import logging
 import logging.config
 import sys
-import threading
 import time
-import traceback
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional
 
 # Context variable for request ID tracking
 request_id_ctx: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
@@ -146,7 +143,7 @@ class StructuredFormatter(logging.Formatter):
             JSON string.
         """
         # Base log data
-        log_data: Dict[str, Any] = {
+        log_data: dict[str, Any] = {
             "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
@@ -373,7 +370,7 @@ class CoordinatorLogger:
         level: int,
         message: str,
         exc_info: Optional[Exception],
-        extra: Dict[str, Any],
+        extra: dict[str, Any],
     ) -> None:
         """Internal log method."""
         # Add coordinator name
@@ -447,7 +444,7 @@ class _DurationTracker:
 
 
 def setup_coordinator_logging(
-    level: Union[str, int] = logging.INFO,
+    level: str | int = logging.INFO,
     format_type: str = "json",  # "json" or "text"
     output_file: Optional[str] = None,
     service_name: str = "victor",

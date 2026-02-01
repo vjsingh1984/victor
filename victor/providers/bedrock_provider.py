@@ -38,7 +38,8 @@ References:
 import json
 import logging
 import os
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 from victor.providers.base import (
     BaseProvider,
@@ -253,12 +254,12 @@ class BedrockProvider(BaseProvider):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Bedrock."""
@@ -398,7 +399,7 @@ class BedrockProvider(BaseProvider):
             client, messages, model, temperature, max_tokens, tools, **kwargs
         )
 
-    def _parse_converse_response(self, response: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_converse_response(self, response: dict[str, Any], model: str) -> CompletionResponse:
         """Parse Bedrock Converse API response."""
         output = response.get("output", {})
         message = output.get("message", {})
@@ -442,12 +443,12 @@ class BedrockProvider(BaseProvider):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Bedrock using Converse Stream API."""
@@ -503,8 +504,8 @@ class BedrockProvider(BaseProvider):
                 None, lambda: client.converse_stream(**request_params)
             )
 
-            accumulated_tool_calls: List[Dict[str, Any]] = []
-            current_tool_use: Optional[Dict[str, Any]] = None
+            accumulated_tool_calls: list[dict[str, Any]] = []
+            current_tool_use: Optional[dict[str, Any]] = None
 
             for event in response.get("stream", []):
                 if "contentBlockStart" in event:
@@ -563,7 +564,7 @@ class BedrockProvider(BaseProvider):
                 provider=self.name,
             ) from e
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List available Bedrock foundation models."""
         try:
             import boto3

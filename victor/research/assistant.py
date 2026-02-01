@@ -7,7 +7,7 @@ protocols actually implemented by the vertical are registered, rather than
 inheriting from all possible protocol interfaces.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.config.settings import VERSION
 
@@ -17,23 +17,12 @@ if TYPE_CHECKING:
 from victor.core.verticals.base import VerticalBase
 from victor.core.vertical_types import StageDefinition
 from victor.core.verticals.protocols import (
-    ModeConfigProviderProtocol,
-    PromptContributorProtocol,
-    SafetyExtensionProtocol,
-    TieredToolConfig,
     ToolDependencyProviderProtocol,
 )
 
 # Phase 3: Import framework capabilities
-from victor.framework.capabilities import FileOperationsCapability
 
 # Import ISP-compliant provider protocols
-from victor.core.verticals.protocols.providers import (
-    HandlerProvider,
-    PromptContributorProvider,
-    ToolDependencyProvider,
-    ToolProvider,
-)
 
 # Phase 2.1: Protocol auto-registration decorator
 from victor.core.verticals.protocol_decorators import register_protocols
@@ -63,7 +52,7 @@ class ResearchAssistant(VerticalBase):
     version = VERSION  # Centralized version from settings.py
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         """Get the list of tools for research tasks.
 
         Uses framework FileOperationsCapability via DI for common file operations
@@ -143,7 +132,7 @@ class ResearchAssistant(VerticalBase):
         return builder
 
     @classmethod
-    def get_stages(cls) -> Dict[str, StageDefinition]:
+    def get_stages(cls) -> dict[str, StageDefinition]:
         """Get research-specific stage definitions.
 
         Uses canonical tool names from victor.tools.tool_names.
@@ -243,7 +232,7 @@ class ResearchAssistant(VerticalBase):
         )
 
     @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
+    def get_handlers(cls) -> dict[str, Any]:
         """Get compute handlers for research workflows.
 
         Returns handlers from victor.research.handlers for workflow execution.
@@ -271,7 +260,7 @@ class ResearchAssistant(VerticalBase):
         return handlers
 
     @classmethod
-    def get_capability_configs(cls) -> Dict[str, Any]:
+    def get_capability_configs(cls) -> dict[str, Any]:
         """Get research capability configurations for centralized storage.
 
         Returns default research configuration for VerticalContext storage.

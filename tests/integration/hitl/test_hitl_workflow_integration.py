@@ -23,8 +23,7 @@ These tests verify:
 
 import asyncio
 import pytest
-from dataclasses import dataclass
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 from victor.workflows.hitl import (
     HITLNode,
@@ -34,11 +33,9 @@ from victor.workflows.hitl import (
     HITLRequest,
     HITLResponse,
     HITLExecutor,
-    HITLHandler,
 )
 from victor.workflows.definition import (
     WorkflowBuilder,
-    WorkflowDefinition,
     WorkflowNodeType,
     ConditionNode,
 )
@@ -432,7 +429,7 @@ class TestHITLCombinedWithConditionalEdges:
     def test_workflow_with_hitl_before_condition(self):
         """HITL node can precede conditional branching."""
 
-        def router(ctx: Dict[str, Any]) -> str:
+        def router(ctx: dict[str, Any]) -> str:
             if ctx.get("approved"):
                 return "proceed"
             return "abort"
@@ -459,7 +456,7 @@ class TestHITLCombinedWithConditionalEdges:
     def test_workflow_with_condition_before_hitl(self):
         """Conditional edge can route to different HITL nodes."""
 
-        def severity_router(ctx: Dict[str, Any]) -> str:
+        def severity_router(ctx: dict[str, Any]) -> str:
             severity = ctx.get("severity", "low")
             if severity == "high":
                 return "high_approval"
@@ -530,7 +527,7 @@ class TestHITLCombinedWithConditionalEdges:
         assert response.value == "manual"
 
         # This value could then be used by a condition node to route
-        def path_router(ctx: Dict[str, Any]) -> str:
+        def path_router(ctx: dict[str, Any]) -> str:
             return ctx.get("user_choice", "automatic")
 
         # Simulate updating context with HITL response
@@ -542,12 +539,12 @@ class TestHITLCombinedWithConditionalEdges:
     def test_complex_workflow_with_multiple_hitl_and_conditions(self):
         """Complex workflow with multiple HITL nodes and conditions."""
 
-        def review_outcome(ctx: Dict[str, Any]) -> str:
+        def review_outcome(ctx: dict[str, Any]) -> str:
             if ctx.get("approved"):
                 return "approved"
             return "rejected"
 
-        def deploy_type(ctx: Dict[str, Any]) -> str:
+        def deploy_type(ctx: dict[str, Any]) -> str:
             return ctx.get("deploy_target", "staging")
 
         workflow = (

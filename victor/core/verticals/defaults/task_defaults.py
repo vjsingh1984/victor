@@ -19,7 +19,7 @@ applicable to most or all verticals. Verticals can import and extend these
 rather than re-defining common patterns.
 """
 
-from typing import Dict, Optional
+from typing import Optional
 
 
 # =============================================================================
@@ -28,7 +28,7 @@ from typing import Dict, Optional
 
 # Default tool budgets by task type (number of tool calls allowed)
 # These are reasonable defaults that can be overridden by verticals
-COMMON_TASK_BUDGETS: Dict[str, int] = {
+COMMON_TASK_BUDGETS: dict[str, int] = {
     # Quick lookup tasks
     "question": 3,
     "lookup": 3,
@@ -56,7 +56,7 @@ COMMON_TASK_BUDGETS: Dict[str, int] = {
 
 # Task type hints for detecting task types from prompts
 # Format: pattern keywords -> task_type
-COMMON_TASK_HINTS: Dict[str, str] = {
+COMMON_TASK_HINTS: dict[str, str] = {
     # Question/lookup patterns
     "what is": "question",
     "explain": "explain",
@@ -139,9 +139,9 @@ def get_task_hint(text: str) -> Optional[str]:
 
 
 def merge_task_budgets(
-    base: Dict[str, int],
-    override: Dict[str, int],
-) -> Dict[str, int]:
+    base: dict[str, int],
+    override: dict[str, int],
+) -> dict[str, int]:
     """Merge task budget definitions.
 
     Override takes precedence for same task type.
@@ -159,9 +159,9 @@ def merge_task_budgets(
 
 
 def merge_task_hints(
-    base: Dict[str, str],
-    override: Dict[str, str],
-) -> Dict[str, str]:
+    base: dict[str, str],
+    override: dict[str, str],
+) -> dict[str, str]:
     """Merge task hint definitions.
 
     Override takes precedence for same pattern.

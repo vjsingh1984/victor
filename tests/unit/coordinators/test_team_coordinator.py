@@ -18,8 +18,7 @@ Tests the team specification and suggestion coordinator extracted from
 the monolithic orchestrator as part of Track 4 Phase 1 refactoring.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 from victor.agent.coordinators.team_coordinator import TeamCoordinator
 

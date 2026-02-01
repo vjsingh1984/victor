@@ -23,9 +23,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Any, Optional, TYPE_CHECKING
 from uuid import uuid4
 
 from victor.framework.conversations.types import (
@@ -115,7 +114,7 @@ class ConversationalNode:
     def __init__(
         self,
         id: str,
-        participants: List[ConversationParticipant],
+        participants: list[ConversationParticipant],
         topic: str,
         name: str = "",
         config: Optional[ConversationalNodeConfig] = None,
@@ -148,9 +147,9 @@ class ConversationalNode:
 
     async def execute(
         self,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         orchestrator: Optional[Any] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute the conversational node.
 
         Args:

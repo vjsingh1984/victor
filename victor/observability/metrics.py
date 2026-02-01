@@ -57,8 +57,9 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from statistics import mean, median, quantiles, StatisticsError
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from statistics import median, quantiles, StatisticsError
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ logger = logging.getLogger(__name__)
 class MetricLabels:
     """Labels for metric identification."""
 
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
 
     def __hash__(self) -> int:
         return hash(frozenset(self.labels.items()))
@@ -96,7 +97,7 @@ class Metric(ABC):
         self,
         name: str,
         description: str = "",
-        labels: Optional[Dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
     ) -> None:
         """Initialize metric.
 
@@ -112,7 +113,7 @@ class Metric(ABC):
         self._created_at = datetime.now(timezone.utc)
 
     @abstractmethod
-    def collect(self) -> Dict[str, Any]:
+    def collect(self) -> dict[str, Any]:
         """Collect metric value(s)."""
         pass
 
@@ -137,7 +138,7 @@ class Counter(Metric):
         self,
         name: str,
         description: str = "",
-        labels: Optional[Dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
     ) -> None:
         super().__init__(name, description, labels)
         self._value: float = 0.0
@@ -159,7 +160,7 @@ class Counter(Metric):
         with self._lock:
             return self._value
 
-    def collect(self) -> Dict[str, Any]:
+    def collect(self) -> dict[str, Any]:
         """Collect counter value."""
         return {
             "type": "counter",
@@ -189,7 +190,7 @@ class Gauge(Metric):
         self,
         name: str,
         description: str = "",
-        labels: Optional[Dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
     ) -> None:
         super().__init__(name, description, labels)
         self._value: float = 0.0
@@ -215,7 +216,7 @@ class Gauge(Metric):
         with self._lock:
             return self._value
 
-    def collect(self) -> Dict[str, Any]:
+    def collect(self) -> dict[str, Any]:
         """Collect gauge value."""
         return {
             "type": "gauge",
@@ -252,16 +253,16 @@ class Histogram(Metric):
         self,
         name: str,
         description: str = "",
-        labels: Optional[Dict[str, str]] = None,
-        buckets: Optional[Tuple[float, ...]] = None,
+        labels: Optional[dict[str, str]] = None,
+        buckets: Optional[tuple[float, ...]] = None,
     ) -> None:
         super().__init__(name, description, labels)
         self._buckets = buckets or self.DEFAULT_BUCKETS
-        self._bucket_counts: Dict[float, int] = dict.fromkeys(self._buckets, 0)
+        self._bucket_counts: dict[float, int] = dict.fromkeys(self._buckets, 0)
         self._bucket_counts[float("inf")] = 0  # +Inf bucket
         self._sum: float = 0.0
         self._count: int = 0
-        self._values: List[float] = []  # For percentile calculation
+        self._values: list[float] = []  # For percentile calculation
         self._max_values = 10000  # Limit stored values
 
     def observe(self, value: float) -> None:
@@ -329,7 +330,7 @@ class Histogram(Metric):
                 idx = int((p / 100) * (len(sorted_values) - 1))
                 return sorted_values[max(0, min(idx, len(sorted_values) - 1))]
 
-    def collect(self) -> Dict[str, Any]:
+    def collect(self) -> dict[str, Any]:
         """Collect histogram data."""
         with self._lock:
             return {
@@ -449,14 +450,14 @@ class MetricsRegistry:
 
     def __init__(self) -> None:
         """Initialize registry."""
-        self._metrics: Dict[str, Metric] = {}
+        self._metrics: dict[str, Metric] = {}
         self._lock = threading.RLock()  # type: ignore[assignment]
 
     def counter(
         self,
         name: str,
         description: str = "",
-        labels: Optional[Dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
     ) -> Counter:
         """Get or create a counter.
 
@@ -478,7 +479,7 @@ class MetricsRegistry:
         self,
         name: str,
         description: str = "",
-        labels: Optional[Dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
     ) -> Gauge:
         """Get or create a gauge.
 
@@ -500,8 +501,8 @@ class MetricsRegistry:
         self,
         name: str,
         description: str = "",
-        labels: Optional[Dict[str, str]] = None,
-        buckets: Optional[Tuple[float, ...]] = None,
+        labels: Optional[dict[str, str]] = None,
+        buckets: Optional[tuple[float, ...]] = None,
     ) -> Histogram:
         """Get or create a histogram.
 
@@ -524,7 +525,7 @@ class MetricsRegistry:
         self,
         name: str,
         description: str = "",
-        labels: Optional[Dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
     ) -> Timer:
         """Get or create a timer.
 
@@ -542,14 +543,14 @@ class MetricsRegistry:
                 self._metrics[key] = Timer(name, description, labels)
             return self._metrics[key]  # type: ignore[return-value]
 
-    def _make_key(self, name: str, labels: Optional[Dict[str, str]]) -> str:
+    def _make_key(self, name: str, labels: Optional[dict[str, str]]) -> str:
         """Create unique key for metric lookup."""
         if labels:
             label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items()))
             return f"{name}{{{label_str}}}"
         return name
 
-    def get(self, name: str, labels: Optional[Dict[str, str]] = None) -> Optional[Metric]:
+    def get(self, name: str, labels: Optional[dict[str, str]] = None) -> Optional[Metric]:
         """Get metric by name.
 
         Args:
@@ -563,7 +564,7 @@ class MetricsRegistry:
         with self._lock:
             return self._metrics.get(key)
 
-    def unregister(self, name: str, labels: Optional[Dict[str, str]] = None) -> bool:
+    def unregister(self, name: str, labels: Optional[dict[str, str]] = None) -> bool:
         """Unregister a metric.
 
         Args:
@@ -580,7 +581,7 @@ class MetricsRegistry:
                 return True
             return False
 
-    def collect(self) -> List[Dict[str, Any]]:
+    def collect(self) -> list[dict[str, Any]]:
         """Collect all metrics.
 
         Returns:
@@ -753,7 +754,7 @@ class MetricsCollector:
         """Handle error events."""
         self.errors.increment()
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get metrics summary.
 
         Returns:

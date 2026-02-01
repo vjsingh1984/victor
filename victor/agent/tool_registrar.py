@@ -70,13 +70,13 @@ Usage:
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 from victor.providers.base import BaseProvider, ToolDefinition
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
-    from victor.tools.enums import CostTier
 
 # Import specialized components (lazy to avoid circular imports)
 # These are imported at runtime in methods that use them
@@ -104,9 +104,9 @@ class ToolRegistrarConfig:
     enable_mcp: bool = False
     enable_tool_graph: bool = True
     airgapped_mode: bool = False
-    plugin_dirs: List[str] = field(default_factory=list)
-    disabled_plugins: Set[str] = field(default_factory=set)
-    plugin_packages: List[str] = field(default_factory=list)
+    plugin_dirs: list[str] = field(default_factory=list)
+    disabled_plugins: set[str] = field(default_factory=set)
+    plugin_packages: list[str] = field(default_factory=list)
     max_workers: int = 4
     max_complexity: int = 10
 
@@ -195,7 +195,7 @@ class ToolRegistrar:
         # Legacy compatibility attributes
         self.plugin_manager: Optional[Any] = None
         self.mcp_registry: Optional[Any] = None
-        self._mcp_tasks: List[asyncio.Task[Any]] = []
+        self._mcp_tasks: list[asyncio.Task[Any]] = []
 
         # Statistics
         self._stats = RegistrationStats()
@@ -204,7 +204,7 @@ class ToolRegistrar:
         self._create_background_task: Optional[Callable[..., Any]] = None
 
         # Tool configuration for context injection (populated in _setup_providers)
-        self._tool_config: Dict[str, Any] = {}
+        self._tool_config: dict[str, Any] = {}
 
         # Lazy loading flag - tools are not loaded until first access
         self._tools_loaded: bool = False
@@ -333,7 +333,7 @@ class ToolRegistrar:
         self._ensure_tools_loaded()
         return self.tools.get(name)
 
-    def get_all_tools(self) -> List[Any]:
+    def get_all_tools(self) -> list[Any]:
         """Get all registered tools, triggering lazy loading if needed.
 
         Returns:
@@ -596,7 +596,7 @@ class ToolRegistrar:
             from pathlib import Path
 
             # Use centralized path for plugins directory
-            plugin_dirs: List[Path] = [get_project_paths().global_plugins_dir]
+            plugin_dirs: list[Path] = [get_project_paths().global_plugins_dir]
             plugin_dirs.extend([Path(d) for d in self.config.plugin_dirs])
 
             plugin_config = getattr(self.settings, "plugin_config", {})
@@ -802,8 +802,8 @@ class ToolRegistrar:
         return registered
 
     def plan_tools(
-        self, goals: List[str], available_inputs: Optional[List[str]] = None
-    ) -> List[ToolDefinition]:
+        self, goals: list[str], available_inputs: Optional[list[str]] = None
+    ) -> list[ToolDefinition]:
         """Plan a sequence of tools to satisfy goals using the dependency graph.
 
         Delegates to ToolGraphBuilder component (SRP compliance).
@@ -821,7 +821,7 @@ class ToolRegistrar:
         graph_builder = self._get_graph_builder()
         return graph_builder.plan_for_goals(goals, available_inputs)
 
-    def infer_goals_from_message(self, user_message: str) -> List[str]:
+    def infer_goals_from_message(self, user_message: str) -> list[str]:
         """Infer planning goals from user request.
 
         Delegates to ToolGraphBuilder component (SRP compliance).
@@ -843,7 +843,7 @@ class ToolRegistrar:
         """
         return self._stats
 
-    def get_tool_config(self) -> Dict[str, Any]:
+    def get_tool_config(self) -> dict[str, Any]:
         """Get tool configuration for context injection.
 
         Returns:
@@ -852,7 +852,7 @@ class ToolRegistrar:
         """
         return self._tool_config.copy()
 
-    def get_plugin_info(self) -> Dict[str, Any]:
+    def get_plugin_info(self) -> dict[str, Any]:
         """Get information about loaded plugins.
 
         Delegates to PluginLoader component (SRP compliance).
@@ -878,7 +878,7 @@ class ToolRegistrar:
             "total": len(self.plugin_manager.loaded_plugins),
         }
 
-    def get_mcp_info(self) -> Dict[str, Any]:
+    def get_mcp_info(self) -> dict[str, Any]:
         """Get information about MCP servers.
 
         Delegates to MCPConnector component (SRP compliance).
@@ -1009,7 +1009,6 @@ class ToolRegistrar:
 
             # Phase 4: Pre-populate tool metadata registry cache
             try:
-                from victor.tools.metadata_registry import ToolMetadataRegistry
 
                 # Note: ToolMetadataRegistry doesn't have get_instance(), use direct instantiation
                 # This is a placeholder - in practice the registry should be passed in or managed elsewhere
@@ -1055,9 +1054,9 @@ class PrewarmResult:
     metadata_cached: bool = False
     duration_ms: float = 0.0
     error: Optional[str] = None
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize result to dictionary."""
         return {
             "success": self.success,

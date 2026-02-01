@@ -21,10 +21,11 @@ Explore modes that modify agent behavior for different tasks.
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
-    from victor.agent.protocols import ModeControllerProtocol
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +66,9 @@ class OperationalModeConfig:
     name: str
     description: str
     # Tools that are allowed in this mode
-    allowed_tools: Set[str] = field(default_factory=set)
+    allowed_tools: set[str] = field(default_factory=set)
     # Tools that are disallowed in this mode (takes precedence)
-    disallowed_tools: Set[str] = field(default_factory=set)
+    disallowed_tools: set[str] = field(default_factory=set)
     # Whether all tools are allowed by default
     allow_all_tools: bool = False
     # System prompt additions for this mode
@@ -79,7 +80,7 @@ class OperationalModeConfig:
     # Maximum files to modify in a single operation
     max_files_per_operation: int = 0  # 0 = no limit
     # Tool priority adjustments (tool_name -> priority_boost)
-    tool_priorities: Dict[str, float] = field(default_factory=dict)
+    tool_priorities: dict[str, float] = field(default_factory=dict)
     # Exploration multiplier - increases exploration limits in explore/plan modes
     exploration_multiplier: float = 1.0
     # Sandbox directory for limited edits (relative to project root)
@@ -90,7 +91,7 @@ class OperationalModeConfig:
 
 
 # Default mode configurations
-MODE_CONFIGS: Dict[AgentMode, OperationalModeConfig] = {
+MODE_CONFIGS: dict[AgentMode, OperationalModeConfig] = {
     AgentMode.BUILD: OperationalModeConfig(
         name="Build",
         description="Implementation mode for creating and modifying code",
@@ -277,8 +278,8 @@ class AgentModeController:
             initial_mode: Starting mode (defaults to BUILD)
         """
         self._current_mode = initial_mode
-        self._mode_history: List[AgentMode] = [initial_mode]
-        self._callbacks: List[Callable[[AgentMode, AgentMode], None]] = []
+        self._mode_history: list[AgentMode] = [initial_mode]
+        self._callbacks: list[Callable[[AgentMode, AgentMode], None]] = []
         logger.info(f"AgentModeController initialized in {initial_mode.value} mode")
 
     @property
@@ -429,7 +430,7 @@ class AgentModeController:
         """
         return self.config.system_prompt_addition
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current mode status.
 
         Returns:
@@ -444,7 +445,7 @@ class AgentModeController:
             "verbose_planning": config.verbose_planning,
         }
 
-    def get_mode_list(self) -> List[Dict[str, Any]]:
+    def get_mode_list(self) -> list[dict[str, Any]]:
         """Get list of available modes.
 
         Returns:

@@ -44,7 +44,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.protocols import IPromptContributor, PromptContext
 
@@ -112,7 +112,7 @@ class ContextPromptContributor(IPromptContributor):
 
     def __init__(
         self,
-        context_handlers: Optional[Dict[str, Any]] = None,
+        context_handlers: Optional[dict[str, Any]] = None,
         priority: int = 75,
     ):
         """Initialize the context prompt contributor.
@@ -287,7 +287,7 @@ class ModeAwareContributor(IPromptContributor):
 
     def __init__(
         self,
-        mode_prompts: Dict[str, str],
+        mode_prompts: dict[str, str],
         priority: int = 80,
     ):
         """Initialize the mode-aware contributor.
@@ -334,7 +334,7 @@ class ModeAwareContributor(IPromptContributor):
         """
         self._mode_prompts[mode] = prompt
 
-    def get_supported_modes(self) -> List[str]:
+    def get_supported_modes(self) -> list[str]:
         """Get list of supported modes.
 
         Returns:
@@ -356,7 +356,7 @@ class StageAwareContributor(IPromptContributor):
 
     def __init__(
         self,
-        stage_prompts: Dict[str, str],
+        stage_prompts: dict[str, str],
         priority: int = 70,
     ):
         """Initialize the stage-aware contributor.
@@ -403,7 +403,7 @@ class StageAwareContributor(IPromptContributor):
         """
         self._stage_prompts[stage] = prompt
 
-    def get_supported_stages(self) -> List[str]:
+    def get_supported_stages(self) -> list[str]:
         """Get list of supported stages.
 
         Returns:

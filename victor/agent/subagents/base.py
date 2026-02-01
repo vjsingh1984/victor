@@ -51,9 +51,9 @@ import asyncio
 import logging
 import time
 import uuid
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Union
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import AsyncIterator
 
 from victor.agent.subagents.protocols import SubAgentContext, SubAgentContextAdapter
 
@@ -68,8 +68,6 @@ if TYPE_CHECKING:
 
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.protocols.agent import IAgentOrchestrator
-    from victor.core.container import ServiceContainer
     from victor.providers.base import StreamChunk
 
 logger = logging.getLogger(__name__)
@@ -102,7 +100,7 @@ class SubAgentConfig:
 
     role: SubAgentRole
     task: str
-    allowed_tools: List[str]
+    allowed_tools: list[str]
     tool_budget: int
     context_limit: int
     can_spawn_subagents: bool = False
@@ -132,13 +130,13 @@ class SubAgentResult:
 
     success: bool
     summary: str
-    details: Dict[str, Any]
+    details: dict[str, Any]
     tool_calls_used: int
     context_size: int
     duration_seconds: float
     error: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert result to dictionary for serialization."""
         return {
             "success": self.success,
@@ -185,7 +183,7 @@ class SubAgent(IAgent):
     def __init__(
         self,
         config: SubAgentConfig,
-        parent: Union["AgentOrchestrator", SubAgentContext],
+        parent: "AgentOrchestrator" | SubAgentContext,
         presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize sub-agent with configuration and parent context.
@@ -247,7 +245,7 @@ class SubAgent(IAgent):
         """Persona of this agent (None for SubAgent)."""
         return None
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> str:
         """Execute a task using this sub-agent.
 
         Note: The SubAgent is configured with a specific task at creation.

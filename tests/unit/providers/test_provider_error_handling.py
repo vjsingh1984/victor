@@ -27,8 +27,6 @@ Total: 30+ tests
 
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
-from typing import List
 
 from tests.mocks.provider_mocks import (
     FailingProvider,
@@ -39,12 +37,10 @@ from tests.mocks.provider_mocks import (
 from victor.core.errors import (
     ProviderAuthError,
     ProviderConnectionError,
-    ProviderError,
-    ProviderInvalidResponseError,
     ProviderRateLimitError,
     ProviderTimeoutError,
 )
-from victor.providers.base import BaseProvider, Message, CompletionResponse
+from victor.providers.base import BaseProvider, CompletionResponse
 
 
 # =============================================================================

@@ -41,7 +41,7 @@ Sprint 4: Implicit Feedback Enhancement
 """
 
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.framework.rl.implicit_feedback import (
     ImplicitFeedback,
@@ -85,7 +85,7 @@ class FeedbackIntegration:
         self._enabled = True
 
         # Session tracking
-        self._active_sessions: Dict[str, SessionContext] = {}
+        self._active_sessions: dict[str, SessionContext] = {}
 
     def set_enabled(self, enabled: bool) -> None:
         """Enable or disable feedback collection.
@@ -325,7 +325,7 @@ class FeedbackIntegration:
 
         try:
             # Create outcome for general consumption (reserved for future learners)
-            _outcome = RLOutcome(  # noqa: F841
+            _outcome = RLOutcome(
                 provider=feedback.provider,
                 model=feedback.model,
                 task_type=feedback.task_type,
@@ -367,7 +367,7 @@ class FeedbackIntegration:
         except Exception as e:
             logger.debug(f"Failed to distribute feedback: {e}")
 
-    def get_quality_weights(self, task_type: str) -> Dict[str, float]:
+    def get_quality_weights(self, task_type: str) -> dict[str, float]:
         """Get learned quality weights for a task type.
 
         Args:
@@ -391,7 +391,7 @@ class FeedbackIntegration:
 
         return {}
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get feedback collection statistics.
 
         Returns:

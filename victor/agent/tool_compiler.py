@@ -23,7 +23,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from victor.agent.tool_graph import (
     CacheStrategy,
@@ -68,7 +68,7 @@ class ToolExecutionCompiler:
             logger.warning("Failed to load idempotent tools config")
             return frozenset()
 
-    def compile(self, tool_calls: List[Dict[str, Any]]) -> ToolExecutionGraph:
+    def compile(self, tool_calls: list[dict[str, Any]]) -> ToolExecutionGraph:
         """Create declarative execution graph from tool calls.
 
         Args:
@@ -121,7 +121,7 @@ class ToolExecutionCompiler:
             },
         )
 
-    def _get_validation_rules(self, tool_name: str) -> List[ValidationRule]:
+    def _get_validation_rules(self, tool_name: str) -> list[ValidationRule]:
         """Get validation rules for a tool.
 
         Args:
@@ -130,7 +130,7 @@ class ToolExecutionCompiler:
         Returns:
             List of validation rules
         """
-        rules: List[ValidationRule] = []
+        rules: list[ValidationRule] = []
         tool = self._tool_registry.get_tool(tool_name)
 
         if not tool:
@@ -186,7 +186,7 @@ class ToolExecutionCompiler:
         """
         return 30.0  # Default timeout
 
-    def _get_tool_metadata(self, tool_name: str) -> Dict[str, Any]:
+    def _get_tool_metadata(self, tool_name: str) -> dict[str, Any]:
         """Get metadata for a tool.
 
         Args:
@@ -205,7 +205,7 @@ class ToolExecutionCompiler:
             "cost_tier": getattr(tool, "cost_tier", None),
         }
 
-    def _get_tool_dependencies(self, tool_name: str, tool_call: Dict[str, Any]) -> List[str]:
+    def _get_tool_dependencies(self, tool_name: str, tool_call: dict[str, Any]) -> list[str]:
         """Get dependencies for a tool.
 
         Args:
@@ -219,7 +219,7 @@ class ToolExecutionCompiler:
         # For now, return empty list
         return []
 
-    def _determine_cache_strategy(self, nodes: List[ToolExecutionNode]) -> CacheStrategy:
+    def _determine_cache_strategy(self, nodes: list[ToolExecutionNode]) -> CacheStrategy:
         """Determine best cache strategy for the graph.
 
         Args:
@@ -236,7 +236,7 @@ class ToolExecutionCompiler:
         else:
             return CacheStrategy.ADAPTIVE
 
-    def compute_graph_hash(self, tool_calls: List[Dict[str, Any]]) -> str:
+    def compute_graph_hash(self, tool_calls: list[dict[str, Any]]) -> str:
         """Compute hash for tool calls (for cache key).
 
         Args:

@@ -54,11 +54,12 @@ import logging
 import threading
 import time
 from collections import Counter, deque
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
+from typing import Any, Optional
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -137,10 +138,10 @@ class AccessTracker:
         self._frequency: Counter[tuple[str, str]] = Counter()
 
         # User-specific tracking (for personalized warming)
-        self._user_patterns: Dict[str, deque[AccessPattern]] = {}
+        self._user_patterns: dict[str, deque[AccessPattern]] = {}
 
         # Time-based tracking (hourly access patterns)
-        self._hourly_patterns: Dict[int, Counter[tuple[str, str]]] = {}
+        self._hourly_patterns: dict[int, Counter[tuple[str, str]]] = {}
 
         self._lock = threading.Lock()
 
@@ -189,7 +190,7 @@ class AccessTracker:
                 self._hourly_patterns[hour] = Counter()
             self._hourly_patterns[hour][key_tuple] += 1
 
-    def get_top_frequent(self, n: int = 100) -> List[tuple[str, str]]:
+    def get_top_frequent(self, n: int = 100) -> list[tuple[str, str]]:
         """Get most frequently accessed keys.
 
         Args:
@@ -201,7 +202,7 @@ class AccessTracker:
         with self._lock:
             return [key for key, _ in self._frequency.most_common(n)]
 
-    def get_top_recent(self, n: int = 100) -> List[tuple[str, str]]:
+    def get_top_recent(self, n: int = 100) -> list[tuple[str, str]]:
         """Get most recently accessed keys.
 
         Args:
@@ -223,7 +224,7 @@ class AccessTracker:
                     break
             return recent_keys
 
-    def get_top_hybrid(self, n: int = 100, recency_weight: float = 0.5) -> List[tuple[str, str]]:
+    def get_top_hybrid(self, n: int = 100, recency_weight: float = 0.5) -> list[tuple[str, str]]:
         """Get top keys using hybrid frequency + recency scoring.
 
         Args:
@@ -235,7 +236,7 @@ class AccessTracker:
         """
         with self._lock:
             # Calculate recency scores (more recent = higher score)
-            recency_scores: Dict[tuple[str, str], float] = {}
+            recency_scores: dict[tuple[str, str], float] = {}
             now = time.time()
             max_age = now - self._recent_accesses[0].timestamp if self._recent_accesses else 1
 
@@ -251,7 +252,7 @@ class AccessTracker:
             frequency_scores = {key: count / max_freq for key, count in self._frequency.items()}
 
             # Calculate hybrid scores
-            hybrid_scores: Dict[tuple[str, str], float] = {}
+            hybrid_scores: dict[tuple[str, str], float] = {}
             all_keys = set(recency_scores.keys()) | set(frequency_scores.keys())
 
             for key in all_keys:
@@ -264,7 +265,7 @@ class AccessTracker:
 
     def get_time_based_predictions(
         self, hour: Optional[int] = None, n: int = 100
-    ) -> List[tuple[str, str]]:
+    ) -> list[tuple[str, str]]:
         """Get predicted keys for a specific time.
 
         Args:
@@ -283,7 +284,7 @@ class AccessTracker:
 
             return [key for key, _ in self._hourly_patterns[hour].most_common(n)]
 
-    def get_user_specific(self, user_id: str, n: int = 100) -> List[tuple[str, str]]:
+    def get_user_specific(self, user_id: str, n: int = 100) -> list[tuple[str, str]]:
         """Get personalized warming keys for a specific user.
 
         Args:
@@ -609,7 +610,7 @@ class CacheWarmer:
         except Exception as e:
             logger.warning(f"Failed to save access patterns: {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get warming statistics.
 
         Returns:

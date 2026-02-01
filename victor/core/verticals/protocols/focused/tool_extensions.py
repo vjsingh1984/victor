@@ -34,9 +34,9 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
-from victor.core.tool_types import ToolDependency, ToolDependencyProviderProtocol
+from victor.core.tool_types import ToolDependencyProviderProtocol
 from victor.core.vertical_types import MiddlewarePriority, MiddlewareResult
 
 
@@ -67,7 +67,7 @@ class ToolExtensionsProtocol(Protocol):
     """
 
     @property
-    def middleware(self) -> List[MiddlewareProtocol]:
+    def middleware(self) -> list[MiddlewareProtocol]:
         """List of middleware implementations for tool call interception.
 
         Middleware can intercept and modify tool calls before and after execution.
@@ -122,7 +122,7 @@ class MiddlewareProtocol(Protocol):
                 return MiddlewarePriority.HIGH
     """
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Called before a tool is executed.
 
         Args:
@@ -137,7 +137,7 @@ class MiddlewareProtocol(Protocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -162,7 +162,7 @@ class MiddlewareProtocol(Protocol):
         """
         return MiddlewarePriority.NORMAL
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get tools this middleware applies to.
 
         Returns:

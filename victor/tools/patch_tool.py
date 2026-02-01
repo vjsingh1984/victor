@@ -22,7 +22,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
@@ -38,7 +38,7 @@ class Hunk:
     old_count: int  # Number of lines in original
     new_start: int  # Line number in new file (1-indexed)
     new_count: int  # Number of lines in new
-    lines: List[str]  # The actual diff lines (with +/-/space prefix)
+    lines: list[str]  # The actual diff lines (with +/-/space prefix)
 
 
 @dataclass
@@ -47,13 +47,13 @@ class PatchFile:
 
     old_path: Optional[str]  # Original file path (None for new files)
     new_path: Optional[str]  # New file path (None for deleted files)
-    hunks: List[Hunk]
+    hunks: list[Hunk]
     is_binary: bool = False
     is_new_file: bool = False
     is_deleted: bool = False
 
 
-def parse_unified_diff(diff_text: str) -> List[PatchFile]:
+def parse_unified_diff(diff_text: str) -> list[PatchFile]:
     """Parse a unified diff into structured patch data.
 
     Args:
@@ -132,7 +132,7 @@ def _parse_path(path_str: str) -> str:
     return path_str
 
 
-def _parse_hunk(lines: List[str], start_idx: int) -> Tuple[Optional[Hunk], int]:
+def _parse_hunk(lines: list[str], start_idx: int) -> tuple[Optional[Hunk], int]:
     """Parse a single hunk from diff lines.
 
     Args:
@@ -189,8 +189,8 @@ def _parse_hunk(lines: List[str], start_idx: int) -> Tuple[Optional[Hunk], int]:
 
 
 def apply_patch_to_content(
-    content: str, hunks: List[Hunk], fuzz: int = 2
-) -> Tuple[bool, str, List[str]]:
+    content: str, hunks: list[Hunk], fuzz: int = 2
+) -> tuple[bool, str, list[str]]:
     """Apply patch hunks to file content.
 
     Args:
@@ -240,7 +240,7 @@ def apply_patch_to_content(
 
 
 def _find_matching_location(
-    lines: List[str], old_lines: List[str], target: int, fuzz: int
+    lines: list[str], old_lines: list[str], target: int, fuzz: int
 ) -> Optional[int]:
     """Find where old_lines match in the file, with fuzz tolerance.
 
@@ -277,7 +277,7 @@ def _find_matching_location(
     return None
 
 
-def _lines_match(lines: List[str], expected: List[str], start: int) -> bool:
+def _lines_match(lines: list[str], expected: list[str], start: int) -> bool:
     """Check if expected lines match at position start."""
     if start + len(expected) > len(lines):
         return False
@@ -305,7 +305,7 @@ async def patch(
     fuzz: int = 2,
     backup: bool = True,
     context_lines: int = 3,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Unified patch operations: create diffs or apply patches.
 
     Operations:
@@ -471,7 +471,7 @@ async def patch(
     return result
 
 
-def _get_new_content_from_hunks(hunks: List[Hunk]) -> str:
+def _get_new_content_from_hunks(hunks: list[Hunk]) -> str:
     """Extract new file content from hunks (for new files)."""
     lines = []
     for hunk in hunks:
@@ -513,7 +513,7 @@ async def _create_diff(
     file_path: str,
     new_content: str,
     context_lines: int = 3,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Internal: Create a unified diff patch from a file and new content."""
     import difflib
 

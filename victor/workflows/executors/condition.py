@@ -20,7 +20,7 @@ Executes condition nodes by evaluating branching logic.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from victor.workflows.definition import ConditionNode
@@ -69,7 +69,7 @@ class ConditionNodeExecutor:
         logger.debug(f"Condition node {node.id} is passthrough (routing handled by StateGraph)")
 
         # Make mutable copy of state
-        state_dict: Dict[str, Any] = dict(state)
+        state_dict: dict[str, Any] = dict(state)
 
         # Track that we passed through this condition node
         if "_node_results" not in state_dict:

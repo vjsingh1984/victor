@@ -22,11 +22,8 @@ Tests the complete flow from YAML file to VerticalConfig, ensuring:
 """
 
 import pytest
-from pathlib import Path
-from typing import Dict, Any
 
-from victor.core.verticals.base import VerticalBase, VerticalConfig
-from victor.framework.tools import ToolSet
+from victor.core.verticals.base import VerticalConfig
 
 
 # ============================================================================

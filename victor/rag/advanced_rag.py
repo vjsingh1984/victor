@@ -22,11 +22,10 @@ This module extends the basic RAG implementation with:
 - Multi-stage retrieval pipeline
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.rag.document_store import DocumentStore
@@ -71,11 +70,11 @@ class SearchResult:
     content: str
     score: float
     source: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     citation: str = ""
     rank: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "chunk_id": self.chunk_id,
@@ -154,7 +153,6 @@ class AdvancedRAG:
             document_store: DocumentStore instance
             config: RAG configuration
         """
-        from victor.rag.document_store import DocumentStore
 
         self.document_store = document_store
         self.config = config or RAGConfig()
@@ -168,7 +166,7 @@ class AdvancedRAG:
         query: str,
         top_k: Optional[int] = None,
         search_strategy: Optional[SearchStrategy] = None,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """Query with advanced search and re-ranking.
 
         Args:
@@ -206,7 +204,7 @@ class AdvancedRAG:
 
         return results[: (self.config.rerank_top_k or top_k)]
 
-    async def _semantic_search(self, query: str, top_k: int) -> List[SearchResult]:
+    async def _semantic_search(self, query: str, top_k: int) -> list[SearchResult]:
         """Pure semantic search using vector similarity."""
         if not self.document_store:
             return []
@@ -230,7 +228,7 @@ class AdvancedRAG:
             logger.error(f"Semantic search failed: {e}")
             return []
 
-    async def _keyword_search(self, query: str, top_k: int) -> List[SearchResult]:
+    async def _keyword_search(self, query: str, top_k: int) -> list[SearchResult]:
         """Keyword-based search using BM25 or similar."""
         if not self.document_store:
             return []
@@ -261,14 +259,14 @@ class AdvancedRAG:
             logger.error(f"Keyword search failed: {e}")
             return []
 
-    async def _hybrid_search(self, query: str, top_k: int) -> List[SearchResult]:
+    async def _hybrid_search(self, query: str, top_k: int) -> list[SearchResult]:
         """Hybrid search combining semantic and keyword."""
         # Retrieve more results for combination
         semantic_results = await self._semantic_search(query, top_k * 2)
         keyword_results = await self._keyword_search(query, top_k * 2)
 
         # Combine scores
-        combined_scores: Dict[str, SearchResult] = {}
+        combined_scores: dict[str, SearchResult] = {}
 
         # Add semantic scores
         for result in semantic_results:
@@ -290,7 +288,7 @@ class AdvancedRAG:
 
         return results[:top_k]
 
-    async def _adaptive_search(self, query: str, top_k: int) -> List[SearchResult]:
+    async def _adaptive_search(self, query: str, top_k: int) -> list[SearchResult]:
         """Adaptive search that chooses strategy based on query."""
         # Analyze query to determine best strategy
         query_type = self._classify_query(query)
@@ -332,7 +330,7 @@ class AdvancedRAG:
 
         return matches / total if total > 0 else 0.0
 
-    async def _rerank_results(self, query: str, results: List[SearchResult]) -> List[SearchResult]:
+    async def _rerank_results(self, query: str, results: list[SearchResult]) -> list[SearchResult]:
         """Re-rank results using configured strategy."""
         if self.config.rerank_strategy == RerankStrategy.SCORE_BASED:
             return await self._rerank_by_score(results)
@@ -343,11 +341,11 @@ class AdvancedRAG:
         else:
             return results
 
-    async def _rerank_by_score(self, results: List[SearchResult]) -> List[SearchResult]:
+    async def _rerank_by_score(self, results: list[SearchResult]) -> list[SearchResult]:
         """Re-rank by score (already sorted)."""
         return sorted(results, key=lambda r: r.score, reverse=True)
 
-    async def _rerank_by_diversity(self, results: List[SearchResult]) -> List[SearchResult]:
+    async def _rerank_by_diversity(self, results: list[SearchResult]) -> list[SearchResult]:
         """Re-rank to maximize diversity."""
         # Maximal Marginal Relevance (MMR) algorithm
         if not results:
@@ -377,8 +375,8 @@ class AdvancedRAG:
         return reranked
 
     async def _rerank_by_relevance(
-        self, query: str, results: List[SearchResult]
-    ) -> List[SearchResult]:
+        self, query: str, results: list[SearchResult]
+    ) -> list[SearchResult]:
         """Re-rank by relevance to query.
 
         Combines original score with query relevance using a weighted formula.
@@ -443,7 +441,7 @@ class AdvancedRAG:
         max_score = len(query_words)
         return (exact_matches + 0.5 * partial_matches) / max_score
 
-    async def _generate_citations(self, results: List[SearchResult]) -> List[SearchResult]:
+    async def _generate_citations(self, results: list[SearchResult]) -> list[SearchResult]:
         """Generate citations for results.
 
         Creates citations in the format: [N] "Title" source p. page
@@ -472,7 +470,7 @@ class AdvancedRAG:
 
     async def query_with_citations(
         self, query: str, top_k: int = 10
-    ) -> Tuple[str, List[SearchResult]]:
+    ) -> tuple[str, list[SearchResult]]:
         """Query and return formatted answer with citations.
 
         Args:
@@ -494,7 +492,7 @@ class AdvancedRAG:
 
         return answer, results
 
-    async def generate_answer(self, query: str, include_sources: bool = True) -> Dict[str, Any]:
+    async def generate_answer(self, query: str, include_sources: bool = True) -> dict[str, Any]:
         """Generate answer with sources.
 
         Args:
@@ -509,10 +507,10 @@ class AdvancedRAG:
         # Combine top results into answer
         answer = " ".join(r.content for r in results[:3])
 
-        response: Dict[str, Any] = {"answer": answer, "query": query}
+        response: dict[str, Any] = {"answer": answer, "query": query}
 
         if include_sources:
-            sources_list: List[Dict[str, Any]] = [
+            sources_list: list[dict[str, Any]] = [
                 {"citation": r.citation, "source": r.source, "score": r.score} for r in results
             ]
             response["sources"] = sources_list

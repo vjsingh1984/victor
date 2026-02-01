@@ -31,10 +31,10 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from victor.providers.base import Message
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -122,9 +122,9 @@ class SQLiteSessionPersistence:
         profile: str = "default",
         session_id: Optional[str] = None,
         title: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         conversation_state: Optional[Any] = None,
-        tool_selection_stats: Optional[Dict[str, Any]] = None,
+        tool_selection_stats: Optional[dict[str, Any]] = None,
     ) -> str:
         """Save a session to SQLite database.
 
@@ -232,7 +232,7 @@ class SQLiteSessionPersistence:
             logger.error(f"Failed to save session to SQLite: {e}")
             return ""
 
-    def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def load_session(self, session_id: str) -> Optional[dict[str, Any]]:
         """Load a session from SQLite.
 
         Args:
@@ -266,7 +266,7 @@ class SQLiteSessionPersistence:
             logger.error(f"Failed to load session {session_id}: {e}")
             return None
 
-    def list_sessions(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+    def list_sessions(self, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
         """List sessions from SQLite.
 
         Args:
@@ -335,7 +335,7 @@ class SQLiteSessionPersistence:
             logger.error(f"Failed to delete session {session_id}: {e}")
             return False
 
-    def search_sessions(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    def search_sessions(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
         """Search sessions by title or content.
 
         Args:
@@ -385,7 +385,7 @@ class SQLiteSessionPersistence:
             logger.error(f"Failed to search sessions: {e}")
             return []
 
-    def get_session_messages(self, session_id: str) -> List[Dict[str, Any]]:
+    def get_session_messages(self, session_id: str) -> list[dict[str, Any]]:
         """Get all messages for a session.
 
         Args:
@@ -427,7 +427,7 @@ class SQLiteSessionPersistence:
             logger.error(f"Failed to get messages for session {session_id}: {e}")
             return []
 
-    def _generate_title(self, conversation_data: Dict[str, Any]) -> str:
+    def _generate_title(self, conversation_data: dict[str, Any]) -> str:
         """Generate a title from the first user message.
 
         Args:

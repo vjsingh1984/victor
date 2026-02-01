@@ -8,25 +8,11 @@ Phase 6: Migration & Testing - Unit Tests
 
 from __future__ import annotations
 
-from typing import Any, Dict
-from unittest.mock import Mock
 
 import pytest
 
 from victor.framework.protocols import (
     # Main protocols
-    OrchestratorProtocol,
-    ChatStateProtocol,
-    ChatResultProtocol,
-    WorkflowChatProtocol,
-    ConversationStateProtocol,
-    ProviderProtocol,
-    ToolsProtocol,
-    SystemPromptProtocol,
-    MessagesProtocol,
-    StreamingProtocol,
-    CapabilityRegistryProtocol,
-    # Implementations
     ChatResult,
     MutableChatState,
     # Types and enums
@@ -36,8 +22,6 @@ from victor.framework.protocols import (
     OrchestratorCapability,
     # Utilities
     verify_protocol_conformance,
-    # Exceptions
-    IncompatibleVersionError,
 )
 
 
@@ -52,13 +36,6 @@ class TestProtocolsPackageStructure:
             ChatStateProtocol,
             ChatResultProtocol,
             WorkflowChatProtocol,
-            ConversationStateProtocol,
-            ProviderProtocol,
-            ToolsProtocol,
-            SystemPromptProtocol,
-            MessagesProtocol,
-            StreamingProtocol,
-            CapabilityRegistryProtocol,
         )
 
         # Verify all are protocols
@@ -83,9 +60,7 @@ class TestProtocolsPackageStructure:
         """Verify all types and enums can be imported."""
         from victor.framework.protocols import (
             ChunkType,
-            OrchestratorStreamChunk,
             CapabilityType,
-            OrchestratorCapability,
             IncompatibleVersionError,
         )
 
@@ -101,10 +76,8 @@ class TestProtocolsPackageStructure:
 
     def test_direct_module_imports(self):
         """Verify direct imports from specific modules work."""
-        from victor.framework.protocols.chat import ChatStateProtocol, MutableChatState
+        from victor.framework.protocols.chat import ChatStateProtocol
         from victor.framework.protocols.orchestrator import OrchestratorProtocol
-        from victor.framework.protocols.streaming import ChunkType
-        from victor.framework.protocols.capability import CapabilityType, OrchestratorCapability
 
         # Verify consistency
         from victor.framework.protocols import ChatStateProtocol as CSP

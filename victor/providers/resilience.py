@@ -44,8 +44,8 @@ import random
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Optional, TypeVar
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,6 @@ T = TypeVar("T")
 from victor.providers.circuit_breaker import (
     CircuitState,
     CircuitBreakerConfig,
-    CircuitBreakerError as CanonicalCircuitBreakerError,
 )
 
 
@@ -266,7 +265,7 @@ class ProviderCircuitBreaker:
         self._state = CircuitBreakerState()
         logger.info(f"CircuitBreaker '{self.name}' reset")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get circuit breaker statistics."""
         return {
             "name": self.name,
@@ -517,7 +516,7 @@ class ProviderRetryStrategy:
 class ProviderUnavailableError(Exception):
     """Raised when no providers are available."""
 
-    def __init__(self, primary_error: Exception, fallback_errors: Optional[List[Exception]] = None):
+    def __init__(self, primary_error: Exception, fallback_errors: Optional[list[Exception]] = None):
         self.primary_error = primary_error
         self.fallback_errors = fallback_errors or []
 
@@ -553,7 +552,7 @@ class ResilientProvider:
         provider: Any,
         circuit_config: Optional[CircuitBreakerConfig] = None,
         retry_config: Optional[ProviderRetryConfig] = None,
-        fallback_providers: Optional[List[Any]] = None,
+        fallback_providers: Optional[list[Any]] = None,
         request_timeout: float = 120.0,
     ):
         """Initialize resilient provider.
@@ -582,7 +581,7 @@ class ResilientProvider:
         self.retry_strategy = ProviderRetryStrategy(config=retry_config)
 
         # Create circuit breakers for fallbacks
-        self._fallback_circuits: Dict[str, ProviderCircuitBreaker] = {}
+        self._fallback_circuits: dict[str, ProviderCircuitBreaker] = {}
         for fb in self.fallback_providers:
             fb_name = getattr(fb, "name", f"fallback_{len(self._fallback_circuits)}")
             self._fallback_circuits[fb_name] = ProviderCircuitBreaker(
@@ -620,7 +619,7 @@ class ResilientProvider:
 
     async def chat(
         self,
-        messages: List[Any],
+        messages: list[Any],
         *,
         model: str,
         **kwargs,
@@ -663,7 +662,7 @@ class ResilientProvider:
             primary_error: Exception = e
 
         # Try fallback providers
-        fallback_errors: List[Exception] = []
+        fallback_errors: list[Exception] = []
 
         for fallback in self.fallback_providers:
             fb_name = getattr(fallback, "name", "unknown")
@@ -701,7 +700,7 @@ class ResilientProvider:
 
     async def stream(
         self,
-        messages: List[Any],
+        messages: list[Any],
         *,
         model: str,
         **kwargs,
@@ -754,7 +753,7 @@ class ResilientProvider:
             self._stats["total_failures"] += 1
             raise
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get resilience statistics."""
         return {
             **self._stats,

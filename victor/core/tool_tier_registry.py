@@ -61,10 +61,10 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Type, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.core.vertical_types import TieredToolConfig
+    pass
 
 
 @dataclass
@@ -84,10 +84,10 @@ class TierRegistryEntry:
     config: Any  # TieredToolConfig
     parent: Optional[str] = None
     description: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     version: str = "0.5.0"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "name": self.name,
@@ -143,7 +143,7 @@ class ToolTierRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._entries: Dict[str, TierRegistryEntry] = {}
+        self._entries: dict[str, TierRegistryEntry] = {}
         self._registry_lock = threading.RLock()
 
     @classmethod
@@ -207,7 +207,7 @@ class ToolTierRegistry:
         *,
         parent: Optional[str] = None,
         description: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         version: str = "0.5.0",
         overwrite: bool = False,
     ) -> None:
@@ -304,10 +304,10 @@ class ToolTierRegistry:
                 return None
 
             # Start with current config
-            merged_mandatory: Set[str] = set(entry.config.mandatory)
-            merged_vertical_core: Set[str] = set(entry.config.vertical_core)
-            merged_semantic_pool: Set[str] = set(entry.config.semantic_pool)
-            merged_stage_tools: Dict[str, Set[str]] = dict(entry.config.stage_tools)
+            merged_mandatory: set[str] = set(entry.config.mandatory)
+            merged_vertical_core: set[str] = set(entry.config.vertical_core)
+            merged_semantic_pool: set[str] = set(entry.config.semantic_pool)
+            merged_stage_tools: dict[str, set[str]] = dict(entry.config.stage_tools)
 
             # Walk up parent chain
             current = entry
@@ -342,10 +342,10 @@ class ToolTierRegistry:
         self,
         base_name: str,
         *,
-        mandatory: Optional[Set[str]] = None,
-        vertical_core: Optional[Set[str]] = None,
-        semantic_pool: Optional[Set[str]] = None,
-        stage_tools: Optional[Dict[str, Set[str]]] = None,
+        mandatory: Optional[set[str]] = None,
+        vertical_core: Optional[set[str]] = None,
+        semantic_pool: Optional[set[str]] = None,
+        stage_tools: Optional[dict[str, set[str]]] = None,
         readonly_only_for_analysis: Optional[bool] = None,
     ) -> Optional[Any]:
         """Create an extended tier configuration from a base.
@@ -405,7 +405,7 @@ class ToolTierRegistry:
             readonly_only_for_analysis=new_readonly,
         )
 
-    def list_all(self) -> List[str]:
+    def list_all(self) -> list[str]:
         """List all registered tier names.
 
         Returns:
@@ -414,7 +414,7 @@ class ToolTierRegistry:
         with self._registry_lock:
             return list(self._entries.keys())
 
-    def list_entries(self) -> List[TierRegistryEntry]:
+    def list_entries(self) -> list[TierRegistryEntry]:
         """List all registry entries.
 
         Returns:
@@ -460,7 +460,7 @@ class ToolTierRegistry:
             config = self.get("base")
         return config
 
-    def validate_tier(self, name: str) -> List[str]:
+    def validate_tier(self, name: str) -> list[str]:
         """Validate a tier configuration.
 
         Checks for common issues:
@@ -475,7 +475,7 @@ class ToolTierRegistry:
         Returns:
             List of validation error messages (empty if valid)
         """
-        errors: List[str] = []
+        errors: list[str] = []
 
         with self._registry_lock:
             entry = self._entries.get(name)
@@ -483,7 +483,7 @@ class ToolTierRegistry:
                 return [f"Tier '{name}' not found"]
 
             # Check for circular inheritance
-            visited: Set[str] = {name}
+            visited: set[str] = {name}
             current = entry
             while current.parent:
                 if current.parent in visited:
@@ -502,7 +502,7 @@ class ToolTierRegistry:
 
             return errors
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert entire registry to dictionary.
 
         Returns:

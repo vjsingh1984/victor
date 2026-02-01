@@ -9,7 +9,7 @@ per TDD principles (tests written before implementation).
 """
 
 import pytest
-from typing import Protocol, runtime_checkable, Any, Optional
+from typing import Any, Optional
 from victor.protocols.capability import (
     CapabilityContainerProtocol,
     get_capability_registry,

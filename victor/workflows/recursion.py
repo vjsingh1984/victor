@@ -43,7 +43,7 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from victor.core.errors import RecursionDepthError
 
@@ -83,7 +83,7 @@ class RecursionContext:
 
     current_depth: int = 0
     max_depth: int = 3
-    execution_stack: List[str] = field(default_factory=list)
+    execution_stack: list[str] = field(default_factory=list)
     _lock: threading.RLock = field(default_factory=threading.RLock)
 
     def enter(self, operation_type: str, identifier: str) -> None:
@@ -163,7 +163,7 @@ class RecursionContext:
         with self._lock:
             return (self.current_depth + levels) <= self.max_depth
 
-    def get_depth_info(self) -> Dict[str, Any]:
+    def get_depth_info(self) -> dict[str, Any]:
         """Get current recursion depth information (thread-safe).
 
         Returns:
@@ -212,7 +212,7 @@ class RecursionContext:
                 f"stack={self.execution_stack})"
             )
 
-    def __deepcopy__(self, memo: Dict[int, Any]) -> "RecursionContext":
+    def __deepcopy__(self, memo: dict[int, Any]) -> "RecursionContext":
         """Custom deepcopy to support checkpointing.
 
         When checkpointing creates a deep copy of workflow state, we need to

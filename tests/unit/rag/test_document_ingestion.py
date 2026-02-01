@@ -22,12 +22,10 @@ Tests cover:
 - Document type detection
 """
 
-import asyncio
 import json
 import tempfile
 from pathlib import Path
-from typing import List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -40,8 +38,6 @@ from victor.rag.document_store import (
     Document,
     DocumentChunk,
     DocumentSearchResult,
-    DocumentStore,
-    DocumentStoreConfig,
 )
 from victor.rag.tools.ingest import RAGIngestTool
 
@@ -172,7 +168,7 @@ def main():
 def mock_embedding_fn():
     """Mock embedding function."""
 
-    async def _embed(text: str) -> List[float]:
+    async def _embed(text: str) -> list[float]:
         # Return deterministic mock embeddings with 384 dimensions
         import hashlib
 

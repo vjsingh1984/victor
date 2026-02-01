@@ -73,18 +73,14 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
 )
+from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
     from victor.framework.coordinators.graph_coordinator import GraphExecutionCoordinator
     from victor.framework.graph import CompiledGraph
     from victor.workflows.registry import WorkflowRegistry
-    from victor.framework.workflow_engine import WorkflowEvent
 
 logger = logging.getLogger(__name__)
 
@@ -120,9 +116,9 @@ class ChatExecutionEvent:
     session_id: str
     timestamp: float
     node_id: Optional[str] = None
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert event to dictionary."""
         return {
             "event_type": self.event_type.value,
@@ -193,18 +189,18 @@ class WorkflowChatCoordinator:
         self._workflow_registry = workflow_registry
         self._graph_coordinator = graph_coordinator
         self._config = config or ChatExecutionConfig()
-        self._sessions: Dict[str, Dict[str, Any]] = {}
+        self._sessions: dict[str, dict[str, Any]] = {}
 
         # Event callbacks
-        self._event_callbacks: List[Callable[[ChatExecutionEvent], None]] = []
+        self._event_callbacks: list[Callable[[ChatExecutionEvent], None]] = []
 
     async def execute_chat(
         self,
         workflow_name: str,
         user_message: str,
         session_id: Optional[str] = None,
-        initial_state: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        initial_state: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """Execute chat workflow and return result.
 
         Args:
@@ -306,7 +302,7 @@ class WorkflowChatCoordinator:
         workflow_name: str,
         user_message: str,
         session_id: Optional[str] = None,
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[ChatExecutionEvent]:
         """Stream chat workflow execution events.
 
@@ -427,7 +423,7 @@ class WorkflowChatCoordinator:
             del self._sessions[session_id]
             logger.debug(f"Ended session {session_id}")
 
-    def _get_or_create_session(self, session_id: str) -> Dict[str, Any]:
+    def _get_or_create_session(self, session_id: str) -> dict[str, Any]:
         """Get existing session or create new one.
 
         Args:
@@ -448,9 +444,9 @@ class WorkflowChatCoordinator:
     def _prepare_state(
         self,
         user_message: str,
-        session: Dict[str, Any],
-        initial_state: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        session: dict[str, Any],
+        initial_state: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """Prepare initial state for workflow execution.
 
         Args:
@@ -474,7 +470,7 @@ class WorkflowChatCoordinator:
 
         return state
 
-    def _update_session(self, session_id: str, final_state: Dict[str, Any]) -> None:
+    def _update_session(self, session_id: str, final_state: dict[str, Any]) -> None:
         """Update session with final state.
 
         Args:

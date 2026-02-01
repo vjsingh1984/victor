@@ -18,14 +18,11 @@ Tests tool capability checks and model capability queries.
 """
 
 from unittest.mock import MagicMock, patch
-from typing import Any
 
 import pytest
 
 from victor.agent.coordinators.tool_capability_coordinator import (
     ToolCapabilityCoordinator,
-    CapabilityCheckResult,
-    ModelCapabilityInfo,
     create_tool_capability_coordinator,
 )
 

@@ -34,14 +34,13 @@ Example:
     related = await memory.get_related("ent_abc123", relation_types=[RelationType.IMPORTS])
 """
 
-import asyncio
 import logging
 import sqlite3
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.storage.memory.entity_types import (
     Entity,
@@ -87,7 +86,7 @@ class LRUCache:
         """Clear all cached entities."""
         self._cache.clear()
 
-    def values(self) -> List[Entity]:
+    def values(self) -> list[Entity]:
         """Get all cached entities."""
         return list(self._cache.values())
 
@@ -145,7 +144,7 @@ class EntityMemory:
         self.config = config or EntityMemoryConfig()
 
         # Tier 1: Short-term memory (current session)
-        self._short_term: Dict[str, Entity] = {}
+        self._short_term: dict[str, Entity] = {}
 
         # Tier 2: Working memory (LRU cache)
         self._working_memory = LRUCache(max_size=self.config.working_memory_size)
@@ -156,7 +155,7 @@ class EntityMemory:
         self._initialized = False
 
         # Tier 4: Entity graph (relations)
-        self._relations: Dict[str, EntityRelation] = {}
+        self._relations: dict[str, EntityRelation] = {}
 
     async def initialize(self) -> None:
         """Initialize the memory storage."""
@@ -336,9 +335,9 @@ class EntityMemory:
     async def search(
         self,
         query: str,
-        entity_types: Optional[List[EntityType]] = None,
+        entity_types: Optional[list[EntityType]] = None,
         limit: int = 10,
-    ) -> List[Entity]:
+    ) -> list[Entity]:
         """Search for entities by name.
 
         Args:
@@ -352,7 +351,7 @@ class EntityMemory:
         if not self._initialized:
             await self.initialize()
 
-        results: List[Entity] = []
+        results: list[Entity] = []
         query_lower = query.lower()
 
         # Search short-term memory first
@@ -364,7 +363,7 @@ class EntityMemory:
         # Search long-term if needed
         if len(results) < limit and self._conn:
             type_filter = ""
-            params: List[Any] = [f"%{query}%"]
+            params: list[Any] = [f"%{query}%"]
 
             if entity_types:
                 placeholders = ",".join("?" * len(entity_types))
@@ -413,7 +412,7 @@ class EntityMemory:
         self,
         entity_type: EntityType,
         limit: int = 50,
-    ) -> List[Entity]:
+    ) -> list[Entity]:
         """Get all entities of a specific type.
 
         Args:
@@ -480,10 +479,10 @@ class EntityMemory:
     async def get_related(
         self,
         entity_id: str,
-        relation_types: Optional[List[RelationType]] = None,
+        relation_types: Optional[list[RelationType]] = None,
         direction: str = "outgoing",
         limit: int = 20,
-    ) -> List[tuple[Entity, EntityRelation]]:
+    ) -> list[tuple[Entity, EntityRelation]]:
         """Get entities related to a given entity.
 
         Args:
@@ -498,7 +497,7 @@ class EntityMemory:
         if not self._initialized:
             await self.initialize()
 
-        results: List[tuple[Entity, EntityRelation]] = []
+        results: list[tuple[Entity, EntityRelation]] = []
 
         # Get relations from memory
         for relation in self._relations.values():
@@ -546,7 +545,7 @@ class EntityMemory:
         results.sort(key=lambda x: x[1].strength, reverse=True)
         return results[:limit]
 
-    async def get_session_entities(self) -> List[Entity]:
+    async def get_session_entities(self) -> list[Entity]:
         """Get all entities from current session.
 
         Returns:
@@ -554,7 +553,7 @@ class EntityMemory:
         """
         return list(self._short_term.values())
 
-    async def get_recent_entities(self, limit: int = 20) -> List[Entity]:
+    async def get_recent_entities(self, limit: int = 20) -> list[Entity]:
         """Get most recently accessed entities.
 
         Returns:
@@ -579,7 +578,7 @@ class EntityMemory:
         self._short_term.clear()
         logger.info(f"Cleared short-term memory for session {self.session_id}")
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get memory statistics.
 
         Returns:

@@ -15,14 +15,12 @@
 """Tests for the multi-language code analyzer module."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from victor.tools.language_analyzer import (
     AnalysisIssue,
     AnalysisResult,
-    BaseLanguageAnalyzer,
     CAnalyzer,
     CppAnalyzer,
     CSharpAnalyzer,

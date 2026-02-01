@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.core.mode_config import ModeConfigRegistry, ModeDefinition
+from victor.core.mode_config import ModeConfigRegistry
 from victor.framework.modes import BaseVerticalModeProvider
 
 

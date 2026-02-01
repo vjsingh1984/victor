@@ -16,9 +16,8 @@
 
 import logging
 import re
-from typing import List, Tuple
 
-from victor.core.chunking.base import Chunk, ChunkingConfig, ChunkingStrategy
+from victor.core.chunking.base import Chunk, ChunkingStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +43,10 @@ class MarkdownChunkingStrategy(ChunkingStrategy):
         return "markdown"
 
     @property
-    def supported_types(self) -> List[str]:
+    def supported_types(self) -> list[str]:
         return ["markdown", "md", "rst", "restructuredtext"]
 
-    def chunk(self, content: str) -> List[Chunk]:
+    def chunk(self, content: str) -> list[Chunk]:
         """Chunk Markdown content by headers.
 
         Args:
@@ -119,7 +118,7 @@ class MarkdownChunkingStrategy(ChunkingStrategy):
         offset: int,
         header_level: int,
         header_text: str,
-    ) -> List[Chunk]:
+    ) -> list[Chunk]:
         """Sub-chunk a large section while preserving code blocks.
 
         Args:

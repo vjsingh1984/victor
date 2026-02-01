@@ -52,10 +52,10 @@ import asyncio
 import logging
 import threading
 import time
-from collections import Counter, defaultdict, deque
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections import defaultdict, deque
+from dataclasses import dataclass
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -205,11 +205,11 @@ class CacheAnalytics:
         self.metrics_retention_hours = metrics_retention_hours
 
         # Access tracking
-        self._access_log: deque[Tuple[str, str, bool, float]] = deque(maxlen=hot_key_window)
+        self._access_log: deque[tuple[str, str, bool, float]] = deque(maxlen=hot_key_window)
         self._latency_samples: deque[float] = deque(maxlen=10000)
 
         # Hot key tracking
-        self._key_stats: Dict[tuple[str, str], Dict[str, Any]] = defaultdict(
+        self._key_stats: dict[tuple[str, str], dict[str, Any]] = defaultdict(
             lambda: {
                 "access_count": 0,
                 "hit_count": 0,
@@ -220,10 +220,10 @@ class CacheAnalytics:
         )
 
         # Time-based metrics
-        self._hourly_metrics: Dict[int, CacheMetrics] = {}
+        self._hourly_metrics: dict[int, CacheMetrics] = {}
 
         # Alert callbacks
-        self._alert_callbacks: List[Callable[[str, Dict[str, Any]], None]] = []
+        self._alert_callbacks: list[Callable[[str, dict[str, Any]], None]] = []
 
         # Thread safety
         self._lock = threading.RLock()
@@ -294,7 +294,7 @@ class CacheAnalytics:
         """
         return 1.0 - self.get_hit_rate()
 
-    def get_latency_stats(self) -> Dict[str, float]:
+    def get_latency_stats(self) -> dict[str, float]:
         """Get latency statistics.
 
         Returns:
@@ -319,7 +319,7 @@ class CacheAnalytics:
                 "p99_ms": samples[int(len(samples) * 0.99)],
             }
 
-    def get_hot_keys(self, top_n: int = 100) -> List[HotKey]:
+    def get_hot_keys(self, top_n: int = 100) -> list[HotKey]:
         """Get most frequently accessed keys.
 
         Args:
@@ -371,7 +371,7 @@ class CacheAnalytics:
 
         return float((l1_evictions + l2_evictions) / total_requests)
 
-    def get_size_utilization(self) -> Dict[str, float]:
+    def get_size_utilization(self) -> dict[str, float]:
         """Get cache size utilization.
 
         Returns:
@@ -386,7 +386,7 @@ class CacheAnalytics:
             / max(stats.get("l2", {}).get("max_size", 1), 1),
         }
 
-    def get_comprehensive_stats(self) -> Dict[str, Any]:
+    def get_comprehensive_stats(self) -> dict[str, Any]:
         """Get comprehensive cache statistics.
 
         Returns:
@@ -405,7 +405,7 @@ class CacheAnalytics:
             "cache_stats": cache_stats,
         }
 
-    def get_recommendations(self) -> List[Recommendation]:
+    def get_recommendations(self) -> list[Recommendation]:
         """Get cache optimization recommendations.
 
         Analyzes metrics and generates actionable recommendations.
@@ -490,7 +490,7 @@ class CacheAnalytics:
 
         return recommendations
 
-    def register_alert_callback(self, callback: Callable[[str, Dict[str, Any]], None]) -> None:
+    def register_alert_callback(self, callback: Callable[[str, dict[str, Any]], None]) -> None:
         """Register an alert callback for performance degradation.
 
         Args:
@@ -559,7 +559,7 @@ class CacheAnalytics:
         self._stop_event.clear()
         logger.info("Stopped cache monitoring")
 
-    def _check_performance_issues(self, stats: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any]]]:
+    def _check_performance_issues(self, stats: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
         """Check for performance issues and generate alerts.
 
         Args:
@@ -612,7 +612,7 @@ class CacheAnalytics:
 
         return alerts
 
-    async def export_to_prometheus(self) -> Dict[str, float]:
+    async def export_to_prometheus(self) -> dict[str, float]:
         """Export metrics in Prometheus format.
 
         Returns:

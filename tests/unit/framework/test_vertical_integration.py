@@ -21,18 +21,14 @@ vertical configurations to orchestrators, achieving parity between CLI
 
 import pytest
 from unittest.mock import MagicMock, patch
-from typing import Dict, List, Optional, Set
 
 from victor.agent.vertical_context import (
     VerticalContext,
     create_vertical_context,
-    VerticalContextProtocol,
-    MutableVerticalContextProtocol,
 )
 from victor.core.verticals.prompt_adapter import (
     PromptContributorAdapter,
     CompositePromptContributor,
-    create_prompt_adapter,
     merge_contributors,
 )
 from victor.framework.vertical_integration import (
@@ -112,7 +108,7 @@ class MockVertical:
         return MockVerticalConfig(cls.name)
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read", "write", "shell", "grep"]
 
     @classmethod
@@ -120,7 +116,7 @@ class MockVertical:
         return "You are a mock assistant for testing."
 
     @classmethod
-    def get_stages(cls) -> Dict[str, any]:
+    def get_stages(cls) -> dict[str, any]:
         return {"INITIAL": {}, "READING": {}, "WRITING": {}}
 
     @classmethod
@@ -133,21 +129,21 @@ class MockOrchestrator:
 
     def __init__(self):
         self._vertical_context = create_vertical_context()
-        self._enabled_tools: Set[str] = set()
-        self._middleware: List[any] = []
-        self._safety_patterns: List[any] = []
+        self._enabled_tools: set[str] = set()
+        self._middleware: list[any] = []
+        self._safety_patterns: list[any] = []
         self.prompt_builder = MagicMock()
 
     def set_vertical_context(self, context: VerticalContext) -> None:
         self._vertical_context = context
 
-    def set_enabled_tools(self, tools: Set[str]) -> None:
+    def set_enabled_tools(self, tools: set[str]) -> None:
         self._enabled_tools = tools
 
-    def apply_vertical_middleware(self, middleware: List[any]) -> None:
+    def apply_vertical_middleware(self, middleware: list[any]) -> None:
         self._middleware = middleware
 
-    def apply_vertical_safety_patterns(self, patterns: List[any]) -> None:
+    def apply_vertical_safety_patterns(self, patterns: list[any]) -> None:
         self._safety_patterns = patterns
 
 

@@ -45,7 +45,7 @@ Example usage:
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -65,7 +65,7 @@ class ISafetyScanner(Protocol):
                 return findings
     """
 
-    def scan(self, content: str) -> List[str]:
+    def scan(self, content: str) -> list[str]:
         """Scan content for safety issues.
 
         Args:
@@ -104,7 +104,7 @@ class SafetyRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry with an empty scanner dictionary."""
-        self._scanners: Dict[str, ISafetyScanner] = {}
+        self._scanners: dict[str, ISafetyScanner] = {}
 
     def register(self, domain: str, scanner: ISafetyScanner) -> None:
         """Register a scanner for a specific domain.
@@ -140,7 +140,7 @@ class SafetyRegistry:
         """
         return self._scanners.get(domain)
 
-    def scan_all(self, content: str) -> List[str]:
+    def scan_all(self, content: str) -> list[str]:
         """Run all registered scanners and aggregate findings.
 
         Iterates through all registered scanners, runs each one on the
@@ -152,7 +152,7 @@ class SafetyRegistry:
         Returns:
             List of all findings from all scanners
         """
-        all_findings: List[str] = []
+        all_findings: list[str] = []
 
         for scanner in self._scanners.values():
             findings = scanner.scan(content)
@@ -160,7 +160,7 @@ class SafetyRegistry:
 
         return all_findings
 
-    def list_domains(self) -> List[str]:
+    def list_domains(self) -> list[str]:
         """List all registered domain names.
 
         Returns:

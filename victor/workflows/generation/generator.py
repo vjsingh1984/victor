@@ -46,15 +46,14 @@ import asyncio
 import json
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Union, cast
+from dataclasses import dataclass
+from typing import Any, Optional, cast
+from collections.abc import Callable
 from enum import Enum
 
 from victor.workflows.generation.requirements import WorkflowRequirements
 from victor.workflows.generation.types import (
     WorkflowValidationError,
-    WorkflowGenerationValidationResult,
-    RefinementResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,7 +107,7 @@ class GenerationMetadata:
     cost_estimate_usd: float = 0.0
     attempt_number: int = 1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "strategy": self.strategy.value,
@@ -198,8 +197,8 @@ class WorkflowGenerator:
     async def generate_from_requirements(
         self,
         requirements: WorkflowRequirements,
-        validation_callback: Optional[Callable[[Dict[str, Any]], Any]] = None,
-    ) -> tuple[Dict[str, Any], GenerationMetadata]:
+        validation_callback: Optional[Callable[[dict[str, Any]], Any]] = None,
+    ) -> tuple[dict[str, Any], GenerationMetadata]:
         """Generate workflow schema from structured requirements.
 
         Args:
@@ -279,10 +278,10 @@ class WorkflowGenerator:
 
     async def refine_schema(
         self,
-        schema: Dict[str, Any],
-        feedback: Union[str, List[str]],
-        validation_errors: Optional[List[WorkflowValidationError]] = None,
-    ) -> Dict[str, Any]:
+        schema: dict[str, Any],
+        feedback: str | list[str],
+        validation_errors: Optional[list[WorkflowValidationError]] = None,
+    ) -> dict[str, Any]:
         """Refine existing schema based on feedback.
 
         Args:
@@ -322,7 +321,7 @@ class WorkflowGenerator:
 
     async def _generate_multi_stage(
         self, requirements: WorkflowRequirements, attempt: int
-    ) -> tuple[Dict[str, Any], GenerationMetadata]:
+    ) -> tuple[dict[str, Any], GenerationMetadata]:
         """Generate workflow using multi-stage approach.
 
         Stage 1: Understand requirements (confirm with LLM)
@@ -357,7 +356,7 @@ class WorkflowGenerator:
 
         return schema, metadata
 
-    async def _stage1_understand(self, requirements: WorkflowRequirements) -> Dict[str, Any]:
+    async def _stage1_understand(self, requirements: WorkflowRequirements) -> dict[str, Any]:
         """Stage 1: Understand and confirm requirements.
 
         Returns a summary of what the LLM understood.
@@ -391,8 +390,8 @@ Focus on the core objective and key steps.
         return {"summary": response.strip()}
 
     async def _stage2_design(
-        self, requirements: WorkflowRequirements, understanding: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, requirements: WorkflowRequirements, understanding: dict[str, Any]
+    ) -> dict[str, Any]:
         """Stage 2: Design workflow structure.
 
         Returns high-level node and edge design.
@@ -430,8 +429,8 @@ Respond with a JSON structure:
         return self._parse_json_response(response)
 
     async def _stage3_generate(
-        self, requirements: WorkflowRequirements, structure: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, requirements: WorkflowRequirements, structure: dict[str, Any]
+    ) -> dict[str, Any]:
         """Stage 3: Generate full workflow JSON schema.
 
         Returns complete schema compatible with StateGraph.from_schema().
@@ -471,7 +470,7 @@ Generate the complete workflow schema as JSON only.
 
     async def _generate_single_stage(
         self, requirements: WorkflowRequirements, attempt: int
-    ) -> tuple[Dict[str, Any], GenerationMetadata]:
+    ) -> tuple[dict[str, Any], GenerationMetadata]:
         """Generate workflow in single LLM call.
 
         Faster than multi-stage but less accurate for complex workflows.
@@ -526,7 +525,7 @@ Generate the workflow schema as JSON only.
 
     async def _generate_from_template(
         self, requirements: WorkflowRequirements
-    ) -> tuple[Dict[str, Any], GenerationMetadata]:
+    ) -> tuple[dict[str, Any], GenerationMetadata]:
         """Generate workflow from pre-defined template.
 
         Fastest method but least flexible. Matches requirements to
@@ -580,7 +579,7 @@ Generate the workflow schema as JSON only.
                 f"doesn't match generator vertical '{self._vertical}'"
             )
 
-    def _validate_schema_structure(self, schema: Dict[str, Any]) -> None:
+    def _validate_schema_structure(self, schema: dict[str, Any]) -> None:
         """Basic validation of generated schema structure.
 
         Args:
@@ -637,9 +636,9 @@ Generate the workflow schema as JSON only.
 
     def _build_refinement_prompt(
         self,
-        schema: Dict[str, Any],
-        feedback: Union[str, List[str]],
-        validation_errors: Optional[List[WorkflowValidationError]] = None,
+        schema: dict[str, Any],
+        feedback: str | list[str],
+        validation_errors: Optional[list[WorkflowValidationError]] = None,
     ) -> str:
         """Build prompt for schema refinement."""
         feedback_text = (
@@ -676,7 +675,7 @@ Fixed schema:
 """
         return prompt
 
-    def _parse_json_response(self, response: str) -> Dict[str, Any]:
+    def _parse_json_response(self, response: str) -> dict[str, Any]:
         """Parse JSON from LLM response.
 
         Handles markdown code blocks and malformed JSON.
@@ -703,13 +702,13 @@ Fixed schema:
         # Parse JSON
         try:
             result = json.loads(response)
-            return cast(Dict[str, Any], result)
+            return cast(dict[str, Any], result)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON: {e}")
             logger.debug(f"Response content: {response[:500]}")
             raise ValueError(f"Invalid JSON in LLM response: {e}") from e
 
-    def _get_schema_template(self) -> Dict[str, Any]:
+    def _get_schema_template(self) -> dict[str, Any]:
         """Get template for workflow schema structure."""
         return {
             "workflow_name": "example_workflow",

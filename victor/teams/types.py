@@ -33,7 +33,8 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Awaitable, Callable
 
 if TYPE_CHECKING:
     # Team member dependencies
@@ -138,7 +139,7 @@ class AgentMessage:
     content: str
     message_type: MessageType
     recipient_id: Optional[str] = None  # None = broadcast to all
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
     reply_to: Optional[str] = None
     priority: MessagePriority = MessagePriority.NORMAL
@@ -146,7 +147,7 @@ class AgentMessage:
 
     # Compatibility aliases for framework AgentMessage
     @property
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> dict[str, Any]:
         """Alias for data (framework compatibility)."""
         return self.data
 
@@ -195,7 +196,7 @@ class AgentMessage:
             header += f" {arrow} {self.recipient_id}"
         return f"{header}: {self.content}"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -241,13 +242,13 @@ class MemoryConfig:
     enabled: bool = True
     persist_across_sessions: bool = False
     search_own_memories_only: bool = False
-    memory_types: Set[str] = field(default_factory=lambda: {"entity", "episodic", "semantic"})
+    memory_types: set[str] = field(default_factory=lambda: {"entity", "episodic", "semantic"})
     max_memories_per_query: int = 10
     relevance_threshold: float = 0.5
     auto_summarize: bool = True
     ttl_seconds: Optional[int] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "enabled": self.enabled,
@@ -261,7 +262,7 @@ class MemoryConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MemoryConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "MemoryConfig":
         """Create from dictionary."""
         return cls(
             enabled=data.get("enabled", True),
@@ -374,15 +375,15 @@ class TeamMember:
     name: str
     goal: str
     tool_budget: int = 15
-    allowed_tools: Optional[List[str]] = None
+    allowed_tools: Optional[list[str]] = None
     can_delegate: bool = False
-    delegation_targets: Optional[List[str]] = None
+    delegation_targets: Optional[list[str]] = None
     reports_to: Optional[str] = None
     is_manager: bool = False
     priority: int = 0
     # Rich persona attributes (CrewAI-compatible)
     backstory: str = ""
-    expertise: List[str] = field(default_factory=list)
+    expertise: list[str] = field(default_factory=list)
     personality: str = ""
     max_delegation_depth: int = 0
     memory: bool = False
@@ -516,7 +517,7 @@ class TeamMember:
         return MemoryConfig(enabled=self.memory)
 
     async def remember(
-        self, key: str, value: Any, metadata: Optional[Dict[str, Any]] = None
+        self, key: str, value: Any, metadata: Optional[dict[str, Any]] = None
     ) -> bool:
         """Store a discovery in memory for future tasks.
 
@@ -544,7 +545,7 @@ class TeamMember:
         try:
             from victor.storage.memory.unified import MemoryType
 
-            full_metadata: Dict[str, Any] = {"member_id": self.id, "member_name": self.name}
+            full_metadata: dict[str, Any] = {"member_id": self.id, "member_name": self.name}
             if self.expertise:
                 full_metadata["expertise"] = ",".join(self.expertise)
             if metadata:
@@ -564,7 +565,7 @@ class TeamMember:
         except Exception:
             return False
 
-    async def recall(self, query: str, limit: Optional[int] = None) -> List[Any]:
+    async def recall(self, query: str, limit: Optional[int] = None) -> list[Any]:
         """Recall memories relevant to a query.
 
         Searches across memory types for relevant discoveries from this
@@ -590,7 +591,7 @@ class TeamMember:
             effective_limit = limit or config.max_memories_per_query
 
             # Build filters based on memory config
-            filters: Dict[str, Any] = {}
+            filters: dict[str, Any] = {}
             if config.search_own_memories_only:
                 filters["member_id"] = self.id
 
@@ -627,7 +628,7 @@ class TeamMember:
         """
         self.memory_coordinator = coordinator
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert TeamMember to dictionary for serialization.
 
         Returns:
@@ -693,11 +694,11 @@ class TeamConfig:
 
     name: str
     goal: str
-    members: List[TeamMember]
+    members: list[TeamMember]
     formation: TeamFormation = TeamFormation.SEQUENTIAL
     max_iterations: int = 50
     total_tool_budget: int = 100
-    shared_context: Dict[str, Any] = field(default_factory=dict)
+    shared_context: dict[str, Any] = field(default_factory=dict)
     on_member_complete: Optional[Callable[[str, Any], None]] = None
     allow_dynamic_membership: bool = False
     timeout_seconds: int = 600
@@ -732,11 +733,11 @@ class TeamConfig:
                 return member
         return None
 
-    def get_workers(self) -> List[TeamMember]:
+    def get_workers(self) -> list[TeamMember]:
         """Get all non-manager members."""
         return [m for m in self.members if not m.is_manager]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "name": self.name,
@@ -797,12 +798,12 @@ class MemberResult:
     success: bool
     output: str
     error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     tool_calls_used: int = 0
     duration_seconds: float = 0.0
-    discoveries: List[str] = field(default_factory=list)
+    discoveries: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "member_id": self.member_id,
@@ -836,17 +837,17 @@ class TeamResult:
 
     success: bool
     final_output: str
-    member_results: Dict[str, MemberResult]
+    member_results: dict[str, MemberResult]
     formation: TeamFormation
     total_tool_calls: int = 0
     total_duration: float = 0.0
-    communication_log: List[AgentMessage] = field(default_factory=list)
-    shared_context: Dict[str, Any] = field(default_factory=dict)
+    communication_log: list[AgentMessage] = field(default_factory=list)
+    shared_context: dict[str, Any] = field(default_factory=dict)
     consensus_achieved: Optional[bool] = None
     consensus_rounds: Optional[int] = None
     error: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "success": self.success,
@@ -876,7 +877,7 @@ class TeamMemberAdapter:
     """
 
     member: "TeamMember"
-    executor: Callable[[str, Dict[str, Any]], Any]
+    executor: Callable[[str, dict[str, Any]], Any]
     message_handler: Optional[Callable[[AgentMessage], Optional[AgentMessage]]] = None
 
     @property
@@ -894,7 +895,7 @@ class TeamMemberAdapter:
         """Persona of this member (None for TeamMemberAdapter)."""
         return None
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> Any:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> Any:
         """Execute a task using the provided executor."""
         return await self.executor(task, context)
 

@@ -46,7 +46,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class QueryExpansionConfig:
         deduplicate: Whether to remove duplicate terms (default: True).
     """
 
-    expansions: Dict[str, List[str]] = field(default_factory=dict)
+    expansions: dict[str, list[str]] = field(default_factory=dict)
     max_expansions: int = 5
     deduplicate: bool = True
 
@@ -81,8 +81,8 @@ class ExpandedQuery:
     """
 
     original: str
-    variations: List[str]
-    matched_patterns: List[str]
+    variations: list[str]
+    matched_patterns: list[str]
 
     @property
     def expansion_count(self) -> int:
@@ -137,7 +137,7 @@ class QueryExpander:
         self._config = config or QueryExpansionConfig()
 
     @property
-    def expansions(self) -> Dict[str, List[str]]:
+    def expansions(self) -> dict[str, list[str]]:
         """Get the expansion dictionary."""
         return self._config.expansions
 
@@ -172,9 +172,9 @@ class QueryExpander:
         query_lower = query.lower().strip()
 
         # Always include original query first
-        variations: List[str] = [query]
-        seen: Set[str] = {query_lower}
-        matched_patterns: List[str] = []
+        variations: list[str] = [query]
+        seen: set[str] = {query_lower}
+        matched_patterns: list[str] = []
 
         # Find matching patterns and add expansions
         for pattern, synonyms in self._config.expansions.items():
@@ -221,7 +221,7 @@ class QueryExpander:
         query_lower = query.lower().strip()
         return any(pattern in query_lower for pattern in self._config.expansions)
 
-    def get_expansion_terms(self, query: str) -> Set[str]:
+    def get_expansion_terms(self, query: str) -> set[str]:
         """Get all expansion terms for a query.
 
         Args:
@@ -231,7 +231,7 @@ class QueryExpander:
             Set of all matching expansion terms (excluding original).
         """
         query_lower = query.lower().strip()
-        terms: Set[str] = set()
+        terms: set[str] = set()
 
         for pattern, synonyms in self._config.expansions.items():
             if pattern in query_lower:
@@ -239,7 +239,7 @@ class QueryExpander:
 
         return terms
 
-    def add_expansions(self, expansions: Dict[str, List[str]]) -> None:
+    def add_expansions(self, expansions: dict[str, list[str]]) -> None:
         """Add additional expansions to the dictionary.
 
         Args:
@@ -257,7 +257,7 @@ class QueryExpander:
 
 
 def create_query_expander(
-    expansions: Optional[Dict[str, List[str]]] = None,
+    expansions: Optional[dict[str, list[str]]] = None,
     max_expansions: int = 5,
 ) -> QueryExpander:
     """Factory function to create a QueryExpander.

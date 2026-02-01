@@ -14,7 +14,6 @@
 
 """Tests for HITL gate patterns."""
 
-import asyncio
 import pytest
 
 from victor.framework.hitl.gates import (

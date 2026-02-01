@@ -23,16 +23,13 @@ These tests verify:
 """
 
 import asyncio
-from typing import Any, AsyncIterator, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
-from victor.config.settings import Settings
 from victor.core.errors import (
     ProviderConnectionError,
-    ProviderRateLimitError,
     ToolExecutionError,
     ToolNotFoundError,
 )
@@ -132,7 +129,7 @@ async def mock_orchestrator():
 # =============================================================================
 
 
-def create_stream_chunks(content: str, final: bool = False) -> List[StreamChunk]:
+def create_stream_chunks(content: str, final: bool = False) -> list[StreamChunk]:
     """Create a list of StreamChunk objects for testing.
 
     Args:

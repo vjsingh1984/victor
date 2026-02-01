@@ -45,11 +45,9 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Callable
-from typing import Tuple
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +63,7 @@ class Counter:
 
     name: str
     help: str
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
     value: float = 0.0
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -101,7 +99,7 @@ class Gauge:
 
     name: str
     help: str
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
     value: float = 0.0
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -153,13 +151,13 @@ class Histogram:
 
     name: str
     help: str
-    labels: Dict[str, str] = field(default_factory=dict)
-    buckets: List[float] = field(
+    labels: dict[str, str] = field(default_factory=dict)
+    buckets: list[float] = field(
         default_factory=lambda: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
     )
     _sum: float = 0.0
     _count: int = 0
-    _bucket_counts: Dict[float, int] = field(default_factory=dict)
+    _bucket_counts: dict[float, int] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def __post_init__(self) -> None:
@@ -227,15 +225,15 @@ class PrometheusRegistry:
     def __init__(self) -> None:
         """Initialize registry."""
         self._lock = threading.RLock()
-        self._counters: Dict[str, Counter] = {}
-        self._gauges: Dict[str, Gauge] = {}
-        self._histograms: Dict[str, Histogram] = {}
+        self._counters: dict[str, Counter] = {}
+        self._gauges: dict[str, Gauge] = {}
+        self._histograms: dict[str, Histogram] = {}
 
     def counter(
         self,
         name: str,
         help: str,
-        labels: Optional[Dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
     ) -> Counter:
         """Get or create a counter metric.
 
@@ -262,7 +260,7 @@ class PrometheusRegistry:
         self,
         name: str,
         help: str,
-        labels: Optional[Dict[str, str]] = None,
+        labels: Optional[dict[str, str]] = None,
     ) -> Gauge:
         """Get or create a gauge metric.
 
@@ -289,8 +287,8 @@ class PrometheusRegistry:
         self,
         name: str,
         help: str,
-        labels: Optional[Dict[str, str]] = None,
-        buckets: Optional[List[float]] = None,
+        labels: Optional[dict[str, str]] = None,
+        buckets: Optional[list[float]] = None,
     ) -> Histogram:
         """Get or create a histogram metric.
 

@@ -18,10 +18,8 @@ These tests verify that the IntelligentAgentPipeline integration hooks
 work correctly within the AgentOrchestrator.
 """
 
-import asyncio
 from dataclasses import dataclass
-from typing import Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -137,7 +135,7 @@ class TestOrchestratorIntelligentHooks:
 
     def test_validate_intelligent_response_skips_short_responses(self):
         """Should skip validation for very short responses."""
-        _integration = MagicMock()  # noqa: F841
+        _integration = MagicMock()
 
         # For responses < 50 chars, validation should be skipped
         short_response = "OK"

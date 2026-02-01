@@ -25,8 +25,8 @@ TDD: These tests are written FIRST before implementation.
 """
 
 import asyncio
-from typing import AsyncIterator, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from collections.abc import AsyncIterator
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -96,7 +96,7 @@ class TestSubAgentStreamExecute:
         with patch.object(
             subagent, "_create_constrained_orchestrator", return_value=mock_orchestrator
         ):
-            chunks: List[StreamChunk] = []
+            chunks: list[StreamChunk] = []
             async for chunk in subagent.stream_execute():
                 chunks.append(chunk)
                 assert isinstance(chunk, StreamChunk)
@@ -126,7 +126,7 @@ class TestSubAgentStreamExecute:
         with patch.object(
             subagent, "_create_constrained_orchestrator", return_value=mock_orchestrator
         ):
-            chunks: List[StreamChunk] = []
+            chunks: list[StreamChunk] = []
             async for chunk in subagent.stream_execute():
                 chunks.append(chunk)
 
@@ -153,7 +153,7 @@ class TestSubAgentStreamExecute:
         with patch.object(
             subagent, "_create_constrained_orchestrator", return_value=mock_orchestrator
         ):
-            chunks: List[StreamChunk] = []
+            chunks: list[StreamChunk] = []
             async for chunk in subagent.stream_execute():
                 chunks.append(chunk)
 
@@ -187,7 +187,7 @@ class TestSubAgentStreamExecute:
         with patch.object(
             subagent, "_create_constrained_orchestrator", return_value=mock_orchestrator
         ):
-            chunks: List[StreamChunk] = []
+            chunks: list[StreamChunk] = []
             async for chunk in subagent.stream_execute():
                 chunks.append(chunk)
 
@@ -243,7 +243,7 @@ class TestSubAgentStreamExecute:
         with patch.object(
             subagent, "_create_constrained_orchestrator", return_value=mock_orchestrator
         ):
-            chunks: List[StreamChunk] = []
+            chunks: list[StreamChunk] = []
             async for chunk in subagent.stream_execute():
                 chunks.append(chunk)
 
@@ -289,7 +289,7 @@ class TestSubAgentOrchestratorStreamSpawn:
             yield StreamChunk(content=" world", is_final=True)
 
         with patch.object(SubAgent, "stream_execute", mock_stream_execute):
-            chunks: List[StreamChunk] = []
+            chunks: list[StreamChunk] = []
             async for chunk in orchestrator.stream_spawn(SubAgentRole.RESEARCHER, "Test task"):
                 chunks.append(chunk)
                 assert isinstance(chunk, StreamChunk)
@@ -302,7 +302,7 @@ class TestSubAgentOrchestratorStreamSpawn:
         """Test that stream_spawn() passes tool_budget to SubAgent."""
         orchestrator = SubAgentOrchestrator(mock_parent)
 
-        created_configs: List[SubAgentConfig] = []
+        created_configs: list[SubAgentConfig] = []
 
         original_init = SubAgent.__init__
 
@@ -329,7 +329,7 @@ class TestSubAgentOrchestratorStreamSpawn:
         """Test that stream_spawn() passes allowed_tools to SubAgent."""
         orchestrator = SubAgentOrchestrator(mock_parent)
 
-        created_configs: List[SubAgentConfig] = []
+        created_configs: list[SubAgentConfig] = []
 
         original_init = SubAgent.__init__
 
@@ -366,7 +366,7 @@ class TestSubAgentOrchestratorStreamSpawn:
             yield StreamChunk(content="Done", is_final=True)
 
         with patch.object(SubAgent, "stream_execute", slow_stream_execute):
-            chunks: List[StreamChunk] = []
+            chunks: list[StreamChunk] = []
             async for chunk in orchestrator.stream_spawn(
                 SubAgentRole.RESEARCHER, "Test task", timeout_seconds=1
             ):
@@ -390,7 +390,7 @@ class TestSubAgentOrchestratorStreamSpawn:
 
         orchestrator = SubAgentOrchestrator(mock_parent)
 
-        created_configs: List[SubAgentConfig] = []
+        created_configs: list[SubAgentConfig] = []
 
         original_init = SubAgent.__init__
 
@@ -450,7 +450,7 @@ class TestSubAgentOrchestratorStreamSpawn:
                 yield StreamChunk()
 
         with patch.object(SubAgent, "stream_execute", empty_stream_execute):
-            chunks: List[StreamChunk] = []
+            chunks: list[StreamChunk] = []
             async for chunk in orchestrator.stream_spawn(SubAgentRole.RESEARCHER, "Test task"):
                 chunks.append(chunk)
 

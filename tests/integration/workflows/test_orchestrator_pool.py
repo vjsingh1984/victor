@@ -27,7 +27,7 @@ Tests multi-provider workflow functionality including:
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from victor.config.settings import Settings, ProfileConfig
 from victor.workflows.orchestrator_pool import OrchestratorPool
@@ -465,7 +465,6 @@ class TestLifecycle:
         self, mock_settings: Any, mock_provider: Any, caplog: Any
     ) -> None:
         """Test that shutdown handles errors gracefully."""
-        import logging
 
         with patch("victor.workflows.orchestrator_pool.ProviderRegistry") as mock_registry:
             with patch(

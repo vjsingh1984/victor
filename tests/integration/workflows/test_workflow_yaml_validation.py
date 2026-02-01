@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
 
 from victor.workflows.generation.validator import WorkflowValidator
 
@@ -108,7 +107,7 @@ EXAMPLE_WORKFLOWS = {
 
 def load_and_compile_workflow(
     workflow_path: str,
-) -> Tuple[str, Dict, List]:
+) -> tuple[str, dict, list]:
     """Load a workflow file and compile all workflows within it.
 
     Args:
@@ -139,7 +138,7 @@ def load_and_compile_workflow(
     return Path(workflow_path).stem, workflows, compiled_graphs
 
 
-def get_all_workflow_files() -> List[str]:
+def get_all_workflow_files() -> list[str]:
     """Get all workflow YAML files from the codebase."""
     workflow_files = []
 
@@ -179,7 +178,7 @@ class TestProductionWorkflows:
         assert len(compiled_graphs) == len(workflows), "All workflows should compile"
 
     @pytest.mark.parametrize("vertical,files", PRODUCTION_WORKFLOWS.items())
-    def test_vertical_all_workflows_valid(self, vertical: str, files: List[str]) -> None:
+    def test_vertical_all_workflows_valid(self, vertical: str, files: list[str]) -> None:
         """Test that all workflows in a vertical are valid."""
         for workflow_path in files:
             try:
@@ -242,7 +241,7 @@ class TestKnownWorkflowIssues:
     """
 
     @pytest.mark.parametrize("workflow_path,issue_info", KNOWN_ISSUES.items())
-    def test_known_issue_documentation(self, workflow_path: str, issue_info: Dict) -> None:
+    def test_known_issue_documentation(self, workflow_path: str, issue_info: dict) -> None:
         """Document and track known workflow issues.
 
         This test will always fail (xfail) but provides documentation
@@ -273,7 +272,7 @@ class TestExampleWorkflows:
     """
 
     @pytest.mark.parametrize("vertical,files", EXAMPLE_WORKFLOWS.items())
-    def test_example_workflow_status(self, vertical: str, files: List[str]) -> None:
+    def test_example_workflow_status(self, vertical: str, files: list[str]) -> None:
         """Test example workflows and document their status.
 
         Example workflows may fail validation, but we should at least

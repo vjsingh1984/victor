@@ -40,7 +40,7 @@ import logging
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
@@ -65,11 +65,11 @@ class PerformancePrediction:
 
     metric_name: str
     predicted_value: float
-    confidence_interval: Tuple[float, float]
+    confidence_interval: tuple[float, float]
     confidence: float
-    factors: Dict[str, float]
+    factors: dict[str, float]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "metric_name": self.metric_name,
@@ -113,8 +113,8 @@ class PerformancePredictor:
         self.use_heuristic = use_heuristic
 
         # Models for different metrics
-        self._models: Dict[str, Any] = {}
-        self._scalers: Dict[str, Any] = {}
+        self._models: dict[str, Any] = {}
+        self._scalers: dict[str, Any] = {}
 
         if model_path and model_path.exists():
             self.load_models(model_path)
@@ -591,7 +591,7 @@ class PerformancePredictor:
 
     def train_execution_time_model(
         self,
-        training_data: List[Dict[str, Any]],
+        training_data: list[dict[str, Any]],
     ) -> None:
         """Train execution time prediction model.
 
@@ -599,7 +599,6 @@ class PerformancePredictor:
             training_data: List of training examples
         """
         from sklearn.ensemble import RandomForestRegressor  # type: ignore[import-untyped]
-        from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
         self._train_model(
             metric_name="execution_time",
@@ -610,7 +609,7 @@ class PerformancePredictor:
 
     def train_success_model(
         self,
-        training_data: List[Dict[str, Any]],
+        training_data: list[dict[str, Any]],
     ) -> None:
         """Train success rate prediction model.
 
@@ -618,7 +617,6 @@ class PerformancePredictor:
             training_data: List of training examples
         """
         from sklearn.ensemble import RandomForestRegressor
-        from sklearn.preprocessing import StandardScaler
 
         self._train_model(
             metric_name="success_rate",
@@ -630,9 +628,9 @@ class PerformancePredictor:
     def _train_model(
         self,
         metric_name: str,
-        training_data: List[Dict[str, Any]],
+        training_data: list[dict[str, Any]],
         model_class: Any,
-        model_params: Dict[str, Any],
+        model_params: dict[str, Any],
     ) -> None:
         """Train a prediction model.
 

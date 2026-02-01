@@ -22,7 +22,7 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional, cast
 
 from victor.agent.conversation_controller import ConversationController, ContextMetrics
 from victor.agent.protocols import IContextOverflowHandler
@@ -133,7 +133,7 @@ class ContextOverflowHandler(IContextOverflowHandler):
     def get_memory_context(
         self,
         max_tokens: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get memory context with optional token limit.
 
         Args:
@@ -154,7 +154,7 @@ class ContextOverflowHandler(IContextOverflowHandler):
 
         # Build context within character limit
         # Prioritize recent messages by iterating in reverse
-        context: List[Dict[str, Any]] = []
+        context: list[dict[str, Any]] = []
         total_chars = 0
 
         for message in reversed(messages):

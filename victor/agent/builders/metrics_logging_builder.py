@@ -19,7 +19,7 @@ Part of HIGH-005: Initialization Complexity reduction.
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.builders.base import FactoryAwareBuilder
 
@@ -42,10 +42,10 @@ class MetricsLoggingBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> dict[str, Any]:  # type: ignore[override]
         """Build metrics and logging components and attach them to orchestrator."""
         factory = self._ensure_factory()
-        components: Dict[str, Any] = {}
+        components: dict[str, Any] = {}
 
         # Analytics - usage logger with DI support (via factory)
         orchestrator.usage_logger = factory.create_usage_logger()

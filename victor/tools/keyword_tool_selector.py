@@ -24,7 +24,7 @@ implementation of IToolSelector protocol.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.providers.base import ToolDefinition
 from victor.protocols.tool_selector import ToolSelectionStrategy
@@ -60,7 +60,7 @@ class KeywordToolSelector:
         conversation_state: Optional["ConversationStateMachine"] = None,
         model: str = "",
         provider_name: str = "",
-        enabled_tools: Optional[Set[str]] = None,
+        enabled_tools: Optional[set[str]] = None,
     ):
         """Initialize keyword-based tool selector.
 
@@ -78,13 +78,13 @@ class KeywordToolSelector:
         self._enabled_tools = enabled_tools
 
         # Cache for core tools
-        self._core_tools_cache: Optional[Set[str]] = None
-        self._core_readonly_cache: Optional[Set[str]] = None
+        self._core_tools_cache: Optional[set[str]] = None
+        self._core_readonly_cache: Optional[set[str]] = None
 
         # Maximum tools to return as fallback when stage pruning removes everything
         self.fallback_max_tools = 10
 
-    def set_enabled_tools(self, tools: Set[str]) -> None:
+    def set_enabled_tools(self, tools: set[str]) -> None:
         """Set the enabled tools filter for this selector.
 
         This allows the orchestrator to update the enabled tools filter
@@ -117,7 +117,7 @@ class KeywordToolSelector:
         self,
         prompt: str,
         context: "ToolSelectionContext",
-    ) -> List[ToolDefinition]:
+    ) -> list[ToolDefinition]:
         """Select tools using keyword-based category matching.
 
         If enabled_tools filter is set (from vertical), returns all enabled tools.
@@ -138,8 +138,8 @@ class KeywordToolSelector:
         all_tools = list(self.tools.list_tools())
 
         # Start with planned tools if provided
-        selected_tools: List[ToolDefinition] = []
-        existing_names: Set[str] = set()
+        selected_tools: list[ToolDefinition] = []
+        existing_names: set[str] = set()
 
         if context.planned_tools:
             # Convert planned tool names to ToolDefinition objects
@@ -255,7 +255,7 @@ class KeywordToolSelector:
         self,
         tool_name: str,
         success: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record tool execution (no-op for keyword selector).
 
@@ -271,8 +271,8 @@ class KeywordToolSelector:
     def prioritize_by_stage(
         self,
         user_message: str,
-        tools: Optional[List["ToolDefinition"]],
-    ) -> Optional[List["ToolDefinition"]]:
+        tools: Optional[list["ToolDefinition"]],
+    ) -> Optional[list["ToolDefinition"]]:
         """Stage-aware pruning of tool list to keep it focused per step.
 
         Note: KeywordToolSelector returns tools as-is since stage-based
@@ -363,7 +363,7 @@ class KeywordToolSelector:
         self,
         prompt: str,
         context: "ToolSelectionContext",
-    ) -> Optional[List[ToolDefinition]]:
+    ) -> Optional[list[ToolDefinition]]:
         """Try to get cached tool selection result.
 
         Args:
@@ -420,7 +420,7 @@ class KeywordToolSelector:
     def _store_selection_in_cache(
         self,
         prompt: str,
-        tools: List[ToolDefinition],
+        tools: list[ToolDefinition],
         context: "ToolSelectionContext",
     ) -> None:
         """Store tool selection result in cache.
@@ -482,7 +482,7 @@ class KeywordToolSelector:
         config_str = f"enabled:{enabled_hash}:model:{self.model}"
         return hashlib.sha256(config_str.encode()).hexdigest()[:16]
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache performance statistics.
 
         Returns:
@@ -525,7 +525,7 @@ class KeywordToolSelector:
     # Helper Methods (extracted from ToolSelector)
     # =========================================================================
 
-    def _get_stage_core_tools(self, stage: Optional["ConversationStage"]) -> Set[str]:
+    def _get_stage_core_tools(self, stage: Optional["ConversationStage"]) -> set[str]:
         """Choose core set based on stage (safe for exploration/analysis).
 
         Args:
@@ -548,7 +548,7 @@ class KeywordToolSelector:
             return self._get_core_readonly_cached()
         return self._get_core_tools_cached()
 
-    def _get_core_tools_cached(self) -> Set[str]:
+    def _get_core_tools_cached(self) -> set[str]:
         """Get critical tools with caching.
 
         Returns:
@@ -560,7 +560,7 @@ class KeywordToolSelector:
             self._core_tools_cache = get_critical_tools(self.tools)
         return self._core_tools_cache.copy()
 
-    def _get_core_readonly_cached(self) -> Set[str]:
+    def _get_core_readonly_cached(self) -> set[str]:
         """Get core read-only tools with caching.
 
         Returns:
@@ -635,8 +635,8 @@ class KeywordToolSelector:
         return any(kw in prompt_lower for kw in write_keywords)
 
     def _filter_tools_for_stage(
-        self, tools: List[ToolDefinition], stage: Optional["ConversationStage"], prompt: str = ""
-    ) -> List[ToolDefinition]:
+        self, tools: list[ToolDefinition], stage: Optional["ConversationStage"], prompt: str = ""
+    ) -> list[ToolDefinition]:
         """Remove write/execute tools during exploration/analysis stages.
 
         Note: Vertical core tools would be preserved if tiered config was available,
@@ -676,7 +676,7 @@ class KeywordToolSelector:
 
         # Fallback to core readonly if filtering removed everything
         readonly_core = self._get_stage_core_tools(stage)
-        fallback: List[ToolDefinition] = []
+        fallback: list[ToolDefinition] = []
         for tool in tools:
             if tool.name in readonly_core:
                 fallback.append(tool)

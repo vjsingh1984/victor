@@ -28,11 +28,8 @@ Test Coverage:
 - Statistics tracking
 """
 
-import asyncio
-import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
-from typing import Any, Dict, List, Optional, Tuple
 
 from victor.agent.coordinators.tool_execution_coordinator import (
     ToolExecutionCoordinator,

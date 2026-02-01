@@ -20,7 +20,7 @@ VerticalExtensionLoader.
 
 import os
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from victor.core.verticals.lazy_extensions import (
     ExtensionLoadTrigger,

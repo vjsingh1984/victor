@@ -61,7 +61,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.session_state_manager import SessionStateManager
@@ -90,7 +90,7 @@ class SessionInfo:
     tool_calls_used: int = 0
     is_active: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "session_id": self.session_id,
@@ -102,7 +102,7 @@ class SessionInfo:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SessionInfo":
+    def from_dict(cls, data: dict[str, Any]) -> "SessionInfo":
         """Create from dictionary."""
         return cls(
             session_id=data.get("session_id", ""),
@@ -134,7 +134,7 @@ class SessionCostSummary:
     input_tokens: int = 0
     output_tokens: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "total_cost": self.total_cost,
@@ -355,7 +355,7 @@ class SessionCoordinator:
         """
         return self._current_session
 
-    def get_session_stats(self) -> Dict[str, Any]:
+    def get_session_stats(self) -> dict[str, Any]:
         """Get comprehensive session statistics.
 
         Returns:
@@ -369,7 +369,7 @@ class SessionCoordinator:
             - is_active: Whether session is active
             - token_usage: Token usage breakdown
         """
-        base_stats: Dict[str, Any] = {
+        base_stats: dict[str, Any] = {
             "enabled": bool(self._memory_manager),
             "session_id": self.session_id,
             "memory_session_id": self._memory_session_id,
@@ -392,7 +392,7 @@ class SessionCoordinator:
 
         return base_stats
 
-    def get_session_summary(self) -> Dict[str, Any]:
+    def get_session_summary(self) -> dict[str, Any]:
         """Get a summary of the current session.
 
         Returns:
@@ -403,14 +403,14 @@ class SessionCoordinator:
         summary["memory_session_id"] = self._memory_session_id
         return summary
 
-    def get_session_cost_summary(self) -> Dict[str, Any]:
+    def get_session_cost_summary(self) -> dict[str, Any]:
         """Get session cost summary.
 
         Returns:
             Dictionary with session cost statistics
         """
         if self._cost_tracker and hasattr(self._cost_tracker, "get_summary"):
-            summary: Dict[str, Any] = self._cost_tracker.get_summary()
+            summary: dict[str, Any] = self._cost_tracker.get_summary()
             return summary
         return {}
 
@@ -432,7 +432,7 @@ class SessionCoordinator:
     async def save_checkpoint(
         self,
         description: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
     ) -> Optional[str]:
         """Save a checkpoint of current session state.
 
@@ -516,7 +516,7 @@ class SessionCoordinator:
             logger.debug(f"Auto-checkpoint failed (serialization error): {e}")
             return None
 
-    def _get_checkpoint_state(self) -> Dict[str, Any]:
+    def _get_checkpoint_state(self) -> dict[str, Any]:
         """Build a dictionary representing current session state for checkpointing."""
         return {
             "session_id": self.session_id,
@@ -527,7 +527,7 @@ class SessionCoordinator:
             "executed_tools": list(self._session_state.executed_tools),
         }
 
-    def _apply_checkpoint_state(self, state: Dict[str, Any]) -> None:
+    def _apply_checkpoint_state(self, state: dict[str, Any]) -> None:
         """Apply a checkpoint state to restore the session.
 
         Args:
@@ -554,7 +554,7 @@ class SessionCoordinator:
     # Recent Sessions
     # ========================================================================
 
-    def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_sessions(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent conversation sessions for recovery.
 
         Args:
@@ -588,7 +588,7 @@ class SessionCoordinator:
     # Token Usage
     # ========================================================================
 
-    def get_token_usage(self) -> Dict[str, int]:
+    def get_token_usage(self) -> dict[str, int]:
         """Get cumulative token usage.
 
         Returns:
@@ -629,8 +629,8 @@ class SessionCoordinator:
     def get_memory_context(
         self,
         max_tokens: Optional[int] = None,
-        messages: Optional[List[Any]] = None,
-    ) -> List[Dict[str, Any]]:
+        messages: Optional[list[Any]] = None,
+    ) -> list[dict[str, Any]]:
         """Get token-aware context messages from memory manager.
 
         Args:
@@ -644,14 +644,14 @@ class SessionCoordinator:
             # Fall back to provided messages
             if messages:
                 # Convert Message objects to dict if needed
-                result_messages: List[Dict[str, Any]] = [
+                result_messages: list[dict[str, Any]] = [
                     msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages
                 ]
                 return result_messages
             return []
 
         try:
-            memory_messages: List[Dict[str, Any]] = self._memory_manager.get_context_messages(
+            memory_messages: list[dict[str, Any]] = self._memory_manager.get_context_messages(
                 session_id=self._memory_session_id,
                 max_tokens=max_tokens,
             )
@@ -659,7 +659,7 @@ class SessionCoordinator:
         except Exception as e:
             logger.warning(f"Failed to get memory context: {e}, using fallback")
             if messages:
-                fallback_messages: List[Dict[str, Any]] = [
+                fallback_messages: list[dict[str, Any]] = [
                     msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages
                 ]
                 return fallback_messages

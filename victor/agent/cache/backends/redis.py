@@ -76,7 +76,8 @@ import asyncio
 import json
 import logging
 import pickle
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Optional
+from collections.abc import Awaitable, Callable
 
 try:
     import redis.asyncio as aioredis
@@ -192,7 +193,6 @@ class RedisCacheBackend(ICacheBackend):
 
         try:
             # Create Redis connection with connection pooling
-            from redis.asyncio.connection import Connection
 
             self._redis = await aioredis.from_url(
                 self._redis_url,
@@ -399,7 +399,7 @@ class RedisCacheBackend(ICacheBackend):
             logger.error(f"Error clearing namespace {namespace}: {e}")
             return 0
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

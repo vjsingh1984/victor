@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 # =============================================================================
@@ -83,11 +83,11 @@ class TaskRequirement:
     task_type: str  # agent, compute, condition, transform, parallel
     role: Optional[str] = None
     goal: Optional[str] = None
-    tools: List[str] = field(default_factory=list)
-    dependencies: List[str] = field(default_factory=list)
+    tools: list[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
     tool_budget: Optional[int] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "id": self.id,
@@ -129,7 +129,7 @@ class InputRequirement:
     required: bool = True
     validation: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -166,7 +166,7 @@ class OutputRequirement:
     destination: str  # file, stdout, api, task:{task_id}
     format: str  # markdown, json, code, plain_text
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -200,13 +200,13 @@ class FunctionalRequirements:
         )
     """
 
-    tasks: List[TaskRequirement]
-    tools: Dict[str, List[str]] = field(default_factory=lambda: {})
-    inputs: List[InputRequirement] = field(default_factory=list)
-    outputs: List[OutputRequirement] = field(default_factory=list)
-    success_criteria: List[str] = field(default_factory=list)
+    tasks: list[TaskRequirement]
+    tools: dict[str, list[str]] = field(default_factory=lambda: {})
+    inputs: list[InputRequirement] = field(default_factory=list)
+    outputs: list[OutputRequirement] = field(default_factory=list)
+    success_criteria: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "tasks": [task.to_dict() for task in self.tasks],
@@ -251,7 +251,7 @@ class BranchRequirement:
     false_branch: str
     condition_type: str  # quality_threshold, error_check, user_approval, data_check
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "condition_id": self.condition_id,
@@ -288,7 +288,7 @@ class LoopRequirement:
     exit_condition: str
     max_iterations: int = 3
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "loop_id": self.loop_id,
@@ -321,12 +321,12 @@ class StructuralRequirements:
     """
 
     execution_order: str  # sequential, parallel, mixed, conditional
-    dependencies: Dict[str, List[str]] = field(default_factory=dict)
-    branches: List[BranchRequirement] = field(default_factory=list)
-    loops: List[LoopRequirement] = field(default_factory=list)
-    joins: Dict[str, str] = field(default_factory=dict)
+    dependencies: dict[str, list[str]] = field(default_factory=dict)
+    branches: list[BranchRequirement] = field(default_factory=list)
+    loops: list[LoopRequirement] = field(default_factory=list)
+    joins: dict[str, str] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "execution_order": self.execution_order,
@@ -367,10 +367,10 @@ class TaskQualityRequirements:
     task_id: str
     timeout_seconds: Optional[int] = None
     tool_budget: Optional[int] = None
-    allowed_tools: List[str] = field(default_factory=list)
+    allowed_tools: list[str] = field(default_factory=list)
     quality_threshold: Optional[float] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "task_id": self.task_id,
@@ -411,9 +411,9 @@ class QualityRequirements:
     max_tool_calls: Optional[int] = None
     max_tokens: Optional[int] = None
     retry_policy: str = "retry"  # retry, fail_fast, continue, fallback
-    task_requirements: List[TaskQualityRequirements] = field(default_factory=list)
+    task_requirements: list[TaskQualityRequirements] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "max_duration_seconds": self.max_duration_seconds,
@@ -459,7 +459,7 @@ class ProjectContext:
     testing_framework: Optional[str] = None
     build_system: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "repo_path": self.repo_path,
@@ -495,10 +495,10 @@ class ContextRequirements:
     vertical: str  # coding, devops, research, rag, dataanalysis, benchmark
     subdomain: Optional[str] = None
     environment: str = "local"  # local, cloud, sandbox
-    user_preferences: Dict[str, Any] = field(default_factory=dict)
+    user_preferences: dict[str, Any] = field(default_factory=dict)
     project_context: Optional[ProjectContext] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "vertical": self.vertical,
@@ -544,7 +544,7 @@ class ExtractionMetadata:
     resolution_strategy: str = "interactive"
     confidence: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "extraction_method": self.extraction_method,
@@ -589,10 +589,10 @@ class WorkflowRequirements:
     structural: StructuralRequirements
     quality: QualityRequirements
     context: ContextRequirements
-    confidence_scores: Dict[str, float] = field(default_factory=dict)
+    confidence_scores: dict[str, float] = field(default_factory=dict)
     metadata: Optional[ExtractionMetadata] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
@@ -659,7 +659,7 @@ class RequirementValidationError:
     severity: str  # critical, error, warning, info
     suggestion: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "field": self.field,
@@ -694,12 +694,12 @@ class RequirementValidationResult:
     """
 
     is_valid: bool
-    errors: List[RequirementValidationError]
-    warnings: List[RequirementValidationError]
-    recommendations: List[str]
+    errors: list[RequirementValidationError]
+    warnings: list[RequirementValidationError]
+    recommendations: list[str]
     score: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API responses."""
         return {
             "is_valid": self.is_valid,
@@ -740,4 +740,4 @@ class Ambiguity:
     message: str
     suggestion: str
     field: str
-    options: Optional[List[str]] = None
+    options: Optional[list[str]] = None

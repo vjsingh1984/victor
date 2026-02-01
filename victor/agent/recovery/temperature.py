@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.agent.recovery.protocols import (
     FailureType,
@@ -49,7 +49,7 @@ class TemperatureState:
     initial_temperature: float
     current_temperature: float
     adjustments_made: int = 0
-    failure_history: List[FailureType] = field(default_factory=list)
+    failure_history: list[FailureType] = field(default_factory=list)
 
     def record_adjustment(
         self,
@@ -75,7 +75,7 @@ class ProgressiveTemperatureAdjuster:
     """
 
     # Default policies per failure type
-    DEFAULT_POLICIES: Dict[FailureType, TemperaturePolicy] = {
+    DEFAULT_POLICIES: dict[FailureType, TemperaturePolicy] = {
         FailureType.EMPTY_RESPONSE: TemperaturePolicy(
             failure_type=FailureType.EMPTY_RESPONSE,
             base_adjustment=0.15,  # Increase to encourage output
@@ -114,7 +114,7 @@ class ProgressiveTemperatureAdjuster:
     }
 
     # Model-specific temperature ranges (learned over time)
-    MODEL_TEMPERATURE_RANGES: Dict[str, Tuple[float, float]] = {
+    MODEL_TEMPERATURE_RANGES: dict[str, tuple[float, float]] = {
         # (min_effective, max_effective)
         "qwen": (0.3, 0.9),
         "llama": (0.2, 0.8),
@@ -127,7 +127,7 @@ class ProgressiveTemperatureAdjuster:
     def __init__(
         self,
         q_store: Optional[QLearningStore] = None,
-        custom_policies: Optional[Dict[FailureType, TemperaturePolicy]] = None,
+        custom_policies: Optional[dict[FailureType, TemperaturePolicy]] = None,
     ):
         self._q_store = q_store
         self._policies = {**self.DEFAULT_POLICIES}
@@ -135,17 +135,17 @@ class ProgressiveTemperatureAdjuster:
             self._policies.update(custom_policies)
 
         # Track per-model learned optimal temperatures
-        self._learned_optima: Dict[str, Dict[str, float]] = {}
+        self._learned_optima: dict[str, dict[str, float]] = {}
         # Format: {model_pattern: {failure_type_name: optimal_temp}}
 
         # Session state
-        self._sessions: Dict[str, TemperatureState] = {}
+        self._sessions: dict[str, TemperatureState] = {}
 
     def get_adjusted_temperature(
         self,
         context: RecoveryContext,
         session_id: Optional[str] = None,
-    ) -> Tuple[float, str]:
+    ) -> tuple[float, str]:
         """Calculate adjusted temperature for recovery.
 
         Args:
@@ -212,7 +212,7 @@ class ProgressiveTemperatureAdjuster:
 
         return new_temp, reason
 
-    def _get_model_bounds(self, model_name: str) -> Tuple[float, float]:
+    def _get_model_bounds(self, model_name: str) -> tuple[float, float]:
         """Get effective temperature bounds for a model."""
         for pattern, bounds in self.MODEL_TEMPERATURE_RANGES.items():
             if pattern in model_name:
@@ -312,7 +312,7 @@ class ProgressiveTemperatureAdjuster:
         if session_id in self._sessions:
             del self._sessions[session_id]
 
-    def get_session_stats(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_session_stats(self, session_id: str) -> Optional[dict[str, Any]]:
         """Get statistics for a session."""
         if session_id not in self._sessions:
             return None
@@ -325,6 +325,6 @@ class ProgressiveTemperatureAdjuster:
             "failure_types": [ft.name for ft in session.failure_history],
         }
 
-    def get_learned_optima(self) -> Dict[str, Dict[str, float]]:
+    def get_learned_optima(self) -> dict[str, dict[str, float]]:
         """Get all learned optimal temperatures."""
         return dict(self._learned_optima)

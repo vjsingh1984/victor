@@ -45,14 +45,15 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
 
 if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +67,11 @@ def configure_data_privacy(
     orchestrator: Any,
     *,
     anonymize_pii: bool = True,
-    pii_columns: Optional[List[str]] = None,
+    pii_columns: Optional[list[str]] = None,
     hash_identifiers: bool = True,
     log_access: bool = True,
     detect_secrets: bool = True,
-    secret_patterns: Optional[List[str]] = None,
+    secret_patterns: Optional[list[str]] = None,
 ) -> None:
     """Configure privacy and PII handling for the orchestrator.
 
@@ -113,7 +114,7 @@ def configure_data_privacy(
     )
 
 
-def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
+def get_privacy_config(orchestrator: Any) -> dict[str, Any]:
     """Get current privacy configuration.
 
     Args:
@@ -136,7 +137,7 @@ def get_privacy_config(orchestrator: Any) -> Dict[str, Any]:
     )
 
 
-def _get_default_secret_patterns() -> List[str]:
+def _get_default_secret_patterns() -> list[str]:
     """Get default regex patterns for secret detection.
 
     Returns:
@@ -159,7 +160,7 @@ def configure_secrets_masking(
     replacement: str = "[REDACTED]",
     mask_in_arguments: bool = True,
     mask_in_output: bool = True,
-    custom_patterns: Optional[List[str]] = None,
+    custom_patterns: Optional[list[str]] = None,
 ) -> None:
     """Configure secrets masking for tool calls and results.
 
@@ -191,7 +192,7 @@ def configure_secrets_masking(
     logger.info(f"Configured secrets masking: enabled={enabled}, replacement={replacement}")
 
 
-def get_secrets_masking_config(orchestrator: Any) -> Dict[str, Any]:
+def get_secrets_masking_config(orchestrator: Any) -> dict[str, Any]:
     """Get current secrets masking configuration.
 
     Args:
@@ -252,7 +253,7 @@ def configure_audit_logging(
     logger.info(f"Configured audit logging: enabled={enabled}, data_access={log_data_access}")
 
 
-def get_audit_logging_config(orchestrator: Any) -> Dict[str, Any]:
+def get_audit_logging_config(orchestrator: Any) -> dict[str, Any]:
     """Get current audit logging configuration.
 
     Args:
@@ -385,15 +386,15 @@ class PrivacyCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
 
     def __init__(self) -> None:
         """Initialize the privacy capability provider."""
-        self._applied: Set[str] = set()
+        self._applied: set[str] = set()
         # Map capability names to their handler functions
-        self._capabilities: Dict[str, Callable[..., None]] = {
+        self._capabilities: dict[str, Callable[..., None]] = {
             "data_privacy": configure_data_privacy,
             "secrets_masking": configure_secrets_masking,
             "audit_logging": configure_audit_logging,
         }
         # Capability metadata for discovery
-        self._metadata: Dict[str, CapabilityMetadata] = {
+        self._metadata: dict[str, CapabilityMetadata] = {
             "data_privacy": CapabilityMetadata(
                 name="data_privacy",
                 description="Framework-level privacy and PII management",
@@ -416,7 +417,7 @@ class PrivacyCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
             ),
         }
 
-    def get_capabilities(self) -> Dict[str, Callable[..., None]]:
+    def get_capabilities(self) -> dict[str, Callable[..., None]]:
         """Return all registered capabilities.
 
         Returns:
@@ -424,7 +425,7 @@ class PrivacyCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
         """
         return self._capabilities.copy()
 
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+    def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
         """Return metadata for all registered capabilities.
 
         Returns:
@@ -489,7 +490,7 @@ class PrivacyCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
         self.apply_secrets_masking(orchestrator)
         self.apply_audit_logging(orchestrator)
 
-    def get_applied(self) -> Set[str]:
+    def get_applied(self) -> set[str]:
         """Get set of applied capability names.
 
         Returns:
@@ -503,7 +504,7 @@ class PrivacyCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
 # =============================================================================
 
 
-CAPABILITIES: List[CapabilityEntry] = [
+CAPABILITIES: list[CapabilityEntry] = [
     CapabilityEntry(
         capability=OrchestratorCapability(
             name="framework_privacy",
@@ -548,7 +549,7 @@ CAPABILITIES: List[CapabilityEntry] = [
 # =============================================================================
 
 
-def get_framework_privacy_capabilities() -> List[CapabilityEntry]:
+def get_framework_privacy_capabilities() -> list[CapabilityEntry]:
     """Get all framework privacy capability entries.
 
     Returns:

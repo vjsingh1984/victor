@@ -57,7 +57,7 @@ import ast
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.core.errors import FileError, ValidationError
 
@@ -109,10 +109,10 @@ class EnrichedSymbol:
     parent_symbol: Optional[str] = None
     # Tier 1/2 enrichments (from LSP or native AST)
     return_type: Optional[str] = None
-    parameters: List[str] = field(default_factory=list)
+    parameters: list[str] = field(default_factory=list)
     visibility: Optional[str] = None  # public, private, protected
     is_async: bool = False
-    decorators: List[str] = field(default_factory=list)
+    decorators: list[str] = field(default_factory=list)
     # Source tier for debugging/analytics
     source_tier: Optional[LanguageTier] = None
 
@@ -209,7 +209,7 @@ class UnifiedSymbolExtractor:
         file_path: Path,
         language: Optional[str] = None,
         content: Optional[str] = None,
-    ) -> List[EnrichedSymbol]:
+    ) -> list[EnrichedSymbol]:
         """Extract symbols using optimal strategy for language tier.
 
         This is the main entry point. It:
@@ -309,7 +309,7 @@ class UnifiedSymbolExtractor:
         file_path: Path,
         language: Optional[str] = None,
         content: Optional[str] = None,
-    ) -> List[EnrichedSymbol]:
+    ) -> list[EnrichedSymbol]:
         """Synchronous symbol extraction (tree-sitter + native AST only).
 
         Use this for non-async contexts. LSP enrichment is skipped.
@@ -388,9 +388,9 @@ class UnifiedSymbolExtractor:
     def _enrich_with_native_ast(
         self,
         content: str,
-        symbols: List[EnrichedSymbol],
+        symbols: list[EnrichedSymbol],
         language: str,
-    ) -> List[EnrichedSymbol]:
+    ) -> list[EnrichedSymbol]:
         """Enrich symbols with native AST info (Python only currently).
 
         Python's ast module provides:
@@ -422,7 +422,7 @@ class UnifiedSymbolExtractor:
 
         return symbols
 
-    def _extract_python_ast_info(self, tree: ast.AST) -> Dict[tuple[str, int], Dict[str, Any]]:
+    def _extract_python_ast_info(self, tree: ast.AST) -> dict[tuple[str, int], dict[str, Any]]:
         """Extract detailed info from Python AST.
 
         Returns:
@@ -433,7 +433,7 @@ class UnifiedSymbolExtractor:
             - decorators: List[str]
             - docstring: Optional[str]
         """
-        info: Dict[tuple[str, int], Dict[str, Any]] = {}
+        info: dict[tuple[str, int], dict[str, Any]] = {}
 
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -458,7 +458,7 @@ class UnifiedSymbolExtractor:
 
         return info
 
-    def _extract_parameters(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> List[str]:
+    def _extract_parameters(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
         """Extract parameter names with optional type annotations."""
         params = []
         for arg in node.args.args:
@@ -501,9 +501,9 @@ class UnifiedSymbolExtractor:
         self,
         file_path: Path,
         content: str,
-        symbols: List[EnrichedSymbol],
+        symbols: list[EnrichedSymbol],
         language: str,
-    ) -> List[EnrichedSymbol]:
+    ) -> list[EnrichedSymbol]:
         """Enrich symbols with LSP hover info for types.
 
         LSP provides:
@@ -544,7 +544,7 @@ class UnifiedSymbolExtractor:
 
         return symbols
 
-    def _parse_hover_contents(self, contents: str) -> Dict[str, Optional[str]]:
+    def _parse_hover_contents(self, contents: str) -> dict[str, Optional[str]]:
         """Parse signature and type info from LSP hover contents.
 
         LSP hover format varies by language server:
@@ -552,7 +552,7 @@ class UnifiedSymbolExtractor:
         - TypeScript (tsserver): "(method) Class.foo(x: number): string"
         - Go (gopls): "func (r *Receiver) Method(x int) string"
         """
-        result: Dict[str, Optional[str]] = {
+        result: dict[str, Optional[str]] = {
             "signature": None,
             "return_type": None,
             "docstring": None,

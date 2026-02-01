@@ -70,9 +70,10 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
+from collections.abc import Callable
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.types import AgentMessage, MemberResult
@@ -140,7 +141,7 @@ class DynamicFormation(BaseFormationStrategy):
     def __init__(
         self,
         initial_formation: str = "parallel",
-        switching_rules: Optional[Dict[str, str]] = None,
+        switching_rules: Optional[dict[str, str]] = None,
         max_switches: int = 5,
         enable_auto_detection: bool = True,
     ):
@@ -161,10 +162,10 @@ class DynamicFormation(BaseFormationStrategy):
         self._current_formation: Optional[BaseFormationStrategy] = None
         self._current_phase = FormationPhase.EXPLORATION
         self._switches_made = 0
-        self._formation_history: List[Dict[str, Any]] = []
-        self._phase_transitions: List[Dict[str, Any]] = []
+        self._formation_history: list[dict[str, Any]] = []
+        self._phase_transitions: list[dict[str, Any]] = []
 
-    def _default_switching_rules(self) -> Dict[str, str]:
+    def _default_switching_rules(self) -> dict[str, str]:
         """Get default switching rules.
 
         Returns:
@@ -188,10 +189,10 @@ class DynamicFormation(BaseFormationStrategy):
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute task with dynamic formation switching.
 
         Args:
@@ -322,7 +323,7 @@ class DynamicFormation(BaseFormationStrategy):
         instance = formation_class()
         return cast("BaseFormationStrategy", instance)
 
-    def _detect_triggers(self, results: List[MemberResult], context: TeamContext) -> List[str]:
+    def _detect_triggers(self, results: list[MemberResult], context: TeamContext) -> list[str]:
         """Detect triggers for formation switching.
 
         Args:
@@ -332,7 +333,7 @@ class DynamicFormation(BaseFormationStrategy):
         Returns:
             List of trigger names detected
         """
-        triggers: List[str] = []
+        triggers: list[str] = []
 
         if not self.enable_auto_detection:
             return triggers
@@ -359,7 +360,7 @@ class DynamicFormation(BaseFormationStrategy):
 
         return triggers
 
-    def _detect_dependencies(self, results: List[MemberResult], context: TeamContext) -> bool:
+    def _detect_dependencies(self, results: list[MemberResult], context: TeamContext) -> bool:
         """Detect if agents have dependencies.
 
         Args:
@@ -385,7 +386,7 @@ class DynamicFormation(BaseFormationStrategy):
 
         return False
 
-    def _detect_conflicts(self, results: List[MemberResult]) -> bool:
+    def _detect_conflicts(self, results: list[MemberResult]) -> bool:
         """Detect if agents have conflicts.
 
         Args:
@@ -406,7 +407,7 @@ class DynamicFormation(BaseFormationStrategy):
 
         return False
 
-    def _detect_consensus_need(self, results: List[MemberResult], context: TeamContext) -> bool:
+    def _detect_consensus_need(self, results: list[MemberResult], context: TeamContext) -> bool:
         """Detect if consensus is needed.
 
         Args:
@@ -472,7 +473,7 @@ class DynamicFormation(BaseFormationStrategy):
             f"(trigger: {trigger}, switches: {self._switches_made}/{self.max_switches})"
         )
 
-    def _update_phase(self, results: List[MemberResult], context: TeamContext) -> None:
+    def _update_phase(self, results: list[MemberResult], context: TeamContext) -> None:
         """Update execution phase based on progress.
 
         Args:
@@ -491,7 +492,7 @@ class DynamicFormation(BaseFormationStrategy):
             {"timestamp": time.time(), "phase": self._current_phase.value}
         )
 
-    def _enhance_results(self, results: List[MemberResult], duration: float) -> List[MemberResult]:
+    def _enhance_results(self, results: list[MemberResult], duration: float) -> list[MemberResult]:
         """Enhance results with dynamic formation metadata.
 
         Args:
@@ -574,7 +575,7 @@ class TaskCharacteristics:
     dependency_level: float = 0.5
     collaboration_needed: float = 0.5
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         """Convert to dictionary."""
         return {
             "complexity": self.complexity,
@@ -625,10 +626,10 @@ class AdaptiveFormation(BaseFormationStrategy):
 
     def __init__(
         self,
-        criteria: Optional[List[str]] = None,
+        criteria: Optional[list[str]] = None,
         default_formation: str = "parallel",
         fallback_formation: str = "sequential",
-        scoring_weights: Optional[Dict[str, Dict[str, float]]] = None,
+        scoring_weights: Optional[dict[str, dict[str, float]]] = None,
         use_ml: bool = False,
         model_path: Optional[str] = None,
         enable_online_learning: bool = False,
@@ -668,7 +669,7 @@ class AdaptiveFormation(BaseFormationStrategy):
                 logger.warning(f"Failed to load ML model: {e}, using heuristic scoring")
                 self.use_ml = False
 
-    def _default_scoring_weights(self) -> Dict[str, Dict[str, float]]:
+    def _default_scoring_weights(self) -> dict[str, dict[str, float]]:
         """Get default scoring weights for formations.
 
         Returns:
@@ -714,10 +715,10 @@ class AdaptiveFormation(BaseFormationStrategy):
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute task with adaptively selected formation.
 
         Args:
@@ -842,7 +843,7 @@ class AdaptiveFormation(BaseFormationStrategy):
                 ]
 
     async def _analyze_task(
-        self, task: AgentMessage, context: TeamContext, agents: List[Any]
+        self, task: AgentMessage, context: TeamContext, agents: list[Any]
     ) -> TaskCharacteristics:
         """Analyze task to extract characteristics.
 
@@ -938,7 +939,7 @@ class AdaptiveFormation(BaseFormationStrategy):
         self,
         task: AgentMessage,
         context: TeamContext,
-        agents: List[Any],
+        agents: list[Any],
         heuristic_char: TaskCharacteristics,
     ) -> TaskCharacteristics:
         """Use ML model for task analysis if available.
@@ -964,7 +965,7 @@ class AdaptiveFormation(BaseFormationStrategy):
 
         return heuristic_char
 
-    def _score_formations(self, characteristics: TaskCharacteristics) -> Dict[str, float]:
+    def _score_formations(self, characteristics: TaskCharacteristics) -> dict[str, float]:
         """Score each formation based on task characteristics.
 
         Args:
@@ -1027,15 +1028,15 @@ class AdaptiveFormation(BaseFormationStrategy):
 
     def _enhance_results(
         self,
-        results: List[MemberResult],
+        results: list[MemberResult],
         selected_formation: str,
         characteristics: TaskCharacteristics,
-        scores: Dict[str, float],
+        scores: dict[str, float],
         duration: float,
         error: Optional[str] = None,
         fallback_used: bool = False,
         selection_method: str = "heuristic",
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Enhance results with adaptive selection metadata.
 
         Args:
@@ -1117,7 +1118,7 @@ class HybridPhase:
     goal: str
     duration_budget: Optional[float] = None
     iteration_limit: Optional[int] = None
-    completion_criteria: Optional[Callable[[List[MemberResult]], bool]] = None
+    completion_criteria: Optional[Callable[[list[MemberResult]], bool]] = None
 
 
 class HybridFormation(BaseFormationStrategy):
@@ -1171,7 +1172,7 @@ class HybridFormation(BaseFormationStrategy):
 
     def __init__(
         self,
-        phases: List[HybridPhase],
+        phases: list[HybridPhase],
         enable_phase_logging: bool = True,
         stop_on_first_failure: bool = False,
     ):
@@ -1188,10 +1189,10 @@ class HybridFormation(BaseFormationStrategy):
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute task through multiple phases.
 
         Args:
@@ -1258,8 +1259,8 @@ class HybridFormation(BaseFormationStrategy):
             # Return final results with metadata
             from typing import cast
 
-            final_results: List[MemberResult] = (
-                cast(List[MemberResult], phase_results[-1]["results"]) if phase_results else []
+            final_results: list[MemberResult] = (
+                cast(list[MemberResult], phase_results[-1]["results"]) if phase_results else []
             )
             return self._enhance_results(
                 final_results,
@@ -1362,11 +1363,11 @@ Focus on achieving this phase's goal. The results will be used in subsequent pha
     async def _execute_phase(
         self,
         formation: BaseFormationStrategy,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
         phase: HybridPhase,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute a single phase.
 
         Args:
@@ -1413,11 +1414,11 @@ Focus on achieving this phase's goal. The results will be used in subsequent pha
 
     def _enhance_results(
         self,
-        results: List[MemberResult],
+        results: list[MemberResult],
         phases_completed: int,
-        phase_results: List[Dict[str, Any]],
+        phase_results: list[dict[str, Any]],
         total_duration: float,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Enhance results with hybrid formation metadata.
 
         Args:

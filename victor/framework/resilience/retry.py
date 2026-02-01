@@ -45,22 +45,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import random
 import time
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
 from functools import wraps
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     Optional,
-    Set,
-    Type,
     TypeVar,
     cast,
 )
+from collections.abc import Awaitable, Callable
 
 # Re-export core retry types (canonical source)
 from victor.core.retry import (
@@ -214,7 +208,7 @@ class RetryHandler:
             retry_cfg = self._config.retry_config
             if strategy_type == "exponential":
                 # Convert tuple to set of Exception types
-                non_retryable: Optional[Set[Type[Exception]]] = None
+                non_retryable: Optional[set[type[Exception]]] = None
                 if retry_cfg.non_retryable_exceptions:
                     # Filter to only Exception types (not BaseException)
                     non_retryable = set(
@@ -480,7 +474,7 @@ async def retry_with_backoff(
     max_delay: float = 60.0,
     exponential_base: float = 2.0,
     jitter: float = 0.1,
-    retryable_exceptions: Optional[Set[Type[Exception]]] = None,
+    retryable_exceptions: Optional[set[type[Exception]]] = None,
     **kwargs: Any,
 ) -> T:
     """Execute async function with exponential backoff retry.
@@ -540,7 +534,7 @@ def retry_with_backoff_sync(
     max_delay: float = 60.0,
     exponential_base: float = 2.0,
     jitter: float = 0.1,
-    retryable_exceptions: Optional[Set[Type[Exception]]] = None,
+    retryable_exceptions: Optional[set[type[Exception]]] = None,
     **kwargs: Any,
 ) -> T:
     """Execute sync function with exponential backoff retry.

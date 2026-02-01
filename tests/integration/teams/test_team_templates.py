@@ -26,10 +26,7 @@ from victor.workflows.team_templates import (
     register_template,
     list_templates,
     search_templates,
-    TaskComplexity,
-    VerticalType,
 )
-from victor.core.errors import ConfigurationError
 
 
 @pytest.fixture

@@ -35,7 +35,7 @@ import pickle
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import numpy as np
@@ -116,14 +116,14 @@ class EnrichedPrompt:
     system_prompt: str
     user_prompt: str
     category: PromptCategory
-    hints: List[str] = field(default_factory=list)
+    hints: list[str] = field(default_factory=list)
 
 
 # =============================================================================
 # PROMPT CORPUS - Comprehensive collection of categorized prompts
 # =============================================================================
 
-HUMANEVAL_CORPUS: List[CorpusEntry] = [
+HUMANEVAL_CORPUS: list[CorpusEntry] = [
     # HumanEval/0 - String grouping (STRING_MANIPULATION)
     CorpusEntry(
         prompt="Write a function that takes a string of nested parentheses and returns a list of separate balanced groups. Input: '( ) (( )) (( )( ))' returns ['()', '(())', '(()())']",
@@ -344,7 +344,7 @@ HUMANEVAL_CORPUS: List[CorpusEntry] = [
 ]
 
 # MBPP-style prompts
-MBPP_CORPUS: List[CorpusEntry] = [
+MBPP_CORPUS: list[CorpusEntry] = [
     CorpusEntry(
         prompt="Write a function to find the nth Fibonacci number.",
         category=PromptCategory.ALGORITHM_IMPLEMENTATION,
@@ -438,7 +438,7 @@ MBPP_CORPUS: List[CorpusEntry] = [
 ]
 
 # Real-world coding prompts
-REALWORLD_CORPUS: List[CorpusEntry] = [
+REALWORLD_CORPUS: list[CorpusEntry] = [
     # File I/O
     CorpusEntry(
         prompt="Write a function to read a CSV file and return a list of dictionaries.",
@@ -554,10 +554,10 @@ REALWORLD_CORPUS: List[CorpusEntry] = [
 ]
 
 # Combine all corpus entries (legacy - kept for backwards compatibility)
-_LEGACY_CORPUS: List[CorpusEntry] = HUMANEVAL_CORPUS + MBPP_CORPUS + REALWORLD_CORPUS
+_LEGACY_CORPUS: list[CorpusEntry] = HUMANEVAL_CORPUS + MBPP_CORPUS + REALWORLD_CORPUS
 
 
-def _build_extended_corpus() -> List[CorpusEntry]:
+def _build_extended_corpus() -> list[CorpusEntry]:
     """Build extended corpus from prompt_corpus_data module.
 
     Returns the full 1000+ entry corpus with realistic distribution:
@@ -597,7 +597,7 @@ def _build_extended_corpus() -> List[CorpusEntry]:
 
 
 # Full corpus - uses extended 1000+ entries if available
-FULL_CORPUS: List[CorpusEntry] = _build_extended_corpus()
+FULL_CORPUS: list[CorpusEntry] = _build_extended_corpus()
 
 
 # =============================================================================
@@ -605,7 +605,7 @@ FULL_CORPUS: List[CorpusEntry] = _build_extended_corpus()
 # =============================================================================
 
 # Simplified builder system using a mapping approach
-PROMPT_TEMPLATES: Dict[PromptCategory, Dict[str, Any]] = {
+PROMPT_TEMPLATES: dict[PromptCategory, dict[str, Any]] = {
     PromptCategory.FUNCTION_COMPLETION: {
         "system": """You are an expert programmer completing Python functions.
 
@@ -937,7 +937,7 @@ class PromptCorpusRegistry:
     def __init__(
         self,
         embedding_model: Optional[Any] = None,
-        corpus: Optional[List[CorpusEntry]] = None,
+        corpus: Optional[list[CorpusEntry]] = None,
         cache_embeddings: bool = True,
         cache_dir: Optional[Path] = None,
     ):
@@ -975,7 +975,7 @@ class PromptCorpusRegistry:
         self._corpus_hash: Optional[str] = None
 
         # Initialize default builders
-        self._builders: Dict[PromptCategory, PromptBuilder] = {
+        self._builders: dict[PromptCategory, PromptBuilder] = {
             PromptCategory.FUNCTION_COMPLETION: FunctionCompletionBuilder(),
             PromptCategory.ALGORITHM_IMPLEMENTATION: AlgorithmImplementationBuilder(),
             PromptCategory.DATA_STRUCTURE: DataStructureBuilder(),
@@ -1211,7 +1211,7 @@ class PromptCorpusRegistry:
         prompt_lower = user_prompt.lower()
 
         # Category keywords
-        keyword_map: Dict[PromptCategory, List[str]] = {
+        keyword_map: dict[PromptCategory, list[str]] = {
             PromptCategory.FUNCTION_COMPLETION: [
                 "complete",
                 "implement the function",
@@ -1286,7 +1286,7 @@ class PromptCorpusRegistry:
         }
 
         # Score each category
-        scores: Dict[PromptCategory, int] = {}
+        scores: dict[PromptCategory, int] = {}
         for category, keywords in keyword_map.items():
             score = sum(1 for kw in keywords if kw in prompt_lower)
             if score > 0:
@@ -1329,7 +1329,7 @@ class PromptCorpusRegistry:
             hints=template["hints"],
         )
 
-    def get_category_for_prompt(self, user_prompt: str) -> Tuple[PromptCategory, float]:
+    def get_category_for_prompt(self, user_prompt: str) -> tuple[PromptCategory, float]:
         """Get the category for a prompt (convenience method).
 
         Args:
@@ -1382,7 +1382,7 @@ def build_enriched_prompt(user_prompt: str) -> EnrichedPrompt:
     return get_registry().build_prompt(user_prompt)
 
 
-def get_prompt_category(user_prompt: str) -> Tuple[PromptCategory, float]:
+def get_prompt_category(user_prompt: str) -> tuple[PromptCategory, float]:
     """Get the category for a prompt (convenience function).
 
     Args:

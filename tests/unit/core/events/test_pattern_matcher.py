@@ -14,7 +14,6 @@
 
 """Tests for the centralized pattern matching utility."""
 
-import pytest
 
 from victor.core.events.pattern_matcher import (
     matches_topic_pattern,

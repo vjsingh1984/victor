@@ -20,7 +20,7 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -80,9 +80,9 @@ class AgentConfig:
     max_recovery_attempts: int = 3
 
     # Additional settings (pass-through to Settings)
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
-    def to_settings_dict(self) -> Dict[str, Any]:
+    def to_settings_dict(self) -> dict[str, Any]:
         """Convert to Settings-compatible dictionary.
 
         Returns:
@@ -177,7 +177,7 @@ Migration:
     Use GraphConfig.from_legacy(**kwargs) to migrate from legacy format.
 """
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.graph import CheckpointerProtocol
@@ -238,8 +238,8 @@ class InterruptConfig:
         )
     """
 
-    interrupt_before: List[str] = field(default_factory=list)
-    interrupt_after: List[str] = field(default_factory=list)
+    interrupt_before: list[str] = field(default_factory=list)
+    interrupt_after: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -367,7 +367,7 @@ class GraphConfig:
             ),
         )
 
-    def to_legacy_dict(self) -> Dict[str, Any]:
+    def to_legacy_dict(self) -> dict[str, Any]:
         """Convert to legacy dict format for backward compatibility.
 
         Returns:
@@ -449,12 +449,12 @@ class SafetyConfig:
 
     level: SafetyLevel = SafetyLevel.MEDIUM
     require_confirmation: bool = False
-    blocked_operations: List[str] = field(default_factory=list)
+    blocked_operations: list[str] = field(default_factory=list)
     audit_log: bool = True
     dry_run: bool = False
 
     @classmethod
-    def from_dict(cls, config: Dict[str, Any]) -> "SafetyConfig":
+    def from_dict(cls, config: dict[str, Any]) -> "SafetyConfig":
         """Create from dict (supports loading from profiles).
 
         Args:
@@ -471,7 +471,7 @@ class SafetyConfig:
             dry_run=config.get("dry_run", False),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dict for serialization.
 
         Returns:
@@ -517,13 +517,13 @@ class StyleConfig:
     """
 
     formatter: Optional[str] = None
-    formatter_options: Dict[str, Any] = field(default_factory=dict)
+    formatter_options: dict[str, Any] = field(default_factory=dict)
     linter: Optional[str] = None
-    linter_options: Dict[str, Any] = field(default_factory=dict)
+    linter_options: dict[str, Any] = field(default_factory=dict)
     style_guide: Optional[str] = None
 
     @classmethod
-    def from_dict(cls, config: Dict[str, Any]) -> "StyleConfig":
+    def from_dict(cls, config: dict[str, Any]) -> "StyleConfig":
         """Create from dict (supports loading from profiles).
 
         Args:
@@ -577,14 +577,14 @@ class ToolConfig:
         )
     """
 
-    enabled_tools: List[str] = field(default_factory=list)
-    disabled_tools: List[str] = field(default_factory=list)
-    tool_settings: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    enabled_tools: list[str] = field(default_factory=list)
+    disabled_tools: list[str] = field(default_factory=list)
+    tool_settings: dict[str, dict[str, Any]] = field(default_factory=dict)
     max_tool_budget: int = 100
     require_confirmation: bool = False
 
     @classmethod
-    def from_dict(cls, config: Dict[str, Any]) -> "ToolConfig":
+    def from_dict(cls, config: dict[str, Any]) -> "ToolConfig":
         """Create from dict (supports loading from profiles).
 
         Args:
@@ -649,7 +649,7 @@ Classes:
     SafetyEnforcer: Framework-level safety enforcer that manages rules
 """
 
-from typing import Callable, Tuple
+from collections.abc import Callable
 
 
 @dataclass
@@ -750,8 +750,8 @@ class SafetyEnforcer:
         return False
 
     def check_operation(
-        self, operation: str, context: Optional[Dict[str, Any]] = None
-    ) -> Tuple[bool, Optional[str]]:
+        self, operation: str, context: Optional[dict[str, Any]] = None
+    ) -> tuple[bool, Optional[str]]:
         """Check if operation is allowed by safety rules.
 
         Args:

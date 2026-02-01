@@ -33,7 +33,7 @@ import fnmatch
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import yaml
 
@@ -64,7 +64,7 @@ _COMPILED_ALIASES = [
 ]
 
 # Cache for normalized model names
-_NORMALIZATION_CACHE: Dict[str, str] = {}
+_NORMALIZATION_CACHE: dict[str, str] = {}
 
 
 def normalize_model_name(model_name: str) -> str:
@@ -107,7 +107,7 @@ def normalize_model_name(model_name: str) -> str:
     return normalized
 
 
-def get_model_name_variants(model_name: str) -> List[str]:
+def get_model_name_variants(model_name: str) -> list[str]:
     """Get all naming variants for a model to try during lookup.
 
     Returns both the original name and normalized form(s) to maximize
@@ -142,7 +142,7 @@ class ModelCapabilityLoader:
     """
 
     _instance: Optional["ModelCapabilityLoader"] = None
-    _config: Optional[Dict[str, Any]] = None
+    _config: Optional[dict[str, Any]] = None
 
     def __new__(cls) -> "ModelCapabilityLoader":
         """Singleton pattern for efficiency."""
@@ -212,7 +212,7 @@ class ModelCapabilityLoader:
         provider_lower = provider.lower()
 
         # Start building resolved config
-        resolved: Dict[str, Any] = {}
+        resolved: dict[str, Any] = {}
 
         # 1. Apply global defaults
         defaults = config_dict.get("defaults")
@@ -263,7 +263,7 @@ class ModelCapabilityLoader:
         # Convert to ToolCallingCapabilities
         return self._config_to_capabilities(resolved, format_hint)
 
-    def _apply_defaults(self, resolved: Dict[str, Any], defaults: Dict[str, Any]) -> None:
+    def _apply_defaults(self, resolved: dict[str, Any], defaults: dict[str, Any]) -> None:
         """Apply defaults section to resolved config."""
         # Flatten nested defaults structure
         for key, value in defaults.items():
@@ -273,7 +273,7 @@ class ModelCapabilityLoader:
             else:
                 resolved[key] = value
 
-    def _apply_training(self, resolved: Dict[str, Any], training: Dict[str, Any]) -> None:
+    def _apply_training(self, resolved: dict[str, Any], training: dict[str, Any]) -> None:
         """Map training capabilities to provider support flags.
 
         Training capabilities indicate what the model CAN do.
@@ -294,8 +294,8 @@ class ModelCapabilityLoader:
             resolved["thinking_disable_prefix"] = training["thinking_disable_prefix"]
 
     def _find_matching_model(
-        self, models: Dict[str, Any], model_lower: str
-    ) -> List[Tuple[int, str, Dict[str, Any]]]:
+        self, models: dict[str, Any], model_lower: str
+    ) -> list[tuple[int, str, dict[str, Any]]]:
         """Find matching model patterns, sorted by specificity."""
         matching = []
 
@@ -338,7 +338,7 @@ class ModelCapabilityLoader:
 
     def _config_to_capabilities(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         format_hint: Optional[ToolCallFormat] = None,
     ) -> ToolCallingCapabilities:
         """Convert resolved config dict to ToolCallingCapabilities object."""
@@ -367,7 +367,7 @@ class ModelCapabilityLoader:
     # Query and introspection methods
     # =========================================================================
 
-    def get_model_config(self, model_pattern: str) -> Optional[Dict[str, Any]]:
+    def get_model_config(self, model_pattern: str) -> Optional[dict[str, Any]]:
         """Get raw configuration for a model pattern.
 
         Useful for helper tools that need to read/modify specific model configs.
@@ -385,17 +385,17 @@ class ModelCapabilityLoader:
         result = models.get(model_pattern)
         return result if isinstance(result, dict) else None
 
-    def get_all_model_patterns(self) -> List[str]:
+    def get_all_model_patterns(self) -> list[str]:
         """Get all configured model patterns."""
         config_dict = self._config or {}
         return list(config_dict.get("models", {}).keys())
 
-    def get_provider_names(self) -> List[str]:
+    def get_provider_names(self) -> list[str]:
         """Get list of configured provider names."""
         config_dict = self._config or {}
         return list(config_dict.get("provider_defaults", {}).keys())
 
-    def get_training_capabilities(self, model_pattern: str) -> Optional[Dict[str, Any]]:
+    def get_training_capabilities(self, model_pattern: str) -> Optional[dict[str, Any]]:
         """Get training capabilities for a model pattern.
 
         Args:
@@ -409,7 +409,7 @@ class ModelCapabilityLoader:
             return model_config.get("training")
         return None
 
-    def get_provider_support(self, model_pattern: str, provider: str) -> Optional[Dict[str, Any]]:
+    def get_provider_support(self, model_pattern: str, provider: str) -> Optional[dict[str, Any]]:
         """Get provider-specific support for a model.
 
         Args:
@@ -427,7 +427,7 @@ class ModelCapabilityLoader:
                 return result if isinstance(result, dict) else None
         return None
 
-    def debug_resolution(self, provider: str, model: str) -> Dict[str, Any]:
+    def debug_resolution(self, provider: str, model: str) -> dict[str, Any]:
         """Debug helper to show capability resolution steps.
 
         Args:
@@ -452,7 +452,7 @@ class ModelCapabilityLoader:
             "final_capabilities": {},
         }
 
-        resolved: Dict[str, Any] = {}
+        resolved: dict[str, Any] = {}
 
         # 1. Global defaults
         defaults = config_dict.get("defaults", {})
@@ -545,7 +545,7 @@ def get_model_capabilities(
     return loader.get_capabilities(provider, model, format_hint)
 
 
-def get_model_training(model_pattern: str) -> Optional[Dict[str, Any]]:
+def get_model_training(model_pattern: str) -> Optional[dict[str, Any]]:
     """Get training capabilities for a model pattern.
 
     Args:
@@ -558,7 +558,7 @@ def get_model_training(model_pattern: str) -> Optional[Dict[str, Any]]:
     return loader.get_training_capabilities(model_pattern)
 
 
-def get_provider_support(model_pattern: str, provider: str) -> Optional[Dict[str, Any]]:
+def get_provider_support(model_pattern: str, provider: str) -> Optional[dict[str, Any]]:
     """Get provider-specific support for a model.
 
     Args:

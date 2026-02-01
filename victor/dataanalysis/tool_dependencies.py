@@ -32,7 +32,6 @@ Use the canonical tool dependency provider:
     provider = create_vertical_tool_dependency_provider()  # Auto-infers "dataanalysis"
 """
 
-from pathlib import Path
 
 from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 

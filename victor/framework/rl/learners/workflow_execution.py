@@ -58,7 +58,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -164,7 +164,7 @@ class WorkflowExecutionLearner(BaseLearner):
     def get_best_workflow(
         self,
         task_type: str,
-        available_workflows: List[str],
+        available_workflows: list[str],
     ) -> Optional[str]:
         """Get the best workflow for a task type using Q-values.
 
@@ -214,8 +214,8 @@ class WorkflowExecutionLearner(BaseLearner):
     def get_workflow_q_values(
         self,
         task_type: str,
-        available_workflows: Optional[List[str]] = None,
-    ) -> Dict[str, float]:
+        available_workflows: Optional[list[str]] = None,
+    ) -> dict[str, float]:
         """Get Q-values for all workflows for a task type.
 
         Args:
@@ -476,7 +476,7 @@ class WorkflowExecutionLearner(BaseLearner):
     def get_workflow_stats(
         self,
         workflow_name: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get statistics for workflows.
 
         Args:
@@ -520,7 +520,7 @@ class WorkflowExecutionLearner(BaseLearner):
             """
             )
 
-        stats: Dict[str, Dict[str, Any]] = {}
+        stats: dict[str, dict[str, Any]] = {}
         for row in cursor.fetchall():
             wf_name = row[0]
             if wf_name not in stats:

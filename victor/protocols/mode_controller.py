@@ -28,13 +28,14 @@ Design Principles:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from collections.abc import Callable
 
 # Re-export canonical ModeControllerProtocol from victor.agent.protocols
 from victor.agent.protocols import ModeControllerProtocol
 
 if TYPE_CHECKING:
-    from victor.agent.mode_controller import AgentMode, OperationalModeConfig
+    from victor.agent.mode_controller import AgentMode
 
 
 @runtime_checkable
@@ -69,7 +70,7 @@ class ExtendedModeControllerProtocol(ModeControllerProtocol, Protocol):
         """
         ...
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current mode status information.
 
         Returns:
@@ -77,7 +78,7 @@ class ExtendedModeControllerProtocol(ModeControllerProtocol, Protocol):
         """
         ...
 
-    def get_mode_list(self) -> List[Dict[str, str]]:
+    def get_mode_list(self) -> list[dict[str, str]]:
         """Get list of available modes.
 
         Returns:

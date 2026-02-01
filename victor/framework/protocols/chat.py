@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
+from collections.abc import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class ChatStateProtocol(Protocol):
     """
 
     @property
-    def messages(self) -> List[Dict[str, Any]]:
+    def messages(self) -> list[dict[str, Any]]:
         """Get the conversation messages.
 
         Returns:
@@ -68,7 +69,7 @@ class ChatStateProtocol(Protocol):
         ...
 
     def add_message(
-        self, role: str, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None
+        self, role: str, content: str, tool_calls: Optional[list[dict[str, Any]]] = None
     ) -> None:
         """Add a message to the conversation history."""
         ...
@@ -85,7 +86,7 @@ class ChatStateProtocol(Protocol):
         """Get metadata value by key."""
         ...
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert state to dictionary for serialization."""
         ...
 
@@ -127,7 +128,7 @@ class ChatResultProtocol(Protocol):
         ...
 
     @property
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> dict[str, Any]:
         """Get execution metadata.
 
         Returns:
@@ -135,7 +136,7 @@ class ChatResultProtocol(Protocol):
         """
         ...
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert result to dictionary."""
         ...
 
@@ -170,7 +171,7 @@ class WorkflowChatProtocol(Protocol):
     """
 
     async def execute_chat_workflow(
-        self, workflow_name: str, initial_state: Dict[str, Any]
+        self, workflow_name: str, initial_state: dict[str, Any]
     ) -> ChatResultProtocol:
         """Execute chat workflow and return result.
 
@@ -184,7 +185,7 @@ class WorkflowChatProtocol(Protocol):
         ...
 
     async def stream_chat_workflow(
-        self, workflow_name: str, initial_state: Dict[str, Any]
+        self, workflow_name: str, initial_state: dict[str, Any]
     ) -> AsyncIterator[ChatResultProtocol]:
         """Stream chat workflow execution.
 
@@ -200,7 +201,7 @@ class WorkflowChatProtocol(Protocol):
         ...
         yield  # type: ignore[misc]
 
-    def list_workflows(self) -> List[str]:
+    def list_workflows(self) -> list[str]:
         """List available chat workflows.
 
         Returns:
@@ -208,7 +209,7 @@ class WorkflowChatProtocol(Protocol):
         """
         ...
 
-    def get_workflow_info(self, workflow_name: str) -> Dict[str, Any]:
+    def get_workflow_info(self, workflow_name: str) -> dict[str, Any]:
         """Get information about a workflow.
 
         Args:
@@ -240,9 +241,9 @@ class ChatResult:
 
     content: str
     iteration_count: int
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert result to dictionary.
 
         Returns:
@@ -289,12 +290,12 @@ class MutableChatState(ChatStateProtocol):
         state.set_metadata("task_type", "coding")
     """
 
-    _messages: List[Dict[str, Any]] = field(default_factory=list)
+    _messages: list[dict[str, Any]] = field(default_factory=list)
     _iteration_count: int = 0
-    _metadata: Dict[str, Any] = field(default_factory=dict)
+    _metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def messages(self) -> List[Dict[str, Any]]:
+    def messages(self) -> list[dict[str, Any]]:
         """Get the conversation messages.
 
         Returns:
@@ -313,7 +314,7 @@ class MutableChatState(ChatStateProtocol):
         return self._iteration_count
 
     def add_message(
-        self, role: str, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None
+        self, role: str, content: str, tool_calls: Optional[list[dict[str, Any]]] = None
     ) -> None:
         """Add a message to the conversation history.
 
@@ -322,7 +323,7 @@ class MutableChatState(ChatStateProtocol):
             content: Message content
             tool_calls: Optional list of tool calls
         """
-        message: Dict[str, Any] = {
+        message: dict[str, Any] = {
             "role": role,
             "content": content,
         }
@@ -358,7 +359,7 @@ class MutableChatState(ChatStateProtocol):
         """
         return self._metadata.get(key, default)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert state to dictionary for serialization.
 
         Returns:
@@ -371,7 +372,7 @@ class MutableChatState(ChatStateProtocol):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MutableChatState":
+    def from_dict(cls, data: dict[str, Any]) -> "MutableChatState":
         """Create state from dictionary.
 
         Args:

@@ -25,16 +25,13 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import List
 
 import pytest
-import yaml
 
 from victor.framework.safety.types import (
     SafetyPattern,
     Severity,
     Action,
-    SafetyViolation,
 )
 from victor.framework.safety.registry import SafetyPatternRegistry
 from victor.framework.safety.scanners import (

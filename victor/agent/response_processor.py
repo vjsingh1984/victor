@@ -47,12 +47,8 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Tuple,
     runtime_checkable,
 )
 
@@ -95,11 +91,11 @@ class ParsedToolCall:
     """A parsed and validated tool call."""
 
     name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     original_name: str = ""
     was_resolved: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary format."""
         return {
             "name": self.name,
@@ -111,9 +107,9 @@ class ParsedToolCall:
 class ParseResult:
     """Result of parsing and validating tool calls."""
 
-    tool_calls: List[Dict[str, Any]]
+    tool_calls: list[dict[str, Any]]
     remaining_content: str
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     filtered_count: int = 0
     parse_method: str = "native"
 
@@ -157,7 +153,7 @@ class ResponseProcessor:
         self._output_formatter = output_formatter
 
     def parse_tool_calls_with_adapter(
-        self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None
+        self, content: str, raw_tool_calls: Optional[list[dict[str, Any]]] = None
     ) -> ToolCallParseResult:
         """Parse tool calls using the tool calling adapter.
 
@@ -191,9 +187,9 @@ class ResponseProcessor:
 
     def parse_and_validate(
         self,
-        tool_calls: Optional[List[Dict[str, Any]]],
+        tool_calls: Optional[list[dict[str, Any]]],
         full_content: str,
-    ) -> Tuple[Optional[List[Dict[str, Any]]], str]:
+    ) -> tuple[Optional[list[dict[str, Any]]], str]:
         """Parse, validate, and normalize tool calls from provider response.
 
         Handles:
@@ -240,8 +236,8 @@ class ResponseProcessor:
         return tool_calls, full_content
 
     def _normalize_tool_calls(
-        self, tool_calls: Optional[List[Any]]
-    ) -> Optional[List[Dict[str, Any]]]:
+        self, tool_calls: Optional[list[Any]]
+    ) -> Optional[list[dict[str, Any]]]:
         """Ensure tool_calls is a list of dicts.
 
         Args:
@@ -260,8 +256,8 @@ class ResponseProcessor:
         return normalized if normalized else None
 
     def _filter_invalid_tools(
-        self, tool_calls: Optional[List[Dict[str, Any]]]
-    ) -> Optional[List[Dict[str, Any]]]:
+        self, tool_calls: Optional[list[dict[str, Any]]]
+    ) -> Optional[list[dict[str, Any]]]:
         """Filter out invalid/disabled tool names.
 
         Args:
@@ -299,8 +295,8 @@ class ResponseProcessor:
         return valid_calls if valid_calls else None
 
     def _coerce_arguments(
-        self, tool_calls: Optional[List[Dict[str, Any]]]
-    ) -> Optional[List[Dict[str, Any]]]:
+        self, tool_calls: Optional[list[dict[str, Any]]]
+    ) -> Optional[list[dict[str, Any]]]:
         """Coerce arguments to dicts (providers may send JSON strings).
 
         Args:
@@ -363,7 +359,7 @@ class ResponseProcessor:
     def format_tool_output(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         output: Any,
         context: Optional[Any] = None,
     ) -> str:
@@ -395,7 +391,7 @@ class ResponseProcessor:
         # Fallback to simple formatting if no formatter
         return f"[TOOL_OUTPUT: {tool_name}]\n{output}\n[/TOOL_OUTPUT]"
 
-    def log_tool_call(self, name: str, kwargs: Dict[str, Any]) -> None:
+    def log_tool_call(self, name: str, kwargs: dict[str, Any]) -> None:
         """Log a tool call for debugging.
 
         Args:

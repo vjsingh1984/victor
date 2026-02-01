@@ -50,7 +50,7 @@ import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -67,14 +67,14 @@ class SessionMetadata:
     profile: str
     message_count: int
     title: str = ""  # Auto-generated or user-provided title
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SessionMetadata":
+    def from_dict(cls, data: dict[str, Any]) -> "SessionMetadata":
         """Create from dictionary."""
         return cls(
             session_id=data.get("session_id", ""),
@@ -94,11 +94,11 @@ class Session:
     """A saved conversation session."""
 
     metadata: SessionMetadata
-    conversation: Dict[str, Any]  # Serialized MessageHistory state
-    conversation_state: Optional[Dict[str, Any]] = None  # ConversationStateMachine state
-    tool_selection_stats: Optional[Dict[str, Any]] = None  # Tool usage statistics
+    conversation: dict[str, Any]  # Serialized MessageHistory state
+    conversation_state: Optional[dict[str, Any]] = None  # ConversationStateMachine state
+    tool_selection_stats: Optional[dict[str, Any]] = None  # Tool usage statistics
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "metadata": self.metadata.to_dict(),
@@ -108,7 +108,7 @@ class Session:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Session":
+    def from_dict(cls, data: dict[str, Any]) -> "Session":
         """Create from dictionary."""
         return cls(
             metadata=SessionMetadata.from_dict(data.get("metadata", {})),
@@ -145,7 +145,7 @@ class SessionPersistence:
         """Generate a unique session ID based on timestamp."""
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    def _generate_title(self, conversation_data: Dict[str, Any]) -> str:
+    def _generate_title(self, conversation_data: dict[str, Any]) -> str:
         """Generate a title from the first user message.
 
         Args:
@@ -172,9 +172,9 @@ class SessionPersistence:
         profile: str = "default",
         session_id: Optional[str] = None,
         title: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         conversation_state: Optional[Any] = None,  # ConversationStateMachine or dict
-        tool_selection_stats: Optional[Dict[str, Any]] = None,
+        tool_selection_stats: Optional[dict[str, Any]] = None,
     ) -> str:
         """Save a session to disk.
 
@@ -270,10 +270,10 @@ class SessionPersistence:
     def list_sessions(
         self,
         limit: int = 20,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
-    ) -> List[SessionMetadata]:
+    ) -> list[SessionMetadata]:
         """List available sessions.
 
         Args:
@@ -285,7 +285,7 @@ class SessionPersistence:
         Returns:
             List of SessionMetadata objects, sorted by updated_at (newest first)
         """
-        sessions: List[SessionMetadata] = []
+        sessions: list[SessionMetadata] = []
 
         for session_file in self.session_dir.glob("*.json"):
             try:
@@ -337,7 +337,7 @@ class SessionPersistence:
         session_id: str,
         conversation: Any,
         conversation_state: Optional[Any] = None,
-        tool_selection_stats: Optional[Dict[str, Any]] = None,
+        tool_selection_stats: Optional[dict[str, Any]] = None,
     ) -> bool:
         """Update an existing session with new conversation state.
 

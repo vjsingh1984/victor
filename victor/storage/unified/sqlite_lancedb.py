@@ -27,10 +27,9 @@ Key Features:
 - Batch operations for performance
 """
 
-import asyncio
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 if TYPE_CHECKING:
     from victor.coding.codebase.embeddings.models import BaseEmbeddingModel
@@ -95,8 +94,6 @@ class SqliteLanceDBStore:
         self.embedding_model = embedding_model
         self._extra_config = kwargs
 
-        from victor.storage.graph.protocol import GraphStoreProtocol
-        from victor.coding.codebase.embeddings.models import BaseEmbeddingModel
 
         self._graph_store: Optional[GraphStoreProtocol] = None
         self._vector_store: Optional[Any] = None
@@ -127,7 +124,6 @@ class SqliteLanceDBStore:
 
         # Initialize SQLite graph store
         from victor.storage.graph.sqlite_store import SqliteGraphStore
-        from victor.storage.graph.protocol import GraphStoreProtocol
 
         graph_db_path = self.persist_directory / "project.db"
         self._graph_store = SqliteGraphStore(project_path=graph_db_path)
@@ -291,7 +287,7 @@ class SqliteLanceDBStore:
 
     async def index_symbols_batch(
         self,
-        symbols: List[Tuple[UnifiedSymbol, str]],
+        symbols: list[tuple[UnifiedSymbol, str]],
         batch_size: int = 500,
     ) -> int:
         """Batch index symbols. Returns count indexed."""
@@ -393,7 +389,7 @@ class SqliteLanceDBStore:
         assert self._graph_store is not None
         await self._graph_store.upsert_edges([graph_edge])
 
-    async def index_edges_batch(self, edges: List[UnifiedEdge]) -> int:
+    async def index_edges_batch(self, edges: list[UnifiedEdge]) -> int:
         """Batch index edges. Returns count indexed."""
         if not self._initialized:
             await self.initialize()
@@ -418,8 +414,8 @@ class SqliteLanceDBStore:
     async def _upsert_vector(
         self,
         doc_id: str,
-        vector: List[float],
-        metadata: Optional[Dict[str, Any]] = None,
+        vector: list[float],
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Upsert single vector to LanceDB."""
         if not self._vector_store:
@@ -441,7 +437,7 @@ class SqliteLanceDBStore:
     # Unified Search
     # =========================================================================
 
-    async def search(self, params: SearchParams) -> List[UnifiedSearchResult]:
+    async def search(self, params: SearchParams) -> list[UnifiedSearchResult]:
         """Unified search combining keyword, semantic, and graph.
 
         Algorithm:
@@ -454,7 +450,7 @@ class SqliteLanceDBStore:
         if not self._initialized:
             await self.initialize()
 
-        results: Dict[str, UnifiedSearchResult] = {}
+        results: dict[str, UnifiedSearchResult] = {}
 
         # Semantic search
         if params.mode in (SearchMode.HYBRID, SearchMode.SEMANTIC):
@@ -513,7 +509,7 @@ class SqliteLanceDBStore:
         query: str,
         limit: int = 20,
         threshold: float = 0.25,
-    ) -> List[UnifiedSearchResult]:
+    ) -> list[UnifiedSearchResult]:
         """Pure semantic search (vector similarity)."""
         return await self._semantic_search(query, limit, threshold)
 
@@ -521,8 +517,8 @@ class SqliteLanceDBStore:
         self,
         query: str,
         limit: int = 20,
-        symbol_types: Optional[List[str]] = None,
-    ) -> List[UnifiedSearchResult]:
+        symbol_types: Optional[list[str]] = None,
+    ) -> list[UnifiedSearchResult]:
         """Pure keyword search (FTS)."""
         return await self._keyword_search(query, limit, symbol_types)
 
@@ -531,7 +527,7 @@ class SqliteLanceDBStore:
         query: str,
         limit: int,
         threshold: float,
-    ) -> List[UnifiedSearchResult]:
+    ) -> list[UnifiedSearchResult]:
         """Internal semantic search."""
         if not self._vector_store or not self._vector_table:
             return []
@@ -574,8 +570,8 @@ class SqliteLanceDBStore:
         self,
         query: str,
         limit: int,
-        symbol_types: Optional[List[str]],
-    ) -> List[UnifiedSearchResult]:
+        symbol_types: Optional[list[str]],
+    ) -> list[UnifiedSearchResult]:
         """Internal keyword search using graph FTS."""
         if not self._graph_store:
             return []
@@ -644,7 +640,7 @@ class SqliteLanceDBStore:
 
         return self._node_to_symbol(node)
 
-    async def get_symbols_in_file(self, rel_path: str) -> List[UnifiedSymbol]:
+    async def get_symbols_in_file(self, rel_path: str) -> list[UnifiedSymbol]:
         """Get all symbols in a file."""
         if not self._initialized:
             await self.initialize()
@@ -657,7 +653,7 @@ class SqliteLanceDBStore:
         self,
         unified_id: str,
         max_depth: int = 1,
-    ) -> List[UnifiedSymbol]:
+    ) -> list[UnifiedSymbol]:
         """Get functions that call this symbol."""
         if not self._initialized:
             await self.initialize()
@@ -683,7 +679,7 @@ class SqliteLanceDBStore:
         self,
         unified_id: str,
         max_depth: int = 1,
-    ) -> List[UnifiedSymbol]:
+    ) -> list[UnifiedSymbol]:
         """Get functions called by this symbol."""
         if not self._initialized:
             await self.initialize()
@@ -708,8 +704,8 @@ class SqliteLanceDBStore:
     async def get_related(
         self,
         unified_id: str,
-        edge_types: Optional[List[str]] = None,
-    ) -> List[Tuple[UnifiedSymbol, str]]:
+        edge_types: Optional[list[str]] = None,
+    ) -> list[tuple[UnifiedSymbol, str]]:
         """Get related symbols with relationship type."""
         if not self._initialized:
             await self.initialize()
@@ -737,7 +733,7 @@ class SqliteLanceDBStore:
         self,
         unified_id: str,
         limit: int = 10,
-    ) -> List[UnifiedSearchResult]:
+    ) -> list[UnifiedSearchResult]:
         """Find semantically similar symbols to given symbol."""
         if not self._initialized:
             await self.initialize()
@@ -761,7 +757,7 @@ class SqliteLanceDBStore:
         self,
         unified_id: str,
         similarity_threshold: float = 0.5,
-    ) -> List[UnifiedSearchResult]:
+    ) -> list[UnifiedSearchResult]:
         """Find symbols that might be affected by changes (graph + semantic).
 
         Combines:
@@ -771,7 +767,7 @@ class SqliteLanceDBStore:
         if not self._initialized:
             await self.initialize()
 
-        results: Dict[str, UnifiedSearchResult] = {}
+        results: dict[str, UnifiedSearchResult] = {}
 
         # Get graph callers (structural impact)
         callers = await self.get_callers(unified_id, max_depth=2)
@@ -831,7 +827,7 @@ class SqliteLanceDBStore:
             self._vector_store.drop_table("symbols")
             self._vector_table = None
 
-    async def stats(self) -> Dict[str, Any]:
+    async def stats(self) -> dict[str, Any]:
         """Get combined statistics."""
         if not self._initialized:
             await self.initialize()

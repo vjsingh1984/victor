@@ -57,12 +57,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING, runtime_checkable
+from typing import Any, Optional, Protocol, TYPE_CHECKING, runtime_checkable
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator_integration import OrchestratorIntegration
-    from victor.agent.coordinators.context_coordinator import ContextCoordinator
-    from victor.agent.coordinators.response_coordinator import ResponseCoordinator
+    pass
 
 from victor.agent.coordinators.base_config import BaseCoordinatorConfig
 
@@ -79,9 +77,9 @@ class ValidationResult:
     """Base class for validation results."""
 
     is_valid: bool
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def add_error(self, error: str) -> None:
         """Add an error message."""
@@ -112,7 +110,7 @@ class IntelligentValidationResult(ValidationResult):
     quality_score: float = 0.5
     grounding_score: float = 0.5
     is_grounded: bool = True
-    grounding_issues: List[str] = field(default_factory=list)
+    grounding_issues: list[str] = field(default_factory=list)
     should_finalize: bool = False
     should_retry: bool = False
     finalize_reason: str = ""
@@ -137,7 +135,7 @@ class ToolCallValidationResult(ValidationResult):
         remaining_content: Content after tool call extraction
     """
 
-    tool_calls: Optional[List[Dict[str, Any]]] = None
+    tool_calls: Optional[list[dict[str, Any]]] = None
     filtered_count: int = 0
     remaining_content: str = ""
 
@@ -174,7 +172,7 @@ class IIntelligentValidationProtocol(Protocol):
         query: str,
         tool_calls: int,
         task_type: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Validate response using intelligent pipeline.
 
         Args:
@@ -238,7 +236,7 @@ class IResponseValidationProtocol(Protocol):
 
     def parse_and_validate_tool_calls(
         self,
-        tool_calls: Optional[List[Dict[str, Any]]],
+        tool_calls: Optional[list[dict[str, Any]]],
         content: str,
         enabled_tools: Optional[set[str]] = None,
     ) -> Any:
@@ -530,7 +528,7 @@ class ValidationCoordinator:
 
     def validate_and_filter_tool_calls(
         self,
-        tool_calls: Optional[List[Dict[str, Any]]],
+        tool_calls: Optional[list[dict[str, Any]]],
         content: str,
         enabled_tools: Optional[set[str]] = None,
     ) -> ToolCallValidationResult:

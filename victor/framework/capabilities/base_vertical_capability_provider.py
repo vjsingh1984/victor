@@ -82,16 +82,16 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 from victor.core.capabilities import Capability as CoreCapability, CapabilityType
 from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
 from victor.framework.protocols import CapabilityType as FrameworkCapabilityType
-from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.capability_loader import CapabilityEntry
 
 if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -144,9 +144,9 @@ class CapabilityDefinition:
     configure_fn: Optional[str] = None
     get_fn: Optional[str] = None
     set_fn: Optional[str] = None
-    default_config: Dict[str, Any] = field(default_factory=dict)
-    dependencies: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    default_config: dict[str, Any] = field(default_factory=dict)
+    dependencies: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     enabled: bool = True
 
     def to_capability_metadata(self) -> CapabilityMetadata:
@@ -227,13 +227,13 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
             vertical_name: Name of the vertical (e.g., "coding", "research")
         """
         self._vertical_name = vertical_name
-        self._applied: Set[str] = set()
-        self._definitions_cache: Optional[Dict[str, CapabilityDefinition]] = None
-        self._capabilities_cache: Optional[Dict[str, Callable[..., None]]] = None
-        self._metadata_cache: Optional[Dict[str, CapabilityMetadata]] = None
+        self._applied: set[str] = set()
+        self._definitions_cache: Optional[dict[str, CapabilityDefinition]] = None
+        self._capabilities_cache: Optional[dict[str, Callable[..., None]]] = None
+        self._metadata_cache: Optional[dict[str, CapabilityMetadata]] = None
 
     @abstractmethod
-    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+    def _get_capability_definitions(self) -> dict[str, CapabilityDefinition]:
         """Define capability definitions for this vertical.
 
         This method MUST be implemented by subclasses to declare their capabilities.
@@ -277,7 +277,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
             f"{self.__class__.__name__} must implement _get_capability_definitions()"
         )
 
-    def _get_definitions(self) -> Dict[str, CapabilityDefinition]:
+    def _get_definitions(self) -> dict[str, CapabilityDefinition]:
         """Get capability definitions with caching.
 
         Returns:
@@ -287,7 +287,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
             self._definitions_cache = self._get_capability_definitions()
         return self._definitions_cache
 
-    def get_capabilities(self) -> Dict[str, Callable[..., None]]:
+    def get_capabilities(self) -> dict[str, Callable[..., None]]:
         """Return all registered capability functions.
 
         Returns:
@@ -313,7 +313,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
 
         return self._capabilities_cache.copy()
 
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+    def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
         """Return metadata for all registered capabilities.
 
         Returns:
@@ -340,7 +340,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
 
     def list_capabilities(
         self, capability_type: Optional[FrameworkCapabilityType] = None
-    ) -> List[str]:
+    ) -> list[str]:
         """List capabilities by type.
 
         Args:
@@ -413,7 +413,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
 
         logger.info(f"Applied capability '{name}' to {self._vertical_name} vertical")
 
-    def get_capability_config(self, orchestrator: Any, name: str) -> Optional[Dict[str, Any]]:
+    def get_capability_config(self, orchestrator: Any, name: str) -> Optional[dict[str, Any]]:
         """Get current configuration for a capability.
 
         Args:
@@ -434,7 +434,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
 
         return get_fn(orchestrator)
 
-    def get_default_config(self, name: str) -> Dict[str, Any]:
+    def get_default_config(self, name: str) -> dict[str, Any]:
         """Get default configuration for a capability.
 
         Args:
@@ -478,7 +478,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
         """
         self.apply_all(orchestrator, **kwargs)
 
-    def get_applied(self) -> Set[str]:
+    def get_applied(self) -> set[str]:
         """Get set of applied capability names.
 
         Returns:
@@ -490,7 +490,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
         """Reset applied capability tracking."""
         self._applied.clear()
 
-    def generate_capabilities_list(self) -> List[CapabilityEntry]:
+    def generate_capabilities_list(self) -> list[CapabilityEntry]:
         """Generate CAPABILITIES list for CapabilityLoader discovery.
 
         Returns:
@@ -498,7 +498,7 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
         """
         from victor.framework.protocols import OrchestratorCapability
 
-        entries: List[CapabilityEntry] = []
+        entries: list[CapabilityEntry] = []
         definitions = self._get_definitions()
 
         for name, definition in definitions.items():
@@ -548,13 +548,13 @@ class BaseVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
 
         return entries
 
-    def generate_capability_configs(self) -> Dict[str, Any]:
+    def generate_capability_configs(self) -> dict[str, Any]:
         """Generate centralized config storage for VerticalContext.
 
         Returns:
             Dict with capability configurations for centralized storage
         """
-        configs: Dict[str, Any] = {}
+        configs: dict[str, Any] = {}
         definitions = self._get_definitions()
 
         for name, definition in definitions.items():

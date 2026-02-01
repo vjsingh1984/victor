@@ -54,13 +54,11 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.framework.debugging.breakpoints import (
     BreakpointManager,
-    BreakpointPosition,
     WorkflowBreakpoint,
 )
 from victor.framework.debugging.execution import (
@@ -200,7 +198,7 @@ class DebugSession:
         """Request immediate pause."""
         await self.execution_ctrl.pause_immediately()
 
-    def get_current_state(self) -> Optional[Dict[str, Any]]:
+    def get_current_state(self) -> Optional[dict[str, Any]]:
         """Get current workflow state at pause.
 
         Returns:
@@ -236,7 +234,7 @@ class DebugSession:
         """
         return self.breakpoint_mgr.clear_breakpoint(breakpoint_id)
 
-    def list_breakpoints(self, **kwargs: Any) -> List[WorkflowBreakpoint]:
+    def list_breakpoints(self, **kwargs: Any) -> list[WorkflowBreakpoint]:
         """List breakpoints (delegates to manager).
 
         Returns:

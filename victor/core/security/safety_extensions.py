@@ -41,7 +41,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from victor.core.security.patterns.types import SafetyPattern
 
@@ -92,10 +92,10 @@ class SafetyExtensions:
         high_risk = safety_ext.get_patterns_by_risk("HIGH")
     """
 
-    safety_patterns: List[SafetyPattern] = field(default_factory=list)
-    validators: List[Any] = field(default_factory=list)  # List[SafetyValidator]
+    safety_patterns: list[SafetyPattern] = field(default_factory=list)
+    validators: list[Any] = field(default_factory=list)  # List[SafetyValidator]
 
-    def get_all_patterns(self) -> List[SafetyPattern]:
+    def get_all_patterns(self) -> list[SafetyPattern]:
         """Get all safety patterns.
 
         Returns:
@@ -103,7 +103,7 @@ class SafetyExtensions:
         """
         return list(self.safety_patterns)
 
-    def get_patterns_by_category(self, category: str) -> List[SafetyPattern]:
+    def get_patterns_by_category(self, category: str) -> list[SafetyPattern]:
         """Get safety patterns for a specific category.
 
         Args:
@@ -114,7 +114,7 @@ class SafetyExtensions:
         """
         return [p for p in self.safety_patterns if p.category == category]
 
-    def get_patterns_by_risk(self, risk_level: str) -> List[SafetyPattern]:
+    def get_patterns_by_risk(self, risk_level: str) -> list[SafetyPattern]:
         """Get safety patterns by risk level.
 
         Args:
@@ -125,7 +125,7 @@ class SafetyExtensions:
         """
         return [p for p in self.safety_patterns if p.risk_level == risk_level]
 
-    def get_categories(self) -> Set[str]:
+    def get_categories(self) -> set[str]:
         """Get all unique categories from patterns.
 
         Returns:
@@ -133,7 +133,7 @@ class SafetyExtensions:
         """
         return {p.category for p in self.safety_patterns}
 
-    def get_bash_patterns(self) -> List[SafetyPattern]:
+    def get_bash_patterns(self) -> list[SafetyPattern]:
         """Get patterns applicable to bash commands.
 
         Returns patterns in "bash", "shell", or "filesystem" categories.
@@ -144,7 +144,7 @@ class SafetyExtensions:
         bash_categories = {"bash", "shell", "filesystem", "system"}
         return [p for p in self.safety_patterns if p.category in bash_categories]
 
-    def get_file_patterns(self) -> List[SafetyPattern]:
+    def get_file_patterns(self) -> list[SafetyPattern]:
         """Get patterns applicable to file operations.
 
         Returns:
@@ -156,8 +156,8 @@ class SafetyExtensions:
     async def validate_operation(
         self,
         operation: str,
-        context: Dict[str, Any],
-    ) -> List[str]:
+        context: dict[str, Any],
+    ) -> list[str]:
         """Run all validators on an operation.
 
         Args:
@@ -167,7 +167,7 @@ class SafetyExtensions:
         Returns:
             List of validation error messages (empty if all pass)
         """
-        errors: List[str] = []
+        errors: list[str] = []
         for validator in self.validators:
             if hasattr(validator, "validate"):
                 try:

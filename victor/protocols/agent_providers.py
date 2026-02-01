@@ -33,7 +33,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 # =============================================================================
@@ -169,7 +169,7 @@ class IProviderSwitcher(Protocol):
         """
         ...
 
-    def get_switch_history(self) -> List[Dict[str, Any]]:
+    def get_switch_history(self) -> list[dict[str, Any]]:
         """Get history of provider switches.
 
         Returns:
@@ -236,7 +236,7 @@ class IProviderEventEmitter(Protocol):
     Separated to support different event implementations.
     """
 
-    def emit_switch_event(self, event: Dict[str, Any]) -> None:
+    def emit_switch_event(self, event: dict[str, Any]) -> None:
         """Emit provider switch event.
 
         Args:
@@ -322,7 +322,7 @@ class ProviderRegistryProtocol(Protocol):
         """
         ...
 
-    def list_providers(self) -> List[str]:
+    def list_providers(self) -> list[str]:
         """Get list of registered provider names.
 
         Returns:

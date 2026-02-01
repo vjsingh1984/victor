@@ -22,11 +22,10 @@ Tests the integration between verticals and global registries:
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
-from typing import Dict, Any, Optional, List
+from unittest.mock import MagicMock
+from typing import Any
 
 from victor.core.verticals.base import VerticalBase
-from victor.agent.vertical_context import VerticalContext
 
 
 class MockVertical(VerticalBase):
@@ -35,7 +34,7 @@ class MockVertical(VerticalBase):
     name = "mock_vertical"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         return ["read", "write"]
 
     @classmethod
@@ -43,7 +42,7 @@ class MockVertical(VerticalBase):
         return "Mock vertical prompt"
 
     @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
+    def get_handlers(cls) -> dict[str, Any]:
         return {
             "mock_handler_1": MagicMock(),
             "mock_handler_2": MagicMock(),
@@ -53,10 +52,10 @@ class MockVertical(VerticalBase):
 class MockWorkflowProvider:
     """Mock workflow provider for testing."""
 
-    def get_workflows(self) -> Dict[str, Any]:
+    def get_workflows(self) -> dict[str, Any]:
         return {"mock_workflow": MagicMock()}
 
-    def get_auto_workflows(self) -> List[tuple]:
+    def get_auto_workflows(self) -> list[tuple]:
         return [
             (r"mock.*pattern", "mock_workflow"),
             (r"test.*trigger", "test_workflow"),
@@ -66,7 +65,7 @@ class MockWorkflowProvider:
 class MockTeamSpecProvider:
     """Mock team spec provider for testing."""
 
-    def get_team_specs(self) -> Dict[str, Any]:
+    def get_team_specs(self) -> dict[str, Any]:
         return {
             "team_1": MagicMock(),
             "team_2": MagicMock(),

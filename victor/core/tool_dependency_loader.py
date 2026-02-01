@@ -54,7 +54,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Optional
 
 import yaml
 
@@ -115,7 +115,7 @@ class ToolDependencyLoader:
                 Defaults to True for consistency with RL Q-values.
         """
         self._canonicalize = canonicalize
-        self._cache: Dict[Path, ToolDependencyConfig] = {}
+        self._cache: dict[Path, ToolDependencyConfig] = {}
 
     def load(
         self,
@@ -271,8 +271,8 @@ class ToolDependencyLoader:
 
     def _convert_dependencies(
         self,
-        deps: List[Any],
-    ) -> List[ToolDependency]:
+        deps: list[Any],
+    ) -> list[ToolDependency]:
         """Convert dependency entries to ToolDependency objects.
 
         Args:
@@ -299,8 +299,8 @@ class ToolDependencyLoader:
 
     def _convert_transitions(
         self,
-        transitions: Dict[str, List[Any]],
-    ) -> Dict[str, List[Tuple[str, float]]]:
+        transitions: dict[str, list[Any]],
+    ) -> dict[str, list[tuple[str, float]]]:
         """Convert transition mappings.
 
         Args:
@@ -309,7 +309,7 @@ class ToolDependencyLoader:
         Returns:
             Dict mapping tool -> list of (next_tool, probability) tuples.
         """
-        result: Dict[str, List[Tuple[str, float]]] = {}
+        result: dict[str, list[tuple[str, float]]] = {}
         for source, targets in transitions.items():
             source_name = self._canonicalize_name(source)
             result[source_name] = [(self._canonicalize_name(t.tool), t.weight) for t in targets]
@@ -317,8 +317,8 @@ class ToolDependencyLoader:
 
     def _convert_clusters(
         self,
-        clusters: Dict[str, List[str]],
-    ) -> Dict[str, Set[str]]:
+        clusters: dict[str, list[str]],
+    ) -> dict[str, set[str]]:
         """Convert cluster definitions.
 
         Args:
@@ -331,8 +331,8 @@ class ToolDependencyLoader:
 
     def _convert_sequences(
         self,
-        sequences: Dict[str, List[str]],
-    ) -> Dict[str, List[str]]:
+        sequences: dict[str, list[str]],
+    ) -> dict[str, list[str]]:
         """Convert sequence definitions.
 
         Args:
@@ -343,7 +343,7 @@ class ToolDependencyLoader:
         """
         return {name: self._convert_tool_list(tools) for name, tools in sequences.items()}
 
-    def _convert_tool_set(self, tools: List[str]) -> Set[str]:
+    def _convert_tool_set(self, tools: list[str]) -> set[str]:
         """Convert tool list to set, optionally canonicalizing names.
 
         Args:
@@ -356,7 +356,7 @@ class ToolDependencyLoader:
             return {self._canonicalize_name(t) for t in tools}
         return set(tools)
 
-    def _convert_tool_list(self, tools: List[str]) -> List[str]:
+    def _convert_tool_list(self, tools: list[str]) -> list[str]:
         """Convert tool list, optionally canonicalizing names.
 
         Args:
@@ -396,7 +396,7 @@ _default_loader = ToolDependencyLoader(canonicalize=True)
 
 
 def load_tool_dependency_yaml(
-    yaml_path: Union[str, Path],
+    yaml_path: str | Path,
     canonicalize: bool = True,
     use_cache: bool = True,
 ) -> ToolDependencyConfig:
@@ -430,7 +430,7 @@ def load_tool_dependency_yaml(
 
 
 def create_tool_dependency_provider(
-    yaml_path: Union[str, Path],
+    yaml_path: str | Path,
     canonicalize: bool = True,
 ) -> BaseToolDependencyProvider:
     """Create a tool dependency provider from a YAML configuration file.
@@ -479,10 +479,10 @@ class YAMLToolDependencyProvider(BaseToolDependencyProvider):
 
     def __init__(
         self,
-        yaml_path: Union[str, Path],
+        yaml_path: str | Path,
         canonicalize: bool = True,
-        additional_dependencies: Optional[List[ToolDependency]] = None,
-        additional_sequences: Optional[Dict[str, List[str]]] = None,
+        additional_dependencies: Optional[list[ToolDependency]] = None,
+        additional_sequences: Optional[dict[str, list[str]]] = None,
     ):
         """Initialize the provider from a YAML file.
 
@@ -533,7 +533,7 @@ class YAMLToolDependencyProvider(BaseToolDependencyProvider):
 
 # Mtime-aware provider cache for automatic cache invalidation
 # Format: {path_str: (mtime_ns, provider_instance)}
-_provider_cache: Dict[str, Tuple[int, BaseToolDependencyProvider]] = {}
+_provider_cache: dict[str, tuple[int, BaseToolDependencyProvider]] = {}
 
 
 def get_cached_provider(yaml_path: str) -> BaseToolDependencyProvider:
@@ -629,7 +629,7 @@ def invalidate_provider_cache(yaml_path: Optional[str] = None) -> int:
 
 # Mapping of vertical names to their canonicalization settings
 # Some verticals disable canonicalization to preserve distinct tool names
-_VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
+_VERTICAL_CANONICALIZE_SETTINGS: dict[str, bool] = {
     "coding": True,
     "devops": False,  # Preserves distinct 'grep' vs 'code_search'
     "research": False,  # Preserves original tool names from ToolNames constants
@@ -641,7 +641,7 @@ _VERTICAL_CANONICALIZE_SETTINGS: Dict[str, bool] = {
 def create_vertical_tool_dependency_provider(
     vertical: Optional[str] = None,
     canonicalize: Optional[bool] = None,
-) -> Union["YAMLToolDependencyProvider", EmptyToolDependencyProvider]:
+) -> "YAMLToolDependencyProvider" | EmptyToolDependencyProvider:
     """Factory function to create tool dependency providers for verticals.
 
     Consolidates vertical-specific tool dependency provider creation into

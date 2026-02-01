@@ -39,7 +39,7 @@ import logging
 import math
 import random
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -94,11 +94,11 @@ class GroundingThresholdLearner(BaseLearner):
 
         # Beta distribution parameters: (alpha, beta) for each (provider, response_type, threshold)
         # Alpha = successes + prior, Beta = failures + prior
-        self._beta_params: Dict[str, Dict[float, Tuple[float, float]]] = {}
+        self._beta_params: dict[str, dict[float, tuple[float, float]]] = {}
 
         # Track outcomes for analysis
-        self._fp_rates: Dict[str, float] = {}  # False positive rates per provider
-        self._fn_rates: Dict[str, float] = {}  # False negative rates per provider
+        self._fp_rates: dict[str, float] = {}  # False positive rates per provider
+        self._fn_rates: dict[str, float] = {}  # False negative rates per provider
         self._total_decisions: int = 0
 
         # Load state from database
@@ -474,7 +474,7 @@ class GroundingThresholdLearner(BaseLearner):
 
     def get_optimal_threshold(
         self, provider: str, response_type: str = "general"
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Get optimal threshold for a provider/response type.
 
         Convenience method that returns threshold and confidence.
@@ -489,7 +489,7 @@ class GroundingThresholdLearner(BaseLearner):
         rec = self.get_recommendation(provider, "", response_type)
         return (rec.value if rec else self.DEFAULT_THRESHOLD, rec.confidence if rec else 0.3)
 
-    def get_provider_error_rates(self, provider: str) -> Dict[str, float]:
+    def get_provider_error_rates(self, provider: str) -> dict[str, float]:
         """Get error rates for a provider.
 
         Args:
@@ -526,7 +526,7 @@ class GroundingThresholdLearner(BaseLearner):
             "total_samples": total,
         }
 
-    def get_all_provider_stats(self) -> Dict[str, Dict[str, float]]:
+    def get_all_provider_stats(self) -> dict[str, dict[str, float]]:
         """Get error rates for all providers.
 
         Returns:
@@ -538,7 +538,7 @@ class GroundingThresholdLearner(BaseLearner):
 
         return {provider: self.get_provider_error_rates(provider) for provider in providers}
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export learner metrics for monitoring.
 
         Returns:

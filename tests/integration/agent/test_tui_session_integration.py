@@ -21,7 +21,6 @@ import pytest
 from victor.agent.session_manager_base import (
     SessionMode,
     SessionConfig,
-    SessionMetrics,
     TUISessionHandler,
 )
 

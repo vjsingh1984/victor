@@ -27,7 +27,7 @@ Performance benefits:
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 try:
     from victor_native import (  # type: ignore[import-not-found]
@@ -126,7 +126,7 @@ def dump_json(obj: Any, pretty: bool = False) -> str:
             raise SerializationError(f"Failed to serialize JSON: {e}")
 
 
-def load_json_batch(json_strings: List[str]) -> List[Any]:
+def load_json_batch(json_strings: list[str]) -> list[Any]:
     """Parse multiple JSON strings in parallel.
 
     Args:
@@ -161,7 +161,7 @@ def load_json_batch(json_strings: List[str]) -> List[Any]:
         return results
 
 
-def dump_json_batch(objects: List[Any], pretty: bool = False) -> List[str]:
+def dump_json_batch(objects: list[Any], pretty: bool = False) -> list[str]:
     """Serialize multiple Python objects to JSON strings in parallel.
 
     Args:
@@ -217,7 +217,7 @@ def is_valid_json(json_str: str) -> bool:
             return False
 
 
-def is_valid_json_batch(json_strings: List[str]) -> List[bool]:
+def is_valid_json_batch(json_strings: list[str]) -> list[bool]:
     """Validate multiple JSON strings in parallel.
 
     Args:
@@ -270,7 +270,7 @@ def query_json(json_str: str, path: str) -> Any:
             raise SerializationError(f"Failed to query JSON path '{path}': {e}")
 
 
-def extract_json_fields(json_str: str, fields: List[str]) -> Dict[str, Any]:
+def extract_json_fields(json_str: str, fields: list[str]) -> dict[str, Any]:
     """Extract specific fields from JSON object.
 
     Args:
@@ -367,7 +367,7 @@ def dump_yaml(obj: Any, pretty: bool = True) -> str:
             raise SerializationError(f"Failed to serialize YAML: {e}")
 
 
-def load_yaml_multi_doc(yaml_str: str) -> List[Any]:
+def load_yaml_multi_doc(yaml_str: str) -> list[Any]:
     """Parse YAML multi-document stream.
 
     Args:
@@ -456,7 +456,7 @@ def convert_json_to_yaml(json_str: str) -> str:
             raise SerializationError(f"Failed to convert JSON to YAML: {e}")
 
 
-def load_config(path: Union[str, Path], format: Optional[str] = None) -> Any:
+def load_config(path: str | Path, format: Optional[str] = None) -> Any:
     """Load and parse config file with format auto-detection.
 
     Args:
@@ -597,7 +597,7 @@ class PythonIncrementalJsonParser:
         return len(self.buffer)
 
 
-def compute_json_diff(original: str, modified: str) -> List[Dict[str, Any]]:
+def compute_json_diff(original: str, modified: str) -> list[dict[str, Any]]:
     """Compute JSON diff (RFC 6902).
 
     Args:
@@ -645,7 +645,7 @@ def compute_json_diff(original: str, modified: str) -> List[Dict[str, Any]]:
             raise SerializationError(f"Failed to compute JSON diff: {e}")
 
 
-def apply_json_patches(json_str: str, patches: List[Dict[str, Any]]) -> str:
+def apply_json_patches(json_str: str, patches: list[dict[str, Any]]) -> str:
     """Apply JSON patches to document.
 
     Args:
@@ -807,7 +807,7 @@ def merge_json(base: str, merge_data: str) -> str:
             raise SerializationError(f"Failed to merge JSON: {e}")
 
 
-def deep_get_json(json_str: str, path: List[str]) -> Any:
+def deep_get_json(json_str: str, path: list[str]) -> Any:
     """Get nested value using path array.
 
     Args:
@@ -846,7 +846,7 @@ def deep_get_json(json_str: str, path: List[str]) -> Any:
             raise SerializationError(f"Failed to get nested value: {e}")
 
 
-def deep_set_json(json_str: str, path: List[str], value: Any) -> str:
+def deep_set_json(json_str: str, path: list[str], value: Any) -> str:
     """Set nested value using path array.
 
     Args:
@@ -914,7 +914,7 @@ def deep_set_json(json_str: str, path: List[str], value: Any) -> str:
 
 
 # Performance utilities
-def get_performance_info() -> Dict[str, Any]:
+def get_performance_info() -> dict[str, Any]:
     """Get information about available performance optimizations.
 
     Returns:

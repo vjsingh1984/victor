@@ -45,7 +45,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from victor.core.container import ServiceContainer, ServiceLifetime
 
@@ -125,9 +125,6 @@ class WorkflowServiceProvider:
             container: DI container to register services in
         """
         # Import workflow protocols and concrete classes
-        from victor.workflows.compiler_protocols import (
-            NodeExecutorFactoryProtocol,
-        )
         from victor.workflows.executors.factory import NodeExecutorFactory
         from victor.workflows.orchestrator_pool import OrchestratorPool
         from victor.workflows.validator import WorkflowValidator

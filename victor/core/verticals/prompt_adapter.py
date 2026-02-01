@@ -45,14 +45,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Protocol,
-    Union,
-    runtime_checkable,
 )
+from collections.abc import Callable
 
 from victor.core.verticals.protocols import (
     PromptContributorProtocol,
@@ -80,7 +75,7 @@ class LegacyTaskHint:
 
     hint: str
     tool_budget: Optional[int] = None
-    priority_tools: List[str] = field(default_factory=list)
+    priority_tools: list[str] = field(default_factory=list)
 
     def to_task_type_hint(self, task_type: str) -> TaskTypeHint:
         """Convert to TaskTypeHint.
@@ -135,7 +130,7 @@ class PromptContributorAdapter(PromptContributorProtocol):
 
     def __init__(
         self,
-        task_hints: Dict[str, TaskTypeHint],
+        task_hints: dict[str, TaskTypeHint],
         system_prompt_section: str = "",
         grounding_rules: str = "",
         priority: int = 50,
@@ -153,7 +148,7 @@ class PromptContributorAdapter(PromptContributorProtocol):
         self._grounding_rules = grounding_rules
         self._priority = priority
 
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
         """Get task type hints.
 
         Returns:
@@ -192,7 +187,7 @@ class PromptContributorAdapter(PromptContributorProtocol):
     @classmethod
     def from_dict(
         cls,
-        task_hints: Optional[Dict[str, Any]] = None,
+        task_hints: Optional[dict[str, Any]] = None,
         system_prompt_section: str = "",
         grounding_rules: str = "",
         priority: int = 50,
@@ -222,7 +217,7 @@ class PromptContributorAdapter(PromptContributorProtocol):
                 }
             )
         """
-        converted_hints: Dict[str, TaskTypeHint] = {}
+        converted_hints: dict[str, TaskTypeHint] = {}
 
         if task_hints:
             for task_type, hint_data in task_hints.items():
@@ -285,7 +280,7 @@ class PromptContributorAdapter(PromptContributorProtocol):
     @classmethod
     def from_callable(
         cls,
-        hints_fn: Callable[[], Dict[str, TaskTypeHint]],
+        hints_fn: Callable[[], dict[str, TaskTypeHint]],
         prompt_fn: Optional[Callable[[], str]] = None,
         grounding_fn: Optional[Callable[[], str]] = None,
         priority: int = 50,
@@ -328,7 +323,7 @@ class PromptContributorAdapter(PromptContributorProtocol):
     # Composition Methods
     # =========================================================================
 
-    def with_hints(self, additional_hints: Dict[str, TaskTypeHint]) -> "PromptContributorAdapter":
+    def with_hints(self, additional_hints: dict[str, TaskTypeHint]) -> "PromptContributorAdapter":
         """Create new adapter with additional hints.
 
         Args:
@@ -420,7 +415,7 @@ class CompositePromptContributor(PromptContributorProtocol):
         hints = composite.get_task_type_hints()
     """
 
-    def __init__(self, contributors: List[PromptContributorProtocol]):
+    def __init__(self, contributors: list[PromptContributorProtocol]):
         """Initialize the composite.
 
         Args:
@@ -429,13 +424,13 @@ class CompositePromptContributor(PromptContributorProtocol):
         # Sort by priority (lower first)
         self._contributors = sorted(contributors, key=lambda c: c.get_priority())
 
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
         """Get merged task type hints.
 
         Returns:
             Merged dict (later contributors override)
         """
-        merged: Dict[str, TaskTypeHint] = {}
+        merged: dict[str, TaskTypeHint] = {}
         for contributor in self._contributors:
             merged.update(contributor.get_task_type_hints())
         return merged
@@ -491,7 +486,7 @@ class CompositePromptContributor(PromptContributorProtocol):
 
 
 def create_prompt_adapter(
-    task_hints: Optional[Dict[str, Any]] = None,
+    task_hints: Optional[dict[str, Any]] = None,
     system_prompt: str = "",
     grounding: str = "",
     priority: int = 50,

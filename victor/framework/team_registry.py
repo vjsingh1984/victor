@@ -48,7 +48,7 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.framework.tool_naming import canonicalize_tool_list, validate_tool_names
 
@@ -74,7 +74,7 @@ class TeamSpecEntry:
     name: str
     spec: Any
     vertical: Optional[str] = None
-    tags: Set[str] = field(default_factory=set)
+    tags: set[str] = field(default_factory=set)
     description: str = ""
 
     @property
@@ -118,9 +118,9 @@ class TeamSpecRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._teams: Dict[str, TeamSpecEntry] = {}
+        self._teams: dict[str, TeamSpecEntry] = {}
         self._lock = threading.RLock()
-        self._team_hashes: Dict[str, str] = {}  # Phase 4: Hash-based idempotence
+        self._team_hashes: dict[str, str] = {}  # Phase 4: Hash-based idempotence
 
     def register(
         self,
@@ -128,7 +128,7 @@ class TeamSpecRegistry:
         spec: Any,
         *,
         vertical: Optional[str] = None,
-        tags: Optional[Set[str]] = None,
+        tags: Optional[set[str]] = None,
         description: str = "",
         replace: bool = False,
     ) -> None:
@@ -207,7 +207,7 @@ class TeamSpecRegistry:
         with self._lock:
             return self._teams.get(name)
 
-    def list_teams(self) -> List[str]:
+    def list_teams(self) -> list[str]:
         """List all registered team names.
 
         Returns:
@@ -216,7 +216,7 @@ class TeamSpecRegistry:
         with self._lock:
             return list(self._teams.keys())
 
-    def list_entries(self) -> List[TeamSpecEntry]:
+    def list_entries(self) -> list[TeamSpecEntry]:
         """List all team spec entries.
 
         Returns:
@@ -225,7 +225,7 @@ class TeamSpecRegistry:
         with self._lock:
             return list(self._teams.values())
 
-    def find_by_vertical(self, vertical: str) -> Dict[str, Any]:
+    def find_by_vertical(self, vertical: str) -> dict[str, Any]:
         """Find team specs by vertical.
 
         Args:
@@ -241,7 +241,7 @@ class TeamSpecRegistry:
                 if entry.vertical == vertical
             }
 
-    def find_by_tag(self, tag: str) -> Dict[str, Any]:
+    def find_by_tag(self, tag: str) -> dict[str, Any]:
         """Find team specs by tag.
 
         Args:
@@ -253,7 +253,7 @@ class TeamSpecRegistry:
         with self._lock:
             return {name: entry.spec for name, entry in self._teams.items() if tag in entry.tags}
 
-    def find_by_tags(self, tags: Set[str], match_all: bool = False) -> Dict[str, Any]:
+    def find_by_tags(self, tags: set[str], match_all: bool = False) -> dict[str, Any]:
         """Find team specs matching multiple tags.
 
         Args:
@@ -294,7 +294,7 @@ class TeamSpecRegistry:
         with self._lock:
             # Task type to vertical/team mapping
             # This is a simple heuristic; verticals can provide more sophisticated matching
-            task_hints: Dict[str, List[str]] = {
+            task_hints: dict[str, list[str]] = {
                 # Coding vertical
                 "feature": ["coding"],
                 "implement": ["coding"],
@@ -381,7 +381,7 @@ class TeamSpecRegistry:
     def register_from_vertical(
         self,
         vertical_name: str,
-        team_specs: Dict[str, Any],
+        team_specs: dict[str, Any],
         replace: bool = True,
     ) -> int:
         """Register multiple team specs from a vertical.
@@ -513,7 +513,7 @@ def register_team_spec(
     spec: Any,
     *,
     vertical: Optional[str] = None,
-    tags: Optional[Set[str]] = None,
+    tags: Optional[set[str]] = None,
     description: str = "",
     replace: bool = False,
 ) -> None:

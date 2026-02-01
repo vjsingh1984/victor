@@ -18,7 +18,7 @@ Consolidates all cache operations into a single tool for better token efficiency
 Supports: stats, clear, info.
 """
 
-from typing import Dict, Any, Optional
+from typing import Any, Optional
 import logging
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -28,7 +28,7 @@ from victor.storage.cache.tiered_cache import TieredCache
 logger = logging.getLogger(__name__)
 
 
-def _get_cache_manager(context: Optional[Dict[str, Any]] = None) -> Optional[TieredCache]:
+def _get_cache_manager(context: Optional[dict[str, Any]] = None) -> Optional[TieredCache]:
     """Get cache manager from execution context.
 
     Args:
@@ -42,7 +42,7 @@ def _get_cache_manager(context: Optional[Dict[str, Any]] = None) -> Optional[Tie
     return None
 
 
-async def _do_stats(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def _do_stats(context: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Get cache statistics."""
     cache_manager = _get_cache_manager(context)
     if cache_manager is None:
@@ -85,8 +85,8 @@ async def _do_stats(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 
 
 async def _do_clear(
-    namespace: Optional[str] = None, context: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    namespace: Optional[str] = None, context: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """Clear cache entries."""
     cache_manager = _get_cache_manager(context)
     if cache_manager is None:
@@ -107,7 +107,7 @@ async def _do_clear(
         return {"success": False, "error": f"Failed to clear cache: {str(e)}"}
 
 
-async def _do_info(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def _do_info(context: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Get cache configuration info."""
     cache_manager = _get_cache_manager(context)
     if cache_manager is None:
@@ -171,8 +171,8 @@ async def _do_info(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 async def cache(
     action: str,
     namespace: Optional[str] = None,
-    context: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    context: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """
     Unified cache management tool for Victor's tiered caching system.
 

@@ -46,7 +46,7 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ class AdaptiveLRUCache:
         self._total_accesses = 0
 
         # Access times for performance tracking
-        self._access_times: List[float] = []
+        self._access_times: list[float] = []
         self._max_access_samples = 100
 
         # Adaptive metrics
@@ -253,7 +253,7 @@ class AdaptiveLRUCache:
             # Check if adjustment needed
             return self._needs_adjustment()
 
-    def adjust_size(self) -> Dict[str, Any]:
+    def adjust_size(self) -> dict[str, Any]:
         """Adjust cache size based on performance metrics.
 
         Returns:
@@ -348,7 +348,7 @@ class AdaptiveLRUCache:
 
             return result
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get comprehensive cache metrics.
 
         Returns:

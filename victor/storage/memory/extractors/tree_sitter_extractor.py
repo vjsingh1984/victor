@@ -20,7 +20,7 @@ with high accuracy through AST parsing rather than regex patterns.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.storage.memory.entity_types import Entity, EntityRelation, EntityType, RelationType
 from victor.storage.memory.extractors.base import EntityExtractor, ExtractionResult
@@ -50,7 +50,7 @@ class TreeSitterEntityExtractor(EntityExtractor):
         return "tree_sitter"
 
     @property
-    def supported_types(self) -> Set[EntityType]:
+    def supported_types(self) -> set[EntityType]:
         """Get supported entity types."""
         return {
             EntityType.FUNCTION,
@@ -76,7 +76,7 @@ class TreeSitterEntityExtractor(EntityExtractor):
         self,
         content: str,
         source: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ExtractionResult:
         """Extract entities from code using Tree-sitter.
 
@@ -88,8 +88,8 @@ class TreeSitterEntityExtractor(EntityExtractor):
         Returns:
             ExtractionResult with entities and relations
         """
-        entities: List[Entity] = []
-        relations: List[EntityRelation] = []
+        entities: list[Entity] = []
+        relations: list[EntityRelation] = []
 
         # Need a file path for Tree-sitter language detection
         if source is None:
@@ -133,7 +133,7 @@ class TreeSitterEntityExtractor(EntityExtractor):
                     temp_path.unlink(missing_ok=True)
 
             # Convert symbols to entities
-            entity_map: Dict[str, Entity] = {}
+            entity_map: dict[str, Entity] = {}
 
             for symbol in symbols:
                 entity_type = self._symbol_type_to_entity_type(symbol.type)
@@ -220,7 +220,7 @@ class TreeSitterEntityExtractor(EntityExtractor):
     async def _extract_inline(
         self,
         content: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ExtractionResult:
         """Extract entities from inline code without file path.
 
@@ -349,7 +349,7 @@ class TreeSitterFileExtractor(EntityExtractor):
         return "tree_sitter_file"
 
     @property
-    def supported_types(self) -> Set[EntityType]:
+    def supported_types(self) -> set[EntityType]:
         """Get supported entity types."""
         return self._inner.supported_types
 
@@ -357,7 +357,7 @@ class TreeSitterFileExtractor(EntityExtractor):
         self,
         content: str,
         source: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ExtractionResult:
         """Extract entities from file content."""
         return await self._inner.extract(content, source, context)
@@ -386,7 +386,7 @@ class TreeSitterFileExtractor(EntityExtractor):
         self,
         directory: Path,
         recursive: bool = True,
-        file_patterns: Optional[List[str]] = None,
+        file_patterns: Optional[list[str]] = None,
     ) -> ExtractionResult:
         """Extract entities from all source files in a directory.
 
@@ -398,8 +398,8 @@ class TreeSitterFileExtractor(EntityExtractor):
         Returns:
             Combined ExtractionResult
         """
-        all_entities: List[Entity] = []
-        all_relations: List[EntityRelation] = []
+        all_entities: list[Entity] = []
+        all_relations: list[EntityRelation] = []
 
         if file_patterns is None:
             file_patterns = [

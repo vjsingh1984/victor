@@ -31,13 +31,11 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type
-from unittest.mock import AsyncMock, MagicMock, Mock
+from typing import Any, Optional
+from unittest.mock import AsyncMock, Mock
 
-import pytest
 
 from victor.agent.protocols import (
     ToolExecutorProtocol,
@@ -75,7 +73,7 @@ class MockProviderFactory:
         response_content: str = "Test response",
         supports_tools: bool = True,
         supports_streaming: bool = True,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> Mock:
         """Create a base mock provider with common configuration.
 
@@ -244,7 +242,7 @@ class MockProviderFactory:
     @classmethod
     def create_with_tool_calls(
         cls,
-        tool_calls: List[Dict[str, Any]],
+        tool_calls: list[dict[str, Any]],
         name: str = "mock",
         model: str = "test-model",
     ) -> Mock:
@@ -1093,7 +1091,6 @@ class TestFixtureFactory:
         """
         from victor.agent.protocols import (
             ResponseSanitizerProtocol,
-            ToolExecutorProtocol,
         )
         from victor.agent.response_sanitizer import ResponseSanitizer
         from victor.analytics.logger import UsageLogger
@@ -1128,7 +1125,7 @@ class TestFixtureFactory:
         return container
 
     @staticmethod
-    def create_tool_registry(tools: Optional[List[Any]] = None) -> Mock:
+    def create_tool_registry(tools: Optional[list[Any]] = None) -> Mock:
         """Create a mock tool registry.
 
         Args:
@@ -1193,8 +1190,8 @@ class TestFixtureFactory:
     @staticmethod
     def create_message_history(
         system_prompt: Optional[str] = None,
-        messages: Optional[List[Dict[str, str]]] = None,
-    ) -> List[Message]:
+        messages: Optional[list[dict[str, str]]] = None,
+    ) -> list[Message]:
         """Create a message history for testing.
 
         Args:
@@ -1258,7 +1255,7 @@ class TestFixtureFactory:
         provider: Optional[Mock] = None,
         settings: Optional[Mock] = None,
         tool_registry: Optional[Any] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a complete orchestrator fixture for testing.
 
         This fixture includes:
@@ -1277,7 +1274,6 @@ class TestFixtureFactory:
         Returns:
             Dictionary with all orchestrator components
         """
-        from victor.config.settings import get_project_paths
 
         # Create components
         if provider is None:
@@ -1339,7 +1335,7 @@ class TestFixtureFactory:
         content: str = "Response",
         role: str = "assistant",
         model: str = "test-model",
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> Mock:
         """Create a mock completion response.
 
@@ -1403,7 +1399,7 @@ def create_test_container() -> ServiceContainer:
     return TestFixtureFactory.create_container()
 
 
-def create_test_tool_registry(tools: Optional[List[Any]] = None) -> Mock:
+def create_test_tool_registry(tools: Optional[list[Any]] = None) -> Mock:
     """Create a test tool registry.
 
     Args:

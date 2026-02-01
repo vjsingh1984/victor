@@ -34,16 +34,16 @@ from __future__ import annotations
 import fnmatch
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import yaml
 
 logger = logging.getLogger(__name__)
 
 # Cache for loaded config
-_config_cache: Optional[Dict[str, Any]] = None
+_config_cache: Optional[dict[str, Any]] = None
 _cache_timestamp: float = 0
 _cache_ttl: float = 300.0  # 5 minutes
 
@@ -83,7 +83,7 @@ class ProviderMetricsCapabilities:
         completion_tokens: int,
         cache_read_tokens: int = 0,
         cache_write_tokens: int = 0,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Calculate cost breakdown for token usage.
 
         Args:
@@ -112,7 +112,7 @@ class ProviderMetricsCapabilities:
             "total_cost": total_cost,
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "provider": self.provider,
@@ -138,7 +138,7 @@ class ProviderMetricsCapabilities:
         }
 
 
-def _load_config() -> Dict[str, Any]:
+def _load_config() -> dict[str, Any]:
     """Load metrics capabilities config with caching.
 
     Returns:
@@ -150,7 +150,7 @@ def _load_config() -> Dict[str, Any]:
     if _config_cache is not None and (now - _cache_timestamp) < _cache_ttl:
         return _config_cache
 
-    config: Dict[str, Any] = {}
+    config: dict[str, Any] = {}
 
     # Phase 1: Load bundled config
     bundled_path = Path(__file__).parent / "provider_metrics.yaml"
@@ -182,7 +182,7 @@ def _load_config() -> Dict[str, Any]:
     return config
 
 
-def _merge_config(base: Dict[str, Any], override: Dict[str, Any]) -> None:
+def _merge_config(base: dict[str, Any], override: dict[str, Any]) -> None:
     """Deep merge override config into base config.
 
     Args:
@@ -196,7 +196,7 @@ def _merge_config(base: Dict[str, Any], override: Dict[str, Any]) -> None:
             base[key] = value
 
 
-def _get_provider_config(config: Dict[str, Any], provider: str) -> Dict[str, Any]:
+def _get_provider_config(config: dict[str, Any], provider: str) -> dict[str, Any]:
     """Get provider-specific config with defaults applied.
 
     Args:
@@ -220,8 +220,8 @@ def _get_provider_config(config: Dict[str, Any], provider: str) -> Dict[str, Any
 
 
 def _get_model_pricing(
-    config: Dict[str, Any], provider: str, model: str
-) -> Optional[Dict[str, float]]:
+    config: dict[str, Any], provider: str, model: str
+) -> Optional[dict[str, float]]:
     """Get model-specific pricing config.
 
     Args:
@@ -240,7 +240,7 @@ def _get_model_pricing(
             if pricing and isinstance(pricing, dict):
                 from typing import cast
 
-                return cast(Dict[str, float], pricing)
+                return cast(dict[str, float], pricing)
 
     # Check provider pricing
     providers = config.get("providers", {})
@@ -262,9 +262,9 @@ def _get_model_pricing(
     return None
 
 
-def _deep_copy(d: Dict[str, Any]) -> Dict[str, Any]:
+def _deep_copy(d: dict[str, Any]) -> dict[str, Any]:
     """Create a deep copy of a dict (simple implementation)."""
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
     for key, value in d.items():
         if isinstance(value, dict):
             result[key] = _deep_copy(value)

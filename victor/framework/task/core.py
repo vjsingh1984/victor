@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 class FrameworkTaskType(Enum):
@@ -93,9 +93,9 @@ class Task:
 
     prompt: str
     type: FrameworkTaskType = FrameworkTaskType.CHAT
-    files: List[str] = field(default_factory=list)
-    context: Dict[str, Any] = field(default_factory=dict)
-    constraints: Dict[str, Any] = field(default_factory=dict)
+    files: list[str] = field(default_factory=list)
+    context: dict[str, Any] = field(default_factory=dict)
+    constraints: dict[str, Any] = field(default_factory=dict)
 
     # Advanced options
     tool_budget: Optional[int] = None
@@ -125,13 +125,13 @@ class TaskResult:
     """
 
     content: str
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     success: bool = True
     error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def files_modified(self) -> List[str]:
+    def files_modified(self) -> list[str]:
         """Get list of files modified during task execution.
 
         Returns:
@@ -149,7 +149,7 @@ class TaskResult:
         return modified
 
     @property
-    def files_read(self) -> List[str]:
+    def files_read(self) -> list[str]:
         """Get list of files read during task execution.
 
         Returns:
@@ -167,7 +167,7 @@ class TaskResult:
         return read
 
     @property
-    def commands_executed(self) -> List[str]:
+    def commands_executed(self) -> list[str]:
         """Get list of shell commands executed during task.
 
         Returns:
@@ -191,7 +191,7 @@ class TaskResult:
         """
         return len(self.tool_calls)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
 
         Returns:

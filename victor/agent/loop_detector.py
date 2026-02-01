@@ -28,14 +28,13 @@ The key insight is that loops are about *intent*, not just parameters:
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state_machine import ConversationStage  # type: ignore[import-not-found]
+    pass  # type: ignore[import-not-found]
 
 from victor.tools.tool_names import get_canonical_name
 
@@ -70,10 +69,10 @@ class LoopContext:
 
     stage: Optional[Any] = None
     purpose: Optional[OperationPurpose] = None
-    previous_milestones: Set[str] = field(default_factory=set)
+    previous_milestones: set[str] = field(default_factory=set)
 
     @classmethod
-    def from_stage(cls, stage: Any, milestones: Optional[Set[str]] = None) -> "LoopContext":
+    def from_stage(cls, stage: Any, milestones: Optional[set[str]] = None) -> "LoopContext":
         """Create context from conversation stage.
 
         Args:
@@ -98,7 +97,7 @@ class LoopSignature:
     """
 
     # Volatile parameters by tool (excluded from signatures)
-    VOLATILE_BY_TOOL: Dict[str, Set[str]] = {
+    VOLATILE_BY_TOOL: dict[str, set[str]] = {
         "read": {"offset", "limit", "line_start", "line_end"},
         "ls": {"pattern", "recursive", "depth", "limit"},  # Pattern variations = exploration
         "search": {"offset", "limit"},
@@ -110,7 +109,7 @@ class LoopSignature:
     @staticmethod
     def generate(
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         context: Optional[LoopContext] = None,
     ) -> str:
         """Generate a context-aware loop detection signature.
@@ -158,7 +157,7 @@ class LoopSignature:
         return f"{readable_part}|{hash_part}"
 
     @staticmethod
-    def _get_stable_args(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_stable_args(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Get stable arguments excluding volatile fields.
 
         Args:
@@ -181,7 +180,7 @@ class LoopSignature:
         return {k: v for k, v in arguments.items() if k not in volatile}
 
     @staticmethod
-    def infer_purpose(tool_name: str, arguments: Dict[str, Any], stage: Any) -> OperationPurpose:
+    def infer_purpose(tool_name: str, arguments: dict[str, Any], stage: Any) -> OperationPurpose:
         """Infer the purpose of a tool call from context.
 
         Args:

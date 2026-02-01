@@ -43,7 +43,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.observability.debug.adapter import (
     DebugAdapter,
@@ -95,9 +95,9 @@ class DebugManager:
             auto_discover: Whether to auto-discover adapters
         """
         self._registry = registry or get_debug_registry()
-        self._sessions: Dict[str, DebugSession] = {}
-        self._session_adapters: Dict[str, DebugAdapter] = {}
-        self._event_handlers: Set[EventHandler] = set()
+        self._sessions: dict[str, DebugSession] = {}
+        self._session_adapters: dict[str, DebugAdapter] = {}
+        self._event_handlers: set[EventHandler] = set()
         self._lock = asyncio.Lock()
 
         # Auto-discover adapters if requested
@@ -110,9 +110,9 @@ class DebugManager:
         self,
         program: str,
         language: Optional[str] = None,
-        arguments: Optional[List[str]] = None,
+        arguments: Optional[list[str]] = None,
         working_directory: Optional[str] = None,
-        environment: Optional[Dict[str, str]] = None,
+        environment: Optional[dict[str, str]] = None,
         stop_on_entry: bool = False,
         **extra_options: Any,
     ) -> DebugSession:
@@ -245,7 +245,7 @@ class DebugManager:
         """
         return self._sessions.get(session_id)
 
-    def list_sessions(self) -> List[DebugSession]:
+    def list_sessions(self) -> list[DebugSession]:
         """List all active sessions.
 
         Returns:
@@ -375,7 +375,7 @@ class DebugManager:
 
     # Inspection
 
-    async def get_threads(self, session_id: str) -> List[Thread]:
+    async def get_threads(self, session_id: str) -> list[Thread]:
         """Get all threads."""
         adapter = self._get_adapter(session_id)
         threads = await adapter.get_threads(session_id)
@@ -389,18 +389,18 @@ class DebugManager:
 
     async def get_stack_trace(
         self, session_id: str, thread_id: Optional[int] = None
-    ) -> List[StackFrame]:
+    ) -> list[StackFrame]:
         """Get stack trace for a thread."""
         adapter = self._get_adapter(session_id)
         thread_id = thread_id or self._get_current_thread(session_id)
         return await adapter.get_stack_trace(session_id, thread_id)
 
-    async def get_scopes(self, session_id: str, frame_id: int) -> List[Scope]:
+    async def get_scopes(self, session_id: str, frame_id: int) -> list[Scope]:
         """Get variable scopes for a stack frame."""
         adapter = self._get_adapter(session_id)
         return await adapter.get_scopes(session_id, frame_id)
 
-    async def get_variables(self, session_id: str, scope_or_ref: int) -> List[Variable]:
+    async def get_variables(self, session_id: str, scope_or_ref: int) -> list[Variable]:
         """Get variables for a scope or reference."""
         adapter = self._get_adapter(session_id)
         return await adapter.get_variables(session_id, scope_or_ref)
@@ -475,7 +475,7 @@ class DebugManager:
 
     # Utilities
 
-    def supported_languages(self) -> List[str]:
+    def supported_languages(self) -> list[str]:
         """Get list of languages with debug support."""
         return self._registry.supported_languages()
 

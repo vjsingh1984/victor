@@ -49,10 +49,10 @@ import logging
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Callable, Dict, Iterator, List, Optional, Union
+from typing import Any, Optional
+from collections.abc import Callable, Iterator
 
-from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
+from victor.core.events import MessagingEvent
 from victor.observability.exporters import BaseExporter
 
 logger = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ class OTELConfig:
     service_name: str = "victor-agent"
     service_version: str = "0.5.0"
     endpoint: Optional[str] = None
-    headers: Optional[Dict[str, str]] = None
+    headers: Optional[dict[str, str]] = None
     use_console_exporter: bool = False
     batch_export: bool = True
     max_queue_size: int = 2048
@@ -118,7 +118,7 @@ class OpenTelemetryExporter(BaseExporter):
         service_name: str = "victor-agent",
         service_version: str = "0.5.0",
         endpoint: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
+        headers: Optional[dict[str, str]] = None,
         use_console_exporter: bool = False,
         batch_export: bool = True,
     ) -> None:
@@ -266,7 +266,7 @@ class OTELSpanManager:
     def span(
         self,
         name: str,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: Optional[dict[str, Any]] = None,
     ) -> Iterator[Any]:
         """Create a span context.
 
@@ -321,7 +321,7 @@ class AsyncBatchingExporter(BaseExporter):
         batch_size: int = 100,
         flush_interval: float = 5.0,
         max_queue_size: int = 10000,
-        on_export_error: Optional[Callable[[Exception, List[MessagingEvent]], None]] = None,
+        on_export_error: Optional[Callable[[Exception, list[MessagingEvent]], None]] = None,
     ) -> None:
         """Initialize async batching exporter.
 
@@ -362,7 +362,7 @@ class AsyncBatchingExporter(BaseExporter):
         """Background export loop."""
         import time
 
-        batch: List[MessagingEvent] = []
+        batch: list[MessagingEvent] = []
         last_flush = time.time()
 
         while not self._shutdown.is_set():
@@ -392,7 +392,7 @@ class AsyncBatchingExporter(BaseExporter):
         if batch:
             self._flush_batch(batch)
 
-    def _flush_batch(self, batch: List[MessagingEvent]) -> None:
+    def _flush_batch(self, batch: list[MessagingEvent]) -> None:
         """Flush batch of events to target.
 
         Args:

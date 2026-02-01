@@ -19,7 +19,7 @@ Based on the Model Context Protocol by Anthropic.
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -72,7 +72,7 @@ class MCPTool(BaseModel):
 
     name: str = Field(description="Tool name")
     description: str = Field(description="Tool description")
-    parameters: List[MCPParameter] = Field(default_factory=list, description="Tool parameters")
+    parameters: list[MCPParameter] = Field(default_factory=list, description="Tool parameters")
     version: str = Field(default="0.5.0", description="Tool version")
 
 
@@ -83,7 +83,7 @@ class MCPResource(BaseModel):
     name: str = Field(description="Resource name")
     description: str = Field(description="Resource description")
     mime_type: Optional[str] = Field(default=None, description="MIME type")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 class MCPMessage(BaseModel):
@@ -92,9 +92,9 @@ class MCPMessage(BaseModel):
     jsonrpc: str = Field(default="2.0", description="JSON-RPC version")
     id: Optional[str] = Field(default=None, description="Message ID")
     method: Optional[MCPMessageType] = Field(default=None, description="Method name")
-    params: Optional[Dict[str, Any]] = Field(default=None, description="Method parameters")
+    params: Optional[dict[str, Any]] = Field(default=None, description="Method parameters")
     result: Optional[Any] = Field(default=None, description="Result (for responses)")
-    error: Optional[Dict[str, Any]] = Field(default=None, description="Error (for error responses)")
+    error: Optional[dict[str, Any]] = Field(default=None, description="Error (for error responses)")
 
 
 class MCPCapabilities(BaseModel):
@@ -105,14 +105,14 @@ class MCPCapabilities(BaseModel):
     If not supported, omit it (None excludes from serialization).
     """
 
-    tools: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Tools capability")
-    resources: Optional[Dict[str, Any]] = Field(
+    tools: Optional[dict[str, Any]] = Field(default_factory=dict, description="Tools capability")
+    resources: Optional[dict[str, Any]] = Field(
         default_factory=dict, description="Resources capability"
     )
-    prompts: Optional[Dict[str, Any]] = Field(default=None, description="Prompts capability")
-    sampling: Optional[Dict[str, Any]] = Field(default=None, description="Sampling capability")
+    prompts: Optional[dict[str, Any]] = Field(default=None, description="Prompts capability")
+    sampling: Optional[dict[str, Any]] = Field(default=None, description="Sampling capability")
 
-    def model_dump(self, **kwargs: Any) -> Dict[str, Any]:
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Override to exclude None values by default."""
         kwargs.setdefault("exclude_none", True)
         return super().model_dump(**kwargs)
@@ -173,4 +173,4 @@ class MCPResourceContent(BaseModel):
     uri: str = Field(description="Resource URI")
     mime_type: Optional[str] = Field(default=None, description="Content MIME type")
     content: str = Field(description="Resource content")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")

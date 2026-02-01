@@ -3,7 +3,6 @@
 Tests the vertical templates implementing the Template Method pattern.
 """
 
-from typing import Any, Dict, List
 
 import pytest
 
@@ -269,7 +268,7 @@ class TestVerticalRegistry:
             description = "Test"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read"]
 
             @classmethod
@@ -305,7 +304,7 @@ class TestVerticalRegistry:
             description = "Temp"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return []
 
             @classmethod
@@ -326,7 +325,7 @@ class TestVerticalRegistry:
             description = "Test"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return []
 
             @classmethod
@@ -353,7 +352,7 @@ class TestCustomVertical:
             description = "Data science and ML assistant"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read", "write", "shell", "web_search"]
 
             @classmethod
@@ -361,7 +360,7 @@ class TestCustomVertical:
                 return "You are a data science assistant specializing in ML..."
 
             @classmethod
-            def get_stages(cls) -> Dict[str, StageDefinition]:
+            def get_stages(cls) -> dict[str, StageDefinition]:
                 return {
                     "INITIAL": StageDefinition(
                         name="INITIAL",
@@ -402,7 +401,7 @@ class TestCustomVertical:
             description = "Coding with extra features"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 # Extend parent tools
                 parent_tools = super().get_tools()
                 return parent_tools + ["extra_tool"]
@@ -491,7 +490,7 @@ class TestBootstrapVerticalActivation:
 
     def test_ensure_bootstrapped_with_vertical(self):
         """ensure_bootstrapped should activate specified vertical."""
-        from victor.core.bootstrap import ensure_bootstrapped, get_container
+        from victor.core.bootstrap import ensure_bootstrapped
         from victor.core.verticals import get_vertical_loader
         from victor.config.settings import Settings
 
@@ -991,7 +990,7 @@ class TestVerticalRegistryExternalDiscovery:
             description = "Test"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return []
 
             @classmethod
@@ -1009,7 +1008,7 @@ class TestVerticalRegistryExternalDiscovery:
             description = "Valid test vertical"
 
             @classmethod
-            def get_tools(cls) -> List[str]:
+            def get_tools(cls) -> list[str]:
                 return ["read", "write"]
 
             @classmethod

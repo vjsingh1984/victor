@@ -23,7 +23,7 @@ This module handles:
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 import tiktoken
 
 from pydantic import BaseModel, Field
@@ -45,7 +45,7 @@ class Message(BaseModel):
     content: str = Field(description="Message content")
     tokens: int = Field(default=0, description="Token count for this message")
     priority: int = Field(default=5, description="Priority (1-10, higher = more important)")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 class FileContext(BaseModel):
@@ -55,14 +55,14 @@ class FileContext(BaseModel):
     content: str = Field(description="File content")
     tokens: int = Field(default=0, description="Token count")
     relevance_score: float = Field(default=0.0, description="Relevance score (0-1)")
-    line_range: Optional[Tuple[int, int]] = Field(default=None, description="Specific line range")
+    line_range: Optional[tuple[int, int]] = Field(default=None, description="Specific line range")
 
 
 class ContextWindow(BaseModel):
     """Represents the current context window state."""
 
-    messages: List[Message] = Field(default_factory=list, description="Conversation messages")
-    files: List[FileContext] = Field(default_factory=list, description="Included files")
+    messages: list[Message] = Field(default_factory=list, description="Conversation messages")
+    files: list[FileContext] = Field(default_factory=list, description="Included files")
     total_tokens: int = Field(default=0, description="Total tokens in context")
     max_tokens: int = Field(default=128000, description="Maximum context window size")
     reserved_tokens: int = Field(default=4096, description="Reserved for response")
@@ -134,7 +134,7 @@ class ProjectContextLoader:
         return len(self.encoder.encode(text))
 
     def add_message(
-        self, role: str, content: str, priority: int = 5, metadata: Optional[Dict[str, Any]] = None
+        self, role: str, content: str, priority: int = 5, metadata: Optional[dict[str, Any]] = None
     ) -> None:
         """Add a message to context.
 
@@ -162,7 +162,7 @@ class ProjectContextLoader:
         path: str,
         content: str,
         relevance_score: float = 1.0,
-        line_range: Optional[Tuple[int, int]] = None,
+        line_range: Optional[tuple[int, int]] = None,
     ) -> None:
         """Add a file to context.
 
@@ -195,7 +195,7 @@ class ProjectContextLoader:
         if self.context.usage_percentage > (self.prune_threshold * 100):
             self._auto_prune()
 
-    def get_context_for_prompt(self) -> List[Dict[str, str]]:
+    def get_context_for_prompt(self) -> list[dict[str, str]]:
         """Get context formatted for LLM prompt.
 
         Returns:
@@ -259,7 +259,7 @@ class ProjectContextLoader:
         # Remove oldest non-system messages
         # Iterate in reverse, removing oldest messages until we hit the target
         removed_tokens = 0
-        messages_to_keep: List[Message] = []
+        messages_to_keep: list[Message] = []
 
         for msg in reversed(other_messages):
             if removed_tokens < tokens_to_remove:
@@ -307,7 +307,7 @@ class ProjectContextLoader:
         first_user = next((m for m in self.context.messages if m.role == "user"), None)
 
         # Keep most recent messages
-        recent_messages: List[Message] = []
+        recent_messages: list[Message] = []
         recent_tokens = 0
         for msg in reversed(self.context.messages):
             if msg.role == "system" or msg == first_user:
@@ -370,7 +370,7 @@ class ProjectContextLoader:
 
         self.context.total_tokens -= removed_tokens
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get context statistics.
 
         Returns:

@@ -35,13 +35,13 @@ from __future__ import annotations
 import logging
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from contextlib import contextmanager
 
 if TYPE_CHECKING:
     from victor.observability.exporters import JsonLineExporter
 
-from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
+from victor.core.events import ObservabilityBus, get_observability_bus
 from victor.observability.emitters import (
     ToolEventEmitter,
     ModelEventEmitter,
@@ -179,7 +179,7 @@ class ObservabilityBridge:
     def tool_start(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         **metadata: Any,
     ) -> None:
         """Emit tool start event.
@@ -232,7 +232,7 @@ class ObservabilityBridge:
     def track_tool(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         **metadata: Any,
     ):
         """Context manager for tracking tool execution.
@@ -440,7 +440,7 @@ class ObservabilityBridge:
         self,
         error: Exception,
         recoverable: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         **metadata: Any,
     ) -> None:
         """Emit error event.

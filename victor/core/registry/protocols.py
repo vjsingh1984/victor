@@ -14,7 +14,7 @@
 
 """Protocol definitions for registry implementations."""
 
-from typing import List, Optional, Protocol, TypeVar, runtime_checkable
+from typing import Optional, Protocol, TypeVar, runtime_checkable
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -64,7 +64,7 @@ class IRegistry(Protocol[K, V]):
         """
         ...
 
-    def list_all(self) -> List[K]:
+    def list_all(self) -> list[K]:
         """List all registered keys.
 
         Returns:

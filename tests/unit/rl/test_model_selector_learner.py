@@ -1,12 +1,11 @@
 """Unit tests for model selector RL learner."""
 
-import sqlite3
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
-from victor.framework.rl.base import RLOutcome, RLRecommendation
+from victor.framework.rl.base import RLOutcome
 from victor.framework.rl.coordinator import RLCoordinator
 from victor.framework.rl.learners.model_selector import ModelSelectorLearner, SelectionStrategy
 from victor.core.database import reset_database, get_database
@@ -67,7 +66,7 @@ def _get_q_value_from_db(
     coordinator: RLCoordinator,
     provider: str,
     task_type: Optional[str] = None,
-) -> Tuple[float, int]:
+) -> tuple[float, int]:
     """Helper to retrieve Q-value and selection count from the database."""
     cursor = coordinator.db.cursor()
     if task_type:

@@ -24,8 +24,8 @@ Extracted from VerticalBase for SRP compliance.
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Type
+from abc import ABC
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class VerticalWorkflowProvider(ABC):
     """
 
     @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
+    def get_handlers(cls) -> dict[str, Any]:
         """Get compute handlers for workflow execution.
 
         Override to provide domain-specific handlers for workflow nodes.

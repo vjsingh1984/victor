@@ -32,7 +32,6 @@ SearchCoordinator Responsibilities:
 
 import pytest
 from unittest.mock import Mock
-from typing import Any, Dict
 
 from victor.agent.coordinators.search_coordinator import SearchCoordinator
 from victor.agent.search_router import SearchRoute, SearchType

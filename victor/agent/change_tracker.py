@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class FileChange:
     file_path: str
     timestamp: float
     tool_name: str
-    tool_args: Dict[str, Any]
+    tool_args: dict[str, Any]
     original_content: Optional[str] = None  # Content before change
     new_content: Optional[str] = None  # Content after change
     original_path: Optional[str] = None  # For renames
@@ -61,7 +61,7 @@ class FileChange:
     session_id: Optional[str] = None
     message_id: Optional[str] = None  # Links to conversation message
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         return {
             "id": self.id,
@@ -80,7 +80,7 @@ class FileChange:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "FileChange":
+    def from_dict(cls, data: dict[str, Any]) -> "FileChange":
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -104,13 +104,13 @@ class ChangeGroup:
     """A group of related changes (e.g., from a single tool execution)."""
 
     id: str
-    changes: List[FileChange] = field(default_factory=list)
+    changes: list[FileChange] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
     description: str = ""
     tool_name: str = ""
     undone: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "id": self.id,
@@ -122,7 +122,7 @@ class ChangeGroup:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ChangeGroup":
+    def from_dict(cls, data: dict[str, Any]) -> "ChangeGroup":
         """Create from dictionary."""
         return cls(
             id=data["id"],
@@ -165,8 +165,8 @@ class FileChangeHistory:
         self.session_id = session_id or self._generate_session_id()
 
         # In-memory stacks for fast operations
-        self._undo_stack: List[ChangeGroup] = []
-        self._redo_stack: List[ChangeGroup] = []
+        self._undo_stack: list[ChangeGroup] = []
+        self._redo_stack: list[ChangeGroup] = []
 
         # Current change group being built
         self._current_group: Optional[ChangeGroup] = None
@@ -346,7 +346,7 @@ class FileChangeHistory:
         original_content: Optional[str] = None,
         new_content: Optional[str] = None,
         tool_name: str = "",
-        tool_args: Optional[Dict[str, Any]] = None,
+        tool_args: Optional[dict[str, Any]] = None,
         original_path: Optional[str] = None,
     ) -> FileChange:
         """Record a file change.
@@ -493,7 +493,7 @@ class FileChangeHistory:
         """Check if redo is available."""
         return len(self._redo_stack) > 0
 
-    def undo(self) -> Tuple[bool, str, List[str]]:
+    def undo(self) -> tuple[bool, str, list[str]]:
         """Undo the last change group.
 
         Returns:
@@ -534,7 +534,7 @@ class FileChangeHistory:
             affected_files,
         )
 
-    def redo(self) -> Tuple[bool, str, List[str]]:
+    def redo(self) -> tuple[bool, str, list[str]]:
         """Redo the last undone change group.
 
         Returns:
@@ -632,7 +632,7 @@ class FileChangeHistory:
                     shutil.move(str(original), str(path))
                     logger.debug(f"Renamed {original} to {path} (redo)")
 
-    def get_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_history(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent change history.
 
         Args:
@@ -656,7 +656,7 @@ class FileChangeHistory:
             )
         return history
 
-    def get_file_history(self, file_path: str, limit: int = 10) -> List[FileChange]:
+    def get_file_history(self, file_path: str, limit: int = 10) -> list[FileChange]:
         """Get change history for a specific file.
 
         Args:

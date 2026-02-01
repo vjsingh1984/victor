@@ -63,7 +63,7 @@ import tracemalloc
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import numpy as np
 import pytest
@@ -107,7 +107,7 @@ class BenchmarkResult:
     p99_latency: float
     throughput: float
     memory_used: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_markdown_row(self) -> str:
         """Convert to markdown table row."""
@@ -134,7 +134,7 @@ class BenchmarkSuite:
     """
 
     name: str
-    results: List[BenchmarkResult] = field(default_factory=list)
+    results: list[BenchmarkResult] = field(default_factory=list)
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 
@@ -265,7 +265,7 @@ def generate_embeddings(num_vectors: int, dim: int = 384) -> np.ndarray:
 # =============================================================================
 
 
-def python_cosine_similarity(query: np.ndarray, tools: np.ndarray) -> List[float]:
+def python_cosine_similarity(query: np.ndarray, tools: np.ndarray) -> list[float]:
     """Compute cosine similarity between query and multiple tool vectors.
 
     This is the pure Python implementation used as baseline.
@@ -495,7 +495,7 @@ def test_python_cosine_similarity_very_large_numpy():
 # =============================================================================
 
 
-def python_topk_sort(scores: List[float], k: int) -> List[Tuple[int, float]]:
+def python_topk_sort(scores: list[float], k: int) -> list[tuple[int, float]]:
     """Select top-k items using sorting.
 
     Args:
@@ -510,7 +510,7 @@ def python_topk_sort(scores: List[float], k: int) -> List[Tuple[int, float]]:
     return indexed[:k]
 
 
-def python_topk_heap(scores: List[float], k: int) -> List[Tuple[int, float]]:
+def python_topk_heap(scores: list[float], k: int) -> list[tuple[int, float]]:
     """Select top-k items using heap.
 
     Args:
@@ -643,8 +643,8 @@ def test_python_topk_scalability(num_items):
 
 
 def python_filter_listcomp(
-    tools: List[str], categories: Dict[str, str], available: set
-) -> List[str]:
+    tools: list[str], categories: dict[str, str], available: set
+) -> list[str]:
     """Filter tools using list comprehension.
 
     Args:
@@ -659,8 +659,8 @@ def python_filter_listcomp(
 
 
 def python_filter_generator(
-    tools: List[str], categories: Dict[str, str], available: set
-) -> List[str]:
+    tools: list[str], categories: dict[str, str], available: set
+) -> list[str]:
     """Filter tools using generator expression.
 
     Args:
@@ -674,7 +674,7 @@ def python_filter_generator(
     return [t for t in tools if categories.get(t) in available]
 
 
-def python_filter_set(tools: List[str], categories: Dict[str, str], available: set) -> List[str]:
+def python_filter_set(tools: list[str], categories: dict[str, str], available: set) -> list[str]:
     """Filter tools using set operations.
 
     Args:
@@ -780,10 +780,10 @@ class MockTool:
 def python_tool_selection_pipeline(
     query: str,
     query_embedding: np.ndarray,
-    tools: List[MockTool],
+    tools: list[MockTool],
     available_categories: set,
     k: int = 10,
-) -> List[Tuple[str, float]]:
+) -> list[tuple[str, float]]:
     """Complete tool selection pipeline.
 
     Args:

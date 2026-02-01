@@ -23,7 +23,7 @@ Extracted from CRITICAL-001 Phase 2C: Extract ToolPlanner
 """
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.tool_registrar import ToolRegistrar
@@ -96,8 +96,8 @@ class ToolPlanner:
     # =====================================================================
 
     def plan_tools(
-        self, goals: List[str], available_inputs: Optional[List[str]] = None
-    ) -> List["ToolDefinition"]:
+        self, goals: list[str], available_inputs: Optional[list[str]] = None
+    ) -> list["ToolDefinition"]:
         """Plan a sequence of tools to satisfy goals using the dependency graph.
 
         Uses the tool dependency graph to determine which tools need to be
@@ -126,7 +126,7 @@ class ToolPlanner:
 
         return planned_tools
 
-    def infer_goals_from_message(self, user_message: str) -> List[str]:
+    def infer_goals_from_message(self, user_message: str) -> list[str]:
         """Infer planning goals from the user request.
 
         Analyzes the user's message to determine what outputs they want,
@@ -147,10 +147,10 @@ class ToolPlanner:
 
     def filter_tools_by_intent(
         self,
-        tools: List[Any],
+        tools: list[Any],
         current_intent: Optional["ActionIntent"] = None,
         use_metadata: bool = False,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Filter tools based on detected user intent.
 
         This method enforces intent-based tool restrictions:
@@ -220,7 +220,7 @@ class ToolPlanner:
 
         return filtered
 
-    def _safe_emit(self, topic: str, data: Dict[str, Any]) -> None:
+    def _safe_emit(self, topic: str, data: dict[str, Any]) -> None:
         """Safely emit event without blocking or causing RuntimeWarning.
 
         Uses fire-and-forget pattern to avoid asyncio issues in synchronous context.

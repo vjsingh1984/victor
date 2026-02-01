@@ -18,7 +18,6 @@ This test module verifies that the framework-level common middleware
 provides the same safety enforcement as the vertical-specific implementations.
 """
 
-import pytest
 
 from victor.framework.config import SafetyEnforcer, SafetyConfig, SafetyLevel
 from victor.framework.middleware.common_middleware import (

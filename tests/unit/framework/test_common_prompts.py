@@ -28,7 +28,6 @@ from victor.framework.prompts.common_prompts import (
     TaskCategory,
     TaskHint,
     TaskHintBuilder,
-    WorkflowTemplate,
 )
 
 

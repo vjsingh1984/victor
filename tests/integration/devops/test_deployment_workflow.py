@@ -22,13 +22,9 @@ Tests cover:
 - Multi-stage deployments
 """
 
-import tempfile
-from pathlib import Path
-from typing import Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
-import yaml
 
 
 # ============================================================================

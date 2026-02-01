@@ -11,7 +11,7 @@ Provides CodeGroundingHook for integrating validation with:
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from .types import (
     CodeValidationResult,
@@ -84,7 +84,7 @@ class CodeGroundingHook:
         file_path: str | Path,
         strict: bool = False,
         config: Optional[ValidationConfig] = None,
-    ) -> Tuple[bool, CodeValidationResult]:
+    ) -> tuple[bool, CodeValidationResult]:
         """
         Validate code before writing to disk.
 
@@ -151,7 +151,7 @@ class CodeGroundingHook:
         file_path: str | Path,
         strict: bool = False,
         config: Optional[ValidationConfig] = None,
-    ) -> Tuple[bool, CodeValidationResult]:
+    ) -> tuple[bool, CodeValidationResult]:
         """
         Synchronous version for non-async contexts.
 
@@ -183,7 +183,7 @@ class CodeGroundingHook:
         file_path: Path,
         strict: bool,
         config: Optional[ValidationConfig],
-    ) -> Tuple[bool, CodeValidationResult]:
+    ) -> tuple[bool, CodeValidationResult]:
         """
         Pure synchronous validation (no async).
 
@@ -275,7 +275,7 @@ def validate_code_before_write(
     content: str,
     file_path: Path,
     strict: bool = False,
-) -> Tuple[bool, CodeValidationResult]:
+) -> tuple[bool, CodeValidationResult]:
     """
     Convenience function for code validation.
 
@@ -295,7 +295,7 @@ async def validate_code_before_write_async(
     content: str,
     file_path: Path,
     strict: bool = False,
-) -> Tuple[bool, CodeValidationResult]:
+) -> tuple[bool, CodeValidationResult]:
     """
     Async convenience function for code validation.
 

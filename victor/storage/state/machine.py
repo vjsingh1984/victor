@@ -45,11 +45,11 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.storage.state.protocols import (
     StateObserverProtocol,
-    StateProtocol,
     StageDetectorProtocol,
     TransitionValidatorProtocol,
 )
@@ -70,10 +70,10 @@ class StateConfig:
         backward_threshold: Confidence required for backward transitions.
     """
 
-    stages: List[str]
+    stages: list[str]
     initial_stage: str
-    transitions: Dict[str, List[str]] = field(default_factory=dict)
-    stage_tools: Dict[str, Set[str]] = field(default_factory=dict)
+    transitions: dict[str, list[str]] = field(default_factory=dict)
+    stage_tools: dict[str, set[str]] = field(default_factory=dict)
     cooldown_seconds: float = 0.0
     backward_threshold: float = 0.8
 
@@ -106,7 +106,7 @@ class StateTransition:
     to_stage: str
     timestamp: float = field(default_factory=time.time)
     confidence: float = 1.0
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 class StateMachine:
@@ -133,8 +133,8 @@ class StateMachine:
     def __init__(
         self,
         config: StateConfig,
-        validators: Optional[List[TransitionValidatorProtocol]] = None,
-        detectors: Optional[List[StageDetectorProtocol]] = None,
+        validators: Optional[list[TransitionValidatorProtocol]] = None,
+        detectors: Optional[list[StageDetectorProtocol]] = None,
     ) -> None:
         """Initialize the state machine.
 
@@ -148,8 +148,8 @@ class StateMachine:
         self._stage_index = {stage: i for i, stage in enumerate(config.stages)}
         self._validators = validators or []
         self._detectors = detectors or []
-        self._observers: List[StateObserverProtocol] = []
-        self._history: List[StateTransition] = []
+        self._observers: list[StateObserverProtocol] = []
+        self._history: list[StateTransition] = []
         self._last_transition_time: float = 0.0
         self._transition_count: int = 0
 
@@ -169,7 +169,7 @@ class StateMachine:
         """
         return self._stage_index[self._current_stage]
 
-    def get_stage_tools(self) -> Set[str]:
+    def get_stage_tools(self) -> set[str]:
         """Get tools for the current stage.
 
         Returns:
@@ -177,7 +177,7 @@ class StateMachine:
         """
         return self._config.stage_tools.get(self._current_stage, set())
 
-    def get_valid_transitions(self) -> List[str]:
+    def get_valid_transitions(self) -> list[str]:
         """Get valid next stages from current stage.
 
         Returns:
@@ -202,7 +202,7 @@ class StateMachine:
         self,
         stage: str,
         confidence: float = 1.0,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> bool:
         """Attempt to transition to a new stage.
 
@@ -285,7 +285,7 @@ class StateMachine:
 
         return True
 
-    def detect_and_transition(self, context: Dict[str, Any]) -> bool:
+    def detect_and_transition(self, context: dict[str, Any]) -> bool:
         """Use detectors to automatically transition.
 
         Args:
@@ -351,7 +351,7 @@ class StateMachine:
         self._detectors.append(detector)
 
     @property
-    def history(self) -> List[StateTransition]:
+    def history(self) -> list[StateTransition]:
         """Get transition history."""
         return list(self._history)
 
@@ -360,7 +360,7 @@ class StateMachine:
         """Get total number of transitions."""
         return self._transition_count
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize state machine to dictionary.
 
         Returns:
@@ -381,7 +381,7 @@ class StateMachine:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], config: StateConfig) -> "StateMachine":
+    def from_dict(cls, data: dict[str, Any], config: StateConfig) -> "StateMachine":
         """Restore state machine from dictionary.
 
         Args:

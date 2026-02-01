@@ -17,14 +17,15 @@
 import logging
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Callable, Tuple, TypedDict
+from typing import Any, Optional, TypedDict
+from collections.abc import Callable
 
 import aiofiles
 
-from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from typing import TypedDict
 
@@ -134,13 +135,13 @@ class FileContentCache:
             max_total_bytes: Maximum total bytes to cache (soft limit)
             ttl_seconds: Time-to-live for cache entries
         """
-        self._cache: Dict[str, CachedFileContent] = {}
+        self._cache: dict[str, CachedFileContent] = {}
         self._lock = threading.RLock()
         self._max_entries = max_entries
         self._max_total_bytes = max_total_bytes
         self._ttl_seconds = ttl_seconds
         self._stats = FileContentCacheStats()
-        self._access_order: List[str] = []  # For LRU eviction
+        self._access_order: list[str] = []  # For LRU eviction
 
     def _normalize_path(self, path: str) -> str:
         """Normalize path to absolute resolved form."""
@@ -308,7 +309,7 @@ class FileContentCache:
             self._stats.total_bytes_cached = 0
             logger.info("File cache CLEARED: %d entries removed", count)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         with self._lock:
             hit_rate = (
@@ -464,7 +465,7 @@ class FileTypeInfo:
     category: FileCategory
     mime_type: str
     description: str
-    extensions: Tuple[str, ...]  # Expected extensions for this type
+    extensions: tuple[str, ...]  # Expected extensions for this type
     magic_bytes: Optional[bytes] = None  # Magic signature if detected
     magic_offset: int = 0  # Offset where magic bytes are found
     suggestion: str = ""  # Help message for unsupported types
@@ -473,7 +474,7 @@ class FileTypeInfo:
 # Magic bytes signatures for common file types
 # Format: (magic_bytes, offset, FileTypeInfo)
 # Order matters: more specific signatures should come first
-MAGIC_SIGNATURES: List[Tuple[bytes, int, FileTypeInfo]] = [
+MAGIC_SIGNATURES: list[tuple[bytes, int, FileTypeInfo]] = [
     # Documents
     (
         b"%PDF",
@@ -870,7 +871,7 @@ BinaryFileHandler = Callable[[Path], str]
 #   FileCategory.DOCUMENT: pdf_handler, docx_handler
 #   FileCategory.IMAGE: image_description_handler
 #   FileCategory.ARCHIVE: archive_list_handler
-_BINARY_HANDLERS: Dict[FileCategory, BinaryFileHandler] = {}
+_BINARY_HANDLERS: dict[FileCategory, BinaryFileHandler] = {}
 
 
 def register_binary_handler(category: FileCategory, handler: BinaryFileHandler) -> None:
@@ -1480,7 +1481,6 @@ async def read(
     from victor.tools.output_utils import (
         truncate_by_lines,
         format_with_line_numbers,
-        TruncationInfo,
     )
 
     # Determine truncation limits based on model context
@@ -1750,7 +1750,7 @@ async def ls(
     depth: int = 2,
     pattern: str = "",
     limit: int = 1000,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """List directory contents with file sizes.
 
     Args:
@@ -1967,7 +1967,7 @@ async def find(
     path: str = ".",
     type: str = "all",
     limit: int = 50,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Find files by name pattern (like Unix find -name).
 
     Searches recursively through the directory tree to locate files
@@ -2115,7 +2115,7 @@ async def overview(
     max_depth: int = 2,
     top_files_by_size: int = 100,
     top_doc_files: int = 15,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get a curated project overview for initial exploration.
 
     Provides:
@@ -2171,9 +2171,9 @@ async def overview(
         doc_extensions = {".md", ".rst", ".txt", ".adoc"}
 
         # Collect all files with metadata
-        all_files: List[Dict[str, Any]] = []
-        directories: List[Dict[str, Any]] = []
-        important_docs: List[Dict[str, Any]] = []
+        all_files: list[dict[str, Any]] = []
+        directories: list[dict[str, Any]] = []
+        important_docs: list[dict[str, Any]] = []
 
         def walk_tree(base: Path, current_depth: int):
             """Walk tree collecting files and directories."""

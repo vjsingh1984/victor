@@ -22,14 +22,13 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 from dataclasses import dataclass
 
 from victor.optimization.workflow.models import (
     Bottleneck,
     BottleneckSeverity,
     BottleneckType,
-    NodeStatistics,
     OptimizationOpportunity,
     OptimizationStrategyType,
     WorkflowProfile,
@@ -52,7 +51,7 @@ class WorkflowChange:
     change_type: str
     target: str
     description: str
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[dict[str, Any]] = None
 
     def __post_init__(self) -> None:
         if self.metadata is None:
@@ -171,7 +170,7 @@ class ParallelGroup:
         parallel_duration: Expected duration if executed in parallel
     """
 
-    node_ids: List[str]
+    node_ids: list[str]
     estimated_speedup: float
     sequential_duration: float
     parallel_duration: float
@@ -188,7 +187,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
 
     def __init__(self) -> None:
         """Initialize parallelization strategy."""
-        self._dependency_cache: Dict[str, Set[str]] = {}
+        self._dependency_cache: dict[str, set[str]] = {}
 
     def can_apply(
         self,
@@ -242,7 +241,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
     def _find_parallelizable_nodes(
         self,
         profile: WorkflowProfile,
-    ) -> List[ParallelGroup]:
+    ) -> list[ParallelGroup]:
         """Identify groups of nodes that can execute in parallel.
 
         Args:
@@ -255,7 +254,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
         deps = self._build_dependency_graph(profile)
 
         parallel_groups = []
-        visited: Set[str] = set()
+        visited: set[str] = set()
 
         # For each node, find independent nodes
         for node_id in profile.node_stats.keys():
@@ -291,7 +290,7 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
     def _build_dependency_graph(
         self,
         profile: WorkflowProfile,
-    ) -> Dict[str, Set[str]]:
+    ) -> dict[str, set[str]]:
         """Build dependency graph showing which nodes depend on which.
 
         This is a simplified implementation. A full implementation would:
@@ -312,10 +311,10 @@ class ParallelizationStrategy(BaseOptimizationStrategy):
     def _find_independent_nodes(
         self,
         node_id: str,
-        deps: Dict[str, Set[str]],
-        visited: Set[str],
-        all_nodes: List[str],
-    ) -> Set[str]:
+        deps: dict[str, set[str]],
+        visited: set[str],
+        all_nodes: list[str],
+    ) -> set[str]:
         """Find nodes that are independent of the given node.
 
         Args:

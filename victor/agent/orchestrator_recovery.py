@@ -51,7 +51,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.recovery import RecoveryHandler, RecoveryOutcome
@@ -69,7 +69,7 @@ class RecoveryState:
     consecutive_failures: int = 0
     recovery_attempts: int = 0
     last_failure_type: Optional["FailureType"] = None
-    recent_responses: List[str] = field(default_factory=list)
+    recent_responses: list[str] = field(default_factory=list)
     session_start_time: float = field(default_factory=time.time)
 
     def reset(self) -> None:
@@ -203,8 +203,8 @@ class OrchestratorRecoveryIntegration:
     async def handle_response(
         self,
         content: str,
-        tool_calls: Optional[List[Dict[str, Any]]],
-        mentioned_tools: Optional[List[str]],
+        tool_calls: Optional[list[dict[str, Any]]],
+        mentioned_tools: Optional[list[str]],
         provider_name: str,
         model_name: str,
         tool_calls_made: int,
@@ -384,7 +384,7 @@ class OrchestratorRecoveryIntegration:
         if success:
             self._state.on_success()
 
-    def get_diagnostics(self) -> Dict[str, Any]:
+    def get_diagnostics(self) -> dict[str, Any]:
         """Get diagnostic information."""
         diagnostics = {
             "enabled": self.enabled,

@@ -21,7 +21,8 @@ Facade pattern.
 import logging
 import time
 from pathlib import Path
-from typing import AsyncIterator, Optional
+from typing import Optional
+from collections.abc import AsyncIterator
 
 from victor.coding.completion.protocol import (
     CompletionCapabilities,
@@ -375,7 +376,8 @@ class CompletionManager:
                 stream_result = provider.stream_inline_completion(params)
                 # Check if it's a coroutine or an async iterator
                 import inspect
-                from typing import AsyncIterator, Any, cast
+                from typing import cast
+                from collections.abc import AsyncIterator
 
                 if inspect.iscoroutine(stream_result):
                     # It's a coroutine returning an iterator

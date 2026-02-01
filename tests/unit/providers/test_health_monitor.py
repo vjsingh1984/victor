@@ -14,7 +14,6 @@
 
 """Unit tests for health monitoring system."""
 
-import asyncio
 import pytest
 
 from victor.providers.health_monitor import (

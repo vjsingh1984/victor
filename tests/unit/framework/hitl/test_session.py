@@ -14,7 +14,6 @@
 
 """Tests for HITL session management."""
 
-import asyncio
 import pytest
 import time
 
@@ -27,7 +26,7 @@ from victor.framework.hitl.session import (
     SessionState,
     get_global_session_manager,
 )
-from victor.framework.hitl.gates import ApprovalGate, TextInputGate
+from victor.framework.hitl.gates import ApprovalGate
 
 
 # =============================================================================

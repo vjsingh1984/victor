@@ -42,7 +42,8 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
 
 from victor.agent.provider_switch_coordinator import SwitchContext
 

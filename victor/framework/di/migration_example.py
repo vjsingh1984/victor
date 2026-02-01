@@ -24,7 +24,7 @@ We'll migrate a simple Analytics service as a proof of concept.
 
 from __future__ import annotations
 
-from typing import Optional, Dict, Any
+from typing import Optional, Any
 from pathlib import Path
 
 
@@ -39,14 +39,14 @@ class MetricsCollector:
     def __init__(self, log_file: Path, enabled: bool = True):
         self.log_file = log_file
         self.enabled = enabled
-        self._metrics: Dict[str, float] = {}
+        self._metrics: dict[str, float] = {}
 
     def record(self, name: str, value: float) -> None:
         if not self.enabled:
             return
         self._metrics[name] = value
 
-    def get_metrics(self) -> Dict[str, float]:
+    def get_metrics(self) -> dict[str, float]:
         return self._metrics.copy()
 
 
@@ -65,7 +65,7 @@ class AnalyticsService:
 
         self.metrics_collector = metrics_collector
 
-    def track_event(self, event_name: str, data: Dict[str, Any]) -> None:
+    def track_event(self, event_name: str, data: dict[str, Any]) -> None:
         """Track an analytics event."""
         self.metrics_collector.record(event_name, 1.0)
 
@@ -108,14 +108,14 @@ class MetricsCollectorV2:
     def __init__(self, log_file: Path, enabled: bool = True):
         self.log_file = log_file
         self.enabled = enabled
-        self._metrics: Dict[str, float] = {}
+        self._metrics: dict[str, float] = {}
 
     def record(self, name: str, value: float) -> None:
         if not self.enabled:
             return
         self._metrics[name] = value
 
-    def get_metrics(self) -> Dict[str, float]:
+    def get_metrics(self) -> dict[str, float]:
         return self._metrics.copy()
 
 
@@ -132,7 +132,7 @@ class AnalyticsServiceV2:
         # Just declare the dependency, container handles the rest
         self.metrics_collector = metrics_collector
 
-    def track_event(self, event_name: str, data: Dict[str, Any]) -> None:
+    def track_event(self, event_name: str, data: dict[str, Any]) -> None:
         """Track an analytics event."""
         self.metrics_collector.record(event_name, 1.0)
 
@@ -146,7 +146,7 @@ def setup_analytics_with_di(settings: Any) -> AnalyticsServiceV2:
     - Type-safe dependency injection
     - Clearer dependency graph
     """
-    from victor.framework.di import DIContainer, ServiceLifetime
+    from victor.framework.di import DIContainer
     from victor.config.settings import get_project_paths
 
     paths = get_project_paths()
@@ -304,7 +304,7 @@ class AnalyticsServiceV3:
 
         self.metrics_collector = metrics_collector
 
-    def track_event(self, event_name: str, data: Dict[str, Any]) -> None:
+    def track_event(self, event_name: str, data: dict[str, Any]) -> None:
         """Track an analytics event."""
         self.metrics_collector.record(event_name, 1.0)
 

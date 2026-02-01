@@ -32,13 +32,12 @@ import hashlib
 import logging
 import sys
 import time
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from victor.integrations.protocols.query_enhancement import (
     EnhancedQuery,
     EnhancementContext,
     EnhancementTechnique,
-    IQueryEnhancementStrategy,
     QueryEnhancementConfig,
 )
 from victor.core.query_enhancement.registry import (
@@ -105,7 +104,7 @@ class QueryEnhancementCache:
             ttl_seconds: Time-to-live in seconds
             max_size: Maximum cache entries
         """
-        self._cache: Dict[str, tuple[EnhancedQuery, float]] = {}
+        self._cache: dict[str, tuple[EnhancedQuery, float]] = {}
         self._ttl = ttl_seconds
         self._max_size = max_size
 

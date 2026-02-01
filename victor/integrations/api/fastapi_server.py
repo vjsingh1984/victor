@@ -33,7 +33,8 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional, cast
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 from fastapi import (
     Body,
@@ -51,12 +52,10 @@ from pydantic import BaseModel, Field, field_validator
 from victor.integrations.search_types import CodeSearchResult
 from victor.integrations.api.event_bridge import EventBridge
 from victor.integrations.api.graph_export import (
-    export_graph_schema,
     get_execution_state,
-    WorkflowExecutionState,
 )
 from victor.integrations.api.workflow_event_bridge import WorkflowEventBridge
-from victor.core.events import ObservabilityBus as EventBus, get_observability_bus
+from victor.core.events import get_observability_bus
 from fastapi.responses import HTMLResponse
 
 logger = logging.getLogger(__name__)
@@ -94,7 +93,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     """Chat request payload."""
 
-    messages: List[ChatMessage]
+    messages: list[ChatMessage]
 
 
 class ChatResponse(BaseModel):
@@ -102,7 +101,7 @@ class ChatResponse(BaseModel):
 
     role: str = "assistant"
     content: str
-    tool_calls: Optional[List[Dict[str, Any]]] = None
+    tool_calls: Optional[list[dict[str, Any]]] = None
 
 
 class CompletionPosition(BaseModel):
@@ -123,13 +122,13 @@ class CompletionRequest(BaseModel):
     context: Optional[str] = None  # Additional file context (imports, etc.)
     max_tokens: int = Field(default=128, ge=1, le=512)  # Limit completion length
     temperature: float = Field(default=0.0, ge=0.0, le=1.0)  # Deterministic by default
-    stop_sequences: Optional[List[str]] = None  # Custom stop sequences
+    stop_sequences: Optional[list[str]] = None  # Custom stop sequences
 
 
 class CompletionResponse(BaseModel):
     """Code completion response."""
 
-    completions: List[str]
+    completions: list[str]
     error: Optional[str] = None
     latency_ms: Optional[float] = None  # Track performance
 
@@ -187,7 +186,7 @@ class APISearchResult(BaseModel):
 class SearchResponse(BaseModel):
     """Search response payload."""
 
-    results: List[APISearchResult]
+    results: list[APISearchResult]
     error: Optional[str] = None
 
 
@@ -223,11 +222,11 @@ class GitCommitRequest(BaseModel):
 
     message: Optional[str] = Field(default=None, max_length=5000)
     use_ai: bool = False
-    files: Optional[List[str]] = None
+    files: Optional[list[str]] = None
 
     @field_validator("files")
     @classmethod
-    def validate_files(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+    def validate_files(cls, v: Optional[list[str]]) -> Optional[list[str]]:
         """Validate file paths to prevent path traversal."""
         if v is None:
             return v
@@ -332,7 +331,7 @@ class VictorFastAPIServer:
         port: int = 8765,
         workspace_root: Optional[str] = None,
         rate_limit_rpm: Optional[int] = None,
-        api_keys: Optional[Dict[str, str]] = None,
+        api_keys: Optional[dict[str, str]] = None,
         enable_cors: bool = True,
         enable_hitl: bool = False,
         hitl_auth_token: Optional[str] = None,
@@ -362,13 +361,13 @@ class VictorFastAPIServer:
         self.hitl_persistent = hitl_persistent
 
         self._orchestrator = None
-        self._ws_clients: List[WebSocket] = []
-        self._pending_tool_approvals: Dict[str, Dict[str, Any]] = {}
+        self._ws_clients: list[WebSocket] = []
+        self._pending_tool_approvals: dict[str, dict[str, Any]] = {}
         self._hitl_store: Optional[Any] = None
         self._event_bridge: Optional[EventBridge] = None
-        self._event_clients: List[WebSocket] = []
+        self._event_clients: list[WebSocket] = []
         self._workflow_event_bridge: Optional[WorkflowEventBridge] = None
-        self._workflow_executions: Dict[str, Dict[str, Any]] = {}
+        self._workflow_executions: dict[str, dict[str, Any]] = {}
         self._shutting_down = False
 
         # Create FastAPI app with lifespan
@@ -753,7 +752,7 @@ class VictorFastAPIServer:
         async def list_providers() -> JSONResponse:
             """List available LLM providers."""
             try:
-                from victor.providers.registry import get_provider_registry, ProviderRegistry
+                from victor.providers.registry import ProviderRegistry
 
                 providers_info = []
 
@@ -1372,7 +1371,6 @@ Respond with just the command to run."""
         @app.post("/terminal/execute", response_model=TerminalCommandResponse, tags=["Terminal"])
         async def terminal_execute(request: TerminalCommandRequest) -> TerminalCommandResponse:
             """Execute a terminal command."""
-            import asyncio.subprocess as asp
 
             cmd_id = f"cmd-{int(time.time() * 1000)}"
             working_dir = request.working_dir or self.workspace_root
@@ -1452,11 +1450,10 @@ Respond with just the command to run."""
         async def workspace_overview(depth: int = Query(3, ge=1, le=10)) -> JSONResponse:
             """Get workspace structure overview."""
             try:
-                import os
                 from pathlib import Path
 
                 root = Path(self.workspace_root)
-                overview: Dict[str, Any] = {
+                overview: dict[str, Any] = {
                     "root": str(root),
                     "name": root.name,
                     "file_counts": {},
@@ -1473,11 +1470,11 @@ Respond with just the command to run."""
                     ".victor",
                 }
 
-                def scan_dir(path: Path, d: int = 0) -> Dict[str, Any]:
+                def scan_dir(path: Path, d: int = 0) -> dict[str, Any]:
                     if d > depth:
                         return {"name": path.name, "type": "directory", "truncated": True}
 
-                    result: Dict[str, Any] = {
+                    result: dict[str, Any] = {
                         "name": path.name,
                         "path": str(path.relative_to(root)),
                         "type": "directory",
@@ -1550,7 +1547,7 @@ Respond with just the command to run."""
                 from pathlib import Path
 
                 root = Path(self.workspace_root)
-                metrics: Dict[str, Any] = {
+                metrics: dict[str, Any] = {
                     "lines_of_code": 0,
                     "files_by_type": {},
                     "largest_files": [],
@@ -1699,7 +1696,7 @@ Respond with just the command to run."""
                 from pathlib import Path
 
                 root = Path(self.workspace_root)
-                dependencies: Dict[str, Any] = {}
+                dependencies: dict[str, Any] = {}
 
                 # Python dependencies
                 for req_file in ["requirements.txt", "pyproject.toml", "setup.py"]:
@@ -2252,7 +2249,7 @@ Respond with just the command to run."""
         # =====================================================================
 
         # In-memory plan storage (would use database in production)
-        _plans: Dict[str, Dict[str, Any]] = {}
+        _plans: dict[str, dict[str, Any]] = {}
 
         @app.get("/plans", tags=["Plans"])
         async def list_plans() -> JSONResponse:
@@ -2406,8 +2403,8 @@ Respond with just the command to run."""
         # =====================================================================
 
         # In-memory team storage
-        _teams: Dict[str, Dict[str, Any]] = {}
-        _team_messages: Dict[str, List[Dict[str, Any]]] = {}
+        _teams: dict[str, dict[str, Any]] = {}
+        _team_messages: dict[str, list[dict[str, Any]]] = {}
 
         @app.post("/teams", tags=["Teams"])
         async def create_team(request: Request) -> JSONResponse:
@@ -2701,7 +2698,7 @@ Respond with just the command to run."""
         # =====================================================================
 
         # In-memory workflow storage
-        _workflow_executions: Dict[str, Dict[str, Any]] = {}
+        _workflow_executions: dict[str, dict[str, Any]] = {}
 
         @app.get("/workflows/templates", tags=["Workflows"])
         async def list_workflow_templates() -> JSONResponse:
@@ -3359,7 +3356,7 @@ Respond with just the command to run."""
             if msg_count == 0:
                 return
 
-            metrics: Dict[str, Any] = {}
+            metrics: dict[str, Any] = {}
             if hasattr(self._orchestrator, "get_session_metrics"):
                 metrics = self._orchestrator.get_session_metrics() or {}
 
@@ -3416,7 +3413,7 @@ Respond with just the command to run."""
         except Exception as e:
             logger.debug(f"RL feedback recording skipped: {e}")
 
-    async def _handle_ws_message(self, ws: WebSocket, data: Dict[str, Any]) -> None:
+    async def _handle_ws_message(self, ws: WebSocket, data: dict[str, Any]) -> None:
         """Handle incoming WebSocket messages."""
         msg_type = data.get("type", "")
 
@@ -3462,7 +3459,7 @@ Respond with just the command to run."""
             channel = data.get("channel", "")
             await ws.send_json({"type": "subscribed", "channel": channel})
 
-    async def _broadcast_ws(self, message: Dict[str, Any]) -> None:
+    async def _broadcast_ws(self, message: dict[str, Any]) -> None:
         """Broadcast a message to all connected WebSocket clients."""
         for ws in self._ws_clients:
             try:
@@ -3470,7 +3467,7 @@ Respond with just the command to run."""
             except Exception:
                 pass
 
-    async def _broadcast_agent_event(self, event_type: str, data: Dict[str, Any]) -> None:
+    async def _broadcast_agent_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Broadcast agent events to all connected WebSocket clients.
 
         Used by BackgroundAgentManager to send real-time updates.
@@ -3483,7 +3480,7 @@ Respond with just the command to run."""
         }
         await self._broadcast_ws(message)
 
-    def _format_messages_markdown(self, messages: List[Dict[str, Any]]) -> str:
+    def _format_messages_markdown(self, messages: list[dict[str, Any]]) -> str:
         """Format messages as markdown."""
         lines = ["# Conversation Export\n"]
         for msg in messages:

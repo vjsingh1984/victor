@@ -64,7 +64,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class ServiceConfig:
 
     name: str
     service_type: str
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
     required: bool = True
     init_timeout: float = 30.0
     cleanup_timeout: float = 10.0
@@ -513,7 +513,7 @@ class ServiceManager:
     """
 
     # Registry of lifecycle handlers by service type
-    _lifecycle_handlers: Dict[str, Type[ServiceLifecycle]] = {
+    _lifecycle_handlers: dict[str, type[ServiceLifecycle]] = {
         "postgres": PostgresService,
         "postgresql": PostgresService,
         "redis": RedisService,
@@ -528,15 +528,15 @@ class ServiceManager:
     }
 
     def __init__(self) -> None:
-        self._services: Dict[str, Any] = {}
-        self._configs: Dict[str, ServiceConfig] = {}
-        self._handlers: Dict[str, ServiceLifecycle] = {}
+        self._services: dict[str, Any] = {}
+        self._configs: dict[str, ServiceConfig] = {}
+        self._handlers: dict[str, ServiceLifecycle] = {}
 
     @classmethod
     def register_service(
         cls,
         service_type: str,
-        handler: Type[ServiceLifecycle],
+        handler: type[ServiceLifecycle],
     ) -> None:
         """Register a lifecycle handler for a service type.
 
@@ -548,8 +548,8 @@ class ServiceManager:
 
     async def initialize_services(
         self,
-        configs: List[ServiceConfig],
-    ) -> Dict[str, Any]:
+        configs: list[ServiceConfig],
+    ) -> dict[str, Any]:
         """Initialize all configured services.
 
         Args:
@@ -618,7 +618,7 @@ class ServiceManager:
         self._handlers.clear()
         self._configs.clear()
 
-    async def health_check_all(self) -> Dict[str, bool]:
+    async def health_check_all(self) -> dict[str, bool]:
         """Check health of all services.
 
         Returns:

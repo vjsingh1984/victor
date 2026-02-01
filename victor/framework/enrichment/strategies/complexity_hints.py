@@ -34,13 +34,13 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Optional
 
 from victor.framework.task.protocols import TaskComplexity
 
 
 # Standard prompt hints per complexity level
-COMPLEXITY_HINTS: Dict[TaskComplexity, str] = {
+COMPLEXITY_HINTS: dict[TaskComplexity, str] = {
     TaskComplexity.SIMPLE: "[SIMPLE] Quick query. Focus on relevant tools. Answer concisely.",
     TaskComplexity.MEDIUM: "[MEDIUM] Moderate exploration. Be focused and efficient.",
     TaskComplexity.COMPLEX: "[COMPLEX] Deep work needed. Examine code systematically. Provide detailed answer.",
@@ -50,7 +50,7 @@ COMPLEXITY_HINTS: Dict[TaskComplexity, str] = {
 }
 
 # Extended hints for models that benefit from more guidance (e.g., Ollama, LMStudio)
-EXTENDED_COMPLEXITY_HINTS: Dict[TaskComplexity, str] = {
+EXTENDED_COMPLEXITY_HINTS: dict[TaskComplexity, str] = {
     TaskComplexity.SIMPLE: "[SIMPLE QUERY] Quick info retrieval. Focus on relevant tools.",
     TaskComplexity.MEDIUM: "[MEDIUM] Moderate exploration. Be focused and efficient.",
     TaskComplexity.COMPLEX: "[COMPLEX] Thorough work. Examine code systematically.",
@@ -82,8 +82,8 @@ class ComplexityHintEnricher:
 
     def __init__(
         self,
-        hints: Optional[Dict[TaskComplexity, str]] = None,
-        extended_hints: Optional[Dict[TaskComplexity, str]] = None,
+        hints: Optional[dict[TaskComplexity, str]] = None,
+        extended_hints: Optional[dict[TaskComplexity, str]] = None,
     ) -> None:
         """Initialize the hint enricher.
 

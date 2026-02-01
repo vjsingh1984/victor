@@ -1,4 +1,3 @@
-from unittest.mock import patch
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings

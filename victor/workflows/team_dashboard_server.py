@@ -43,16 +43,12 @@ import logging
 import time
 import uuid
 from collections import defaultdict
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Set,
 )
 
 try:
@@ -67,17 +63,12 @@ except ImportError:
     WebSocket = None  # type: ignore
 
 from victor.workflows.team_collaboration import (
-    TeamCommunicationProtocol,
-    SharedTeamContext,
-    NegotiationFramework,
     CommunicationLog,
     ContextUpdate,
     NegotiationResult,
 )
 from victor.workflows.team_metrics import (
     TeamMetricsCollector,
-    MemberExecutionMetrics,
-    TeamExecutionMetrics,
 )
 
 logger = logging.getLogger(__name__)
@@ -131,11 +122,11 @@ class MemberState:
     end_time: Optional[datetime] = None
     duration_seconds: float = 0.0
     tool_calls_used: int = 0
-    tools_used: Set[str] = field(default_factory=set)
+    tools_used: set[str] = field(default_factory=set)
     error_message: Optional[str] = None
     last_activity: float = field(default_factory=lambda: time.time())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "member_id": self.member_id,
@@ -174,9 +165,9 @@ class TeamExecutionState:
     execution_id: str
     team_id: str
     formation: str
-    member_states: Dict[str, MemberState] = field(default_factory=dict)
-    shared_context: Dict[str, Any] = field(default_factory=dict)
-    communication_logs: List[CommunicationLog] = field(default_factory=list)
+    member_states: dict[str, MemberState] = field(default_factory=dict)
+    shared_context: dict[str, Any] = field(default_factory=dict)
+    communication_logs: list[CommunicationLog] = field(default_factory=list)
     negotiation_status: Optional[NegotiationResult] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
@@ -185,7 +176,7 @@ class TeamExecutionState:
     recursion_depth: int = 0
     consensus_achieved: Optional[bool] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "execution_id": self.execution_id,
@@ -220,9 +211,9 @@ class DashboardEvent:
     event_type: str
     execution_id: str
     timestamp: float
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "event_type": self.event_type,
@@ -312,8 +303,8 @@ class ConnectionManager:
 
     def __init__(self) -> None:
         """Initialize connection manager."""
-        self._active_connections: Dict[str, Set[WebSocket]] = defaultdict(set)
-        self._connection_metadata: Dict[WebSocket, Dict[str, Any]] = {}
+        self._active_connections: dict[str, set[WebSocket]] = defaultdict(set)
+        self._connection_metadata: dict[WebSocket, dict[str, Any]] = {}
         self._lock = asyncio.Lock()
 
     async def connect(self, websocket: WebSocket, execution_id: str) -> None:
@@ -432,7 +423,7 @@ class ConnectionManager:
 
     async def send_personal_message(
         self,
-        message: Dict[str, Any],
+        message: dict[str, Any],
         websocket: WebSocket,
     ) -> None:
         """Send a message to a specific WebSocket.
@@ -458,7 +449,7 @@ class ConnectionManager:
         """
         return len(self._active_connections.get(execution_id, set()))
 
-    def get_all_execution_ids(self) -> List[str]:
+    def get_all_execution_ids(self) -> list[str]:
         """Get all execution IDs with active connections.
 
         Returns:
@@ -490,7 +481,7 @@ class TeamDashboardServer:
     def __init__(
         self,
         metrics_collector: Optional[TeamMetricsCollector] = None,
-        cors_origins: Optional[List[str]] = None,
+        cors_origins: Optional[list[str]] = None,
     ) -> None:
         """Initialize dashboard server.
 
@@ -522,9 +513,9 @@ class TeamDashboardServer:
 
         # Components
         self._connection_manager = ConnectionManager()
-        self._execution_states: Dict[str, TeamExecutionState] = {}
+        self._execution_states: dict[str, TeamExecutionState] = {}
         self._metrics_collector = metrics_collector or TeamMetricsCollector.get_instance()
-        self._event_bus_subscriptions: List[Any] = []
+        self._event_bus_subscriptions: list[Any] = []
 
         # Setup routes
         self._setup_routes()
@@ -540,7 +531,7 @@ class TeamDashboardServer:
         """Setup FastAPI routes."""
 
         @self._app.get("/health")
-        async def health_check() -> Dict[str, Any]:
+        async def health_check() -> dict[str, Any]:
             """Health check endpoint."""
             return {
                 "status": "healthy",
@@ -600,7 +591,7 @@ class TeamDashboardServer:
         self,
         execution_id: str,
         websocket: WebSocket,
-        message: Dict[str, Any],
+        message: dict[str, Any],
     ) -> None:
         """Handle incoming message from client.
 
@@ -732,7 +723,7 @@ class TeamDashboardServer:
         execution_id: str,
         member_id: str,
         tool_calls_used: int,
-        tools_used: Set[str],
+        tools_used: set[str],
     ) -> None:
         """Broadcast member updated event.
 
@@ -973,7 +964,7 @@ class TeamDashboardServer:
         """
         return self._execution_states.get(execution_id)
 
-    def get_all_execution_states(self) -> Dict[str, TeamExecutionState]:
+    def get_all_execution_states(self) -> dict[str, TeamExecutionState]:
         """Get all execution states.
 
         Returns:
@@ -981,7 +972,7 @@ class TeamDashboardServer:
         """
         return self._execution_states.copy()
 
-    def get_active_executions(self) -> List[str]:
+    def get_active_executions(self) -> list[str]:
         """Get list of active execution IDs.
 
         Returns:
@@ -999,7 +990,7 @@ _dashboard_server_instance: Optional[TeamDashboardServer] = None
 
 def get_dashboard_server(
     metrics_collector: Optional[TeamMetricsCollector] = None,
-    cors_origins: Optional[List[str]] = None,
+    cors_origins: Optional[list[str]] = None,
 ) -> TeamDashboardServer:
     """Get singleton dashboard server instance.
 

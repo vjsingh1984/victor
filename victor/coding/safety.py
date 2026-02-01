@@ -24,7 +24,6 @@ backward compatibility for existing imports.
 
 from __future__ import annotations
 
-from typing import Dict, List
 
 from victor.core.security.patterns.code_patterns import (
     CodePatternScanner,
@@ -39,8 +38,8 @@ from victor.core.security.patterns.types import SafetyPattern
 
 
 # Re-export core patterns with legacy names for backward compatibility
-GIT_DANGEROUS_PATTERNS: List[SafetyPattern] = GIT_PATTERNS
-CODING_FILE_PATTERNS: List[SafetyPattern] = SENSITIVE_FILE_PATTERNS
+GIT_DANGEROUS_PATTERNS: list[SafetyPattern] = GIT_PATTERNS
+CODING_FILE_PATTERNS: list[SafetyPattern] = SENSITIVE_FILE_PATTERNS
 
 
 class CodingSafetyExtension(SafetyExtensionProtocol):
@@ -98,10 +97,10 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
         )
         # Add to scanner's patterns by extending it
         if not hasattr(self, "_custom_patterns"):
-            self._custom_patterns: List[SafetyPattern] = []
+            self._custom_patterns: list[SafetyPattern] = []
         self._custom_patterns.append(custom_pattern)
 
-    def get_bash_patterns(self) -> List[SafetyPattern]:
+    def get_bash_patterns(self) -> list[SafetyPattern]:
         """Get coding-specific bash command patterns.
 
         Returns:
@@ -112,7 +111,7 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
             return base_patterns + self._custom_patterns
         return base_patterns
 
-    def get_file_patterns(self) -> List[SafetyPattern]:
+    def get_file_patterns(self) -> list[SafetyPattern]:
         """Get coding-specific file operation patterns.
 
         Returns:
@@ -120,7 +119,7 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
         """
         return self._scanner.file_patterns
 
-    def get_tool_restrictions(self) -> Dict[str, List[str]]:
+    def get_tool_restrictions(self) -> dict[str, list[str]]:
         """Get tool-specific argument restrictions.
 
         Returns:
@@ -144,7 +143,7 @@ class CodingSafetyExtension(SafetyExtensionProtocol):
         """
         return "coding"
 
-    def scan_command(self, command: str) -> List[SafetyPattern]:
+    def scan_command(self, command: str) -> list[SafetyPattern]:
         """Scan a command for dangerous patterns.
 
         Args:

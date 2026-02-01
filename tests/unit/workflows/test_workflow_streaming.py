@@ -4,11 +4,7 @@ These tests follow TDD approach - written before implementation.
 They verify the streaming data models for graph orchestration.
 """
 
-import asyncio
-import pytest
 from datetime import datetime, timezone
-from typing import Any, AsyncIterator, Dict, List, Optional
-from unittest.mock import AsyncMock
 
 
 class TestWorkflowEventType:
@@ -383,13 +379,14 @@ class TestIStreamingWorkflowExecutor:
             ICheckpointStore,
         )
         from victor.workflows.streaming import WorkflowStreamChunk, WorkflowEventType
-        from typing import AsyncIterator, Callable, Optional, Dict, Any
+        from typing import Optional, Any
+        from collections.abc import AsyncIterator, Callable
 
         class MockStreamingExecutor:
             async def astream(
                 self,
                 graph: IWorkflowGraph,
-                initial_state: Dict[str, Any],
+                initial_state: dict[str, Any],
                 checkpoint_store: Optional[ICheckpointStore] = None,
             ) -> AsyncIterator[WorkflowStreamChunk]:
                 yield WorkflowStreamChunk(

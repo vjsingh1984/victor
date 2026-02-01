@@ -59,7 +59,8 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, cast
+from typing import Any, Optional, cast
+from collections.abc import Callable
 from enum import Enum
 
 from victor.framework.graph import StateGraph
@@ -120,12 +121,12 @@ class PipelineResult:
 
     success: bool
     graph: Optional[StateGraph[Any]] = None
-    schema: Optional[Dict[str, Any]] = None
+    schema: Optional[dict[str, Any]] = None
     requirements: Optional[WorkflowRequirements] = None
     validation: Optional[WorkflowGenerationValidationResult] = None
     metadata: Optional[GenerationMetadata] = None
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
 
     @property
@@ -135,7 +136,7 @@ class PipelineResult:
             return "No errors"
         return "\n".join(f"- {err}" for err in self.errors)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON export."""
         return {
             "success": self.success,
@@ -218,7 +219,7 @@ class WorkflowGenerationPipeline:
         self,
         description: str,
         mode: str = "auto",
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         validation_callback: Optional[Callable[..., Any]] = None,
         progress_callback: Optional[Callable[..., Any]] = None,
     ) -> PipelineResult:
@@ -412,7 +413,7 @@ class WorkflowGenerationPipeline:
     # Private Methods
     # =============================================================================
 
-    async def _validate_schema(self, schema: Dict[str, Any]) -> WorkflowGenerationValidationResult:
+    async def _validate_schema(self, schema: dict[str, Any]) -> WorkflowGenerationValidationResult:
         """Validate workflow schema.
 
         Performs multi-layer validation:
@@ -438,8 +439,8 @@ class WorkflowGenerationPipeline:
         return result
 
     async def _refine_schema(
-        self, schema: Dict[str, Any], validation: WorkflowGenerationValidationResult
-    ) -> Tuple[Dict[str, Any], RefinementResult]:
+        self, schema: dict[str, Any], validation: WorkflowGenerationValidationResult
+    ) -> tuple[dict[str, Any], RefinementResult]:
         """Refine schema based on validation errors.
 
         Uses automated refinement to fix common errors.
@@ -462,14 +463,14 @@ class WorkflowGenerationPipeline:
         # Handle both sync and async refiners
         if isinstance(result, asyncio.Future) or hasattr(result, "__await__"):
             refined_result = await result
-            return cast(Tuple[Dict[str, Any], RefinementResult], refined_result)
+            return cast(tuple[dict[str, Any], RefinementResult], refined_result)
         # If result is a tuple, return it directly
         if isinstance(result, tuple):
             return result
         # Otherwise, it should be a RefinementResult, wrap it
         return (schema, result)
 
-    async def _compile_to_graph(self, schema: Dict[str, Any]) -> StateGraph[Any]:
+    async def _compile_to_graph(self, schema: dict[str, Any]) -> StateGraph[Any]:
         """Compile schema to executable StateGraph.
 
         Args:
@@ -498,7 +499,7 @@ class WorkflowGenerationPipeline:
             logger.error(f"Failed to compile schema to StateGraph: {e}")
             raise ValueError(f"Schema compilation failed: {e}") from e
 
-    async def _interactive_approval(self, stage: str, data: Dict[str, Any]) -> bool:
+    async def _interactive_approval(self, stage: str, data: dict[str, Any]) -> bool:
         """Request user approval in interactive mode.
 
         Args:

@@ -62,7 +62,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.framework.workflows.base_handler import BaseHandler, HandlerError
 from victor.framework.handler_registry import handler_decorator
@@ -98,7 +98,7 @@ class StatsComputeHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute statistical computations."""
         data = None
         operations = []
@@ -180,11 +180,11 @@ class MLTrainingHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute ML training."""
         model_type = node.input_mapping.get("model_type", "linear")
-        _features_key = node.input_mapping.get("features")  # noqa: F841
-        _target_key = node.input_mapping.get("target")  # noqa: F841
+        _features_key = node.input_mapping.get("features")
+        _target_key = node.input_mapping.get("target")
 
         train_cmd = f"python -m victor.ml.train --model {model_type}"
         result = await tool_registry.execute("shell", command=train_cmd, _exec_ctx={})
@@ -240,7 +240,7 @@ class PyCaretHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute PyCaret AutoML."""
         # Extract inputs
         data_key = node.input_mapping.get("data")
@@ -297,7 +297,7 @@ class PyCaretHandler(BaseHandler):
         time_budget: int,
         fold: int,
         sort_by: Optional[str],
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run PyCaret AutoML pipeline."""
         import asyncio
 
@@ -324,7 +324,7 @@ class PyCaretHandler(BaseHandler):
         time_budget: int,
         fold: int,
         sort_by: Optional[str],
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Synchronous PyCaret execution."""
         try:
             if task == "classification":
@@ -478,7 +478,7 @@ class AutoSklearnHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute Auto-sklearn AutoML."""
         # Extract inputs
         X_key = node.input_mapping.get("X")
@@ -538,7 +538,7 @@ class AutoSklearnHandler(BaseHandler):
         metric: Optional[str],
         n_jobs: int,
         ensemble_size: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run Auto-sklearn AutoML pipeline."""
         import asyncio
 
@@ -566,7 +566,7 @@ class AutoSklearnHandler(BaseHandler):
         metric: Optional[str],
         n_jobs: int,
         ensemble_size: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Synchronous Auto-sklearn execution."""
         try:
             from sklearn.model_selection import train_test_split  # type: ignore[import-untyped]
@@ -684,7 +684,7 @@ class RLTrainingHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute RL training."""
         # Extract inputs
         env_id = node.input_mapping.get("env", "CartPole-v1")
@@ -720,7 +720,7 @@ class RLTrainingHandler(BaseHandler):
         learning_rate: float,
         n_eval_episodes: int,
         save_path: Optional[str],
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Train RL agent asynchronously."""
         import asyncio
 
@@ -746,7 +746,7 @@ class RLTrainingHandler(BaseHandler):
         learning_rate: float,
         n_eval_episodes: int,
         save_path: Optional[str],
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Synchronous RL training."""
         try:
             import gymnasium as gym  # type: ignore[import-not-found]

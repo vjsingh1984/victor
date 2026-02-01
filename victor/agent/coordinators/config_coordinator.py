@@ -42,10 +42,9 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from victor.agent.protocols import ToolAccessContext
@@ -67,9 +66,9 @@ class ValidationResult:
     """
 
     valid: bool
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] | None = None
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
@@ -93,10 +92,10 @@ class OrchestratorConfig:
     model: str
     temperature: float = 0.7
     max_tokens: int = 4096
-    tool_selection: Dict[str, Any] | None = None
+    tool_selection: dict[str, Any] | None = None
     thinking: bool = False
     profile_name: str | None = None
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class ConfigCoordinator:
@@ -121,7 +120,7 @@ class ConfigCoordinator:
 
     def __init__(
         self,
-        providers: Optional[List[IConfigProvider]] = None,
+        providers: Optional[list[IConfigProvider]] = None,
         enable_cache: bool = True,
     ) -> None:
         """Initialize the configuration coordinator.
@@ -133,13 +132,13 @@ class ConfigCoordinator:
         # Sort providers by priority (lowest first, so higher priority can override)
         self._providers = sorted(providers or [], key=lambda p: p.priority())
         self._enable_cache = enable_cache
-        self._config_cache: Dict[str, Dict[str, Any]] = {}
+        self._config_cache: dict[str, dict[str, Any]] = {}
 
     async def load_config(
         self,
         session_id: str,
-        config_override: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        config_override: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """Load configuration for a session.
 
         Tries each provider in priority order and merges the results.
@@ -204,7 +203,7 @@ class ConfigCoordinator:
         session_id: str,
         provider: str,
         model: str,
-        config_override: Optional[Dict[str, Any]] = None,
+        config_override: Optional[dict[str, Any]] = None,
     ) -> OrchestratorConfig:
         """Load orchestrator-specific configuration.
 
@@ -242,7 +241,7 @@ class ConfigCoordinator:
 
     async def validate_config(
         self,
-        config: Dict[str, Any] | OrchestratorConfig,
+        config: dict[str, Any] | OrchestratorConfig,
     ) -> ValidationResult:
         """Validate configuration.
 
@@ -358,9 +357,9 @@ class ConfigCoordinator:
 
     def _deep_merge(
         self,
-        base: Dict[str, Any],
-        override: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base: dict[str, Any],
+        override: dict[str, Any],
+    ) -> dict[str, Any]:
         """Deep merge two dictionaries.
 
         Args:
@@ -382,7 +381,7 @@ class ConfigCoordinator:
 
     async def create_provider_from_config(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         settings: Any,
         provider_registry: Any = None,
     ) -> Any:
@@ -462,7 +461,7 @@ class SettingsConfigProvider(IConfigProvider):
         self._settings = settings
         self._priority = priority
 
-    async def get_config(self, session_id: str) -> Dict[str, Any]:
+    async def get_config(self, session_id: str) -> dict[str, Any]:
         """Get configuration from Settings.
 
         Args:
@@ -514,7 +513,7 @@ class EnvironmentConfigProvider(IConfigProvider):
         self._env = os.environ
         self._priority = priority
 
-    async def get_config(self, session_id: str) -> Dict[str, Any]:
+    async def get_config(self, session_id: str) -> dict[str, Any]:
         """Get configuration from environment variables.
 
         Args:
@@ -523,7 +522,6 @@ class EnvironmentConfigProvider(IConfigProvider):
         Returns:
             Configuration dictionary from environment
         """
-        import os
 
         config = {}
 
@@ -574,7 +572,7 @@ class ProfileConfigProvider(IConfigProvider):
         self._profile_name = profile_name
         self._priority = priority
 
-    async def get_config(self, session_id: str) -> Dict[str, Any]:
+    async def get_config(self, session_id: str) -> dict[str, Any]:
         """Get configuration from profile.
 
         Args:
@@ -696,7 +694,7 @@ class ToolAccessConfigCoordinator:
 
     def build_tool_access_context(
         self,
-        session_enabled_tools: Optional[Set[str]] = None,
+        session_enabled_tools: Optional[set[str]] = None,
         current_mode: Optional[str] = None,
     ) -> ToolAccessContext:
         """Build ToolAccessContext for unified access control checks.
@@ -724,8 +722,8 @@ class ToolAccessConfigCoordinator:
 
     def get_enabled_tools(
         self,
-        session_enabled_tools: Optional[Set[str]] = None,
-    ) -> Set[str]:
+        session_enabled_tools: Optional[set[str]] = None,
+    ) -> set[str]:
         """Get currently enabled tool names.
 
         Uses ToolAccessController if available for unified access control.
@@ -742,7 +740,7 @@ class ToolAccessConfigCoordinator:
         if self._tool_access_controller:
             context = self.build_tool_access_context(session_enabled_tools=session_enabled_tools)
             result: Any = self._tool_access_controller.get_allowed_tools(context)
-            return cast(Set[str], result)
+            return cast(set[str], result)
 
         # Check mode coordinator for BUILD mode (allows all tools minus disallowed)
         if self._mode_coordinator:
@@ -751,7 +749,7 @@ class ToolAccessConfigCoordinator:
                 all_tools = self.get_available_tools()
                 # Remove any explicitly disallowed tools
                 disallowed: Any = mode_config.disallowed_tools
-                enabled = all_tools - cast(Set[str], disallowed)
+                enabled = all_tools - cast(set[str], disallowed)
                 return enabled
 
         # Check for framework-set tools (vertical filtering)
@@ -764,7 +762,7 @@ class ToolAccessConfigCoordinator:
     def is_tool_enabled(
         self,
         tool_name: str,
-        session_enabled_tools: Optional[Set[str]] = None,
+        session_enabled_tools: Optional[set[str]] = None,
     ) -> bool:
         """Check if a specific tool is enabled.
 
@@ -798,7 +796,7 @@ class ToolAccessConfigCoordinator:
 
     def set_enabled_tools(
         self,
-        tools: Set[str],
+        tools: set[str],
         session_enabled_tools_attr: Optional[Any] = None,
         tool_selector: Optional[Any] = None,
         vertical_context: Optional[Any] = None,
@@ -844,7 +842,7 @@ class ToolAccessConfigCoordinator:
                     f"vertical_core={sorted(tiered_config.vertical_core)}"
                 )
 
-    def get_available_tools(self) -> Set[str]:
+    def get_available_tools(self) -> set[str]:
         """Get all registered tool names.
 
         Returns:
@@ -874,9 +872,9 @@ class ToolAccessConfigCoordinator:
 
     def detect_config_changes(
         self,
-        old_config: Dict[str, Any],
-        new_config: Dict[str, Any],
-    ) -> Dict[str, Tuple[Any, Any]]:
+        old_config: dict[str, Any],
+        new_config: dict[str, Any],
+    ) -> dict[str, tuple[Any, Any]]:
         """Detect changes between two configurations.
 
         Args:
@@ -902,7 +900,7 @@ class ToolAccessConfigCoordinator:
         self,
         from_mode: str,
         to_mode: str,
-        current_tools: Set[str],
+        current_tools: set[str],
     ) -> ValidationResult:
         """Validate that a mode transition is safe given current tools.
 
@@ -914,8 +912,8 @@ class ToolAccessConfigCoordinator:
         Returns:
             ValidationResult with validation status
         """
-        errors: List[str] = []
-        warnings: List[str] = []
+        errors: list[str] = []
+        warnings: list[str] = []
 
         # Check if moving to more restrictive mode
         restrictive_modes = {"plan", "explore"}

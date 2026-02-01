@@ -26,7 +26,7 @@ testability and reusability across the codebase.
 from __future__ import annotations
 
 import logging
-from typing import Any, Set, cast
+from typing import Any, cast
 
 from victor.tools.tool_names import ToolNames
 
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Shell-related aliases that should resolve intelligently
 # LLMs often hallucinate these tool names, so we map them appropriately
-SHELL_ALIASES: Set[str] = {
+SHELL_ALIASES: set[str] = {
     "run",
     "bash",
     "execute",
@@ -45,7 +45,7 @@ SHELL_ALIASES: Set[str] = {
 }
 
 
-def get_shell_aliases() -> Set[str]:
+def get_shell_aliases() -> set[str]:
     """Get the set of all shell-related tool aliases.
 
     Returns:
@@ -120,9 +120,9 @@ def resolve_shell_variant(
 
 def detect_mentioned_tools(
     text: str,
-    available_tools: Set[str],
+    available_tools: set[str],
     tool_aliases: dict[str, str] | None = None,
-) -> Set[str]:
+) -> set[str]:
     """Detect which tools are mentioned in a text string.
 
     This function scans text for mentions of tool names or their aliases,

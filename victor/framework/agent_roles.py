@@ -41,7 +41,7 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Set, Type
+from typing import Optional
 
 from victor.framework.agent_protocols import AgentCapability, IAgentRole
 
@@ -72,7 +72,7 @@ class ManagerRole:
     """
 
     name: str = "manager"
-    capabilities: Set[AgentCapability] = field(
+    capabilities: set[AgentCapability] = field(
         default_factory=lambda: {
             AgentCapability.DELEGATE,
             AgentCapability.COMMUNICATE,
@@ -80,7 +80,7 @@ class ManagerRole:
             AgentCapability.READ,
         }
     )
-    allowed_tools: Set[str] = field(
+    allowed_tools: set[str] = field(
         default_factory=lambda: {
             "read_file",
             "list_directory",
@@ -138,14 +138,14 @@ class ResearcherRole:
     """
 
     name: str = "researcher"
-    capabilities: Set[AgentCapability] = field(
+    capabilities: set[AgentCapability] = field(
         default_factory=lambda: {
             AgentCapability.READ,
             AgentCapability.SEARCH,
             AgentCapability.COMMUNICATE,
         }
     )
-    allowed_tools: Set[str] = field(
+    allowed_tools: set[str] = field(
         default_factory=lambda: {
             "read_file",
             "list_directory",
@@ -205,7 +205,7 @@ class ExecutorRole:
     """
 
     name: str = "executor"
-    capabilities: Set[AgentCapability] = field(
+    capabilities: set[AgentCapability] = field(
         default_factory=lambda: {
             AgentCapability.READ,
             AgentCapability.WRITE,
@@ -213,7 +213,7 @@ class ExecutorRole:
             AgentCapability.COMMUNICATE,
         }
     )
-    allowed_tools: Set[str] = field(
+    allowed_tools: set[str] = field(
         default_factory=lambda: {
             "read_file",
             "write_file",
@@ -276,14 +276,14 @@ class ReviewerRole:
     """
 
     name: str = "reviewer"
-    capabilities: Set[AgentCapability] = field(
+    capabilities: set[AgentCapability] = field(
         default_factory=lambda: {
             AgentCapability.READ,
             AgentCapability.APPROVE,
             AgentCapability.COMMUNICATE,
         }
     )
-    allowed_tools: Set[str] = field(
+    allowed_tools: set[str] = field(
         default_factory=lambda: {
             "read_file",
             "list_directory",
@@ -323,7 +323,7 @@ When you find issues, provide specific, actionable feedback."""
 
 
 # Map of role names to role classes
-ROLE_REGISTRY: Dict[str, Type[IAgentRole]] = {
+ROLE_REGISTRY: dict[str, type[IAgentRole]] = {
     "manager": ManagerRole,
     "researcher": ResearcherRole,
     "executor": ExecutorRole,

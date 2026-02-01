@@ -15,7 +15,7 @@
 """Unit tests for TeamNode."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -307,7 +307,6 @@ class TestTeamNode:
 
     def test_merge_team_result_team_wins(self, sample_team_node):
         """Test merging team result with team_wins mode."""
-        from victor.teams.types import TeamResult
 
         graph_state = {"key": "graph_value"}
         team_result = MagicMock()
@@ -323,7 +322,6 @@ class TestTeamNode:
 
     def test_merge_team_result_graph_wins(self, sample_team_node):
         """Test merging team result with graph_wins mode."""
-        from victor.teams.types import TeamResult
 
         sample_team_node.config.merge_mode = MergeMode.GRAPH_WINS
 
@@ -341,7 +339,6 @@ class TestTeamNode:
 
     def test_merge_team_result_error_mode(self, sample_team_node):
         """Test merging team result with error mode raises on conflict."""
-        from victor.teams.types import TeamResult
 
         sample_team_node.config.merge_mode = MergeMode.ERROR
 

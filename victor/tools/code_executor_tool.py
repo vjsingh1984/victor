@@ -27,7 +27,7 @@ import signal
 import tarfile
 import os
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Optional
 import weakref
 
 logger = logging.getLogger(__name__)
@@ -432,7 +432,7 @@ class CodeSandbox:
             "stderr": stderr,
         }
 
-    def put_files(self, file_paths: List[str]) -> None:
+    def put_files(self, file_paths: list[str]) -> None:
         """Copies files from the local filesystem into the container's working dir."""
         if not self.docker_available:
             # Docker not available - skip file operations
@@ -480,7 +480,7 @@ async def _execute_code(sandbox_instance: CodeSandbox, code: str) -> str:
     return output
 
 
-async def _upload_files(sandbox_instance: CodeSandbox, file_paths: List[str]) -> str:
+async def _upload_files(sandbox_instance: CodeSandbox, file_paths: list[str]) -> str:
     """Internal: Upload files to sandbox."""
     try:
         sandbox_instance.put_files(file_paths)
@@ -499,7 +499,7 @@ async def _upload_files(sandbox_instance: CodeSandbox, file_paths: List[str]) ->
 async def sandbox(
     operation: str,
     code: str = "",
-    file_paths: Optional[List[str]] = None,
+    file_paths: Optional[list[str]] = None,
     context: Optional[dict[str, Any]] = None,
 ) -> str:
     """Unified sandbox operations for code execution in isolated Docker container.

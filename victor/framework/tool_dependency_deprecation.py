@@ -43,7 +43,8 @@ from __future__ import annotations
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Callable, Dict, Generic, Optional, Set, TypeVar
+from typing import Any, Generic, Optional, TypeVar
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +172,7 @@ class VerticalDeprecationModule:
         self.vertical_name = vertical_name
         self.yaml_path = yaml_path
         self.constant_prefix = constant_prefix
-        self._descriptors: Dict[str, "DeprecatedConstantDescriptor[Any]"] = {}
+        self._descriptors: dict[str, "DeprecatedConstantDescriptor[Any]"] = {}
         self._config_cache: Optional[Any] = None
 
     def _get_config(self) -> Any:
@@ -263,7 +264,7 @@ class VerticalDeprecationModule:
 
         raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
 
-    def get_constant_names(self) -> Set[str]:
+    def get_constant_names(self) -> set[str]:
         """Get all registered constant names.
 
         Returns:
@@ -287,7 +288,7 @@ def create_vertical_deprecation_module(
     constant_prefix: str,
     *,
     include_standard: bool = True,
-    extra_mappings: Optional[Dict[str, tuple[Any, ...]]] = None,
+    extra_mappings: Optional[dict[str, tuple[Any, ...]]] = None,
 ) -> VerticalDeprecationModule:
     """Factory to create deprecated constant descriptors for a vertical.
 

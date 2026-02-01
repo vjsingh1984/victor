@@ -64,10 +64,10 @@ from __future__ import annotations
 
 import logging
 import time
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
+from collections.abc import Callable
 
 from victor.core.vertical_types import MiddlewarePriority, MiddlewareResult
 from victor.core.verticals.protocols import MiddlewareProtocol
@@ -127,9 +127,9 @@ class ContentValidationResult:
     """
 
     is_valid: bool = True
-    issues: List[ValidationIssue] = field(default_factory=list)
+    issues: list[ValidationIssue] = field(default_factory=list)
     fixed_content: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def error_count(self) -> int:
@@ -169,7 +169,7 @@ class ValidatorProtocol(Protocol):
     def validate(
         self,
         content: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ContentValidationResult:
         """Validate content and return results.
 
@@ -193,8 +193,8 @@ class FixableValidatorProtocol(ValidatorProtocol, Protocol):
     def fix(
         self,
         content: str,
-        issues: List[ValidationIssue],
-        context: Optional[Dict[str, Any]] = None,
+        issues: list[ValidationIssue],
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Attempt to fix issues in content.
 
@@ -236,7 +236,7 @@ class LoggingMiddleware(MiddlewareProtocol):
         include_arguments: bool = True,
         include_results: bool = False,
         sanitize_arguments: bool = True,
-        exclude_tools: Optional[Set[str]] = None,
+        exclude_tools: Optional[set[str]] = None,
         logger_name: Optional[str] = None,
     ):
         """Initialize the logging middleware.
@@ -255,7 +255,7 @@ class LoggingMiddleware(MiddlewareProtocol):
         self._sanitize_arguments = sanitize_arguments
         self._exclude_tools = exclude_tools or set()
         self._logger = logging.getLogger(logger_name) if logger_name else logger
-        self._start_times: Dict[str, float] = {}
+        self._start_times: dict[str, float] = {}
 
     def _sanitize_value(self, key: str, value: Any) -> Any:
         """Sanitize sensitive argument values.
@@ -293,7 +293,7 @@ class LoggingMiddleware(MiddlewareProtocol):
 
         return value
 
-    def _format_arguments(self, arguments: Dict[str, Any]) -> str:
+    def _format_arguments(self, arguments: dict[str, Any]) -> str:
         """Format arguments for logging.
 
         Args:
@@ -308,7 +308,7 @@ class LoggingMiddleware(MiddlewareProtocol):
         sanitized = {k: self._sanitize_value(k, v) for k, v in arguments.items()}
         return f" args={sanitized}"
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Log tool call before execution.
 
         Args:
@@ -333,7 +333,7 @@ class LoggingMiddleware(MiddlewareProtocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -381,7 +381,7 @@ class LoggingMiddleware(MiddlewareProtocol):
         """
         return MiddlewarePriority.DEFERRED
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get tools this middleware applies to.
 
         Returns:
@@ -438,7 +438,7 @@ class SecretMaskingMiddleware(MiddlewareProtocol):
 
         return mask_secrets(content, replacement=self._replacement)
 
-    def _mask_dict_values(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _mask_dict_values(self, data: dict[str, Any]) -> dict[str, Any]:
         """Recursively mask secrets in dictionary values.
 
         Args:
@@ -447,7 +447,7 @@ class SecretMaskingMiddleware(MiddlewareProtocol):
         Returns:
             Dictionary with masked values
         """
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         for key, value in data.items():
             if isinstance(value, str):
                 result[key] = self._mask_content(value)
@@ -459,7 +459,7 @@ class SecretMaskingMiddleware(MiddlewareProtocol):
                 result[key] = value
         return result
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Optionally mask secrets in input arguments.
 
         Args:
@@ -488,7 +488,7 @@ class SecretMaskingMiddleware(MiddlewareProtocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -532,7 +532,7 @@ class SecretMaskingMiddleware(MiddlewareProtocol):
         """
         return MiddlewarePriority.HIGH
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get tools this middleware applies to.
 
         Returns:
@@ -618,8 +618,8 @@ class MetricsMiddleware(MiddlewareProtocol):
         """
         self._enable_timing = enable_timing
         self._callback = callback
-        self._metrics: Dict[str, ToolMetrics] = {}
-        self._start_times: Dict[str, float] = {}
+        self._metrics: dict[str, ToolMetrics] = {}
+        self._start_times: dict[str, float] = {}
 
     def _get_or_create_metrics(self, tool_name: str) -> ToolMetrics:
         """Get or create metrics for a tool.
@@ -634,7 +634,7 @@ class MetricsMiddleware(MiddlewareProtocol):
             self._metrics[tool_name] = ToolMetrics(tool_name=tool_name)
         return self._metrics[tool_name]
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Record call start time.
 
         Args:
@@ -653,7 +653,7 @@ class MetricsMiddleware(MiddlewareProtocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -705,7 +705,7 @@ class MetricsMiddleware(MiddlewareProtocol):
         """
         return MiddlewarePriority.LOW
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get tools this middleware applies to.
 
         Returns:
@@ -724,7 +724,7 @@ class MetricsMiddleware(MiddlewareProtocol):
         """
         return self._metrics.get(tool_name)
 
-    def get_summary(self) -> Dict[str, ToolMetrics]:
+    def get_summary(self) -> dict[str, ToolMetrics]:
         """Get summary of all metrics.
 
         Returns:
@@ -829,10 +829,10 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         self,
         block_dangerous: bool = True,
         warn_on_risky: bool = True,
-        protected_branches: Optional[Set[str]] = None,
-        allowed_force_branches: Optional[Set[str]] = None,
-        custom_blocked: Optional[Set[str]] = None,
-        custom_warned: Optional[Set[str]] = None,
+        protected_branches: Optional[set[str]] = None,
+        allowed_force_branches: Optional[set[str]] = None,
+        custom_blocked: Optional[set[str]] = None,
+        custom_warned: Optional[set[str]] = None,
     ):
         """Initialize git safety middleware.
 
@@ -885,7 +885,7 @@ class GitSafetyMiddleware(MiddlewareProtocol):
                     return True
         return False
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Check git operations for safety.
 
         Args:
@@ -946,7 +946,7 @@ class GitSafetyMiddleware(MiddlewareProtocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -965,7 +965,7 @@ class GitSafetyMiddleware(MiddlewareProtocol):
         """
         return MiddlewarePriority.CRITICAL
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get applicable tools.
 
         Returns:
@@ -1024,8 +1024,8 @@ class OutputValidationMiddleware(MiddlewareProtocol):
     def __init__(
         self,
         validator: ValidatorProtocol,
-        applicable_tools: Optional[Set[str]] = None,
-        argument_names: Optional[Set[str]] = None,
+        applicable_tools: Optional[set[str]] = None,
+        argument_names: Optional[set[str]] = None,
         auto_fix: bool = True,
         block_on_error: bool = False,
         max_fix_iterations: int = 3,
@@ -1055,7 +1055,7 @@ class OutputValidationMiddleware(MiddlewareProtocol):
     async def before_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
     ) -> MiddlewareResult:
         """Validate arguments before tool execution.
 
@@ -1069,7 +1069,7 @@ class OutputValidationMiddleware(MiddlewareProtocol):
             MiddlewareResult with validation status and optionally modified arguments
         """
         # Find arguments to validate
-        content_to_validate: Dict[str, str] = {}
+        content_to_validate: dict[str, str] = {}
         for arg_name in self._argument_names:
             if arg_name in arguments and isinstance(arguments[arg_name], str):
                 content_to_validate[arg_name] = arguments[arg_name]
@@ -1084,8 +1084,8 @@ class OutputValidationMiddleware(MiddlewareProtocol):
         }
 
         # Validate each content field
-        all_issues: List[ValidationIssue] = []
-        modified_arguments: Dict[str, Any] = {}
+        all_issues: list[ValidationIssue] = []
+        modified_arguments: dict[str, Any] = {}
         any_fixed = False
 
         for arg_name, content in content_to_validate.items():
@@ -1112,7 +1112,7 @@ class OutputValidationMiddleware(MiddlewareProtocol):
                     )
 
         # Build metadata
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "validation_performed": True,
             "validation_passed": len(all_issues) == 0,
             "issue_count": len(all_issues),
@@ -1159,7 +1159,7 @@ class OutputValidationMiddleware(MiddlewareProtocol):
     def _validate_content(
         self,
         content: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ContentValidationResult:
         """Validate content using the configured validator.
 
@@ -1187,8 +1187,8 @@ class OutputValidationMiddleware(MiddlewareProtocol):
     def _try_fix(
         self,
         content: str,
-        issues: List[ValidationIssue],
-        context: Optional[Dict[str, Any]] = None,
+        issues: list[ValidationIssue],
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Attempt to fix content if validator supports fixing.
 
@@ -1222,7 +1222,7 @@ class OutputValidationMiddleware(MiddlewareProtocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -1241,7 +1241,7 @@ class OutputValidationMiddleware(MiddlewareProtocol):
         """
         return self._priority
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get applicable tools.
 
         Returns:
@@ -1266,7 +1266,7 @@ class CacheResult:
         self,
         proceed: bool = True,
         cached_result: Optional[Any] = None,
-        modified_arguments: Optional[Dict[str, Any]] = None,
+        modified_arguments: Optional[dict[str, Any]] = None,
         error_message: Optional[str] = None,
         **metadata: Any,
     ):
@@ -1338,8 +1338,8 @@ class CacheMiddleware(MiddlewareProtocol):
     def __init__(
         self,
         ttl_seconds: int = 300,
-        cacheable_tools: Optional[Set[str]] = None,
-        key_components: Optional[List[str]] = None,
+        cacheable_tools: Optional[set[str]] = None,
+        key_components: Optional[list[str]] = None,
         cache_backend: Optional[Any] = None,  # ICacheBackend from common.py
         cache_namespace: str = "tool_cache",
         auto_detect_idempotent: bool = True,
@@ -1371,7 +1371,7 @@ class CacheMiddleware(MiddlewareProtocol):
 
         # In-memory cache storage (fallback if no backend)
         if cache_backend is None:
-            self._cache: Optional[Dict[str, tuple[Any, float]]] = {}
+            self._cache: Optional[dict[str, tuple[Any, float]]] = {}
         else:
             self._cache = None  # Not used when backend is provided
 
@@ -1379,7 +1379,7 @@ class CacheMiddleware(MiddlewareProtocol):
         self._hits = 0
         self._misses = 0
 
-    def _build_cache_key(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+    def _build_cache_key(self, tool_name: str, arguments: dict[str, Any]) -> str:
         """Build cache key from tool name and arguments.
 
         Args:
@@ -1453,7 +1453,7 @@ class CacheMiddleware(MiddlewareProtocol):
 
         return time.time() > expiry_time
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> CacheResult:  # type: ignore[override]
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> CacheResult:  # type: ignore[override]
         """Check cache before tool execution.
 
         Args:
@@ -1491,7 +1491,7 @@ class CacheMiddleware(MiddlewareProtocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -1531,7 +1531,7 @@ class CacheMiddleware(MiddlewareProtocol):
 
         return None
 
-    def invalidate(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def invalidate(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Invalidate a specific cache entry.
 
         Args:
@@ -1570,7 +1570,7 @@ class CacheMiddleware(MiddlewareProtocol):
         self._hits = 0
         self._misses = 0
 
-    def get_stats(self) -> Dict[str, int | float]:
+    def get_stats(self) -> dict[str, int | float]:
         """Get cache statistics.
 
         Returns:
@@ -1605,7 +1605,7 @@ class CacheMiddleware(MiddlewareProtocol):
         """
         return MiddlewarePriority.HIGH
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get tools this middleware applies to.
 
         Returns:
@@ -1631,7 +1631,7 @@ class RateLimitResult:
         proceed: bool = True,
         blocked: bool = False,
         retry_after_seconds: Optional[float] = None,
-        modified_arguments: Optional[Dict[str, Any]] = None,
+        modified_arguments: Optional[dict[str, Any]] = None,
         error_message: Optional[str] = None,
         **metadata: Any,
     ):
@@ -1678,7 +1678,7 @@ class RateLimitMiddleware(MiddlewareProtocol):
         self,
         max_calls: int = 10,
         time_window_seconds: int = 60,
-        blocked_tools: Optional[Set[str]] = None,
+        blocked_tools: Optional[set[str]] = None,
     ):
         """Initialize the rate limit middleware.
 
@@ -1692,7 +1692,7 @@ class RateLimitMiddleware(MiddlewareProtocol):
         self._blocked_tools = blocked_tools or set()
 
         # Track calls per tool: {tool_name: [(timestamp, count), ...]}
-        self._call_history: Dict[str, List[float]] = {}
+        self._call_history: dict[str, list[float]] = {}
 
     def _is_limited(self, tool_name: str) -> bool:
         """Check if a tool is rate-limited.
@@ -1758,7 +1758,7 @@ class RateLimitMiddleware(MiddlewareProtocol):
 
         return max(0.0, window_end - current_time)
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> RateLimitResult:  # type: ignore[override]
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> RateLimitResult:  # type: ignore[override]
         """Check rate limit before tool execution.
 
         Args:
@@ -1811,7 +1811,7 @@ class RateLimitMiddleware(MiddlewareProtocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -1834,7 +1834,7 @@ class RateLimitMiddleware(MiddlewareProtocol):
         """Reset all rate limits."""
         self._call_history.clear()
 
-    def get_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_stats(self) -> dict[str, dict[str, Any]]:
         """Get rate limit statistics.
 
         Returns:
@@ -1865,7 +1865,7 @@ class RateLimitMiddleware(MiddlewareProtocol):
         """
         return MiddlewarePriority.CRITICAL
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get tools this middleware applies to.
 
         Returns:
@@ -1922,9 +1922,9 @@ class ValidationMiddleware(MiddlewareProtocol):
 
     def __init__(
         self,
-        schemas: Optional[Dict[str, Dict[str, Any]]] = None,
+        schemas: Optional[dict[str, dict[str, Any]]] = None,
         enabled: bool = True,
-        applicable_tools: Optional[Set[str]] = None,
+        applicable_tools: Optional[set[str]] = None,
     ):
         """Initialize ValidationMiddleware.
 
@@ -1937,7 +1937,7 @@ class ValidationMiddleware(MiddlewareProtocol):
         self._enabled = enabled
         self._applicable_tools = applicable_tools
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Validate tool arguments against schema.
 
         Args:
@@ -1966,7 +1966,7 @@ class ValidationMiddleware(MiddlewareProtocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -1977,7 +1977,7 @@ class ValidationMiddleware(MiddlewareProtocol):
         """
         return None
 
-    def _validate(self, schema: Dict[str, Any], arguments: Dict[str, Any]) -> None:
+    def _validate(self, schema: dict[str, Any], arguments: dict[str, Any]) -> None:
         """Validate arguments against JSON schema.
 
         Args:
@@ -2008,7 +2008,7 @@ class ValidationMiddleware(MiddlewareProtocol):
                     prop_value = arguments[prop_name]
                     self._validate_property(prop_name, prop_value, prop_schema)
 
-    def _validate_property(self, prop_name: str, value: Any, prop_schema: Dict[str, Any]) -> None:
+    def _validate_property(self, prop_name: str, value: Any, prop_schema: dict[str, Any]) -> None:
         """Validate a single property against its schema.
 
         Args:
@@ -2056,7 +2056,7 @@ class ValidationMiddleware(MiddlewareProtocol):
         """
         return MiddlewarePriority.HIGH
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get applicable tools.
 
         Returns:
@@ -2085,8 +2085,8 @@ class SafetyCheckMiddleware(MiddlewareProtocol):
 
     def __init__(
         self,
-        blocked_tools: Optional[Set[str]] = None,
-        allowed_paths: Optional[Set[str]] = None,
+        blocked_tools: Optional[set[str]] = None,
+        allowed_paths: Optional[set[str]] = None,
         enabled: bool = True,
     ):
         """Initialize SafetyCheckMiddleware.
@@ -2100,7 +2100,7 @@ class SafetyCheckMiddleware(MiddlewareProtocol):
         self._allowed_paths = allowed_paths
         self._enabled = enabled
 
-    async def before_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> MiddlewareResult:
+    async def before_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> MiddlewareResult:
         """Perform safety checks before tool execution.
 
         Args:
@@ -2146,7 +2146,7 @@ class SafetyCheckMiddleware(MiddlewareProtocol):
     async def after_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result: Any,
         success: bool,
     ) -> Optional[Any]:
@@ -2213,7 +2213,7 @@ class SafetyCheckMiddleware(MiddlewareProtocol):
         """
         return MiddlewarePriority.CRITICAL
 
-    def get_applicable_tools(self) -> Optional[Set[str]]:
+    def get_applicable_tools(self) -> Optional[set[str]]:
         """Get applicable tools.
 
         Returns:

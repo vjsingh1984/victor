@@ -39,9 +39,8 @@ from __future__ import annotations
 import hashlib
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
-from victor.agent.context_compactor import MessagePriority
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +55,10 @@ class CompactionStrategy(ABC):
     @abstractmethod
     def compact(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         target_tokens: int,
         current_query: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Compact messages to fit within target token limit.
 
         Args:
@@ -74,10 +73,10 @@ class CompactionStrategy(ABC):
 
     async def compact_async(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         target_tokens: int,
         current_query: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of compact (default implementation delegates to sync).
 
         Args:
@@ -127,10 +126,10 @@ class TruncationCompactionStrategy(CompactionStrategy):
 
     def compact(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         target_tokens: int,
         current_query: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Compact messages by truncation.
 
         Preserves:
@@ -141,12 +140,12 @@ class TruncationCompactionStrategy(CompactionStrategy):
         if not messages:
             return []
 
-        result: List[Dict[str, Any]] = []
+        result: list[dict[str, Any]] = []
         current_chars = 0
         target_chars = target_tokens * 3  # Rough estimation: 3 chars per token
 
         # First pass: Collect protected messages
-        protected_messages: List[Dict[str, Any]] = []
+        protected_messages: list[dict[str, Any]] = []
         if self.keep_system_messages:
             protected_messages.extend([m for m in messages if m.get("role") == "system"])
 
@@ -181,7 +180,7 @@ class TruncationCompactionStrategy(CompactionStrategy):
 
         return result
 
-    def _is_pinned_message(self, message: Dict[str, Any]) -> bool:
+    def _is_pinned_message(self, message: dict[str, Any]) -> bool:
         """Check if message should be pinned (never removed).
 
         Args:
@@ -248,14 +247,14 @@ class LLMCompactionStrategy(CompactionStrategy):
         self.preserve_recent_count = preserve_recent_count
 
         # Summary cache: hash -> summary
-        self._summary_cache: Dict[str, str] = {}
+        self._summary_cache: dict[str, str] = {}
 
     def compact(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         target_tokens: int,
         current_query: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Synchronous compact - not supported for LLM-based compaction.
 
         LLM-based compaction requires async operations. Use compact_async() instead.
@@ -278,10 +277,10 @@ class LLMCompactionStrategy(CompactionStrategy):
 
     async def compact_async(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         target_tokens: int,
         current_query: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Compact messages using LLM summarization.
 
         Args:
@@ -308,7 +307,7 @@ class LLMCompactionStrategy(CompactionStrategy):
         to_summarize = regular[: len(regular) - len(recent)]
 
         # Build result
-        result: List[Dict[str, Any]] = []
+        result: list[dict[str, Any]] = []
 
         # Add protected messages
         result.extend(protected)
@@ -334,7 +333,7 @@ class LLMCompactionStrategy(CompactionStrategy):
 
         return result
 
-    def _is_protected_message(self, message: Dict[str, Any]) -> bool:
+    def _is_protected_message(self, message: dict[str, Any]) -> bool:
         """Check if message should be protected from summarization.
 
         Args:
@@ -360,7 +359,7 @@ class LLMCompactionStrategy(CompactionStrategy):
 
     async def _get_or_create_summary(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
     ) -> str:
         """Get cached summary or create new one.
 
@@ -387,7 +386,7 @@ class LLMCompactionStrategy(CompactionStrategy):
 
         return summary
 
-    def _make_cache_key(self, messages: List[Dict[str, Any]]) -> str:
+    def _make_cache_key(self, messages: list[dict[str, Any]]) -> str:
         """Create cache key from messages.
 
         Args:
@@ -406,7 +405,7 @@ class LLMCompactionStrategy(CompactionStrategy):
 
     async def _summarize_with_llm(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
     ) -> str:
         """Summarize messages using LLM.
 
@@ -492,10 +491,10 @@ class HybridCompactionStrategy(CompactionStrategy):
 
     def compact(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         target_tokens: int,
         current_query: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Synchronous compact - delegates to async version.
 
         Args:
@@ -511,10 +510,10 @@ class HybridCompactionStrategy(CompactionStrategy):
 
     async def compact_async(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         target_tokens: int,
         current_query: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Compact messages using adaptive strategy.
 
         Args:
@@ -551,7 +550,7 @@ class HybridCompactionStrategy(CompactionStrategy):
                 logger.debug("Using truncation strategy (low complexity)")
                 return self.truncation_strategy.compact(messages, target_tokens, current_query)
 
-    def _calculate_complexity(self, messages: List[Dict[str, Any]]) -> float:
+    def _calculate_complexity(self, messages: list[dict[str, Any]]) -> float:
         """Calculate complexity score for messages.
 
         Higher complexity = more need for LLM summarization.

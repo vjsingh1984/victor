@@ -21,7 +21,8 @@ the Factory pattern.
 import importlib
 import logging
 from pathlib import Path
-from typing import Callable, Optional, Type
+from typing import Optional
+from collections.abc import Callable
 
 from victor.processing.completion.protocol import CompletionCapabilities
 from victor.processing.completion.provider import BaseCompletionProvider
@@ -43,7 +44,7 @@ class CompletionProviderRegistry:
         """Initialize the registry."""
         self._providers: dict[str, BaseCompletionProvider] = {}
         self._factories: dict[str, Callable[[], BaseCompletionProvider]] = {}
-        self._provider_classes: dict[str, Type[BaseCompletionProvider]] = {}
+        self._provider_classes: dict[str, type[BaseCompletionProvider]] = {}
 
     def register(self, provider: BaseCompletionProvider) -> None:
         """Register a provider instance.
@@ -59,7 +60,7 @@ class CompletionProviderRegistry:
     def register_class(
         self,
         name: str,
-        provider_class: Type[BaseCompletionProvider],
+        provider_class: type[BaseCompletionProvider],
     ) -> None:
         """Register a provider class for lazy instantiation.
 

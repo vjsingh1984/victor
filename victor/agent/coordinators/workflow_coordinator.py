@@ -22,7 +22,7 @@ to improve modularity and testability.
 """
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.workflows.registry import WorkflowRegistry
@@ -98,7 +98,7 @@ class WorkflowCoordinator:
         logger.debug(f"Registered {count} mode workflows via WorkflowCoordinator")
         return count
 
-    def list_workflows(self) -> List[str]:
+    def list_workflows(self) -> list[str]:
         """List all registered workflow names.
 
         Returns:

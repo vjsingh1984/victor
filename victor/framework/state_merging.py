@@ -62,13 +62,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -124,10 +122,10 @@ class MergeStrategy(Protocol):
 
     def merge(
         self,
-        graph_state: Dict[str, Any],
-        team_state: Dict[str, Any],
+        graph_state: dict[str, Any],
+        team_state: dict[str, Any],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Merge team state into graph state.
 
         Args:
@@ -158,10 +156,10 @@ class BaseMergeStrategy(ABC):
     @abstractmethod
     def merge(
         self,
-        graph_state: Dict[str, Any],
-        team_state: Dict[str, Any],
+        graph_state: dict[str, Any],
+        team_state: dict[str, Any],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Merge team state into graph state.
 
         Args:
@@ -252,10 +250,10 @@ class DictMergeStrategy(BaseMergeStrategy):
 
     def merge(
         self,
-        graph_state: Dict[str, Any],
-        team_state: Dict[str, Any],
+        graph_state: dict[str, Any],
+        team_state: dict[str, Any],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Merge team state into graph state.
 
         Args:
@@ -300,10 +298,10 @@ class ListMergeStrategy(BaseMergeStrategy):
 
     def merge(
         self,
-        graph_state: Dict[str, Any],
-        team_state: Dict[str, Any],
+        graph_state: dict[str, Any],
+        team_state: dict[str, Any],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Merge team state into graph state.
 
         Args:
@@ -385,10 +383,10 @@ class CustomMergeStrategy(BaseMergeStrategy):
 
     def merge(
         self,
-        graph_state: Dict[str, Any],
-        team_state: Dict[str, Any],
+        graph_state: dict[str, Any],
+        team_state: dict[str, Any],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Merge team state into graph state.
 
         Args:
@@ -442,7 +440,7 @@ class SelectiveMergeStrategy(BaseMergeStrategy):
 
     def __init__(
         self,
-        keys_to_merge: List[str],
+        keys_to_merge: list[str],
         mode: MergeMode = MergeMode.TEAM_WINS,
         recursive: bool = True,
     ):
@@ -459,10 +457,10 @@ class SelectiveMergeStrategy(BaseMergeStrategy):
 
     def merge(
         self,
-        graph_state: Dict[str, Any],
-        team_state: Dict[str, Any],
+        graph_state: dict[str, Any],
+        team_state: dict[str, Any],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Merge team state into graph state.
 
         Only merges keys that are in keys_to_merge. Other keys from
@@ -516,10 +514,10 @@ class SelectiveMergeStrategy(BaseMergeStrategy):
 
 
 def validate_merged_state(
-    merged_state: Dict[str, Any],
-    required_keys: Optional[List[str]] = None,
-    forbidden_keys: Optional[List[str]] = None,
-    validators: Optional[Dict[str, Callable[[Any], bool]]] = None,
+    merged_state: dict[str, Any],
+    required_keys: Optional[list[str]] = None,
+    forbidden_keys: Optional[list[str]] = None,
+    validators: Optional[dict[str, Callable[[Any], bool]]] = None,
 ) -> bool:
     """Validate merged state before continuing execution.
 

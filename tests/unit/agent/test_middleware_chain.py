@@ -3,8 +3,7 @@
 Tests the middleware chain pattern for tool execution processing.
 """
 
-from typing import Any, Dict, Optional
-from unittest.mock import MagicMock
+from typing import Any, Optional
 
 import pytest
 
@@ -49,7 +48,7 @@ class TestMiddlewareChain:
 
         class TestMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
@@ -65,7 +64,7 @@ class TestMiddlewareChain:
 
         class HighPriority:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
@@ -77,7 +76,7 @@ class TestMiddlewareChain:
 
         class LowPriority:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
@@ -89,7 +88,7 @@ class TestMiddlewareChain:
 
         class CriticalPriority:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
@@ -118,7 +117,7 @@ class TestMiddlewareChain:
 
         class BlockingMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult(
                     proceed=False,
@@ -144,7 +143,7 @@ class TestMiddlewareChain:
 
         class ModifyingMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult(
                     proceed=True,
@@ -171,7 +170,7 @@ class TestMiddlewareChain:
 
         class FirstMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 execution_order.append("first")
                 return MiddlewareResult()
@@ -184,7 +183,7 @@ class TestMiddlewareChain:
 
         class SecondMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 execution_order.append("second")
                 return MiddlewareResult()
@@ -211,14 +210,14 @@ class TestMiddlewareChain:
 
         class FirstMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
             async def after_tool_call(
                 self,
                 tool_name: str,
-                arguments: Dict[str, Any],
+                arguments: dict[str, Any],
                 result: Any,
                 success: bool,
             ) -> Optional[Any]:
@@ -233,14 +232,14 @@ class TestMiddlewareChain:
 
         class SecondMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
             async def after_tool_call(
                 self,
                 tool_name: str,
-                arguments: Dict[str, Any],
+                arguments: dict[str, Any],
                 result: Any,
                 success: bool,
             ) -> Optional[Any]:
@@ -269,7 +268,7 @@ class TestMiddlewareChain:
 
         class FilteredMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 executed_for.append(tool_name)
                 return MiddlewareResult()
@@ -295,14 +294,14 @@ class TestMiddlewareChain:
 
         class ResultModifier:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
             async def after_tool_call(
                 self,
                 tool_name: str,
-                arguments: Dict[str, Any],
+                arguments: dict[str, Any],
                 result: Any,
                 success: bool,
             ) -> Optional[Any]:
@@ -328,7 +327,7 @@ class TestMiddlewareChain:
 
         class BlockingMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult(proceed=False)
 
@@ -340,7 +339,7 @@ class TestMiddlewareChain:
 
         class SecondMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 nonlocal second_executed
                 second_executed = True
@@ -366,7 +365,7 @@ class TestMiddlewareChain:
 
         class FailingMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 raise ValueError("Test error")
 
@@ -388,7 +387,7 @@ class TestMiddlewareChain:
 
         class TestMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
@@ -430,7 +429,7 @@ class TestMiddlewareChainAdvanced:
 
         class SimpleMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
@@ -456,7 +455,7 @@ class TestMiddlewareChainAdvanced:
 
         class TestMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
@@ -481,14 +480,14 @@ class TestMiddlewareChainAdvanced:
 
         class PassthroughMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
             async def after_tool_call(
                 self,
                 tool_name: str,
-                arguments: Dict[str, Any],
+                arguments: dict[str, Any],
                 result: Any,
                 success: bool,
             ) -> Optional[Any]:
@@ -521,7 +520,7 @@ class TestMiddlewareChainAdvanced:
 
         class BlockingMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult(
                     proceed=False,
@@ -556,7 +555,7 @@ class TestMiddlewareChainAdvanced:
 
         class ModifyingMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult(
                     proceed=True,
@@ -566,7 +565,7 @@ class TestMiddlewareChainAdvanced:
             async def after_tool_call(
                 self,
                 tool_name: str,
-                arguments: Dict[str, Any],
+                arguments: dict[str, Any],
                 result: Any,
                 success: bool,
             ) -> Optional[Any]:
@@ -598,14 +597,14 @@ class TestMiddlewareChainAdvanced:
 
         class PassthroughMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
             async def after_tool_call(
                 self,
                 tool_name: str,
-                arguments: Dict[str, Any],
+                arguments: dict[str, Any],
                 result: Any,
                 success: bool,
             ) -> Optional[Any]:
@@ -637,7 +636,7 @@ class TestMiddlewareChainAdvanced:
 
         class TestMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 
@@ -690,7 +689,7 @@ class TestCreateMiddlewareChainFactory:
 
         class TestMiddleware:
             async def before_tool_call(
-                self, tool_name: str, arguments: Dict[str, Any]
+                self, tool_name: str, arguments: dict[str, Any]
             ) -> MiddlewareResult:
                 return MiddlewareResult()
 

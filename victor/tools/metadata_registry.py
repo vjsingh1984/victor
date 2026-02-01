@@ -113,7 +113,8 @@ See `victor/agent/conversation_state.py` for a complete migration example.
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
+from typing import Any, Optional
+from collections.abc import Callable, Iterator
 
 from victor.tools.base import (
     AccessMode,
@@ -136,7 +137,7 @@ except ImportError:
     pass
 
 
-def _get_matched_pattern_indices(text: str, patterns: List[str]) -> List[int]:
+def _get_matched_pattern_indices(text: str, patterns: list[str]) -> list[int]:
     """Get indices of patterns that match in text (using Rust or Python fallback).
 
     Returns unique pattern indices (not all matches).
@@ -152,7 +153,7 @@ def _get_matched_pattern_indices(text: str, patterns: List[str]) -> List[int]:
 
 
 # Default fallback tools when registry is empty or keyword matching fails
-_FALLBACK_CRITICAL_TOOLS: Set[str] = {
+_FALLBACK_CRITICAL_TOOLS: set[str] = {
     "read",
     "write",
     "edit",
@@ -177,7 +178,7 @@ class KeywordMatchResult:
 
     tool_name: str
     score: float
-    matched_keywords: Set[str]
+    matched_keywords: set[str]
     priority_boost: float = 0.0
 
     @property
@@ -200,14 +201,14 @@ class MatchingMetrics:
     fallback_used: int = 0
     avg_match_time_ms: float = 0.0
     avg_tools_per_match: float = 0.0
-    keyword_hit_counts: Dict[str, int] = field(default_factory=dict)
-    category_hit_counts: Dict[str, int] = field(default_factory=dict)
+    keyword_hit_counts: dict[str, int] = field(default_factory=dict)
+    category_hit_counts: dict[str, int] = field(default_factory=dict)
 
     def record_match(
         self,
         duration_ms: float,
         tools_matched: int,
-        keywords_matched: Set[str],
+        keywords_matched: set[str],
         used_fallback: bool = False,
     ) -> None:
         """Record a keyword matching operation."""
@@ -234,7 +235,7 @@ class MatchingMetrics:
         """Record a category-based lookup."""
         self.category_hit_counts[category] = self.category_hit_counts.get(category, 0) + 1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert metrics to dictionary for logging/export."""
         return {
             "total_queries": self.total_queries,
@@ -278,16 +279,16 @@ class ToolMetadataEntry:
     access_mode: AccessMode
     danger_level: DangerLevel
     cost_tier: CostTier
-    aliases: Set[str] = field(default_factory=set)
-    keywords: Set[str] = field(default_factory=set)
-    stages: Set[str] = field(default_factory=set)  # Conversation stages where tool is relevant
+    aliases: set[str] = field(default_factory=set)
+    keywords: set[str] = field(default_factory=set)
+    stages: set[str] = field(default_factory=set)  # Conversation stages where tool is relevant
     description: str = ""
     # NEW: Decorator-driven semantic selection fields
-    mandatory_keywords: Set[str] = field(default_factory=set)  # Keywords that force inclusion
-    task_types: Set[str] = field(
+    mandatory_keywords: set[str] = field(default_factory=set)  # Keywords that force inclusion
+    task_types: set[str] = field(
         default_factory=set
     )  # Task types for classification-aware selection
-    progress_params: Set[str] = field(default_factory=set)  # Params for loop detection
+    progress_params: set[str] = field(default_factory=set)  # Params for loop detection
     execution_category: ExecutionCategory = ExecutionCategory.READ_ONLY  # For parallel execution
     # NEW: Availability check for optional tools
     _availability_check: Optional[Callable[[], bool]] = field(default=None, repr=False)
@@ -339,7 +340,7 @@ class ToolMetadataEntry:
         priority = getattr(tool, "priority", Priority.MEDIUM)
         access_mode = getattr(tool, "access_mode", AccessMode.READONLY)
         danger_level = getattr(tool, "danger_level", DangerLevel.SAFE)
-        aliases: Set[str] = getattr(tool, "aliases", set())
+        aliases: set[str] = getattr(tool, "aliases", set())
         category = getattr(tool, "category", None)
         # Extract keywords from tool decorator metadata, filtering short keywords
         raw_keywords = getattr(tool, "keywords", None) or []
@@ -437,7 +438,7 @@ class ToolMetadataRegistry:
     """
 
     # Priority weights for scoring (higher priority = higher boost)
-    _PRIORITY_WEIGHTS: Dict[Priority, float] = {
+    _PRIORITY_WEIGHTS: dict[Priority, float] = {
         Priority.CRITICAL: 0.3,
         Priority.HIGH: 0.2,
         Priority.MEDIUM: 0.1,
@@ -446,19 +447,19 @@ class ToolMetadataRegistry:
 
     def __init__(self) -> None:
         """Initialize empty registry."""
-        self._entries: Dict[str, ToolMetadataEntry] = {}
-        self._by_priority: Dict[Priority, Set[str]] = {p: set() for p in Priority}
-        self._by_access_mode: Dict[AccessMode, Set[str]] = {a: set() for a in AccessMode}
-        self._by_danger_level: Dict[DangerLevel, Set[str]] = {d: set() for d in DangerLevel}
-        self._by_category: Dict[str, Set[str]] = {}
-        self._by_keyword: Dict[str, Set[str]] = {}  # keyword -> set of tool names
-        self._by_stage: Dict[str, Set[str]] = {}  # stage -> set of tool names
-        self._alias_map: Dict[str, str] = {}  # alias -> canonical name
+        self._entries: dict[str, ToolMetadataEntry] = {}
+        self._by_priority: dict[Priority, set[str]] = {p: set() for p in Priority}
+        self._by_access_mode: dict[AccessMode, set[str]] = {a: set() for a in AccessMode}
+        self._by_danger_level: dict[DangerLevel, set[str]] = {d: set() for d in DangerLevel}
+        self._by_category: dict[str, set[str]] = {}
+        self._by_keyword: dict[str, set[str]] = {}  # keyword -> set of tool names
+        self._by_stage: dict[str, set[str]] = {}  # stage -> set of tool names
+        self._alias_map: dict[str, str] = {}  # alias -> canonical name
         self._metrics: MatchingMetrics = MatchingMetrics()
         # NEW: Indexes for decorator-driven semantic selection
-        self._by_mandatory_keyword: Dict[str, Set[str]] = {}  # mandatory_keyword -> tools
-        self._by_task_type: Dict[str, Set[str]] = {}  # task_type -> tools
-        self._by_execution_category: Dict[ExecutionCategory, Set[str]] = {
+        self._by_mandatory_keyword: dict[str, set[str]] = {}  # mandatory_keyword -> tools
+        self._by_task_type: dict[str, set[str]] = {}  # task_type -> tools
+        self._by_execution_category: dict[ExecutionCategory, set[str]] = {
             ec: set() for ec in ExecutionCategory
         }
 
@@ -512,7 +513,7 @@ class ToolMetadataRegistry:
         # NEW: Index execution category
         self._by_execution_category[entry.execution_category].add(entry.name)
 
-    def register_all(self, tools: List[BaseTool]) -> None:
+    def register_all(self, tools: list[BaseTool]) -> None:
         """Register multiple tools.
 
         Args:
@@ -521,7 +522,7 @@ class ToolMetadataRegistry:
         for tool in tools:
             self.register(tool)
 
-    def get_core_readonly_tools(self) -> List[str]:
+    def get_core_readonly_tools(self) -> list[str]:
         """Get core tools that are explicitly read-only.
 
         Uses decorator metadata (category + access/exec hints) so the list
@@ -541,7 +542,7 @@ class ToolMetadataRegistry:
             "graph",  # Code graph traversal for rapid codebase discovery
         }
 
-        core_readonly: List[str] = list(default_readonly)
+        core_readonly: list[str] = list(default_readonly)
 
         # Simple env override (comma-separated) to avoid pydantic parsing errors
         import os
@@ -605,7 +606,7 @@ class ToolMetadataRegistry:
 
         return None
 
-    def get_by_priority(self, priority: Priority) -> List[ToolMetadataEntry]:
+    def get_by_priority(self, priority: Priority) -> list[ToolMetadataEntry]:
         """Get all tools with specified priority.
 
         Args:
@@ -616,7 +617,7 @@ class ToolMetadataRegistry:
         """
         return [self._entries[name] for name in self._by_priority.get(priority, set())]
 
-    def get_by_access_mode(self, access_mode: AccessMode) -> List[ToolMetadataEntry]:
+    def get_by_access_mode(self, access_mode: AccessMode) -> list[ToolMetadataEntry]:
         """Get all tools with specified access mode.
 
         Args:
@@ -627,7 +628,7 @@ class ToolMetadataRegistry:
         """
         return [self._entries[name] for name in self._by_access_mode.get(access_mode, set())]
 
-    def get_by_danger_level(self, danger_level: DangerLevel) -> List[ToolMetadataEntry]:
+    def get_by_danger_level(self, danger_level: DangerLevel) -> list[ToolMetadataEntry]:
         """Get all tools with specified danger level.
 
         Args:
@@ -638,7 +639,7 @@ class ToolMetadataRegistry:
         """
         return [self._entries[name] for name in self._by_danger_level.get(danger_level, set())]
 
-    def get_by_category(self, category: str) -> List[ToolMetadataEntry]:
+    def get_by_category(self, category: str) -> list[ToolMetadataEntry]:
         """Get all tools in specified category.
 
         Args:
@@ -649,7 +650,7 @@ class ToolMetadataRegistry:
         """
         return [self._entries[name] for name in self._by_category.get(category, set())]
 
-    def get_tools_by_category(self, category: str) -> Set[str]:
+    def get_tools_by_category(self, category: str) -> set[str]:
         """Get tool names in the specified category.
 
         Args:
@@ -660,7 +661,7 @@ class ToolMetadataRegistry:
         """
         return self._by_category.get(category, set()).copy()
 
-    def get_all_categories(self) -> Set[str]:
+    def get_all_categories(self) -> set[str]:
         """Get all registered categories.
 
         Returns:
@@ -668,7 +669,7 @@ class ToolMetadataRegistry:
         """
         return set(self._by_category.keys())
 
-    def get_category_keywords(self, category: str) -> Set[str]:
+    def get_category_keywords(self, category: str) -> set[str]:
         """Get all keywords from tools in a category.
 
         Aggregates keywords from all tools in the specified category,
@@ -680,14 +681,14 @@ class ToolMetadataRegistry:
         Returns:
             Set of all keywords from tools in this category
         """
-        result: Set[str] = set()
+        result: set[str] = set()
         for tool_name in self._by_category.get(category, set()):
             entry = self._entries.get(tool_name)
             if entry:
                 result.update(entry.keywords)
         return result
 
-    def get_all_category_keywords(self) -> Dict[str, Set[str]]:
+    def get_all_category_keywords(self) -> dict[str, set[str]]:
         """Get mapping of categories to aggregated keywords.
 
         Builds a complete mapping of category names to the combined keywords
@@ -699,7 +700,7 @@ class ToolMetadataRegistry:
         """
         return {cat: self.get_category_keywords(cat) for cat in self._by_category.keys()}
 
-    def detect_categories_from_text(self, text: str) -> Set[str]:
+    def detect_categories_from_text(self, text: str) -> set[str]:
         """Detect relevant categories from keywords in text.
 
         Scans the text for keywords that match tools in each category,
@@ -714,7 +715,7 @@ class ToolMetadataRegistry:
         Returns:
             Set of category names where matching keywords were found
         """
-        detected: Set[str] = set()
+        detected: set[str] = set()
 
         for category in self._by_category.keys():
             keywords = self.get_category_keywords(category)
@@ -730,7 +731,7 @@ class ToolMetadataRegistry:
 
         return detected
 
-    def get_by_keyword(self, keyword: str) -> List[ToolMetadataEntry]:
+    def get_by_keyword(self, keyword: str) -> list[ToolMetadataEntry]:
         """Get all tools with specified keyword.
 
         Args:
@@ -742,7 +743,7 @@ class ToolMetadataRegistry:
         keyword_lower = keyword.lower()
         return [self._entries[name] for name in self._by_keyword.get(keyword_lower, set())]
 
-    def get_tools_by_keywords(self, keywords: List[str]) -> Set[str]:
+    def get_tools_by_keywords(self, keywords: list[str]) -> set[str]:
         """Get tool names matching any of the given keywords.
 
         Args:
@@ -751,14 +752,14 @@ class ToolMetadataRegistry:
         Returns:
             Set of tool names that have any matching keyword
         """
-        result: Set[str] = set()
+        result: set[str] = set()
         for keyword in keywords:
             keyword_lower = keyword.lower()
             if keyword_lower in self._by_keyword:
                 result.update(self._by_keyword[keyword_lower])
         return result
 
-    def get_by_stage(self, stage: str) -> List[ToolMetadataEntry]:
+    def get_by_stage(self, stage: str) -> list[ToolMetadataEntry]:
         """Get all tools relevant for the specified conversation stage.
 
         Args:
@@ -771,7 +772,7 @@ class ToolMetadataRegistry:
         stage_lower = stage.lower()
         return [self._entries[name] for name in self._by_stage.get(stage_lower, set())]
 
-    def get_tools_by_stage(self, stage: str) -> Set[str]:
+    def get_tools_by_stage(self, stage: str) -> set[str]:
         """Get tool names relevant for the specified conversation stage.
 
         Args:
@@ -784,7 +785,7 @@ class ToolMetadataRegistry:
         stage_lower = stage.lower()
         return self._by_stage.get(stage_lower, set()).copy()
 
-    def get_all_stages(self) -> Set[str]:
+    def get_all_stages(self) -> set[str]:
         """Get all stages discovered from registered tools.
 
         Returns:
@@ -792,7 +793,7 @@ class ToolMetadataRegistry:
         """
         return set(self._by_stage.keys())
 
-    def get_stage_tool_mapping(self) -> Dict[str, Set[str]]:
+    def get_stage_tool_mapping(self) -> dict[str, set[str]]:
         """Get complete mapping of stages to tool names.
 
         This replaces static STAGE_TOOL_MAPPING dictionaries by
@@ -807,7 +808,7 @@ class ToolMetadataRegistry:
     # NEW: Decorator-driven semantic selection methods
     # =========================================================================
 
-    def get_tools_by_mandatory_keyword(self, keyword: str) -> Set[str]:
+    def get_tools_by_mandatory_keyword(self, keyword: str) -> set[str]:
         """Get tools that must be included when this keyword is matched.
 
         Unlike regular keywords which influence ranking, mandatory keywords
@@ -821,7 +822,7 @@ class ToolMetadataRegistry:
         """
         return self._by_mandatory_keyword.get(keyword.lower(), set()).copy()
 
-    def get_tools_matching_mandatory_keywords(self, text: str) -> Set[str]:
+    def get_tools_matching_mandatory_keywords(self, text: str) -> set[str]:
         """Find tools whose mandatory keywords appear in the given text.
 
         Scans the text for all registered mandatory keywords and returns
@@ -834,13 +835,13 @@ class ToolMetadataRegistry:
             Set of tool names whose mandatory keywords match (guaranteed inclusion)
         """
         text_lower = text.lower()
-        result: Set[str] = set()
+        result: set[str] = set()
         for keyword, tool_names in self._by_mandatory_keyword.items():
             if keyword in text_lower:
                 result.update(tool_names)
         return result
 
-    def get_all_mandatory_keywords(self) -> Set[str]:
+    def get_all_mandatory_keywords(self) -> set[str]:
         """Get all registered mandatory keywords.
 
         Returns:
@@ -848,7 +849,7 @@ class ToolMetadataRegistry:
         """
         return set(self._by_mandatory_keyword.keys())
 
-    def get_tools_by_task_type(self, task_type: str) -> Set[str]:
+    def get_tools_by_task_type(self, task_type: str) -> set[str]:
         """Get tools relevant for the specified task type.
 
         Enables classification-aware tool selection where tools can declare
@@ -863,7 +864,7 @@ class ToolMetadataRegistry:
         """
         return self._by_task_type.get(task_type.lower(), set()).copy()
 
-    def get_tools_for_task_classification(self, task_type: str) -> List[ToolMetadataEntry]:
+    def get_tools_for_task_classification(self, task_type: str) -> list[ToolMetadataEntry]:
         """Get tool entries relevant for the specified task classification.
 
         Returns full metadata entries for task-type matching, enabling
@@ -878,7 +879,7 @@ class ToolMetadataRegistry:
         tool_names = self.get_tools_by_task_type(task_type)
         return [self._entries[name] for name in tool_names if name in self._entries]
 
-    def get_all_task_types(self) -> Set[str]:
+    def get_all_task_types(self) -> set[str]:
         """Get all registered task types.
 
         Returns:
@@ -886,7 +887,7 @@ class ToolMetadataRegistry:
         """
         return set(self._by_task_type.keys())
 
-    def get_task_type_tool_mapping(self) -> Dict[str, Set[str]]:
+    def get_task_type_tool_mapping(self) -> dict[str, set[str]]:
         """Get complete mapping of task types to tool names.
 
         This replaces static TASK_TYPE_CATEGORIES dictionaries by
@@ -897,7 +898,7 @@ class ToolMetadataRegistry:
         """
         return {tt: tools.copy() for tt, tools in self._by_task_type.items()}
 
-    def get_tools_by_execution_category(self, category: ExecutionCategory) -> Set[str]:
+    def get_tools_by_execution_category(self, category: ExecutionCategory) -> set[str]:
         """Get tools in the specified execution category.
 
         Used for parallel execution planning to identify which tools
@@ -911,7 +912,7 @@ class ToolMetadataRegistry:
         """
         return self._by_execution_category.get(category, set()).copy()
 
-    def get_parallelizable_tools(self) -> Set[str]:
+    def get_parallelizable_tools(self) -> set[str]:
         """Get all tools that are safe to run in parallel.
 
         Returns tools in READ_ONLY, COMPUTE, and NETWORK categories
@@ -920,13 +921,13 @@ class ToolMetadataRegistry:
         Returns:
             Set of tool names that are safe to parallelize
         """
-        result: Set[str] = set()
+        result: set[str] = set()
         for category in ExecutionCategory:
             if category.can_parallelize:
                 result.update(self._by_execution_category.get(category, set()))
         return result
 
-    def get_conflicting_tools(self, tool_name: str) -> Set[str]:
+    def get_conflicting_tools(self, tool_name: str) -> set[str]:
         """Get tools that would conflict with the given tool.
 
         Used for dependency analysis in parallel execution.
@@ -942,7 +943,7 @@ class ToolMetadataRegistry:
             return set()
 
         conflicts = entry.execution_category.conflicts_with
-        result: Set[str] = set()
+        result: set[str] = set()
         for conflicting_cat in conflicts:
             result.update(self._by_execution_category.get(conflicting_cat, set()))
 
@@ -950,7 +951,7 @@ class ToolMetadataRegistry:
         result.discard(tool_name)
         return result
 
-    def get_progress_params(self, tool_name: str) -> Set[str]:
+    def get_progress_params(self, tool_name: str) -> set[str]:
         """Get progress parameters for a tool.
 
         Progress params indicate which parameters signal meaningful progress
@@ -967,7 +968,7 @@ class ToolMetadataRegistry:
             return entry.progress_params.copy()
         return set()
 
-    def get_tools_with_progress_params(self) -> Dict[str, Set[str]]:
+    def get_tools_with_progress_params(self) -> dict[str, set[str]]:
         """Get all tools that have progress parameters defined.
 
         Returns:
@@ -979,7 +980,7 @@ class ToolMetadataRegistry:
             if entry.progress_params
         }
 
-    def get_execution_category_mapping(self) -> Dict[str, Set[str]]:
+    def get_execution_category_mapping(self) -> dict[str, set[str]]:
         """Get complete mapping of execution categories to tool names.
 
         This replaces static TOOL_CATEGORIES dictionaries in parallel_executor
@@ -994,7 +995,7 @@ class ToolMetadataRegistry:
     # Access mode-based tool discovery (replaces static WRITE_TOOL_NAMES, etc.)
     # =========================================================================
 
-    def get_write_tools(self) -> Set[str]:
+    def get_write_tools(self) -> set[str]:
         """Get tools that perform write/modify operations.
 
         Replaces static WRITE_TOOL_NAMES frozensets in safety.py, action_authorizer.py.
@@ -1003,12 +1004,12 @@ class ToolMetadataRegistry:
         Returns:
             Set of tool names with WRITE, EXECUTE, or MIXED access_mode
         """
-        result: Set[str] = set()
+        result: set[str] = set()
         for mode in [AccessMode.WRITE, AccessMode.EXECUTE, AccessMode.MIXED]:
             result.update(self._by_access_mode.get(mode, set()))
         return result
 
-    def get_idempotent_tools(self) -> Set[str]:
+    def get_idempotent_tools(self) -> set[str]:
         """Get tools that are safe to cache (readonly, no side effects).
 
         Replaces static DEFAULT_CACHEABLE_TOOLS in tool_executor.py.
@@ -1019,7 +1020,7 @@ class ToolMetadataRegistry:
         """
         return self._by_access_mode.get(AccessMode.READONLY, set()).copy()
 
-    def get_cache_invalidating_tools(self) -> Set[str]:
+    def get_cache_invalidating_tools(self) -> set[str]:
         """Get tools that modify state and should invalidate cache.
 
         Replaces static CACHE_INVALIDATING_TOOLS in tool_executor.py.
@@ -1031,7 +1032,7 @@ class ToolMetadataRegistry:
         # Same as get_write_tools() - cache invalidation = state modification
         return self.get_write_tools()
 
-    def get_tools_matching_text(self, text: str) -> Set[str]:
+    def get_tools_matching_text(self, text: str) -> set[str]:
         """Find tools whose keywords appear in the given text.
 
         Scans the text for all registered keywords and returns tools
@@ -1046,7 +1047,7 @@ class ToolMetadataRegistry:
         Returns:
             Set of tool names whose keywords match
         """
-        result: Set[str] = set()
+        result: set[str] = set()
 
         # Get all keywords and their indices for Rust pattern matching
         all_keywords = list(self._by_keyword.keys())
@@ -1068,7 +1069,7 @@ class ToolMetadataRegistry:
         min_score: float = 0.0,
         max_results: Optional[int] = None,
         use_fallback: bool = True,
-    ) -> List[KeywordMatchResult]:
+    ) -> list[KeywordMatchResult]:
         """Find tools matching text with relevance scores.
 
         Enhanced version of get_tools_matching_text() that returns scored results.
@@ -1089,8 +1090,8 @@ class ToolMetadataRegistry:
         start_time = time.time()
 
         # Collect matches per tool using Rust-accelerated pattern matching
-        tool_matches: Dict[str, Set[str]] = {}
-        matched_keywords: Set[str] = set()
+        tool_matches: dict[str, set[str]] = {}
+        matched_keywords: set[str] = set()
 
         # Get all keywords for single-pass matching
         all_keywords = list(self._by_keyword.keys())
@@ -1109,7 +1110,7 @@ class ToolMetadataRegistry:
                         tool_matches[tool_name].add(keyword)
 
         # Calculate scores
-        results: List[KeywordMatchResult] = []
+        results: list[KeywordMatchResult] = []
         for tool_name, keywords in tool_matches.items():
             entry = self._entries.get(tool_name)
             if not entry:
@@ -1171,7 +1172,7 @@ class ToolMetadataRegistry:
 
         return results
 
-    def get_all_discovered_categories(self) -> Set[str]:
+    def get_all_discovered_categories(self) -> set[str]:
         """Get all categories discovered from registered tools.
 
         Returns:
@@ -1182,8 +1183,8 @@ class ToolMetadataRegistry:
     def get_tools_by_category_with_fallback(
         self,
         category: str,
-        fallback_categories: Optional[List[str]] = None,
-    ) -> List[ToolMetadataEntry]:
+        fallback_categories: Optional[list[str]] = None,
+    ) -> list[ToolMetadataEntry]:
         """Get tools by category with fallback chain.
 
         If the requested category has no tools, tries fallback categories
@@ -1220,7 +1221,7 @@ class ToolMetadataRegistry:
         """Reset matching metrics."""
         self._metrics = MatchingMetrics()
 
-    def get_all_keywords(self) -> Set[str]:
+    def get_all_keywords(self) -> set[str]:
         """Get all registered keywords.
 
         Returns:
@@ -1228,7 +1229,7 @@ class ToolMetadataRegistry:
         """
         return set(self._by_keyword.keys())
 
-    def get_all_tool_names(self) -> Set[str]:
+    def get_all_tool_names(self) -> set[str]:
         """Get all registered tool names.
 
         Returns:
@@ -1236,7 +1237,7 @@ class ToolMetadataRegistry:
         """
         return set(self._entries.keys())
 
-    def get_fallback_tools_for_category(self, category: str) -> Set[str]:
+    def get_fallback_tools_for_category(self, category: str) -> set[str]:
         """Get fallback tools for a logical category.
 
         Used when semantic selection returns empty results for a category.
@@ -1262,25 +1263,25 @@ class ToolMetadataRegistry:
         # Try direct category lookup
         return self._by_category.get(category, set()).copy()
 
-    def get_critical_tools(self) -> List[ToolMetadataEntry]:
+    def get_critical_tools(self) -> list[ToolMetadataEntry]:
         """Get all CRITICAL priority tools."""
         return self.get_by_priority(Priority.CRITICAL)
 
-    def get_safe_tools(self) -> List[ToolMetadataEntry]:
+    def get_safe_tools(self) -> list[ToolMetadataEntry]:
         """Get all safe tools (readonly, no danger)."""
         return [entry for entry in self._entries.values() if entry.is_safe]
 
-    def get_dangerous_tools(self) -> List[ToolMetadataEntry]:
+    def get_dangerous_tools(self) -> list[ToolMetadataEntry]:
         """Get all dangerous tools (HIGH or CRITICAL danger level)."""
         high = self.get_by_danger_level(DangerLevel.HIGH)
         critical = self.get_by_danger_level(DangerLevel.CRITICAL)
         return high + critical
 
-    def get_tools_requiring_approval(self) -> List[ToolMetadataEntry]:
+    def get_tools_requiring_approval(self) -> list[ToolMetadataEntry]:
         """Get all tools that require user approval."""
         return [entry for entry in self._entries.values() if entry.requires_approval]
 
-    def get_tools_for_task(self, task_type: str) -> List[ToolMetadataEntry]:
+    def get_tools_for_task(self, task_type: str) -> list[ToolMetadataEntry]:
         """Get tools appropriate for a task type.
 
         Args:
@@ -1293,7 +1294,7 @@ class ToolMetadataRegistry:
             entry for entry in self._entries.values() if entry.should_include_for_task(task_type)
         ]
 
-    def get_tools_up_to_priority(self, max_priority: Priority) -> List[ToolMetadataEntry]:
+    def get_tools_up_to_priority(self, max_priority: Priority) -> list[ToolMetadataEntry]:
         """Get all tools with priority <= max_priority (lower value = higher priority).
 
         Args:
@@ -1314,7 +1315,7 @@ class ToolMetadataRegistry:
         category: Optional[str] = None,
         safe_only: bool = False,
         requires_approval: Optional[bool] = None,
-    ) -> List[ToolMetadataEntry]:
+    ) -> list[ToolMetadataEntry]:
         """Filter tools by multiple criteria.
 
         Args:
@@ -1358,7 +1359,7 @@ class ToolMetadataRegistry:
     # Availability filtering for optional tools
     # =========================================================================
 
-    def get_available_tools(self) -> List[ToolMetadataEntry]:
+    def get_available_tools(self) -> list[ToolMetadataEntry]:
         """Get all tools that are currently available for use.
 
         Filters out tools that require configuration (e.g., Slack, Teams, Jira)
@@ -1370,7 +1371,7 @@ class ToolMetadataRegistry:
         """
         return [entry for entry in self._entries.values() if entry.is_available()]
 
-    def get_unavailable_tools(self) -> List[ToolMetadataEntry]:
+    def get_unavailable_tools(self) -> list[ToolMetadataEntry]:
         """Get tools that require configuration but are not currently configured.
 
         Useful for informing users about tools that could be enabled with
@@ -1385,7 +1386,7 @@ class ToolMetadataRegistry:
             if entry.requires_configuration and not entry.is_available()
         ]
 
-    def get_tools_requiring_configuration(self) -> List[ToolMetadataEntry]:
+    def get_tools_requiring_configuration(self) -> list[ToolMetadataEntry]:
         """Get all tools that require external configuration.
 
         These are tools with an availability_check (e.g., Slack, Teams, Jira)
@@ -1396,7 +1397,7 @@ class ToolMetadataRegistry:
         """
         return [entry for entry in self._entries.values() if entry.requires_configuration]
 
-    def get_available_tool_names(self) -> Set[str]:
+    def get_available_tool_names(self) -> set[str]:
         """Get names of all currently available tools.
 
         Convenience method for tool selection that returns just the names
@@ -1433,7 +1434,7 @@ class ToolMetadataRegistry:
         resolved = get_canonical_name(name)
         return resolved != name and resolved in self._entries
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Get summary statistics of registered tools.
 
         Returns:
@@ -1466,7 +1467,7 @@ class ToolMetadataRegistry:
             "tools_requiring_configuration": len(self.get_tools_requiring_configuration()),
         }
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get registry statistics for monitoring and diagnostics.
 
         Phase 3 implementation: Provides comprehensive statistics about
@@ -1501,7 +1502,7 @@ class ToolMetadataRegistry:
 
         return stats
 
-    def refresh_from_tools(self, tools: List[Any]) -> bool:
+    def refresh_from_tools(self, tools: list[Any]) -> bool:
         """Refresh registry from tool list with hash-based change detection.
 
         Phase 3 implementation: Uses hash-based change detection to skip
@@ -1521,7 +1522,6 @@ class ToolMetadataRegistry:
             True if reindexing was performed, False if skipped (cache hit)
         """
         import hashlib
-        import json
 
         # Calculate hash of current tool definitions
         tool_list = sorted(tools, key=lambda t: t.name if hasattr(t, "name") else str(t))
@@ -1635,7 +1635,7 @@ def get_tool_metadata(name: str) -> Optional[ToolMetadataEntry]:
     return get_global_registry().get(name)
 
 
-def get_fallback_critical_tools() -> Set[str]:
+def get_fallback_critical_tools() -> set[str]:
     """Get the fallback critical tools set.
 
     Returns:
@@ -1648,7 +1648,7 @@ def get_tools_matching_text_scored(
     text: str,
     min_score: float = 0.0,
     max_results: Optional[int] = None,
-) -> List[KeywordMatchResult]:
+) -> list[KeywordMatchResult]:
     """Get tools matching text with scores from global registry.
 
     Convenience function for scored matching using the global registry.
@@ -1677,7 +1677,7 @@ def get_matching_metrics() -> MatchingMetrics:
     return get_global_registry().metrics
 
 
-def get_tools_by_stage(stage: str) -> Set[str]:
+def get_tools_by_stage(stage: str) -> set[str]:
     """Get tool names relevant for the specified conversation stage.
 
     This function enables decorator-driven stage-based tool selection,
@@ -1693,7 +1693,7 @@ def get_tools_by_stage(stage: str) -> Set[str]:
     return get_global_registry().get_tools_by_stage(stage)
 
 
-def get_stage_tool_mapping() -> Dict[str, Set[str]]:
+def get_stage_tool_mapping() -> dict[str, set[str]]:
     """Get complete mapping of stages to tool names from global registry.
 
     This replaces static STAGE_TOOL_MAPPING dictionaries by
@@ -1705,7 +1705,7 @@ def get_stage_tool_mapping() -> Dict[str, Set[str]]:
     return get_global_registry().get_stage_tool_mapping()
 
 
-def get_all_stages() -> Set[str]:
+def get_all_stages() -> set[str]:
     """Get all stages discovered from registered tools.
 
     Returns:
@@ -1719,7 +1719,7 @@ def get_all_stages() -> Set[str]:
 # =========================================================================
 
 
-def get_tools_matching_mandatory_keywords(text: str) -> Set[str]:
+def get_tools_matching_mandatory_keywords(text: str) -> set[str]:
     """Find tools whose mandatory keywords appear in the given text.
 
     Scans the text for all registered mandatory keywords and returns
@@ -1734,7 +1734,7 @@ def get_tools_matching_mandatory_keywords(text: str) -> Set[str]:
     return get_global_registry().get_tools_matching_mandatory_keywords(text)
 
 
-def get_tools_by_task_type(task_type: str) -> Set[str]:
+def get_tools_by_task_type(task_type: str) -> set[str]:
     """Get tools relevant for the specified task type.
 
     Enables classification-aware tool selection where tools can declare
@@ -1749,7 +1749,7 @@ def get_tools_by_task_type(task_type: str) -> Set[str]:
     return get_global_registry().get_tools_by_task_type(task_type)
 
 
-def get_task_type_tool_mapping() -> Dict[str, Set[str]]:
+def get_task_type_tool_mapping() -> dict[str, set[str]]:
     """Get complete mapping of task types to tool names from global registry.
 
     This replaces static TASK_TYPE_CATEGORIES dictionaries by
@@ -1761,7 +1761,7 @@ def get_task_type_tool_mapping() -> Dict[str, Set[str]]:
     return get_global_registry().get_task_type_tool_mapping()
 
 
-def get_tools_by_execution_category(category: ExecutionCategory) -> Set[str]:
+def get_tools_by_execution_category(category: ExecutionCategory) -> set[str]:
     """Get tools in the specified execution category.
 
     Used for parallel execution planning to identify which tools
@@ -1776,7 +1776,7 @@ def get_tools_by_execution_category(category: ExecutionCategory) -> Set[str]:
     return get_global_registry().get_tools_by_execution_category(category)
 
 
-def get_parallelizable_tools() -> Set[str]:
+def get_parallelizable_tools() -> set[str]:
     """Get all tools that are safe to run in parallel.
 
     Returns tools in READ_ONLY, COMPUTE, and NETWORK categories
@@ -1788,7 +1788,7 @@ def get_parallelizable_tools() -> Set[str]:
     return get_global_registry().get_parallelizable_tools()
 
 
-def get_progress_params(tool_name: str) -> Set[str]:
+def get_progress_params(tool_name: str) -> set[str]:
     """Get progress parameters for a tool.
 
     Progress params indicate which parameters signal meaningful progress
@@ -1803,7 +1803,7 @@ def get_progress_params(tool_name: str) -> Set[str]:
     return get_global_registry().get_progress_params(tool_name)
 
 
-def get_execution_category_mapping() -> Dict[str, Set[str]]:
+def get_execution_category_mapping() -> dict[str, set[str]]:
     """Get complete mapping of execution categories to tool names.
 
     This replaces static TOOL_CATEGORIES dictionaries in parallel_executor
@@ -1820,7 +1820,7 @@ def get_execution_category_mapping() -> Dict[str, Set[str]]:
 # =========================================================================
 
 
-def get_write_tools() -> Set[str]:
+def get_write_tools() -> set[str]:
     """Get tools that perform write/modify operations.
 
     Replaces static WRITE_TOOL_NAMES frozensets in safety.py, action_authorizer.py.
@@ -1832,7 +1832,7 @@ def get_write_tools() -> Set[str]:
     return get_global_registry().get_write_tools()
 
 
-def get_idempotent_tools() -> Set[str]:
+def get_idempotent_tools() -> set[str]:
     """Get tools that are safe to cache (readonly, no side effects).
 
     Replaces static DEFAULT_CACHEABLE_TOOLS in tool_executor.py.
@@ -1844,7 +1844,7 @@ def get_idempotent_tools() -> Set[str]:
     return get_global_registry().get_idempotent_tools()
 
 
-def get_cache_invalidating_tools() -> Set[str]:
+def get_cache_invalidating_tools() -> set[str]:
     """Get tools that modify state and should invalidate cache.
 
     Replaces static CACHE_INVALIDATING_TOOLS in tool_executor.py.
@@ -1861,7 +1861,7 @@ def get_cache_invalidating_tools() -> Set[str]:
 # =========================================================================
 
 
-def get_tools_by_category(category: str) -> Set[str]:
+def get_tools_by_category(category: str) -> set[str]:
     """Get tool names in the specified category.
 
     Args:
@@ -1873,7 +1873,7 @@ def get_tools_by_category(category: str) -> Set[str]:
     return get_global_registry().get_tools_by_category(category)
 
 
-def get_all_categories() -> Set[str]:
+def get_all_categories() -> set[str]:
     """Get all registered categories.
 
     Returns:
@@ -1882,7 +1882,7 @@ def get_all_categories() -> Set[str]:
     return get_global_registry().get_all_categories()
 
 
-def get_category_keywords(category: str) -> Set[str]:
+def get_category_keywords(category: str) -> set[str]:
     """Get all keywords from tools in a category.
 
     Aggregates keywords from all tools in the specified category,
@@ -1897,7 +1897,7 @@ def get_category_keywords(category: str) -> Set[str]:
     return get_global_registry().get_category_keywords(category)
 
 
-def get_all_category_keywords() -> Dict[str, Set[str]]:
+def get_all_category_keywords() -> dict[str, set[str]]:
     """Get mapping of categories to aggregated keywords.
 
     Builds a complete mapping of category names to the combined keywords
@@ -1910,7 +1910,7 @@ def get_all_category_keywords() -> Dict[str, Set[str]]:
     return get_global_registry().get_all_category_keywords()
 
 
-def detect_categories_from_text(text: str) -> Set[str]:
+def detect_categories_from_text(text: str) -> set[str]:
     """Detect relevant categories from keywords in text.
 
     Scans the text for keywords that match tools in each category,
@@ -1933,7 +1933,7 @@ def detect_categories_from_text(text: str) -> Set[str]:
 # =========================================================================
 
 
-def get_available_tools() -> List[ToolMetadataEntry]:
+def get_available_tools() -> list[ToolMetadataEntry]:
     """Get all tools that are currently available for use.
 
     Filters out tools that require configuration (e.g., Slack, Teams, Jira)
@@ -1945,7 +1945,7 @@ def get_available_tools() -> List[ToolMetadataEntry]:
     return get_global_registry().get_available_tools()
 
 
-def get_unavailable_tools() -> List[ToolMetadataEntry]:
+def get_unavailable_tools() -> list[ToolMetadataEntry]:
     """Get tools that require configuration but are not currently configured.
 
     Returns:
@@ -1954,7 +1954,7 @@ def get_unavailable_tools() -> List[ToolMetadataEntry]:
     return get_global_registry().get_unavailable_tools()
 
 
-def get_tools_requiring_configuration() -> List[ToolMetadataEntry]:
+def get_tools_requiring_configuration() -> list[ToolMetadataEntry]:
     """Get all tools that require external configuration.
 
     Returns:
@@ -1963,7 +1963,7 @@ def get_tools_requiring_configuration() -> List[ToolMetadataEntry]:
     return get_global_registry().get_tools_requiring_configuration()
 
 
-def get_available_tool_names() -> Set[str]:
+def get_available_tool_names() -> set[str]:
     """Get names of all currently available tools.
 
     Returns:
@@ -1987,6 +1987,6 @@ def is_tool_available(tool_name: str) -> bool:
     return entry.is_available()
 
 
-def get_core_readonly_tools() -> List[str]:
+def get_core_readonly_tools() -> list[str]:
     """Get names of core tools that are explicitly read-only."""
     return get_global_registry().get_core_readonly_tools()

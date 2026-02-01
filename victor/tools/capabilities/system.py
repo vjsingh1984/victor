@@ -41,7 +41,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.protocols.tool import ITool
@@ -203,9 +203,9 @@ class CapabilityDefinition:
 
     name: ToolCapability
     description: str
-    tools: List[str]
-    dependencies: List[ToolCapability] = field(default_factory=list)
-    conflicts: List[ToolCapability] = field(default_factory=list)
+    tools: list[str]
+    dependencies: list[ToolCapability] = field(default_factory=list)
+    conflicts: list[ToolCapability] = field(default_factory=list)
 
 
 class CapabilityRegistry:
@@ -245,7 +245,7 @@ class CapabilityRegistry:
     """
 
     # Category to capability mapping for auto-discovery
-    CATEGORY_CAPABILITY_MAP: Dict[str, ToolCapability] = {
+    CATEGORY_CAPABILITY_MAP: dict[str, ToolCapability] = {
         "git": ToolCapability.VERSION_CONTROL,
         "filesystem": ToolCapability.FILE_READ,
         "docker": ToolCapability.CONTAINERIZATION,
@@ -298,7 +298,7 @@ class CapabilityRegistry:
 
     def __init__(self) -> None:
         """Initialize the capability registry."""
-        self._capabilities: Dict[ToolCapability, CapabilityDefinition] = {}
+        self._capabilities: dict[ToolCapability, CapabilityDefinition] = {}
 
     def register_capability(self, definition: CapabilityDefinition) -> None:
         """Register a capability definition.
@@ -317,7 +317,7 @@ class CapabilityRegistry:
 
     def get_tools_for_capability(
         self, capability: ToolCapability, include_dependencies: bool = True
-    ) -> Set[str]:
+    ) -> set[str]:
         """Get tools for a capability.
 
         Args:
@@ -348,8 +348,8 @@ class CapabilityRegistry:
         return tools
 
     def check_conflicts(
-        self, capabilities: List[ToolCapability]
-    ) -> List[Tuple[ToolCapability, ToolCapability]]:
+        self, capabilities: list[ToolCapability]
+    ) -> list[tuple[ToolCapability, ToolCapability]]:
         """Check for conflicts between capabilities.
 
         Args:
@@ -381,7 +381,7 @@ class CapabilityRegistry:
 
         return conflicts
 
-    def resolve_dependencies(self, capabilities: List[ToolCapability]) -> List[ToolCapability]:
+    def resolve_dependencies(self, capabilities: list[ToolCapability]) -> list[ToolCapability]:
         """Resolve capability dependencies.
 
         Returns a list of capabilities including all dependencies,
@@ -398,8 +398,8 @@ class CapabilityRegistry:
             all_needed = registry.resolve_dependencies(required)
             # Returns [FILE_WRITE, FILE_READ]
         """
-        resolved: List[ToolCapability] = []
-        seen: Set[ToolCapability] = set()
+        resolved: list[ToolCapability] = []
+        seen: set[ToolCapability] = set()
 
         def add_capability(cap: ToolCapability) -> None:
             """Recursively add capability and its dependencies."""
@@ -422,7 +422,7 @@ class CapabilityRegistry:
 
         return resolved
 
-    async def auto_discover_capabilities(self, tools: List["ITool"]) -> None:
+    async def auto_discover_capabilities(self, tools: list["ITool"]) -> None:
         """Automatically register capabilities based on tool metadata.
 
         Analyzes tool metadata (category, keywords) and maps tools to appropriate
@@ -511,7 +511,7 @@ class CapabilityRegistry:
                 return capability
         return None
 
-    def get_all_tools(self) -> Set[str]:
+    def get_all_tools(self) -> set[str]:
         """Get all unique tools across all capabilities.
 
         Collects all tool names from all registered capabilities and returns
@@ -524,7 +524,7 @@ class CapabilityRegistry:
             all_tools = registry.get_all_tools()
             print(f"Total unique tools: {len(all_tools)}")
         """
-        all_tools: Set[str] = set()
+        all_tools: set[str] = set()
         for definition in self._capabilities.values():
             all_tools.update(definition.tools)
         return all_tools
@@ -561,9 +561,9 @@ class CapabilitySelector:
 
     def select_tools(
         self,
-        required_capabilities: List[ToolCapability],
-        excluded_tools: Optional[Set[str]] = None,
-    ) -> List[str]:
+        required_capabilities: list[ToolCapability],
+        excluded_tools: Optional[set[str]] = None,
+    ) -> list[str]:
         """Select tools based on required capabilities.
 
         Args:
@@ -590,7 +590,7 @@ class CapabilitySelector:
         resolved_capabilities = self._registry.resolve_dependencies(required_capabilities)
 
         # Collect tools from all capabilities
-        tool_set: Set[str] = set()
+        tool_set: set[str] = set()
         for capability in resolved_capabilities:
             tools = self._registry.get_tools_for_capability(capability)
             tool_set.update(tools)
@@ -602,7 +602,7 @@ class CapabilitySelector:
         # Return as list for deterministic ordering
         return sorted(tool_set)
 
-    def recommend_capabilities(self, task_description: str) -> List[ToolCapability]:
+    def recommend_capabilities(self, task_description: str) -> list[ToolCapability]:
         """Recommend capabilities for a task description.
 
         Analyzes task description and recommends relevant capabilities.
@@ -687,7 +687,7 @@ class CapabilitySelector:
 
         return recommendations
 
-    def get_capability_summary(self) -> Dict[str, List[str]]:
+    def get_capability_summary(self) -> dict[str, list[str]]:
         """Return summary of all capabilities and their tools.
 
         Returns a dictionary mapping capability names to lists of tool names

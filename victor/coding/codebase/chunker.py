@@ -52,7 +52,7 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.native.protocols import ChunkInfo, TextChunkerProtocol
@@ -200,9 +200,9 @@ class CodeChunk:
     line_start: int = 0
     line_end: int = 0
     parent_id: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_document(self) -> Dict[str, Any]:
+    def to_document(self) -> dict[str, Any]:
         """Convert to document format for indexing."""
         return {
             "id": self.id,
@@ -250,7 +250,7 @@ class CodeChunker:
         file_path: Path,
         relative_path: str,
         content: Optional[str] = None,
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Chunk a Python file into embeddable chunks.
 
         Args:
@@ -274,7 +274,7 @@ class CodeChunker:
             logger.warning(f"Syntax error in {file_path}: {e}")
             return []
 
-        chunks: List[CodeChunk] = []
+        chunks: list[CodeChunk] = []
         lines = content.split("\n")
 
         # File-level summary (if enabled)
@@ -301,7 +301,7 @@ class CodeChunker:
         self,
         file_path: str,
         tree: ast.Module,
-        lines: List[str],
+        lines: list[str],
     ) -> Optional[CodeChunk]:
         """Create a file-level summary chunk.
 
@@ -371,7 +371,7 @@ class CodeChunker:
         self,
         file_path: str,
         tree: ast.Module,
-        lines: List[str],
+        lines: list[str],
     ) -> Optional[CodeChunk]:
         """Create an import block chunk for dependency analysis."""
         imports = []
@@ -407,10 +407,10 @@ class CodeChunker:
         self,
         node: ast.ClassDef,
         file_path: str,
-        lines: List[str],
-    ) -> List[CodeChunk]:
+        lines: list[str],
+    ) -> list[CodeChunk]:
         """Chunk a class definition."""
-        chunks: List[CodeChunk] = []
+        chunks: list[CodeChunk] = []
         class_id = f"{file_path}:{node.name}"
 
         # Class summary (if enabled)
@@ -438,7 +438,7 @@ class CodeChunker:
         self,
         node: ast.ClassDef,
         file_path: str,
-        lines: List[str],
+        lines: list[str],
     ) -> Optional[CodeChunk]:
         """Create a class-level summary chunk."""
         parts = [f"Class: {node.name}"]
@@ -513,16 +513,16 @@ class CodeChunker:
         self,
         node: ast.FunctionDef | ast.AsyncFunctionDef,
         file_path: str,
-        lines: List[str],
+        lines: list[str],
         parent_id: Optional[str] = None,
         class_name: Optional[str] = None,
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Chunk a function/method definition.
 
         For small functions: Single METHOD_HEADER chunk
         For large functions: METHOD_HEADER + multiple METHOD_BODY chunks
         """
-        chunks: List[CodeChunk] = []
+        chunks: list[CodeChunk] = []
 
         # Build symbol ID
         if class_name:
@@ -621,15 +621,15 @@ class CodeChunker:
         self,
         node: ast.FunctionDef | ast.AsyncFunctionDef,
         file_path: str,
-        lines: List[str],
+        lines: list[str],
         symbol_id: str,
         class_name: Optional[str],
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Create overlapping body chunks for large functions.
 
         Uses sliding window with overlap to preserve context.
         """
-        chunks: List[CodeChunk] = []
+        chunks: list[CodeChunk] = []
 
         # Get function body lines (excluding docstring line if present)
         start_line = node.lineno  # 1-indexed
@@ -770,8 +770,8 @@ class CodeChunker:
 def chunk_codebase(
     root_path: Path,
     config: Optional[ChunkConfig] = None,
-    ignore_patterns: Optional[List[str]] = None,
-) -> List[CodeChunk]:
+    ignore_patterns: Optional[list[str]] = None,
+) -> list[CodeChunk]:
     """Chunk an entire codebase.
 
     Args:
@@ -793,7 +793,7 @@ def chunk_codebase(
         ".pytest_cache/",
     ]
 
-    all_chunks: List[CodeChunk] = []
+    all_chunks: list[CodeChunk] = []
 
     for py_file in root_path.rglob("*.py"):
         # Check ignore patterns
@@ -813,7 +813,7 @@ def chunk_codebase(
 # =============================================================================
 
 # Config file patterns for structured chunking
-CONFIG_FILE_PATTERNS: Dict[str, Dict[str, Any]] = {
+CONFIG_FILE_PATTERNS: dict[str, dict[str, Any]] = {
     "yaml": {
         "block_start": r"^(\w[\w-]*):\s*$",
         "key_value": r"^(\w[\w-]*):\s+\S",
@@ -968,7 +968,7 @@ class TierAwareChunker:
         relative_path: str,
         language: Optional[str] = None,
         content: Optional[str] = None,
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Chunk a file using the optimal strategy with robust fallback.
 
         Fallback chain (simple, no regex):
@@ -1020,7 +1020,7 @@ class TierAwareChunker:
         # Ultimate fallback - should never reach here but just in case
         return self._chunk_with_overlap(file_path, relative_path, language, content)
 
-    def _get_fallback_chain(self, language: str, file_path: Path) -> List[ChunkingFallback]:
+    def _get_fallback_chain(self, language: str, file_path: Path) -> list[ChunkingFallback]:
         """Determine the fallback chain for a language.
 
         Args:
@@ -1093,7 +1093,7 @@ class TierAwareChunker:
         relative_path: str,
         language: str,
         content: str,
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Apply a specific fallback strategy."""
         if fallback == ChunkingFallback.PYTHON_AST:
             return self._py_chunker.chunk_file(file_path, relative_path, content)
@@ -1113,12 +1113,12 @@ class TierAwareChunker:
         relative_path: str,
         language: str,
         content: str,
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Chunk using tree-sitter symbol extraction."""
         if not self._ts:
             return []
 
-        chunks: List[CodeChunk] = []
+        chunks: list[CodeChunk] = []
         lines = content.split("\n")
 
         symbols = self._ts.extract_symbols(file_path, language)
@@ -1195,9 +1195,9 @@ class TierAwareChunker:
         relative_path: str,
         language: str,
         content: str,
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Chunk config files with structure awareness."""
-        chunks: List[CodeChunk] = []
+        chunks: list[CodeChunk] = []
         lines = content.split("\n")
 
         # File summary
@@ -1244,7 +1244,7 @@ class TierAwareChunker:
         # Fallback: chunk by sections/blocks
         return self._chunk_with_overlap(file_path, relative_path, language, content)
 
-    def _extract_config_sections(self, content: str, language: str) -> List[Dict[str, Any]]:
+    def _extract_config_sections(self, content: str, language: str) -> list[dict[str, Any]]:
         """Extract top-level sections from config files."""
         sections = []
         lines = content.split("\n")
@@ -1328,7 +1328,7 @@ class TierAwareChunker:
         relative_path: str,
         language: str,
         content: str,
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Universal fallback: sliding window with overlap.
 
         Delegates to TextChunkerProtocol (Rust when available) for
@@ -1337,7 +1337,7 @@ class TierAwareChunker:
         Works for ANY file type. Creates overlapping chunks based on
         line boundaries for context preservation.
         """
-        chunks: List[CodeChunk] = []
+        chunks: list[CodeChunk] = []
         lines = content.split("\n")
 
         # File summary (always created)

@@ -29,7 +29,8 @@ import asyncio
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.evaluation.protocol import (
     BenchmarkTask,

@@ -48,9 +48,10 @@ import logging
 import threading
 import time
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.agent.cache.dependency_extractor import DependencyExtractor
+import builtins
 
 logger = logging.getLogger(__name__)
 
@@ -107,9 +108,9 @@ class LazyInvalidationCache:
             dependency_extractor: Dependency extractor for auto-detecting files
         """
         self._cache: OrderedDict[str, Any] = OrderedDict()
-        self._timestamps: Dict[str, float] = {}
-        self._stale_keys: Set[str] = set()
-        self._file_index: Dict[str, Set[str]] = {}
+        self._timestamps: dict[str, float] = {}
+        self._stale_keys: set[str] = set()
+        self._file_index: dict[str, set[str]] = {}
         self._max_size = max_size
         self._ttl_seconds = ttl_seconds
         self._cleanup_interval = cleanup_interval
@@ -147,7 +148,7 @@ class LazyInvalidationCache:
         """
         return key in self._stale_keys
 
-    def _extract_files(self, value: Any) -> Set[str]:
+    def _extract_files(self, value: Any) -> builtins.set[str]:
         """Extract file paths from cached value.
 
         Args:
@@ -156,7 +157,7 @@ class LazyInvalidationCache:
         Returns:
             Set of file paths
         """
-        files: Set[str] = set()
+        files: set[str] = set()
 
         # Handle ToolCallResult objects
         if hasattr(value, "arguments") and hasattr(value, "tool_name"):
@@ -303,7 +304,7 @@ class LazyInvalidationCache:
             self._cache.move_to_end(key)
             return self._cache[key]
 
-    def set(self, key: str, value: Any, files: Optional[List[str]] = None) -> None:
+    def set(self, key: str, value: Any, files: Optional[list[str]] = None) -> None:
         """Set a value in the cache.
 
         Thread-safe: Protected by threading.Lock.
@@ -383,7 +384,7 @@ class LazyInvalidationCache:
 
             return count
 
-    def mark_stale_batch(self, file_paths: List[str]) -> int:
+    def mark_stale_batch(self, file_paths: list[str]) -> int:
         """Mark multiple files as stale in one operation.
 
         Thread-safe: Protected by threading.Lock.
@@ -442,7 +443,7 @@ class LazyInvalidationCache:
                 if not self._is_stale(k) and not self._is_expired(k)
             ]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics for monitoring.
 
         Thread-safe: Returns snapshot of current stats.

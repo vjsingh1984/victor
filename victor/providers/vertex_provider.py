@@ -37,7 +37,8 @@ References:
 import json
 import logging
 import os
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -45,8 +46,6 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderError,
-    ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
 )
@@ -142,7 +141,7 @@ class VertexAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             headers={"Content-Type": "application/json"},
         )
 
-    async def _get_auth_headers(self) -> Dict[str, str]:
+    async def _get_auth_headers(self) -> dict[str, str]:
         """Get authentication headers for Vertex AI requests.
 
         Uses Application Default Credentials (ADC) or API key.
@@ -198,12 +197,12 @@ class VertexAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Vertex AI."""
@@ -230,12 +229,12 @@ class VertexAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Vertex AI."""
@@ -249,7 +248,7 @@ class VertexAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
             async with self.client.stream("POST", url, json=payload, headers=headers) as response:
                 response.raise_for_status()
-                accumulated_tool_calls: List[Dict[str, Any]] = []
+                accumulated_tool_calls: list[dict[str, Any]] = []
 
                 async for line in response.aiter_lines():
                     if not line.strip() or not line.startswith("data: "):
@@ -280,7 +279,7 @@ class VertexAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def _build_request_payload(
         self, messages, model, temperature, max_tokens, tools, **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build Vertex AI request payload (Gemini format)."""
         # Convert messages to Gemini format
         contents = []
@@ -348,7 +347,7 @@ class VertexAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return payload
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         """Parse Vertex AI response."""
         candidates = result.get("candidates", [])
         if not candidates:

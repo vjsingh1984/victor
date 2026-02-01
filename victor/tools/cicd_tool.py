@@ -25,7 +25,7 @@ Features:
 import logging
 import subprocess
 from pathlib import Path
-from typing import Any, Collection, Dict, Optional
+from typing import Any, Optional
 
 import yaml
 
@@ -49,7 +49,7 @@ def _get_icon(name: str) -> str:
 
 
 # Workflow templates
-GITHUB_ACTIONS_TEMPLATES: Dict[str, Dict[str, Any]] = {
+GITHUB_ACTIONS_TEMPLATES: dict[str, dict[str, Any]] = {
     "python-test": {
         "name": "Python Tests",
         "on": {
@@ -220,7 +220,7 @@ async def cicd(
     file: Optional[str] = None,
     output: Optional[str] = None,
     validate_command: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Unified CI/CD tool for pipeline management.
 

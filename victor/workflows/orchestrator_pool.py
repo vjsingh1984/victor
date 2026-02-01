@@ -21,7 +21,7 @@ caching to avoid recreating orchestrators for the same profile.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from victor.config.settings import Settings, ProfileConfig
 from victor.providers.registry import ProviderRegistry
@@ -58,9 +58,9 @@ class OrchestratorPool:
         """
         self._settings = settings
         self._container = container
-        self._orchestrators: Dict[str, Any] = {}
-        self._providers: Dict[str, Any] = {}
-        self._profiles: Dict[str, ProfileConfig] = {}
+        self._orchestrators: dict[str, Any] = {}
+        self._providers: dict[str, Any] = {}
+        self._profiles: dict[str, ProfileConfig] = {}
 
     def get_orchestrator(self, profile: Optional[str] = None) -> Any:
         """Get orchestrator for a profile.

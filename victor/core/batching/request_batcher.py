@@ -35,8 +35,9 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Awaitable
-from collections import defaultdict, deque
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable, Awaitable
+from collections import defaultdict
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -81,8 +82,8 @@ class BatchEntry:
     """
 
     request_id: str
-    args: Tuple[Any, ...]
-    kwargs: Dict[str, Any]
+    args: tuple[Any, ...]
+    kwargs: dict[str, Any]
     priority: BatchPriority = BatchPriority.MEDIUM
     timestamp: float = field(default_factory=time.time)
     future: Optional["asyncio.Future[Any]"] = None
@@ -117,7 +118,7 @@ class BatchStats:
     avg_batch_size: float = 0.0
     total_wait_time: float = 0.0
     total_execution_time: float = 0.0
-    priority_distribution: Dict[BatchPriority, int] = field(
+    priority_distribution: dict[BatchPriority, int] = field(
         default_factory=lambda: dict.fromkeys(BatchPriority, 0)
     )
 
@@ -154,7 +155,7 @@ class BatchStats:
                     self.avg_batch_size * (self.total_batches - 1) + batch_size
                 ) / self.total_batches
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get statistics as dictionary.
 
         Returns:
@@ -225,7 +226,7 @@ class RequestBatcher:
     def __init__(
         self,
         key_func: Callable[..., str],
-        batch_func: Callable[[List[BatchEntry]], Awaitable[List[Any]]],
+        batch_func: Callable[[list[BatchEntry]], Awaitable[list[Any]]],
         max_batch_size: int = 10,
         batch_timeout: float = 0.1,
         max_concurrent_batches: int = 5,
@@ -246,9 +247,9 @@ class RequestBatcher:
         self.max_concurrent_batches = max_concurrent_batches
 
         # Batching state (thread-safe)
-        self._batches: Dict[str, List[BatchEntry]] = defaultdict(list)
-        self._pending_entries: Dict[str, Set[str]] = defaultdict(set)
-        self._batch_timers: Dict[str, asyncio.TimerHandle] = {}
+        self._batches: dict[str, list[BatchEntry]] = defaultdict(list)
+        self._pending_entries: dict[str, set[str]] = defaultdict(set)
+        self._batch_timers: dict[str, asyncio.TimerHandle] = {}
         self._lock = threading.Lock()
 
         # Semaphore for concurrent batch execution
@@ -447,7 +448,7 @@ class RequestBatcher:
             except Exception as e:
                 logger.error(f"Error in flush loop: {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get batcher statistics.
 
         Returns:
@@ -520,7 +521,7 @@ class ToolCallBatcher:
             batch_timeout=batch_timeout,
         )
 
-    async def _execute_tool_batch(self, entries: List[BatchEntry]) -> List[Any]:
+    async def _execute_tool_batch(self, entries: list[BatchEntry]) -> list[Any]:
         """Execute a batch of tool calls.
 
         Args:
@@ -551,7 +552,7 @@ class ToolCallBatcher:
 
         return results
 
-    async def batch_calls(self, calls: List[Dict[str, Any]]) -> List[Any]:
+    async def batch_calls(self, calls: list[dict[str, Any]]) -> list[Any]:
         """Batch multiple tool calls.
 
         Args:
@@ -582,7 +583,7 @@ class ToolCallBatcher:
         """Stop the batcher."""
         await self.batcher.stop()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get batcher statistics.
 
         Returns:
@@ -619,7 +620,7 @@ def get_llm_batcher(
         with _batcher_lock:
             if _global_llm_batcher is None:
                 # Create dummy batch function (will be set by orchestrator)
-                async def dummy_batch(entries: Any) -> List[Any]:
+                async def dummy_batch(entries: Any) -> list[Any]:
                     return [None] * len(entries)
 
                 _global_llm_batcher = RequestBatcher(

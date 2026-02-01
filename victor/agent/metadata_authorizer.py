@@ -39,13 +39,12 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.agent.action_authorizer import ActionIntent
 
 from victor.tools.auth_metadata import (
-    ToolAuthMetadata,
     ToolAuthMetadataRegistry,
     ToolSafety,
     get_tool_auth_metadata_registry,
@@ -159,7 +158,7 @@ class MetadataActionAuthorizer:
         self._cache[cache_key] = True
         return True
 
-    def get_blocked_tools(self, intent: "ActionIntent") -> Set[str]:
+    def get_blocked_tools(self, intent: "ActionIntent") -> set[str]:
         """Get all tools that are blocked for a given intent.
 
         This method queries the metadata registry to find all tools
@@ -181,8 +180,8 @@ class MetadataActionAuthorizer:
         return blocked_tools
 
     def get_authorized_tools(
-        self, intent: "ActionIntent", available_tools: Optional[List[str]] = None
-    ) -> Set[str]:
+        self, intent: "ActionIntent", available_tools: Optional[list[str]] = None
+    ) -> set[str]:
         """Get all tools that are authorized for a given intent.
 
         Args:
@@ -202,7 +201,7 @@ class MetadataActionAuthorizer:
 
         return authorized_tools
 
-    def filter_tools(self, tools: List[str], intent: "ActionIntent") -> List[str]:
+    def filter_tools(self, tools: list[str], intent: "ActionIntent") -> list[str]:
         """Filter a list of tools to only authorized ones.
 
         Args:
@@ -238,7 +237,7 @@ class MetadataActionAuthorizer:
         metadata = self._registry.get(tool_name)
         return metadata.requires_user_confirmation() if metadata else False
 
-    def get_tools_by_capability(self, capability: str) -> List[str]:
+    def get_tools_by_capability(self, capability: str) -> list[str]:
         """Get all tools with a specific capability.
 
         Args:
@@ -249,7 +248,7 @@ class MetadataActionAuthorizer:
         """
         return self._registry.get_tools_by_capability(capability)
 
-    def get_tools_by_domain(self, domain: str) -> List[str]:
+    def get_tools_by_domain(self, domain: str) -> list[str]:
         """Get all tools in a specific domain.
 
         Args:
@@ -278,7 +277,7 @@ class MetadataActionAuthorizer:
 
         total_tools = len(self._registry.list_all_tools())
 
-        summary: Dict[str, Any] = {
+        summary: dict[str, Any] = {
             "total_tools": total_tools,
             "tools_by_safety": {},
             "blocked_tools_by_intent": {},

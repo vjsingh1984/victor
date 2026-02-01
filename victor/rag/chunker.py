@@ -45,9 +45,9 @@ import json
 import logging
 import re
 import uuid
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable, Coroutine, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Optional
+from collections.abc import Callable, Coroutine
 
 from victor.rag.document_store import Document, DocumentChunk
 
@@ -123,7 +123,7 @@ class ChunkingConfig:
 
 
 # Type alias for embedding function
-EmbeddingFn = Callable[[str], Coroutine[Any, Any, List[float]]]
+EmbeddingFn = Callable[[str], Coroutine[Any, Any, list[float]]]
 
 
 def detect_document_type(source: str, content: str) -> str:
@@ -229,7 +229,7 @@ class DocumentChunker:
         self,
         doc: Document,
         embedding_fn: EmbeddingFn,
-    ) -> List[DocumentChunk]:
+    ) -> list[DocumentChunk]:
         """Chunk a document into indexed chunks.
 
         Selects the appropriate chunking strategy based on document type.
@@ -284,7 +284,7 @@ class DocumentChunker:
 
         return chunks
 
-    def _chunk_text(self, content: str) -> List[Tuple[str, int, int]]:
+    def _chunk_text(self, content: str) -> list[tuple[str, int, int]]:
         """Chunk plain text with sentence boundaries.
 
         Args:
@@ -334,7 +334,7 @@ class DocumentChunker:
 
         return chunks
 
-    def _chunk_markdown(self, content: str) -> List[Tuple[str, int, int]]:
+    def _chunk_markdown(self, content: str) -> list[tuple[str, int, int]]:
         """Chunk markdown preserving structure.
 
         Respects headers and code blocks as natural break points.
@@ -371,7 +371,7 @@ class DocumentChunker:
 
         return chunks
 
-    def _chunk_code(self, content: str) -> List[Tuple[str, int, int]]:
+    def _chunk_code(self, content: str) -> list[tuple[str, int, int]]:
         """Chunk code preserving function/class boundaries.
 
         Attempts to keep functions and classes intact.
@@ -420,7 +420,7 @@ class DocumentChunker:
 
         return chunks
 
-    def _chunk_html(self, content: str) -> List[Tuple[str, int, int]]:
+    def _chunk_html(self, content: str) -> list[tuple[str, int, int]]:
         """Chunk HTML preserving semantic structure.
 
         Uses paragraph, section, table, and header elements as natural
@@ -486,7 +486,7 @@ class DocumentChunker:
             return self._chunk_text(full_text)
 
         # Convert semantic elements to chunks with size limits
-        current_chunk: List[str] = []
+        current_chunk: list[str] = []
         current_size = 0
         pos = 0
 
@@ -528,7 +528,7 @@ class DocumentChunker:
         logger.debug(f"HTML chunking produced {len(chunks)} chunks")
         return chunks if chunks else self._chunk_text(soup.get_text())
 
-    def _chunk_json(self, content: str) -> List[Tuple[str, int, int]]:
+    def _chunk_json(self, content: str) -> list[tuple[str, int, int]]:
         """Chunk JSON preserving object boundaries.
 
         Chunks by top-level keys or array items.
@@ -567,7 +567,7 @@ class DocumentChunker:
 
         elif isinstance(data, list):
             # Chunk by array items (batch small items together)
-            current_batch: List[Any] = []
+            current_batch: list[Any] = []
             current_size = 0
 
             for item in data:

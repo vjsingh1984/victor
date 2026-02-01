@@ -42,13 +42,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from victor.teams.team_analytics import ExecutionRecord
-    from victor.teams.types import TeamConfig, TeamFormation
+    from victor.teams.types import TeamConfig
 
 logger = logging.getLogger(__name__)
 
@@ -87,12 +86,12 @@ class TeamExperience:
     team_id: str
     task: str
     team_config: "TeamConfig"
-    result: Dict[str, Any]
+    result: dict[str, Any]
     reward: float
     timestamp: datetime = field(default_factory=datetime.now)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "experience_id": self.experience_id,
@@ -123,10 +122,10 @@ class AdaptationRecommendation:
     description: str
     expected_improvement: float
     confidence: float
-    changes: Dict[str, Any]
+    changes: dict[str, Any]
     rationale: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "recommendation_type": self.recommendation_type,
@@ -160,7 +159,7 @@ class LearningProgress:
     learning_rate: float
     adaptation_count: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "team_id": self.team_id,
@@ -223,11 +222,11 @@ class TeamLearningSystem:
         self.discount_factor = discount_factor
 
         # Knowledge storage
-        self._experiences: Dict[str, TeamExperience] = {}
-        self._team_experiences: Dict[str, List[str]] = defaultdict(list)
-        self._q_table: Dict[Tuple[str, str], float] = {}  # (team_id, state) -> value
-        self._formation_performance: Dict[str, Dict[str, List[float]]] = {}
-        self._member_performance: Dict[str, Dict[str, List[float]]] = {}
+        self._experiences: dict[str, TeamExperience] = {}
+        self._team_experiences: dict[str, list[str]] = defaultdict(list)
+        self._q_table: dict[tuple[str, str], float] = {}  # (team_id, state) -> value
+        self._formation_performance: dict[str, dict[str, list[float]]] = {}
+        self._member_performance: dict[str, dict[str, list[float]]] = {}
 
         # Load existing data
         if storage_path and storage_path.exists():
@@ -237,10 +236,10 @@ class TeamLearningSystem:
         self,
         team_config: "TeamConfig",
         task: str,
-        result: Dict[str, Any],
+        result: dict[str, Any],
         team_id: str = "default",
         reward: Optional[float] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> str:
         """Record a team experience for learning.
 
@@ -283,7 +282,7 @@ class TeamLearningSystem:
 
         return experience_id
 
-    def _compute_reward(self, result: Dict[str, Any]) -> float:
+    def _compute_reward(self, result: dict[str, Any]) -> float:
         """Compute reward from execution result.
 
         Args:
@@ -439,7 +438,7 @@ class TeamLearningSystem:
             adaptation_count=0,  # Would track actual adaptations
         )
 
-    def get_recommendations(self, team_id: str, top_k: int = 5) -> List[AdaptationRecommendation]:
+    def get_recommendations(self, team_id: str, top_k: int = 5) -> list[AdaptationRecommendation]:
         """Get adaptation recommendations for a team.
 
         Args:
@@ -449,7 +448,7 @@ class TeamLearningSystem:
         Returns:
             List of recommendations
         """
-        recommendations: List[AdaptationRecommendation] = []
+        recommendations: list[AdaptationRecommendation] = []
         experience_ids = self._team_experiences.get(team_id, [])
         experiences = [self._experiences[eid] for eid in experience_ids if eid in self._experiences]
 
@@ -477,7 +476,7 @@ class TeamLearningSystem:
         return recommendations[:top_k]
 
     def _recommend_formation(
-        self, experiences: List[TeamExperience]
+        self, experiences: list[TeamExperience]
     ) -> Optional[AdaptationRecommendation]:
         """Recommend formation changes.
 
@@ -522,7 +521,7 @@ class TeamLearningSystem:
         )
 
     def _recommend_member_changes(
-        self, experiences: List[TeamExperience]
+        self, experiences: list[TeamExperience]
     ) -> Optional[AdaptationRecommendation]:
         """Recommend member changes.
 
@@ -563,7 +562,7 @@ class TeamLearningSystem:
         )
 
     def _recommend_budget_changes(
-        self, experiences: List[TeamExperience]
+        self, experiences: list[TeamExperience]
     ) -> Optional[AdaptationRecommendation]:
         """Recommend budget changes.
 

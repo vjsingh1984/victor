@@ -15,7 +15,7 @@
 """RAG Search Tool - Search for relevant chunks in the RAG store."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from victor.tools.base import BaseTool, ToolResult
 from victor.tools.enums import CostTier
@@ -71,7 +71,7 @@ class RAGSearchTool(BaseTool):
 
     async def execute(
         self,
-        _exec_ctx: Dict[str, Any] | None = None,
+        _exec_ctx: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> ToolResult:
         """Execute search query.
@@ -87,7 +87,6 @@ class RAGSearchTool(BaseTool):
         Returns:
             ToolResult with search results
         """
-        from victor.rag.document_store import DocumentStore
 
         query = kwargs.get("query", "")
         k = kwargs.get("k", 10)

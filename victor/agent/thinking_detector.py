@@ -26,17 +26,12 @@ import hashlib
 import logging
 import re
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Deque,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
     runtime_checkable,
 )
 
@@ -65,7 +60,7 @@ class ThinkingPattern:
     """Represents a detected thinking pattern."""
 
     content_hash: str
-    keywords: Set[str]
+    keywords: set[str]
     iteration: int
     timestamp: float
     length: int
@@ -177,7 +172,7 @@ STOPWORDS: frozenset[str] = frozenset(
 )
 
 # Patterns indicating circular thinking
-CIRCULAR_PATTERNS: List[re.Pattern[str]] = [
+CIRCULAR_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"let me (read|check|look at|examine|see) (the|this) (file|code)", re.I),
     re.compile(r"i need to (read|check|look at|examine|see)", re.I),
     re.compile(r"(first|now) let me", re.I),
@@ -192,7 +187,7 @@ CIRCULAR_PATTERNS: List[re.Pattern[str]] = [
 ]
 
 # Stalling patterns - thinking without action (common in DeepSeek)
-STALLING_PATTERNS: List[re.Pattern[str]] = [
+STALLING_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^let me\b", re.I),  # Starts with "let me"
     re.compile(r"^i('ll| will| need to| should)\b", re.I),  # Starts with intent
     re.compile(r"^now\b", re.I),  # Starts with "now"
@@ -204,7 +199,7 @@ STALLING_PATTERNS: List[re.Pattern[str]] = [
 class IThinkingDetector(Protocol):
     """Protocol for thinking pattern detection."""
 
-    def record_thinking(self, content: str) -> Tuple[bool, str]:
+    def record_thinking(self, content: str) -> tuple[bool, str]:
         """Record thinking block and detect loops."""
         ...
 
@@ -212,7 +207,7 @@ class IThinkingDetector(Protocol):
         """Reset detector state."""
         ...
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get detection statistics."""
         ...
 
@@ -262,8 +257,8 @@ class ThinkingPatternDetector:
             stalling_threshold: Count for consecutive stalling detection
             presentation: Optional presentation adapter for icons (creates default if None)
         """
-        self._history: Deque[ThinkingPattern] = deque(maxlen=window_size)
-        self._pattern_counts: Dict[str, int] = {}
+        self._history: deque[ThinkingPattern] = deque(maxlen=window_size)
+        self._pattern_counts: dict[str, int] = {}
         self._repetition_threshold = repetition_threshold
         self._similarity_threshold = similarity_threshold
         self._stalling_threshold = stalling_threshold
@@ -285,7 +280,7 @@ class ThinkingPatternDetector:
         else:
             self._presentation = presentation
 
-    def _extract_keywords(self, text: str) -> Set[str]:
+    def _extract_keywords(self, text: str) -> set[str]:
         """Extract significant keywords from thinking block.
 
         Args:
@@ -305,7 +300,7 @@ class ThinkingPatternDetector:
 
         return keywords
 
-    def _compute_similarity(self, kw1: Set[str], kw2: Set[str]) -> float:
+    def _compute_similarity(self, kw1: set[str], kw2: set[str]) -> float:
         """Compute Jaccard similarity between keyword sets.
 
         Args:
@@ -389,7 +384,7 @@ class ThinkingPatternDetector:
         else:
             return "general"
 
-    def record_thinking(self, content: str) -> Tuple[bool, str]:
+    def record_thinking(self, content: str) -> tuple[bool, str]:
         """Record thinking block and detect loops.
 
         Args:
@@ -589,7 +584,7 @@ class ThinkingPatternDetector:
 
         return base_guidance + advice
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get detection statistics.
 
         Returns:
@@ -609,7 +604,7 @@ class ThinkingPatternDetector:
             "unique_patterns": len(self._pattern_counts),
         }
 
-    def get_recent_patterns(self) -> List[Dict[str, Any]]:
+    def get_recent_patterns(self) -> list[dict[str, Any]]:
         """Get recent pattern information.
 
         Returns:

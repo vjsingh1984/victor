@@ -31,18 +31,16 @@ import time
 import uuid
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
-    Dict,
     Generic,
     Optional,
     TYPE_CHECKING,
     cast,
 )
+from collections.abc import AsyncIterator
 
 if TYPE_CHECKING:
     from victor.framework.config import GraphConfig
-    from victor.framework.graph import CompiledGraph, GraphExecutionResult
+    from victor.framework.graph import CompiledGraph
     from victor.workflows.compiler_protocols import (
         ExecutionContextProtocol,
         ExecutionEventProtocol,
@@ -105,7 +103,7 @@ class StateGraphExecutor(Generic[StateType]):
 
     async def invoke(
         self,
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         *,
         config: Optional["GraphConfig"] = None,
         thread_id: Optional[str] = None,
@@ -161,7 +159,7 @@ class StateGraphExecutor(Generic[StateType]):
 
     async def stream(
         self,
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         *,
         config: Optional["GraphConfig"] = None,
         thread_id: Optional[str] = None,
@@ -195,7 +193,6 @@ class StateGraphExecutor(Generic[StateType]):
                 if event.data:
                     print(f"Data: {event.data}")
         """
-        from victor.workflows.compiler_protocols import ExecutionEventProtocol
 
         exec_config = config or self._default_config
         thread_id = thread_id or uuid.uuid4().hex
@@ -234,7 +231,6 @@ class StateGraphExecutor(Generic[StateType]):
             print(f"Thread ID: {context.thread_id}")
         """
         from dataclasses import dataclass
-        from typing import Any
 
         thread_id = thread_id or uuid.uuid4().hex
 

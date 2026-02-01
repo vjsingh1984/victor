@@ -7,15 +7,15 @@ This is the fallback extractor when native AST is not available.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
-from ..types import ExtractedSymbol, TreeSitterCapability
+from ..types import ExtractedSymbol
 
 logger = logging.getLogger(__name__)
 
 # Language module mappings for tree-sitter
 # Maps language name to (module_name, function_name)
-LANGUAGE_MODULES: Dict[str, Tuple[str, str]] = {
+LANGUAGE_MODULES: dict[str, tuple[str, str]] = {
     "python": ("tree_sitter_python", "language"),
     "javascript": ("tree_sitter_javascript", "language"),
     "typescript": ("tree_sitter_typescript", "language_typescript"),
@@ -56,7 +56,7 @@ LANGUAGE_MODULES: Dict[str, Tuple[str, str]] = {
 
 # Symbol extraction queries for common languages
 # These S-expression queries extract class, function, and method definitions
-SYMBOL_QUERIES: Dict[str, str] = {
+SYMBOL_QUERIES: dict[str, str] = {
     "python": """
         (class_definition
             name: (identifier) @name) @definition.class
@@ -140,9 +140,9 @@ class TreeSitterExtractor:
     """
 
     def __init__(self) -> None:
-        self._parser_cache: Dict[str, Any] = {}
-        self._language_cache: Dict[str, Any] = {}
-        self._query_cache: Dict[Tuple[str, str], Any] = {}
+        self._parser_cache: dict[str, Any] = {}
+        self._language_cache: dict[str, Any] = {}
+        self._query_cache: dict[tuple[str, str], Any] = {}
         self._tree_sitter_available = self._check_tree_sitter()
 
     def _check_tree_sitter(self) -> bool:
@@ -164,7 +164,7 @@ class TreeSitterExtractor:
         code: str,
         file_path: Path,
         language: str,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """
         Extract symbols from code using tree-sitter.
 
@@ -253,9 +253,9 @@ class TreeSitterExtractor:
         tree: Any,
         file_path: str,
         language: str,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract symbols from a parsed tree."""
-        symbols: List[ExtractedSymbol] = []
+        symbols: list[ExtractedSymbol] = []
 
         # Get language-specific query
         query_src = SYMBOL_QUERIES.get(language)
@@ -273,9 +273,9 @@ class TreeSitterExtractor:
         file_path: str,
         language: str,
         query_src: str,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract symbols using a tree-sitter query."""
-        symbols: List[ExtractedSymbol] = []
+        symbols: list[ExtractedSymbol] = []
 
         try:
             from tree_sitter import Query, QueryCursor
@@ -328,9 +328,9 @@ class TreeSitterExtractor:
         node: Any,
         file_path: str,
         parent: Optional[str] = None,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Generic symbol extraction for languages without queries."""
-        symbols: List[ExtractedSymbol] = []
+        symbols: list[ExtractedSymbol] = []
 
         # Common node types that indicate symbol definitions
         symbol_types = {
@@ -402,7 +402,7 @@ class TreeSitterExtractor:
         self,
         code: str,
         language: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get locations of syntax errors in code."""
         if not self._tree_sitter_available:
             return []
@@ -413,7 +413,7 @@ class TreeSitterExtractor:
 
         try:
             tree = parser.parse(bytes(code, "utf8"))
-            errors: List[Dict[str, Any]] = []
+            errors: list[dict[str, Any]] = []
             self._collect_errors(tree.root_node, errors)
             return errors
         except Exception as e:
@@ -429,7 +429,7 @@ class TreeSitterExtractor:
     def _collect_errors(
         self,
         node: Any,
-        errors: List[Dict[str, Any]],
+        errors: list[dict[str, Any]],
     ) -> None:
         """Collect error nodes from tree."""
         if node.type == "ERROR":
@@ -456,7 +456,7 @@ class TreeSitterExtractor:
         for child in node.children:
             self._collect_errors(child, errors)
 
-    def get_supported_languages(self) -> List[str]:
+    def get_supported_languages(self) -> list[str]:
         """Get list of languages with known tree-sitter support."""
         return list(LANGUAGE_MODULES.keys())
 

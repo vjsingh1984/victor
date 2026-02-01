@@ -19,10 +19,8 @@ Tests the accessor protocols that replace direct private attribute access.
 
 from __future__ import annotations
 
-from typing import Any, Optional, Protocol, runtime_checkable
 from unittest.mock import MagicMock
 
-import pytest
 
 
 class TestCapabilityLoaderAccessProtocol:

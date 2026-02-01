@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from tree_sitter import Tree
@@ -74,7 +74,7 @@ class TreeSitterQueries:
     """
 
     # Symbol extraction queries
-    symbols: List[QueryPattern] = field(default_factory=list)
+    symbols: list[QueryPattern] = field(default_factory=list)
 
     # Relationship extraction queries
     calls: Optional[str] = None
@@ -85,7 +85,7 @@ class TreeSitterQueries:
 
     # For resolving enclosing scope (e.g., which function a call is inside)
     # List of (node_type, name_field) tuples
-    enclosing_scopes: List[Tuple[str, str]] = field(default_factory=list)
+    enclosing_scopes: list[tuple[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -125,7 +125,7 @@ class ChunkStrategy(Protocol):
 
     def chunk_file(
         self, tree: "Tree", content: bytes, file_path: Optional[str] = None
-    ) -> List[CodeChunk]:
+    ) -> list[CodeChunk]:
         """Split a file into semantic chunks using AST.
 
         Args:
@@ -161,28 +161,28 @@ class LanguageConfig:
     # Identity
     name: str  # Canonical name (e.g., "python")
     display_name: str  # Human-readable name (e.g., "Python")
-    aliases: List[str] = field(default_factory=list)  # Alternative names
+    aliases: list[str] = field(default_factory=list)  # Alternative names
 
     # File identification
-    extensions: List[str] = field(default_factory=list)  # .py, .pyw
-    filenames: List[str] = field(default_factory=list)  # Makefile, Dockerfile
-    shebangs: List[str] = field(default_factory=list)  # #!/usr/bin/python
+    extensions: list[str] = field(default_factory=list)  # .py, .pyw
+    filenames: list[str] = field(default_factory=list)  # Makefile, Dockerfile
+    shebangs: list[str] = field(default_factory=list)  # #!/usr/bin/python
 
     # Syntax
     comment_style: CommentStyle = CommentStyle.HASH
     line_comment: Optional[str] = "#"
     block_comment_start: Optional[str] = None
     block_comment_end: Optional[str] = None
-    string_delimiters: List[str] = field(default_factory=lambda: ['"', "'"])
+    string_delimiters: list[str] = field(default_factory=lambda: ['"', "'"])
 
     # Indentation
     indent_size: int = 4
     use_tabs: bool = False
 
     # Tooling
-    package_managers: List[str] = field(default_factory=list)  # pip, npm
-    build_systems: List[str] = field(default_factory=list)  # make, cargo
-    test_frameworks: List[str] = field(default_factory=list)  # pytest, jest
+    package_managers: list[str] = field(default_factory=list)  # pip, npm
+    build_systems: list[str] = field(default_factory=list)  # make, cargo
+    test_frameworks: list[str] = field(default_factory=list)  # pytest, jest
 
     # LSP
     language_server: Optional[str] = None  # Command to start LSP
@@ -197,16 +197,16 @@ class TestRunner:
     """Configuration for a test runner."""
 
     name: str
-    command: List[str]  # Base command (e.g., ["pytest"])
+    command: list[str]  # Base command (e.g., ["pytest"])
     file_pattern: str = "test_*.py"  # Pattern for test files
-    discover_args: List[str] = field(default_factory=list)  # Args for discovery
-    run_args: List[str] = field(default_factory=list)  # Args for running
-    coverage_args: List[str] = field(default_factory=list)  # Args for coverage
-    parallel_args: List[str] = field(default_factory=list)  # Args for parallel run
+    discover_args: list[str] = field(default_factory=list)  # Args for discovery
+    run_args: list[str] = field(default_factory=list)  # Args for running
+    coverage_args: list[str] = field(default_factory=list)  # Args for coverage
+    parallel_args: list[str] = field(default_factory=list)  # Args for parallel run
 
     # Output parsing
     output_format: str = "text"  # text, json, junit
-    json_args: List[str] = field(default_factory=list)  # Args for JSON output
+    json_args: list[str] = field(default_factory=list)  # Args for JSON output
 
 
 @dataclass
@@ -214,14 +214,14 @@ class BuildSystem:
     """Configuration for a build system."""
 
     name: str
-    build_command: List[str]  # e.g., ["cargo", "build"]
-    run_command: List[str]  # e.g., ["cargo", "run"]
-    clean_command: List[str] = field(default_factory=list)
-    install_command: List[str] = field(default_factory=list)
+    build_command: list[str]  # e.g., ["cargo", "build"]
+    run_command: list[str]  # e.g., ["cargo", "run"]
+    clean_command: list[str] = field(default_factory=list)
+    install_command: list[str] = field(default_factory=list)
 
     # Build modes
-    debug_args: List[str] = field(default_factory=list)
-    release_args: List[str] = field(default_factory=list)
+    debug_args: list[str] = field(default_factory=list)
+    release_args: list[str] = field(default_factory=list)
 
     # Manifest file
     manifest_file: Optional[str] = None  # Cargo.toml, package.json
@@ -232,8 +232,8 @@ class Formatter:
     """Configuration for a code formatter."""
 
     name: str
-    command: List[str]  # e.g., ["black", "."]
-    check_args: List[str] = field(default_factory=list)  # Args for check mode
+    command: list[str]  # e.g., ["black", "."]
+    check_args: list[str] = field(default_factory=list)  # Args for check mode
     config_file: Optional[str] = None  # pyproject.toml, .prettierrc
 
 
@@ -242,8 +242,8 @@ class Linter:
     """Configuration for a linter."""
 
     name: str
-    command: List[str]  # e.g., ["ruff", "check"]
-    fix_args: List[str] = field(default_factory=list)  # Args for auto-fix
+    command: list[str]  # e.g., ["ruff", "check"]
+    fix_args: list[str] = field(default_factory=list)  # Args for auto-fix
     config_file: Optional[str] = None
     output_format: str = "text"  # text, json, sarif
 

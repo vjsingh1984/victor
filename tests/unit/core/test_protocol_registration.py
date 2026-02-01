@@ -21,9 +21,8 @@ These tests verify:
 3. Integration with existing VerticalBase pattern
 """
 
-import pytest
-from typing import List, Optional, Protocol, runtime_checkable
-from unittest.mock import Mock, MagicMock, patch
+from typing import Protocol, runtime_checkable
+from unittest.mock import patch
 
 
 # Define test protocols
@@ -31,7 +30,7 @@ from unittest.mock import Mock, MagicMock, patch
 class MockToolProvider(Protocol):
     """Mock protocol for tool provision."""
 
-    def get_tools(self) -> List[str]: ...
+    def get_tools(self) -> list[str]: ...
 
 
 @runtime_checkable
@@ -45,7 +44,7 @@ class MockPromptProvider(Protocol):
 class MockMiddlewareProvider(Protocol):
     """Mock protocol for middleware provision."""
 
-    def get_middleware(self) -> List[str]: ...
+    def get_middleware(self) -> list[str]: ...
 
 
 class TestRegisterProtocolsDecorator:
@@ -71,12 +70,11 @@ class TestRegisterProtocolsDecorator:
     def test_decorator_detects_implemented_protocols(self):
         """Decorator should detect which protocols a class implements."""
         from victor.core.verticals.protocol_decorators import (
-            register_protocols,
             get_implemented_protocols,
         )
 
         class TestVertical:
-            def get_tools(self) -> List[str]:
+            def get_tools(self) -> list[str]:
                 return ["tool1", "tool2"]
 
             def get_prompt(self) -> str:
@@ -98,7 +96,7 @@ class TestRegisterProtocolsDecorator:
 
         @register_protocols(protocols=[MockToolProvider])
         class TestVertical:
-            def get_tools(self) -> List[str]:
+            def get_tools(self) -> list[str]:
                 return []
 
         # Should not raise
@@ -107,7 +105,6 @@ class TestRegisterProtocolsDecorator:
     def test_decorator_auto_detects_from_known_protocols(self):
         """Decorator should auto-detect from known vertical protocols."""
         from victor.core.verticals.protocol_decorators import (
-            register_protocols,
             KNOWN_VERTICAL_PROTOCOLS,
         )
 
@@ -137,7 +134,7 @@ class TestGetImplementedProtocols:
         from victor.core.verticals.protocol_decorators import get_implemented_protocols
 
         class PartialVertical:
-            def get_tools(self) -> List[str]:
+            def get_tools(self) -> list[str]:
                 return []
 
         protocols = get_implemented_protocols(
@@ -153,7 +150,7 @@ class TestGetImplementedProtocols:
         from victor.core.verticals.protocol_decorators import get_implemented_protocols
 
         class BaseVertical:
-            def get_tools(self) -> List[str]:
+            def get_tools(self) -> list[str]:
                 return []
 
         class DerivedVertical(BaseVertical):
@@ -183,7 +180,7 @@ class TestProtocolDecoratorIntegration:
 
             @register_protocols(protocols=[MockToolProvider])
             class TestVertical:
-                def get_tools(self) -> List[str]:
+                def get_tools(self) -> list[str]:
                     return []
 
             # Verify register_protocol was called
@@ -201,7 +198,7 @@ class TestProtocolDecoratorIntegration:
 
             @register_protocols(protocols=[MockToolProvider])
             class TestVertical:
-                def get_tools(self) -> List[str]:
+                def get_tools(self) -> list[str]:
                     return []
 
             # register_protocol should be called (current impl doesn't check is_registered)

@@ -25,7 +25,7 @@ This separation allows mixing and matching:
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from victor.storage.embeddings.service import EmbeddingService
 
     try:
-        from openai import AsyncOpenAI as AsyncOpenAIType  # noqa: F401
+        from openai import AsyncOpenAI as AsyncOpenAIType
     except ImportError:
         pass
 
@@ -110,7 +110,7 @@ class BaseEmbeddingModel(ABC):
         pass
 
     @abstractmethod
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding for single text.
 
         Args:
@@ -122,7 +122,7 @@ class BaseEmbeddingModel(ABC):
         pass
 
     @abstractmethod
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts (batch optimized).
 
         Args:
@@ -196,7 +196,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         self._initialized = True
         print(f"✅ Model loaded (shared via EmbeddingService)! Dimension: {self.get_dimension()}")
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding for single text."""
         if not self._initialized:
             await self.initialize()
@@ -207,7 +207,7 @@ class SentenceTransformerModel(BaseEmbeddingModel):
         embedding = await self._embedding_service.embed_text(text)
         return list(embedding.tolist())
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts (batch optimized)."""
         if not self._initialized:
             await self.initialize()
@@ -275,7 +275,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
 
         print(f"✅ OpenAI embedding model initialized: {self.config.embedding_model}")
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding using OpenAI API."""
         if not self._initialized:
             await self.initialize()
@@ -290,7 +290,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         assert isinstance(embedding, list)
         return embedding
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts."""
         if not self._initialized:
             await self.initialize()
@@ -362,7 +362,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
 
         print(f"✅ Cohere embedding model initialized: {self.config.embedding_model}")
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding using Cohere API."""
         if not self._initialized:
             await self.initialize()
@@ -375,7 +375,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         assert isinstance(embedding, list)
         return embedding
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts."""
         if not self._initialized:
             await self.initialize()
@@ -486,7 +486,7 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
         print(f"✅ Ollama embedding model ready: {self.config.embedding_model}")
         print(f"📊 Embedding dimension: {self.get_dimension()}")
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding for single text using Ollama.
 
         Args:
@@ -513,7 +513,7 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
         except Exception as e:
             raise RuntimeError(f"Failed to generate embedding: {e}")
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts (optimized with concurrent requests).
 
         Ollama doesn't have a native batch API, so we use asyncio.gather

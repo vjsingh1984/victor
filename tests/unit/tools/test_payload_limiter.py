@@ -4,15 +4,13 @@
 
 """Unit tests for the PayloadSizeLimiter."""
 
-import pytest
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.providers.payload_limiter import (
     DEFAULT_LIMITS,
     PayloadEstimate,
     ProviderPayloadLimiter,
-    TruncationResult,
     TruncationStrategy,
     get_payload_limiter,
 )
@@ -25,7 +23,7 @@ class MockMessage:
     role: str
     content: str
     tool_call_id: Optional[str] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
+    tool_calls: Optional[list[dict[str, Any]]] = None
     name: Optional[str] = None
 
 
@@ -35,7 +33,7 @@ class MockToolDefinition:
 
     name: str
     description: str
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
 
 
 class TestProviderPayloadLimiter:

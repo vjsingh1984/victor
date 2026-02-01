@@ -18,8 +18,8 @@ Usage:
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import AsyncIterator, Any
+from typing import Any
+from collections.abc import AsyncIterator
 from datetime import datetime
 
 # Import canonical AgentMode from mode_controller

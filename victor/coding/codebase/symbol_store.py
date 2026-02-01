@@ -47,7 +47,7 @@ import sqlite3
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 from victor.coding.codebase.ignore_patterns import DEFAULT_SKIP_DIRS, should_ignore_path
 
@@ -85,7 +85,7 @@ class SymbolInfo:
     docstring: Optional[str] = None
     signature: Optional[str] = None
     parent_symbol: Optional[str] = None  # For methods: parent class name
-    modifiers: List[str] = field(default_factory=list)  # public, private, async, static
+    modifiers: list[str] = field(default_factory=list)  # public, private, async, static
     is_exported: bool = False
     content_hash: Optional[str] = None
 
@@ -146,8 +146,8 @@ class SymbolStore:
     def __init__(
         self,
         root_path: str,
-        include_dirs: Optional[List[str]] = None,
-        exclude_dirs: Optional[List[str]] = None,
+        include_dirs: Optional[list[str]] = None,
+        exclude_dirs: Optional[list[str]] = None,
     ):
         """Initialize symbol store.
 
@@ -268,7 +268,7 @@ class SymbolStore:
                     return category
         return None
 
-    async def index_codebase(self, force: bool = False) -> Dict[str, Any]:
+    async def index_codebase(self, force: bool = False) -> dict[str, Any]:
         """Index the entire codebase with incremental update support.
 
         Handles:
@@ -284,7 +284,7 @@ class SymbolStore:
             Statistics about the indexing operation
         """
         start_time = time.time()
-        stats: Dict[str, Any] = {
+        stats: dict[str, Any] = {
             "files_indexed": 0,
             "files_skipped": 0,
             "files_deleted": 0,
@@ -299,7 +299,7 @@ class SymbolStore:
         print(f"🔍 Indexing symbols in {self.root}")
 
         # Collect all current source files
-        current_files: Set[str] = set()
+        current_files: set[str] = set()
         source_files = []
         search_paths = (
             [self.root / d for d in self.include_dirs] if self.include_dirs else [self.root]
@@ -552,7 +552,7 @@ class SymbolStore:
 
     def _extract_symbols_robust(
         self, file_path: Path, language: str
-    ) -> Tuple[List[SymbolInfo], List[str], Optional[str]]:
+    ) -> tuple[list[SymbolInfo], list[str], Optional[str]]:
         """Extract symbols with robust error handling for imperfect codebases.
 
         Users may have codebases with syntax errors, incomplete code, or other issues.
@@ -582,7 +582,7 @@ class SymbolStore:
 
     def _extract_python_symbols_robust(
         self, content: str, rel_path: str
-    ) -> Tuple[List[SymbolInfo], List[str]]:
+    ) -> tuple[list[SymbolInfo], list[str]]:
         """Extract Python symbols with fallback to regex for files with syntax errors.
 
         First tries AST parsing. If that fails due to SyntaxError, falls back
@@ -597,7 +597,7 @@ class SymbolStore:
 
     def _extract_python_symbols_regex_fallback(
         self, content: str, rel_path: str
-    ) -> Tuple[List[SymbolInfo], List[str]]:
+    ) -> tuple[list[SymbolInfo], list[str]]:
         """Extract Python symbols using regex when AST parsing fails.
 
         This allows indexing files with syntax errors, which is common in
@@ -668,7 +668,7 @@ class SymbolStore:
 
     def _extract_python_symbols_from_ast(
         self, tree: ast.AST, rel_path: str, content: str
-    ) -> Tuple[List[SymbolInfo], List[str]]:
+    ) -> tuple[list[SymbolInfo], list[str]]:
         """Extract symbols from a parsed AST tree."""
         symbols = []
         imports = []
@@ -741,7 +741,7 @@ class SymbolStore:
 
     def _extract_generic_symbols(
         self, content: str, rel_path: str, language: str
-    ) -> Tuple[List[SymbolInfo], List[str]]:
+    ) -> tuple[list[SymbolInfo], list[str]]:
         """Extract symbols from any language robustly.
 
         Strategy:
@@ -765,7 +765,7 @@ class SymbolStore:
 
     def _extract_generic_symbols_treesitter(
         self, content: str, rel_path: str, language: str
-    ) -> Tuple[List[SymbolInfo], List[str]]:
+    ) -> tuple[list[SymbolInfo], list[str]]:
         """Extract symbols using tree-sitter for accurate parsing.
 
         Tree-sitter is error-tolerant and can parse files with syntax errors,
@@ -890,7 +890,7 @@ class SymbolStore:
 
     def _extract_generic_symbols_regex(
         self, content: str, rel_path: str, language: str
-    ) -> Tuple[List[SymbolInfo], List[str]]:
+    ) -> tuple[list[SymbolInfo], list[str]]:
         """Extract symbols from any language using regex patterns.
 
         This is the fallback for languages without tree-sitter support
@@ -985,7 +985,7 @@ class SymbolStore:
 
         return symbols, imports
 
-    def _extract_docstring_before(self, lines: List[str], line_idx: int) -> Optional[str]:
+    def _extract_docstring_before(self, lines: list[str], line_idx: int) -> Optional[str]:
         """Extract docstring/comment from lines before the symbol."""
         if line_idx <= 0:
             return None
@@ -1002,9 +1002,9 @@ class SymbolStore:
 
         return None
 
-    def _detect_patterns(self, conn: sqlite3.Connection) -> List[Tuple[Any, ...]]:
+    def _detect_patterns(self, conn: sqlite3.Connection) -> list[tuple[Any, ...]]:
         """Detect architecture patterns from indexed symbols."""
-        patterns: List[Tuple[Any, ...]] = []
+        patterns: list[tuple[Any, ...]] = []
 
         # Check for Provider pattern
         cursor = conn.execute(
@@ -1048,7 +1048,7 @@ class SymbolStore:
 
     # Query methods
 
-    def find_by_category(self, category: str, limit: int = 50) -> List[SymbolInfo]:
+    def find_by_category(self, category: str, limit: int = 50) -> list[SymbolInfo]:
         """Find symbols by architecture category."""
         with sqlite3.connect(str(self._db_path)) as conn:
             cursor = conn.execute(
@@ -1059,7 +1059,7 @@ class SymbolStore:
             )
             return [self._row_to_symbol(row) for row in cursor]
 
-    def find_by_type(self, symbol_type: str, limit: int = 100) -> List[SymbolInfo]:
+    def find_by_type(self, symbol_type: str, limit: int = 100) -> list[SymbolInfo]:
         """Find symbols by type (class, function, interface, etc.)."""
         with sqlite3.connect(str(self._db_path)) as conn:
             cursor = conn.execute(
@@ -1070,7 +1070,7 @@ class SymbolStore:
             )
             return [self._row_to_symbol(row) for row in cursor]
 
-    def find_by_name_pattern(self, pattern: str, limit: int = 50) -> List[SymbolInfo]:
+    def find_by_name_pattern(self, pattern: str, limit: int = 50) -> list[SymbolInfo]:
         """Find symbols matching a name pattern (use % as wildcard)."""
         with sqlite3.connect(str(self._db_path)) as conn:
             cursor = conn.execute(
@@ -1081,7 +1081,7 @@ class SymbolStore:
             )
             return [self._row_to_symbol(row) for row in cursor]
 
-    def find_key_components(self, limit: int = 20) -> List[SymbolInfo]:
+    def find_key_components(self, limit: int = 20) -> list[SymbolInfo]:
         """Find key architectural components (prioritized by category importance)."""
         with sqlite3.connect(str(self._db_path)) as conn:
             cursor = conn.execute(
@@ -1106,7 +1106,7 @@ class SymbolStore:
             )
             return [self._row_to_symbol(row) for row in cursor]
 
-    def find_named_implementations(self) -> Dict[str, List[Dict[str, Any]]]:
+    def find_named_implementations(self) -> dict[str, list[dict[str, Any]]]:
         """Find named implementations grouped by domain.
 
         Detects patterns like:
@@ -1155,7 +1155,7 @@ class SymbolStore:
             "auth": ["auth", "security", "identity"],
         }
 
-        results: Dict[str, List[Dict[str, Any]]] = {}
+        results: dict[str, list[dict[str, Any]]] = {}
 
         with sqlite3.connect(str(self._db_path)) as conn:
             # Get all struct/class symbols with their paths
@@ -1278,7 +1278,7 @@ class SymbolStore:
 
         return results
 
-    def find_performance_hints(self) -> Dict[str, List[Dict[str, str]]]:
+    def find_performance_hints(self) -> dict[str, list[dict[str, str]]]:
         """Extract performance hints from docstrings and comments.
 
         Looks for patterns like:
@@ -1299,7 +1299,7 @@ class SymbolStore:
             (r"(?:latency|throughput|performance)[:\s]+[^.]{10,50}", "description"),
         ]
 
-        results: Dict[str, List[Dict[str, str]]] = {}
+        results: dict[str, list[dict[str, str]]] = {}
 
         with sqlite3.connect(str(self._db_path)) as conn:
             cursor = conn.execute(
@@ -1324,7 +1324,7 @@ class SymbolStore:
 
         return results
 
-    def get_detected_patterns(self) -> List[Dict[str, Any]]:
+    def get_detected_patterns(self) -> list[dict[str, Any]]:
         """Get all detected architecture patterns."""
         with sqlite3.connect(str(self._db_path)) as conn:
             cursor = conn.execute(
@@ -1342,10 +1342,10 @@ class SymbolStore:
                 for row in cursor
             ]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get statistics about the symbol store."""
         with sqlite3.connect(str(self._db_path)) as conn:
-            stats: Dict[str, Any] = {}
+            stats: dict[str, Any] = {}
 
             # File count by language
             cursor = conn.execute("SELECT language, COUNT(*) FROM files GROUP BY language")

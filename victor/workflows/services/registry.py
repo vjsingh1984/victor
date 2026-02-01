@@ -39,9 +39,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.workflows.services.definition import (
     ServiceConfig,
@@ -84,11 +85,11 @@ class ServiceRegistry:
     """
 
     def __init__(self) -> None:
-        self._providers: Dict[ServiceProviderType, ServiceProvider] = {}
-        self._services: Dict[str, ServiceRegistryEntry] = {}
-        self._startup_order: List[str] = []
-        self._on_service_started: List[Callable[[ServiceHandle], None]] = []
-        self._on_service_stopped: List[Callable[[str], None]] = []
+        self._providers: dict[ServiceProviderType, ServiceProvider] = {}
+        self._services: dict[str, ServiceRegistryEntry] = {}
+        self._startup_order: list[str] = []
+        self._on_service_started: list[Callable[[ServiceHandle], None]] = []
+        self._on_service_stopped: list[Callable[[str], None]] = []
 
     def register_provider(
         self, provider_type: ServiceProviderType, provider: ServiceProvider
@@ -139,7 +140,7 @@ class ServiceRegistry:
             return handle.connection_info.get(export_key)
         return None
 
-    def get_all_exports(self) -> Dict[str, Dict[str, str]]:
+    def get_all_exports(self) -> dict[str, dict[str, str]]:
         """Get all exports from all services.
 
         Returns:
@@ -183,7 +184,7 @@ class ServiceRegistry:
 
     async def start_all(
         self,
-        configs: Optional[List[ServiceConfig]] = None,
+        configs: Optional[list[ServiceConfig]] = None,
         timeout: float = 300.0,
     ) -> None:
         """Start all services in dependency order.
@@ -323,7 +324,7 @@ class ServiceRegistry:
                 except Exception as e:
                     logger.warning(f"Cleanup failed for '{name}': {e}")
 
-    def _compute_startup_order(self) -> List[str]:
+    def _compute_startup_order(self) -> list[str]:
         """Compute startup order using topological sort.
 
         Returns:
@@ -333,8 +334,8 @@ class ServiceRegistry:
             ServiceDependencyError: If circular dependency detected
         """
         # Build dependency graph
-        in_degree: Dict[str, int] = dict.fromkeys(self._services, 0)
-        dependents: Dict[str, List[str]] = defaultdict(list)
+        in_degree: dict[str, int] = dict.fromkeys(self._services, 0)
+        dependents: dict[str, list[str]] = defaultdict(list)
 
         for name, entry in self._services.items():
             for dep in entry.config.depends_on:
@@ -379,7 +380,7 @@ class ServiceRegistry:
         """Register callback for service stopped events."""
         self._on_service_stopped.append(callback)
 
-    def list_services(self) -> List[Dict[str, Any]]:
+    def list_services(self) -> list[dict[str, Any]]:
         """List all services with their status."""
         return [
             {
@@ -412,7 +413,7 @@ class ServiceContext:
     def __init__(
         self,
         registry: ServiceRegistry,
-        configs: List[ServiceConfig],
+        configs: list[ServiceConfig],
         timeout: float = 300.0,
         cleanup_on_failure: bool = True,
     ):
@@ -444,7 +445,7 @@ class ServiceContext:
         """Get export value from a service."""
         return self.registry.get_export(service_name, export_key)
 
-    def get_all_exports(self) -> Dict[str, Dict[str, str]]:
+    def get_all_exports(self) -> dict[str, dict[str, str]]:
         """Get all exports."""
         return self.registry.get_all_exports()
 
@@ -498,11 +499,11 @@ class RestartPolicyEnforcer:
             registry: Service registry to monitor
         """
         self.registry = registry
-        self._restart_counts: Dict[str, int] = {}
-        self._restart_history: Dict[str, List[RestartAttempt]] = defaultdict(list)
+        self._restart_counts: dict[str, int] = {}
+        self._restart_history: dict[str, list[RestartAttempt]] = defaultdict(list)
         self._monitoring = False
         self._monitor_task: Optional[asyncio.Task[None]] = None
-        self._manually_stopped: Set[str] = set()
+        self._manually_stopped: set[str] = set()
 
     def should_restart(
         self,
@@ -692,7 +693,7 @@ class RestartPolicyEnforcer:
         healthy_threshold: int,
     ) -> None:
         """Main monitoring loop."""
-        healthy_counts: Dict[str, int] = defaultdict(int)
+        healthy_counts: dict[str, int] = defaultdict(int)
 
         while self._monitoring:
             await asyncio.sleep(check_interval)
@@ -720,7 +721,7 @@ class RestartPolicyEnforcer:
                 except Exception as e:
                     logger.error(f"Error checking health of '{name}': {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get restart policy enforcement statistics."""
         return {
             "monitoring": self._monitoring,

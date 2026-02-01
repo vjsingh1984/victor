@@ -20,10 +20,9 @@ FrameworkStepHandler.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 if TYPE_CHECKING:
     pass
@@ -33,14 +32,14 @@ class MockVerticalContext:
     """Mock vertical context for testing."""
 
     def __init__(self):
-        self.workflows: Dict[str, Any] = {}
+        self.workflows: dict[str, Any] = {}
         self.rl_config: Any = None
         self.rl_hooks: Any = None
-        self.team_specs: Dict[str, Any] = {}
-        self.chains: Dict[str, Any] = {}
-        self.personas: Dict[str, Any] = {}
+        self.team_specs: dict[str, Any] = {}
+        self.chains: dict[str, Any] = {}
+        self.personas: dict[str, Any] = {}
 
-    def apply_workflows(self, workflows: Dict[str, Any]) -> None:
+    def apply_workflows(self, workflows: dict[str, Any]) -> None:
         self.workflows.update(workflows)
 
     def apply_rl_config(self, config: Any) -> None:
@@ -49,7 +48,7 @@ class MockVerticalContext:
     def apply_rl_hooks(self, hooks: Any) -> None:
         self.rl_hooks = hooks
 
-    def apply_team_specs(self, specs: Dict[str, Any]) -> None:
+    def apply_team_specs(self, specs: dict[str, Any]) -> None:
         self.team_specs.update(specs)
 
 
@@ -60,10 +59,10 @@ class MockIntegrationResult:
         self.workflows_count: int = 0
         self.rl_learners_count: int = 0
         self.team_specs_count: int = 0
-        self.infos: List[str] = []
-        self.warnings: List[str] = []
-        self.step_statuses: Dict[str, Any] = {}
-        self.step_details: Dict[str, Any] = {}
+        self.infos: list[str] = []
+        self.warnings: list[str] = []
+        self.step_statuses: dict[str, Any] = {}
+        self.step_details: dict[str, Any] = {}
 
     def add_info(self, msg: str) -> None:
         self.infos.append(msg)
@@ -75,7 +74,7 @@ class MockIntegrationResult:
         self,
         step_name: str,
         status: str,
-        details: Optional[Dict] = None,
+        details: Optional[dict] = None,
         duration_ms: Optional[float] = None,
     ) -> None:
         """Record step status (required by BaseStepHandler)."""
@@ -101,7 +100,7 @@ class MockWorkflowProvider:
     name = "test_vertical"
 
     @classmethod
-    def get_workflows(cls) -> Dict[str, Any]:
+    def get_workflows(cls) -> dict[str, Any]:
         return {"workflow1": {"steps": []}, "workflow2": {"steps": []}}
 
 
@@ -122,7 +121,7 @@ class MockTeamSpecProvider:
     name = "test_vertical"
 
     @classmethod
-    def get_team_specs(cls) -> Dict[str, Any]:
+    def get_team_specs(cls) -> dict[str, Any]:
         return {"team1": {"members": []}, "team2": {"members": []}}
 
 
@@ -132,7 +131,7 @@ class MockChainProvider:
     name = "test_vertical"
 
     @classmethod
-    def get_chains(cls) -> Dict[str, Any]:
+    def get_chains(cls) -> dict[str, Any]:
         return {"chain1": {}, "chain2": {}}
 
 
@@ -142,7 +141,7 @@ class MockPersonaProvider:
     name = "test_vertical"
 
     @classmethod
-    def get_personas(cls) -> Dict[str, Any]:
+    def get_personas(cls) -> dict[str, Any]:
         class MockPersona:
             def to_dict(self):
                 return {"name": "test", "role": "tester", "expertise": []}
@@ -156,7 +155,7 @@ class MockHandlerProvider:
     name = "test_vertical"
 
     @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
+    def get_handlers(cls) -> dict[str, Any]:
         return {"handler1": lambda x: x}
 
 

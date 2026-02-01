@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, List, Optional, Set
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from victor.agent.tool_selection import ToolSelector
@@ -117,7 +117,7 @@ class CachePrewarmer:
         """
         self._tool_registry = tool_registry
         self._tool_selector = tool_selector
-        self._prewarmed_queries: Set[str] = set()
+        self._prewarmed_queries: set[str] = set()
         self._enabled = True
 
     def enable(self) -> None:
@@ -188,7 +188,7 @@ class CachePrewarmer:
         logger.info(f"Pre-warmed {count} task type patterns")
         return count
 
-    async def prewarm_stage_queries(self, stages: Optional[List[str]] = None) -> int:
+    async def prewarm_stage_queries(self, stages: Optional[list[str]] = None) -> int:
         """Pre-warm cache with stage-based queries.
 
         Args:

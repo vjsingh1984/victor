@@ -33,10 +33,9 @@ import asyncio
 import functools
 import logging
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, TypeVar, cast
-from urllib.parse import urlparse
+from typing import Any, Optional, TypeVar, cast
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -93,21 +92,21 @@ class QueryCache:
             max_size: Maximum number of cached queries
             ttl_seconds: Time-to-live for cache entries (default: 5 minutes)
         """
-        self._cache: Dict[str, Tuple[Any, float]] = {}
+        self._cache: dict[str, tuple[Any, float]] = {}
         self._max_size = max_size
         self._ttl = ttl_seconds
         self._lock = asyncio.Lock()
         self._hits = 0
         self._misses = 0
 
-    def _hash_key(self, query: str, params: Tuple[Any, ...]) -> str:
+    def _hash_key(self, query: str, params: tuple[Any, ...]) -> str:
         """Generate a hash key for the query."""
         import hashlib
 
         key = f"{query}:{params}"
         return hashlib.sha256(key.encode()).hexdigest()[:16]
 
-    async def get(self, query: str, params: Tuple[Any, ...]) -> Optional[Any]:
+    async def get(self, query: str, params: tuple[Any, ...]) -> Optional[Any]:
         """Get cached query result.
 
         Args:
@@ -135,7 +134,7 @@ class QueryCache:
             self._hits += 1
             return result
 
-    async def set(self, query: str, params: Tuple[Any, ...], result: Any) -> None:
+    async def set(self, query: str, params: tuple[Any, ...], result: Any) -> None:
         """Cache query result.
 
         Args:
@@ -176,7 +175,7 @@ class QueryCache:
         total = self._hits + self._misses
         return self._hits / total if total > 0 else 0.0
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         return {
             "size": len(self._cache),
@@ -324,7 +323,7 @@ class DatabaseOptimizer:
         """
         self._query_cache = QueryCache(max_size=cache_size, ttl_seconds=cache_ttl)
         self._connection_pool: Optional[ConnectionPool] = None
-        self._query_metrics: Dict[str, QueryMetrics] = {}
+        self._query_metrics: dict[str, QueryMetrics] = {}
         self._enable_metrics = True
 
     async def initialize(
@@ -346,7 +345,7 @@ class DatabaseOptimizer:
     async def execute_query(
         self,
         query: str,
-        params: Tuple[Any, ...] = (),
+        params: tuple[Any, ...] = (),
         use_cache: bool = True,
     ) -> Any:
         """Execute a database query with optimizations.
@@ -396,7 +395,7 @@ class DatabaseOptimizer:
     async def _execute_actual_query(
         self,
         query: str,
-        params: Tuple[Any, ...],
+        params: tuple[Any, ...],
     ) -> Any:
         """Execute the actual database query.
 
@@ -411,8 +410,8 @@ class DatabaseOptimizer:
     async def execute_batch(
         self,
         query: str,
-        params_list: List[Tuple[Any, ...]],
-    ) -> List[Any]:
+        params_list: list[tuple[Any, ...]],
+    ) -> list[Any]:
         """Execute multiple queries in a batch.
 
         Batch operations are 20-30% faster than individual queries
@@ -444,7 +443,7 @@ class DatabaseOptimizer:
 
         return hashlib.md5(query.encode(), usedforsecurity=False).hexdigest()[:8]
 
-    def get_query_metrics(self) -> Dict[str, Dict[str, Any]]:
+    def get_query_metrics(self) -> dict[str, dict[str, Any]]:
         """Get metrics for all executed queries.
 
         Returns:
@@ -461,7 +460,7 @@ class DatabaseOptimizer:
             for query_hash, metrics in self._query_metrics.items()
         }
 
-    def get_slow_queries(self, threshold_ms: float = 100.0) -> List[Dict[str, Any]]:
+    def get_slow_queries(self, threshold_ms: float = 100.0) -> list[dict[str, Any]]:
         """Get queries that exceed the performance threshold.
 
         Args:
@@ -481,7 +480,7 @@ class DatabaseOptimizer:
             if metrics.avg_time_ms > threshold_ms
         ]
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get query cache statistics."""
         return self._query_cache.get_stats()
 
@@ -516,7 +515,7 @@ def cached_query(
         async def get_user(user_id: int) -> User:
             return await db.fetch_user(user_id)
     """
-    _cache: Dict[str, Tuple[Any, float]] = {}
+    _cache: dict[str, tuple[Any, float]] = {}
 
     def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         @functools.wraps(func)

@@ -45,7 +45,8 @@ import logging
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.config.settings import Settings
@@ -67,7 +68,7 @@ class ProviderConfigStrategy(ABC):
         ...
 
     @property
-    def aliases(self) -> List[str]:
+    def aliases(self) -> list[str]:
         """Alternative names that map to this provider."""
         return []
 
@@ -75,8 +76,8 @@ class ProviderConfigStrategy(ABC):
     def get_settings(
         self,
         settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         """Get provider-specific settings.
 
         Args:
@@ -104,8 +105,8 @@ class AnthropicConfig(ProviderConfigStrategy):
     def get_settings(
         self,
         settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         from victor.config.api_keys import get_api_key
 
         result = dict(base_settings)
@@ -126,8 +127,8 @@ class OpenAIConfig(ProviderConfigStrategy):
     def get_settings(
         self,
         settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         from victor.config.api_keys import get_api_key
 
         result = dict(base_settings)
@@ -146,14 +147,14 @@ class GoogleConfig(ProviderConfigStrategy):
         return "google"
 
     @property
-    def aliases(self) -> List[str]:
+    def aliases(self) -> list[str]:
         return ["gemini"]
 
     def get_settings(
         self,
         settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         from victor.config.api_keys import get_api_key
 
         result = dict(base_settings)
@@ -171,14 +172,14 @@ class XAIConfig(ProviderConfigStrategy):
         return "xai"
 
     @property
-    def aliases(self) -> List[str]:
+    def aliases(self) -> list[str]:
         return ["grok"]
 
     def get_settings(
         self,
         settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         from victor.config.api_keys import get_api_key
 
         result = dict(base_settings)
@@ -199,8 +200,8 @@ class OllamaConfig(ProviderConfigStrategy):
     def get_settings(
         self,
         settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         result = dict(base_settings)
         result.setdefault("base_url", settings.ollama_base_url)
         return result
@@ -216,8 +217,8 @@ class LMStudioConfig(ProviderConfigStrategy):
     def get_settings(
         self,
         settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         result = dict(base_settings)
 
         urls = getattr(settings, "lmstudio_base_urls", []) or []
@@ -259,8 +260,8 @@ class VLLMConfig(ProviderConfigStrategy):
     def get_settings(
         self,
         settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         result = dict(base_settings)
         result.setdefault("base_url", settings.vllm_base_url)
         return result
@@ -274,14 +275,14 @@ class MoonshotConfig(ProviderConfigStrategy):
         return "moonshot"
 
     @property
-    def aliases(self) -> List[str]:
+    def aliases(self) -> list[str]:
         return ["kimi"]
 
     def get_settings(
         self,
         settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         from victor.config.api_keys import get_api_key
 
         result = dict(base_settings)
@@ -302,8 +303,8 @@ class DeepSeekConfig(ProviderConfigStrategy):
     def get_settings(
         self,
         settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         from victor.config.api_keys import get_api_key
 
         result = dict(base_settings)
@@ -322,14 +323,14 @@ class GroqCloudConfig(ProviderConfigStrategy):
         return "groqcloud"
 
     @property
-    def aliases(self) -> List[str]:
+    def aliases(self) -> list[str]:
         return ["groq"]
 
     def get_settings(
         self,
         settings: "Settings",
-        base_settings: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        base_settings: dict[str, Any],
+    ) -> dict[str, Any]:
         from victor.config.api_keys import get_api_key
 
         result = dict(base_settings)
@@ -353,8 +354,8 @@ class ProviderConfigRegistry:
     Thread-safe for concurrent access.
     """
 
-    _strategies: Dict[str, ProviderConfigStrategy] = field(default_factory=dict)
-    _aliases: Dict[str, str] = field(default_factory=dict)
+    _strategies: dict[str, ProviderConfigStrategy] = field(default_factory=dict)
+    _aliases: dict[str, str] = field(default_factory=dict)
     _lock: threading.RLock = field(default_factory=threading.RLock)
 
     def register(self, strategy: ProviderConfigStrategy) -> None:
@@ -377,7 +378,7 @@ class ProviderConfigRegistry:
         self,
         provider: str,
         settings: "Settings",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get settings for a provider.
 
         Args:
@@ -406,7 +407,7 @@ class ProviderConfigRegistry:
             logger.debug(f"No config strategy for provider '{provider}', using base settings")
             return base_settings
 
-    def list_providers(self) -> List[str]:
+    def list_providers(self) -> list[str]:
         """List all registered provider names."""
         with self._lock:
             return list(self._strategies.keys())
@@ -458,7 +459,7 @@ def _register_builtin_providers(registry: ProviderConfigRegistry) -> None:
 
 def register_provider_config(
     provider_name: str,
-) -> Callable[[Type[ProviderConfigStrategy]], Type[ProviderConfigStrategy]]:
+) -> Callable[[type[ProviderConfigStrategy]], type[ProviderConfigStrategy]]:
     """Decorator to register a provider config strategy.
 
     Usage:
@@ -468,8 +469,8 @@ def register_provider_config(
     """
 
     def decorator(
-        cls: Type[ProviderConfigStrategy],
-    ) -> Type[ProviderConfigStrategy]:
+        cls: type[ProviderConfigStrategy],
+    ) -> type[ProviderConfigStrategy]:
         instance = cls()
         get_provider_config_registry().register(instance)
         return cls

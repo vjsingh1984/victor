@@ -29,7 +29,7 @@ import fnmatch
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 import yaml
 
@@ -49,7 +49,7 @@ class ModelSerializationCapabilities:
     preferred_format: Optional[SerializationFormat] = None
 
     # Allowed formats for auto-selection
-    allowed_formats: List[SerializationFormat] = field(
+    allowed_formats: list[SerializationFormat] = field(
         default_factory=lambda: [
             SerializationFormat.TOON,
             SerializationFormat.CSV,
@@ -59,7 +59,7 @@ class ModelSerializationCapabilities:
     )
 
     # Formats to disable
-    disabled_formats: Set[SerializationFormat] = field(default_factory=set)
+    disabled_formats: set[SerializationFormat] = field(default_factory=set)
 
     # Thresholds
     min_array_size_for_tabular: int = 3
@@ -111,8 +111,8 @@ class CapabilityRegistry:
             config_path = Path(__file__).parent.parent.parent / "config" / "model_capabilities.yaml"
 
         self._config_path = config_path
-        self._config: Dict[str, Any] = {}
-        self._cache: Dict[str, ModelSerializationCapabilities] = {}
+        self._config: dict[str, Any] = {}
+        self._cache: dict[str, ModelSerializationCapabilities] = {}
         self._loaded = False
 
     def _load_config(self) -> None:
@@ -233,7 +233,7 @@ class CapabilityRegistry:
 
     def _parse_capabilities(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
     ) -> ModelSerializationCapabilities:
         """Parse capabilities from config dict.
 
@@ -296,7 +296,7 @@ class CapabilityRegistry:
     def _merge_capabilities(
         self,
         base: ModelSerializationCapabilities,
-        overrides: Dict[str, Any],
+        overrides: dict[str, Any],
     ) -> ModelSerializationCapabilities:
         """Merge override config into base capabilities.
 

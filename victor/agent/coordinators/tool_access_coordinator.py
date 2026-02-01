@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
@@ -91,9 +91,9 @@ class ToolAccessContext:
         disallowed_tools: Tools explicitly disallowed by mode
     """
 
-    session_enabled_tools: Optional[Set[str]] = None
+    session_enabled_tools: Optional[set[str]] = None
     current_mode: Optional[str] = None
-    disallowed_tools: Set[str] = field(default_factory=set)
+    disallowed_tools: set[str] = field(default_factory=set)
 
 
 class ToolAccessCoordinator:
@@ -139,7 +139,7 @@ class ToolAccessCoordinator:
         self._mode_controller = mode_controller
 
         # Session-level tool restrictions
-        self._session_enabled_tools: Optional[Set[str]] = None
+        self._session_enabled_tools: Optional[set[str]] = None
 
         logger.debug(
             f"ToolAccessCoordinator initialized with "
@@ -170,7 +170,7 @@ class ToolAccessCoordinator:
     def get_enabled_tools(
         self,
         context: Optional[ToolAccessContext] = None,
-    ) -> Set[str]:
+    ) -> set[str]:
         """Get currently enabled tool names.
 
         Args:
@@ -188,7 +188,7 @@ class ToolAccessCoordinator:
             config = self._mode_controller.config
             if config.allow_all_tools:
                 all_tools = self.get_available_tools()
-                enabled: Set[str] = all_tools - config.disallowed_tools
+                enabled: set[str] = all_tools - config.disallowed_tools
                 return enabled
 
         # Return session-set tools
@@ -198,7 +198,7 @@ class ToolAccessCoordinator:
         # Fall back to all available tools
         return self.get_available_tools()
 
-    def get_available_tools(self) -> Set[str]:
+    def get_available_tools(self) -> set[str]:
         """Get all registered tool names.
 
         Returns:
@@ -289,7 +289,7 @@ class ToolAccessCoordinator:
             layer="default",
         )
 
-    def set_enabled_tools(self, tools: Set[str]) -> None:
+    def set_enabled_tools(self, tools: set[str]) -> None:
         """Set which tools are enabled for this session.
 
         Args:
@@ -332,7 +332,7 @@ class ToolAccessCoordinator:
         Returns:
             ToolAccessContext with session and mode information
         """
-        disallowed: Set[str] = set()
+        disallowed: set[str] = set()
         mode_name = None
 
         if self._mode_controller:

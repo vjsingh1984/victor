@@ -25,7 +25,8 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Awaitable, Callable
 from threading import Lock
 
 
@@ -61,7 +62,7 @@ class SessionEvent:
     event_type: str
     timestamp: float = field(default_factory=time.time)
     gate_id: Optional[str] = None
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -131,7 +132,7 @@ class HITLSession:
         workflow_id: str,
         config: Optional[HITLSessionConfig] = None,
         session_id: Optional[str] = None,
-        initial_context: Optional[Dict[str, Any]] = None,
+        initial_context: Optional[dict[str, Any]] = None,
     ):
         """Initialize a new HITL session.
 
@@ -146,19 +147,19 @@ class HITLSession:
         self.config = config or HITLSessionConfig()
 
         self._state = SessionState.ACTIVE
-        self._context: Dict[str, Any] = initial_context or {}
-        self._history: List[SessionEvent] = []
-        self._results: List[GateExecutionResult] = []
+        self._context: dict[str, Any] = initial_context or {}
+        self._history: list[SessionEvent] = []
+        self._results: list[GateExecutionResult] = []
         self._created_at = time.time()
         self._updated_at = time.time()
 
         # Concurrent gate management
-        self._pending_gates: Dict[str, asyncio.Event] = {}
+        self._pending_gates: dict[str, asyncio.Event] = {}
         self._lock = Lock()
 
         # Callbacks
-        self._on_state_change: List[Callable[[SessionState, SessionState], None]] = []
-        self._on_gate_complete: List[Callable[[GateExecutionResult], None]] = []
+        self._on_state_change: list[Callable[[SessionState, SessionState], None]] = []
+        self._on_gate_complete: list[Callable[[GateExecutionResult], None]] = []
 
     @property
     def state(self) -> SessionState:
@@ -166,7 +167,7 @@ class HITLSession:
         return self._state
 
     @property
-    def context(self) -> Dict[str, Any]:
+    def context(self) -> dict[str, Any]:
         """Session context."""
         return dict(self._context)
 
@@ -214,7 +215,7 @@ class HITLSession:
     async def execute_gate(
         self,
         gate: Any,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         handler: Optional[Callable[..., Awaitable[Any]]] = None,
     ) -> GateExecutionResult:
         """Execute a gate within this session.
@@ -310,7 +311,7 @@ class HITLSession:
             self._add_event("session_failed", data={"reason": reason})
         self._set_state(SessionState.FAILED)
 
-    def get_history(self) -> List[SessionEvent]:
+    def get_history(self) -> list[SessionEvent]:
         """Get session event history.
 
         Returns:
@@ -318,7 +319,7 @@ class HITLSession:
         """
         return list(self._history)
 
-    def get_results(self) -> List[GateExecutionResult]:
+    def get_results(self) -> list[GateExecutionResult]:
         """Get all gate execution results.
 
         Returns:
@@ -326,13 +327,13 @@ class HITLSession:
         """
         return list(self._results)
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get a summary of the session.
 
         Returns:
             Summary dictionary
         """
-        gate_counts: Dict[str, int] = {}
+        gate_counts: dict[str, int] = {}
         for result in self._results:
             gate_counts[result.gate_type] = gate_counts.get(result.gate_type, 0) + 1
 
@@ -388,7 +389,7 @@ class HITLSession:
                     pass  # Don't let callback errors break the session
 
     def _add_event(
-        self, event_type: str, gate_id: Optional[str] = None, data: Optional[Dict[str, Any]] = None
+        self, event_type: str, gate_id: Optional[str] = None, data: Optional[dict[str, Any]] = None
     ) -> None:
         """Add an event to the session history.
 
@@ -423,7 +424,7 @@ class HITLSessionManager:
         Args:
             default_config: Default configuration for new sessions
         """
-        self._sessions: Dict[str, HITLSession] = {}
+        self._sessions: dict[str, HITLSession] = {}
         self._lock = Lock()
         self._default_config = default_config or HITLSessionConfig()
 
@@ -432,7 +433,7 @@ class HITLSessionManager:
         workflow_id: str,
         config: Optional[HITLSessionConfig] = None,
         session_id: Optional[str] = None,
-        initial_context: Optional[Dict[str, Any]] = None,
+        initial_context: Optional[dict[str, Any]] = None,
     ) -> HITLSession:
         """Create a new HITL session.
 
@@ -472,7 +473,7 @@ class HITLSessionManager:
         self,
         workflow_id: Optional[str] = None,
         state: Optional[SessionState] = None,
-    ) -> List[HITLSession]:
+    ) -> list[HITLSession]:
         """List sessions with optional filters.
 
         Args:
@@ -515,7 +516,7 @@ class HITLSessionManager:
 
         return len(to_remove)
 
-    def get_all_summaries(self) -> List[Dict[str, Any]]:
+    def get_all_summaries(self) -> list[dict[str, Any]]:
         """Get summaries for all sessions.
 
         Returns:

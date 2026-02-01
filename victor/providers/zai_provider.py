@@ -28,8 +28,8 @@ References:
 
 import json
 import logging
-import os
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -37,9 +37,7 @@ from victor.providers.base import (
     BaseProvider,
     CompletionResponse,
     Message,
-    ProviderAuthError,
     ProviderError,
-    ProviderRateLimitError,
     ProviderTimeoutError,
     StreamChunk,
     ToolDefinition,
@@ -52,7 +50,7 @@ logger = logging.getLogger(__name__)
 # Available z.ai GLM models
 # Reference: https://docs.z.ai/ and https://z.ai/blog/glm-4.6
 # Type annotation for ZAI_MODELS to fix MyPy type inference
-ZAI_MODELS: Dict[str, Dict[str, Any]] = {
+ZAI_MODELS: dict[str, dict[str, Any]] = {
     "glm-4.7": {
         "description": "GLM-4.7 - Latest flagship model",
         "context_window": 128000,
@@ -182,12 +180,12 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str = "glm-4.7",
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         thinking: bool = False,
         **kwargs: Any,
     ) -> CompletionResponse:
@@ -250,12 +248,12 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str = "glm-4.7",
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from z.ai with tool call accumulation.
@@ -298,7 +296,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             async with self.client.stream("POST", "/chat/completions", json=payload) as response:
                 response.raise_for_status()
 
-                accumulated_tool_calls: List[Dict[str, Any]] = []
+                accumulated_tool_calls: list[dict[str, Any]] = []
                 has_sent_final = False
 
                 async for line in response.aiter_lines():
@@ -347,21 +345,21 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                 raw_error=e,
             )
 
-    def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def _convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert standard tools to z.ai format (OpenAI-compatible)."""
         return convert_tools_to_openai_format(tools)
 
     def _build_request_payload(
         self,
-        messages: List[Message],
+        messages: list[Message],
         model: str,
         temperature: float,
         max_tokens: int,
-        tools: Optional[List[ToolDefinition]],
+        tools: Optional[list[ToolDefinition]],
         stream: bool,
         thinking: bool = False,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build request payload for z.ai's OpenAI-compatible API.
 
         Args:
@@ -380,7 +378,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         # Build messages in OpenAI format
         formatted_messages = []
         for msg in messages:
-            formatted_msg: Dict[str, Any] = {
+            formatted_msg: dict[str, Any] = {
                 "role": msg.role,
                 "content": msg.content,
             }
@@ -389,7 +387,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                 formatted_msg["tool_call_id"] = msg.tool_call_id
             formatted_messages.append(formatted_msg)
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "messages": formatted_messages,
             "temperature": temperature,
@@ -417,8 +415,8 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         return payload
 
     def _normalize_tool_calls(
-        self, tool_calls: Optional[List[Dict[str, Any]]]
-    ) -> Optional[List[Dict[str, Any]]]:
+        self, tool_calls: Optional[list[dict[str, Any]]]
+    ) -> Optional[list[dict[str, Any]]]:
         """Normalize tool calls from OpenAI format.
 
         Converts:
@@ -464,7 +462,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return normalized if normalized else None
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         """Parse z.ai API response.
 
         Args:
@@ -521,7 +519,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         )
 
     def _parse_stream_chunk(
-        self, chunk_data: Dict[str, Any], accumulated_tool_calls: List[Dict[str, Any]]
+        self, chunk_data: dict[str, Any], accumulated_tool_calls: list[dict[str, Any]]
     ) -> Optional[StreamChunk]:
         """Parse streaming chunk from z.ai with tool call accumulation.
 
@@ -604,7 +602,7 @@ class ZAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             usage=usage,
         )
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List available z.ai GLM models.
 
         Returns:

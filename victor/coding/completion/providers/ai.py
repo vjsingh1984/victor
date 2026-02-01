@@ -20,7 +20,8 @@ multi-line suggestions (Copilot-style).
 
 import logging
 import time
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 from victor.coding.completion.protocol import (
     CompletionCapabilities,
@@ -38,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 # FIM (Fill-In-the-Middle) prompt templates per language
-FIM_TEMPLATES: Dict[str, Dict[str, str]] = {
+FIM_TEMPLATES: dict[str, dict[str, str]] = {
     "default": {
         "prefix": "<PRE>",
         "suffix": "<SUF>",
@@ -88,7 +89,7 @@ class AICompletionProvider(StreamingCompletionProvider):
         provider: Optional[Any] = None,
         model: Optional[str] = None,
         max_context_lines: int = 100,
-        fim_template: str | Dict[str, str] = "default",
+        fim_template: str | dict[str, str] = "default",
     ):
         """Initialize the AI completion provider.
 
@@ -106,7 +107,7 @@ class AICompletionProvider(StreamingCompletionProvider):
 
         # Set FIM template
         if isinstance(fim_template, dict):
-            self._fim_template: Dict[str, str] = fim_template
+            self._fim_template: dict[str, str] = fim_template
         else:
             self._fim_template = FIM_TEMPLATES.get(fim_template, FIM_TEMPLATES["default"])
 

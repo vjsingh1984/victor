@@ -31,7 +31,7 @@ Phase 6 Refactoring: Extracted from AgentOrchestrator
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -85,7 +85,7 @@ class IntelligentFeatureCoordinator:
         self,
         task: str,
         task_type: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Prepare an intelligent request using Q-learning optimization.
 
         Delegates to Q-learning coordinator if enabled.
@@ -101,7 +101,7 @@ class IntelligentFeatureCoordinator:
             return None
 
         try:
-            result: Optional[Dict[str, Any]] = await self._qlearning_coordinator.prepare_request(
+            result: Optional[dict[str, Any]] = await self._qlearning_coordinator.prepare_request(
                 task, task_type
             )
             return result
@@ -115,9 +115,9 @@ class IntelligentFeatureCoordinator:
 
     async def validate_intelligent_response(
         self,
-        response: Dict[str, Any],
-        expected_outcomes: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        response: dict[str, Any],
+        expected_outcomes: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         """Validate an intelligent response using quality metrics.
 
         Delegates to evaluation coordinator if available.
@@ -133,7 +133,7 @@ class IntelligentFeatureCoordinator:
             return {"validated": False, "reason": "Evaluation coordinator not available"}
 
         try:
-            validation_result: Dict[str, Any] = (
+            validation_result: dict[str, Any] = (
                 await self._evaluation_coordinator.validate_response(
                     response,
                     expected_outcomes=expected_outcomes,
@@ -153,7 +153,7 @@ class IntelligentFeatureCoordinator:
         task: str,
         task_type: str,
         outcome: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> bool:
         """Record intelligent outcome for Q-learning.
 
@@ -242,7 +242,7 @@ class IntelligentFeatureCoordinator:
     # State Management
     # ========================================================================
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         """Get coordinator state for monitoring.
 
         Returns:

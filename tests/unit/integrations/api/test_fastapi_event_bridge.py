@@ -18,7 +18,7 @@ TDD tests for real-time event streaming to VS Code and other clients.
 """
 
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 

@@ -34,27 +34,20 @@ from __future__ import annotations
 import re
 import threading
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Union,
-    cast,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.framework.validation.pipeline import (
         ValidationContext,
         ValidationResult,
-        ValidationSeverity,
     )
 
 logger = __import__("logging").getLogger(__name__)
@@ -94,7 +87,7 @@ class ValidatorProtocol(Protocol):
 
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         context: ValidationContext,
     ) -> ValidationResult:
         """Validate the data.
@@ -149,7 +142,7 @@ class BaseValidator(ABC):
         """Get the validator name."""
         return self.__class__.__name__
 
-    def _get_value(self, data: Dict[str, Any]) -> tuple[str, Any]:
+    def _get_value(self, data: dict[str, Any]) -> tuple[str, Any]:
         """Get the value to validate.
 
         Returns:
@@ -248,7 +241,7 @@ class BaseValidator(ABC):
     @abstractmethod
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         context: ValidationContext,
     ) -> ValidationResult:
         """Validate the data.
@@ -309,7 +302,7 @@ class ThresholdValidator(BaseValidator):
 
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         context: ValidationContext,
     ) -> ValidationResult:
         """Validate the threshold.
@@ -424,7 +417,7 @@ class RangeValidator(BaseValidator):
 
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         context: ValidationContext,
     ) -> ValidationResult:
         """Validate the range.
@@ -529,7 +522,7 @@ class PresenceValidator(BaseValidator):
 
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         context: ValidationContext,
     ) -> ValidationResult:
         """Validate the presence.
@@ -611,7 +604,7 @@ class PatternValidator(BaseValidator):
         USERNAME = "username"
 
     # Common regex patterns
-    PATTERNS: Dict[PatternType, str] = {
+    PATTERNS: dict[PatternType, str] = {
         PatternType.EMAIL: r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
         PatternType.URL: r"^https?://[^\s/$.?#].[^\s]*$",
         PatternType.UUID: r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
@@ -629,7 +622,7 @@ class PatternValidator(BaseValidator):
         self,
         field: str,
         pattern: Optional[str] = None,
-        pattern_type: Optional[Union[str, PatternType]] = None,
+        pattern_type: Optional[str | PatternType] = None,
         flags: int = 0,
         error_code: Optional[str] = None,
     ):
@@ -666,7 +659,7 @@ class PatternValidator(BaseValidator):
 
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         context: ValidationContext,
     ) -> ValidationResult:
         """Validate the pattern.
@@ -738,7 +731,7 @@ class TypeValidator(BaseValidator):
     def __init__(
         self,
         field: str,
-        expected_type: Union[type, tuple[type, ...], str],
+        expected_type: type | tuple[type, ...] | str,
         coerce: bool = False,
         error_code: Optional[str] = None,
     ):
@@ -760,7 +753,7 @@ class TypeValidator(BaseValidator):
 
         self._coerce = coerce
 
-    def _resolve_type_name(self, type_name: str) -> Union[type, tuple[type, ...]]:
+    def _resolve_type_name(self, type_name: str) -> type | tuple[type, ...]:
         """Resolve a type name to the actual type.
 
         Args:
@@ -816,7 +809,7 @@ class TypeValidator(BaseValidator):
 
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         context: ValidationContext,
     ) -> ValidationResult:
         """Validate the type.
@@ -918,7 +911,7 @@ class LengthValidator(BaseValidator):
 
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         context: ValidationContext,
     ) -> ValidationResult:
         """Validate the length.
@@ -1007,8 +1000,8 @@ class CompositeValidator(BaseValidator):
 
     def __init__(
         self,
-        validators: List[ValidatorProtocol],
-        logic: Union[CompositeLogic, str] = CompositeLogic.ALL,
+        validators: list[ValidatorProtocol],
+        logic: CompositeLogic | str = CompositeLogic.ALL,
         field: Optional[str] = None,
         error_code: Optional[str] = None,
     ):
@@ -1036,7 +1029,7 @@ class CompositeValidator(BaseValidator):
 
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         context: ValidationContext,
     ) -> ValidationResult:
         """Validate using the composite logic.
@@ -1061,7 +1054,7 @@ class CompositeValidator(BaseValidator):
 
     def _combine_results(
         self,
-        results: List[ValidationResult],
+        results: list[ValidationResult],
     ) -> ValidationResult:
         """Combine validation results using the configured logic.
 
@@ -1080,7 +1073,7 @@ class CompositeValidator(BaseValidator):
         else:  # CompositeLogic.ONE
             return self._one_logic(results)
 
-    def _all_logic(self, results: List[ValidationResult]) -> ValidationResult:
+    def _all_logic(self, results: list[ValidationResult]) -> ValidationResult:
         """ALL logic: All validators must pass."""
         from victor.framework.validation.pipeline import ValidationResult
 
@@ -1089,7 +1082,7 @@ class CompositeValidator(BaseValidator):
             combined.merge(result)
         return combined
 
-    def _any_logic(self, results: List[ValidationResult]) -> ValidationResult:
+    def _any_logic(self, results: list[ValidationResult]) -> ValidationResult:
         """ANY logic: At least one validator must pass."""
         # Check if any passed
         if any(r.is_valid for r in results):
@@ -1106,7 +1099,7 @@ class CompositeValidator(BaseValidator):
             combined.merge(result)
         return combined
 
-    def _none_logic(self, results: List[ValidationResult]) -> ValidationResult:
+    def _none_logic(self, results: list[ValidationResult]) -> ValidationResult:
         """NONE logic: No validators should pass."""
         from victor.framework.validation.pipeline import ValidationResult
 
@@ -1122,7 +1115,7 @@ class CompositeValidator(BaseValidator):
 
         return ValidationResult(is_valid=True)
 
-    def _one_logic(self, results: List[ValidationResult]) -> ValidationResult:
+    def _one_logic(self, results: list[ValidationResult]) -> ValidationResult:
         """ONE logic: Exactly one validator must pass."""
         from victor.framework.validation.pipeline import ValidationResult
 
@@ -1164,7 +1157,7 @@ class ConditionalValidator(BaseValidator):
     def __init__(
         self,
         validator: ValidatorProtocol,
-        condition: Callable[[Dict[str, Any]], bool],
+        condition: Callable[[dict[str, Any]], bool],
         field: Optional[str] = None,
         error_code: Optional[str] = None,
     ):
@@ -1187,7 +1180,7 @@ class ConditionalValidator(BaseValidator):
 
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         context: ValidationContext,
     ) -> ValidationResult:
         """Validate only if condition is met.
@@ -1251,7 +1244,7 @@ class TransformingValidator(BaseValidator):
 
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         context: ValidationContext,
     ) -> ValidationResult:
         """Validate after transforming the value.

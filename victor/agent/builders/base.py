@@ -21,7 +21,7 @@ Part of HIGH-005: Initialization Complexity reduction.
 """
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from victor.config.settings import Settings
 
 import logging
@@ -56,11 +56,11 @@ class ComponentBuilder(ABC):
             settings: Application settings to use for component initialization
         """
         self.settings = settings
-        self._built_components: Dict[str, Any] = {}
+        self._built_components: dict[str, Any] = {}
         self._logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
-    def build(self, **kwargs: Any) -> Dict[str, Any]:
+    def build(self, **kwargs: Any) -> dict[str, Any]:
         """Build and return the component(s).
 
         This method must be implemented by concrete builder classes to
@@ -148,7 +148,7 @@ class FactoryAwareBuilder(ComponentBuilder):
         max_tokens: int = 4096,
         provider_name: Optional[str] = None,
         profile_name: Optional[str] = None,
-        tool_selection: Optional[Dict[str, Any]] = None,
+        tool_selection: Optional[dict[str, Any]] = None,
         thinking: bool = False,
     ) -> "OrchestratorFactory":
         """Ensure factory exists, creating it if necessary.
@@ -194,7 +194,7 @@ class FactoryAwareBuilder(ComponentBuilder):
 
         return self._factory
 
-    def _register_components(self, components: Dict[str, Any]) -> None:
+    def _register_components(self, components: dict[str, Any]) -> None:
         """Register all non-None components from a dictionary.
 
         This method implements the component registration pattern that was

@@ -18,20 +18,18 @@ Tests the prompt building coordination functionality.
 """
 
 import time
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from victor.agent.coordinators.prompt_coordinator import (
     PromptCoordinator,
-    PromptBuildError,
     BasePromptContributor,
     SystemPromptContributor,
     TaskHintContributor,
     PromptBuilderCoordinator,
     IPromptBuilderCoordinator,
 )
-from victor.protocols import PromptContext
 
 
 class MockPromptContributor(BasePromptContributor):

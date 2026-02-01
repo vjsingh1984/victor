@@ -25,8 +25,7 @@ Tests cover:
 import asyncio
 import tempfile
 from pathlib import Path
-from typing import List
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -50,7 +49,6 @@ from victor.rag.tools.search import RAGSearchTool
 async def rag_store():
     """Create an in-memory RAG document store for testing."""
     import hashlib
-    import numpy as np
 
     class MockEmbeddingService:
         async def embed(self, text: str):

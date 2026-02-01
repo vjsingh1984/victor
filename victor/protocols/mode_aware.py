@@ -35,10 +35,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Optional, Protocol, Set, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from victor.agent.mode_controller import AgentModeController, OperationalModeConfig
+    from victor.agent.mode_controller import AgentModeController
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +90,8 @@ class ModeInfo:
     allow_all_tools: bool = True
     exploration_multiplier: float = 1.0
     sandbox_dir: Optional[str] = None
-    allowed_tools: Optional[Set[str]] = None
-    disallowed_tools: Optional[Set[str]] = None
+    allowed_tools: Optional[set[str]] = None
+    disallowed_tools: Optional[set[str]] = None
 
     def __post_init__(self) -> None:
         if self.allowed_tools is None:

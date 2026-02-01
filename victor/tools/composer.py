@@ -27,7 +27,7 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from graphlib import TopologicalSorter
-from typing import Any, Dict, List, Optional, Set, Tuple, Callable
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +67,8 @@ class ToolSpec:
 
     name: str
     tool: Any
-    inputs: Dict[str, Any] = field(default_factory=dict)
-    dependencies: List[str] = field(default_factory=list)
+    inputs: dict[str, Any] = field(default_factory=dict)
+    dependencies: list[str] = field(default_factory=list)
     timeout: float = 30.0
     retry_count: int = 0
 
@@ -91,7 +91,7 @@ class ToolResult:
     result: Any = None
     error: Optional[str] = None
     duration: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -106,7 +106,7 @@ class CompositionPlan:
         fail_fast: Stop on first error
     """
 
-    tools: List[ToolSpec]
+    tools: list[ToolSpec]
     execution_strategy: ExecutionStrategy = ExecutionStrategy.DEPENDENCY
     aggregation_strategy: AggregationStrategy = AggregationStrategy.MERGE
     max_parallelism: int = 5
@@ -150,7 +150,7 @@ class ToolComposer:
             orchestrator: Agent orchestrator for tool execution
         """
         self.orchestrator = orchestrator
-        self._tools: List[ToolSpec] = []
+        self._tools: list[ToolSpec] = []
         self._execution_strategy = ExecutionStrategy.DEPENDENCY
         self._aggregation_strategy = AggregationStrategy.MERGE
         self._max_parallelism = 5
@@ -160,8 +160,8 @@ class ToolComposer:
         self,
         tool: Any,
         name: Optional[str] = None,
-        inputs: Optional[Dict[str, Any]] = None,
-        depends_on: Optional[List[str]] = None,
+        inputs: Optional[dict[str, Any]] = None,
+        depends_on: Optional[list[str]] = None,
         timeout: float = 30.0,
     ) -> "ToolComposer":
         """Add tool to composition (fluent API).
@@ -254,7 +254,7 @@ class ToolComposer:
         # Aggregate results
         return await self._aggregate_results(results, plan.aggregation_strategy)
 
-    async def _execute_sequential(self, plan: CompositionPlan) -> List[ToolResult]:
+    async def _execute_sequential(self, plan: CompositionPlan) -> list[ToolResult]:
         """Execute tools sequentially."""
         results = []
 
@@ -268,7 +268,7 @@ class ToolComposer:
 
         return results
 
-    async def _execute_parallel(self, plan: CompositionPlan) -> List[ToolResult]:
+    async def _execute_parallel(self, plan: CompositionPlan) -> list[ToolResult]:
         """Execute tools in parallel."""
         semaphore = asyncio.Semaphore(plan.max_parallelism)
 
@@ -295,7 +295,7 @@ class ToolComposer:
 
         return processed_results
 
-    async def _execute_with_dependencies(self, plan: CompositionPlan) -> List[ToolResult]:
+    async def _execute_with_dependencies(self, plan: CompositionPlan) -> list[ToolResult]:
         """Execute tools respecting dependencies."""
         # Build dependency graph
         graph = {spec.name: spec.dependencies for spec in plan.tools}
@@ -305,7 +305,7 @@ class ToolComposer:
         execution_order = list(sorter.static_order())
 
         # Execute in order
-        results_map: Dict[str, ToolResult] = {}
+        results_map: dict[str, ToolResult] = {}
 
         for tool_name in execution_order:
             spec = next(s for s in plan.tools if s.name == tool_name)
@@ -335,7 +335,7 @@ class ToolComposer:
 
         return list(results_map.values())
 
-    async def _execute_adaptive(self, plan: CompositionPlan) -> List[ToolResult]:
+    async def _execute_adaptive(self, plan: CompositionPlan) -> list[ToolResult]:
         """Adaptive execution based on tool characteristics."""
         # For now, use dependency-based execution
         # In production, could use ML to predict optimal strategy
@@ -408,7 +408,7 @@ class ToolComposer:
                 raise ValueError(f"Cannot execute tool: {spec.name}")
 
     async def _aggregate_results(
-        self, results: List[ToolResult], strategy: AggregationStrategy
+        self, results: list[ToolResult], strategy: AggregationStrategy
     ) -> Any:
         """Aggregate tool results."""
         if not results:
@@ -427,18 +427,18 @@ class ToolComposer:
         else:
             return self._aggregate_all(results)
 
-    def _aggregate_first(self, results: List[ToolResult]) -> Any:
+    def _aggregate_first(self, results: list[ToolResult]) -> Any:
         """Return first successful result."""
         for result in results:
             if result.success:
                 return result.result
         return None
 
-    def _aggregate_all(self, results: List[ToolResult]) -> List[ToolResult]:
+    def _aggregate_all(self, results: list[ToolResult]) -> list[ToolResult]:
         """Return all results."""
         return results
 
-    def _aggregate_merge(self, results: List[ToolResult]) -> Dict[str, Any]:
+    def _aggregate_merge(self, results: list[ToolResult]) -> dict[str, Any]:
         """Merge results into single dict."""
         merged = {}
 
@@ -451,7 +451,7 @@ class ToolComposer:
 
         return merged
 
-    def _aggregate_concat(self, results: List[ToolResult]) -> List[Any]:
+    def _aggregate_concat(self, results: list[ToolResult]) -> list[Any]:
         """Concatenate list results."""
         concatenated = []
 
@@ -464,7 +464,7 @@ class ToolComposer:
 
         return concatenated
 
-    async def _aggregate_vote(self, results: List[ToolResult]) -> Any:
+    async def _aggregate_vote(self, results: list[ToolResult]) -> Any:
         """Vote on results."""
         # Count occurrences of each result
         from collections import Counter
@@ -482,7 +482,7 @@ class ToolComposer:
             # For unhashable results (e.g., dicts), return first
             return successful_results[0]
 
-    def create_workflow_from_plan(self, plan: CompositionPlan) -> Dict[str, Any]:
+    def create_workflow_from_plan(self, plan: CompositionPlan) -> dict[str, Any]:
         """Create workflow definition from plan.
 
         Args:
@@ -515,7 +515,7 @@ class ToolComposer:
 
 
 def compose_tools(
-    tools: List[Any],
+    tools: list[Any],
     strategy: ExecutionStrategy = ExecutionStrategy.DEPENDENCY,
     aggregation: AggregationStrategy = AggregationStrategy.MERGE,
 ) -> ToolComposer:

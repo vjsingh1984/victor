@@ -18,7 +18,7 @@ This protocol defines the interface for building and managing system prompts,
 including mode-specific prompts, hints, and thinking mode handling.
 """
 
-from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
+from typing import Any, Optional, Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.tools import ToolSet
@@ -157,7 +157,7 @@ class IPromptBuilderCoordinator(Protocol):
         """
         ...
 
-    def get_prompt_contributors(self) -> List[Any]:
+    def get_prompt_contributors(self) -> list[Any]:
         """Get registered prompt contributors.
 
         Returns:

@@ -19,12 +19,10 @@ realistic production scenarios.
 """
 
 import asyncio
-import pytest
 import time
 import random
 import statistics
-from typing import Any, Dict, List
-from datetime import datetime
+from typing import Any
 
 import httpx
 from pytest import mark
@@ -42,7 +40,7 @@ class UserSession:
         self.user_id = user_id
         self.provider = provider
         self.model = model
-        self.conversation_history: List[Dict[str, Any]] = []
+        self.conversation_history: list[dict[str, Any]] = []
         self.message_count = 0
 
     def next_message(self) -> str:
@@ -111,7 +109,7 @@ class TestConcurrentUsers:
         num_users = 10
         messages_per_user = 5
 
-        async def user_session(client: httpx.AsyncClient, user_id: str) -> Dict[str, Any]:
+        async def user_session(client: httpx.AsyncClient, user_id: str) -> dict[str, Any]:
             """Simulate a user session."""
             session = UserSession(f"user_{user_id}")
             latencies = []
@@ -182,7 +180,7 @@ class TestConcurrentUsers:
         num_users = 50
         messages_per_user = 3
 
-        async def user_session(client: httpx.AsyncClient, user_id: str) -> Dict[str, Any]:
+        async def user_session(client: httpx.AsyncClient, user_id: str) -> dict[str, Any]:
             """Simulate a user session."""
             session = UserSession(f"user_{user_id}")
             latencies = []
@@ -259,7 +257,7 @@ class TestConcurrentUsers:
 
         async def user_session(
             client: httpx.AsyncClient, user_id: str, delay: float
-        ) -> Dict[str, Any]:
+        ) -> dict[str, Any]:
             """Simulate a user session with initial delay."""
             await asyncio.sleep(delay)  # Ramp-up delay
 
@@ -393,7 +391,7 @@ class TestConcurrentUsers:
         burst_size = 50
         messages_per_user = 2
 
-        async def user_session(client: httpx.AsyncClient, user_id: str) -> Dict[str, Any]:
+        async def user_session(client: httpx.AsyncClient, user_id: str) -> dict[str, Any]:
             """Simulate a user session."""
             session = UserSession(f"user_{user_id}")
             errors = 0

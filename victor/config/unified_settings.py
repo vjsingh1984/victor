@@ -48,7 +48,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import yaml
 from pydantic import Field, field_validator, model_validator
@@ -122,7 +122,7 @@ class VictorSettings(BaseSettings):
     ollama_base_url: str = Field(
         default="http://localhost:11434", description="Ollama server base URL"
     )
-    lmstudio_base_urls: List[str] = Field(
+    lmstudio_base_urls: list[str] = Field(
         default=["http://127.0.0.1:1234"], description="LMStudio tiered endpoints (try in order)"
     )
     vllm_base_url: str = Field(default="http://localhost:8000", description="vLLM server base URL")
@@ -273,7 +273,7 @@ class VictorSettings(BaseSettings):
     codebase_graph_path: Optional[str] = Field(
         default=None, description="Optional explicit graph db path"
     )
-    core_readonly_tools: Optional[List[str]] = Field(
+    core_readonly_tools: Optional[list[str]] = Field(
         default=None, description="Override/extend curated read-only tool set"
     )
 
@@ -312,7 +312,7 @@ class VictorSettings(BaseSettings):
     enable_semantic_threshold_rl_learning: bool = Field(
         default=False, description="Enable automatic threshold learning"
     )
-    semantic_threshold_overrides: Dict[str, float] = Field(
+    semantic_threshold_overrides: dict[str, float] = Field(
         default_factory=dict, description="Model:task:tool threshold overrides"
     )
 
@@ -360,7 +360,7 @@ class VictorSettings(BaseSettings):
         ge=1,
         description="Warn when approaching budget limit",
     )
-    tool_calling_models: Dict[str, List[str]] = Field(
+    tool_calling_models: dict[str, list[str]] = Field(
         default_factory=_load_tool_capable_patterns_from_yaml,
         description="Models known to support structured tool calls per provider",
     )
@@ -396,7 +396,7 @@ class VictorSettings(BaseSettings):
 
     tool_cache_enabled: bool = Field(default=True, description="Enable tool result caching")
     tool_cache_ttl: int = Field(default=600, ge=0, description="Tool cache TTL in seconds")
-    tool_cache_allowlist: List[str] = Field(
+    tool_cache_allowlist: list[str] = Field(
         default=[
             "code_search",
             "semantic_code_search",
@@ -439,13 +439,13 @@ class VictorSettings(BaseSettings):
     # ==========================================================================
 
     plugin_enabled: bool = Field(default=True, description="Enable plugin system")
-    plugin_packages: List[str] = Field(
+    plugin_packages: list[str] = Field(
         default_factory=list, description="Python packages to load as plugins"
     )
-    plugin_disabled: List[str] = Field(
+    plugin_disabled: list[str] = Field(
         default_factory=list, description="List of plugin names to disable"
     )
-    plugin_config: Dict[str, Dict[str, Any]] = Field(
+    plugin_config: dict[str, dict[str, Any]] = Field(
         default_factory=dict, description="Plugin-specific configuration"
     )
 
@@ -517,7 +517,7 @@ class VictorSettings(BaseSettings):
     )
     max_continuation_prompts_action: int = Field(default=5, ge=1, description="For action tasks")
     max_continuation_prompts_default: int = Field(default=3, ge=1, description="For other tasks")
-    continuation_prompt_overrides: Dict[str, Dict[str, int]] = Field(
+    continuation_prompt_overrides: dict[str, dict[str, int]] = Field(
         default_factory=dict, description="Provider/model-specific continuation prompt overrides"
     )
     enable_continuation_rl_learning: bool = Field(
@@ -789,10 +789,10 @@ class VictorSettings(BaseSettings):
     # Plugin Directories
     # ==========================================================================
 
-    plugin_dirs: List[str] = Field(
+    plugin_dirs: list[str] = Field(
         default_factory=list, description="Additional directories to scan for plugins"
     )
-    disabled_plugins: List[str] = Field(
+    disabled_plugins: list[str] = Field(
         default_factory=list,
         description="List of plugin names to disable (renamed from plugin_disabled)",
     )
@@ -807,7 +807,7 @@ class VictorSettings(BaseSettings):
     provider_auto_fallback: bool = Field(
         default=True, description="Automatically fallback to secondary providers on failure"
     )
-    fallback_providers: List[str] = Field(
+    fallback_providers: list[str] = Field(
         default_factory=list, description="Ordered list of fallback providers"
     )
 
@@ -902,7 +902,7 @@ class VictorSettings(BaseSettings):
     @classmethod
     def from_sources(
         cls,
-        cli_args: Optional[Dict[str, Any]] = None,
+        cli_args: Optional[dict[str, Any]] = None,
         profile_name: Optional[str] = None,
         config_dir: Optional[Path] = None,
     ) -> "VictorSettings":
@@ -937,7 +937,7 @@ class VictorSettings(BaseSettings):
             config_dir = Path.home() / ".victor"
 
         # Start with defaults + env vars + .env file (Pydantic handles these)
-        settings_dict: Dict[str, Any] = {}
+        settings_dict: dict[str, Any] = {}
 
         # Layer 5: Load profiles.yaml if exists
         profiles_path = config_dir / "profiles.yaml"

@@ -20,7 +20,7 @@ rather than concrete implementations.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from victor.framework.ingestion.models import Chunk, ChunkingConfig, SourceContent
 
@@ -49,8 +49,8 @@ class ChunkerProtocol(Protocol):
         self,
         content: str,
         doc_type: str = "text",
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[Chunk]:
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> list[Chunk]:
         """Chunk content into smaller pieces.
 
         Args:
@@ -112,8 +112,8 @@ class IngestionPipelineProtocol(Protocol):
     async def ingest(
         self,
         source: str,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[Chunk]:
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> list[Chunk]:
         """Ingest content from a source.
 
         Args:

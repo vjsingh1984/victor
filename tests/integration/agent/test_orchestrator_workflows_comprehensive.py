@@ -30,11 +30,8 @@ Run with:
 
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -42,12 +39,7 @@ from victor.protocols import (
     AnalyticsEvent,
     AnalyticsQuery,
     ExportResult,
-    CompactionContext,
-    ContextBudget,
-    CompactionResult,
-    PromptContext,
 )
-from victor.tools.base import CostTier
 
 
 # =============================================================================

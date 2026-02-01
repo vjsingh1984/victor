@@ -41,9 +41,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 # These imports are intentionally after pytestmark to avoid loading if Ollama unavailable
-from victor.agent.orchestrator import AgentOrchestrator  # noqa: E402
-from victor.providers.base import Message, ToolDefinition  # noqa: E402
-from victor.providers.ollama_provider import OllamaProvider  # noqa: E402
+from victor.agent.orchestrator import AgentOrchestrator
+from victor.providers.base import Message, ToolDefinition
+from victor.providers.ollama_provider import OllamaProvider
 
 
 @pytest.fixture

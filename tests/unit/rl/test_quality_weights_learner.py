@@ -20,7 +20,6 @@ to learn optimal quality dimension weights per task type.
 
 import pytest
 from pathlib import Path
-from typing import Dict
 
 from victor.framework.rl.base import RLOutcome
 from victor.framework.rl.coordinator import RLCoordinator
@@ -52,7 +51,7 @@ def learner(coordinator: RLCoordinator) -> QualityWeightLearner:
 def _record_quality_outcome(
     learner: QualityWeightLearner,
     task_type: str = "analysis",
-    dimension_scores: Dict[str, float] | None = None,
+    dimension_scores: dict[str, float] | None = None,
     overall_success: float = 0.8,
 ) -> None:
     """Helper to record a quality outcome."""

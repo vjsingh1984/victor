@@ -21,9 +21,9 @@ use victor_coding.codebase.chunker.CodeChunker instead.
 
 import logging
 import re
-from typing import Any, List
+from typing import Any
 
-from victor.core.chunking.base import Chunk, ChunkingConfig, ChunkingStrategy
+from victor.core.chunking.base import Chunk, ChunkingStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class CodeChunkingStrategy(ChunkingStrategy):
         return "code"
 
     @property
-    def supported_types(self) -> List[str]:
+    def supported_types(self) -> list[str]:
         return [
             "code",
             "python",
@@ -88,7 +88,7 @@ class CodeChunkingStrategy(ChunkingStrategy):
             "csharp",
         ]
 
-    def chunk(self, content: str) -> List[Chunk]:
+    def chunk(self, content: str) -> list[Chunk]:
         """Chunk code content by function/class boundaries.
 
         Args:
@@ -174,7 +174,7 @@ class CodeChunkingStrategy(ChunkingStrategy):
         offset: int,
         def_type: str,
         symbol_name: str,
-    ) -> List[Chunk]:
+    ) -> list[Chunk]:
         """Sub-chunk a large function/class definition.
 
         Args:

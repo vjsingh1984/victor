@@ -193,9 +193,9 @@ class VerticalExtensions:
         _dynamic_extensions: Dynamic extensions from registry (OCP-compliant)
     """
 
-    middleware: List[MiddlewareProtocol] = field(default_factory=list)
-    safety_extensions: List[SafetyExtensionProtocol] = field(default_factory=list)
-    prompt_contributors: List[PromptContributorProtocol] = field(default_factory=list)
+    middleware: list[MiddlewareProtocol] = field(default_factory=list)
+    safety_extensions: list[SafetyExtensionProtocol] = field(default_factory=list)
+    prompt_contributors: list[PromptContributorProtocol] = field(default_factory=list)
     mode_config_provider: Optional[ModeConfigProviderProtocol] = None
     tool_dependency_provider: Optional[ToolDependencyProviderProtocol] = None
     workflow_provider: Optional[WorkflowProviderProtocol] = None
@@ -205,11 +205,11 @@ class VerticalExtensions:
     enrichment_strategy: Optional[EnrichmentStrategyProtocol] = None
     tool_selection_strategy: Optional[ToolSelectionStrategyProtocol] = None
     tiered_tool_config: Optional[Any] = None  # TieredToolConfig
-    _dynamic_extensions: Dict[str, List["IExtension"]] = field(
+    _dynamic_extensions: dict[str, list["IExtension"]] = field(
         default_factory=dict, repr=False, compare=False
     )
 
-    def get_all_task_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_all_task_hints(self) -> dict[str, TaskTypeHint]:
         """Merge task hints from all contributors.
 
         Later contributors override earlier ones for same task type.
@@ -222,7 +222,7 @@ class VerticalExtensions:
             merged.update(contributor.get_task_type_hints())
         return merged
 
-    def get_all_safety_patterns(self) -> List["SafetyPattern"]:
+    def get_all_safety_patterns(self) -> list["SafetyPattern"]:
         """Collect safety patterns from all extensions.
 
         Returns:
@@ -231,13 +231,13 @@ class VerticalExtensions:
         # Import locally to avoid circular import at module level
         from victor.core.security.patterns.types import SafetyPattern
 
-        patterns: List[SafetyPattern] = []
+        patterns: list[SafetyPattern] = []
         for ext in self.safety_extensions:
             patterns.extend(ext.get_bash_patterns())
             patterns.extend(ext.get_file_patterns())
         return patterns
 
-    def get_all_mode_configs(self) -> Dict[str, ModeConfig]:
+    def get_all_mode_configs(self) -> dict[str, ModeConfig]:
         """Get mode configs from provider.
 
         Returns:
@@ -247,7 +247,7 @@ class VerticalExtensions:
             return self.mode_config_provider.get_mode_configs()
         return {}
 
-    def get_extension(self, extension_type: str) -> List["IExtension"]:
+    def get_extension(self, extension_type: str) -> list["IExtension"]:
         """Get dynamic extensions by type.
 
         Retrieves extensions from the dynamic extension registry,

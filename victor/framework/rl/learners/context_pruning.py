@@ -29,11 +29,10 @@ Design:
 """
 
 import logging
-import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -430,7 +429,7 @@ class ContextPruningLearner(BaseLearner):
         result: float = max(-1.0, min(1.0, reward * 2))
         return result
 
-    def get_stats(self, provider_type: Optional[str] = None) -> Dict[str, Any]:
+    def get_stats(self, provider_type: Optional[str] = None) -> dict[str, Any]:
         """Get learner statistics.
 
         Args:

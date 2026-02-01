@@ -69,7 +69,8 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
+from collections.abc import Awaitable, Callable
 
 
 # =============================================================================
@@ -263,7 +264,7 @@ class ICacheBackend(Protocol):
         """
         ...
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

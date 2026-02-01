@@ -50,26 +50,19 @@ import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Protocol,
-    Tuple,
-    Type,
 )
+from collections.abc import Callable
 
-from victor.workflows.protocols import NodeRunner, NodeRunnerResult, ProtocolNodeStatus
-from victor.workflows.context import ExecutionContext
+from victor.workflows.protocols import NodeRunner, NodeRunnerResult
 
 if TYPE_CHECKING:
     from victor.agent.subagents import SubAgentOrchestrator
     from victor.tools.registry import ToolRegistry
-    from victor.workflows.hitl import HITLExecutor, HITLNode
+    from victor.workflows.hitl import HITLExecutor
     from victor.agent.orchestrator import AgentOrchestrator
 
 logger = logging.getLogger(__name__)
@@ -87,7 +80,7 @@ class BaseNodeRunner(ABC):
     creation. Subclasses implement the specific execution logic.
     """
 
-    def __init__(self, supported_types: List[str]):
+    def __init__(self, supported_types: list[str]):
         """Initialize the runner.
 
         Args:
@@ -102,9 +95,9 @@ class BaseNodeRunner(ABC):
     async def execute(
         self,
         node_id: str,
-        node_config: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Tuple[Dict[str, Any], NodeRunnerResult]:
+        node_config: dict[str, Any],
+        context: dict[str, Any],
+    ) -> tuple[dict[str, Any], NodeRunnerResult]:
         """Execute a node with timing and error handling.
 
         Args:
@@ -173,9 +166,9 @@ class BaseNodeRunner(ABC):
     async def _execute_impl(
         self,
         node_id: str,
-        node_config: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Tuple[Dict[str, Any], Any]:
+        node_config: dict[str, Any],
+        context: dict[str, Any],
+    ) -> tuple[dict[str, Any], Any]:
         """Implement node-specific execution logic.
 
         Args:
@@ -228,9 +221,9 @@ class AgentNodeRunner(BaseNodeRunner):
     async def _execute_impl(
         self,
         node_id: str,
-        node_config: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Tuple[Dict[str, Any], Any]:
+        node_config: dict[str, Any],
+        context: dict[str, Any],
+    ) -> tuple[dict[str, Any], Any]:
         """Execute an agent node via sub-agent spawning."""
         if self._sub_agents is None:
             raise RuntimeError("SubAgentManager not configured for AgentNodeRunner")
@@ -277,8 +270,8 @@ class AgentNodeRunner(BaseNodeRunner):
     def _build_task(
         self,
         goal: str,
-        data: Dict[str, Any],
-        config: Dict[str, Any],
+        data: dict[str, Any],
+        config: dict[str, Any],
     ) -> str:
         """Build task description from goal and context."""
         parts = [goal]
@@ -316,7 +309,7 @@ class ComputeNodeRunner(BaseNodeRunner):
     def __init__(
         self,
         tool_registry: Optional["ToolRegistry"] = None,
-        handler_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        handler_registry: Optional[dict[str, Callable[..., Any]]] = None,
     ):
         """Initialize the compute runner.
 
@@ -344,9 +337,9 @@ class ComputeNodeRunner(BaseNodeRunner):
     async def _execute_impl(
         self,
         node_id: str,
-        node_config: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Tuple[Dict[str, Any], Any]:
+        node_config: dict[str, Any],
+        context: dict[str, Any],
+    ) -> tuple[dict[str, Any], Any]:
         """Execute a compute node via handler or tools."""
         handler_name = node_config.get("handler")
         output_key = node_config.get("output_key", node_id)
@@ -378,7 +371,7 @@ class ComputeNodeRunner(BaseNodeRunner):
 
                 @dataclass
                 class MockWorkflowContext:
-                    data: Dict[str, Any]
+                    data: dict[str, Any]
 
                 mock_node = MockComputeNode(id="_compute_", description="Compute handler")
                 mock_context = MockWorkflowContext(data=context)
@@ -421,9 +414,9 @@ class ComputeNodeRunner(BaseNodeRunner):
 
     def _resolve_inputs(
         self,
-        inputs: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        inputs: dict[str, Any],
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
         """Resolve input references to actual values.
 
         Supports $ctx.key and $data.key syntax for context references.
@@ -467,7 +460,7 @@ class TransformNodeRunner(BaseNodeRunner):
         )
     """
 
-    def __init__(self, transform_registry: Optional[Dict[str, Callable[..., Any]]] = None):
+    def __init__(self, transform_registry: Optional[dict[str, Callable[..., Any]]] = None):
         """Initialize the transform runner.
 
         Args:
@@ -483,9 +476,9 @@ class TransformNodeRunner(BaseNodeRunner):
     async def _execute_impl(
         self,
         node_id: str,
-        node_config: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Tuple[Dict[str, Any], Any]:
+        node_config: dict[str, Any],
+        context: dict[str, Any],
+    ) -> tuple[dict[str, Any], Any]:
         """Execute a transform on context data."""
         transform = node_config.get("transform")
         transform_name = node_config.get("transform_name")
@@ -557,9 +550,9 @@ class HITLNodeRunner(BaseNodeRunner):
     async def _execute_impl(
         self,
         node_id: str,
-        node_config: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Tuple[Dict[str, Any], Any]:
+        node_config: dict[str, Any],
+        context: dict[str, Any],
+    ) -> tuple[dict[str, Any], Any]:
         """Execute a HITL node for human interaction."""
         if self._hitl_executor is None:
             raise RuntimeError("HITLExecutor not configured for HITLNodeRunner")
@@ -625,7 +618,7 @@ class ConditionNodeRunner(BaseNodeRunner):
         )
     """
 
-    def __init__(self, condition_registry: Optional[Dict[str, Callable[..., Any]]] = None):
+    def __init__(self, condition_registry: Optional[dict[str, Callable[..., Any]]] = None):
         """Initialize the condition runner.
 
         Args:
@@ -641,9 +634,9 @@ class ConditionNodeRunner(BaseNodeRunner):
     async def _execute_impl(
         self,
         node_id: str,
-        node_config: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Tuple[Dict[str, Any], Any]:
+        node_config: dict[str, Any],
+        context: dict[str, Any],
+    ) -> tuple[dict[str, Any], Any]:
         """Evaluate condition and return branch name."""
         condition = node_config.get("condition")
         condition_name = node_config.get("condition_name")
@@ -705,7 +698,7 @@ class ParallelNodeRunner(BaseNodeRunner):
 
     def __init__(
         self,
-        child_runners: Optional[Dict[str, "NodeRunner"]] = None,
+        child_runners: Optional[dict[str, "NodeRunner"]] = None,
         max_concurrency: int = 5,
     ):
         """Initialize the parallel runner.
@@ -725,9 +718,9 @@ class ParallelNodeRunner(BaseNodeRunner):
     async def _execute_impl(
         self,
         node_id: str,
-        node_config: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Tuple[Dict[str, Any], Any]:
+        node_config: dict[str, Any],
+        context: dict[str, Any],
+    ) -> tuple[dict[str, Any], Any]:
         """Execute child nodes in parallel."""
         children = node_config.get("children", [])
         max_concurrency = node_config.get("max_concurrency", self._max_concurrency)
@@ -736,9 +729,9 @@ class ParallelNodeRunner(BaseNodeRunner):
             return context, {}
 
         semaphore = asyncio.Semaphore(max_concurrency)
-        results: Dict[str, Any] = {}
+        results: dict[str, Any] = {}
 
-        async def execute_child(child_config: Dict[str, Any]) -> None:
+        async def execute_child(child_config: dict[str, Any]) -> None:
             async with semaphore:
                 child_id = child_config.get("id", "")
                 child_type = child_config.get("type", "")
@@ -793,7 +786,7 @@ class NodeRunnerRegistry:
 
     def __init__(self) -> None:
         """Initialize an empty registry."""
-        self._runners: List[NodeRunner] = []
+        self._runners: list[NodeRunner] = []
 
     def register(self, runner: NodeRunner) -> "NodeRunnerRegistry":
         """Register a node runner.
@@ -821,7 +814,7 @@ class NodeRunnerRegistry:
                 return runner
         return None
 
-    def get_all_runners(self) -> List[NodeRunner]:
+    def get_all_runners(self) -> list[NodeRunner]:
         """Get all registered runners."""
         return list(self._runners)
 

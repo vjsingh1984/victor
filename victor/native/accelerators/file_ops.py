@@ -38,7 +38,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ class FileOpsCacheStats:
         """Average walk time in milliseconds."""
         return self.total_duration_ms / self.total_walks if self.total_walks > 0 else 0.0
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         """Convert to dictionary for serialization."""
         return {
             "total_walks": float(self.total_walks),
@@ -149,11 +149,11 @@ class FileOpsAccelerator:
     def walk_directory(
         self,
         root: str,
-        patterns: Optional[List[str]] = None,
+        patterns: Optional[list[str]] = None,
         max_depth: int = 100,
         follow_symlinks: bool = False,
-        ignore_patterns: Optional[List[str]] = None,
-    ) -> List[FileInfo]:
+        ignore_patterns: Optional[list[str]] = None,
+    ) -> list[FileInfo]:
         """Walk directory tree and collect file information.
 
         Args:
@@ -187,11 +187,11 @@ class FileOpsAccelerator:
     def _walk_directory_rust(
         self,
         root: str,
-        patterns: Optional[List[str]] = None,
+        patterns: Optional[list[str]] = None,
         max_depth: int = 100,
         follow_symlinks: bool = False,
-        ignore_patterns: Optional[List[str]] = None,
-    ) -> List[FileInfo]:
+        ignore_patterns: Optional[list[str]] = None,
+    ) -> list[FileInfo]:
         """Walk directory using Rust implementation.
 
         Args:
@@ -233,11 +233,11 @@ class FileOpsAccelerator:
     def _walk_directory_python(
         self,
         root: str,
-        patterns: Optional[List[str]] = None,
+        patterns: Optional[list[str]] = None,
         max_depth: int = 100,
         follow_symlinks: bool = False,
-        ignore_patterns: Optional[List[str]] = None,
-    ) -> List[FileInfo]:
+        ignore_patterns: Optional[list[str]] = None,
+    ) -> list[FileInfo]:
         """Walk directory using Python os module.
 
         Args:

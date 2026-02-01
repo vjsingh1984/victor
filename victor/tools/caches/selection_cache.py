@@ -58,13 +58,13 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.core.registries import CacheStrategy, UniversalRegistry
 from victor.providers.base import ToolDefinition
 
 if TYPE_CHECKING:
-    from victor.tools.caches.cache_keys import CacheKeyGenerator
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -82,12 +82,12 @@ class CachedSelection:
         metadata: Additional metadata (selection time, scores, latency, etc.)
     """
 
-    value: List[str]
-    tools: List[ToolDefinition] = field(default_factory=list)
+    value: list[str]
+    tools: list[ToolDefinition] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
     hit_count: int = 0
     ttl: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     selection_latency_ms: float = 0.0  # Track selection time for performance metrics
 
     def is_expired(self) -> bool:
@@ -346,7 +346,7 @@ class ToolSelectionCache:
             )
 
         # Metrics per namespace
-        self._metrics: Dict[str, CacheMetrics] = {
+        self._metrics: dict[str, CacheMetrics] = {
             self.NAMESPACE_QUERY: CacheMetrics(),
             self.NAMESPACE_CONTEXT: CacheMetrics(),
             self.NAMESPACE_RL: CacheMetrics(),
@@ -399,11 +399,11 @@ class ToolSelectionCache:
     def put(
         self,
         key: str,
-        value: List[str],
-        tools: Optional[List[ToolDefinition]] = None,
+        value: list[str],
+        tools: Optional[list[ToolDefinition]] = None,
         namespace: str = NAMESPACE_QUERY,
         ttl: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         selection_latency_ms: float = 0.0,
     ) -> None:
         """Store selection in cache.
@@ -463,8 +463,8 @@ class ToolSelectionCache:
     def put_query(
         self,
         key: str,
-        value: List[str],
-        tools: Optional[List[ToolDefinition]] = None,
+        value: list[str],
+        tools: Optional[list[ToolDefinition]] = None,
         ttl: Optional[int] = None,
         selection_latency_ms: float = 0.0,
     ) -> None:
@@ -500,8 +500,8 @@ class ToolSelectionCache:
     def put_context(
         self,
         key: str,
-        value: List[str],
-        tools: Optional[List[ToolDefinition]] = None,
+        value: list[str],
+        tools: Optional[list[ToolDefinition]] = None,
         ttl: Optional[int] = None,
         selection_latency_ms: float = 0.0,
     ) -> None:
@@ -537,8 +537,8 @@ class ToolSelectionCache:
     def put_rl(
         self,
         key: str,
-        value: List[str],
-        tools: Optional[List[ToolDefinition]] = None,
+        value: list[str],
+        tools: Optional[list[ToolDefinition]] = None,
         ttl: Optional[int] = None,
         selection_latency_ms: float = 0.0,
     ) -> None:
@@ -669,13 +669,13 @@ class ToolSelectionCache:
                 for metrics in self._metrics.values():
                     metrics.reset()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get comprehensive cache statistics.
 
         Returns:
             Dictionary with cache stats including latency metrics
         """
-        stats: Dict[str, Any] = {
+        stats: dict[str, Any] = {
             "enabled": self._enabled,
             "max_size": self._max_size,
             "namespaces": {},

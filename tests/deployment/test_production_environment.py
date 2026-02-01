@@ -5,14 +5,13 @@ Validates that the production environment is properly configured
 for live production traffic with high availability and performance.
 """
 
-import os
 import pytest
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 
 @pytest.fixture
-def production_env_vars() -> Dict[str, str]:
+def production_env_vars() -> dict[str, str]:
     """Production environment variables."""
     return {
         "VICTOR_PROFILE": "production",
@@ -31,7 +30,7 @@ def production_env_vars() -> Dict[str, str]:
 
 
 @pytest.fixture
-def production_kubernetes_config() -> Dict[str, Any]:
+def production_kubernetes_config() -> dict[str, Any]:
     """Expected Kubernetes configuration for production."""
     return {
         "namespace": "victor-ai-prod",

@@ -39,8 +39,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
-from functools import lru_cache
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +74,7 @@ class MatchResult:
     text: str
     line_number: int = 1
     column: int = 1
-    groups: Dict[str, str] = field(default_factory=dict)
+    groups: dict[str, str] = field(default_factory=dict)
 
     def __len__(self) -> int:
         return self.end - self.start
@@ -99,9 +98,9 @@ class CompiledRegexSet:
     """
 
     language: str
-    patterns: Dict[str, str]
+    patterns: dict[str, str]
     compiled_set: Any
-    types: List[str]
+    types: list[str]
     compiled_at: float = field(default_factory=time.time)
 
     def __len__(self) -> int:
@@ -152,7 +151,7 @@ class RegexStats:
         """Cache hit rate as a percentage."""
         return (self.cache_hits / self.total_matches * 100) if self.total_matches > 0 else 0.0
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         """Convert to dictionary for serialization."""
         return {
             "total_compilations": float(self.total_compilations),
@@ -258,10 +257,10 @@ class RegexEngineAccelerator:
         self._use_rust = _RUST_AVAILABLE and not force_python
         self._max_cache_size = max_cache_size
         self._cache_ttl = cache_ttl_seconds
-        self._compiled_sets: Dict[str, CompiledRegexSet] = {}
+        self._compiled_sets: dict[str, CompiledRegexSet] = {}
         self._stats = RegexStats()
         self._lock = threading.Lock()
-        self._access_order: List[str] = []  # For LRU eviction
+        self._access_order: list[str] = []  # For LRU eviction
 
         if self._use_rust:
             try:
@@ -306,8 +305,8 @@ class RegexEngineAccelerator:
     def compile_patterns(
         self,
         language: str,
-        pattern_types: Optional[List[str]] = None,
-        custom_patterns: Optional[Dict[str, str]] = None,
+        pattern_types: Optional[list[str]] = None,
+        custom_patterns: Optional[dict[str, str]] = None,
     ) -> CompiledRegexSet:
         """Compile regex patterns for a language.
 
@@ -376,7 +375,7 @@ class RegexEngineAccelerator:
 
         return compiled
 
-    def _rust_compile_patterns(self, language: str, patterns: Dict[str, str]) -> Any:
+    def _rust_compile_patterns(self, language: str, patterns: dict[str, str]) -> Any:
         """Compile patterns using Rust regex engine."""
         try:
             # Convert to list of (name, pattern) tuples
@@ -389,8 +388,8 @@ class RegexEngineAccelerator:
             return self._python_compile_patterns(language, patterns)
 
     def _python_compile_patterns(
-        self, language: str, patterns: Dict[str, str]
-    ) -> Dict[str, re.Pattern]:
+        self, language: str, patterns: dict[str, str]
+    ) -> dict[str, re.Pattern]:
         """Compile patterns using Python's re module."""
         compiled = {}
         for name, pattern in patterns.items():
@@ -406,7 +405,7 @@ class RegexEngineAccelerator:
         source_code: str,
         compiled_set: CompiledRegexSet,
         include_line_numbers: bool = True,
-    ) -> List[MatchResult]:
+    ) -> list[MatchResult]:
         """Match all patterns in source code.
 
         Args:
@@ -435,7 +434,7 @@ class RegexEngineAccelerator:
 
     def _rust_match_all(
         self, source_code: str, compiled_set: CompiledRegexSet
-    ) -> List[MatchResult]:
+    ) -> list[MatchResult]:
         """Match patterns using Rust regex engine."""
         try:
             matches = self._engine.match_all(
@@ -462,7 +461,7 @@ class RegexEngineAccelerator:
 
     def _python_match_all(
         self, source_code: str, compiled_set: CompiledRegexSet
-    ) -> List[MatchResult]:
+    ) -> list[MatchResult]:
         """Match patterns using Python's re module."""
         results = []
 
@@ -487,7 +486,7 @@ class RegexEngineAccelerator:
 
         return results
 
-    def _add_line_numbers(self, source_code: str, results: List[MatchResult]) -> None:
+    def _add_line_numbers(self, source_code: str, results: list[MatchResult]) -> None:
         """Add line numbers and columns to match results."""
         line_starts = [0]
         for i, char in enumerate(source_code):
@@ -533,7 +532,7 @@ class RegexEngineAccelerator:
         source_code: str,
         compiled_set: CompiledRegexSet,
         pattern_name: str,
-    ) -> List[MatchResult]:
+    ) -> list[MatchResult]:
         """Find all matches for a specific pattern.
 
         Args:
@@ -547,7 +546,7 @@ class RegexEngineAccelerator:
         results = self.match_all(source_code, compiled_set)
         return [r for r in results if r.pattern_name == pattern_name]
 
-    def _get_patterns(self, language: str, pattern_types: Optional[List[str]]) -> Dict[str, str]:
+    def _get_patterns(self, language: str, pattern_types: Optional[list[str]]) -> dict[str, str]:
         """Get regex patterns for a language."""
         lang_patterns = self._PATTERNS.get(language.lower(), {})
 
@@ -560,8 +559,8 @@ class RegexEngineAccelerator:
     def _make_cache_key(
         self,
         language: str,
-        pattern_types: Optional[List[str]],
-        custom_patterns: Optional[Dict[str, str]],
+        pattern_types: Optional[list[str]],
+        custom_patterns: Optional[dict[str, str]],
     ) -> str:
         """Generate cache key for compiled set."""
         key_parts = [language.lower()]
@@ -585,7 +584,7 @@ class RegexEngineAccelerator:
         logger.info("Cleared regex engine cache")
 
     @property
-    def cache_stats(self) -> Dict[str, Any]:
+    def cache_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         with self._lock:
             return {
@@ -596,7 +595,7 @@ class RegexEngineAccelerator:
             }
 
     @property
-    def supported_languages(self) -> List[str]:
+    def supported_languages(self) -> list[str]:
         """Get list of supported languages."""
         return list(self._PATTERNS.keys())
 

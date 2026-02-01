@@ -37,30 +37,24 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     TYPE_CHECKING,
-    Union,
 )
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.workflows.definition import (
         WorkflowDefinition,
-        WorkflowNode,
     )
     from victor.workflows.execution_engine import (
         ExecutionContext,
         ExecutionTrace,
-        NodeStatus,
     )
     from victor.workflows.unified_compiler import CachedCompiledGraph
 
@@ -113,7 +107,7 @@ class BreakpointInfo:
     """
 
     node_id: str
-    condition: Optional[Callable[[Dict[str, Any]], bool]] = None
+    condition: Optional[Callable[[dict[str, Any]], bool]] = None
     hit_count: int = 0
     enabled: bool = True
     temp: bool = False
@@ -132,7 +126,7 @@ class StackFrame:
 
     node_id: str
     node_type: str
-    state: Dict[str, Any]
+    state: dict[str, Any]
     timestamp: float
 
 
@@ -155,10 +149,10 @@ class DebugSession:
     workflow_name: str
     start_time: float
     state: DebugState = DebugState.IDLE
-    breakpoints: Dict[str, BreakpointInfo] = field(default_factory=dict)
-    call_stack: List[StackFrame] = field(default_factory=list)
-    current_state: Dict[str, Any] = field(default_factory=dict)
-    events: List[Dict[str, Any]] = field(default_factory=list)
+    breakpoints: dict[str, BreakpointInfo] = field(default_factory=dict)
+    call_stack: list[StackFrame] = field(default_factory=list)
+    current_state: dict[str, Any] = field(default_factory=dict)
+    events: list[dict[str, Any]] = field(default_factory=list)
 
 
 # =============================================================================
@@ -175,7 +169,7 @@ class WorkflowDebugger:
 
     def __init__(
         self,
-        workflow: Union["WorkflowDefinition", "CachedCompiledGraph"],
+        workflow: "WorkflowDefinition" | "CachedCompiledGraph",
     ):
         """Initialize workflow debugger.
 
@@ -212,7 +206,7 @@ class WorkflowDebugger:
     def set_breakpoint(
         self,
         node_id: str,
-        condition: Optional[Callable[[Dict[str, Any]], bool]] = None,
+        condition: Optional[Callable[[dict[str, Any]], bool]] = None,
         temporary: bool = False,
     ) -> None:
         """Set a breakpoint on a node.
@@ -254,7 +248,7 @@ class WorkflowDebugger:
         logger.info(f"Cleared {count} breakpoint(s)")
         self._log_event("all_breakpoints_cleared", {"count": count})
 
-    def list_breakpoints(self) -> List[BreakpointInfo]:
+    def list_breakpoints(self) -> list[BreakpointInfo]:
         """List all breakpoints.
 
         Returns:
@@ -288,9 +282,9 @@ class WorkflowDebugger:
 
     async def start(
         self,
-        inputs: Optional[Dict[str, Any]] = None,
+        inputs: Optional[dict[str, Any]] = None,
         stop_on_entry: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Start debugging session.
 
         Args:
@@ -351,7 +345,7 @@ class WorkflowDebugger:
     # Step Execution
     # =========================================================================
 
-    async def step_over(self) -> Dict[str, Any]:
+    async def step_over(self) -> dict[str, Any]:
         """Step to next node (skip function calls).
 
         Returns:
@@ -375,7 +369,7 @@ class WorkflowDebugger:
         # For now, return current state
         return self.session.current_state.copy()
 
-    async def step_into(self) -> Dict[str, Any]:
+    async def step_into(self) -> dict[str, Any]:
         """Step into next node (enter function calls).
 
         Returns:
@@ -393,7 +387,7 @@ class WorkflowDebugger:
 
         return self.session.current_state.copy()
 
-    async def step_out(self) -> Dict[str, Any]:
+    async def step_out(self) -> dict[str, Any]:
         """Step out of current node.
 
         Returns:
@@ -411,7 +405,7 @@ class WorkflowDebugger:
 
         return self.session.current_state.copy()
 
-    async def continue_execution(self) -> Dict[str, Any]:
+    async def continue_execution(self) -> dict[str, Any]:
         """Continue execution to next breakpoint.
 
         Returns:
@@ -429,7 +423,7 @@ class WorkflowDebugger:
 
         return self.session.current_state.copy()
 
-    async def skip_node(self, node_id: str) -> Dict[str, Any]:
+    async def skip_node(self, node_id: str) -> dict[str, Any]:
         """Skip execution of a node.
 
         Args:
@@ -448,7 +442,7 @@ class WorkflowDebugger:
     # State Inspection
     # =========================================================================
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         """Get current workflow state.
 
         Returns:
@@ -456,7 +450,7 @@ class WorkflowDebugger:
         """
         return self.session.current_state.copy()
 
-    def get_variables(self) -> Dict[str, Any]:
+    def get_variables(self) -> dict[str, Any]:
         """Get current workflow variables (non-internal).
 
         Returns:
@@ -490,7 +484,7 @@ class WorkflowDebugger:
     # Stack Trace
     # =========================================================================
 
-    def get_stack_trace(self) -> List[StackFrame]:
+    def get_stack_trace(self) -> list[StackFrame]:
         """Get execution stack trace.
 
         Returns:
@@ -498,7 +492,7 @@ class WorkflowDebugger:
         """
         return self.session.call_stack.copy()
 
-    def get_call_stack(self) -> List[str]:
+    def get_call_stack(self) -> list[str]:
         """Get call stack as list of node IDs.
 
         Returns:
@@ -520,7 +514,7 @@ class WorkflowDebugger:
     # Session Info
     # =========================================================================
 
-    def get_session_info(self) -> Dict[str, Any]:
+    def get_session_info(self) -> dict[str, Any]:
         """Get debug session information.
 
         Returns:
@@ -544,7 +538,7 @@ class WorkflowDebugger:
             "stack_depth": len(self.session.call_stack),
         }
 
-    def get_events(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_events(self, limit: Optional[int] = None) -> list[dict[str, Any]]:
         """Get debug session events.
 
         Args:
@@ -565,7 +559,7 @@ class WorkflowDebugger:
     def _check_breakpoint(
         self,
         node_id: str,
-        state: Dict[str, Any],
+        state: dict[str, Any],
     ) -> bool:
         """Check if execution should break at node.
 
@@ -600,7 +594,7 @@ class WorkflowDebugger:
         self,
         node_id: str,
         node_type: str,
-        state: Dict[str, Any],
+        state: dict[str, Any],
     ) -> None:
         """Push frame onto call stack.
 
@@ -630,7 +624,7 @@ class WorkflowDebugger:
             return frame
         return None
 
-    def _update_state(self, state: Dict[str, Any]) -> None:
+    def _update_state(self, state: dict[str, Any]) -> None:
         """Update current state.
 
         Args:
@@ -638,7 +632,7 @@ class WorkflowDebugger:
         """
         self.session.current_state = state.copy()
 
-    def _log_event(self, event_type: str, data: Dict[str, Any]) -> None:
+    def _log_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Log a debug event.
 
         Args:
@@ -660,7 +654,7 @@ class WorkflowDebugger:
 
 
 def create_debugger(
-    workflow: Union["WorkflowDefinition", "CachedCompiledGraph"],
+    workflow: "WorkflowDefinition" | "CachedCompiledGraph",
 ) -> WorkflowDebugger:
     """Create a workflow debugger.
 

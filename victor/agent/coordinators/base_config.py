@@ -38,7 +38,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass
@@ -84,14 +84,14 @@ class BaseCoordinatorConfig:
     log_level: str = "INFO"
     enable_metrics: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary.
 
         Returns:
             Dictionary representation of the configuration including
             all fields from this class and any subclasses.
         """
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         for key, value in self.__dict__.items():
             if not key.startswith("_"):
                 result[key] = value

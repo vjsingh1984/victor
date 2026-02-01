@@ -40,10 +40,10 @@ import psutil
 import tracemalloc
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import AsyncMock, MagicMock, Mock
+from typing import Any, Optional
+from unittest.mock import AsyncMock, MagicMock
 from dataclasses import dataclass, field
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager
 
 # Import from parent conftest for Ollama availability checking
 import sys
@@ -98,7 +98,7 @@ class BenchmarkResult:
     cpu_percent: float
     success: bool
     error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -117,8 +117,8 @@ class BenchmarkSuite:
     """Comprehensive benchmark suite for coordinator performance."""
 
     def __init__(self):
-        self.results: List[BenchmarkResult] = []
-        self.baselines: Dict[str, PerformanceBaseline] = {}
+        self.results: list[BenchmarkResult] = []
+        self.baselines: dict[str, PerformanceBaseline] = {}
 
     @asynccontextmanager
     async def measure(self, name: str, operation: str):
@@ -173,7 +173,7 @@ class BenchmarkSuite:
         finally:
             tracemalloc.stop()
 
-    def get_statistics(self, operation: str) -> Dict[str, float]:
+    def get_statistics(self, operation: str) -> dict[str, float]:
         """Get statistics for an operation."""
         op_results = [r for r in self.results if r.operation == operation and r.success]
 

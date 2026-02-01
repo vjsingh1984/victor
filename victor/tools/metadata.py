@@ -16,7 +16,7 @@
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.tools.enums import (
     AccessMode,
@@ -61,22 +61,22 @@ class ToolMetadata:
     """
 
     category: str = ""
-    keywords: List[str] = field(default_factory=list)
-    use_cases: List[str] = field(default_factory=list)
-    examples: List[str] = field(default_factory=list)
-    priority_hints: List[str] = field(default_factory=list)
+    keywords: list[str] = field(default_factory=list)
+    use_cases: list[str] = field(default_factory=list)
+    examples: list[str] = field(default_factory=list)
+    priority_hints: list[str] = field(default_factory=list)
     # Selection/approval metadata with sensible defaults
     priority: Optional["Priority"] = None  # Default: MEDIUM when None
     access_mode: Optional["AccessMode"] = None  # Default: READONLY when None
     danger_level: Optional["DangerLevel"] = None  # Default: SAFE when None
     # Stage affinity for conversation state machine
-    stages: List[str] = field(default_factory=list)  # e.g., ["initial", "reading", "execution"]
+    stages: list[str] = field(default_factory=list)  # e.g., ["initial", "reading", "execution"]
     # NEW: Mandatory keyword triggers that force tool inclusion
-    mandatory_keywords: List[str] = field(default_factory=list)  # e.g., ["show diff", "compare"]
+    mandatory_keywords: list[str] = field(default_factory=list)  # e.g., ["show diff", "compare"]
     # NEW: Task types for classification-aware selection
-    task_types: List[str] = field(default_factory=list)  # e.g., ["analysis", "search", "default"]
+    task_types: list[str] = field(default_factory=list)  # e.g., ["analysis", "search", "default"]
     # NEW: Progress parameters for loop detection
-    progress_params: List[str] = field(default_factory=list)  # e.g., ["path", "offset", "limit"]
+    progress_params: list[str] = field(default_factory=list)  # e.g., ["path", "offset", "limit"]
     # NEW: Execution category for parallel execution
     execution_category: Optional["ExecutionCategory"] = None  # Default: READ_ONLY when None
 
@@ -114,7 +114,7 @@ class ToolMetadata:
             self.danger_level == DangerLevel.SAFE if self.danger_level else False
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary format for YAML/JSON export."""
         return {
             "category": self.category,
@@ -139,7 +139,7 @@ class ToolMetadata:
         cls,
         name: str,
         description: str,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         cost_tier: Optional["CostTier"] = None,
     ) -> "ToolMetadata":
         """Auto-generate metadata from tool properties.
@@ -227,7 +227,7 @@ class ToolMetadata:
         )
 
     @staticmethod
-    def _extract_keywords(name: str, description: str) -> List[str]:
+    def _extract_keywords(name: str, description: str) -> list[str]:
         """Extract keywords from tool name and description.
 
         Args:
@@ -354,7 +354,7 @@ class ToolMetadata:
         return list(keywords)[:10]  # Cap at 10 keywords
 
     @staticmethod
-    def _generate_use_cases(name: str, description: str) -> List[str]:
+    def _generate_use_cases(name: str, description: str) -> list[str]:
         """Generate use cases from description.
 
         Args:
@@ -392,7 +392,7 @@ class ToolMetadata:
         return use_cases[:3]  # Limit to 3 use cases
 
     @staticmethod
-    def _generate_examples(name: str, parameters: Dict[str, Any]) -> List[str]:
+    def _generate_examples(name: str, parameters: dict[str, Any]) -> list[str]:
         """Generate example requests from tool name and parameters.
 
         Args:
@@ -455,9 +455,9 @@ class ToolMetadataRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._metadata_cache: Dict[str, ToolMetadata] = {}
-        self._category_index: Dict[str, List[str]] = {}  # category -> tool names
-        self._keyword_index: Dict[str, List[str]] = {}  # keyword -> tool names
+        self._metadata_cache: dict[str, ToolMetadata] = {}
+        self._category_index: dict[str, list[str]] = {}  # category -> tool names
+        self._keyword_index: dict[str, list[str]] = {}  # keyword -> tool names
         self._tools_hash: Optional[str] = None  # Hash of registered tools for change detection
         self._last_refresh_count: int = 0  # Number of tools at last refresh
 
@@ -478,7 +478,7 @@ class ToolMetadataRegistry:
         cls._instance = None
 
     @staticmethod
-    def _calculate_tools_hash(tools: List["BaseTool"]) -> str:
+    def _calculate_tools_hash(tools: list["BaseTool"]) -> str:
         """Calculate hash of all tool definitions to detect changes.
 
         Args:
@@ -499,7 +499,7 @@ class ToolMetadataRegistry:
         combined = "|".join(tool_strings)
         return hashlib.sha256(combined.encode()).hexdigest()
 
-    def needs_reindex(self, tools: List["BaseTool"]) -> bool:
+    def needs_reindex(self, tools: list["BaseTool"]) -> bool:
         """Check if tools have changed and reindexing is needed.
 
         Uses hash-based change detection to avoid unnecessary reindexing.
@@ -526,7 +526,7 @@ class ToolMetadataRegistry:
         current_hash = self._calculate_tools_hash(tools)
         return current_hash != self._tools_hash
 
-    def refresh_from_tools(self, tools: List["BaseTool"], force: bool = False) -> bool:
+    def refresh_from_tools(self, tools: list["BaseTool"], force: bool = False) -> bool:
         """Refresh metadata cache from a list of tools.
 
         Uses smart reindexing: only rebuilds if tools have changed (hash mismatch)
@@ -616,7 +616,7 @@ class ToolMetadataRegistry:
         """
         return self._metadata_cache.get(tool_name)
 
-    def get_all_metadata(self) -> Dict[str, ToolMetadata]:
+    def get_all_metadata(self) -> dict[str, ToolMetadata]:
         """Get all registered metadata.
 
         Returns:
@@ -624,7 +624,7 @@ class ToolMetadataRegistry:
         """
         return self._metadata_cache.copy()
 
-    def get_tools_by_category(self, category: str) -> List[str]:
+    def get_tools_by_category(self, category: str) -> list[str]:
         """Get tool names in a specific category.
 
         Args:
@@ -635,7 +635,7 @@ class ToolMetadataRegistry:
         """
         return self._category_index.get(category, []).copy()
 
-    def get_tools_by_keyword(self, keyword: str) -> List[str]:
+    def get_tools_by_keyword(self, keyword: str) -> list[str]:
         """Get tool names matching a keyword.
 
         Args:
@@ -646,7 +646,7 @@ class ToolMetadataRegistry:
         """
         return self._keyword_index.get(keyword.lower(), []).copy()
 
-    def get_all_categories(self) -> List[str]:
+    def get_all_categories(self) -> list[str]:
         """Get all registered categories.
 
         Returns:
@@ -654,7 +654,7 @@ class ToolMetadataRegistry:
         """
         return list(self._category_index.keys())
 
-    def get_all_keywords(self) -> List[str]:
+    def get_all_keywords(self) -> list[str]:
         """Get all registered keywords.
 
         Returns:
@@ -662,7 +662,7 @@ class ToolMetadataRegistry:
         """
         return list(self._keyword_index.keys())
 
-    def search_tools(self, query: str) -> List[str]:
+    def search_tools(self, query: str) -> list[str]:
         """Search for tools matching a query string.
 
         Searches across tool names, categories, and keywords.
@@ -693,7 +693,7 @@ class ToolMetadataRegistry:
 
         return list(matches)
 
-    def export_all(self) -> Dict[str, Dict[str, Any]]:
+    def export_all(self) -> dict[str, dict[str, Any]]:
         """Export all metadata as dictionaries.
 
         Useful for debugging, analysis, or generating tool_knowledge.yaml.
@@ -703,7 +703,7 @@ class ToolMetadataRegistry:
         """
         return {name: metadata.to_dict() for name, metadata in self._metadata_cache.items()}
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get statistics about registered tools and metadata.
 
         Returns:
@@ -725,7 +725,7 @@ class ToolMetadataRegistry:
             "categories": list(self._category_index.keys()),
         }
 
-    def get_category_tools_map(self) -> Dict[str, List[str]]:
+    def get_category_tools_map(self) -> dict[str, list[str]]:
         """Get mapping of categories to tool names.
 
         This method returns a dictionary in the same format as the legacy
@@ -737,7 +737,7 @@ class ToolMetadataRegistry:
         """
         return {category: list(tools) for category, tools in self._category_index.items()}
 
-    def get_tools_for_task_type(self, task_type: str) -> List[str]:
+    def get_tools_for_task_type(self, task_type: str) -> list[str]:
         """Get relevant tools for a task type.
 
         Maps high-level task types to appropriate categories and returns

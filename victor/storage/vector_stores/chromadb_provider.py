@@ -28,7 +28,7 @@ For embedding models:
 """
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     import chromadb  # type: ignore[import-not-found]
@@ -159,7 +159,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             raise RuntimeError("ChromaDB collection not initialized. Call initialize() first.")
         return self.collection
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding for single text.
 
         Args:
@@ -175,7 +175,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             raise RuntimeError("Embedding model not initialized")
         return await self.embedding_model.embed_text(text)
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts (optimized).
 
         Args:
@@ -191,7 +191,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             raise RuntimeError("Embedding model not initialized")
         return await self.embedding_model.embed_batch(texts)
 
-    async def index_document(self, doc_id: str, content: str, metadata: Dict[str, Any]) -> None:
+    async def index_document(self, doc_id: str, content: str, metadata: dict[str, Any]) -> None:
         """Index a single document.
 
         Args:
@@ -214,7 +214,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
             metadatas=[metadata],
         )
 
-    async def index_documents(self, documents: List[Dict[str, Any]]) -> None:
+    async def index_documents(self, documents: list[dict[str, Any]]) -> None:
         """Batch index multiple documents (optimized).
 
         Args:
@@ -259,8 +259,8 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         self,
         query: str,
         limit: int = 10,
-        filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[EmbeddingSearchResult]:
+        filter_metadata: Optional[dict[str, Any]] = None,
+    ) -> list[EmbeddingSearchResult]:
         """Search for similar documents.
 
         Args:
@@ -287,7 +287,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
         )
 
         # Convert to EmbeddingSearchResult objects
-        search_results: List[EmbeddingSearchResult] = []
+        search_results: list[EmbeddingSearchResult] = []
         ids = results.get("ids")
         documents = results.get("documents")
         metadatas = results.get("metadatas")
@@ -382,7 +382,7 @@ class ChromaDBProvider(BaseEmbeddingProvider):
 
         print("🗑️  Cleared index")
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get index statistics.
 
         Returns:

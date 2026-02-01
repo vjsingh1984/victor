@@ -52,7 +52,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING, Union, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 try:
     from cachetools import TTLCache  # type: ignore[import-untyped]
@@ -62,8 +62,6 @@ except ImportError:
 
 if TYPE_CHECKING:
     from victor.workflows.definition import (
-        ConditionNode,
-        TransformNode,
         WorkflowDefinition,
         WorkflowNode,
     )
@@ -100,8 +98,8 @@ class DependencyGraph:
         # Returns {'B', 'C', 'D'} if B->A, C->B, D->C
     """
 
-    dependents: Dict[str, Set[str]] = field(default_factory=dict)
-    dependencies: Dict[str, Set[str]] = field(default_factory=dict)
+    dependents: dict[str, set[str]] = field(default_factory=dict)
+    dependencies: dict[str, set[str]] = field(default_factory=dict)
 
     def add_dependency(self, node_id: str, depends_on: str) -> None:
         """Record that node_id depends on depends_on.
@@ -118,15 +116,15 @@ class DependencyGraph:
             self.dependents[depends_on] = set()
         self.dependents[depends_on].add(node_id)
 
-    def get_dependencies(self, node_id: str) -> Set[str]:
+    def get_dependencies(self, node_id: str) -> set[str]:
         """Get nodes that this node depends on (upstream)."""
         return self.dependencies.get(node_id, set())
 
-    def get_dependents(self, node_id: str) -> Set[str]:
+    def get_dependents(self, node_id: str) -> set[str]:
         """Get nodes that depend on this node (downstream)."""
         return self.dependents.get(node_id, set())
 
-    def get_cascade_set(self, node_id: str) -> Set[str]:
+    def get_cascade_set(self, node_id: str) -> set[str]:
         """Get all nodes that should be invalidated when node_id changes.
 
         Performs breadth-first traversal to find all downstream dependents.
@@ -137,7 +135,7 @@ class DependencyGraph:
         Returns:
             Set of all node IDs that should be invalidated
         """
-        result: Set[str] = set()
+        result: set[str] = set()
         to_process = list(self.dependents.get(node_id, set()))
 
         while to_process:
@@ -149,9 +147,9 @@ class DependencyGraph:
 
         return result
 
-    def get_all_upstream(self, node_id: str) -> Set[str]:
+    def get_all_upstream(self, node_id: str) -> set[str]:
         """Get all upstream dependencies (transitive)."""
-        result: Set[str] = set()
+        result: set[str] = set()
         to_process = list(self.dependencies.get(node_id, set()))
 
         while to_process:
@@ -212,7 +210,7 @@ class DependencyGraph:
 
         return graph
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize for debugging/storage."""
         return {
             "dependents": {k: list(v) for k, v in self.dependents.items()},
@@ -382,8 +380,8 @@ class WorkflowCacheConfig:
     max_entries: Optional[int] = None
     persist_to_disk: bool = False
     disk_cache_path: Optional[str] = None
-    cacheable_node_types: Set[str] = field(default_factory=lambda: {"transform", "condition"})
-    excluded_context_keys: Set[str] = field(
+    cacheable_node_types: set[str] = field(default_factory=lambda: {"transform", "condition"})
+    excluded_context_keys: set[str] = field(
         default_factory=lambda: {"_internal", "_debug", "_timestamps"}
     )
 
@@ -447,7 +445,7 @@ class WorkflowCache:
         self._lock = threading.RLock()
 
         # Statistics tracking
-        self._stats: Dict[str, Any] = {
+        self._stats: dict[str, Any] = {
             "hits": 0,
             "misses": 0,
             "sets": 0,
@@ -496,7 +494,7 @@ class WorkflowCache:
     def get(
         self,
         node: "WorkflowNode",
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> Optional["NodeResult"]:
         """Get cached result for a node.
 
@@ -534,7 +532,7 @@ class WorkflowCache:
     def set(
         self,
         node: "WorkflowNode",
-        context: Dict[str, Any],
+        context: dict[str, Any],
         result: "NodeResult",
     ) -> bool:
         """Cache a node result.
@@ -674,14 +672,14 @@ class WorkflowCache:
             logger.info(f"Cleared {count} workflow cache entries")
             return count
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:
             Dictionary with cache statistics
         """
         with self._lock:
-            stats: Dict[str, Any] = self._stats.copy()
+            stats: dict[str, Any] = self._stats.copy()
 
             total = stats["hits"] + stats["misses"]
             stats["hit_rate"] = stats["hits"] / total if total > 0 else 0.0
@@ -759,7 +757,7 @@ class WorkflowCache:
     def _generate_cache_key(
         self,
         node: "WorkflowNode",
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> str:
         """Generate cache key for a node execution (alias for _make_cache_key).
 
@@ -777,7 +775,7 @@ class WorkflowCache:
     def _make_cache_key(
         self,
         node: "WorkflowNode",
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> str:
         """Generate cache key for a node execution.
 
@@ -829,8 +827,8 @@ class WorkflowCache:
     def _get_relevant_context(
         self,
         node: "WorkflowNode",
-        context: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
         """Extract relevant context values for cache key.
 
         Filters out excluded keys and limits depth to avoid
@@ -886,7 +884,7 @@ class WorkflowCacheManager:
             default_config: Default configuration for new caches
         """
         self._default_config = default_config or WorkflowCacheConfig()
-        self._caches: Dict[str, WorkflowCache] = {}
+        self._caches: dict[str, WorkflowCache] = {}
         self._lock = threading.RLock()
 
     def get_cache(
@@ -969,7 +967,7 @@ class WorkflowCacheManager:
             self._caches.clear()
             return total
 
-    def get_all_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics for all workflow caches.
 
         Returns:
@@ -978,7 +976,7 @@ class WorkflowCacheManager:
         with self._lock:
             return {name: cache.get_stats() for name, cache in self._caches.items()}
 
-    def get_global_stats(self) -> Dict[str, Any]:
+    def get_global_stats(self) -> dict[str, Any]:
         """Get global statistics across all workflow caches.
 
         Returns:
@@ -1207,10 +1205,10 @@ class WorkflowDefinitionCache:
             logger.info(f"Cleared {count} definition cache entries")
             return count
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         with self._lock:
-            stats: Dict[str, Any] = self._stats.copy()
+            stats: dict[str, Any] = self._stats.copy()
             total = stats["hits"] + stats["misses"]
             stats["hit_rate"] = stats["hits"] / total if total > 0 else 0.0
             stats["size"] = len(self._cache) if self._cache else 0
@@ -1256,7 +1254,7 @@ class WorkflowDefinitionCache:
             "set() expects (key, definition) or (path, workflow_name, config_hash, definition)"
         )
 
-    def invalidate(self, key: Union[str, Path]) -> int:
+    def invalidate(self, key: str | Path) -> int:
         """Invalidate cached definition by key or file path."""
         if isinstance(key, Path):
             return self.invalidate_by_path(key)

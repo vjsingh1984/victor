@@ -20,7 +20,6 @@ Tests the SQLiteCacheBackend with in-memory database for fast testing.
 import asyncio
 import pickle
 import sqlite3
-from pathlib import Path
 
 import pytest
 

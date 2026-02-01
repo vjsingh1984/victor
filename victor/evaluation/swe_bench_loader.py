@@ -52,7 +52,8 @@ import logging
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any, Optional
+from collections.abc import Iterator
 
 from victor.evaluation.protocol import BenchmarkTask, BenchmarkType
 

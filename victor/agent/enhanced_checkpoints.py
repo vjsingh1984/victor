@@ -48,10 +48,10 @@ import json
 import logging
 import sqlite3
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.providers.base import Message
@@ -74,14 +74,14 @@ class CheckpointState:
     """
 
     session_id: str
-    messages: List[Dict[str, Any]] = field(default_factory=list)
-    context: Dict[str, Any] = field(default_factory=dict)
-    execution_state: Dict[str, Any] = field(default_factory=dict)
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
+    messages: list[dict[str, Any]] = field(default_factory=list)
+    context: dict[str, Any] = field(default_factory=dict)
+    execution_state: dict[str, Any] = field(default_factory=dict)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "session_id": self.session_id,
@@ -94,7 +94,7 @@ class CheckpointState:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CheckpointState":
+    def from_dict(cls, data: dict[str, Any]) -> "CheckpointState":
         """Create from dictionary."""
         timestamp = data.get("timestamp")
         if timestamp:
@@ -142,7 +142,7 @@ class StateSerializer:
     """
 
     @staticmethod
-    def serialize_messages(messages: List["Message"]) -> List[Dict[str, Any]]:
+    def serialize_messages(messages: list["Message"]) -> list[dict[str, Any]]:
         """Serialize messages to JSON-serializable format.
 
         Args:
@@ -164,7 +164,7 @@ class StateSerializer:
         return serialized
 
     @staticmethod
-    def deserialize_messages(data: List[Dict[str, Any]]) -> List["Message"]:
+    def deserialize_messages(data: list[dict[str, Any]]) -> list["Message"]:
         """Deserialize messages from JSON format.
 
         Args:
@@ -189,7 +189,7 @@ class StateSerializer:
         return messages
 
     @staticmethod
-    def serialize_context(context: Dict[str, Any]) -> Dict[str, Any]:
+    def serialize_context(context: dict[str, Any]) -> dict[str, Any]:
         """Serialize context to JSON-serializable format.
 
         Args:
@@ -199,7 +199,7 @@ class StateSerializer:
             JSON-serializable dictionary
         """
         # Convert datetime objects to ISO format
-        serialized: Dict[str, Any] = {}
+        serialized: dict[str, Any] = {}
         for key, value in context.items():
             if isinstance(value, datetime):
                 serialized[key] = value.isoformat()
@@ -213,7 +213,7 @@ class StateSerializer:
         return serialized
 
     @staticmethod
-    def serialize_execution_state(state: Any) -> Dict[str, Any]:
+    def serialize_execution_state(state: Any) -> dict[str, Any]:
         """Serialize execution state to JSON format.
 
         Args:
@@ -344,7 +344,7 @@ class SQLiteCheckpointBackend:
         self,
         session_id: Optional[str] = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List checkpoints from database.
 
         Args:
@@ -565,7 +565,7 @@ class EnhancedCheckpointManager:
         self,
         session_id: Optional[str] = None,
         include_git: bool = True,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List all checkpoints.
 
         Args:
@@ -664,7 +664,7 @@ class EnhancedCheckpointManager:
 
         return None
 
-    def cleanup_old(self, keep_count: int = 20) -> Dict[str, int]:
+    def cleanup_old(self, keep_count: int = 20) -> dict[str, int]:
         """Clean up old checkpoints from both backends.
 
         Args:

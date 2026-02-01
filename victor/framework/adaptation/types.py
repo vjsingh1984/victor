@@ -23,7 +23,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 from uuid import uuid4
 
 
@@ -83,10 +84,10 @@ class GraphModification:
     description: str
     target_node: Optional[str] = None
     target_edge: Optional[tuple[str, str]] = None
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     trigger: AdaptationTrigger = AdaptationTrigger.MANUAL
     priority: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     id: str = field(default_factory=lambda: str(uuid4())[:8])
     created_at: datetime = field(default_factory=datetime.now)
 
@@ -104,10 +105,10 @@ class AdaptationValidationResult:
     """
 
     is_valid: bool
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    suggestions: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def merge(self, other: "AdaptationValidationResult") -> "AdaptationValidationResult":
         """Merge two validation results."""
@@ -134,13 +135,13 @@ class AdaptationImpact:
         details: Additional details
     """
 
-    affects_nodes: List[str] = field(default_factory=list)
-    affects_edges: List[tuple[str, str]] = field(default_factory=list)
+    affects_nodes: list[str] = field(default_factory=list)
+    affects_edges: list[tuple[str, str]] = field(default_factory=list)
     execution_path_change: bool = False
     performance_impact: str = "neutral"  # "positive", "neutral", "negative"
     risk_level: RiskLevel = RiskLevel.LOW
     estimated_overhead_ms: float = 0.0
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -156,10 +157,10 @@ class AdaptationCheckpoint:
     """
 
     id: str
-    graph_state: Dict[str, Any]
+    graph_state: dict[str, Any]
     created_at: datetime = field(default_factory=datetime.now)
     description: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -219,8 +220,8 @@ class AdaptationStrategy:
 
     name: str
     description: str
-    trigger_condition: Callable[[Dict[str, Any]], bool]
-    modification_generator: Callable[[Dict[str, Any]], List[GraphModification]]
+    trigger_condition: Callable[[dict[str, Any]], bool]
+    modification_generator: Callable[[dict[str, Any]], list[GraphModification]]
     priority: int = 0
     enabled: bool = True
 

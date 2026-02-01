@@ -30,14 +30,14 @@ Performance Benefits:
 
 from __future__ import annotations
 
-import functools
 import importlib
 import json
 import logging
 import threading
 import time
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Tuple, Type, Union
-from functools import wraps, lru_cache
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable
+from functools import wraps
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -174,7 +174,7 @@ def json_dumps(obj: Any, *, indent: Optional[int] = None) -> str:
         return json.dumps(obj, indent=indent)
 
 
-def json_loads(s: Union[str, bytes]) -> Any:
+def json_loads(s: str | bytes) -> Any:
     """Deserialize JSON string to object with optimized backend.
 
     Uses orjson if available (3-5x faster), falls back to standard json.
@@ -264,7 +264,7 @@ class ThreadSafeMemoized:
         """
         self.ttl = ttl
         self.max_size = max_size
-        self._cache: Dict[Tuple[Any, ...], Tuple[Any, float]] = {}
+        self._cache: dict[tuple[Any, ...], tuple[Any, float]] = {}
         self._lock = threading.RLock()
 
     def __call__(self, func: F) -> F:
@@ -318,7 +318,7 @@ class ThreadSafeMemoized:
         with self._lock:
             self._cache.clear()
 
-    def _cache_info(self) -> Dict[str, Any]:
+    def _cache_info(self) -> dict[str, Any]:
         """Get cache information.
 
         Returns:
@@ -368,7 +368,7 @@ class cached_property:
         self.attr_name = f"_cached_{func.__name__}"
         self._lock = threading.Lock()
 
-    def __get__(self, instance: Any, owner: Optional[Type[Any]] = None) -> Any:
+    def __get__(self, instance: Any, owner: Optional[type[Any]] = None) -> Any:
         """Get property value, computing and caching if necessary.
 
         Args:
@@ -402,7 +402,7 @@ class cached_property:
 
             return cached_value
 
-    def __set_name__(self, owner: Type[Any], name: str) -> None:
+    def __set_name__(self, owner: type[Any], name: str) -> None:
         """Set property name (Python 3.8+)."""
         self.attr_name = f"_cached_{name}"
 
@@ -466,7 +466,7 @@ def retry(
     base_delay: float = 1.0,
     max_delay: float = 60.0,
     exponential_base: float = 2.0,
-    exceptions: Tuple[Type[Exception], ...] = (Exception,),
+    exceptions: tuple[type[Exception], ...] = (Exception,),
 ) -> Callable[..., Any]:
     """Decorator to retry function with exponential backoff.
 
@@ -528,7 +528,7 @@ def async_retry(
     base_delay: float = 1.0,
     max_delay: float = 60.0,
     exponential_base: float = 2.0,
-    exceptions: Tuple[Type[Exception], ...] = (Exception,),
+    exceptions: tuple[type[Exception], ...] = (Exception,),
 ) -> Callable[..., Any]:
     """Decorator to retry async function with exponential backoff.
 

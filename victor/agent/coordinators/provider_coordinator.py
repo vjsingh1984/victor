@@ -45,18 +45,15 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
 )
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.agent.provider_manager import ProviderManager, ProviderState
@@ -158,14 +155,14 @@ class ProviderCoordinator:
         self.config = config or ProviderCoordinatorConfig()
 
         # Post-switch hooks
-        self._post_switch_hooks: List[Callable[[ProviderState], None]] = []
+        self._post_switch_hooks: list[Callable[[ProviderState], None]] = []
 
         # Rate limit tracking
         self._rate_limit_count: int = 0
         self._last_rate_limit_time: Optional[float] = None
 
         # Runtime capability cache (per provider/model)
-        self._capability_cache: Dict[tuple[str, str], Any] = {}
+        self._capability_cache: dict[tuple[str, str], Any] = {}
 
         logger.debug(
             f"ProviderCoordinator initialized: "
@@ -303,7 +300,7 @@ class ProviderCoordinator:
             logger.error(f"Failed to switch model to {model}: {e}")
             return False
 
-    def get_current_provider_info(self) -> Dict[str, Any]:
+    def get_current_provider_info(self) -> dict[str, Any]:
         """Get information about the current provider and model.
 
         Returns:
@@ -331,7 +328,7 @@ class ProviderCoordinator:
         await self._manager.stop_health_monitoring()
         logger.info("ProviderCoordinator: Stopped health monitoring")
 
-    async def get_provider_health(self) -> Dict[str, Any]:
+    async def get_provider_health(self) -> dict[str, Any]:
         """Get health status of current provider.
 
         Returns:
@@ -354,7 +351,7 @@ class ProviderCoordinator:
             "switch_count": state.switch_count,
         }
 
-    async def get_healthy_providers(self) -> List[str]:
+    async def get_healthy_providers(self) -> list[str]:
         """Get list of healthy providers.
 
         Returns:
@@ -435,7 +432,7 @@ class ProviderCoordinator:
         self._rate_limit_count += 1
         self._last_rate_limit_time = time.time()
 
-    def get_rate_limit_stats(self) -> Dict[str, Any]:
+    def get_rate_limit_stats(self) -> dict[str, Any]:
         """Get rate limit statistics.
 
         Returns:

@@ -37,8 +37,8 @@ References:
 
 import json
 import logging
-import os
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -161,12 +161,12 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Mistral.
@@ -213,12 +213,12 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Mistral.
@@ -248,7 +248,7 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
             async with self.client.stream("POST", "/chat/completions", json=payload) as response:
                 response.raise_for_status()
 
-                accumulated_tool_calls: List[Dict[str, Any]] = []
+                accumulated_tool_calls: list[dict[str, Any]] = []
 
                 async for line in response.aiter_lines():
                     if not line.strip():
@@ -287,14 +287,14 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def _build_request_payload(
         self,
-        messages: List[Message],
+        messages: list[Message],
         model: str,
         temperature: float,
         max_tokens: int,
-        tools: Optional[List[ToolDefinition]],
+        tools: Optional[list[ToolDefinition]],
         stream: bool,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build request payload for Mistral API.
 
         Args:
@@ -311,7 +311,7 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
         """
         formatted_messages = []
         for msg in messages:
-            formatted_msg: Dict[str, Any] = {
+            formatted_msg: dict[str, Any] = {
                 "role": msg.role,
                 "content": msg.content,
             }
@@ -335,7 +335,7 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
                 ]
             formatted_messages.append(formatted_msg)
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "messages": formatted_messages,
             "max_tokens": max_tokens,
@@ -359,7 +359,7 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return payload
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         """Parse Mistral API response."""
         choices = result.get("choices", [])
         if not choices:
@@ -411,8 +411,8 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
         )
 
     def _normalize_tool_calls(
-        self, tool_calls: Optional[List[Dict[str, Any]]]
-    ) -> Optional[List[Dict[str, Any]]]:
+        self, tool_calls: Optional[list[dict[str, Any]]]
+    ) -> Optional[list[dict[str, Any]]]:
         """Normalize tool calls from OpenAI format."""
         if not tool_calls:
             return None
@@ -443,8 +443,8 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def _parse_stream_chunk(
         self,
-        chunk_data: Dict[str, Any],
-        accumulated_tool_calls: List[Dict[str, Any]],
+        chunk_data: dict[str, Any],
+        accumulated_tool_calls: list[dict[str, Any]],
     ) -> StreamChunk:
         """Parse streaming chunk from Mistral."""
         choices = chunk_data.get("choices", [])
@@ -508,7 +508,7 @@ class MistralProvider(BaseProvider, HTTPErrorHandlerMixin):
             is_final=finish_reason is not None,
         )
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List available Mistral models."""
         try:
             response = await self.client.get("/models")

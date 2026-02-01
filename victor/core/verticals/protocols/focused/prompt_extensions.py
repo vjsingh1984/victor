@@ -41,7 +41,7 @@ Related Protocols:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Dict, List, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from victor.core.verticals.protocols.enrichment import EnrichmentStrategyProtocol
 from victor.core.verticals.protocols.prompt_provider import (
@@ -88,7 +88,7 @@ class PromptExtensionsProtocol(Protocol):
 
     @property
     @abstractmethod
-    def prompt_contributors(self) -> List[PromptContributorProtocol]:
+    def prompt_contributors(self) -> list[PromptContributorProtocol]:
         """Get the list of prompt contributors.
 
         Returns:
@@ -108,7 +108,7 @@ class PromptExtensionsProtocol(Protocol):
         """
         ...
 
-    def get_all_task_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_all_task_hints(self) -> dict[str, TaskTypeHint]:
         """Merge task hints from all contributors.
 
         Later contributors override earlier ones for same task type.
@@ -116,12 +116,12 @@ class PromptExtensionsProtocol(Protocol):
         Returns:
             Merged dict of task type hints
         """
-        merged: Dict[str, TaskTypeHint] = {}
+        merged: dict[str, TaskTypeHint] = {}
         for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
             merged.update(contributor.get_task_type_hints())
         return merged
 
-    def get_all_system_prompt_sections(self) -> List[str]:
+    def get_all_system_prompt_sections(self) -> list[str]:
         """Collect all system prompt sections from contributors.
 
         Returns:

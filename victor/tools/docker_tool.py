@@ -24,14 +24,14 @@ Features:
 """
 
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async, check_docker_available
 
 
-async def _run_docker_command_async(args: List[str], timeout: int = 30) -> Tuple[bool, str, str]:
+async def _run_docker_command_async(args: list[str], timeout: int = 30) -> tuple[bool, str, str]:
     """Run Docker command asynchronously.
 
     Args:
@@ -62,8 +62,8 @@ async def docker(
     operation: str,
     resource_id: Optional[str] = None,
     resource_type: str = "container",
-    options: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    options: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """
     Unified Docker operations for container and image management.
 

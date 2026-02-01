@@ -18,7 +18,6 @@ Updated to use canonical ObservabilityBus from victor.core.events instead of
 deprecated EventBus from victor.observability.event_bus.
 """
 
-from unittest.mock import MagicMock
 import asyncio
 
 import pytest

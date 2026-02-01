@@ -21,7 +21,7 @@ with AdaptableGraph for common optimization patterns.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List
+from typing import Any
 
 from victor.framework.adaptation.types import (
     AdaptationStrategy,
@@ -49,7 +49,7 @@ def create_retry_strategy(
         AdaptationStrategy for retry logic
     """
 
-    def trigger_condition(context: Dict[str, Any]) -> bool:
+    def trigger_condition(context: dict[str, Any]) -> bool:
         """Check if node has exceeded error threshold."""
         error_counts = context.get("error_counts", {})
         for node_id, count in error_counts.items():
@@ -59,7 +59,7 @@ def create_retry_strategy(
                     return True
         return False
 
-    def modification_generator(context: Dict[str, Any]) -> List[GraphModification]:
+    def modification_generator(context: dict[str, Any]) -> list[GraphModification]:
         """Generate retry modifications for failing nodes."""
         modifications = []
         error_counts = context.get("error_counts", {})
@@ -107,7 +107,7 @@ def create_circuit_breaker_strategy(
         AdaptationStrategy for circuit breakers
     """
 
-    def trigger_condition(context: Dict[str, Any]) -> bool:
+    def trigger_condition(context: dict[str, Any]) -> bool:
         """Check if node should have circuit breaker."""
         recent_failures = context.get("recent_failures", {})
         for node_id, failures in recent_failures.items():
@@ -116,7 +116,7 @@ def create_circuit_breaker_strategy(
                     return True
         return False
 
-    def modification_generator(context: Dict[str, Any]) -> List[GraphModification]:
+    def modification_generator(context: dict[str, Any]) -> list[GraphModification]:
         """Generate circuit breaker modifications."""
         modifications = []
         recent_failures = context.get("recent_failures", {})
@@ -163,7 +163,7 @@ def create_parallelization_strategy(
         AdaptationStrategy for parallelization
     """
 
-    def trigger_condition(context: Dict[str, Any]) -> bool:
+    def trigger_condition(context: dict[str, Any]) -> bool:
         """Check if parallelization would help."""
         # Check latency
         total_latency = context.get("total_latency_ms", 0)
@@ -179,7 +179,7 @@ def create_parallelization_strategy(
         independent_groups = _find_independent_groups(node_dependencies)
         return any(len(group) >= 2 for group in independent_groups)
 
-    def modification_generator(context: Dict[str, Any]) -> List[GraphModification]:
+    def modification_generator(context: dict[str, Any]) -> list[GraphModification]:
         """Generate parallelization modifications."""
         modifications = []
         node_dependencies = context.get("node_dependencies", {})
@@ -227,7 +227,7 @@ def create_caching_strategy(
         AdaptationStrategy for caching
     """
 
-    def trigger_condition(context: Dict[str, Any]) -> bool:
+    def trigger_condition(context: dict[str, Any]) -> bool:
         """Check if caching would help."""
         node_call_patterns = context.get("node_call_patterns", {})
 
@@ -246,7 +246,7 @@ def create_caching_strategy(
 
         return False
 
-    def modification_generator(context: Dict[str, Any]) -> List[GraphModification]:
+    def modification_generator(context: dict[str, Any]) -> list[GraphModification]:
         """Generate caching modifications."""
         modifications = []
         node_call_patterns = context.get("node_call_patterns", {})
@@ -289,8 +289,8 @@ def create_caching_strategy(
 
 
 def _find_independent_groups(
-    node_dependencies: Dict[str, List[str]],
-) -> List[set[str]]:
+    node_dependencies: dict[str, list[str]],
+) -> list[set[str]]:
     """Find groups of nodes that can run in parallel.
 
     Args:

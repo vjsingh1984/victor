@@ -25,7 +25,7 @@ This module provides high-level management functions for working with FEPs:
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.feps.schema import (
     FEPMetadata,
@@ -34,7 +34,6 @@ from victor.feps.schema import (
     FEPType,
     FEPValidator,
     FEPValidationResult,
-    parse_fep_metadata,
 )
 
 
@@ -62,7 +61,7 @@ class FEPManager:
         status_filter: Optional[FEPStatus] = None,
         type_filter: Optional[FEPType] = None,
         sort_by: str = "number",
-    ) -> List[FEPMetadata]:
+    ) -> list[FEPMetadata]:
         """List all FEPs with optional filtering and sorting.
 
         Args:
@@ -123,7 +122,7 @@ class FEPManager:
         except Exception:
             return None
 
-    def get_fep_sections(self, fep_number: int) -> Optional[Dict[str, FEPSection]]:
+    def get_fep_sections(self, fep_number: int) -> Optional[dict[str, FEPSection]]:
         """Extract and return FEP sections.
 
         Args:
@@ -140,7 +139,7 @@ class FEPManager:
         content_without_frontmatter = self.validator._remove_frontmatter(content)
 
         # Extract sections
-        sections: Dict[str, FEPSection] = {}
+        sections: dict[str, FEPSection] = {}
         self.validator._extract_and_validate_sections(content_without_frontmatter, sections)
 
         return sections
@@ -164,7 +163,7 @@ class FEPManager:
 
         return self.validator.validate_file(matches[0])
 
-    def update_fep_status(self, fep_number: int, new_status: FEPStatus) -> Tuple[bool, str]:
+    def update_fep_status(self, fep_number: int, new_status: FEPStatus) -> tuple[bool, str]:
         """Update FEP status.
 
         Args:
@@ -213,7 +212,7 @@ class FEPManager:
         except Exception as e:
             return False, f"Failed to update status: {e}"
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get FEP statistics.
 
         Returns:
@@ -226,12 +225,12 @@ class FEPManager:
         all_feps = self.list_feps()
 
         # Count by status
-        by_status: Dict[str, int] = {}
+        by_status: dict[str, int] = {}
         for status in FEPStatus:
             by_status[status.value] = 0
 
         # Count by type
-        by_type: Dict[str, int] = {}
+        by_type: dict[str, int] = {}
         for fep_type in FEPType:
             by_type[fep_type.value] = 0
 
@@ -267,8 +266,8 @@ class FEPManager:
     def search_feps(
         self,
         query: str,
-        search_in: Optional[List[str]] = None,
-    ) -> List[FEPMetadata]:
+        search_in: Optional[list[str]] = None,
+    ) -> list[FEPMetadata]:
         """Search FEPs by query string.
 
         Args:

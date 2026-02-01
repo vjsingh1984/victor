@@ -47,7 +47,7 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -312,7 +312,7 @@ class AdaptiveTTLCache:
                 self._ttl_adjustments = 0
                 self._total_accesses = 0
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get cache metrics.
 
         Returns:

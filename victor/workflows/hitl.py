@@ -47,7 +47,8 @@ from datetime import datetime, timezone
 from enum import Enum
 
 
-from typing import Any, Callable, Dict, List, Optional, Protocol
+from typing import Any, Optional, Protocol
+from collections.abc import Callable
 
 from victor.workflows.definition import WorkflowNode, WorkflowNodeType
 
@@ -150,7 +151,7 @@ class HITLCategory(str, Enum):
 
 
 # Map modes to categories
-HITL_MODE_CATEGORIES: Dict[HITLMode, HITLCategory] = {
+HITL_MODE_CATEGORIES: dict[HITLMode, HITLCategory] = {
     HITLMode.CLI: HITLCategory.LOCAL,
     HITLMode.TUI: HITLCategory.LOCAL,
     HITLMode.API: HITLCategory.ASYNC_API,
@@ -453,14 +454,14 @@ class HITLRequest:
     node_id: str
     hitl_type: HITLNodeType
     prompt: str
-    context: Dict[str, Any] = field(default_factory=dict)
-    choices: Optional[List[str]] = None
+    context: dict[str, Any] = field(default_factory=dict)
+    choices: Optional[list[str]] = None
     default_value: Optional[Any] = None
     timeout: float = 300.0
     fallback: HITLFallback = HITLFallback.ABORT
     created_at: datetime = field(default_factory=_utc_now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize for transmission/display."""
         return {
             "request_id": self.request_id,
@@ -494,11 +495,11 @@ class HITLResponse:
     status: HITLStatus
     approved: bool = True
     value: Optional[Any] = None
-    modifications: Optional[Dict[str, Any]] = None
+    modifications: Optional[dict[str, Any]] = None
     reason: Optional[str] = None
     responded_at: datetime = field(default_factory=_utc_now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize response."""
         return {
             "request_id": self.request_id,
@@ -547,8 +548,8 @@ class HITLNode(WorkflowNode):
 
     hitl_type: HITLNodeType = HITLNodeType.APPROVAL
     prompt: str = "Proceed?"
-    context_keys: List[str] = field(default_factory=list)
-    choices: Optional[List[str]] = None
+    context_keys: list[str] = field(default_factory=list)
+    choices: Optional[list[str]] = None
     default_value: Optional[Any] = None
     timeout: float = 300.0
     fallback: HITLFallback = HITLFallback.ABORT
@@ -559,7 +560,7 @@ class HITLNode(WorkflowNode):
         """HITL nodes have their own node type."""
         return WorkflowNodeType.HITL
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize node."""
         d = super().to_dict()
         d.update(
@@ -581,7 +582,7 @@ class HITLNode(WorkflowNode):
 
     def create_request(
         self,
-        workflow_context: Dict[str, Any],
+        workflow_context: dict[str, Any],
     ) -> HITLRequest:
         """Create a HITL request from workflow context.
 
@@ -658,9 +659,9 @@ class HITLExecutor:
         self.transport_config = transport_config
         self._transport: Optional[Any] = None  # BaseTransport, avoid circular import
 
-        self._pending_requests: Dict[str, asyncio.Event] = {}
-        self._responses: Dict[str, HITLResponse] = {}
-        self._external_refs: Dict[str, str] = {}  # request_id -> external_ref
+        self._pending_requests: dict[str, asyncio.Event] = {}
+        self._responses: dict[str, HITLResponse] = {}
+        self._external_refs: dict[str, str] = {}  # request_id -> external_ref
 
     def _get_transport(self) -> Optional[Any]:
         """Get or create the transport adapter."""
@@ -691,7 +692,7 @@ class HITLExecutor:
     async def execute_hitl_node(
         self,
         node: HITLNode,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         workflow_id: Optional[str] = None,
     ) -> HITLResponse:
         """Execute a HITL node, waiting for human response.

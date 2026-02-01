@@ -14,8 +14,7 @@
 
 """Tests for lazy tool composition utilities."""
 
-from typing import Any, Dict
-from unittest.mock import MagicMock
+from typing import Any
 
 import pytest
 
@@ -33,11 +32,11 @@ class MockTool:
         self.run_count = 0
         self.arun_count = 0
 
-    def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def run(self, inputs: dict[str, Any]) -> dict[str, Any]:
         self.run_count += 1
         return {"result": inputs.get("input", "default"), "run_count": self.run_count}
 
-    async def arun(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    async def arun(self, inputs: dict[str, Any]) -> dict[str, Any]:
         self.arun_count += 1
         return {"result": inputs.get("input", "default"), "arun_count": self.arun_count}
 

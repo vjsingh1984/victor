@@ -36,9 +36,9 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 if TYPE_CHECKING:
     from victor.providers.base import Message, ToolDefinition
@@ -129,7 +129,7 @@ class PayloadEstimate:
     limit_bytes: int = 0
     utilization_pct: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for logging/serialization."""
         return {
             "total_bytes": self.total_bytes,
@@ -150,8 +150,8 @@ class PayloadEstimate:
 class TruncationResult:
     """Result of payload truncation."""
 
-    messages: List["Message"]
-    tools: Optional[List["ToolDefinition"]]
+    messages: list["Message"]
+    tools: Optional[list["ToolDefinition"]]
     truncated: bool
     strategy_used: Optional[TruncationStrategy]
     messages_removed: int = 0
@@ -165,8 +165,8 @@ class PayloadLimiter(Protocol):
 
     def estimate_size(
         self,
-        messages: List["Message"],
-        tools: Optional[List["ToolDefinition"]] = None,
+        messages: list["Message"],
+        tools: Optional[list["ToolDefinition"]] = None,
         **kwargs: Any,
     ) -> PayloadEstimate:
         """Estimate the payload size in bytes."""
@@ -174,17 +174,17 @@ class PayloadLimiter(Protocol):
 
     def check_limit(
         self,
-        messages: List["Message"],
-        tools: Optional[List["ToolDefinition"]] = None,
+        messages: list["Message"],
+        tools: Optional[list["ToolDefinition"]] = None,
         **kwargs: Any,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, Optional[str]]:
         """Check if payload is within limits. Returns (ok, warning_message)."""
         ...
 
     def truncate_if_needed(
         self,
-        messages: List["Message"],
-        tools: Optional[List["ToolDefinition"]] = None,
+        messages: list["Message"],
+        tools: Optional[list["ToolDefinition"]] = None,
         strategy: TruncationStrategy = TruncationStrategy.TRUNCATE_OLDEST,
         **kwargs: Any,
     ) -> TruncationResult:
@@ -227,8 +227,8 @@ class ProviderPayloadLimiter:
 
     def estimate_size(
         self,
-        messages: List["Message"],
-        tools: Optional[List["ToolDefinition"]] = None,
+        messages: list["Message"],
+        tools: Optional[list["ToolDefinition"]] = None,
         **kwargs: Any,
     ) -> PayloadEstimate:
         """Estimate the payload size in bytes.
@@ -304,10 +304,10 @@ class ProviderPayloadLimiter:
 
     def check_limit(
         self,
-        messages: List["Message"],
-        tools: Optional[List["ToolDefinition"]] = None,
+        messages: list["Message"],
+        tools: Optional[list["ToolDefinition"]] = None,
         **kwargs: Any,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, Optional[str]]:
         """Check if payload is within limits.
 
         Args:
@@ -342,8 +342,8 @@ class ProviderPayloadLimiter:
 
     def truncate_if_needed(
         self,
-        messages: List["Message"],
-        tools: Optional[List["ToolDefinition"]] = None,
+        messages: list["Message"],
+        tools: Optional[list["ToolDefinition"]] = None,
         strategy: Optional[TruncationStrategy] = None,
         **kwargs: Any,
     ) -> TruncationResult:
@@ -391,8 +391,8 @@ class ProviderPayloadLimiter:
 
     def _truncate_oldest(
         self,
-        messages: List["Message"],
-        tools: Optional[List["ToolDefinition"]],
+        messages: list["Message"],
+        tools: Optional[list["ToolDefinition"]],
         estimate: PayloadEstimate,
         **kwargs: Any,
     ) -> TruncationResult:
@@ -447,8 +447,8 @@ class ProviderPayloadLimiter:
 
     def _truncate_tool_results(
         self,
-        messages: List["Message"],
-        tools: Optional[List["ToolDefinition"]],
+        messages: list["Message"],
+        tools: Optional[list["ToolDefinition"]],
         estimate: PayloadEstimate,
         **kwargs: Any,
     ) -> TruncationResult:
@@ -497,8 +497,8 @@ class ProviderPayloadLimiter:
 
     def _summarize_tool_results(
         self,
-        messages: List["Message"],
-        tools: Optional[List["ToolDefinition"]],
+        messages: list["Message"],
+        tools: Optional[list["ToolDefinition"]],
         estimate: PayloadEstimate,
         **kwargs: Any,
     ) -> TruncationResult:
@@ -510,8 +510,8 @@ class ProviderPayloadLimiter:
 
     def _reduce_tools(
         self,
-        messages: List["Message"],
-        tools: Optional[List["ToolDefinition"]],
+        messages: list["Message"],
+        tools: Optional[list["ToolDefinition"]],
         estimate: PayloadEstimate,
         **kwargs: Any,
     ) -> TruncationResult:
@@ -545,9 +545,9 @@ class ProviderPayloadLimiter:
             bytes_saved=bytes_saved,
         )
 
-    def _message_to_dict(self, msg: "Message") -> Dict[str, Any]:
+    def _message_to_dict(self, msg: "Message") -> dict[str, Any]:
         """Convert message to dict for size estimation."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "role": getattr(msg, "role", "user"),
             "content": getattr(msg, "content", ""),
         }
@@ -559,7 +559,7 @@ class ProviderPayloadLimiter:
             result["name"] = msg.name
         return result
 
-    def _tool_to_dict(self, tool: "ToolDefinition") -> Dict[str, Any]:
+    def _tool_to_dict(self, tool: "ToolDefinition") -> dict[str, Any]:
         """Convert tool definition to dict for size estimation."""
         return {
             "type": "function",

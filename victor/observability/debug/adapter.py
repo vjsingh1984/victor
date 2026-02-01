@@ -34,15 +34,12 @@ from enum import Enum
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
     TypeVar,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 from victor.observability.debug.protocol import (
     AttachConfiguration,
@@ -85,7 +82,7 @@ class DebugEvent:
 
     type: DebugEventType
     session_id: str
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
 
 # Event handler type
@@ -125,7 +122,7 @@ class DebugAdapterCapabilities:
     # Exception handling
     supports_exception_options: bool = False
     supports_exception_filter_options: bool = False
-    exception_breakpoint_filters: List[Dict[str, Any]] = field(default_factory=list)
+    exception_breakpoint_filters: list[dict[str, Any]] = field(default_factory=list)
 
     # Other
     supports_modules_request: bool = False
@@ -135,7 +132,7 @@ class DebugAdapterCapabilities:
     supports_disassemble_request: bool = False
 
     # Language-specific
-    supported_languages: List[str] = field(default_factory=list)
+    supported_languages: list[str] = field(default_factory=list)
 
 
 @runtime_checkable
@@ -159,7 +156,7 @@ class DebugAdapter(Protocol):
         ...
 
     @property
-    def languages(self) -> List[str]:
+    def languages(self) -> list[str]:
         """Languages supported by this adapter."""
         ...
 
@@ -219,9 +216,9 @@ class DebugAdapter(Protocol):
         self,
         session_id: str,
         source: Path,
-        breakpoints: List[SourceLocation],
-        conditions: Optional[Dict[int, str]] = None,
-    ) -> List[Breakpoint]:
+        breakpoints: list[SourceLocation],
+        conditions: Optional[dict[int, str]] = None,
+    ) -> list[Breakpoint]:
         """Set breakpoints in a source file.
 
         Args:
@@ -238,8 +235,8 @@ class DebugAdapter(Protocol):
     async def set_function_breakpoints(
         self,
         session_id: str,
-        names: List[str],
-    ) -> List[Breakpoint]:
+        names: list[str],
+    ) -> list[Breakpoint]:
         """Set breakpoints on function names.
 
         Args:
@@ -309,7 +306,7 @@ class DebugAdapter(Protocol):
 
     # Inspection
 
-    async def get_threads(self, session_id: str) -> List[Thread]:
+    async def get_threads(self, session_id: str) -> list[Thread]:
         """Get all threads in the debugged program.
 
         Args:
@@ -326,7 +323,7 @@ class DebugAdapter(Protocol):
         thread_id: int,
         start_frame: int = 0,
         levels: int = 20,
-    ) -> List[StackFrame]:
+    ) -> list[StackFrame]:
         """Get stack trace for a thread.
 
         Args:
@@ -340,7 +337,7 @@ class DebugAdapter(Protocol):
         """
         ...
 
-    async def get_scopes(self, session_id: str, frame_id: int) -> List[Scope]:
+    async def get_scopes(self, session_id: str, frame_id: int) -> list[Scope]:
         """Get variable scopes for a stack frame.
 
         Args:
@@ -359,7 +356,7 @@ class DebugAdapter(Protocol):
         filter_type: Optional[str] = None,
         start: int = 0,
         count: int = 100,
-    ) -> List[Variable]:
+    ) -> list[Variable]:
         """Get variables for a scope or container.
 
         Args:
@@ -427,8 +424,8 @@ class BaseDebugAdapter(ABC):
 
     def __init__(self):
         """Initialize base adapter."""
-        self._event_handlers: Set[EventHandler] = set()
-        self._sessions: Dict[str, DebugSession] = {}
+        self._event_handlers: set[EventHandler] = set()
+        self._sessions: dict[str, DebugSession] = {}
         self._lock = asyncio.Lock()
         self._capabilities: Optional[DebugAdapterCapabilities] = None
 
@@ -440,7 +437,7 @@ class BaseDebugAdapter(ABC):
 
     @property
     @abstractmethod
-    def languages(self) -> List[str]:
+    def languages(self) -> list[str]:
         """Supported languages."""
         ...
 

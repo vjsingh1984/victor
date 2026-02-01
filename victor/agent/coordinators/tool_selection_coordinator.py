@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.agent.protocols import IToolSelectionCoordinator, AgentToolSelectionContext
 
@@ -219,7 +219,7 @@ class ToolSelectionCoordinator(IToolSelectionCoordinator):
     def route_search_query(
         self,
         query: str,
-        available_tools: Set[str],
+        available_tools: set[str],
     ) -> str:
         """Route a search query to the appropriate tool.
 
@@ -258,8 +258,8 @@ class ToolSelectionCoordinator(IToolSelectionCoordinator):
     def detect_mentioned_tools(
         self,
         prompt: str,
-        available_tools: Optional[Set[str]] = None,
-    ) -> Set[str]:
+        available_tools: Optional[set[str]] = None,
+    ) -> set[str]:
         """Detect tools mentioned in a prompt.
 
         Scans the prompt for explicit tool mentions.
@@ -291,7 +291,7 @@ class ToolSelectionCoordinator(IToolSelectionCoordinator):
     def classify_task_keywords(
         self,
         task: str,
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        conversation_history: Optional[list[dict[str, Any]]] = None,
     ) -> str:
         """Classify task type using keyword analysis.
 
@@ -413,7 +413,7 @@ class ToolSelectionCoordinator(IToolSelectionCoordinator):
     def extract_required_files(
         self,
         prompt: str,
-    ) -> Set[str]:
+    ) -> set[str]:
         """Extract required files from a prompt.
 
         Parses the prompt to find file paths that are explicitly mentioned
@@ -452,7 +452,7 @@ class ToolSelectionCoordinator(IToolSelectionCoordinator):
     def extract_required_outputs(
         self,
         prompt: str,
-    ) -> Set[str]:
+    ) -> set[str]:
         """Extract required outputs from a prompt.
 
         Parses the prompt to find output specifications (file paths,

@@ -23,7 +23,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.storage.checkpoints.protocol import (
     CheckpointData,
@@ -115,7 +115,7 @@ class SQLiteCheckpointBackend(CheckpointManagerProtocol):
     async def save_checkpoint(
         self,
         session_id: str,
-        state_data: Dict[str, Any],
+        state_data: dict[str, Any],
         metadata: CheckpointMetadata,
     ) -> str:
         """Save a checkpoint to SQLite.
@@ -258,7 +258,7 @@ class SQLiteCheckpointBackend(CheckpointManagerProtocol):
         session_id: str,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[CheckpointMetadata]:
+    ) -> list[CheckpointMetadata]:
         """List checkpoints for a session.
 
         Args:
@@ -467,7 +467,7 @@ class SQLiteCheckpointBackend(CheckpointManagerProtocol):
             logger.error(f"Failed to count checkpoints: {e}")
             return 0
 
-    async def get_all_sessions(self) -> List[str]:
+    async def get_all_sessions(self) -> list[str]:
         """Get all session IDs with checkpoints.
 
         Returns:

@@ -30,14 +30,11 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
     Optional,
     Protocol,
-    Union,
     runtime_checkable,
 )
+from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph
@@ -62,7 +59,7 @@ class IWorkflowExecutor(Protocol):
     async def execute(
         self,
         workflow: Any,
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
         """Execute a workflow.
@@ -89,7 +86,7 @@ class IStreamingExecutor(Protocol):
     async def stream(
         self,
         workflow: Any,
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         **kwargs: Any,
     ) -> AsyncIterator["WorkflowEvent"]:
         """Stream workflow execution events.
@@ -119,10 +116,10 @@ class IYAMLLoader(Protocol):
 
     def load_workflow_from_file(
         self,
-        path: Union[str, Path],
+        path: str | Path,
         workflow_name: Optional[str] = None,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
-        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[dict[str, Callable[..., Any]]] = None,
     ) -> "WorkflowDefinition":
         """Load a workflow definition from a YAML file.
 
@@ -151,11 +148,11 @@ class IYAMLWorkflowCoordinator(Protocol):
 
     async def execute(
         self,
-        yaml_path: Union[str, Path],
-        initial_state: Optional[Dict[str, Any]] = None,
+        yaml_path: str | Path,
+        initial_state: Optional[dict[str, Any]] = None,
         workflow_name: Optional[str] = None,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
-        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[dict[str, Callable[..., Any]]] = None,
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
         """Execute a YAML-defined workflow.
@@ -175,11 +172,11 @@ class IYAMLWorkflowCoordinator(Protocol):
 
     async def stream(
         self,
-        yaml_path: Union[str, Path],
-        initial_state: Optional[Dict[str, Any]] = None,
+        yaml_path: str | Path,
+        initial_state: Optional[dict[str, Any]] = None,
         workflow_name: Optional[str] = None,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
-        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[dict[str, Callable[..., Any]]] = None,
         **kwargs: Any,
     ) -> AsyncIterator["WorkflowEvent"]:
         """Stream events from YAML workflow execution.
@@ -213,7 +210,7 @@ class IGraphExecutor(Protocol):
     async def execute(
         self,
         graph: "CompiledGraph[Any]",
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
         """Execute a compiled StateGraph.
@@ -231,7 +228,7 @@ class IGraphExecutor(Protocol):
     async def stream(
         self,
         graph: "CompiledGraph[Any]",
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> AsyncIterator["WorkflowEvent"]:
         """Stream events from StateGraph execution.
@@ -261,9 +258,9 @@ class IHITLExecutor(Protocol):
 
     async def execute_with_hitl(
         self,
-        yaml_path: Union[str, Path],
-        initial_state: Optional[Dict[str, Any]] = None,
-        approval_callback: Optional[Callable[[Dict[str, Any]], bool]] = None,
+        yaml_path: str | Path,
+        initial_state: Optional[dict[str, Any]] = None,
+        approval_callback: Optional[Callable[[dict[str, Any]], bool]] = None,
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
         """Execute workflow with HITL approval nodes.

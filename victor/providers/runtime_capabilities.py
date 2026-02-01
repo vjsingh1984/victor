@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -16,4 +16,4 @@ class ProviderRuntimeCapabilities:
     supports_tools: bool
     supports_streaming: bool
     source: str = "config"  # e.g., "discovered", "config"
-    raw: Optional[Dict[str, Any]] = None
+    raw: Optional[dict[str, Any]] = None

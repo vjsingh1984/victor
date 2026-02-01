@@ -21,14 +21,11 @@ from __future__ import annotations
 
 import pytest
 
-from victor.agent.personas.persona_manager import PersonaManager
-from victor.agent.personas.persona_repository import PersonaRepository
 from victor.agent.personas.types import (
     AdaptedPersona,
     CommunicationStyle,
     Feedback,
     PersonalityType,
-    Persona,
 )
 
 

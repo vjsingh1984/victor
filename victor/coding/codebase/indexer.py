@@ -31,13 +31,13 @@ import asyncio
 import hashlib
 import json
 import logging
-import os
 import re
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 from pydantic import BaseModel, Field
 from tree_sitter import Query
@@ -48,12 +48,10 @@ from victor.coding.codebase.unified_extractor import UnifiedSymbolExtractor, Enr
 from victor.coding.languages.registry import get_language_registry
 from victor.coding.languages.tiers import get_tier, LanguageTier
 from victor.coding.codebase.graph.registry import create_graph_store
-from victor.storage.graph.sqlite_store import SqliteGraphStore
 from victor.coding.codebase.symbol_resolver import SymbolResolver
 
 if TYPE_CHECKING:
     from victor.coding.codebase.embeddings.base import BaseEmbeddingProvider
-    from victor.coding.codebase.graph.protocol import GraphStoreProtocol as CodingGraphStoreProtocol
     from victor.storage.graph.protocol import GraphStoreProtocol
 
 # Import Rust accelerator for stdlib detection via unified facade (5-10x faster)
@@ -179,7 +177,7 @@ def _process_file_parallel(
     file_path_str: str,
     root_str: str,
     language: str,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     """Process a single file for indexing in a subprocess.
 
     This is a module-level function (not a method) so it can be pickled
@@ -206,13 +204,13 @@ def _process_file_parallel(
         return None
 
     # Extract symbols using tree-sitter
-    symbols_data: List[Dict[str, Any]] = []
-    call_edges: List[Tuple[str, str]] = []
-    imports: List[str] = []
-    inherit_edges: List[Tuple[str, str]] = []
-    implements_edges: List[Tuple[str, str]] = []
-    compose_edges: List[Tuple[str, str]] = []
-    references: List[str] = []
+    symbols_data: list[dict[str, Any]] = []
+    call_edges: list[tuple[str, str]] = []
+    imports: list[str] = []
+    inherit_edges: list[tuple[str, str]] = []
+    implements_edges: list[tuple[str, str]] = []
+    compose_edges: list[tuple[str, str]] = []
+    references: list[str] = []
 
     # Tree-sitter symbol extraction
     try:
@@ -415,7 +413,7 @@ def _find_enclosing_function(node: Any, language: str) -> Optional[str]:
 # See: victor/codebase/tree_sitter_extractor.py for the new unified extractor
 # =============================================================================
 
-REFERENCE_QUERIES: Dict[str, str] = {
+REFERENCE_QUERIES: dict[str, str] = {
     "python": """
         (call function: (identifier) @name)
         (call function: (attribute attribute: (identifier) @name))
@@ -450,7 +448,7 @@ REFERENCE_QUERIES: Dict[str, str] = {
 }
 
 # Map file extensions to tree-sitter language ids
-EXTENSION_TO_LANGUAGE: Dict[str, str] = {
+EXTENSION_TO_LANGUAGE: dict[str, str] = {
     ".py": "python",
     ".js": "javascript",
     ".mjs": "javascript",
@@ -477,7 +475,7 @@ EXTENSION_TO_LANGUAGE: Dict[str, str] = {
 
 # Tree-sitter symbol queries per language for lightweight multi-language graph capture.
 # Uses @def capture for end_line (function body boundaries) and @name for symbol name.
-SYMBOL_QUERIES: Dict[str, List[Tuple[str, str]]] = {
+SYMBOL_QUERIES: dict[str, list[tuple[str, str]]] = {
     "python": [
         ("class", "(class_definition name: (identifier) @name) @def"),
         ("function", "(function_definition name: (identifier) @name) @def"),
@@ -540,7 +538,7 @@ SYMBOL_QUERIES: Dict[str, List[Tuple[str, str]]] = {
     ],
 }
 
-INHERITS_QUERIES: Dict[str, str] = {
+INHERITS_QUERIES: dict[str, str] = {
     "python": """
         (class_definition
             name: (identifier) @child
@@ -569,7 +567,7 @@ INHERITS_QUERIES: Dict[str, str] = {
     """,
 }
 
-IMPLEMENTS_QUERIES: Dict[str, str] = {
+IMPLEMENTS_QUERIES: dict[str, str] = {
     "typescript": """
         (class_declaration
             name: (identifier) @child
@@ -591,7 +589,7 @@ IMPLEMENTS_QUERIES: Dict[str, str] = {
     """,
 }
 
-COMPOSITION_QUERIES: Dict[str, str] = {
+COMPOSITION_QUERIES: dict[str, str] = {
     "javascript": """
         (class_declaration
             name: (identifier) @owner
@@ -643,7 +641,7 @@ COMPOSITION_QUERIES: Dict[str, str] = {
 }
 
 # Tree-sitter call queries (callee only) for multi-language call/reference edges.
-CALL_QUERIES: Dict[str, str] = {
+CALL_QUERIES: dict[str, str] = {
     "python": """
         (call function: (identifier) @callee)
         (call function: (attribute attribute: (identifier) @callee))
@@ -678,7 +676,7 @@ CALL_QUERIES: Dict[str, str] = {
 }
 
 # Mapping of function/method node types to name field for caller resolution.
-ENCLOSING_NAME_FIELDS: Dict[str, List[Tuple[str, str]]] = {
+ENCLOSING_NAME_FIELDS: dict[str, list[tuple[str, str]]] = {
     "python": [
         ("function_definition", "name"),
         ("class_definition", "name"),
@@ -730,7 +728,7 @@ else:
 
 
 # Module-level function for ProcessPoolExecutor (must be picklable)
-def _parse_file_worker(args: Tuple[str, str]) -> Optional[Dict[str, Any]]:
+def _parse_file_worker(args: tuple[str, str]) -> Optional[dict[str, Any]]:
     """Parse a single Python file and extract metadata.
 
     This is a module-level function for use with ProcessPoolExecutor.
@@ -761,7 +759,7 @@ def _parse_file_worker(args: Tuple[str, str]) -> Optional[Dict[str, Any]]:
 
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
-                symbol_entry: Dict[str, Any] = {
+                symbol_entry: dict[str, Any] = {
                     "name": node.name,
                     "type": "class",
                     "file_path": rel_path,
@@ -774,7 +772,7 @@ def _parse_file_worker(args: Tuple[str, str]) -> Optional[Dict[str, Any]]:
                 # Check if it's a method (inside a class)
                 name = node.name
                 # Build signature
-                args_list: List[str] = [arg.arg for arg in node.args.args]
+                args_list: list[str] = [arg.arg for arg in node.args.args]
                 signature = f"{node.name}({', '.join(args_list)})"
                 symbols.append(
                     {
@@ -820,8 +818,8 @@ class CodebaseFileHandler(FileSystemEventHandler):
     def __init__(
         self,
         on_change: Callable[[str], None],
-        file_patterns: List[str] | None = None,
-        ignore_patterns: List[str] | None = None,
+        file_patterns: list[str] | None = None,
+        ignore_patterns: list[str] | None = None,
     ):
         """Initialize file handler.
 
@@ -846,7 +844,7 @@ class CodebaseFileHandler(FileSystemEventHandler):
             ]
         )
         self._debounce_lock = threading.Lock()
-        self._pending_changes: Set[str] = set()
+        self._pending_changes: set[str] = set()
         self._debounce_timer: Optional[threading.Timer] = None
         self._debounce_delay = 0.5  # 500ms debounce
 
@@ -932,9 +930,9 @@ class IndexedSymbol(BaseModel):
     docstring: Optional[str] = None
     signature: Optional[str] = None
     parent_symbol: Optional[str] = None  # parent symbol name (for methods in classes)
-    references: List[str] = Field(default_factory=list)  # Files that reference this symbol
-    base_classes: List[str] = Field(default_factory=list)  # inheritance targets
-    composition: List[Tuple[str, str]] = Field(default_factory=list)  # (owner, member) for has-a
+    references: list[str] = Field(default_factory=list)  # Files that reference this symbol
+    base_classes: list[str] = Field(default_factory=list)  # inheritance targets
+    composition: list[tuple[str, str]] = Field(default_factory=list)  # (owner, member) for has-a
 
 
 # Backward compatibility alias
@@ -946,14 +944,14 @@ class FileMetadata(BaseModel):
 
     path: str
     language: str
-    symbols: List[Symbol] = Field(default_factory=list)
-    imports: List[str] = Field(default_factory=list)
-    dependencies: List[str] = Field(default_factory=list)  # Files this file depends on
-    call_edges: List[Tuple[str, str]] = Field(default_factory=list)  # (caller, callee) pairs
-    inherit_edges: List[Tuple[str, str]] = Field(default_factory=list)  # (child, base)
-    implements_edges: List[Tuple[str, str]] = Field(default_factory=list)  # (child, interface)
-    compose_edges: List[Tuple[str, str]] = Field(default_factory=list)  # (owner, member)
-    references: List[str] = Field(default_factory=list)  # Identifier references (tree-sitter/AST)
+    symbols: list[Symbol] = Field(default_factory=list)
+    imports: list[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)  # Files this file depends on
+    call_edges: list[tuple[str, str]] = Field(default_factory=list)  # (caller, callee) pairs
+    inherit_edges: list[tuple[str, str]] = Field(default_factory=list)  # (child, base)
+    implements_edges: list[tuple[str, str]] = Field(default_factory=list)  # (child, interface)
+    compose_edges: list[tuple[str, str]] = Field(default_factory=list)  # (owner, member)
+    references: list[str] = Field(default_factory=list)  # Identifier references (tree-sitter/AST)
     last_modified: float  # File mtime when indexed
     indexed_at: float = 0.0  # When this file was indexed
     size: int
@@ -1032,9 +1030,9 @@ class CodebaseIndex:
     def __init__(
         self,
         root_path: str,
-        ignore_patterns: Optional[List[str]] = None,
+        ignore_patterns: Optional[list[str]] = None,
         use_embeddings: bool = True,
-        embedding_config: Optional[Dict[str, Any]] = None,
+        embedding_config: Optional[dict[str, Any]] = None,
         enable_watcher: bool = True,
         graph_store: Optional["GraphStoreProtocol"] = None,
         graph_store_name: Optional[str] = None,
@@ -1100,14 +1098,14 @@ class CodebaseIndex:
         ]
 
         # Indexed data
-        self.files: Dict[str, FileMetadata] = {}
-        self.symbols: Dict[str, Symbol] = {}  # symbol_name -> Symbol
-        self.symbol_index: Dict[str, List[str]] = {}  # file -> symbol names
+        self.files: dict[str, FileMetadata] = {}
+        self.symbols: dict[str, Symbol] = {}  # symbol_name -> Symbol
+        self.symbol_index: dict[str, list[str]] = {}  # file -> symbol names
 
         # Staleness tracking
         self._is_indexed = False
         self._is_stale = False
-        self._changed_files: Set[str] = set()
+        self._changed_files: set[str] = set()
         self._last_indexed: Optional[float] = None
         self._staleness_lock = threading.Lock()
 
@@ -1117,7 +1115,7 @@ class CodebaseIndex:
         self._file_handler: Optional[CodebaseFileHandler] = None
 
         # Callbacks for change notifications (e.g., SymbolStore)
-        self._change_callbacks: List[Callable[[str], None]] = []
+        self._change_callbacks: list[Callable[[str], None]] = []
 
         # Graph store (per-repo, embedded in project.db)
         if graph_store is None:
@@ -1126,12 +1124,12 @@ class CodebaseIndex:
             )
         else:
             self.graph_store = graph_store
-        self._graph_nodes: List[GraphNode] = []
-        self._graph_edges: List[GraphEdge] = []
-        self._pending_call_edges: List[tuple[str, str, str]] = []  # caller_id, callee_name, file
-        self._pending_inherit_edges: List[tuple[str, str, str]] = []  # child_id, base_name, file
-        self._pending_implements_edges: List[tuple[str, str, str]] = []  # child_id, interface, file
-        self._pending_compose_edges: List[tuple[str, str, str]] = []  # owner_id, member_type, file
+        self._graph_nodes: list[GraphNode] = []
+        self._graph_edges: list[GraphEdge] = []
+        self._pending_call_edges: list[tuple[str, str, str]] = []  # caller_id, callee_name, file
+        self._pending_inherit_edges: list[tuple[str, str, str]] = []  # child_id, base_name, file
+        self._pending_implements_edges: list[tuple[str, str, str]] = []  # child_id, interface, file
+        self._pending_compose_edges: list[tuple[str, str, str]] = []  # owner_id, member_type, file
         self._symbol_resolver = SymbolResolver()
 
         # Embedding support (optional)
@@ -1269,7 +1267,7 @@ class CodebaseIndex:
                 logger.warning(f"Failed to clear graph store: {e}")
 
         # Discover all files matching watched patterns
-        files_to_index: List[Tuple[Path, str]] = []
+        files_to_index: list[tuple[Path, str]] = []
         for pattern in self.WATCHED_PATTERNS:
             for file_path in self.root.rglob(pattern):
                 if file_path.is_file() and not self._should_ignore(file_path):
@@ -1353,7 +1351,7 @@ class CodebaseIndex:
         self._last_indexed = time.time()
         logger.info(f"Indexed {len(self.files)} files with {len(self.symbols)} symbols")
 
-    async def _index_files_parallel(self, files_to_index: List[Tuple[Path, str]]) -> None:
+    async def _index_files_parallel(self, files_to_index: list[tuple[Path, str]]) -> None:
         """Index files using parallel processing with ProcessPoolExecutor.
 
         This method provides 3-8x speedup on multi-core systems by processing
@@ -1410,7 +1408,7 @@ class CodebaseIndex:
             f"({files_per_sec:.1f} files/sec, {errors} errors)"
         )
 
-    def _merge_parallel_result(self, result: Dict[str, Any]) -> None:
+    def _merge_parallel_result(self, result: dict[str, Any]) -> None:
         """Merge a parallel processing result into the index.
 
         Converts the result dictionary from _process_file_parallel into
@@ -1472,7 +1470,7 @@ class CodebaseIndex:
             logger.debug("Index is stale, rebuilding")
             await self.index_codebase()
 
-    async def incremental_reindex(self, files: Optional[List[str]] = None) -> Dict[str, Any]:
+    async def incremental_reindex(self, files: Optional[list[str]] = None) -> dict[str, Any]:
         """Perform incremental reindexing of changed files only.
 
         This method efficiently updates the index by only processing files that:
@@ -1494,7 +1492,7 @@ class CodebaseIndex:
             - unchanged: Count of files that didn't need updating
             - errors: List of files that failed to index
         """
-        stats: Dict[str, Any] = {
+        stats: dict[str, Any] = {
             "updated": [],
             "added": [],
             "removed": [],
@@ -1522,7 +1520,7 @@ class CodebaseIndex:
                         files_to_check.append(file_path)
 
         # Track current files to detect deletions
-        current_files: Set[str] = set()
+        current_files: set[str] = set()
 
         for file_path in files_to_check:
             if not file_path.exists():
@@ -1721,10 +1719,10 @@ class CodebaseIndex:
         return language.startswith("config")
 
     def _extract_references(
-        self, file_path: Path, language: str, fallback_calls: List[str], imports: List[str]
-    ) -> List[str]:
+        self, file_path: Path, language: str, fallback_calls: list[str], imports: list[str]
+    ) -> list[str]:
         """Extract identifier references using tree-sitter when available."""
-        refs: Set[str] = set(fallback_calls) | set(imports)
+        refs: set[str] = set(fallback_calls) | set(imports)
 
         # PRIMARY: Get reference query from language plugin
         query_src = None
@@ -1785,7 +1783,7 @@ class CodebaseIndex:
 
         return list(refs)
 
-    def _extract_config_keys(self, content: str, language: str) -> List[tuple[str, int]]:
+    def _extract_config_keys(self, content: str, language: str) -> list[tuple[str, int]]:
         """Extract top-level-ish config keys for JSON/YAML/INI/property files."""
         keys: dict[str, int] = {}
 
@@ -1835,12 +1833,12 @@ class CodebaseIndex:
     # Lines 866-1197 removed on 2025-12-11 during plugin architecture refactoring.
     # ========================================================================
 
-    def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> List[Symbol]:
+    def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> list[Symbol]:
         """Extract lightweight symbol declarations for non-Python languages via tree-sitter."""
         query_defs = SYMBOL_QUERIES.get(language)
         if not query_defs:
             return []
-        symbols: List[Symbol] = []
+        symbols: list[Symbol] = []
         parser = None
         try:
             from victor.coding.codebase.tree_sitter_manager import get_parser
@@ -1895,7 +1893,7 @@ class CodebaseIndex:
         except Exception:
             return []
 
-        regex_fallbacks: Dict[str, list[Tuple[str, str]]] = {
+        regex_fallbacks: dict[str, list[tuple[str, str]]] = {
             "javascript": [
                 ("class", r"class\s+(\w+)"),
                 ("function", r"function\s+(\w+)"),
@@ -1927,10 +1925,10 @@ class CodebaseIndex:
         return symbols
 
     def _extract_inheritance(
-        self, file_path: Path, language: str, symbols: List[Symbol]
-    ) -> List[Tuple[str, str]]:
+        self, file_path: Path, language: str, symbols: list[Symbol]
+    ) -> list[tuple[str, str]]:
         """Extract child->base inheritance edges."""
-        edges: List[Tuple[str, str]] = []
+        edges: list[tuple[str, str]] = []
         # First check if symbols have base_classes populated (from AST path)
         if language == "python":
             for sym in symbols:
@@ -2028,10 +2026,10 @@ class CodebaseIndex:
         return edges
 
     def _extract_implements(
-        self, file_path: Path, language: str, symbols: List[Symbol]
-    ) -> List[Tuple[str, str]]:
+        self, file_path: Path, language: str, symbols: list[Symbol]
+    ) -> list[tuple[str, str]]:
         """Extract child->interface implements edges for typed languages."""
-        edges: List[Tuple[str, str]] = []
+        edges: list[tuple[str, str]] = []
         query_src = IMPLEMENTS_QUERIES.get(language)
         parser = None
         try:
@@ -2079,10 +2077,10 @@ class CodebaseIndex:
         return edges
 
     def _extract_composition(
-        self, file_path: Path, language: str, symbols: List[Symbol]
-    ) -> List[Tuple[str, str]]:
+        self, file_path: Path, language: str, symbols: list[Symbol]
+    ) -> list[tuple[str, str]]:
         """Extract has-a/composition edges (owner -> member type)."""
-        edges: List[Tuple[str, str]] = []
+        edges: list[tuple[str, str]] = []
 
         # Python handled via AST visitor (class attributes)
         if language == "python":
@@ -2192,7 +2190,7 @@ class CodebaseIndex:
 
     def _extract_calls_with_tree_sitter(
         self, file_path: Path, language: str
-    ) -> List[Tuple[str, str]]:
+    ) -> list[tuple[str, str]]:
         """Extract caller->callee pairs using tree-sitter (non-Python)."""
         query_src = CALL_QUERIES.get(language)
         if not query_src:
@@ -2218,7 +2216,7 @@ class CodebaseIndex:
 
         from tree_sitter import QueryCursor
 
-        call_edges: List[Tuple[str, str]] = []
+        call_edges: list[tuple[str, str]] = []
         try:
             lang = parser.language
             if lang is None:
@@ -2279,7 +2277,7 @@ class CodebaseIndex:
         # Use unified extractor for tier-aware symbol extraction
         # This provides enhanced type info for Tier 1/2 languages
         tier_config = get_tier(language)
-        symbols: List[Symbol] = []
+        symbols: list[Symbol] = []
 
         if tier_config.tier in (LanguageTier.TIER_1, LanguageTier.TIER_2):
             # Try unified extractor first (provides enriched symbols)
@@ -2301,7 +2299,7 @@ class CodebaseIndex:
             symbols = self._extract_symbols_with_tree_sitter(file_path, language)
 
         call_edges = self._extract_calls_with_tree_sitter(file_path, language)
-        imports: List[str] = []
+        imports: list[str] = []
 
         # Lightweight Python import extraction (tree-sitter path omits imports today)
         if language == "python":
@@ -2629,7 +2627,7 @@ class CodebaseIndex:
         query: str,
         max_files: int = 10,
         auto_reindex: bool = True,
-    ) -> List[FileMetadata]:
+    ) -> list[FileMetadata]:
         """Find files relevant to a query.
 
         Automatically reindexes if the index is stale (lazy reindexing).
@@ -2692,7 +2690,7 @@ class CodebaseIndex:
                 return symbol
         return None
 
-    def get_file_context(self, file_path: str) -> Dict[str, Any]:
+    def get_file_context(self, file_path: str) -> dict[str, Any]:
         """Get full context for a file including dependencies.
 
         Args:
@@ -2714,7 +2712,7 @@ class CodebaseIndex:
             "dependents": self._find_dependents(file_path),
         }
 
-    def _find_dependents(self, file_path: str) -> List[FileMetadata]:
+    def _find_dependents(self, file_path: str) -> list[FileMetadata]:
         """Find files that depend on this file."""
         dependents = []
         for metadata in self.files.values():
@@ -2722,7 +2720,7 @@ class CodebaseIndex:
                 dependents.append(metadata)
         return dependents
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get index statistics including staleness information."""
         with self._staleness_lock:
             is_stale = self._is_stale
@@ -2746,7 +2744,7 @@ class CodebaseIndex:
             stats["embedding_stats"] = asyncio.run(self.embedding_provider.get_stats())
         return stats
 
-    def _initialize_embeddings(self, config: Optional[Dict[str, Any]]) -> None:
+    def _initialize_embeddings(self, config: Optional[dict[str, Any]]) -> None:
         """Initialize embedding provider.
 
         Embeddings are stored in {rootrepo}/.victor/embeddings/ directory by default.
@@ -2815,11 +2813,11 @@ class CodebaseIndex:
         self,
         query: str,
         max_results: int = 10,
-        filter_metadata: Optional[Dict[str, Any]] = None,
+        filter_metadata: Optional[dict[str, Any]] = None,
         auto_reindex: bool = True,
         similarity_threshold: Optional[float] = None,
         expand_query: bool = True,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Perform semantic search using embeddings with query expansion and threshold filtering.
 
         Automatically reindexes if the index is stale (lazy reindexing).
@@ -2939,12 +2937,12 @@ class SymbolVisitor(ast.NodeVisitor):
         self.metadata = metadata
         self.current_class: Optional[str] = None
         self.current_function: Optional[str] = None
-        self.call_edges: List[Tuple[str, str]] = []
-        self.composition_edges: List[Tuple[str, str]] = []
+        self.call_edges: list[tuple[str, str]] = []
+        self.composition_edges: list[tuple[str, str]] = []
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definition."""
-        bases: List[str] = []
+        bases: list[str] = []
         for base in node.bases:
             if isinstance(base, ast.Name):
                 bases.append(base.id)
@@ -3079,7 +3077,7 @@ class BackgroundIndexerService:
         self._stop_event = threading.Event()
         self._running = False
         self._last_run: Optional[float] = None
-        self._stats: Dict[str, Any] = {"runs": 0, "files_updated": 0, "errors": 0}
+        self._stats: dict[str, Any] = {"runs": 0, "files_updated": 0, "errors": 0}
 
         if auto_start:
             self.start()
@@ -3183,7 +3181,7 @@ class BackgroundIndexerService:
         finally:
             loop.close()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get background indexer statistics."""
         return {
             **self._stats,

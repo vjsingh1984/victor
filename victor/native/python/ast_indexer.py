@@ -27,7 +27,7 @@ during codebase indexing. The Rust implementation uses:
 from __future__ import annotations
 
 import re
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from victor.native.observability import InstrumentedAccelerator
 
@@ -274,7 +274,7 @@ class PythonAstIndexer(InstrumentedAccelerator):
             top_level = module_name.split(".")[0]
             return top_level in STDLIB_MODULES
 
-    def batch_is_stdlib_modules(self, module_names: List[str]) -> List[bool]:
+    def batch_is_stdlib_modules(self, module_names: list[str]) -> list[bool]:
         """Check multiple module names for stdlib membership.
 
         Args:
@@ -295,7 +295,7 @@ class PythonAstIndexer(InstrumentedAccelerator):
         top_level = module_name.split(".")[0]
         return top_level in STDLIB_MODULES
 
-    def extract_identifiers(self, source: str) -> List[str]:
+    def extract_identifiers(self, source: str) -> list[str]:
         """Extract all unique identifier references from source code.
 
         Uses regex pattern [A-Za-z_][A-Za-z0-9_]*.
@@ -314,7 +314,7 @@ class PythonAstIndexer(InstrumentedAccelerator):
             identifiers = set(_IDENTIFIER_PATTERN.findall(source))
             return list(identifiers)
 
-    def extract_identifiers_with_positions(self, source: str) -> List[Tuple[str, int, int]]:
+    def extract_identifiers_with_positions(self, source: str) -> list[tuple[str, int, int]]:
         """Extract identifiers with their positions.
 
         Args:
@@ -333,7 +333,7 @@ class PythonAstIndexer(InstrumentedAccelerator):
 
             return results
 
-    def filter_stdlib_imports(self, imports: List[str]) -> Tuple[List[str], List[str]]:
+    def filter_stdlib_imports(self, imports: list[str]) -> tuple[list[str], list[str]]:
         """Partition imports into stdlib and non-stdlib.
 
         Args:

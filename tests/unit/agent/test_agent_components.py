@@ -4,8 +4,7 @@ Phase 7.4: Tests for AgentBuilder, AgentSession, and AgentBridge components.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
-from typing import Any, Dict
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from victor.framework.agent_components import (
     AgentBridge,
@@ -930,7 +929,6 @@ class TestAgentBuilderContainerIntegration:
         from victor.core.container import ServiceContainer
         from victor.framework.service_provider import (
             FrameworkServiceProvider,
-            ToolConfiguratorService,
         )
 
         container = ServiceContainer()
@@ -955,7 +953,6 @@ class TestAgentBuilderContainerIntegration:
         from victor.core.container import ServiceContainer
         from victor.framework.service_provider import (
             FrameworkServiceProvider,
-            EventRegistryService,
         )
 
         container = ServiceContainer()

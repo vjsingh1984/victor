@@ -26,7 +26,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, Set
+from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 from victor.framework.chain_registry import get_chain_registry
 from victor.workflows.definition import (
@@ -40,9 +40,6 @@ from victor.workflows.definition import (
 )
 from victor.workflows.isolation import IsolationMapper
 from victor.workflows.resilience import (
-    CircuitBreaker,
-    CircuitBreakerRegistry,
-    CircuitState,
     RetryExecutor,
     retry_policy_to_strategy,
     get_node_circuit_breaker,
@@ -57,7 +54,7 @@ if TYPE_CHECKING:
     from victor.framework.rl.checkpoint_store import CheckpointStore
     from victor.tools.registry import ToolRegistry
     from victor.workflows.cache import WorkflowCache, WorkflowCacheConfig
-    from victor.workflows.services import ServiceRegistry, ServiceConfig
+    from victor.workflows.services import ServiceRegistry
     from victor.workflows.protocols import RetryPolicy
 
 logger = logging.getLogger(__name__)
@@ -106,7 +103,7 @@ class ComputeHandler(Protocol):
 
 
 # Global registry for compute handlers
-_compute_handlers: Dict[str, ComputeHandler] = {}
+_compute_handlers: dict[str, ComputeHandler] = {}
 
 
 def register_compute_handler(name: str, handler: ComputeHandler) -> None:
@@ -139,7 +136,7 @@ def get_compute_handler(name: str) -> Optional[ComputeHandler]:
     return _compute_handlers.get(name)
 
 
-def list_compute_handlers() -> List[str]:
+def list_compute_handlers() -> list[str]:
     """List all registered compute handler names."""
     return list(_compute_handlers.keys())
 
@@ -185,7 +182,7 @@ class NodeResult:
         """Check if node completed successfully."""
         return self.status == ExecutorNodeStatus.COMPLETED
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "node_id": self.node_id,
@@ -285,7 +282,7 @@ class TemporalContext:
             return data_dt <= as_of_dt
         return data_dt < as_of_dt
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "as_of_date": self.as_of_date,
@@ -295,7 +292,7 @@ class TemporalContext:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TemporalContext":
+    def from_dict(cls, data: dict[str, Any]) -> "TemporalContext":
         """Create from dictionary."""
         return cls(
             as_of_date=data.get("as_of_date"),
@@ -319,9 +316,9 @@ class WorkflowContext:
         temporal: Optional temporal context for point-in-time analysis
     """
 
-    data: Dict[str, Any] = field(default_factory=dict)
-    node_results: Dict[str, NodeResult] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
+    node_results: dict[str, NodeResult] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     temporal: Optional[TemporalContext] = None
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -332,7 +329,7 @@ class WorkflowContext:
         """Set a context value."""
         self.data[key] = value
 
-    def update(self, values: Dict[str, Any]) -> None:
+    def update(self, values: dict[str, Any]) -> None:
         """Update multiple context values."""
         self.data.update(values)
 
@@ -348,7 +345,7 @@ class WorkflowContext:
         """Check if any nodes failed."""
         return any(r.status == ExecutorNodeStatus.FAILED for r in self.node_results.values())
 
-    def get_outputs(self) -> Dict[str, Any]:
+    def get_outputs(self) -> dict[str, Any]:
         """Get all successful node outputs."""
         return {
             node_id: result.output
@@ -377,7 +374,7 @@ class WorkflowResult:
     total_tool_calls: int = 0
     error: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "workflow_name": self.workflow_name,
@@ -467,7 +464,7 @@ class WorkflowExecutor:
         self.default_timeout = default_timeout
         self._checkpointer = checkpointer
         self._sub_agents: Optional["SubAgentOrchestrator"] = None
-        self._active_executions: Dict[str, asyncio.Task[Any]] = {}
+        self._active_executions: dict[str, asyncio.Task[Any]] = {}
         self._tool_registry = tool_registry
         self._service_registry = service_registry
         self._services_started = False
@@ -486,7 +483,6 @@ class WorkflowExecutor:
         """Get or create SubAgentOrchestrator."""
         if self._sub_agents is None:
             from victor.agent.subagents.orchestrator import SubAgentOrchestrator
-            from victor.agent.orchestrator import AgentOrchestrator
 
             # Use the orchestrator directly if it has the required interface
             # SubAgentOrchestrator will adapt to the orchestrator protocol
@@ -535,7 +531,6 @@ class WorkflowExecutor:
         if not services_config:
             return
 
-        from victor.workflows.services import ServiceConfig
         from victor.workflows.yaml_loader import ServiceConfigYAML
 
         logger.info(f"Starting {len(services_config)} infrastructure services...")
@@ -601,7 +596,7 @@ class WorkflowExecutor:
             except Exception:
                 pass
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:
@@ -614,7 +609,7 @@ class WorkflowExecutor:
     async def execute(
         self,
         workflow: WorkflowDefinition,
-        initial_context: Optional[Dict[str, Any]] = None,
+        initial_context: Optional[dict[str, Any]] = None,
         *,
         timeout: Optional[float] = None,
         thread_id: Optional[str] = None,
@@ -761,11 +756,11 @@ class WorkflowExecutor:
             raise ValueError("Workflow has no start node")
 
         # Track executed nodes to prevent loops
-        executed: Set[str] = set()
+        executed: set[str] = set()
 
         # Resume from checkpoint node or start
         start_node = resume_from_node or workflow.start_node
-        to_execute: List[str] = [start_node]
+        to_execute: list[str] = [start_node]
 
         while to_execute:
             node_id = to_execute.pop(0)
@@ -817,7 +812,7 @@ class WorkflowExecutor:
         self,
         node: WorkflowNode,
         context: WorkflowContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """Get next nodes to execute based on node type.
 
         Args:
@@ -931,7 +926,6 @@ class WorkflowExecutor:
         Returns:
             NodeResult with execution outcome
         """
-        from victor.workflows.protocols import RetryPolicy as WorkflowRetryPolicy
 
         strategy = retry_policy_to_strategy(retry_policy)
         executor = RetryExecutor(strategy)
@@ -1160,10 +1154,9 @@ class WorkflowExecutor:
         Returns:
             NodeResult with combined outputs
         """
-        from victor.workflows.definition import WorkflowNode
 
         # Get the actual nodes to execute
-        parallel_nodes: List[WorkflowNode] = []
+        parallel_nodes: list[WorkflowNode] = []
         for node_id in node.parallel_nodes:
             # This requires access to the workflow definition
             # For now, store node references in metadata
@@ -1191,7 +1184,7 @@ class WorkflowExecutor:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Process results based on join strategy
-        node_results: List[NodeResult] = []
+        node_results: list[NodeResult] = []
         for r in results:
             if isinstance(r, Exception):
                 error_result = NodeResult(
@@ -1321,7 +1314,7 @@ class WorkflowExecutor:
 
             # Default tool execution with constraint enforcement
             tool_params = self._build_compute_params(node, context)
-            outputs: Dict[str, Any] = {}
+            outputs: dict[str, Any] = {}
             tool_calls_used = 0
             constraints = node.constraints
 
@@ -1482,7 +1475,7 @@ class WorkflowExecutor:
         self,
         node: ComputeNode,
         context: WorkflowContext,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build tool parameters from context using input mapping.
 
         Args:
@@ -1617,7 +1610,7 @@ class WorkflowExecutor:
     async def execute_by_name(
         self,
         workflow_name: str,
-        initial_context: Optional[Dict[str, Any]] = None,
+        initial_context: Optional[dict[str, Any]] = None,
         *,
         timeout: Optional[float] = None,
     ) -> WorkflowResult:
@@ -1743,7 +1736,7 @@ class WorkflowExecutor:
         workflow_name: str,
         last_node: str,
         next_node: Optional[str],
-        context_data: Dict[str, Any],
+        context_data: dict[str, Any],
     ) -> None:
         """Save workflow checkpoint using existing RL CheckpointStore.
 

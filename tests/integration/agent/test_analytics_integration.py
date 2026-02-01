@@ -28,16 +28,13 @@ from __future__ import annotations
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from typing import Dict, Any, Optional
+from typing import Any
 
 from victor.agent.coordinators.analytics_coordinator import (
     AnalyticsCoordinator,
-    SessionAnalytics,
-    ConsoleAnalyticsExporter,
 )
 from victor.protocols import (
     AnalyticsEvent,
-    AnalyticsQuery,
     AnalyticsResult,
     ExportResult,
     IAnalyticsExporter,

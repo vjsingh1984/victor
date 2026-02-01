@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import victor.framework.middleware as middleware_module
 
@@ -59,7 +59,7 @@ class MiddlewareProfile:
 
     name: str
     description: str
-    middlewares: List[Any] = field(default_factory=list)
+    middlewares: list[Any] = field(default_factory=list)
     priority: int = 50
 
 
@@ -259,7 +259,7 @@ def get_profile(name: str) -> Optional[MiddlewareProfile]:
     return profiles.get(name)
 
 
-def list_profiles() -> List[str]:
+def list_profiles() -> list[str]:
     """List all available profile names.
 
     Returns:

@@ -59,7 +59,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Union
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -113,14 +114,14 @@ class TaskTypeDefinition:
     category: TaskCategory
     hint: str = ""
     tool_budget: int = 10
-    priority_tools: List[str] = field(default_factory=list)
+    priority_tools: list[str] = field(default_factory=list)
     max_iterations: int = 30
-    aliases: Union[List[str], Set[str]] = field(default_factory=set)
+    aliases: list[str] | set[str] = field(default_factory=set)
     vertical: Optional[str] = None
     needs_tools: bool = True
     force_action_after_read: bool = False
-    stage_tools: Dict[str, List[str]] = field(default_factory=dict)
-    force_action_hints: Dict[str, str] = field(default_factory=dict)
+    stage_tools: dict[str, list[str]] = field(default_factory=dict)
+    force_action_hints: dict[str, str] = field(default_factory=dict)
     exploration_multiplier: float = 1.0
 
     def __post_init__(self) -> None:
@@ -161,10 +162,10 @@ class TaskTypeRegistry:
 
     def __init__(self) -> None:
         """Initialize empty registry. Use get_instance() for singleton access."""
-        self._core_types: Dict[str, TaskTypeDefinition] = {}
-        self._vertical_overrides: Dict[str, Dict[str, TaskTypeDefinition]] = {}
-        self._aliases: Dict[str, str] = {}
-        self._registration_hooks: List[Callable[["TaskTypeRegistry"], None]] = []
+        self._core_types: dict[str, TaskTypeDefinition] = {}
+        self._vertical_overrides: dict[str, dict[str, TaskTypeDefinition]] = {}
+        self._aliases: dict[str, str] = {}
+        self._registration_hooks: list[Callable[["TaskTypeRegistry"], None]] = []
 
     @classmethod
     def get_instance(cls) -> "TaskTypeRegistry":
@@ -316,7 +317,7 @@ class TaskTypeRegistry:
         definition = self.get(task_type, vertical)
         return definition.max_iterations if definition else 30
 
-    def get_priority_tools(self, task_type: str, vertical: Optional[str] = None) -> List[str]:
+    def get_priority_tools(self, task_type: str, vertical: Optional[str] = None) -> list[str]:
         """Get priority tools for a task type.
 
         Args:
@@ -344,7 +345,7 @@ class TaskTypeRegistry:
         definition = self.get(task_type, vertical)
         return definition.category if definition else None
 
-    def list_types(self, vertical: Optional[str] = None) -> List[str]:
+    def list_types(self, vertical: Optional[str] = None) -> list[str]:
         """List all registered task type names.
 
         Args:
@@ -358,7 +359,7 @@ class TaskTypeRegistry:
             names.update(self._vertical_overrides[vertical.lower()].keys())
         return sorted(names)
 
-    def list_verticals(self) -> List[str]:
+    def list_verticals(self) -> list[str]:
         """List all registered verticals.
 
         Returns:

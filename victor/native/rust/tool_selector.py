@@ -29,7 +29,7 @@ when Rust is unavailable, ensuring compatibility across all environments.
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 import numpy as np
 
@@ -98,9 +98,9 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
 
     def cosine_similarity_batch(
         self,
-        query: List[float],
-        tools: List[List[float]],
-    ) -> List[float]:
+        query: list[float],
+        tools: list[list[float]],
+    ) -> list[float]:
         """Compute cosine similarities between query and multiple tools.
 
         Args:
@@ -135,9 +135,9 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
 
     def _python_cosine_similarity_batch(
         self,
-        query: List[float],
-        tools: List[List[float]],
-    ) -> List[float]:
+        query: list[float],
+        tools: list[list[float]],
+    ) -> list[float]:
         """Python fallback for cosine similarity computation.
 
         Uses NumPy for vectorized operations, providing reasonable
@@ -163,7 +163,7 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
 
             return similarities
 
-    def topk_indices(self, scores: List[float], k: int) -> List[int]:
+    def topk_indices(self, scores: list[float], k: int) -> list[int]:
         """Select top-k indices from scores.
 
         Args:
@@ -196,7 +196,7 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
         else:
             return self._python_topk_indices(scores, k)
 
-    def _python_topk_indices(self, scores: List[float], k: int) -> List[int]:
+    def _python_topk_indices(self, scores: list[float], k: int) -> list[int]:
         """Python fallback for top-k selection.
 
         Uses NumPy argsort for efficient selection.
@@ -209,7 +209,7 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
             top_k_indices = indices[np.argsort(arr[indices])[::-1]]
             return top_k_indices.tolist()
 
-    def topk_with_scores(self, scores: List[float], k: int) -> List[Tuple[int, float]]:
+    def topk_with_scores(self, scores: list[float], k: int) -> list[tuple[int, float]]:
         """Select top-k (index, score) pairs from scores.
 
         Args:
@@ -239,7 +239,7 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
         else:
             return self._python_topk_with_scores(scores, k)
 
-    def _python_topk_with_scores(self, scores: List[float], k: int) -> List[Tuple[int, float]]:
+    def _python_topk_with_scores(self, scores: list[float], k: int) -> list[tuple[int, float]]:
         """Python fallback for top-k with scores."""
         with self._timed_call("topk_with_scores_python"):
             indices = self._python_topk_indices(scores, k)
@@ -247,10 +247,10 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
 
     def filter_by_category(
         self,
-        tools: List[str],
-        available_categories: Set[str],
-        tool_category_map: Dict[str, str],
-    ) -> List[str]:
+        tools: list[str],
+        available_categories: set[str],
+        tool_category_map: dict[str, str],
+    ) -> list[str]:
         """Filter tools by category membership.
 
         Args:
@@ -283,10 +283,10 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
 
     def _python_filter_by_category(
         self,
-        tools: List[str],
-        available_categories: Set[str],
-        tool_category_map: Dict[str, str],
-    ) -> List[str]:
+        tools: list[str],
+        available_categories: set[str],
+        tool_category_map: dict[str, str],
+    ) -> list[str]:
         """Python fallback for category filtering.
 
         Uses list comprehension with set membership check.
@@ -296,13 +296,13 @@ class ToolSelectorAccelerator(InstrumentedAccelerator):
 
     def filter_and_rank(
         self,
-        query: List[float],
-        tools: List[List[float]],
-        tool_names: List[str],
-        available_categories: Set[str],
-        tool_category_map: Dict[str, str],
+        query: list[float],
+        tools: list[list[float]],
+        tool_names: list[str],
+        available_categories: set[str],
+        tool_category_map: dict[str, str],
         k: int,
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """Combined filter and rank operation.
 
         Filters tools by category, then computes similarities and returns

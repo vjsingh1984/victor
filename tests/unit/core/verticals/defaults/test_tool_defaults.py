@@ -18,13 +18,11 @@ Tests the shared tool defaults infrastructure that verticals should use
 to eliminate code duplication.
 """
 
-import pytest
 
 from victor.core.tool_types import ToolDependency
 from victor.core.verticals.defaults.tool_defaults import (
     COMMON_TOOL_CLUSTERS,
     COMMON_TOOL_DEPENDENCIES,
-    COMMON_TOOL_TRANSITIONS,
     COMMON_REQUIRED_TOOLS,
     COMMON_OPTIONAL_TOOLS,
     merge_clusters,

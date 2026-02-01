@@ -27,7 +27,7 @@ Following the refinement plan, these protocols extend existing Victor
 infrastructure and follow SOLID principles.
 """
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable, TYPE_CHECKING
+from typing import Any, Optional, Protocol, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     try:
@@ -60,9 +60,9 @@ class GraphModification:
         self,
         modification_type: str,
         description: str,
-        node_data: Optional[Dict[str, Any]] = None,
-        edge_data: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        node_data: Optional[dict[str, Any]] = None,
+        edge_data: Optional[dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize graph modification.
 
@@ -87,9 +87,9 @@ class AdaptationValidationResult:
     def __init__(
         self,
         is_valid: bool,
-        errors: Optional[List[str]] = None,
-        warnings: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        errors: Optional[list[str]] = None,
+        warnings: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize validation result.
 
@@ -108,7 +108,7 @@ class AdaptationValidationResult:
 class CompiledGraph:
     """Compiled workflow graph (alias for type clarity)."""
 
-    def __init__(self, graph: Any, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, graph: Any, metadata: Optional[dict[str, Any]] = None) -> None:
         """Initialize compiled graph wrapper.
 
         Args:
@@ -126,7 +126,7 @@ class ModifiedGraph:
         self,
         graph: CompiledGraph,
         modification: GraphModification,
-        changes: Dict[str, Any],
+        changes: dict[str, Any],
     ) -> None:
         """Initialize modified graph.
 
@@ -145,12 +145,12 @@ class AdaptationImpact:
 
     def __init__(
         self,
-        affects_nodes: List[str],
-        affects_edges: List[tuple[str, str]],
+        affects_nodes: list[str],
+        affects_edges: list[tuple[str, str]],
         execution_path_change: bool,
         performance_impact: str,  # "positive", "neutral", "negative"
         risk_level: str,  # "low", "medium", "high"
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize adaptation impact.
 
@@ -294,7 +294,7 @@ class GraphApplier(Protocol):
     async def apply_batch(
         self,
         graph: CompiledGraph,
-        modifications: List[GraphModification],
+        modifications: list[GraphModification],
     ) -> ModifiedGraph:
         """Apply multiple modifications atomically.
 
@@ -314,7 +314,7 @@ class GraphApplier(Protocol):
         self,
         graph: CompiledGraph,
         modification: GraphModification,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Preview changes without applying.
 
         Args:
@@ -443,8 +443,8 @@ class ImpactAnalyzer(Protocol):
 
     async def compare_states(
         self,
-        before: Dict[str, Any],
-        after: Dict[str, Any],
+        before: dict[str, Any],
+        after: dict[str, Any],
     ) -> AdaptationImpact:
         """Compare before/after states.
 

@@ -26,7 +26,7 @@ Features:
 """
 
 import logging
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional, cast
 
 from victor.agent.tool_calling.base import ToolCall
 
@@ -76,7 +76,7 @@ class ToolCallSignatureManager:
     def compute_signature(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
     ) -> int:
         """
         Compute a signature hash for a tool call.
@@ -111,9 +111,9 @@ class ToolCallSignatureManager:
 
     def compute_batch_signatures(
         self,
-        tool_names: List[str],
-        arguments_list: List[Dict[str, Any]],
-    ) -> List[int]:
+        tool_names: list[str],
+        arguments_list: list[dict[str, Any]],
+    ) -> list[int]:
         """
         Compute signatures for multiple tool calls in batch.
 
@@ -139,7 +139,7 @@ class ToolCallSignatureManager:
                     tool_names,
                     arguments_list,
                 )
-                return cast(List[int], result)
+                return cast(list[int], result)
             except Exception as e:
                 logger.error(f"Rust batch signature computation failed: {e}")
                 raise
@@ -153,8 +153,8 @@ class ToolCallSignatureManager:
 
     def deduplicate_tool_calls(
         self,
-        tool_calls: List[ToolCall],
-    ) -> List[ToolCall]:
+        tool_calls: list[ToolCall],
+    ) -> list[ToolCall]:
         """
         Deduplicate a list of tool calls based on their signatures.
 
@@ -209,9 +209,9 @@ class ToolCallSignatureManager:
 
     def detect_loops(
         self,
-        tool_calls: List[ToolCall],
+        tool_calls: list[ToolCall],
         threshold: int = 3,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Detect potential loops by finding repeated tool calls.
 
@@ -222,8 +222,8 @@ class ToolCallSignatureManager:
         Returns:
             List of tool names that appear to be in a loop
         """
-        signature_counts: Dict[int, int] = {}
-        signature_to_tool: Dict[int, str] = {}
+        signature_counts: dict[int, int] = {}
+        signature_to_tool: dict[int, str] = {}
 
         for call in tool_calls:
             sig = self.compute_signature(call.name, call.arguments)
@@ -269,7 +269,7 @@ def get_signature_manager() -> ToolCallSignatureManager:
     return _default_manager
 
 
-def compute_signature(tool_name: str, arguments: Dict[str, Any]) -> int:
+def compute_signature(tool_name: str, arguments: dict[str, Any]) -> int:
     """
     Compute a signature hash for a tool call (convenience function).
 
@@ -283,7 +283,7 @@ def compute_signature(tool_name: str, arguments: Dict[str, Any]) -> int:
     return get_signature_manager().compute_signature(tool_name, arguments)
 
 
-def deduplicate_tool_calls(tool_calls: List[ToolCall]) -> List[ToolCall]:
+def deduplicate_tool_calls(tool_calls: list[ToolCall]) -> list[ToolCall]:
     """
     Deduplicate tool calls (convenience function).
 

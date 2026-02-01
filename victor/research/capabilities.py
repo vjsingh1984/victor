@@ -38,17 +38,17 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 from victor.framework.capabilities.base_vertical_capability_provider import (
     BaseVerticalCapabilityProvider,
     CapabilityDefinition,
 )
-from victor.framework.protocols import CapabilityType, OrchestratorCapability
-from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.protocols import CapabilityType
+from victor.framework.capability_loader import CapabilityEntry
 
 if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def configure_source_verification(
     )
 
 
-def get_source_verification(orchestrator: Any) -> Dict[str, Any]:
+def get_source_verification(orchestrator: Any) -> dict[str, Any]:
     """Get current source verification configuration.
 
     Args:
@@ -106,7 +106,7 @@ def get_source_verification(orchestrator: Any) -> Dict[str, Any]:
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
     return cast(
-        Dict[str, Any],
+        dict[str, Any],
         context.get_capability_config(
             "source_verification",
             {
@@ -149,7 +149,7 @@ def configure_citation_management(
     logger.info(f"Configured citation management: style={default_style}")
 
 
-def get_citation_config(orchestrator: Any) -> Dict[str, Any]:
+def get_citation_config(orchestrator: Any) -> dict[str, Any]:
     """Get current citation configuration.
 
     Args:
@@ -161,7 +161,7 @@ def get_citation_config(orchestrator: Any) -> Dict[str, Any]:
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
     return cast(
-        Dict[str, Any],
+        dict[str, Any],
         context.get_capability_config(
             "citation_management",
             {
@@ -207,7 +207,7 @@ def configure_research_quality(
     )
 
 
-def get_research_quality(orchestrator: Any) -> Dict[str, Any]:
+def get_research_quality(orchestrator: Any) -> dict[str, Any]:
     """Get current research quality configuration.
 
     Args:
@@ -219,7 +219,7 @@ def get_research_quality(orchestrator: Any) -> Dict[str, Any]:
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
     return cast(
-        Dict[str, Any],
+        dict[str, Any],
         context.get_capability_config(
             "research_quality",
             {
@@ -265,7 +265,7 @@ def configure_literature_analysis(
     )
 
 
-def get_literature_config(orchestrator: Any) -> Dict[str, Any]:
+def get_literature_config(orchestrator: Any) -> dict[str, Any]:
     """Get current literature analysis configuration.
 
     Args:
@@ -277,7 +277,7 @@ def get_literature_config(orchestrator: Any) -> Dict[str, Any]:
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
     return cast(
-        Dict[str, Any],
+        dict[str, Any],
         context.get_capability_config(
             "literature_analysis",
             {
@@ -323,7 +323,7 @@ def configure_fact_checking(
     )
 
 
-def get_fact_checking_config(orchestrator: Any) -> Dict[str, Any]:
+def get_fact_checking_config(orchestrator: Any) -> dict[str, Any]:
     """Get current fact-checking configuration.
 
     Args:
@@ -335,7 +335,7 @@ def get_fact_checking_config(orchestrator: Any) -> Dict[str, Any]:
     # SOLID DIP: Read from VerticalContext instead of direct attribute access
     context = orchestrator.vertical_context
     return cast(
-        Dict[str, Any],
+        dict[str, Any],
         context.get_capability_config(
             "fact_checking",
             {
@@ -377,7 +377,7 @@ class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
         """Initialize the research capability provider."""
         super().__init__("research")
 
-    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+    def _get_capability_definitions(self) -> dict[str, CapabilityDefinition]:
         """Define research capability definitions.
 
         Returns:
@@ -490,23 +490,23 @@ class ResearchCapabilityProvider(BaseVerticalCapabilityProvider):
         configure_fact_checking(orchestrator, **kwargs)
         self._applied.add("fact_checking")
 
-    def get_source_verification(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_source_verification(self, orchestrator: Any) -> dict[str, Any]:
         """Get source verification configuration."""
         return get_source_verification(orchestrator)
 
-    def get_citation_config(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_citation_config(self, orchestrator: Any) -> dict[str, Any]:
         """Get citation configuration."""
         return get_citation_config(orchestrator)
 
-    def get_research_quality(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_research_quality(self, orchestrator: Any) -> dict[str, Any]:
         """Get research quality configuration."""
         return get_research_quality(orchestrator)
 
-    def get_literature_config(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_literature_config(self, orchestrator: Any) -> dict[str, Any]:
         """Get literature configuration."""
         return get_literature_config(orchestrator)
 
-    def get_fact_checking_config(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_fact_checking_config(self, orchestrator: Any) -> dict[str, Any]:
         """Get fact-checking configuration."""
         return get_fact_checking_config(orchestrator)
 
@@ -529,7 +529,7 @@ def _get_provider() -> ResearchCapabilityProvider:
 
 
 # Generate CAPABILITIES list from provider
-CAPABILITIES: List[CapabilityEntry] = []
+CAPABILITIES: list[CapabilityEntry] = []
 
 
 def _generate_capabilities_list() -> None:
@@ -548,7 +548,7 @@ _generate_capabilities_list()
 # =============================================================================
 
 
-def get_research_capabilities() -> List[CapabilityEntry]:
+def get_research_capabilities() -> list[CapabilityEntry]:
     """Get all Research capability entries.
 
     Returns:
@@ -563,13 +563,12 @@ def create_research_capability_loader() -> Any:
     Returns:
         CapabilityLoader with Research capabilities registered
     """
-    from victor.framework.capability_loader import CapabilityLoader
 
     provider = _get_provider()
     return provider.create_capability_loader()
 
 
-def get_capability_configs() -> Dict[str, Any]:
+def get_capability_configs() -> dict[str, Any]:
     """Get Research capability configurations for centralized storage.
 
     Returns default Research configuration for VerticalContext storage.

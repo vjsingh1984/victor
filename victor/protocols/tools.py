@@ -26,7 +26,7 @@ Design Principles:
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -55,7 +55,7 @@ class ToolProtocol(Protocol):
         ...
 
     @property
-    def allowed_tools(self) -> Optional[List[str]]:
+    def allowed_tools(self) -> Optional[list[str]]:
         """Get list of allowed tool names, if restricted.
 
         Returns:

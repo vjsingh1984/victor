@@ -42,10 +42,7 @@ from __future__ import annotations
 import logging
 from typing import (
     Any,
-    Callable,
     Optional,
-    Set,
-    Type,
     TypeVar,
 )
 
@@ -56,7 +53,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-def check_protocol(obj: Any, protocol: Type[T]) -> Optional[T]:
+def check_protocol(obj: Any, protocol: type[T]) -> Optional[T]:
     """Check if object conforms to protocol using isinstance.
 
     This function provides consistent protocol checking without hasattr fallbacks.
@@ -90,7 +87,7 @@ def check_protocol(obj: Any, protocol: Type[T]) -> Optional[T]:
 def check_protocol_optional(
     obj: Any,
     method_name: str,
-    protocol: Type[T],
+    protocol: type[T],
 ) -> Optional[T]:
     """Check optional provider pattern: obj.method_name() -> protocol conformant.
 
@@ -132,7 +129,7 @@ def check_protocol_optional(
     return check_protocol(provider, protocol)
 
 
-def is_protocol_conformant(obj: Any, protocol: Type[T]) -> bool:
+def is_protocol_conformant(obj: Any, protocol: type[T]) -> bool:
     """Check if object conforms to protocol (boolean result).
 
     Simple helper that returns True/False instead of the object.
@@ -147,7 +144,7 @@ def is_protocol_conformant(obj: Any, protocol: Type[T]) -> bool:
     return check_protocol(obj, protocol) is not None
 
 
-def get_protocol_methods(protocol: Type[Any]) -> Set[str]:
+def get_protocol_methods(protocol: type[Any]) -> set[str]:
     """Get the method names defined by a protocol.
 
     Args:
@@ -184,7 +181,7 @@ def get_protocol_methods(protocol: Type[Any]) -> Set[str]:
     return methods
 
 
-def protocol_error_message(obj: Any, protocol: Type[Any]) -> str:
+def protocol_error_message(obj: Any, protocol: type[Any]) -> str:
     """Generate an error message for protocol non-conformance.
 
     Args:
@@ -213,7 +210,7 @@ def protocol_error_message(obj: Any, protocol: Type[Any]) -> str:
     return f"{obj_type} does not conform to {protocol_name}"
 
 
-def require_protocol(obj: Any, protocol: Type[T], context: str = "") -> T:
+def require_protocol(obj: Any, protocol: type[T], context: str = "") -> T:
     """Require that object conforms to protocol, raise if not.
 
     Use this when protocol conformance is mandatory.

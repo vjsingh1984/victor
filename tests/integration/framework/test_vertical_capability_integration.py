@@ -32,12 +32,12 @@ For each vertical, tests verify:
 - Capabilities can be applied to orchestrator
 """
 
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 from unittest.mock import MagicMock
 
 import pytest
 
-from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
+from victor.framework.capabilities import BaseCapabilityProvider
 from victor.coding.workflows import CodingWorkflowProvider
 from victor.devops.workflows import DevOpsWorkflowProvider
 from victor.dataanalysis.workflows import DataAnalysisWorkflowProvider
@@ -51,13 +51,13 @@ class MockVerticalContext:
 
     def __init__(self, orchestrator: Any = None):
         """Initialize mock vertical context."""
-        self.team_specs: Dict = {}
+        self.team_specs: dict = {}
         self.tools: list = []
         self.capabilities: list = []
-        self._capability_configs: Dict = {}
+        self._capability_configs: dict = {}
         self._orchestrator = orchestrator
 
-    def set_capability_config(self, name: str, config: Dict) -> None:
+    def set_capability_config(self, name: str, config: dict) -> None:
         """Set capability configuration.
 
         Also sets legacy attributes on orchestrator for backward compatibility.
@@ -97,7 +97,7 @@ class MockVerticalContext:
                 key = name[4:]  # Remove "rag_" prefix
                 self._orchestrator.rag_config[key] = config
 
-    def get_capability_config(self, name: str, default: Any = None) -> Optional[Dict]:
+    def get_capability_config(self, name: str, default: Any = None) -> Optional[dict]:
         """Get capability configuration."""
         return self._capability_configs.get(name, default)
 
@@ -113,30 +113,30 @@ class MockOrchestrator:
         """Initialize mock orchestrator with config storage."""
         self.vertical_context = MockVerticalContext(orchestrator=self)
 
-        self.source_verification_config: Optional[Dict] = None
-        self.citation_config: Optional[Dict] = None
-        self.research_quality_config: Optional[Dict] = None
-        self.literature_config: Optional[Dict] = None
-        self.fact_checking_config: Optional[Dict] = None
+        self.source_verification_config: Optional[dict] = None
+        self.citation_config: Optional[dict] = None
+        self.research_quality_config: Optional[dict] = None
+        self.literature_config: Optional[dict] = None
+        self.fact_checking_config: Optional[dict] = None
 
-        self.safety_config: Dict = {"git": {}, "deployment": {}}
-        self.code_style: Optional[Dict] = None
-        self.test_config: Optional[Dict] = None
-        self.lsp_config: Optional[Dict] = None
-        self.refactor_config: Optional[Dict] = None
+        self.safety_config: dict = {"git": {}, "deployment": {}}
+        self.code_style: Optional[dict] = None
+        self.test_config: Optional[dict] = None
+        self.lsp_config: Optional[dict] = None
+        self.refactor_config: Optional[dict] = None
 
-        self.container_config: Optional[Dict] = None
-        self.infra_config: Optional[Dict] = None
-        self.cicd_config: Optional[Dict] = None
-        self.monitoring_config: Optional[Dict] = None
+        self.container_config: Optional[dict] = None
+        self.infra_config: Optional[dict] = None
+        self.cicd_config: Optional[dict] = None
+        self.monitoring_config: Optional[dict] = None
 
-        self.data_quality_config: Optional[Dict] = None
-        self.visualization_config: Optional[Dict] = None
-        self.statistics_config: Optional[Dict] = None
-        self.ml_config: Optional[Dict] = None
-        self.privacy_config: Optional[Dict] = None
+        self.data_quality_config: Optional[dict] = None
+        self.visualization_config: Optional[dict] = None
+        self.statistics_config: Optional[dict] = None
+        self.ml_config: Optional[dict] = None
+        self.privacy_config: Optional[dict] = None
 
-        self.rag_config: Dict = {}
+        self.rag_config: dict = {}
 
 
 class TestResearchVerticalCapabilities:
@@ -259,7 +259,6 @@ class TestResearchVerticalCapabilities:
         from victor.research.capabilities import (
             get_source_verification,
             get_citation_config,
-            get_research_quality,
         )
 
         orchestrator = MockOrchestrator()

@@ -32,7 +32,6 @@ import logging
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Optional,
 )
 
@@ -188,7 +187,7 @@ class CacheCoordinator:
             return count
         return 0
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns comprehensive statistics for result caching,
@@ -202,7 +201,7 @@ class CacheCoordinator:
             - definition_cache: Definition cache stats
             - graph_cache: Compiled graph cache stats
         """
-        stats: Dict[str, Any] = {
+        stats: dict[str, Any] = {
             "enabled": self._caching_enabled,
             "ttl_seconds": self._cache_ttl_seconds,
             "result_caches": {},
@@ -224,7 +223,7 @@ class CacheCoordinator:
 
         return stats
 
-    def get_result_cache_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_result_cache_stats(self) -> dict[str, dict[str, Any]]:
         """Get result cache statistics for all workflows.
 
         Returns:
@@ -234,7 +233,7 @@ class CacheCoordinator:
             return self._cache_manager.get_all_stats()
         return {}
 
-    def get_definition_cache_stats(self) -> Dict[str, Any]:
+    def get_definition_cache_stats(self) -> dict[str, Any]:
         """Get definition cache statistics.
 
         Returns:
@@ -244,7 +243,7 @@ class CacheCoordinator:
             return self._definition_cache.get_stats()
         return {}
 
-    def get_graph_cache_stats(self) -> Dict[str, Any]:
+    def get_graph_cache_stats(self) -> dict[str, Any]:
         """Get compiled graph cache statistics.
 
         Returns:

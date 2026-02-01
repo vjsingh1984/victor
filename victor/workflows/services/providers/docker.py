@@ -31,21 +31,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.workflows.services.definition import (
-    PortMapping,
     ServiceConfig,
     ServiceHandle,
     ServiceStartError,
     ServiceState,
-    VolumeMount,
 )
 from victor.workflows.services.providers.base import BaseServiceProvider
 
 if TYPE_CHECKING:
-    import docker
     from docker.models.containers import Container
 
 logger = logging.getLogger(__name__)
@@ -121,9 +117,9 @@ class DockerServiceProvider(BaseServiceProvider):
         self,
         config: ServiceConfig,
         handle: ServiceHandle,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build Docker container configuration."""
-        container_config: Dict[str, Any] = {
+        container_config: dict[str, Any] = {
             "image": config.image,
             "name": handle.service_id,
             "detach": True,
@@ -138,7 +134,7 @@ class DockerServiceProvider(BaseServiceProvider):
 
         # Port mappings
         if config.ports:
-            ports: Dict[str, Optional[Tuple[str, int]]] = {}
+            ports: dict[str, Optional[tuple[str, int]]] = {}
             for pm in config.ports:
                 port_key = f"{pm.container_port}/{pm.protocol}"
                 if pm.host_port == 0:
@@ -342,7 +338,7 @@ class DockerServiceProvider(BaseServiceProvider):
         self,
         handle: ServiceHandle,
         command: str,
-    ) -> Tuple[int, str]:
+    ) -> tuple[int, str]:
         """Execute a command inside the container."""
         if not handle.container_id:
             raise RuntimeError("No container ID")
@@ -383,7 +379,7 @@ class DockerServiceProvider(BaseServiceProvider):
         """
         loop = asyncio.get_event_loop()
 
-        filters: Dict[str, Any] = {"label": f"{self._label_prefix}.managed=true"}
+        filters: dict[str, Any] = {"label": f"{self._label_prefix}.managed=true"}
         if label_filter:
             filters["label"] = [filters["label"], label_filter]
 
@@ -396,7 +392,6 @@ class DockerServiceProvider(BaseServiceProvider):
             count = 0
             for container in containers:
                 try:
-                    from docker.models.containers import Container
 
                     def remove_container(c: Container = container) -> None:
                         c.remove(force=True)
@@ -416,7 +411,7 @@ class DockerServiceProvider(BaseServiceProvider):
             logger.error(f"Cleanup failed: {e}")
             return 0
 
-    def list_running(self) -> List[Dict[str, Any]]:
+    def list_running(self) -> list[dict[str, Any]]:
         """List all running managed containers.
 
         Returns:

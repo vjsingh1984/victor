@@ -20,7 +20,7 @@ language-aware code completions.
 
 import logging
 import typing
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from victor.coding.completion.protocol import (
     CompletionCapabilities,

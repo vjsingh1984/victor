@@ -145,9 +145,9 @@ When to use the pipeline instead:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-from victor.agent.capability_registry import CAPABILITY_METHOD_MAPPINGS, get_method_for_capability
+from victor.agent.capability_registry import get_method_for_capability
 from victor.core.errors import CapabilityRegistryRequiredError
 
 if TYPE_CHECKING:
@@ -276,7 +276,7 @@ class VerticalIntegrationAdapter:
 
         return False
 
-    def apply_middleware(self, middleware: List[Any]) -> None:
+    def apply_middleware(self, middleware: list[Any]) -> None:
         """Apply middleware from vertical (single implementation).
 
         This method consolidates the two previous implementations:
@@ -359,7 +359,7 @@ class VerticalIntegrationAdapter:
 
         logger.debug(f"Applied {len(middleware)} middleware from vertical")
 
-    def apply_safety_patterns(self, patterns: List[Any]) -> None:
+    def apply_safety_patterns(self, patterns: list[Any]) -> None:
         """Apply safety patterns from vertical (single implementation).
 
         This method consolidates the two previous implementations:

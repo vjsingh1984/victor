@@ -64,19 +64,16 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 from uuid import uuid4
 
-from victor.agent.mcp_connector import MCPServerInfo
-from victor.core.events import UnifiedEventType, get_events_by_category
+from victor.core.events import UnifiedEventType
 from victor.protocols.tool_selector import (
     IToolSelector,
     ToolSelectionContext,
-    ToolSelectionStrategy,
 )
 from victor.tools.base import BaseTool
 from victor.tools.enums import CostTier
@@ -101,14 +98,14 @@ class AvailableTool:
 
     name: str
     description: str
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
     cost_tier: CostTier
     category: str = "general"
     source: str = "registry"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "name": self.name,
@@ -159,9 +156,9 @@ class ToolSignature:
     """
 
     tool_name: str
-    input_types: Dict[str, str]
+    input_types: dict[str, str]
     output_type: str
-    semantic_tags: List[str] = field(default_factory=list)
+    semantic_tags: list[str] = field(default_factory=list)
     complexity: int = 5
 
     def matches_signature(self, other: "ToolSignature") -> float:
@@ -209,13 +206,13 @@ class Skill:
     id: str = field(default_factory=lambda: str(uuid4()))
     name: str = ""
     description: str = ""
-    tools: List[AvailableTool] = field(default_factory=list)
-    dependencies: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    tools: list[AvailableTool] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     version: str = "0.5.0"
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def add_tool(self, tool: AvailableTool) -> None:
         """Add a tool to the skill.
@@ -243,7 +240,7 @@ class Skill:
             return True
         return False
 
-    def get_tool_names(self) -> List[str]:
+    def get_tool_names(self) -> list[str]:
         """Get list of tool names in this skill.
 
         Returns:
@@ -251,7 +248,7 @@ class Skill:
         """
         return [t.name for t in self.tools]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "id": self.id,
@@ -284,15 +281,15 @@ class SkillCapabilities:
         idempotent: Whether tool is idempotent (same input = same output)
     """
 
-    input_types: Dict[str, str]
-    output_types: List[str]
+    input_types: dict[str, str]
+    output_types: list[str]
     complexity: int = 5
     reliability: float = 0.9
     performance: str = "medium"
     side_effects: bool = False
     idempotent: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
 
         Returns:
@@ -384,7 +381,7 @@ class MCPTool:
     description: str
     server_name: str
     server_url: str
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
     enabled: bool = True
 
     def to_available_tool(self) -> AvailableTool:
@@ -435,15 +432,15 @@ class SkillDiscoveryEngine:
         self._tool_registry = tool_registry
         self._tool_selector = tool_selector
         self._event_bus = event_bus
-        self._registered_skills: Dict[str, Skill] = {}
-        self._mcp_tools_cache: Dict[str, List[MCPTool]] = {}
+        self._registered_skills: dict[str, Skill] = {}
+        self._mcp_tools_cache: dict[str, list[MCPTool]] = {}
 
     async def discover_tools(
         self,
-        context: Optional[Dict[str, Any]] = None,
-        categories: Optional[List[str]] = None,
+        context: Optional[dict[str, Any]] = None,
+        categories: Optional[list[str]] = None,
         include_disabled: bool = False,
-    ) -> List[AvailableTool]:
+    ) -> list[AvailableTool]:
         """Discover available tools from registry.
 
         Args:
@@ -507,7 +504,7 @@ class SkillDiscoveryEngine:
         self,
         server_url: Optional[str] = None,
         refresh_cache: bool = False,
-    ) -> List[MCPTool]:
+    ) -> list[MCPTool]:
         """Discover tools from MCP servers.
 
         Args:
@@ -578,7 +575,7 @@ class SkillDiscoveryEngine:
 
         return mcp_tools
 
-    def get_tool_signatures(self, tools: List[AvailableTool]) -> List[ToolSignature]:
+    def get_tool_signatures(self, tools: list[AvailableTool]) -> list[ToolSignature]:
         """Extract tool signatures for matching.
 
         Args:
@@ -636,10 +633,10 @@ class SkillDiscoveryEngine:
     async def match_tools_to_task(
         self,
         task: str,
-        available_tools: List[AvailableTool],
+        available_tools: list[AvailableTool],
         limit: int = 10,
         min_score: float = 0.3,
-    ) -> List[AvailableTool]:
+    ) -> list[AvailableTool]:
         """Match tools to task using semantic similarity.
 
         Args:
@@ -720,11 +717,11 @@ class SkillDiscoveryEngine:
     async def compose_skill(
         self,
         name: str,
-        tools: List[AvailableTool],
+        tools: list[AvailableTool],
         description: str,
-        dependencies: Optional[List[str]] = None,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        dependencies: Optional[list[str]] = None,
+        tags: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> Skill:
         """Compose a skill from multiple tools.
 
@@ -822,7 +819,7 @@ class SkillDiscoveryEngine:
         """
         return self._registered_skills.get(name)
 
-    def list_skills(self, tag: Optional[str] = None) -> List[Skill]:
+    def list_skills(self, tag: Optional[str] = None) -> list[Skill]:
         """List registered skills.
 
         Args:
@@ -889,9 +886,9 @@ class SkillDiscoveryEngine:
     def rank_skills_by_relevance(
         self,
         query: str,
-        skills: List[Skill],
+        skills: list[Skill],
         top_k: Optional[int] = None,
-    ) -> List[Skill]:
+    ) -> list[Skill]:
         """Rank skills by semantic relevance to a query.
 
         Uses semantic matching over skill names, descriptions, tags, and tools
@@ -957,7 +954,7 @@ class SkillDiscoveryEngine:
 
         return ranked_skills
 
-    async def _publish_event(self, event_type: UnifiedEventType, data: Dict[str, Any]) -> None:
+    async def _publish_event(self, event_type: UnifiedEventType, data: dict[str, Any]) -> None:
         """Publish event to event bus.
 
         Args:

@@ -26,8 +26,7 @@ Design Principles:
 """
 
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.conversation_memory import ConversationStore
@@ -100,7 +99,7 @@ class MemoryManager:
     def get_context(
         self,
         max_tokens: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get token-aware context messages from memory.
 
         Uses intelligent pruning to select the most relevant messages
@@ -134,7 +133,7 @@ class MemoryManager:
             logger.warning(f"Failed to get memory context: {e}, using in-memory")
             return self._get_in_memory_context()
 
-    def _get_in_memory_context(self) -> List[Dict[str, Any]]:
+    def _get_in_memory_context(self) -> list[dict[str, Any]]:
         """Get context from in-memory message history.
 
         Returns:
@@ -149,7 +148,7 @@ class MemoryManager:
             logger.warning(f"Failed to get in-memory context: {e}")
             return []
 
-    def get_session_stats(self) -> Dict[str, Any]:
+    def get_session_stats(self) -> dict[str, Any]:
         """Get statistics for the current memory session.
 
         Returns:
@@ -204,7 +203,7 @@ class MemoryManager:
         except Exception:
             return 0
 
-    def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_sessions(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent conversation sessions for recovery.
 
         Args:

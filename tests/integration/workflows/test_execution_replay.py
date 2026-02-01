@@ -14,19 +14,13 @@
 
 """Integration tests for workflow execution replay system."""
 
-import asyncio
-import json
 import pytest
-import tempfile
-from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 from victor.workflows.execution_recorder import (
     ExecutionRecorder,
     ExecutionReplayer,
     RecordingEventType,
-    RecordingMetadata,
-    StateSnapshot,
 )
 from victor.workflows.recording_storage import (
     FileRecordingStorage,
@@ -36,8 +30,6 @@ from victor.workflows.recording_storage import (
 )
 from victor.workflows.recording_integration import (
     record_workflow,
-    enable_workflow_recording,
-    save_workflow_recording,
 )
 
 

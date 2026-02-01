@@ -35,13 +35,11 @@ from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Dict,
-    List,
     Optional,
     Protocol,
     runtime_checkable,
 )
+from collections.abc import AsyncIterator
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStage
@@ -63,7 +61,7 @@ class ConversationControllerProtocol(Protocol):
         """Add a message to conversation history."""
         ...
 
-    def get_messages(self) -> List[Dict[str, Any]]:
+    def get_messages(self) -> list[dict[str, Any]]:
         """Get all messages in conversation."""
         ...
 
@@ -99,7 +97,7 @@ class ConversationStateMachineProtocol(Protocol):
         """Get current conversation stage (alias)."""
         ...
 
-    def record_tool_execution(self, tool_name: str, args: Dict[str, Any]) -> None:
+    def record_tool_execution(self, tool_name: str, args: dict[str, Any]) -> None:
         """Record tool execution for stage inference."""
         ...
 
@@ -119,7 +117,7 @@ class MessageHistoryProtocol(Protocol):
         """Add a message."""
         ...
 
-    def get_messages_for_provider(self) -> List[Any]:
+    def get_messages_for_provider(self) -> list[Any]:
         """Get all messages for provider."""
         ...
 
@@ -156,7 +154,7 @@ class StreamingToolChunk:
     chunk_type: str  # "start", "progress", "result", "error", "cache_hit"
     content: Any
     is_final: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @runtime_checkable
@@ -176,8 +174,8 @@ class StreamingToolAdapterProtocol(Protocol):
 
     async def execute_streaming(
         self,
-        tool_calls: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None,
+        tool_calls: list[dict[str, Any]],
+        context: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[StreamingToolChunk]:
         """Execute tools with streaming output.
 
@@ -200,9 +198,9 @@ class StreamingToolAdapterProtocol(Protocol):
     async def execute_streaming_single(
         self,
         tool_name: str,
-        tool_args: Dict[str, Any],
+        tool_args: dict[str, Any],
         tool_call_id: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[StreamingToolChunk]:
         """Execute a single tool with streaming output.
 
@@ -272,7 +270,7 @@ class ContextCompactorProtocol(Protocol):
         ...
 
     def truncate_tool_result(
-        self, tool_name: str, result: str, context: Optional[Dict[str, Any]] = None
+        self, tool_name: str, result: str, context: Optional[dict[str, Any]] = None
     ) -> str:
         """Truncate tool result if needed."""
         ...
@@ -305,8 +303,8 @@ class ConversationEmbeddingStoreProtocol(Protocol):
         session_id: Optional[str] = None,
         limit: int = 10,
         min_similarity: float = 0.3,
-        exclude_message_ids: Optional[List[str]] = None,
-    ) -> List[Any]:
+        exclude_message_ids: Optional[list[str]] = None,
+    ) -> list[Any]:
         """Search for semantically similar messages.
 
         Args:
@@ -332,7 +330,7 @@ class ConversationEmbeddingStoreProtocol(Protocol):
         """
         ...
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get store statistics."""
         ...
 

@@ -24,16 +24,14 @@ including:
 """
 
 import asyncio
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from victor.workflows import (
     WorkflowBuilder,
-    WorkflowDefinition,
     WorkflowExecutor,
-    WorkflowResult,
     ExecutorNodeStatus,
     load_workflow_from_yaml,
 )
@@ -102,7 +100,7 @@ class TestWorkflowExecution:
         """Test workflow with conditional branching."""
         from victor.workflows import NodeResult
 
-        def check_issues(ctx: Dict[str, Any]) -> str:
+        def check_issues(ctx: dict[str, Any]) -> str:
             return "fix" if ctx.get("has_issues") else "skip"
 
         workflow = (
@@ -140,7 +138,7 @@ class TestWorkflowExecution:
         """Test workflow takes skip branch when no issues."""
         from victor.workflows import NodeResult
 
-        def check_issues(ctx: Dict[str, Any]) -> str:
+        def check_issues(ctx: dict[str, Any]) -> str:
             return "fix" if ctx.get("has_issues") else "skip"
 
         workflow = (

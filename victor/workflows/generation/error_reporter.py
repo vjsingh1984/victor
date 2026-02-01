@@ -45,7 +45,6 @@ Example:
 """
 
 import json
-from typing import Dict, List, Optional
 
 from victor.workflows.generation.types import (
     ErrorCategory,
@@ -77,9 +76,9 @@ class ErrorReport:
     def __init__(
         self,
         result: WorkflowGenerationValidationResult,
-        errors_by_category: Dict[str, List[WorkflowValidationError]],
-        errors_by_severity: Dict[str, List[WorkflowValidationError]],
-        errors_by_node: Dict[str, List[WorkflowValidationError]],
+        errors_by_category: dict[str, list[WorkflowValidationError]],
+        errors_by_severity: dict[str, list[WorkflowValidationError]],
+        errors_by_node: dict[str, list[WorkflowValidationError]],
     ):
         self.result = result
         self.errors_by_category = errors_by_category
@@ -126,7 +125,7 @@ class ErrorReporter:
             ErrorReport with grouped errors
         """
         # Group by category
-        errors_by_category: Dict[str, List[WorkflowValidationError]] = {
+        errors_by_category: dict[str, list[WorkflowValidationError]] = {
             "schema": result.schema_errors,
             "structure": result.structure_errors,
             "semantic": result.semantic_errors,
@@ -134,7 +133,7 @@ class ErrorReporter:
         }
 
         # Group by severity
-        errors_by_severity: Dict[str, List[WorkflowValidationError]] = {
+        errors_by_severity: dict[str, list[WorkflowValidationError]] = {
             "critical": [],
             "error": [],
             "warning": [],
@@ -550,8 +549,8 @@ class ErrorReporter:
         return "\n".join(lines)
 
     def prioritize_errors(
-        self, errors: List[WorkflowValidationError]
-    ) -> List[WorkflowValidationError]:
+        self, errors: list[WorkflowValidationError]
+    ) -> list[WorkflowValidationError]:
         """Sort errors by severity and importance.
 
         Priority order:

@@ -19,7 +19,7 @@ then synthesizes results.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional, cast
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.types import AgentMessage, MemberResult, MessageType
@@ -39,16 +39,16 @@ class HierarchicalFormation(BaseFormationStrategy):
     Use case: Complex task decomposition, supervised execution
     """
 
-    def get_required_roles(self) -> Optional[List[str]]:
+    def get_required_roles(self) -> Optional[list[str]]:
         """Hierarchical formation requires manager role."""
         return ["manager", "coordinator", "lead"]
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute with manager-worker pattern."""
         if len(agents) < 2:
             raise ValueError(

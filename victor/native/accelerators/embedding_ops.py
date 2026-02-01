@@ -35,9 +35,8 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -211,10 +210,10 @@ class EmbeddingOpsAccelerator:
 
     def batch_cosine_similarity(
         self,
-        query: List[float],
-        embeddings: List[List[float]],
+        query: list[float],
+        embeddings: list[list[float]],
         use_cache: Optional[bool] = None,
-    ) -> List[float]:
+    ) -> list[float]:
         """Compute cosine similarities between query and embeddings.
 
         Args:
@@ -299,9 +298,9 @@ class EmbeddingOpsAccelerator:
 
     def _numpy_batch_similarity(
         self,
-        query: List[float],
-        embeddings: List[List[float]],
-    ) -> List[float]:
+        query: list[float],
+        embeddings: list[list[float]],
+    ) -> list[float]:
         """NumPy fallback for cosine similarity."""
         import numpy as np
 
@@ -323,9 +322,9 @@ class EmbeddingOpsAccelerator:
 
     def topk_indices(
         self,
-        scores: List[float],
+        scores: list[float],
         k: int,
-    ) -> List[int]:
+    ) -> list[int]:
         """Select top-k indices using partial sort algorithm.
 
         Args:
@@ -374,7 +373,7 @@ class EmbeddingOpsAccelerator:
             self._stats.record_topk_call(duration_ms, False)
             return result
 
-    def _numpy_topk_indices(self, scores: List[float], k: int) -> List[int]:
+    def _numpy_topk_indices(self, scores: list[float], k: int) -> list[int]:
         """NumPy fallback using argpartition (O(n))."""
         import numpy as np
 
@@ -388,9 +387,9 @@ class EmbeddingOpsAccelerator:
 
     def similarity_matrix(
         self,
-        queries: List[List[float]],
-        corpus: List[List[float]],
-    ) -> List[List[float]]:
+        queries: list[list[float]],
+        corpus: list[list[float]],
+    ) -> list[list[float]]:
         """Compute similarity matrix for queries vs corpus.
 
         Args:
@@ -443,9 +442,9 @@ class EmbeddingOpsAccelerator:
 
     def _numpy_similarity_matrix(
         self,
-        queries: List[List[float]],
-        corpus: List[List[float]],
-    ) -> List[List[float]]:
+        queries: list[list[float]],
+        corpus: list[list[float]],
+    ) -> list[list[float]]:
         """NumPy fallback for similarity matrix."""
         import numpy as np
 

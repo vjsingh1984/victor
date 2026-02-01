@@ -49,12 +49,11 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from victor.core.protocols import OrchestratorProtocol
 from victor.framework.vertical_integration import (
     VerticalIntegrationPipeline,
-    IntegrationResult,
 )
 
 # TYPE_CHECKING: Import orchestrator for type hints only (backward compatibility bridge)
@@ -106,7 +105,7 @@ class FrameworkShim:
         settings: "Settings",
         profile_name: str = "default",
         thinking: bool = False,
-        vertical: Optional[Union[Type["VerticalBase"], str]] = None,
+        vertical: Optional[type["VerticalBase"] | str] = None,
         enable_observability: bool = True,
         session_id: Optional[str] = None,
         enable_cqrs_bridge: bool = False,
@@ -138,8 +137,8 @@ class FrameworkShim:
         self._vertical_config: Optional["VerticalConfig"] = None
 
     def _resolve_vertical(
-        self, vertical: Optional[Union[Type["VerticalBase"], str]]
-    ) -> Optional[Type["VerticalBase"]]:
+        self, vertical: Optional[type["VerticalBase"] | str]
+    ) -> Optional[type["VerticalBase"]]:
         """Resolve vertical from name or class.
 
         Args:
@@ -215,7 +214,7 @@ class FrameworkShim:
         # Cast to protocol for type safety
         return cast(OrchestratorProtocol, self._orchestrator)
 
-    def _apply_vertical(self, vertical: Type["VerticalBase"]) -> None:
+    def _apply_vertical(self, vertical: type["VerticalBase"]) -> None:
         """Apply vertical configuration to orchestrator.
 
         This delegates to VerticalIntegrationPipeline for unified vertical
@@ -322,7 +321,7 @@ class FrameworkShim:
         return self._session_id
 
     @property
-    def vertical(self) -> Optional[Type["VerticalBase"]]:
+    def vertical(self) -> Optional[type["VerticalBase"]]:
         """Get the applied vertical class.
 
         Returns:
@@ -373,7 +372,7 @@ class FrameworkShim:
             )
 
 
-def get_vertical(name: Optional[str]) -> Optional[Type["VerticalBase"]]:
+def get_vertical(name: Optional[str]) -> Optional[type["VerticalBase"]]:
     """Convenience function to look up a vertical by name.
 
     This is a thin wrapper around VerticalRegistry.get() for CLI usage.

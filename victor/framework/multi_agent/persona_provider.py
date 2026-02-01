@@ -44,7 +44,7 @@ import logging
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
 
@@ -78,7 +78,7 @@ class PersonaMetadata:
     version: str
     description: str
     category: str
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     author: Optional[str] = None
     vertical: Optional[str] = None
     deprecated: bool = False
@@ -127,9 +127,9 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
             return
 
         super().__init__()
-        self._personas: Dict[str, Dict[str, "PersonaTraits"]] = {}
-        self._metadata: Dict[str, Dict[str, PersonaMetadata]] = {}
-        self._categories: Dict[str, Set[str]] = {
+        self._personas: dict[str, dict[str, "PersonaTraits"]] = {}
+        self._metadata: dict[str, dict[str, PersonaMetadata]] = {}
+        self._categories: dict[str, set[str]] = {
             "research": set(),
             "planning": set(),
             "execution": set(),
@@ -137,8 +137,8 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
             "other": set(),
         }
         # Initialize BaseCapabilityProvider attributes
-        self._capabilities: Dict[str, "PersonaTraits"] = {}
-        self._metadata_full: Dict[str, CapabilityMetadata] = {}
+        self._capabilities: dict[str, "PersonaTraits"] = {}
+        self._metadata_full: dict[str, CapabilityMetadata] = {}
         object.__setattr__(self, "_initialized", True)
 
     @classmethod
@@ -159,7 +159,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
         persona: "PersonaTraits",
         category: str,
         description: str = "",
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         author: Optional[str] = None,
         vertical: Optional[str] = None,
         deprecated: bool = False,
@@ -285,7 +285,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
             versions = list(self._personas[name].keys())
             return self._get_latest_version(versions)
 
-    def list_personas(self, category: Optional[str] = None) -> List[str]:
+    def list_personas(self, category: Optional[str] = None) -> list[str]:
         """List all registered persona names.
 
         Args:
@@ -303,7 +303,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
 
             return list(self._categories[category])
 
-    def list_persona_versions(self, name: str) -> List[str]:
+    def list_persona_versions(self, name: str) -> list[str]:
         """List all versions of a persona.
 
         Args:
@@ -318,7 +318,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
 
             return sorted(self._personas[name].keys(), key=self._semver_key, reverse=True)
 
-    def get_capabilities(self) -> Dict[str, "PersonaTraits"]:
+    def get_capabilities(self) -> dict[str, "PersonaTraits"]:
         """Return all registered personas (as capabilities).
 
         Returns:
@@ -326,14 +326,14 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
         """
         with self._lock:
             # Return latest version of each persona
-            result: Dict[str, PersonaTraits] = {}
+            result: dict[str, PersonaTraits] = {}
             for name in self._personas:
                 persona = self.get_persona(name)
                 if persona:
                     result[name] = persona
             return result
 
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+    def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
         """Return metadata for all personas.
 
         Returns:
@@ -353,7 +353,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
                     )
             return result
 
-    def get_registry_stats(self) -> Dict[str, Any]:
+    def get_registry_stats(self) -> dict[str, Any]:
         """Get registry statistics.
 
         Returns:
@@ -403,7 +403,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
         return tuple(int(p) for p in parts)
 
     @staticmethod
-    def _get_latest_version(versions: List[str]) -> str:
+    def _get_latest_version(versions: list[str]) -> str:
         """Get the latest version from a list of SemVer strings.
 
         Args:

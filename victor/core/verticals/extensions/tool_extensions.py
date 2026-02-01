@@ -42,10 +42,9 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from victor.core.tool_types import ToolDependency
-from victor.core.vertical_types import MiddlewarePriority, MiddlewareResult
 
 
 @dataclass
@@ -80,10 +79,10 @@ class ToolExtensions:
         deps = tool_ext.get_dependencies_for("edit")  # Returns ["read"]
     """
 
-    middleware: List[Any] = field(default_factory=list)  # List[MiddlewareProtocol]
-    tool_dependencies: List[ToolDependency] = field(default_factory=list)
+    middleware: list[Any] = field(default_factory=list)  # List[MiddlewareProtocol]
+    tool_dependencies: list[ToolDependency] = field(default_factory=list)
 
-    def get_sorted_middleware(self) -> List[Any]:
+    def get_sorted_middleware(self) -> list[Any]:
         """Get middleware sorted by priority (HIGH first, then NORMAL, then LOW).
 
         Returns:
@@ -95,7 +94,7 @@ class ToolExtensions:
             key=lambda m: m.get_priority().value if hasattr(m, "get_priority") else 50,
         )
 
-    def get_dependencies_for(self, tool_name: str) -> List[str]:
+    def get_dependencies_for(self, tool_name: str) -> list[str]:
         """Get dependency tools for a given tool.
 
         Args:
@@ -124,18 +123,18 @@ class ToolExtensions:
         deps = self.get_dependencies_for(tool_name)
         return dependency in deps
 
-    def get_all_dependency_tools(self) -> Set[str]:
+    def get_all_dependency_tools(self) -> set[str]:
         """Get all tools that are dependencies of other tools.
 
         Returns:
             Set of tool names that are dependencies
         """
-        all_deps: Set[str] = set()
+        all_deps: set[str] = set()
         for dep in self.tool_dependencies:
             all_deps.update(dep.depends_on)
         return all_deps
 
-    def get_middleware_for_tool(self, tool_name: str) -> List[Any]:
+    def get_middleware_for_tool(self, tool_name: str) -> list[Any]:
         """Get middleware applicable to a specific tool.
 
         Args:
@@ -177,7 +176,7 @@ class ToolExtensions:
 
         # Merge dependencies (other overrides same-tool entries)
         # Handle both 'tool' and 'tool_name' attributes for compatibility
-        dep_map: Dict[str, ToolDependency] = {}
+        dep_map: dict[str, ToolDependency] = {}
         for dep in self.tool_dependencies:
             dep_tool = getattr(dep, "tool_name", getattr(dep, "tool", None))
             if dep_tool:

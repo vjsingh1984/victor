@@ -32,28 +32,20 @@ from __future__ import annotations
 import sqlite3
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import MagicMock
 
 import pytest
 
 from victor.agent.improvement import (
-    ImprovementTrajectory,
-    MovingAverageMetrics,
-    ProficiencyMetrics,
-    ProficiencyScore,
     ProficiencyTracker,
-    Suggestion,
     TaskOutcome,
     TrendDirection,
 )
-from victor.framework.rl import RLOutcome
 from victor.framework.rl.rl_coordinator_enhanced import (
     EnhancedRLCoordinator as FrameworkRLCoordinator,
     Experience,
     LearningAlgorithm,
     ExplorationStrategy,
-    PolicyStats,
 )
 
 
@@ -138,7 +130,7 @@ def mock_orchestrator():
 
 
 @pytest.fixture
-def sample_task_outcomes() -> List[TaskOutcome]:
+def sample_task_outcomes() -> list[TaskOutcome]:
     """Create sample task outcomes for testing.
 
     Returns:
@@ -200,7 +192,7 @@ class TestProficiencyTrackerIntegration:
         assert score.success_rate == 0.5  # 5/10 success
 
     def test_tracker_moving_average_calculation(
-        self, proficiency_tracker: ProficiencyTracker, sample_task_outcomes: List[TaskOutcome]
+        self, proficiency_tracker: ProficiencyTracker, sample_task_outcomes: list[TaskOutcome]
     ):
         """Test moving average metrics calculation.
 
@@ -303,7 +295,7 @@ class TestProficiencyTrackerIntegration:
         assert trajectory[0].sample_count > 0
 
     def test_export_proficiency_metrics(
-        self, proficiency_tracker: ProficiencyTracker, sample_task_outcomes: List[TaskOutcome]
+        self, proficiency_tracker: ProficiencyTracker, sample_task_outcomes: list[TaskOutcome]
     ):
         """Test exporting comprehensive proficiency metrics.
 

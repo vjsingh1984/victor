@@ -42,7 +42,8 @@ import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional, TypeVar, Awaitable
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable, Awaitable
 from functools import wraps
 
 logger = logging.getLogger(__name__)

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import ast
 import re
-from typing import Dict, List, Optional, Set
+from typing import Optional
 
 from victor.native.observability import InstrumentedAccelerator
 from victor.native.protocols import NativeSymbol, SymbolType
@@ -259,7 +259,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
     def get_version(self) -> Optional[str]:
         return self._version
 
-    def extract_functions(self, source: str, lang: str) -> List[NativeSymbol]:
+    def extract_functions(self, source: str, lang: str) -> list[NativeSymbol]:
         """Extract function definitions from source."""
         with self._timed_call("extract_functions", lang=lang):
             if lang == "python":
@@ -268,7 +268,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
             # Currently supported: Python. See tree-sitter language registry for additions.
             return []
 
-    def extract_classes(self, source: str, lang: str) -> List[NativeSymbol]:
+    def extract_classes(self, source: str, lang: str) -> list[NativeSymbol]:
         """Extract class definitions from source."""
         with self._timed_call("extract_classes", lang=lang):
             if lang == "python":
@@ -277,7 +277,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
             # Currently supported: Python. See tree-sitter language registry for additions.
             return []
 
-    def extract_imports(self, source: str, lang: str) -> List[str]:
+    def extract_imports(self, source: str, lang: str) -> list[str]:
         """Extract import statements from source."""
         with self._timed_call("extract_imports", lang=lang):
             if lang == "python":
@@ -286,7 +286,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
             # Currently supported: Python. See tree-sitter language registry for additions.
             return []
 
-    def extract_references(self, source: str) -> List[str]:
+    def extract_references(self, source: str) -> list[str]:
         """Extract all identifier references from source."""
         with self._timed_call("reference_extraction"):
             return IDENTIFIER_PATTERN.findall(source)
@@ -298,7 +298,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
             top_level = name.split(".")[0]
             return top_level in STDLIB_MODULES
 
-    def _extract_python_functions(self, source: str) -> List[NativeSymbol]:
+    def _extract_python_functions(self, source: str) -> list[NativeSymbol]:
         """Extract functions from Python source using ast."""
         try:
             tree = ast.parse(source)
@@ -337,7 +337,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
 
         return symbols
 
-    def _extract_python_classes(self, source: str) -> List[NativeSymbol]:
+    def _extract_python_classes(self, source: str) -> list[NativeSymbol]:
         """Extract classes from Python source using ast."""
         try:
             tree = ast.parse(source)
@@ -378,14 +378,14 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
 
         return symbols
 
-    def _extract_python_imports(self, source: str) -> List[str]:
+    def _extract_python_imports(self, source: str) -> list[str]:
         """Extract imports from Python source using ast."""
         try:
             tree = ast.parse(source)
         except SyntaxError:
             return []
 
-        imports: Set[str] = set()
+        imports: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:

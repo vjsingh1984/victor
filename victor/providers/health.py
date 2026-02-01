@@ -46,7 +46,8 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +81,9 @@ class HealthCheckResult:
     error: Optional[str] = None
     timestamp: datetime = field(default_factory=datetime.now)
     model: Optional[str] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "provider_name": self.provider_name,
@@ -108,14 +109,14 @@ class ProviderHealthReport:
         total_check_time_ms: Time to complete all checks
     """
 
-    results: Dict[str, HealthCheckResult] = field(default_factory=dict)
+    results: dict[str, HealthCheckResult] = field(default_factory=dict)
     healthy_count: int = 0
     degraded_count: int = 0
     unhealthy_count: int = 0
     timestamp: datetime = field(default_factory=datetime.now)
     total_check_time_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "results": {name: r.to_dict() for name, r in self.results.items()},
@@ -211,7 +212,7 @@ class ProviderHealthChecker:
     def __init__(
         self,
         history_size: int = 100,
-        custom_configs: Optional[Dict[str, Dict[str, Any]]] = None,
+        custom_configs: Optional[dict[str, dict[str, Any]]] = None,
     ):
         """Initialize health checker.
 
@@ -223,20 +224,20 @@ class ProviderHealthChecker:
         self._configs = {**PROVIDER_HEALTH_CONFIG, **(custom_configs or {})}
 
         # Health check history per provider
-        self._history: Dict[str, List[HealthCheckResult]] = {}
+        self._history: dict[str, list[HealthCheckResult]] = {}
 
         # Latest result per provider
-        self._latest: Dict[str, HealthCheckResult] = {}
+        self._latest: dict[str, HealthCheckResult] = {}
 
         # Background monitoring task
         self._monitoring_task: Optional[asyncio.Task] = None
         self._stop_monitoring = asyncio.Event()
 
         # Registered provider instances
-        self._providers: Dict[str, Any] = {}
+        self._providers: dict[str, Any] = {}
 
         # Callbacks for health changes
-        self._on_health_change: List[Callable[[str, HealthStatus, HealthStatus], None]] = []
+        self._on_health_change: list[Callable[[str, HealthStatus, HealthStatus], None]] = []
 
         logger.debug(f"ProviderHealthChecker initialized with history_size={history_size}")
 
@@ -270,14 +271,14 @@ class ProviderHealthChecker:
         """
         self._on_health_change.append(callback)
 
-    def _get_config(self, provider_name: str) -> Dict[str, Any]:
+    def _get_config(self, provider_name: str) -> dict[str, Any]:
         """Get health check config for provider."""
         return self._configs.get(provider_name, DEFAULT_HEALTH_CONFIG)
 
     def _determine_status(
         self,
         latency_ms: float,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         error: Optional[str] = None,
     ) -> HealthStatus:
         """Determine health status from latency and config.
@@ -421,7 +422,7 @@ class ProviderHealthChecker:
 
     async def check_all(
         self,
-        providers: Optional[Dict[str, Any]] = None,
+        providers: Optional[dict[str, Any]] = None,
     ) -> ProviderHealthReport:
         """Check health of all registered providers in parallel.
 
@@ -476,7 +477,7 @@ class ProviderHealthChecker:
         result = self._latest.get(provider_name)
         return result.status if result else HealthStatus.UNKNOWN
 
-    def get_healthy_providers(self) -> List[str]:
+    def get_healthy_providers(self) -> list[str]:
         """Get list of healthy providers sorted by latency (fastest first).
 
         Returns:
@@ -491,7 +492,7 @@ class ProviderHealthChecker:
         healthy.sort(key=lambda x: x[1].latency_ms)
         return [name for name, _ in healthy]
 
-    def get_available_providers(self) -> List[str]:
+    def get_available_providers(self) -> list[str]:
         """Get list of available providers (healthy or degraded).
 
         Returns:
@@ -515,7 +516,7 @@ class ProviderHealthChecker:
         self,
         provider_name: str,
         limit: Optional[int] = None,
-    ) -> List[HealthCheckResult]:
+    ) -> list[HealthCheckResult]:
         """Get health check history for a provider.
 
         Args:
@@ -553,7 +554,7 @@ class ProviderHealthChecker:
         )
         return (healthy_count / len(history)) * 100.0
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get health checker statistics.
 
         Returns:
@@ -575,7 +576,7 @@ class ProviderHealthChecker:
     async def start_monitoring(
         self,
         interval_seconds: float = 60.0,
-        providers: Optional[Dict[str, Any]] = None,
+        providers: Optional[dict[str, Any]] = None,
     ) -> None:
         """Start background health monitoring.
 

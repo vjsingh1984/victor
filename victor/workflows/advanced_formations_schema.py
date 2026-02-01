@@ -40,9 +40,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field, validator
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +93,7 @@ class DynamicSwitchingRule:
     trigger: str
     target_formation: str
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         """Convert to dictionary."""
         return {"trigger": self.trigger, "target_formation": self.target_formation}
 
@@ -111,11 +110,11 @@ class DynamicFormationConfig:
     """
 
     initial_formation: str = "parallel"
-    switching_rules: List[Dict[str, str]] = field(default_factory=list)
+    switching_rules: list[dict[str, str]] = field(default_factory=list)
     max_switches: int = 5
     enable_auto_detection: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "initial_formation": self.initial_formation,
@@ -125,7 +124,7 @@ class DynamicFormationConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DynamicFormationConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "DynamicFormationConfig":
         """Create from dictionary."""
         return cls(
             initial_formation=data.get("initial_formation", "parallel"),
@@ -147,15 +146,15 @@ class AdaptiveFormationConfig:
         use_ml: Use ML model if available
     """
 
-    criteria: List[str] = field(
+    criteria: list[str] = field(
         default_factory=lambda: ["complexity", "deadline", "resource_availability"]
     )
     default_formation: str = "parallel"
     fallback_formation: str = "sequential"
-    scoring_weights: Optional[Dict[str, Dict[str, float]]] = None
+    scoring_weights: Optional[dict[str, dict[str, float]]] = None
     use_ml: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "criteria": self.criteria,
@@ -166,7 +165,7 @@ class AdaptiveFormationConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AdaptiveFormationConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "AdaptiveFormationConfig":
         """Create from dictionary."""
         return cls(
             criteria=data.get("criteria", ["complexity", "deadline", "resource_availability"]),
@@ -195,7 +194,7 @@ class HybridPhaseConfig:
     iteration_limit: Optional[int] = None
     completion_criteria: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "formation": self.formation,
@@ -206,7 +205,7 @@ class HybridPhaseConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "HybridPhaseConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "HybridPhaseConfig":
         """Create from dictionary."""
         return cls(
             formation=data["formation"],
@@ -227,11 +226,11 @@ class HybridFormationConfig:
         stop_on_first_failure: Stop if any phase fails
     """
 
-    phases: List[HybridPhaseConfig]
+    phases: list[HybridPhaseConfig]
     enable_phase_logging: bool = True
     stop_on_first_failure: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "phases": [phase.to_dict() for phase in self.phases],
@@ -240,7 +239,7 @@ class HybridFormationConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "HybridFormationConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "HybridFormationConfig":
         """Create from dictionary."""
         phases = [HybridPhaseConfig.from_dict(phase_data) for phase_data in data.get("phases", [])]
         return cls(
@@ -266,9 +265,9 @@ class AdvancedFormationConfig:
     adaptive_config: Optional[AdaptiveFormationConfig] = None
     hybrid_config: Optional[HybridFormationConfig] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
-        result: Dict[str, Any] = {"type": self.type}
+        result: dict[str, Any] = {"type": self.type}
 
         if self.dynamic_config:
             result["dynamic_config"] = self.dynamic_config.to_dict()
@@ -280,7 +279,7 @@ class AdvancedFormationConfig:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AdvancedFormationConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "AdvancedFormationConfig":
         """Create from dictionary."""
         formation_type = data.get("type", "")
 
@@ -310,7 +309,7 @@ class ValidationError(Exception):
     pass
 
 
-def validate_dynamic_config(config: DynamicFormationConfig) -> List[str]:
+def validate_dynamic_config(config: DynamicFormationConfig) -> list[str]:
     """Validate dynamic formation configuration.
 
     Args:
@@ -356,7 +355,7 @@ def validate_dynamic_config(config: DynamicFormationConfig) -> List[str]:
     return errors
 
 
-def validate_adaptive_config(config: AdaptiveFormationConfig) -> List[str]:
+def validate_adaptive_config(config: AdaptiveFormationConfig) -> list[str]:
     """Validate adaptive formation configuration.
 
     Args:
@@ -418,7 +417,7 @@ def validate_adaptive_config(config: AdaptiveFormationConfig) -> List[str]:
     return errors
 
 
-def validate_hybrid_config(config: HybridFormationConfig) -> List[str]:
+def validate_hybrid_config(config: HybridFormationConfig) -> list[str]:
     """Validate hybrid formation configuration.
 
     Args:
@@ -455,7 +454,7 @@ def validate_hybrid_config(config: HybridFormationConfig) -> List[str]:
     return errors
 
 
-def validate_advanced_formation_config(config: AdvancedFormationConfig) -> List[str]:
+def validate_advanced_formation_config(config: AdvancedFormationConfig) -> list[str]:
     """Validate advanced formation configuration.
 
     Args:
@@ -497,7 +496,7 @@ def validate_advanced_formation_config(config: AdvancedFormationConfig) -> List[
     return errors
 
 
-def parse_advanced_formation_from_yaml(yaml_data: Dict[str, Any]) -> AdvancedFormationConfig:
+def parse_advanced_formation_from_yaml(yaml_data: dict[str, Any]) -> AdvancedFormationConfig:
     """Parse advanced formation configuration from YAML data.
 
     Args:

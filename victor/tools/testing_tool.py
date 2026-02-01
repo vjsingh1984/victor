@@ -14,7 +14,7 @@
 
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Any
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
@@ -32,8 +32,8 @@ from victor.tools.subprocess_executor import run_command_async, CommandErrorType
     stages=["verification"],  # Conversation stages where relevant
 )
 async def test(
-    path: Optional[str] = None, pytest_args: Optional[List[str]] = None
-) -> Dict[str, Any]:
+    path: Optional[str] = None, pytest_args: Optional[list[str]] = None
+) -> dict[str, Any]:
     """
     Runs tests using pytest and returns a structured summary of the results.
 
@@ -95,7 +95,7 @@ async def test(
         return {"error": f"An unexpected error occurred: {e}"}
 
 
-def _summarize_report(report: Dict[str, Any]) -> Dict[str, Any]:
+def _summarize_report(report: dict[str, Any]) -> dict[str, Any]:
     """Parses the JSON report from pytest and creates a concise summary."""
     summary = report.get("summary", {})
     total = summary.get("total", 0)

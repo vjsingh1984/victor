@@ -48,7 +48,7 @@ import logging
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.tools.composition import Runnable
@@ -79,7 +79,7 @@ class ChainMetadata:
     version: str
     description: str
     category: str
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     author: Optional[str] = None
     deprecated: bool = False
 
@@ -125,9 +125,9 @@ class ChainRegistry:
         if self._initialized:
             return
 
-        self._chains: Dict[str, Dict[str, "Runnable[Any, Any]"]] = {}
-        self._metadata: Dict[str, Dict[str, ChainMetadata]] = {}
-        self._categories: Dict[str, Set[str]] = {
+        self._chains: dict[str, dict[str, "Runnable[Any, Any]"]] = {}
+        self._metadata: dict[str, dict[str, ChainMetadata]] = {}
+        self._categories: dict[str, set[str]] = {
             "exploration": set(),
             "editing": set(),
             "analysis": set(),
@@ -143,7 +143,7 @@ class ChainRegistry:
         chain: "Runnable[Any, Any]",
         category: str,
         description: str = "",
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         author: Optional[str] = None,
         deprecated: bool = False,
     ) -> None:
@@ -255,7 +255,7 @@ class ChainRegistry:
             versions = list(self._chains[name].keys())
             return self._get_latest_version(versions)
 
-    def list_chains(self, category: Optional[str] = None) -> List[str]:
+    def list_chains(self, category: Optional[str] = None) -> list[str]:
         """List all registered chain names.
 
         Args:
@@ -273,7 +273,7 @@ class ChainRegistry:
 
             return list(self._categories[category])
 
-    def list_chain_versions(self, name: str) -> List[str]:
+    def list_chain_versions(self, name: str) -> list[str]:
         """List all versions of a chain.
 
         Args:
@@ -328,7 +328,7 @@ class ChainRegistry:
 
             return False
 
-    def get_registry_stats(self) -> Dict[str, Any]:
+    def get_registry_stats(self) -> dict[str, Any]:
         """Get registry statistics.
 
         Returns:
@@ -364,7 +364,7 @@ class ChainRegistry:
         return re.match(pattern, version) is not None
 
     @staticmethod
-    def _semver_key(version: str) -> Tuple[int, ...]:
+    def _semver_key(version: str) -> tuple[int, ...]:
         """Convert SemVer to tuple for sorting.
 
         Args:
@@ -379,7 +379,7 @@ class ChainRegistry:
         return tuple(int(p) for p in parts)
 
     @staticmethod
-    def _get_latest_version(versions: List[str]) -> str:
+    def _get_latest_version(versions: list[str]) -> str:
         """Get the latest version from a list of SemVer strings.
 
         Args:

@@ -26,7 +26,7 @@ import base64
 import io
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.multimodal.processor import ProcessingResult
@@ -98,7 +98,7 @@ class ImageProcessor:
 
     async def process(
         self,
-        image_path: Union[str, Path],
+        image_path: str | Path,
         query: Optional[str] = None,
         encode_base64: bool = False,
         extract_ocr: bool = False,
@@ -181,9 +181,9 @@ class ImageProcessor:
                 source=str(image_path),
             )
 
-    def _extract_metadata(self, image: "Image.Image", path: Path) -> Dict[str, Any]:
+    def _extract_metadata(self, image: "Image.Image", path: Path) -> dict[str, Any]:
         """Extract image metadata."""
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "format": image.format,
             "mode": image.mode,
             "size": image.size,
@@ -239,7 +239,7 @@ class ImageProcessor:
             logger.warning(f"OCR extraction failed: {e}")
             return ""
 
-    def encode_base64(self, image_path: Union[str, Path]) -> str:
+    def encode_base64(self, image_path: str | Path) -> str:
         """Encode image as base64 string.
 
         Args:
@@ -271,7 +271,7 @@ class ImageProcessor:
 
     async def extract_video_frames(
         self,
-        video_path: Union[str, Path],
+        video_path: str | Path,
         num_frames: int = 5,
     ) -> "ProcessingResult":
         """Extract frames from video for analysis.
@@ -366,9 +366,9 @@ class ImageProcessor:
 
     def resize_image(
         self,
-        image_path: Union[str, Path],
+        image_path: str | Path,
         max_size: int = 1024,
-        output_path: Optional[Union[str, Path]] = None,
+        output_path: Optional[str | Path] = None,
     ) -> Optional[str]:
         """Resize image to max dimension while maintaining aspect ratio.
 

@@ -38,20 +38,19 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.core.events import ObservabilityBus, get_observability_bus
 from victor.core.events.emit_helper import emit_event_sync
 from victor.observability.batching_integration import (
     BatchConfig,
     BatchedObservabilityIntegration,
-    BatchStrategy,
 )
 from victor.observability.hooks import StateHookManager, TransitionHistory
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.observability.cqrs_adapter import CQRSEventAdapter, UnifiedEventBridge
+    from victor.observability.cqrs_adapter import UnifiedEventBridge
 
 logger = logging.getLogger(__name__)
 
@@ -101,8 +100,8 @@ class ObservabilityIntegration:
         """
         self._bus = event_bus or get_observability_bus()
         self._session_id = session_id
-        self._wired_components: List[str] = []
-        self._tool_start_times: Dict[str, float] = {}
+        self._wired_components: list[str] = []
+        self._tool_start_times: dict[str, float] = {}
         self._cqrs_bridge: Optional["UnifiedEventBridge"] = None
         self._state_hook_manager: Optional[StateHookManager] = None
         self._batched_integration: Optional[BatchedObservabilityIntegration] = None
@@ -126,7 +125,7 @@ class ObservabilityIntegration:
         self._batched_integration = BatchedObservabilityIntegration(config or BatchConfig())
 
         # Set up emitter to forward to the event bus
-        async def emit_batch(events: List[Dict[str, Any]]) -> None:
+        async def emit_batch(events: list[dict[str, Any]]) -> None:
             for event in events:
                 topic = event.pop("_topic", "observability.event")
                 await self._bus.emit(topic=topic, data=event)
@@ -164,7 +163,7 @@ class ObservabilityIntegration:
             return self._state_hook_manager.history
         return None
 
-    def get_state_transition_metrics(self) -> Dict[str, Any]:
+    def get_state_transition_metrics(self) -> dict[str, Any]:
         """Get metrics about state transitions.
 
         Returns a summary of transition patterns including:
@@ -192,7 +191,7 @@ class ObservabilityIntegration:
 
         # Calculate per-stage average durations
         stage_avg_durations = {}
-        all_durations: List[float] = []
+        all_durations: list[float] = []
         for stage in unique_stages:
             avg = history.get_average_duration(stage)
             if avg is not None:
@@ -350,7 +349,7 @@ class ObservabilityIntegration:
         def emit_transition_with_analytics(
             old_stage: str,
             new_stage: str,
-            context: Dict[str, Any],
+            context: dict[str, Any],
             history: TransitionHistory,
         ) -> None:
             """Emit state change with rich analytics from history."""
@@ -424,7 +423,7 @@ class ObservabilityIntegration:
     # Internal Helpers
     # =========================================================================
 
-    def _emit_event_async(self, topic: str, data: Dict[str, Any]) -> None:
+    def _emit_event_async(self, topic: str, data: dict[str, Any]) -> None:
         """Emit an event asynchronously, optionally using batching.
 
         Args:
@@ -460,7 +459,7 @@ class ObservabilityIntegration:
     def on_tool_start(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         tool_id: Optional[str] = None,
     ) -> None:
         """Emit a tool start event.
@@ -610,7 +609,7 @@ class ObservabilityIntegration:
     # Lifecycle Events
     # =========================================================================
 
-    def on_session_start(self, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def on_session_start(self, metadata: Optional[dict[str, Any]] = None) -> None:
         """Emit a session start event.
 
         Args:
@@ -658,7 +657,7 @@ class ObservabilityIntegration:
     def on_error(
         self,
         error: Exception,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         recoverable: bool = True,
     ) -> None:
         """Emit an error event.
@@ -731,7 +730,7 @@ class ToolEventMiddleware:
     def before_execute(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         tool_id: Optional[str] = None,
     ) -> None:
         """Called before tool execution.

@@ -63,13 +63,13 @@ import asyncio
 import logging
 import time
 import uuid
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
-    from victor.teams.types import AgentMessage, TeamMember
+    from victor.teams.types import AgentMessage
 
 logger = logging.getLogger(__name__)
 
@@ -110,11 +110,11 @@ class CommunicationLog:
     recipient_id: Optional[str]
     content: str
     communication_type: CommunicationType
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     response_id: Optional[str] = None
     duration_ms: Optional[float] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "timestamp": self.timestamp,
@@ -178,7 +178,7 @@ class TeamCommunicationProtocol:
 
     def __init__(
         self,
-        members: List[Any],
+        members: list[Any],
         communication_type: CommunicationType = CommunicationType.REQUEST_RESPONSE,
         log_messages: bool = True,
     ):
@@ -192,9 +192,9 @@ class TeamCommunicationProtocol:
         self._members = {m.id: m for m in members}
         self._communication_type = communication_type
         self._log_messages = log_messages
-        self._communication_log: List[CommunicationLog] = []
-        self._message_handlers: Dict[str, List[Any]] = {}  # topic -> subscribers
-        self._pending_requests: Dict[str, asyncio.Future[AgentMessage]] = {}
+        self._communication_log: list[CommunicationLog] = []
+        self._message_handlers: dict[str, list[Any]] = {}  # topic -> subscribers
+        self._pending_requests: dict[str, asyncio.Future[AgentMessage]] = {}
 
     async def send_request(
         self,
@@ -300,7 +300,7 @@ class TeamCommunicationProtocol:
         message_type: str = "broadcast",
         exclude_sender: bool = True,
         **metadata: Any,
-    ) -> List[Optional[AgentMessage]]:
+    ) -> list[Optional[AgentMessage]]:
         """Broadcast message to all team members.
 
         Args:
@@ -329,7 +329,7 @@ class TeamCommunicationProtocol:
             data=metadata,
         )
 
-        responses: List[Optional[AgentMessage]] = []
+        responses: list[Optional[AgentMessage]] = []
 
         for member_id, member in self._members.items():
             if exclude_sender and member_id == sender_id:
@@ -363,11 +363,11 @@ class TeamCommunicationProtocol:
     async def multicast(
         self,
         sender_id: str,
-        recipient_ids: List[str],
+        recipient_ids: list[str],
         content: str,
         message_type: str = "multicast",
         **metadata: Any,
-    ) -> Dict[str, Optional[AgentMessage]]:
+    ) -> dict[str, Optional[AgentMessage]]:
         """Send message to multiple specific recipients.
 
         Args:
@@ -397,7 +397,7 @@ class TeamCommunicationProtocol:
             data=metadata,
         )
 
-        responses: Dict[str, Optional[AgentMessage]] = {}
+        responses: dict[str, Optional[AgentMessage]] = {}
 
         tasks = []
         for recipient_id in recipient_ids:
@@ -406,7 +406,7 @@ class TeamCommunicationProtocol:
                 responses[recipient_id] = None
                 continue
 
-            async def send_and_log(rec_id: str, rec: Any) -> Tuple[str, Optional[AgentMessage]]:
+            async def send_and_log(rec_id: str, rec: Any) -> tuple[str, Optional[AgentMessage]]:
                 try:
                     response = await rec.receive_message(message)
                     if self._log_messages:
@@ -519,7 +519,7 @@ class TeamCommunicationProtocol:
 
         return len(subscribers)
 
-    def get_communication_log(self) -> List[CommunicationLog]:
+    def get_communication_log(self) -> list[CommunicationLog]:
         """Get all communication logs.
 
         Returns:
@@ -536,7 +536,7 @@ class TeamCommunicationProtocol:
         """Clear all communication logs."""
         self._communication_log.clear()
 
-    def get_communication_stats(self) -> Dict[str, Any]:
+    def get_communication_stats(self) -> dict[str, Any]:
         """Get statistics about team communications.
 
         Returns:
@@ -555,8 +555,8 @@ class TeamCommunicationProtocol:
                 "avg_response_time_ms": 0,
             }
 
-        by_type: Dict[str, int] = {}
-        by_sender: Dict[str, int] = {}
+        by_type: dict[str, int] = {}
+        by_sender: dict[str, int] = {}
         total_response_time: float = 0.0
         response_count = 0
 
@@ -659,7 +659,7 @@ class SharedTeamContext:
 
     def __init__(
         self,
-        keys: Optional[List[str]] = None,
+        keys: Optional[list[str]] = None,
         conflict_resolution: ConflictResolutionStrategy = ConflictResolutionStrategy.LAST_WRITE_WINS,
         custom_resolver: Optional[Callable[[str, Any, Any, str], Any]] = None,
     ):
@@ -674,8 +674,8 @@ class SharedTeamContext:
         self._keys = set(keys) if keys else None
         self._conflict_resolution = conflict_resolution
         self._custom_resolver = custom_resolver
-        self._state: Dict[str, Any] = {}
-        self._update_history: List[ContextUpdate] = []
+        self._state: dict[str, Any] = {}
+        self._update_history: list[ContextUpdate] = []
         self._lock = asyncio.Lock()
 
     async def get(self, key: str, default: Any = None) -> Any:
@@ -891,7 +891,7 @@ class SharedTeamContext:
         # Otherwise, new value wins
         return new
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         """Get current state (snapshot).
 
         Returns:
@@ -902,7 +902,7 @@ class SharedTeamContext:
         """
         return self._state.copy()
 
-    def get_update_history(self, key: Optional[str] = None) -> List[ContextUpdate]:
+    def get_update_history(self, key: Optional[str] = None) -> list[ContextUpdate]:
         """Get update history.
 
         Args:
@@ -997,8 +997,8 @@ class Proposal:
     content: str
     proposer_id: str
     timestamp: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    votes: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    votes: dict[str, Any] = field(default_factory=dict)
     rank: Optional[int] = None
 
 
@@ -1017,10 +1017,10 @@ class NegotiationResult:
 
     success: bool
     agreed_proposal: Optional[Proposal]
-    votes: Dict[str, Any]
+    votes: dict[str, Any]
     rounds: int
     consensus_achieved: bool
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class NegotiationFramework:
@@ -1066,7 +1066,7 @@ class NegotiationFramework:
 
     def __init__(
         self,
-        members: List[Any],
+        members: list[Any],
         voting_strategy: VotingStrategy = VotingStrategy.MAJORITY,
         negotiation_type: NegotiationType = NegotiationType.VOTING,
         max_rounds: int = 3,
@@ -1083,9 +1083,9 @@ class NegotiationFramework:
         self._voting_strategy = voting_strategy
         self._negotiation_type = negotiation_type
         self._max_rounds = max_rounds
-        self._expertise_weights: Dict[str, float] = {}
+        self._expertise_weights: dict[str, float] = {}
 
-    def set_expertise_weights(self, weights: Dict[str, float]) -> None:
+    def set_expertise_weights(self, weights: dict[str, float]) -> None:
         """Set expertise weights for members.
 
         Args:
@@ -1102,9 +1102,9 @@ class NegotiationFramework:
 
     async def negotiate(
         self,
-        proposals: List[str],
+        proposals: list[str],
         topic: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> NegotiationResult:
         """Run a negotiation process.
 
@@ -1148,9 +1148,9 @@ class NegotiationFramework:
 
     async def _voting_negotiation(
         self,
-        proposals: List[Proposal],
+        proposals: list[Proposal],
         topic: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> NegotiationResult:
         """Run voting-based negotiation."""
         from victor.teams.types import AgentMessage, MessageType
@@ -1162,7 +1162,7 @@ class NegotiationFramework:
             rounds += 1
 
             # Collect votes
-            votes: Dict[str, Dict[str, Any]] = {prop.id: {} for prop in proposals}
+            votes: dict[str, dict[str, Any]] = {prop.id: {} for prop in proposals}
 
             for member_id, member in self._members.items():
                 # Send voting request
@@ -1215,13 +1215,13 @@ class NegotiationFramework:
 
     async def _compromise_negotiation(
         self,
-        proposals: List[Proposal],
+        proposals: list[Proposal],
         topic: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> NegotiationResult:
         """Run compromise-based negotiation."""
         # Get preferences from all members
-        preferences: Dict[str, List[str]] = {}
+        preferences: dict[str, list[str]] = {}
 
         for member_id, member in self._members.items():
             from victor.teams.types import AgentMessage, MessageType
@@ -1256,7 +1256,7 @@ class NegotiationFramework:
             )
 
         # Calculate average rank for each proposal
-        avg_ranks: Dict[str, float] = {}
+        avg_ranks: dict[str, float] = {}
         for prop in proposals:
             ranks = [
                 preferences[m].index(prop.content) + 1
@@ -1291,9 +1291,9 @@ class NegotiationFramework:
 
     async def _ranked_choice_negotiation(
         self,
-        proposals: List[Proposal],
+        proposals: list[Proposal],
         topic: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> NegotiationResult:
         """Run ranked choice negotiation."""
         from victor.teams.types import AgentMessage, MessageType
@@ -1305,7 +1305,7 @@ class NegotiationFramework:
             rounds += 1
 
             # Get rankings for active proposals
-            rankings: Dict[str, List[str]] = {}
+            rankings: dict[str, list[str]] = {}
 
             for member_id, member in self._members.items():
                 message = AgentMessage(
@@ -1328,7 +1328,7 @@ class NegotiationFramework:
                     logger.warning(f"Failed to get rankings from {member_id}: {e}")
 
             # Count first choices
-            first_choices: Dict[str, int] = {}
+            first_choices: dict[str, int] = {}
             for member_id, member_rankings in rankings.items():
                 if member_rankings:
                     first_choice = member_rankings[0]
@@ -1375,7 +1375,7 @@ class NegotiationFramework:
             metadata={"reason": "no_proposals_remaining"},
         )
 
-    def _parse_vote(self, content: str, proposals: List[Proposal]) -> Optional[Proposal]:
+    def _parse_vote(self, content: str, proposals: list[Proposal]) -> Optional[Proposal]:
         """Parse vote from member response.
 
         Args:
@@ -1400,7 +1400,7 @@ class NegotiationFramework:
 
         return None
 
-    def _parse_rankings(self, content: str, proposals: List[Proposal]) -> List[str]:
+    def _parse_rankings(self, content: str, proposals: list[Proposal]) -> list[str]:
         """Parse rankings from member response.
 
         Args:
@@ -1430,7 +1430,7 @@ class NegotiationFramework:
 
         return rankings
 
-    def _tally_votes(self, votes: Dict[str, Dict[str, Any]]) -> Optional[str]:
+    def _tally_votes(self, votes: dict[str, dict[str, Any]]) -> Optional[str]:
         """Tally votes and determine winner.
 
         Args:
@@ -1443,7 +1443,7 @@ class NegotiationFramework:
             return None
 
         # Calculate totals
-        totals: Dict[str, float] = {}
+        totals: dict[str, float] = {}
         for prop_id, member_votes in votes.items():
             totals[prop_id] = sum(member_votes.values())
 
@@ -1471,7 +1471,7 @@ class NegotiationFramework:
 
         return None
 
-    def _check_consensus(self, votes: Dict[str, Dict[str, Any]], winner_id: str) -> bool:
+    def _check_consensus(self, votes: dict[str, dict[str, Any]], winner_id: str) -> bool:
         """Check if consensus was achieved (all voted for winner).
 
         Args:

@@ -14,7 +14,7 @@
 
 """Generic file operations capability provider (Phase 3)."""
 
-from typing import List, Optional, Set
+from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
 
@@ -58,7 +58,7 @@ class FileOperationsCapability:
 
     def __init__(
         self,
-        operations: Optional[List[FileOperation]] = None,
+        operations: Optional[list[FileOperation]] = None,
     ) -> None:
         """Initialize file operations capability.
 
@@ -67,7 +67,7 @@ class FileOperationsCapability:
         """
         self.operations = operations or self.DEFAULT_OPERATIONS.copy()
 
-    def get_tools(self) -> Set[str]:
+    def get_tools(self) -> set[str]:
         """Get tool names for this capability.
 
         Returns:
@@ -75,7 +75,7 @@ class FileOperationsCapability:
         """
         return {op.tool_name for op in self.operations if op.required}
 
-    def get_tool_list(self) -> List[str]:
+    def get_tool_list(self) -> list[str]:
         """Get tool names as a list.
 
         Returns:

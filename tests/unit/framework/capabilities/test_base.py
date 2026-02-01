@@ -18,8 +18,6 @@ These tests verify the capability provider framework for verticals.
 """
 
 import pytest
-from dataclasses import FrozenInstanceError
-from typing import Dict, List
 
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
@@ -123,12 +121,12 @@ class TestCapabilityProvider(BaseCapabilityProvider[MockCapability]):
     """Concrete implementation of BaseCapabilityProvider for testing."""
 
     def __init__(self):
-        self._capabilities: Dict[str, MockCapability] = {
+        self._capabilities: dict[str, MockCapability] = {
             "read": MockCapability("read", 1),
             "write": MockCapability("write", 2),
             "execute": MockCapability("execute", 3),
         }
-        self._metadata: Dict[str, CapabilityMetadata] = {
+        self._metadata: dict[str, CapabilityMetadata] = {
             "read": CapabilityMetadata(
                 name="read", description="Read files and data", version="1.0", tags=["io", "safe"]
             ),
@@ -148,20 +146,20 @@ class TestCapabilityProvider(BaseCapabilityProvider[MockCapability]):
             ),
         }
 
-    def get_capabilities(self) -> Dict[str, MockCapability]:
+    def get_capabilities(self) -> dict[str, MockCapability]:
         return self._capabilities
 
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+    def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
         return self._metadata
 
 
 class EmptyCapabilityProvider(BaseCapabilityProvider[MockCapability]):
     """A capability provider with no capabilities."""
 
-    def get_capabilities(self) -> Dict[str, MockCapability]:
+    def get_capabilities(self) -> dict[str, MockCapability]:
         return {}
 
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+    def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
         return {}
 
 
@@ -299,10 +297,10 @@ class TestCapabilityProviderWithDifferentTypes:
         """Provider should work with string capabilities."""
 
         class StringProvider(BaseCapabilityProvider[str]):
-            def get_capabilities(self) -> Dict[str, str]:
+            def get_capabilities(self) -> dict[str, str]:
                 return {"greeting": "Hello", "farewell": "Goodbye"}
 
-            def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+            def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
                 return {
                     "greeting": CapabilityMetadata("greeting", "Says hello"),
                     "farewell": CapabilityMetadata("farewell", "Says goodbye"),
@@ -315,16 +313,16 @@ class TestCapabilityProviderWithDifferentTypes:
 
     def test_callable_capability_provider(self):
         """Provider should work with callable capabilities."""
-        from typing import Callable
+        from collections.abc import Callable
 
         class CallableProvider(BaseCapabilityProvider[Callable[[], int]]):
-            def get_capabilities(self) -> Dict[str, Callable[[], int]]:
+            def get_capabilities(self) -> dict[str, Callable[[], int]]:
                 return {
                     "get_one": lambda: 1,
                     "get_two": lambda: 2,
                 }
 
-            def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+            def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
                 return {
                     "get_one": CapabilityMetadata("get_one", "Returns 1"),
                     "get_two": CapabilityMetadata("get_two", "Returns 2"),
@@ -339,14 +337,14 @@ class TestCapabilityProviderWithDifferentTypes:
         """Provider should work with dict capabilities."""
         from typing import Any
 
-        class DictProvider(BaseCapabilityProvider[Dict[str, Any]]):
-            def get_capabilities(self) -> Dict[str, Dict[str, Any]]:
+        class DictProvider(BaseCapabilityProvider[dict[str, Any]]):
+            def get_capabilities(self) -> dict[str, dict[str, Any]]:
                 return {
                     "config": {"host": "localhost", "port": 8080},
                     "settings": {"debug": True, "log_level": "INFO"},
                 }
 
-            def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+            def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
                 return {
                     "config": CapabilityMetadata("config", "Configuration dict"),
                     "settings": CapabilityMetadata("settings", "Settings dict"),
@@ -372,7 +370,7 @@ class TestCapabilityProviderAbstractMethods:
         """Subclass must implement get_capabilities."""
 
         class IncompleteProvider(BaseCapabilityProvider[str]):
-            def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+            def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
                 return {}
 
         with pytest.raises(TypeError) as exc_info:
@@ -383,7 +381,7 @@ class TestCapabilityProviderAbstractMethods:
         """Subclass must implement get_capability_metadata."""
 
         class IncompleteProvider(BaseCapabilityProvider[str]):
-            def get_capabilities(self) -> Dict[str, str]:
+            def get_capabilities(self) -> dict[str, str]:
                 return {}
 
         with pytest.raises(TypeError) as exc_info:

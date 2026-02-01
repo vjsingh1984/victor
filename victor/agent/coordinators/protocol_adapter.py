@@ -50,7 +50,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.coordinators.state_coordinator import StateCoordinator
@@ -60,10 +60,8 @@ if TYPE_CHECKING:
     from victor.agent.mode_controller import AgentModeController
     from victor.agent.unified_tracker import UnifiedTaskTracker  # type: ignore[import-not-found]
     from victor.tools.registry import ToolRegistry
-    from victor.agent.message_history import MessageHistory
     from victor.core.verticals.vertical_context import VerticalContext  # type: ignore[import-not-found]
     from victor.agent.tool_selector import ToolSelector  # type: ignore[import-not-found]
-    from victor.agent.protocols import ToolAccessContext
     from victor.agent.prompts.system import SystemPromptBuilder  # type: ignore[import-not-found]
 
     # Conversation is not in the conversation module, use Any as fallback
@@ -185,7 +183,7 @@ class OrchestratorProtocolAdapter:
         fallback_budget: int = getattr(self._orchestrator, "tool_budget", 50)
         return fallback_budget
 
-    def get_observed_files(self) -> Set[str]:
+    def get_observed_files(self) -> set[str]:
         """Get files observed/read during conversation (protocol method).
 
         Returns:
@@ -193,14 +191,14 @@ class OrchestratorProtocolAdapter:
         """
         return self._state_coordinator.observed_files
 
-    def get_modified_files(self) -> Set[str]:
+    def get_modified_files(self) -> set[str]:
         """Get files modified during conversation (protocol method).
 
         Returns:
             Set of absolute file paths
         """
         if self._conversation_state and hasattr(self._conversation_state, "state"):
-            modified: Set[str] = set(getattr(self._conversation_state.state, "modified_files", []))
+            modified: set[str] = set(getattr(self._conversation_state.state, "modified_files", []))
             return modified
         return set()
 
@@ -283,7 +281,7 @@ class OrchestratorProtocolAdapter:
     # ToolsProtocol
     # ========================================================================
 
-    def get_available_tools(self) -> Set[str]:
+    def get_available_tools(self) -> set[str]:
         """Get all registered tool names (protocol method).
 
         Returns:
@@ -293,20 +291,20 @@ class OrchestratorProtocolAdapter:
             return set(self._tools.list_tools())
         return set()
 
-    def get_enabled_tools(self) -> Set[str]:
+    def get_enabled_tools(self) -> set[str]:
         """Get currently enabled tool names (protocol method).
 
         Returns:
             Set of enabled tool names for this session
         """
         if self._tool_access_config_coordinator:
-            enabled: Set[str] = self._tool_access_config_coordinator.get_enabled_tools(
+            enabled: set[str] = self._tool_access_config_coordinator.get_enabled_tools(
                 session_enabled_tools=getattr(self._orchestrator, "_enabled_tools", None),
             )
             return enabled
         return set()
 
-    def set_enabled_tools(self, tools: Set[str], tiered_config: Any = None) -> None:
+    def set_enabled_tools(self, tools: set[str], tiered_config: Any = None) -> None:
         """Set which tools are enabled for this session (protocol method).
 
         Args:
@@ -395,7 +393,7 @@ class OrchestratorProtocolAdapter:
     # Health Check Methods
     # ========================================================================
 
-    def check_tool_selector_health(self) -> Dict[str, Any]:
+    def check_tool_selector_health(self) -> dict[str, Any]:
         """Check if tool selector is properly initialized.
 
         This health check prevents the critical bug where SemanticToolSelector

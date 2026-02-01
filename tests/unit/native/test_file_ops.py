@@ -18,8 +18,6 @@ Unit tests for file operations Rust extension.
 Tests parallel directory traversal, metadata collection, and filtering.
 """
 
-import os
-import tempfile
 import time
 from pathlib import Path
 from unittest.mock import patch

@@ -36,7 +36,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -66,12 +66,12 @@ class OptionState:
     """
 
     current_mode: str = "build"
-    tools_used: List[str] = field(default_factory=list)
+    tools_used: list[str] = field(default_factory=list)
     iterations: int = 0
     context_size: int = 0
     task_progress: float = 0.0
     last_tool_success: bool = True
-    custom_features: Dict[str, Any] = field(default_factory=dict)
+    custom_features: dict[str, Any] = field(default_factory=dict)
 
     def to_tuple(self) -> tuple[Any, ...]:
         """Convert to hashable tuple for Q-table lookup."""
@@ -101,7 +101,7 @@ class OptionResult:
     reward: float = 0.0
     steps: int = 0
     final_state: Optional[OptionState] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class Option(ABC):
@@ -434,7 +434,7 @@ class OptionRegistry:
 
     def __init__(self) -> None:
         """Initialize registry with default options."""
-        self._options: Dict[str, Option] = {}
+        self._options: dict[str, Option] = {}
         self._active_option: Optional[Option] = None
 
         # Register default options
@@ -452,7 +452,7 @@ class OptionRegistry:
         self._options[option.name] = option
         logger.debug(f"Registered option: {option.name}")
 
-    def get_available_options(self, state: OptionState) -> List[Option]:
+    def get_available_options(self, state: OptionState) -> list[Option]:
         """Get options that can be initiated in current state.
 
         Args:
@@ -535,7 +535,7 @@ class OptionRegistry:
         self._active_option = None
         return result
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export registry metrics.
 
         Returns:

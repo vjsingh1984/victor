@@ -32,12 +32,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Any, Optional, TYPE_CHECKING
 
 import yaml
 
 if TYPE_CHECKING:
-    from types import ModuleType
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -66,19 +66,19 @@ class VerticalYAMLConfig:
     name: str
     version: str
     description: str
-    tools: List[str]
-    system_prompt_config: Dict[str, Any]
-    stages: Dict[str, Dict[str, Any]]
-    middleware: List[Dict[str, Any]]
-    safety_extension: Optional[Dict[str, Any]]
-    prompt_contributor: Optional[Dict[str, Any]]
-    mode_config: Optional[Dict[str, Any]]
-    tool_dependencies: Optional[Dict[str, Any]]
-    workflows: Dict[str, Any]
-    provider_hints: Dict[str, Any]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tools: list[str]
+    system_prompt_config: dict[str, Any]
+    stages: dict[str, dict[str, Any]]
+    middleware: list[dict[str, Any]]
+    safety_extension: Optional[dict[str, Any]]
+    prompt_contributor: Optional[dict[str, Any]]
+    mode_config: Optional[dict[str, Any]]
+    tool_dependencies: Optional[dict[str, Any]]
+    workflows: dict[str, Any]
+    provider_hints: dict[str, Any]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary.
 
         Returns:
@@ -130,7 +130,7 @@ class VerticalConfigLoader:
 
     def __init__(self) -> None:
         """Initialize the configuration loader."""
-        self._cache: Dict[str, VerticalYAMLConfig] = {}
+        self._cache: dict[str, VerticalYAMLConfig] = {}
 
     def load_vertical_config(
         self,
@@ -249,7 +249,7 @@ class VerticalConfigLoader:
 
     def _extract_prompt_text(
         self,
-        prompt_config: Dict[str, Any],
+        prompt_config: dict[str, Any],
     ) -> str:
         """Extract prompt text from prompt configuration.
 
@@ -289,7 +289,7 @@ class VerticalConfigLoader:
         else:
             raise ValueError(f"Unknown prompt source: {source}")
 
-    def _validate_required_fields(self, yaml_data: Dict[str, Any], config_path: Path) -> None:
+    def _validate_required_fields(self, yaml_data: dict[str, Any], config_path: Path) -> None:
         """Validate that required fields are present in YAML data.
 
         Supports both legacy and structured YAML formats.
@@ -339,7 +339,7 @@ class VerticalConfigLoader:
                     f"Missing required fields in {config_path}: {', '.join(missing_fields)}"
                 )
 
-    def _extract_config(self, yaml_data: Dict[str, Any]) -> VerticalYAMLConfig:
+    def _extract_config(self, yaml_data: dict[str, Any]) -> VerticalYAMLConfig:
         """Extract configuration from parsed YAML data.
 
         Supports both legacy and new YAML structure:
@@ -363,7 +363,7 @@ class VerticalConfigLoader:
             # Legacy flat format
             return self._extract_legacy_config(yaml_data)
 
-    def _extract_structured_config(self, yaml_data: Dict[str, Any]) -> VerticalYAMLConfig:
+    def _extract_structured_config(self, yaml_data: dict[str, Any]) -> VerticalYAMLConfig:
         """Extract configuration from new structured YAML format.
 
         Args:
@@ -437,7 +437,7 @@ class VerticalConfigLoader:
             metadata=additional_metadata,
         )
 
-    def _extract_legacy_config(self, yaml_data: Dict[str, Any]) -> VerticalYAMLConfig:
+    def _extract_legacy_config(self, yaml_data: dict[str, Any]) -> VerticalYAMLConfig:
         """Extract configuration from legacy flat YAML format.
 
         Args:

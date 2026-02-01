@@ -20,7 +20,7 @@ This module provides fast execution of pre-compiled tool execution graphs.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from victor.agent.tool_graph import ToolExecutionGraph
 
@@ -41,9 +41,9 @@ class ToolExecutionEngine:
             tool_pipeline: ToolPipeline instance
         """
         self._tool_pipeline = tool_pipeline
-        self._graph_cache: Dict[str, ToolExecutionGraph] = {}
+        self._graph_cache: dict[str, ToolExecutionGraph] = {}
 
-    async def execute(self, graph: ToolExecutionGraph, context: Dict[str, Any]) -> Any:
+    async def execute(self, graph: ToolExecutionGraph, context: dict[str, Any]) -> Any:
         """Execute pre-compiled graph.
 
         Args:
@@ -106,7 +106,7 @@ class ToolExecutionEngine:
         self._graph_cache.clear()
         logger.debug("Cleared tool execution graph cache")
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

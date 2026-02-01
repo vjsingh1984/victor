@@ -31,7 +31,7 @@ Logging Levels (Victor convention):
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.providers.base import Message
 
@@ -214,7 +214,7 @@ class DebugLogger:
     def log_tool_call(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         iteration: int,
     ) -> None:
         """Log tool call (one line)."""
@@ -262,7 +262,7 @@ class DebugLogger:
         preview = self._truncate(content, 60)
         self.logger.debug(f"   🤖 {len(content)} chars{tc_str}: {preview}")
 
-    def log_new_messages(self, messages: List[Message]) -> None:
+    def log_new_messages(self, messages: list[Message]) -> None:
         """Update stats from messages (no logging)."""
         if not self.enabled:
             return
@@ -325,7 +325,7 @@ class DebugLogger:
                 f"   {chart_icon} Context: {char_count:,} chars (~{estimated_tokens:,} tokens, {context_pct:.0f}% of {self.context_window:,})"
             )
 
-    def log_conversation_summary(self, messages: List[Message]) -> None:
+    def log_conversation_summary(self, messages: list[Message]) -> None:
         """Log final conversation summary."""
         if not self.enabled:
             return

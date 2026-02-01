@@ -78,16 +78,12 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Union,
 )
+from collections.abc import Callable
 
 from victor.framework.state_merging import (
     MergeMode,
-    MergeStrategy,
     StateMergeError,
     create_merge_strategy,
 )
@@ -122,7 +118,7 @@ class TeamNodeConfig:
     output_key: str = "team_result"
     continue_on_error: bool = True
     validate_before_merge: bool = False
-    required_keys: Optional[List[str]] = None
+    required_keys: Optional[list[str]] = None
     custom_merge: Optional[Callable[[str, Any, Any], Any]] = None
 
 
@@ -151,19 +147,19 @@ class TeamNode:
     name: str
     goal: str
     team_formation: TeamFormation
-    members: List[TeamMember]
+    members: list[TeamMember]
     config: TeamNodeConfig = field(default_factory=TeamNodeConfig)
-    shared_context: Dict[str, Any] = field(default_factory=dict)
+    shared_context: dict[str, Any] = field(default_factory=dict)
     max_iterations: int = 50
     total_tool_budget: int = 100
-    next_nodes: List[str] = field(default_factory=list)
+    next_nodes: list[str] = field(default_factory=list)
     retry_policy: Optional[Any] = None  # RetryPolicy from victor.workflows.protocols
 
     def execute(
         self,
         orchestrator: Optional["AgentOrchestrator"],
-        graph_state: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        graph_state: dict[str, Any],
+    ) -> dict[str, Any]:
         """Execute the team node (sync wrapper).
 
         Args:
@@ -197,8 +193,8 @@ class TeamNode:
     async def execute_async(
         self,
         orchestrator: Optional["AgentOrchestrator"],
-        graph_state: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        graph_state: dict[str, Any],
+    ) -> dict[str, Any]:
         """Execute the team node asynchronously.
 
         This method:
@@ -248,7 +244,6 @@ class TeamNode:
             )
 
             # Add members to coordinator
-            from victor.teams.types import TeamMemberAdapter
 
             for member in self.members:
                 # Create adapter that bridges TeamMember to ITeamMember
@@ -324,7 +319,7 @@ class TeamNode:
             else:
                 raise
 
-    def _build_goal(self, graph_state: Dict[str, Any]) -> str:
+    def _build_goal(self, graph_state: dict[str, Any]) -> str:
         """Build goal with context substitution.
 
         Args:
@@ -343,7 +338,7 @@ class TeamNode:
 
         return goal
 
-    def _extract_context(self, graph_state: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_context(self, graph_state: dict[str, Any]) -> dict[str, Any]:
         """Extract relevant context for team from graph state.
 
         Args:
@@ -394,7 +389,7 @@ class TeamNode:
             )
 
         # Execute via unified coordinator
-        result_dict: Dict[str, Any] = await coordinator.execute_task(
+        result_dict: dict[str, Any] = await coordinator.execute_task(
             task=team_config.goal, context=team_config.shared_context or {}
         )
         # Convert dict result to TeamResult
@@ -404,9 +399,9 @@ class TeamNode:
 
     def _merge_team_result(
         self,
-        graph_state: Dict[str, Any],
+        graph_state: dict[str, Any],
         team_result: "TeamResult",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Merge team result into graph state.
 
         Args:
@@ -472,7 +467,7 @@ class TeamNode:
                 )
                 return graph_state
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize node to dictionary.
 
         Returns:
@@ -501,7 +496,7 @@ class TeamNode:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TeamNode":
+    def from_dict(cls, data: dict[str, Any]) -> "TeamNode":
         """Deserialize node from dictionary.
 
         Args:

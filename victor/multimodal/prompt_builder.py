@@ -23,7 +23,7 @@ import base64
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class MediaContent:
     type: str
     content: str
     path: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -56,10 +56,10 @@ class BuiltPrompt:
     """
 
     text: str
-    media: List[MediaContent] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    media: list[MediaContent] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary format."""
         return {
             "text": self.text,
@@ -108,9 +108,9 @@ class MultiModalPromptBuilder:
             max_text_length: Maximum total text length
         """
         self.max_text_length = max_text_length
-        self._text_parts: List[str] = []
-        self._media_items: List[MediaContent] = []
-        self._metadata: Dict[str, Any] = {}
+        self._text_parts: list[str] = []
+        self._media_items: list[MediaContent] = []
+        self._metadata: dict[str, Any] = {}
 
     def add_text(self, text: str, truncate: bool = True) -> "MultiModalPromptBuilder":
         """Add text content.
@@ -130,7 +130,7 @@ class MultiModalPromptBuilder:
 
     def add_image(
         self,
-        image_path: Union[str, Path],
+        image_path: str | Path,
         encode_base64: bool = True,
         description: Optional[str] = None,
     ) -> "MultiModalPromptBuilder":
@@ -171,7 +171,7 @@ class MultiModalPromptBuilder:
 
     def add_document(
         self,
-        document_path: Union[str, Path],
+        document_path: str | Path,
         query: Optional[str] = None,
         max_length: int = 2000,
     ) -> "MultiModalPromptBuilder":
@@ -232,7 +232,7 @@ class MultiModalPromptBuilder:
 
     def add_audio(
         self,
-        audio_path: Union[str, Path],
+        audio_path: str | Path,
         transcription: Optional[str] = None,
     ) -> "MultiModalPromptBuilder":
         """Add audio content.
@@ -268,7 +268,7 @@ class MultiModalPromptBuilder:
 
     def add_video(
         self,
-        video_path: Union[str, Path],
+        video_path: str | Path,
         transcription: Optional[str] = None,
         num_frames: int = 3,
     ) -> "MultiModalPromptBuilder":
@@ -355,7 +355,7 @@ class MultiModalPromptBuilder:
 
 def create_vision_prompt(
     query: str,
-    image_path: Union[str, Path],
+    image_path: str | Path,
     context: Optional[str] = None,
 ) -> BuiltPrompt:
     """Create a vision prompt for image analysis.
@@ -381,7 +381,7 @@ def create_vision_prompt(
 
 def create_document_prompt(
     query: str,
-    document_path: Union[str, Path],
+    document_path: str | Path,
     excerpt_length: int = 2000,
 ) -> BuiltPrompt:
     """Create a prompt for document analysis.
@@ -404,7 +404,7 @@ def create_document_prompt(
 
 def create_multimodal_prompt(
     query: str,
-    items: List[Dict[str, Any]],
+    items: list[dict[str, Any]],
 ) -> BuiltPrompt:
     """Create a prompt with multiple media types.
 

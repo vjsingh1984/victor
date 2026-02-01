@@ -61,18 +61,13 @@ from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
     runtime_checkable,
 )
 
 if TYPE_CHECKING:
-    from victor.providers.base import StreamChunk
+    pass
 
 # Import focused protocols for composition
 from victor.protocols.chat import ChatProtocol

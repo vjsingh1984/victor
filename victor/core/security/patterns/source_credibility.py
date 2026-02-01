@@ -27,7 +27,7 @@ Performance:
 import logging
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional
 
 if TYPE_CHECKING:
     # Type stubs for native extensions (optional)
@@ -73,7 +73,7 @@ class CredibilityMatch(NamedTuple):
 
 # URL patterns for credibility classification
 # These are domain-agnostic and can be extended by verticals
-SOURCE_CREDIBILITY_PATTERNS: Dict[CredibilityLevel, List[str]] = {
+SOURCE_CREDIBILITY_PATTERNS: dict[CredibilityLevel, list[str]] = {
     CredibilityLevel.HIGH: [
         r"\.gov($|/)",  # Government domains
         r"\.edu($|/)",  # Educational institutions
@@ -114,7 +114,7 @@ SOURCE_CREDIBILITY_PATTERNS: Dict[CredibilityLevel, List[str]] = {
 }
 
 # Domain type descriptions for transparency
-DOMAIN_TYPES: Dict[str, str] = {
+DOMAIN_TYPES: dict[str, str] = {
     r"\.gov": "government",
     r"\.edu": "educational",
     r"arxiv\.org": "preprint_server",
@@ -186,7 +186,7 @@ def is_low_credibility(url: str) -> bool:
     return validate_source_credibility(url).level == CredibilityLevel.LOW
 
 
-def get_source_safety_reminders() -> List[str]:
+def get_source_safety_reminders() -> list[str]:
     """Get safety reminders for source verification."""
     return [
         "Verify claims with multiple independent sources",
@@ -207,7 +207,7 @@ class SourceCredibilityScanner:
     def __init__(self) -> None:
         """Initialize the scanner with optional native acceleration."""
         self._patterns = SOURCE_CREDIBILITY_PATTERNS
-        self._native_matchers: Dict[CredibilityLevel, Any] = {}
+        self._native_matchers: dict[CredibilityLevel, Any] = {}
         self._use_native = _NATIVE_AVAILABLE
 
         if self._use_native:
@@ -236,7 +236,7 @@ class SourceCredibilityScanner:
             logger.warning(f"Failed to initialize native matchers: {e}")
             self._use_native = False
 
-    def scan(self, content: str) -> List[CredibilityMatch]:
+    def scan(self, content: str) -> list[CredibilityMatch]:
         """Scan content for URLs and classify their credibility.
 
         Args:
@@ -251,7 +251,7 @@ class SourceCredibilityScanner:
 
         return [validate_source_credibility(url) for url in urls]
 
-    def batch_scan(self, urls: List[str]) -> List[CredibilityMatch]:
+    def batch_scan(self, urls: list[str]) -> list[CredibilityMatch]:
         """Batch scan multiple URLs for credibility.
 
         Uses native acceleration when available for better performance.
@@ -264,7 +264,7 @@ class SourceCredibilityScanner:
         """
         return [validate_source_credibility(url) for url in urls]
 
-    def get_low_credibility_urls(self, content: str) -> List[str]:
+    def get_low_credibility_urls(self, content: str) -> list[str]:
         """Get list of low-credibility URLs in content.
 
         Args:

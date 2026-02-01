@@ -16,10 +16,8 @@
 
 from __future__ import annotations
 
-import base64
 import json
-from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -44,7 +42,6 @@ def mock_provider():
 @pytest.fixture
 def sample_image_path(tmp_path):
     """Create a sample image file for testing."""
-    import io
 
     # Create a minimal valid PNG file
     from PIL import Image
@@ -486,7 +483,6 @@ class TestDataClasses:
 
     def test_image_analysis_creation(self):
         """Test creating ImageAnalysis."""
-        from datetime import datetime
 
         analysis = ImageAnalysis(
             analysis="Test image",

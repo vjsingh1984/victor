@@ -35,7 +35,7 @@ Usage:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 # =============================================================================
@@ -60,7 +60,7 @@ class RLConfigProviderProtocol(Protocol):
     """
 
     @abstractmethod
-    def get_rl_config(self) -> Dict[str, Any]:
+    def get_rl_config(self) -> dict[str, Any]:
         """Get RL configuration for this vertical.
 
         Returns:

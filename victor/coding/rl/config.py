@@ -22,7 +22,6 @@ across RL Q-values, workflow patterns, and vertical configurations.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Set
 
 from victor.framework.rl import LearnerType
 from victor.framework.rl.config import BaseRLConfig
@@ -55,7 +54,7 @@ class CodingRLConfig(BaseRLConfig):
     """
 
     # Coding uses additional learners (MODE_TRANSITION, QUALITY_WEIGHTS)
-    active_learners: List[LearnerType] = field(
+    active_learners: list[LearnerType] = field(
         default_factory=lambda: [
             LearnerType.TOOL_SELECTOR,
             LearnerType.CONTINUATION_PATIENCE,
@@ -67,7 +66,7 @@ class CodingRLConfig(BaseRLConfig):
 
     # Task type to tool mappings for tool selection learning
     # Uses canonical ToolNames constants for consistency
-    task_type_mappings: Dict[str, List[str]] = field(
+    task_type_mappings: dict[str, list[str]] = field(
         default_factory=lambda: {
             # Analysis tasks
             "refactoring": [
@@ -132,7 +131,7 @@ class CodingRLConfig(BaseRLConfig):
     )
 
     # Quality thresholds by task type (higher = stricter)
-    quality_thresholds: Dict[str, float] = field(
+    quality_thresholds: dict[str, float] = field(
         default_factory=lambda: {
             "refactoring": 0.90,  # High bar for refactoring
             "debugging": 0.85,
@@ -147,7 +146,7 @@ class CodingRLConfig(BaseRLConfig):
 
     # Coding-specific: different patience values (3 for cloud, 7 for local)
     # This overrides the BaseRLConfig default
-    default_patience: Dict[str, int] = field(
+    default_patience: dict[str, int] = field(
         default_factory=lambda: {
             "anthropic": 3,
             "openai": 3,
@@ -163,7 +162,7 @@ class CodingRLConfig(BaseRLConfig):
 
     # Tools that should never be recommended together (conflicting)
     # Uses canonical ToolNames constants for consistency
-    conflicting_tools: Dict[str, Set[str]] = field(
+    conflicting_tools: dict[str, set[str]] = field(
         default_factory=lambda: {
             ToolNames.WRITE: {ToolNames.EDIT},  # Use one or the other
             ToolNames.EDIT: {ToolNames.WRITE},

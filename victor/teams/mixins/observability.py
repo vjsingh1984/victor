@@ -41,7 +41,8 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +120,7 @@ class ObservabilityMixin:
     def _emit_team_event(
         self,
         event_name: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> None:
         """Emit a team event to the EventBus.
 
@@ -178,7 +179,7 @@ class ObservabilityMixin:
             },
         )
 
-    def _get_observability_context(self) -> Dict[str, Any]:
+    def _get_observability_context(self) -> dict[str, Any]:
         """Get current observability context.
 
         Returns:

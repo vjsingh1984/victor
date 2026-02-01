@@ -21,8 +21,7 @@ to avoid blocking the event loop during SQLite operations.
 import asyncio
 import tempfile
 from pathlib import Path
-from typing import Generator
-from unittest.mock import patch, MagicMock
+from collections.abc import Generator
 
 import pytest
 

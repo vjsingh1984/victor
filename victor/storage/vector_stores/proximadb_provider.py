@@ -30,9 +30,8 @@ Features:
 - Multiple distance metrics (cosine, euclidean, dot)
 """
 
-import asyncio
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.storage.vector_stores.base import (
     BaseEmbeddingProvider,
@@ -235,7 +234,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         except Exception as e:
             print(f"Warning: Could not create collection: {e}")
 
-    def _to_sql_value(self, value: Any) -> Dict[str, Any]:
+    def _to_sql_value(self, value: Any) -> dict[str, Any]:
         """Convert Python value to ProximaDB SqlValue format."""
         if value is None:
             return {"null_value": 0}
@@ -252,11 +251,11 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         else:
             return {"string_value": str(value)}
 
-    def _convert_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+    def _convert_metadata(self, metadata: dict[str, Any]) -> dict[str, Any]:
         """Convert metadata dict to SqlValue format."""
         return {k: self._to_sql_value(v) for k, v in metadata.items()}
 
-    def _extract_sql_value(self, sql_value: Dict[str, Any]) -> Any:
+    def _extract_sql_value(self, sql_value: dict[str, Any]) -> Any:
         """Extract Python value from SqlValue format."""
         if "string_value" in sql_value:
             return sql_value["string_value"]
@@ -272,7 +271,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             return [self._extract_sql_value(v) for v in sql_value["array_value"].get("values", [])]
         return sql_value
 
-    def _extract_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_metadata(self, metadata: dict[str, Any]) -> dict[str, Any]:
         """Extract Python values from SqlValue metadata."""
         return {k: self._extract_sql_value(v) for k, v in metadata.items()}
 
@@ -282,7 +281,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             raise RuntimeError("HTTP client not initialized. Call initialize() first.")
         return self._client
 
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """Generate embedding for single text.
 
         Args:
@@ -298,7 +297,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             raise RuntimeError("Embedding model not initialized")
         return await self.embedding_model.embed_text(text)
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for batch of texts.
 
         Args:
@@ -318,7 +317,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         self,
         doc_id: str,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Index a single document.
 
@@ -334,7 +333,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         embedding = await self.embed_text(content)
 
         # Prepare vector with metadata
-        vector_data: Dict[str, Any] = {
+        vector_data: dict[str, Any] = {
             "id": doc_id,
             "vector": embedding,
         }
@@ -357,7 +356,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         if not result.get("success"):
             print(f"Warning: Insert may have failed: {result}")
 
-    async def index_documents(self, documents: List[Dict[str, Any]]) -> None:
+    async def index_documents(self, documents: list[dict[str, Any]]) -> None:
         """Index multiple documents in batch.
 
         Args:
@@ -405,8 +404,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         self,
         query: str,
         limit: int = 5,
-        filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[EmbeddingSearchResult]:
+        filter_metadata: Optional[dict[str, Any]] = None,
+    ) -> list[EmbeddingSearchResult]:
         """Search for similar documents.
 
         Args:
@@ -424,7 +423,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         query_embedding = await self.embed_text(query)
 
         # Prepare search request
-        search_query: Dict[str, Any] = {"vector": query_embedding}
+        search_query: dict[str, Any] = {"vector": query_embedding}
         if filter_metadata:
             search_query["filters"] = self._convert_metadata(filter_metadata)
 
@@ -439,10 +438,10 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             },
         )
 
-        data: Dict[str, Any] = response.json()
+        data: dict[str, Any] = response.json()
 
         # Parse results (handle nested structure)
-        results: List[EmbeddingSearchResult] = []
+        results: list[EmbeddingSearchResult] = []
         if data.get("success") and data.get("results"):
             inner = data["results"]
             if isinstance(inner, dict) and "results" in inner:
@@ -530,7 +529,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         await self._ensure_collection(self._collection_name, self._dimension)
         print("Cleared index")
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get index statistics.
 
         Returns:

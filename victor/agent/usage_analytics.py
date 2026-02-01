@@ -54,7 +54,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Optional, Tuple
+from typing import Any, ClassVar, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -140,18 +140,18 @@ class UsageAnalytics:
         self.config = config or AnalyticsConfig()
 
         # Tool execution records: tool_name -> list of records
-        self._tool_records: Dict[str, List[ToolExecutionRecord]] = defaultdict(list)
+        self._tool_records: dict[str, list[ToolExecutionRecord]] = defaultdict(list)
 
         # Provider call records: provider_name -> list of records
-        self._provider_records: Dict[str, List[ProviderCallRecord]] = defaultdict(list)
+        self._provider_records: dict[str, list[ProviderCallRecord]] = defaultdict(list)
 
         # Session statistics
         self._current_session: Optional[ConversationStats] = None
-        self._session_history: List[ConversationStats] = []
+        self._session_history: list[ConversationStats] = []
 
         # Aggregated metrics for quick access
-        self._tool_aggregates: Dict[str, Dict[str, Any]] = {}
-        self._provider_aggregates: Dict[str, Dict[str, Any]] = {}
+        self._tool_aggregates: dict[str, dict[str, Any]] = {}
+        self._provider_aggregates: dict[str, dict[str, Any]] = {}
 
         # Thread safety
         self._data_lock = threading.RLock()
@@ -360,7 +360,7 @@ class UsageAnalytics:
         with self._data_lock:
             # Track selection method distribution
             if "_selection_stats" not in self.__dict__:
-                self._selection_stats: Dict[str, Dict[str, Any]] = {}
+                self._selection_stats: dict[str, dict[str, Any]] = {}
 
             if method not in self._selection_stats:
                 self._selection_stats[method] = {
@@ -401,7 +401,7 @@ class UsageAnalytics:
         with self._data_lock:
             # Track TTFT stats per provider/model
             if "_ttft_stats" not in self.__dict__:
-                self._ttft_stats: Dict[str, List[float]] = {}
+                self._ttft_stats: dict[str, list[float]] = {}
 
             key = f"{provider_name}:{model}"
             if key not in self._ttft_stats:
@@ -440,7 +440,7 @@ class UsageAnalytics:
         with self._data_lock:
             # Track streaming stats
             if "_streaming_stats" not in self.__dict__:
-                self._streaming_stats: Dict[str, Dict[str, Any]] = {}
+                self._streaming_stats: dict[str, dict[str, Any]] = {}
 
             key = f"{provider_name}:{model}"
             if key not in self._streaming_stats:
@@ -472,7 +472,7 @@ class UsageAnalytics:
             f"tokens={total_tokens}, duration={total_duration_ms:.1f}ms"
         )
 
-    def get_selection_insights(self) -> Dict[str, Any]:
+    def get_selection_insights(self) -> dict[str, Any]:
         """Get insights about tool selection patterns.
 
         Returns:
@@ -497,7 +497,7 @@ class UsageAnalytics:
                 }
 
             # Add recommendations
-            recommendations: List[str] = []
+            recommendations: list[str] = []
             if "semantic" in insights and "keyword" in insights:
                 if insights["semantic"]["avg_selection_time_ms"] > 100:
                     recommendations.append(
@@ -509,7 +509,7 @@ class UsageAnalytics:
 
             return insights
 
-    def get_ttft_insights(self, provider_name: Optional[str] = None) -> Dict[str, Any]:
+    def get_ttft_insights(self, provider_name: Optional[str] = None) -> dict[str, Any]:
         """Get time-to-first-token insights.
 
         Args:
@@ -570,7 +570,7 @@ class UsageAnalytics:
 
         # Error distribution
         errors = [r.error_type for r in records if r.error_type]
-        error_counts: Dict[str, int] = {}
+        error_counts: dict[str, int] = {}
         for error in errors:
             error_counts[error] = error_counts.get(error, 0) + 1
 
@@ -622,7 +622,7 @@ class UsageAnalytics:
     # Query Methods
     # ========================================================================
 
-    def get_tool_insights(self, tool_name: str) -> Dict[str, Any]:
+    def get_tool_insights(self, tool_name: str) -> dict[str, Any]:
         """Get optimization insights for a tool.
 
         Args:
@@ -661,7 +661,7 @@ class UsageAnalytics:
 
             return insights
 
-    def get_provider_insights(self, provider_name: str) -> Dict[str, Any]:
+    def get_provider_insights(self, provider_name: str) -> dict[str, Any]:
         """Get optimization insights for a provider.
 
         Args:
@@ -697,7 +697,7 @@ class UsageAnalytics:
 
             return insights
 
-    def get_top_tools(self, metric: str = "usage", limit: int = 10) -> List[Tuple[str, float]]:
+    def get_top_tools(self, metric: str = "usage", limit: int = 10) -> list[tuple[str, float]]:
         """Get top tools by a given metric.
 
         Args:
@@ -725,7 +725,7 @@ class UsageAnalytics:
 
             return [(name, agg.get(key, 0)) for name, agg in sorted_tools[:limit]]
 
-    def get_session_summary(self) -> Dict[str, Any]:
+    def get_session_summary(self) -> dict[str, Any]:
         """Get summary of conversation sessions.
 
         Returns:
@@ -752,7 +752,7 @@ class UsageAnalytics:
                 "avg_session_duration_seconds": avg_duration,
             }
 
-    def get_optimization_recommendations(self) -> List[Dict[str, Any]]:
+    def get_optimization_recommendations(self) -> list[dict[str, Any]]:
         """Get actionable optimization recommendations.
 
         Returns:
@@ -965,10 +965,10 @@ class UsageAnalytics:
     def _ensure_buffer_state(self) -> None:
         """Initialize buffer state if not already done."""
         if not hasattr(self, "_tool_buffer"):
-            self._tool_buffer: List[Dict[str, Any]] = []
-            self._provider_buffer: List[Dict[str, Any]] = []
-            self._selection_buffer: List[Dict[str, Any]] = []
-            self._streaming_buffer: List[Dict[str, Any]] = []
+            self._tool_buffer: list[dict[str, Any]] = []
+            self._provider_buffer: list[dict[str, Any]] = []
+            self._selection_buffer: list[dict[str, Any]] = []
+            self._streaming_buffer: list[dict[str, Any]] = []
             self._buffer_lock = threading.Lock()
             self._buffer_size = 100
             self._flush_interval = 5.0
@@ -1271,7 +1271,7 @@ class UsageAnalytics:
         await self.flush_buffers_async()
         logger.debug("UsageAnalytics: Stopped auto-flush")
 
-    def get_buffer_stats(self) -> Dict[str, Any]:
+    def get_buffer_stats(self) -> dict[str, Any]:
         """Get buffer statistics.
 
         Returns:

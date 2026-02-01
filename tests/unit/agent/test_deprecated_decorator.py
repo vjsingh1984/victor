@@ -15,7 +15,6 @@
 """Tests for the @deprecated decorator."""
 
 import warnings
-import pytest
 
 from victor.agent.decorators import deprecated, deprecated_property, deprecated_class
 

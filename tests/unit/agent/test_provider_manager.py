@@ -745,7 +745,6 @@ class TestCheckHealth:
     @pytest.mark.asyncio
     async def test_check_health_healthy(self, manager):
         """Test health check for healthy provider."""
-        from victor.protocols.provider_manager import HealthStatus
 
         # Mock the health monitor to return healthy
         with patch.object(
@@ -764,7 +763,6 @@ class TestCheckHealth:
     @pytest.mark.asyncio
     async def test_check_health_unhealthy(self, manager):
         """Test health check for unhealthy provider."""
-        from victor.protocols.provider_manager import HealthStatus
 
         # Mock the health monitor to return unhealthy
         with patch.object(
@@ -781,7 +779,6 @@ class TestCheckHealth:
     @pytest.mark.asyncio
     async def test_check_health_error_handling(self, manager):
         """Test health check error handling."""
-        from victor.protocols.provider_manager import HealthStatus
 
         # Mock the health monitor to raise exception
         with patch.object(

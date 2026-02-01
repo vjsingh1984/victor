@@ -30,7 +30,8 @@ Key Features:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from collections.abc import AsyncIterator
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStateMachine

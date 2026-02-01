@@ -28,7 +28,7 @@ Thread Safety:
 """
 
 import logging
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class ConversationCoordinator:
         self._usage_logger = usage_logger
 
     @property
-    def messages(self) -> List[Any]:
+    def messages(self) -> list[Any]:
         """Get conversation messages.
 
         Provides backward-compatible property access to message history.
@@ -81,7 +81,7 @@ class ConversationCoordinator:
         Returns:
             List of messages in conversation history
         """
-        result: List[Any] = self._conversation.messages
+        result: list[Any] = self._conversation.messages
         return result
 
     def add_message(self, role: str, content: str) -> None:

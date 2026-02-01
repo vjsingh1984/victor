@@ -14,7 +14,6 @@
 
 """Tests for Data Analysis personas."""
 
-import pytest
 
 from victor.dataanalysis.teams.personas import (
     DATA_ANALYSIS_PERSONAS,

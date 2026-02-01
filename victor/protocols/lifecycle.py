@@ -41,7 +41,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 @dataclass
@@ -63,8 +63,8 @@ class SessionMetadata:
     session_id: str
     created_at: str
     config: "SessionConfig"
-    resources: Dict[str, Any]
-    metadata: Dict[str, Any] | None = None
+    resources: dict[str, Any]
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
@@ -87,7 +87,7 @@ class SessionConfig:
     max_tokens: int = 4096
     tools: Any = None
     vertical: Optional[str] = None
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
@@ -104,9 +104,9 @@ class CleanupResult:
 
     success: bool
     session_id: str
-    resources_freed: List[str]
+    resources_freed: list[str]
     error_message: str | None = None
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
@@ -125,7 +125,7 @@ class RecoveryResult:
     session_id: str
     state_recovered: bool
     error_message: str | None = None
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @runtime_checkable
@@ -214,7 +214,7 @@ class ILifecycleManager(Protocol):
     async def get_session_status(
         self,
         session_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get status of a session.
 
         Returns health and resource usage information for

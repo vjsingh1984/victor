@@ -26,7 +26,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -73,7 +73,7 @@ class TaskDeliverable:
     description: str
     artifact_path: Optional[str] = None
     verified: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -84,9 +84,9 @@ class TaskCompletionState:
     Use configure_for_complexity() to set based on task complexity.
     """
 
-    expected_deliverables: List[DeliverableType] = field(default_factory=list)
-    completed_deliverables: List[TaskDeliverable] = field(default_factory=list)
-    completion_signals: Set[str] = field(default_factory=set)
+    expected_deliverables: list[DeliverableType] = field(default_factory=list)
+    completed_deliverables: list[TaskDeliverable] = field(default_factory=list)
+    completion_signals: set[str] = field(default_factory=set)
     continuation_requests: int = 0
     # Default to MEDIUM complexity budget (5) - was 2 which caused premature termination
     max_continuation_requests: int = 5
@@ -123,11 +123,11 @@ class TaskCompletionState:
 class ITaskCompletionDetector(Protocol):
     """Protocol for task completion detection."""
 
-    def analyze_intent(self, user_message: str) -> List[DeliverableType]:
+    def analyze_intent(self, user_message: str) -> list[DeliverableType]:
         """Infer expected deliverables from user request."""
         ...
 
-    def record_tool_result(self, tool_name: str, result: Dict[str, Any]) -> None:
+    def record_tool_result(self, tool_name: str, result: dict[str, Any]) -> None:
         """Record deliverables from tool execution."""
         ...
 
@@ -320,7 +320,7 @@ class TaskCompletionDetector:
             self._presentation = create_presentation_adapter()
         else:
             self._presentation = presentation
-        self._intent_keywords: Dict[str, List[DeliverableType]] = {
+        self._intent_keywords: dict[str, list[DeliverableType]] = {
             # File creation keywords
             "create": [DeliverableType.FILE_CREATED],
             "add": [DeliverableType.FILE_CREATED],
@@ -350,7 +350,7 @@ class TaskCompletionDetector:
             "test": [DeliverableType.CODE_EXECUTED],
         }
 
-    def analyze_intent(self, user_message: str) -> List[DeliverableType]:
+    def analyze_intent(self, user_message: str) -> list[DeliverableType]:
         """Infer expected deliverables from user request.
 
         Args:
@@ -360,7 +360,7 @@ class TaskCompletionDetector:
             List of expected deliverable types
         """
         message_lower = user_message.lower()
-        deliverables: Set[DeliverableType] = set()
+        deliverables: set[DeliverableType] = set()
 
         # Check for file extension mentions (strong signal for file creation)
         if re.search(r"\.\w{2,4}\b", user_message):  # .py, .js, .yaml, etc.
@@ -377,7 +377,7 @@ class TaskCompletionDetector:
         logger.debug(f"Analyzed intent, expecting: {self._state.expected_deliverables}")
         return self._state.expected_deliverables
 
-    def record_tool_result(self, tool_name: str, result: Dict[str, Any]) -> None:
+    def record_tool_result(self, tool_name: str, result: dict[str, Any]) -> None:
         """Record deliverables from tool execution.
 
         Args:

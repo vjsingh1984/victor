@@ -27,7 +27,7 @@ The SecurityAnalysisAssistant provides:
 
 from __future__ import annotations
 
-from typing import ClassVar, Dict, List, Optional
+from typing import ClassVar, Optional
 
 from victor.core.verticals.base import VerticalBase
 from victor.core.vertical_types import StageDefinition
@@ -88,7 +88,7 @@ class SecurityAnalysisAssistant(VerticalBase):
     version: ClassVar[str] = "0.5.0"
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         """Get tools optimized for security analysis.
 
         Returns:
@@ -193,7 +193,7 @@ Security Best Practices:
         return SecurityAnalysisServiceProvider()
 
     @classmethod
-    def get_stages(cls) -> Dict[str, "StageDefinition"]:
+    def get_stages(cls) -> dict[str, "StageDefinition"]:
         """Get workflow stages for security analysis.
 
         Returns:

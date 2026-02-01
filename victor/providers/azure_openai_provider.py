@@ -37,7 +37,8 @@ References:
 import json
 import logging
 import os
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -221,12 +222,12 @@ class AzureOpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Azure OpenAI."""
@@ -250,12 +251,12 @@ class AzureOpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Azure OpenAI."""
@@ -268,7 +269,7 @@ class AzureOpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
             async with self.client.stream("POST", url, json=payload) as response:
                 response.raise_for_status()
-                accumulated_tool_calls: List[Dict[str, Any]] = []
+                accumulated_tool_calls: list[dict[str, Any]] = []
 
                 async for line in response.aiter_lines():
                     if not line.strip() or not line.startswith("data: "):
@@ -304,7 +305,7 @@ class AzureOpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def _build_request_payload(
         self, messages, model, temperature, max_tokens, tools, stream, **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build Azure OpenAI request payload (OpenAI format)."""
         formatted_messages = []
         for msg in messages:
@@ -352,7 +353,7 @@ class AzureOpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return payload
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         """Parse Azure OpenAI response."""
         choices = result.get("choices", [])
         if not choices:
@@ -390,7 +391,7 @@ class AzureOpenAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             raw_response=result,
         )
 
-    def _normalize_tool_calls(self, tool_calls) -> Optional[List[Dict[str, Any]]]:
+    def _normalize_tool_calls(self, tool_calls) -> Optional[list[dict[str, Any]]]:
         """Normalize tool calls to Victor format."""
         if not tool_calls:
             return None

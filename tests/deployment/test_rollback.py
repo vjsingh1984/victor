@@ -20,16 +20,14 @@ Success Criteria:
 
 import asyncio
 import json
-import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import pytest
-import yaml
 from pydantic import BaseModel, Field
 
 
@@ -94,14 +92,14 @@ class RollbackMetrics:
     pods_healthy_after: int = 0
 
     # Additional metadata
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    notes: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
 
     # Timestamp
     timestamp: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert metrics to dictionary"""
         return {
             "scenario": self.scenario.value,
@@ -293,13 +291,13 @@ def rollback_metrics_collector():
         def add_metrics(self, metrics: RollbackMetrics):
             self.metrics.append(metrics)
 
-        def get_all_metrics(self) -> List[RollbackMetrics]:
+        def get_all_metrics(self) -> list[RollbackMetrics]:
             return self.metrics
 
-        def get_metrics_by_scenario(self, scenario: RollbackScenario) -> List[RollbackMetrics]:
+        def get_metrics_by_scenario(self, scenario: RollbackScenario) -> list[RollbackMetrics]:
             return [m for m in self.metrics if m.scenario == scenario]
 
-        def generate_report(self) -> Dict[str, Any]:
+        def generate_report(self) -> dict[str, Any]:
             """Generate test report"""
             return {
                 "total_scenarios": len(self.metrics),
@@ -346,7 +344,7 @@ async def check_health_endpoint(url: str, timeout: int = 5) -> bool:
         return False
 
 
-async def check_metrics(endpoint: str) -> Dict[str, float]:
+async def check_metrics(endpoint: str) -> dict[str, float]:
     """Check metrics endpoint"""
     try:
         # In real implementation, scrape Prometheus metrics
@@ -362,7 +360,7 @@ async def check_metrics(endpoint: str) -> Dict[str, float]:
         return {}
 
 
-async def run_smoke_tests(base_url: str) -> Dict[str, bool]:
+async def run_smoke_tests(base_url: str) -> dict[str, bool]:
     """Run smoke tests"""
     tests = {
         "health": await check_health_endpoint(f"{base_url}/health"),

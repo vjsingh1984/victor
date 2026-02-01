@@ -51,7 +51,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, cast
 
 if TYPE_CHECKING:
     from victor.workflows.definition import ConstraintsProtocol
@@ -80,7 +80,7 @@ class SandboxResult:
     output: Any = None
     error: Optional[str] = None
     exit_code: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class SandboxProvider(ABC):
@@ -121,7 +121,7 @@ class SandboxProvider(ABC):
     async def execute(
         self,
         code: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         config: "IsolationConfig",
         timeout: Optional[float] = None,
     ) -> SandboxResult:
@@ -156,7 +156,7 @@ class SandboxProvider(ABC):
         """
         return False
 
-    def get_capabilities(self) -> Dict[str, bool]:
+    def get_capabilities(self) -> dict[str, bool]:
         """Get all sandbox capabilities."""
         return {
             "networking": self.supports_feature("networking"),
@@ -187,8 +187,8 @@ class SandboxProviderRegistry:
     _instance: Optional["SandboxProviderRegistry"] = None
 
     def __init__(self) -> None:
-        self._providers: Dict[str, Type[SandboxProvider]] = {}
-        self._instances: Dict[str, SandboxProvider] = {}
+        self._providers: dict[str, type[SandboxProvider]] = {}
+        self._instances: dict[str, SandboxProvider] = {}
 
     @classmethod
     def get_instance(cls) -> "SandboxProviderRegistry":
@@ -208,7 +208,7 @@ class SandboxProviderRegistry:
     def register(
         self,
         sandbox_type: str,
-        provider_class: Type[SandboxProvider],
+        provider_class: type[SandboxProvider],
     ) -> None:
         """Register a sandbox provider.
 
@@ -236,7 +236,7 @@ class SandboxProviderRegistry:
                 self._instances[sandbox_type] = provider_class()
         return self._instances.get(sandbox_type)
 
-    def list_types(self) -> List[str]:
+    def list_types(self) -> list[str]:
         """List available sandbox types."""
         return list(self._providers.keys())
 
@@ -244,7 +244,7 @@ class SandboxProviderRegistry:
         """Check if sandbox type is registered."""
         return sandbox_type in self._providers
 
-    def get_all_capabilities(self) -> Dict[str, Dict[str, bool]]:
+    def get_all_capabilities(self) -> dict[str, dict[str, bool]]:
         """Get capabilities for all registered providers."""
         result = {}
         for sandbox_type in self._providers:
@@ -273,7 +273,7 @@ class NoneSandboxProvider(SandboxProvider):
     async def execute(
         self,
         code: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         config: "IsolationConfig",
         timeout: Optional[float] = None,
     ) -> SandboxResult:
@@ -306,7 +306,7 @@ class ProcessSandboxProvider(SandboxProvider):
     async def execute(
         self,
         code: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         config: "IsolationConfig",
         timeout: Optional[float] = None,
     ) -> SandboxResult:
@@ -338,7 +338,7 @@ class DockerSandboxProvider(SandboxProvider):
     async def execute(
         self,
         code: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         config: "IsolationConfig",
         timeout: Optional[float] = None,
     ) -> SandboxResult:
@@ -430,7 +430,7 @@ class ResourceLimits:
     max_processes: int = 32
     timeout_seconds: float = 60.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "max_memory_mb": self.max_memory_mb,
             "max_cpu_seconds": self.max_cpu_seconds,
@@ -440,7 +440,7 @@ class ResourceLimits:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ResourceLimits":
+    def from_dict(cls, data: dict[str, Any]) -> "ResourceLimits":
         return cls(
             max_memory_mb=data.get("max_memory_mb", 512),
             max_cpu_seconds=data.get("max_cpu_seconds", 300),
@@ -490,7 +490,7 @@ class ConnectionConfig:
     verify_ssl: bool = True
     timeout: int = 30
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "protocol": self.protocol,
             "endpoint": self.endpoint,
@@ -502,7 +502,7 @@ class ConnectionConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ConnectionConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "ConnectionConfig":
         return cls(
             protocol=data.get("protocol", "local"),
             endpoint=data.get("endpoint"),
@@ -593,8 +593,8 @@ class DeploymentConfig:
     task_definition: Optional[str] = None  # ECS
     dag_id: Optional[str] = None  # Airflow
     api_path: Optional[str] = None  # Generic API
-    node_selector: Dict[str, str] = field(default_factory=dict)
-    tolerations: List[Dict[str, str]] = field(default_factory=list)
+    node_selector: dict[str, str] = field(default_factory=dict)
+    tolerations: list[dict[str, str]] = field(default_factory=list)
     gpu_required: bool = False
     spot_instance: bool = False
 
@@ -610,7 +610,7 @@ class DeploymentConfig:
     def is_container(self) -> bool:
         return self.target in ("docker", "kubernetes", "eks", "aks", "gke", "ecs")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "locality": self.locality,
             "target": self.target,
@@ -628,7 +628,7 @@ class DeploymentConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DeploymentConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "DeploymentConfig":
         connection_data = data.get("connection")
         connection = ConnectionConfig.from_dict(connection_data) if connection_data else None
 
@@ -750,9 +750,9 @@ class IsolationConfig:
     filesystem_readonly: bool = False
     resource_limits: Optional[ResourceLimits] = None
     working_directory: Optional[str] = None
-    environment: Dict[str, str] = field(default_factory=dict)
+    environment: dict[str, str] = field(default_factory=dict)
     docker_image: Optional[str] = None
-    docker_volumes: Dict[str, str] = field(default_factory=dict)
+    docker_volumes: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.resource_limits is None:
@@ -773,7 +773,7 @@ class IsolationConfig:
         """Check if process isolation is used."""
         return self.sandbox_type == "process"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "sandbox_type": self.sandbox_type,
             "network_allowed": self.network_allowed,
@@ -786,7 +786,7 @@ class IsolationConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "IsolationConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "IsolationConfig":
         resource_data = data.get("resource_limits")
         resource_limits = ResourceLimits.from_dict(resource_data) if resource_data else None
 
@@ -822,7 +822,7 @@ class IsolationMapper:
     """
 
     # Per-vertical default isolation configurations
-    VERTICAL_DEFAULTS: Dict[str, IsolationConfig] = {
+    VERTICAL_DEFAULTS: dict[str, IsolationConfig] = {
         "coding": IsolationConfig(
             sandbox_type="process",
             network_allowed=True,
@@ -868,7 +868,7 @@ class IsolationMapper:
         cls,
         constraints: "ConstraintsProtocol",
         vertical: Optional[str] = None,
-        override_config: Optional[Dict[str, Any]] = None,
+        override_config: Optional[dict[str, Any]] = None,
     ) -> IsolationConfig:
         """Map constraints to isolation configuration.
 

@@ -32,7 +32,8 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.agent.tool_executor import ToolExecutionResult, ToolExecutor
 
@@ -62,7 +63,7 @@ WRITE_TOOLS = frozenset({"write_file", "edit_files", "execute_bash", "docker"})
 NETWORK_TOOLS = frozenset({"web_search", "web_fetch", "http_request"})
 
 # TOOL_CATEGORIES dictionary for backward compatibility with tests
-TOOL_CATEGORIES: Dict[str, ToolCategory] = {
+TOOL_CATEGORIES: dict[str, ToolCategory] = {
     **dict.fromkeys(READ_TOOLS, ToolCategory.READ_ONLY),
     **dict.fromkeys(WRITE_TOOLS, ToolCategory.WRITE),
     **dict.fromkeys(NETWORK_TOOLS, ToolCategory.NETWORK),
@@ -79,9 +80,9 @@ class ParallelExecutionConfig:
 
 @dataclass
 class ParallelExecutionResult:
-    results: List[ToolExecutionResult] = field(default_factory=list)
+    results: list[ToolExecutionResult] = field(default_factory=list)
     total_time: float = 0.0
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
     completed_count: int = 0
     failed_count: int = 0
     parallel_speedup: float = 1.0  # Speedup ratio vs sequential execution
@@ -107,10 +108,10 @@ class ParallelToolExecutor:
             return ToolCategory.NETWORK
         return ToolCategory.COMPUTE
 
-    def _has_write_tools(self, tool_calls: List[Dict[str, Any]]) -> bool:
+    def _has_write_tools(self, tool_calls: list[dict[str, Any]]) -> bool:
         return any(tc.get("name", "") in WRITE_TOOLS for tc in tool_calls)
 
-    def _can_parallelize(self, tool_calls: List[Dict[str, Any]]) -> bool:
+    def _can_parallelize(self, tool_calls: list[dict[str, Any]]) -> bool:
         """Check if the given tool calls can be parallelized.
 
         Args:
@@ -130,9 +131,9 @@ class ParallelToolExecutor:
             return False
         return True
 
-    def _extract_file_dependencies(self, tool_calls: List[Dict[str, Any]]) -> Dict[int, Set[int]]:
-        dependencies: Dict[int, Set[int]] = {i: set() for i in range(len(tool_calls))}
-        path_writers: Dict[str, List[int]] = {}
+    def _extract_file_dependencies(self, tool_calls: list[dict[str, Any]]) -> dict[int, set[int]]:
+        dependencies: dict[int, set[int]] = {i: set() for i in range(len(tool_calls))}
+        path_writers: dict[str, list[int]] = {}
 
         for i, tc in enumerate(tool_calls):
             name = tc.get("name", "")
@@ -151,8 +152,8 @@ class ParallelToolExecutor:
 
     async def execute_parallel(
         self,
-        tool_calls: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None,
+        tool_calls: list[dict[str, Any]],
+        context: Optional[dict[str, Any]] = None,
     ) -> ParallelExecutionResult:
         start_time = time.time()
         result = ParallelExecutionResult()
@@ -173,8 +174,8 @@ class ParallelToolExecutor:
         # Parallel execution with dependency handling
         dependencies = self._extract_file_dependencies(tool_calls)
         pending = set(range(len(tool_calls)))
-        completed: Set[int] = set()
-        results_by_index: Dict[int, ToolExecutionResult] = {}
+        completed: set[int] = set()
+        results_by_index: dict[int, ToolExecutionResult] = {}
 
         while pending:
             ready = [i for i in pending if not (dependencies[i] - completed)]
@@ -227,8 +228,8 @@ class ParallelToolExecutor:
 
     async def _execute_sequential(
         self,
-        tool_calls: List[Dict[str, Any]],
-        context: Dict[str, Any],
+        tool_calls: list[dict[str, Any]],
+        context: dict[str, Any],
         result: ParallelExecutionResult,
         start_time: float,
     ) -> ParallelExecutionResult:
@@ -254,7 +255,7 @@ class ParallelToolExecutor:
         )
 
     async def _execute_single(
-        self, tool_call: Dict[str, Any], context: Dict[str, Any]
+        self, tool_call: dict[str, Any], context: dict[str, Any]
     ) -> ToolExecutionResult:
         tool_name = tool_call.get("name", "unknown")
         arguments = tool_call.get("arguments", {})

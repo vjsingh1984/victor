@@ -22,7 +22,6 @@ through the capability injector. This test suite validates migration to shared
 defaults for consistency with other verticals.
 """
 
-import pytest
 
 from victor.core.verticals.defaults.tool_defaults import COMMON_REQUIRED_TOOLS
 from victor.framework.tool_naming import ToolNames
@@ -163,7 +162,6 @@ class TestCodingSharedDefaultsUsage:
 
         Note: Coding is currently migrating from capability injector to shared defaults.
         """
-        import victor.coding.assistant as coding_assistant_module
         import inspect
 
         # Get the source code of get_tools method

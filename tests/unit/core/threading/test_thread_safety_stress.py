@@ -42,25 +42,20 @@ import threading
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-from dataclasses import dataclass
-from typing import Any, Dict, List, Set
+from typing import Any
 
 import pytest
 
 from victor.core.events.backends import InMemoryEventBackend, BackendConfig
-from victor.core.events.protocols import MessagingEvent, EventHandler
+from victor.core.events.protocols import MessagingEvent
 from victor.core.container import (
     ServiceContainer,
     ServiceLifetime,
-    get_container,
     reset_container,
 )
 from victor.agent.tool_pipeline import (
-    ToolPipeline,
-    ToolPipelineConfig,
     ExecutionMetrics,
     LRUToolCache,
-    ToolRateLimiter,
 )
 
 
@@ -132,8 +127,8 @@ class ConcurrentOperationTracker:
     """Track results of concurrent operations for validation."""
 
     def __init__(self):
-        self.results: List[Any] = []
-        self.errors: List[Exception] = []
+        self.results: list[Any] = []
+        self.errors: list[Exception] = []
         self.lock = threading.Lock()
 
     def add_result(self, result: Any) -> None:

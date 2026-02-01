@@ -34,7 +34,8 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Callable, Dict, List, Optional, Awaitable
+from typing import Any, Optional
+from collections.abc import Callable, Awaitable
 
 from victor.framework.enrichment import (
     ContextEnrichment,
@@ -56,7 +57,7 @@ _file_pattern_matcher = FilePatternMatcher(DATA_PATTERNS)
 _analysis_classifier = KeywordClassifier(ANALYSIS_TYPES)
 
 
-def _detect_analysis_type(prompt: str) -> List[str]:
+def _detect_analysis_type(prompt: str) -> list[str]:
     """Detect the type of analysis requested from the prompt.
 
     Uses the framework's KeywordClassifier with ANALYSIS_TYPES for consistent
@@ -71,7 +72,7 @@ def _detect_analysis_type(prompt: str) -> List[str]:
     return _analysis_classifier.classify(prompt)
 
 
-def _extract_data_references(prompt: str) -> Dict[str, List[str]]:
+def _extract_data_references(prompt: str) -> dict[str, list[str]]:
     """Extract data references from the prompt.
 
     Args:
@@ -80,7 +81,7 @@ def _extract_data_references(prompt: str) -> Dict[str, List[str]]:
     Returns:
         Dict with file_mentions, column_mentions, table_mentions
     """
-    references: Dict[str, List[str]] = {
+    references: dict[str, list[str]] = {
         "files": [],
         "columns": [],
         "tables": [],
@@ -114,7 +115,7 @@ class DataAnalysisEnrichmentStrategy:
 
     def __init__(
         self,
-        schema_lookup_fn: Optional[Callable[[str], Awaitable[Dict[str, Any]]]] = None,
+        schema_lookup_fn: Optional[Callable[[str], Awaitable[dict[str, Any]]]] = None,
         max_columns: int = 20,
     ):
         """Initialize the Data Analysis enrichment strategy.
@@ -128,7 +129,7 @@ class DataAnalysisEnrichmentStrategy:
 
     def set_schema_lookup_fn(
         self,
-        fn: Callable[[str], Awaitable[Dict[str, Any]]],
+        fn: Callable[[str], Awaitable[dict[str, Any]]],
     ) -> None:
         """Set the schema lookup function.
 
@@ -141,7 +142,7 @@ class DataAnalysisEnrichmentStrategy:
         self,
         prompt: str,
         context: EnrichmentContext,
-    ) -> List[ContextEnrichment]:
+    ) -> list[ContextEnrichment]:
         """Get enrichments for a data analysis prompt.
 
         Detects analysis type and provides relevant guidance,
@@ -155,7 +156,7 @@ class DataAnalysisEnrichmentStrategy:
         Returns:
             List of context enrichments
         """
-        enrichments: List[ContextEnrichment] = []
+        enrichments: list[ContextEnrichment] = []
 
         # Detect analysis types using framework KeywordClassifier
         analysis_types = _detect_analysis_type(prompt)
@@ -164,7 +165,7 @@ class DataAnalysisEnrichmentStrategy:
         data_refs = _extract_data_references(prompt)
 
         # Also categorize any files from context using framework FilePatternMatcher
-        data_file_categories: Dict[str, List[str]] = {}
+        data_file_categories: dict[str, list[str]] = {}
         if context.file_mentions:
             data_file_categories = _file_pattern_matcher.match(context.file_mentions)
 
@@ -208,7 +209,7 @@ class DataAnalysisEnrichmentStrategy:
 
     async def _enrich_from_schema(
         self,
-        data_sources: List[str],
+        data_sources: list[str],
     ) -> Optional[ContextEnrichment]:
         """Enrich with schema information.
 
@@ -334,7 +335,7 @@ class DataAnalysisEnrichmentStrategy:
 
     def _enrich_from_tool_history(
         self,
-        tool_history: List[Dict[str, Any]],
+        tool_history: list[dict[str, Any]],
     ) -> Optional[ContextEnrichment]:
         """Enrich from previous Python/SQL tool results.
 

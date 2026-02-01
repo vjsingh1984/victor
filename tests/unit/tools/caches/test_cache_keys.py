@@ -14,11 +14,9 @@
 
 """Tests for cache key generation."""
 
-import pytest
 
 from victor.tools.caches.cache_keys import (
     CacheKeyGenerator,
-    calculate_tools_hash,
     generate_context_key,
     generate_query_key,
     get_cache_key_generator,

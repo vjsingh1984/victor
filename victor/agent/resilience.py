@@ -56,12 +56,12 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar, TYPE_CHECKING, cast
+from typing import Any, Optional, TypeVar, TYPE_CHECKING
+from collections.abc import Awaitable, Callable
 
 # Import canonical types from circuit_breaker.py to avoid duplication
 from victor.providers.circuit_breaker import (
     CircuitState as _CircuitState,
-    CircuitBreakerConfig as CanonicalCircuitBreakerConfig,
 )
 
 if TYPE_CHECKING:
@@ -146,9 +146,9 @@ class MultiCircuitBreaker:
             config: Circuit breaker configuration
         """
         self.config = config or CircuitBreakerConfig()
-        self._circuits: Dict[str, CircuitStats] = defaultdict(CircuitStats)
-        self._locks: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
-        self._half_open_calls: Dict[str, int] = defaultdict(int)
+        self._circuits: dict[str, CircuitStats] = defaultdict(CircuitStats)
+        self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._half_open_calls: dict[str, int] = defaultdict(int)
 
     def get_state(self, name: str) -> CircuitState:
         """Get current state of a circuit.
@@ -259,7 +259,7 @@ class MultiCircuitBreaker:
         self._half_open_calls[name] = 0
         logger.info(f"Circuit '{name}' reset to CLOSED")
 
-    def get_stats(self, name: str) -> Dict[str, Any]:
+    def get_stats(self, name: str) -> dict[str, Any]:
         """Get statistics for a circuit.
 
         Args:
@@ -282,7 +282,7 @@ class MultiCircuitBreaker:
             ),
         }
 
-    def get_all_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics for all circuits.
 
         Returns:
@@ -470,9 +470,9 @@ class RateLimiter:
             config: Rate limit configuration
         """
         self.config = config or RateLimitConfig()
-        self._tokens: Dict[str, float] = {}
-        self._last_update: Dict[str, float] = {}
-        self._locks: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._tokens: dict[str, float] = {}
+        self._last_update: dict[str, float] = {}
+        self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     async def acquire(self, name: str, tokens: int = 1) -> float:
         """Acquire tokens, waiting if necessary.
@@ -541,7 +541,7 @@ class RateLimiter:
             return False
         return self._tokens[name] < 1
 
-    def get_stats(self, name: str) -> Dict[str, Any]:
+    def get_stats(self, name: str) -> dict[str, Any]:
         """Get rate limiter statistics.
 
         Args:
@@ -639,7 +639,7 @@ class ResilientExecutor:
                 return fallback_result
             raise
 
-    def get_health_report(self) -> Dict[str, Any]:
+    def get_health_report(self) -> dict[str, Any]:
         """Get health report for all circuits and rate limiters.
 
         Returns:

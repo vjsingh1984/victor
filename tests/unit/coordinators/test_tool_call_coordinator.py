@@ -15,8 +15,7 @@
 """Unit tests for ToolCallCoordinator."""
 
 import pytest
-from unittest.mock import Mock, AsyncMock, patch
-from typing import Dict, Any, List
+from unittest.mock import Mock, AsyncMock
 
 from victor.agent.coordinators.tool_call_coordinator import (
     ToolCallCoordinator,
@@ -24,7 +23,6 @@ from victor.agent.coordinators.tool_call_coordinator import (
 )
 from victor.agent.coordinators.tool_call_protocol import (
     ToolCallContext,
-    ToolCallResult,
     ToolCallCoordinatorConfig,
 )
 from victor.agent.tool_calling.base import ToolCall

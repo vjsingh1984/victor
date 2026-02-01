@@ -55,7 +55,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 from victor.agent.recovery.protocols import (
     FailureType,
@@ -74,7 +74,7 @@ if TYPE_CHECKING:
     from victor.agent.recovery.protocols import QLearningStoreProtocol
     from victor.agent.usage_analytics import UsageAnalytics
     from victor.agent.context_compactor import ContextCompactor
-    from victor.providers.circuit_breaker import CircuitBreaker, CircuitBreakerRegistry
+    from victor.providers.circuit_breaker import CircuitBreakerRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -238,13 +238,13 @@ class RecoveryCoordinator:
     def detect_failure(
         self,
         content: str = "",
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
-        mentioned_tools: Optional[List[str]] = None,
+        tool_calls: Optional[list[dict[str, Any]]] = None,
+        mentioned_tools: Optional[list[str]] = None,
         elapsed_time: float = 0.0,
         session_idle_timeout: float = 180.0,
         quality_score: float = 0.5,
         consecutive_failures: int = 0,
-        recent_responses: Optional[List[str]] = None,
+        recent_responses: Optional[list[str]] = None,
         context_utilization: Optional[float] = None,
     ) -> Optional[FailureType]:
         """Detect failure type from response characteristics.
@@ -310,7 +310,7 @@ class RecoveryCoordinator:
     def _detect_stuck_loop(
         self,
         content: str,
-        recent_responses: Optional[List[str]],
+        recent_responses: Optional[list[str]],
     ) -> bool:
         """Detect stuck planning loop pattern."""
         if not content:
@@ -343,7 +343,7 @@ class RecoveryCoordinator:
     def _detect_repeated_response(
         self,
         content: str,
-        recent_responses: List[str],
+        recent_responses: list[str],
     ) -> bool:
         """Detect repeated response pattern."""
         if not content or not recent_responses:
@@ -374,8 +374,8 @@ class RecoveryCoordinator:
         session_idle_timeout: float = 180.0,
         current_temperature: float = 0.7,
         consecutive_failures: int = 0,
-        mentioned_tools: Optional[List[str]] = None,
-        recent_responses: Optional[List[str]] = None,
+        mentioned_tools: Optional[list[str]] = None,
+        recent_responses: Optional[list[str]] = None,
         quality_score: float = 0.5,
         task_type: str = "general",
         is_analysis_task: bool = False,
@@ -478,7 +478,7 @@ class RecoveryCoordinator:
         current_provider: str,
         current_model: str,
         failure_type: FailureType,
-    ) -> Optional[Tuple[str, str]]:
+    ) -> Optional[tuple[str, str]]:
         """Get fallback model using circuit breaker status if available."""
         # Default fallback chains
         fallback_chains = {
@@ -575,7 +575,7 @@ class RecoveryCoordinator:
         self._current_context = None
         self._current_outcome = None
 
-    def get_diagnostics(self) -> Dict[str, Any]:
+    def get_diagnostics(self) -> dict[str, Any]:
         """Get diagnostic information."""
         diagnostics = {
             "recovery_attempts": self._recovery_attempts,

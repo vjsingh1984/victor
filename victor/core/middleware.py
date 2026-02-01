@@ -53,24 +53,17 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Dict,
     Generic,
-    List,
     Optional,
-    Set,
-    Type,
     TypeVar,
-    Union,
     cast,
 )
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -115,12 +108,12 @@ class MiddlewareContext(Generic[TRequest]):
     request: TRequest
     request_id: str = ""
     start_time: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     cancelled: bool = False
     error: Optional[Exception] = None
 
     # Internal state
-    _values: Dict[str, Any] = field(default_factory=dict)
+    _values: dict[str, Any] = field(default_factory=dict)
 
     def set(self, key: str, value: Any) -> None:
         """Set a context value."""
@@ -279,7 +272,7 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
 
     def __init__(self) -> None:
         """Initialize pipeline."""
-        self._middleware: List[Middleware[TRequest, TResponse]] = []
+        self._middleware: list[Middleware[TRequest, TResponse]] = []
         self._frozen: bool = False
 
     def use(
@@ -413,7 +406,7 @@ class MiddlewarePipeline(Generic[TRequest, TResponse]):
         return len(self._middleware)
 
     @property
-    def middleware_names(self) -> List[str]:
+    def middleware_names(self) -> list[str]:
         """Get names of middleware in order."""
         return [m.name for m in self._middleware]
 
@@ -518,7 +511,7 @@ class ErrorHandlingMiddleware(Middleware[TRequest, TResponse]):
 
     def __init__(
         self,
-        handlers: Optional[Dict[Type[Exception], Callable[[Exception], Any]]] = None,
+        handlers: Optional[dict[type[Exception], Callable[[Exception], Any]]] = None,
         default_handler: Optional[Callable[[Exception], Any]] = None,
         reraise: bool = True,
     ) -> None:
@@ -656,7 +649,7 @@ class CachingMiddleware(Middleware[TRequest, TResponse]):
 
     def __init__(
         self,
-        cache: Dict[str, Any],
+        cache: dict[str, Any],
         key_fn: Callable[[MiddlewareContext[Any]], Optional[str]],
         ttl: float = 300.0,
     ) -> None:
@@ -768,7 +761,7 @@ class MetricsMiddleware(Middleware[TRequest, TResponse]):
         self._error_count += 1
         raise error
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get collected metrics."""
         return {
             f"{self._prefix}_requests": self._request_count,
@@ -824,7 +817,7 @@ class PipelineBuilder(Generic[TRequest, TResponse]):
 
     def with_error_handling(
         self,
-        handlers: Optional[Dict[Type[Exception], Callable[[Exception], Any]]] = None,
+        handlers: Optional[dict[type[Exception], Callable[[Exception], Any]]] = None,
     ) -> "PipelineBuilder[TRequest, TResponse]":
         """Add error handling middleware."""
         self._pipeline.use(ErrorHandlingMiddleware(handlers=handlers))

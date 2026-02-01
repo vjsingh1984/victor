@@ -77,17 +77,12 @@ from dataclasses import dataclass, field
 from typing import (
     Any,
     ClassVar,
-    Dict,
-    List,
     Optional,
-    Type,
     TYPE_CHECKING,
-    Protocol as TypingProtocol,
 )
-from typing import runtime_checkable
 
 if TYPE_CHECKING:
-    from victor.core.verticals.protocols import VerticalExtensions
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -122,8 +117,8 @@ class ProtocolImplementationEntry:
         ttl: Time-to-live in seconds (None = no expiration)
     """
 
-    protocol_type: Type[Any]
-    implementation: Type[Any]
+    protocol_type: type[Any]
+    implementation: type[Any]
     cached_result: Any = None
     timestamp: float = field(default_factory=lambda: __import__("time").time())
     ttl: Optional[int] = None
@@ -181,19 +176,19 @@ class ProtocolBasedExtensionLoader:
     """
 
     # Protocol registry: maps protocol_type -> {vertical_class -> implementation}
-    _protocol_registry: ClassVar[Dict[Type[Any], Dict[Type[Any], Any]]] = {}
+    _protocol_registry: ClassVar[dict[type[Any], dict[type[Any], Any]]] = {}
 
     # Protocol implementation cache: maps (vertical_class, protocol_type) -> cached_result
-    _protocol_cache: ClassVar[Dict[tuple[Type[Any], Type[Any]], Any]] = {}
+    _protocol_cache: ClassVar[dict[tuple[type[Any], type[Any]], Any]] = {}
 
     # Protocol conformance cache: maps (vertical_class, protocol_type) -> bool
-    _conformance_cache: ClassVar[Dict[tuple[Type[Any], Type[Any]], bool]] = {}
+    _conformance_cache: ClassVar[dict[tuple[type[Any], type[Any]], bool]] = {}
 
     @classmethod
     def register_protocol(
         cls,
-        protocol_type: Type[Any],
-        vertical_class: Type[Any],
+        protocol_type: type[Any],
+        vertical_class: type[Any],
         implementation: Optional[Any] = None,
     ) -> None:
         """Register a vertical class as implementing a protocol.
@@ -248,8 +243,8 @@ class ProtocolBasedExtensionLoader:
     @classmethod
     def implements_protocol(
         cls,
-        vertical_class: Type[Any],
-        protocol_type: Type[Any],
+        vertical_class: type[Any],
+        protocol_type: type[Any],
     ) -> bool:
         """Check if a vertical class implements a protocol.
 
@@ -298,8 +293,8 @@ class ProtocolBasedExtensionLoader:
     @classmethod
     def _check_protocol_methods(
         cls,
-        vertical_class: Type[Any],
-        protocol_type: Type[Any],
+        vertical_class: type[Any],
+        protocol_type: type[Any],
     ) -> bool:
         """Check if vertical_class has all required methods from protocol_type.
 
@@ -333,8 +328,8 @@ class ProtocolBasedExtensionLoader:
     @classmethod
     def get_protocol(
         cls,
-        vertical_class: Type[Any],
-        protocol_type: Type[Any],
+        vertical_class: type[Any],
+        protocol_type: type[Any],
         use_cache: bool = True,
     ) -> Optional[Any]:
         """Get the protocol implementation for a vertical.
@@ -378,7 +373,7 @@ class ProtocolBasedExtensionLoader:
         return implementation
 
     @classmethod
-    def list_protocols(cls, vertical_class: Type[Any]) -> List[Type[Any]]:
+    def list_protocols(cls, vertical_class: type[Any]) -> list[type[Any]]:
         """List all protocols implemented by a vertical.
 
         Args:
@@ -399,7 +394,7 @@ class ProtocolBasedExtensionLoader:
         return implemented
 
     @classmethod
-    def list_verticals(cls, protocol_type: Type[Any]) -> List[Type[Any]]:
+    def list_verticals(cls, protocol_type: type[Any]) -> list[type[Any]]:
         """List all verticals implementing a protocol.
 
         Args:
@@ -420,8 +415,8 @@ class ProtocolBasedExtensionLoader:
     @classmethod
     def unregister_protocol(
         cls,
-        protocol_type: Type[Any],
-        vertical_class: Type[Any],
+        protocol_type: type[Any],
+        vertical_class: type[Any],
     ) -> None:
         """Unregister a vertical from a protocol.
 
@@ -449,8 +444,8 @@ class ProtocolBasedExtensionLoader:
     @classmethod
     def clear_cache(
         cls,
-        vertical_class: Optional[Type[Any]] = None,
-        protocol_type: Optional[Type[Any]] = None,
+        vertical_class: Optional[type[Any]] = None,
+        protocol_type: Optional[type[Any]] = None,
     ) -> None:
         """Clear protocol cache entries.
 
@@ -509,7 +504,7 @@ class ProtocolBasedExtensionLoader:
         )
 
     @classmethod
-    def get_registry_stats(cls) -> Dict[str, Any]:
+    def get_registry_stats(cls) -> dict[str, Any]:
         """Get registry statistics for debugging.
 
         Returns:
@@ -536,8 +531,8 @@ class ProtocolBasedExtensionLoader:
 
 
 def register_protocol_implementation(
-    protocol_type: Type[Any],
-    vertical_class: Type[Any],
+    protocol_type: type[Any],
+    vertical_class: type[Any],
 ) -> None:
     """Register a vertical as implementing a protocol.
 
@@ -564,8 +559,8 @@ def register_protocol_implementation(
 
 
 def implements_protocol(
-    vertical_class: Type[Any],
-    protocol_type: Type[Any],
+    vertical_class: type[Any],
+    protocol_type: type[Any],
 ) -> bool:
     """Check if a vertical implements a protocol.
 

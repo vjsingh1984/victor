@@ -35,9 +35,10 @@ import logging
 import threading
 import time
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.agent.cache.dependency_extractor import DependencyExtractor
+import builtins
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +95,8 @@ class IndexedLRUCache:
             dependency_extractor: Dependency extractor for auto-detecting files
         """
         self._cache: OrderedDict[str, Any] = OrderedDict()
-        self._timestamps: Dict[str, float] = {}
-        self._file_index: Dict[str, Set[str]] = {}
+        self._timestamps: dict[str, float] = {}
+        self._file_index: dict[str, set[str]] = {}
         self._max_size = max_size
         self._ttl_seconds = ttl_seconds
         self._lock = threading.Lock()
@@ -172,7 +173,7 @@ class IndexedLRUCache:
                 if not self._file_index[file_path]:
                     del self._file_index[file_path]
 
-    def _extract_files(self, value: Any) -> Set[str]:
+    def _extract_files(self, value: Any) -> builtins.set[str]:
         """Extract file paths from cached value.
 
         Args:
@@ -181,7 +182,7 @@ class IndexedLRUCache:
         Returns:
             Set of file paths
         """
-        files: Set[str] = set()
+        files: set[str] = set()
 
         # Handle ToolCallResult objects
         if hasattr(value, "arguments") and hasattr(value, "tool_name"):
@@ -332,7 +333,7 @@ class IndexedLRUCache:
 
             return len(keys_to_invalidate)
 
-    def invalidate_files(self, file_paths: List[str]) -> int:
+    def invalidate_files(self, file_paths: list[str]) -> int:
         """Invalidate cache entries for multiple files.
 
         More efficient than calling invalidate_file multiple times
@@ -400,7 +401,7 @@ class IndexedLRUCache:
         with self._lock:
             return len(self._cache)
 
-    def items(self) -> List[tuple[Any, Any]]:
+    def items(self) -> list[tuple[Any, Any]]:
         """Return all non-expired items in the cache.
 
         Thread-safe: Returns snapshot of current items.
@@ -428,7 +429,7 @@ class IndexedLRUCache:
                 return True
             return False
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics for monitoring.
 
         Thread-safe: Returns snapshot of current stats.

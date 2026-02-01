@@ -33,18 +33,15 @@ import gc
 import time
 import tracemalloc
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
 from victor.optimization.runtime.lazy_loader import (
     LazyComponentLoader,
-    LoadingStats,
 )
 from victor.optimization.runtime.parallel_executor import (
-    AdaptiveParallelExecutor,
     OptimizationStrategy,
-    PerformanceMetrics,
     create_adaptive_executor,
 )
 

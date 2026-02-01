@@ -68,7 +68,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Protocol, Type, TypeVar
+from typing import Any, Optional, Protocol, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -113,10 +113,10 @@ class HealthCheckResult:
 
     status: HealthStatus
     message: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "status": self.status.value,
@@ -142,7 +142,7 @@ class ServiceMetadata:
     service_type: str
     version: Optional[str] = None
     description: str = ""
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
 
 class ServiceLifecycleProtocol(Protocol):
@@ -213,7 +213,7 @@ class ServiceConfigurable(Protocol):
     """Protocol for services that can be configured via YAML."""
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> "ServiceConfigurable":
+    def from_config(cls, config: dict[str, Any]) -> "ServiceConfigurable":
         """Create service instance from configuration dict.
 
         Args:
@@ -506,7 +506,7 @@ class SQLiteServiceHandler(BaseService):
         self._connection: Optional[Any] = None
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> "SQLiteServiceHandler":
+    def from_config(cls, config: dict[str, Any]) -> "SQLiteServiceHandler":
         """Create from YAML config dict.
 
         Args:
@@ -605,9 +605,9 @@ class DockerServiceConfig:
 
     image: str
     container_name: Optional[str] = None
-    ports: Dict[str, str] = field(default_factory=dict)
-    volumes: Dict[str, str] = field(default_factory=dict)
-    environment: Dict[str, str] = field(default_factory=dict)
+    ports: dict[str, str] = field(default_factory=dict)
+    volumes: dict[str, str] = field(default_factory=dict)
+    environment: dict[str, str] = field(default_factory=dict)
     auto_remove: bool = True
     command: Optional[str] = None
 
@@ -638,7 +638,7 @@ class DockerServiceHandler(BaseService):
         self._client: Optional[Any] = None
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> "DockerServiceHandler":
+    def from_config(cls, config: dict[str, Any]) -> "DockerServiceHandler":
         """Create from YAML config dict."""
         metadata = ServiceMetadata(
             name=config.get("name", "docker"),
@@ -758,7 +758,7 @@ class HTTPServiceConfig:
 
     base_url: str
     timeout: float = 30.0
-    headers: Dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = field(default_factory=dict)
     auth: Optional[tuple[str, str]] = None
     verify_ssl: bool = True
 
@@ -788,7 +788,7 @@ class HTTPServiceHandler(BaseService):
         self._client: Optional[Any] = None
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> "HTTPServiceHandler":
+    def from_config(cls, config: dict[str, Any]) -> "HTTPServiceHandler":
         """Create from YAML config dict."""
         metadata = ServiceMetadata(
             name=config.get("name", "http"),
@@ -905,7 +905,7 @@ class ExternalServiceHandler(BaseService):
         self._http_client: Optional[Any] = None
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> "ExternalServiceHandler":
+    def from_config(cls, config: dict[str, Any]) -> "ExternalServiceHandler":
         """Create from YAML config dict."""
         metadata = ServiceMetadata(
             name=config.get("name", "external"),
@@ -991,7 +991,7 @@ class ServiceRegistry:
     """
 
     def __init__(self) -> None:
-        self._services: Dict[str, BaseService] = {}
+        self._services: dict[str, BaseService] = {}
         self._lock = threading.Lock()
         self._async_lock = asyncio.Lock()
 
@@ -1076,7 +1076,7 @@ class ServiceRegistry:
             self._services.clear()
             logger.info("All services shut down")
 
-    async def health_check_all(self) -> Dict[str, HealthCheckResult]:
+    async def health_check_all(self) -> dict[str, HealthCheckResult]:
         """Check health of all registered services.
 
         Returns:
@@ -1088,7 +1088,7 @@ class ServiceRegistry:
                 results[name] = await service.health_check()
         return results
 
-    def list_services(self) -> List[str]:
+    def list_services(self) -> list[str]:
         """List all registered service names.
 
         Returns:
@@ -1107,7 +1107,7 @@ class ServiceTypeHandler(Protocol):
     """Protocol for service type handlers."""
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> BaseService:
+    def from_config(cls, config: dict[str, Any]) -> BaseService:
         """Create service from config."""
         ...
 
@@ -1133,7 +1133,7 @@ class ServiceManager:
     """
 
     # Registry of service type handlers
-    _handlers: Dict[str, Type[ServiceTypeHandler]] = {
+    _handlers: dict[str, type[ServiceTypeHandler]] = {
         "sqlite": SQLiteServiceHandler,
         "docker": DockerServiceHandler,
         "http": HTTPServiceHandler,
@@ -1150,7 +1150,7 @@ class ServiceManager:
         self._registry = registry or ServiceRegistry()
 
     @classmethod
-    def register_handler(cls, service_type: str, handler: Type[ServiceTypeHandler]) -> None:
+    def register_handler(cls, service_type: str, handler: type[ServiceTypeHandler]) -> None:
         """Register a service type handler.
 
         Args:
@@ -1161,8 +1161,8 @@ class ServiceManager:
 
     async def initialize_services(
         self,
-        configs: List[Dict[str, Any]],
-    ) -> Dict[str, BaseService]:
+        configs: list[dict[str, Any]],
+    ) -> dict[str, BaseService]:
         """Initialize services from configuration list.
 
         Args:
@@ -1204,7 +1204,7 @@ class ServiceManager:
         """Shutdown all managed services."""
         await self._registry.shutdown_all()
 
-    async def health_check_all(self) -> Dict[str, HealthCheckResult]:
+    async def health_check_all(self) -> dict[str, HealthCheckResult]:
         """Check health of all services.
 
         Returns:
@@ -1259,7 +1259,7 @@ async def create_http_service(
     name: str,
     base_url: str,
     timeout: float = 30.0,
-    headers: Optional[Dict[str, str]] = None,
+    headers: Optional[dict[str, str]] = None,
 ) -> HTTPServiceHandler:
     """Create and start an HTTP client service.
 

@@ -39,7 +39,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.framework.rl.checkpoint_store import (
     CheckpointStore,
@@ -83,7 +83,7 @@ class PolicyState:
     stage: PolicyStage = PolicyStage.DEVELOPMENT
     shadow_version: Optional[str] = None
     canary_traffic: int = 0
-    performance_baseline: Dict[str, float] = field(default_factory=dict)
+    performance_baseline: dict[str, float] = field(default_factory=dict)
     last_checkpoint_outcomes: int = 0
     auto_checkpoint_threshold: int = 100
 
@@ -109,7 +109,7 @@ class RollbackEvent:
     from_version: str
     to_version: str
     reason: str
-    metrics_before: Dict[str, float]
+    metrics_before: dict[str, float]
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -167,16 +167,16 @@ class PolicyManager:
         self._checkpoint_store = checkpoint_store or get_checkpoint_store()
 
         # Policy states per learner
-        self._policy_states: Dict[str, PolicyState] = {}
+        self._policy_states: dict[str, PolicyState] = {}
 
         # Recent outcomes for degradation detection
-        self._recent_outcomes: Dict[str, List[Dict[str, Any]]] = {}
+        self._recent_outcomes: dict[str, list[dict[str, Any]]] = {}
 
         # Rollback history
-        self._rollback_history: List[RollbackEvent] = []
+        self._rollback_history: list[RollbackEvent] = []
 
         # Shadow mode states
-        self._shadow_states: Dict[str, Dict[str, Any]] = {}
+        self._shadow_states: dict[str, dict[str, Any]] = {}
 
     def set_coordinator(self, coordinator: "RLCoordinator") -> None:
         """Set the RL coordinator.
@@ -223,7 +223,7 @@ class PolicyManager:
         learner_name: str,
         success: bool,
         quality_score: float = 0.5,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record an outcome and check for auto-checkpoint/rollback.
 
@@ -326,7 +326,7 @@ class PolicyManager:
         except Exception as e:
             logger.error(f"PolicyManager: Failed to auto-checkpoint {learner_name}: {e}")
 
-    def _export_learner_state(self, learner: "BaseLearner") -> Dict[str, Any]:
+    def _export_learner_state(self, learner: "BaseLearner") -> dict[str, Any]:
         """Export learner state for checkpointing.
 
         Args:
@@ -335,7 +335,7 @@ class PolicyManager:
         Returns:
             Serializable state dictionary
         """
-        state: Dict[str, Any] = {"name": learner.name}
+        state: dict[str, Any] = {"name": learner.name}
 
         # Export Q-values if available
         if hasattr(learner, "_q_values"):
@@ -359,7 +359,7 @@ class PolicyManager:
 
         return state
 
-    def _import_learner_state(self, learner: "BaseLearner", state: Dict[str, Any]) -> None:
+    def _import_learner_state(self, learner: "BaseLearner", state: dict[str, Any]) -> None:
         """Import state into a learner.
 
         Args:
@@ -541,7 +541,7 @@ class PolicyManager:
 
         return True
 
-    def stop_shadow_mode(self, learner_name: str) -> Dict[str, Any]:
+    def stop_shadow_mode(self, learner_name: str) -> dict[str, Any]:
         """Stop shadow mode and return comparison results.
 
         Args:
@@ -657,7 +657,7 @@ class PolicyManager:
     def get_rollback_history(
         self,
         learner_name: Optional[str] = None,
-    ) -> List[RollbackEvent]:
+    ) -> list[RollbackEvent]:
         """Get rollback history.
 
         Args:
@@ -670,7 +670,7 @@ class PolicyManager:
             return [e for e in self._rollback_history if e.learner_name == learner_name]
         return self._rollback_history
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export policy manager metrics.
 
         Returns:

@@ -5,21 +5,20 @@ Validates that configurations can be promoted correctly through
 the environment pipeline: development → testing → staging → production.
 """
 
-import os
 import pytest
 import yaml
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
 
 
 @pytest.fixture
-def environment_order() -> List[str]:
+def environment_order() -> list[str]:
     """Return the correct order of environments."""
     return ["development", "testing", "staging", "production"]
 
 
 @pytest.fixture
-def environment_configs() -> Dict[str, Dict[str, Any]]:
+def environment_configs() -> dict[str, dict[str, Any]]:
     """Load configurations for all environments."""
     configs = {}
 
@@ -436,7 +435,6 @@ class TestSecretsPromotion:
 
     def test_secrets_not_in_version_control(self):
         """Test that secrets are not stored in configuration files."""
-        import re
 
         # Check that no actual secrets are in YAML files
         yaml_files = [

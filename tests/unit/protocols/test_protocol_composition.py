@@ -19,7 +19,8 @@ and maintains backward compatibility.
 """
 
 import pytest
-from typing import Any, AsyncIterator, List, Optional, Set, Tuple
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 from victor.protocols.agent import IAgentOrchestrator
 from victor.protocols.chat import ChatProtocol
@@ -154,7 +155,7 @@ class MockOrchestratorImplementation:
         return self._tool_registry
 
     @property
-    def allowed_tools(self) -> Optional[List[str]]:
+    def allowed_tools(self) -> Optional[list[str]]:
         """Get list of allowed tool names, if restricted."""
         return self._allowed_tools
 
@@ -163,7 +164,7 @@ class MockOrchestratorImplementation:
     # =========================================================================
 
     @property
-    def messages(self) -> List[Any]:
+    def messages(self) -> list[Any]:
         """Get conversation messages."""
         return self._messages
 
@@ -173,17 +174,17 @@ class MockOrchestratorImplementation:
         return self._tool_calls_used
 
     @property
-    def executed_tools(self) -> List[str]:
+    def executed_tools(self) -> list[str]:
         """Get list of executed tool names in order."""
         return self._executed_tools
 
     @property
-    def failed_tool_signatures(self) -> Set[Tuple[str, str]]:
+    def failed_tool_signatures(self) -> set[tuple[str, str]]:
         """Get set of failed tool call signatures."""
         return self._failed_tool_signatures
 
     @property
-    def observed_files(self) -> Set[str]:
+    def observed_files(self) -> set[str]:
         """Get set of files observed during session."""
         return self._observed_files
 

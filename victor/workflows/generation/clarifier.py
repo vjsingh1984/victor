@@ -52,15 +52,11 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Optional, TYPE_CHECKING
 
 from victor.workflows.generation.requirements import (
     Ambiguity,
-    ContextRequirements,
-    FunctionalRequirements,
-    QualityRequirements,
-    StructuralRequirements,
     WorkflowRequirements,
 )
 
@@ -96,7 +92,7 @@ class Question:
     """
 
     text: str
-    options: Optional[List[str]] = None
+    options: Optional[list[str]] = None
     default: Optional[str] = None
     field: str = ""
     ambiguity_ref: Optional[Ambiguity] = None
@@ -225,7 +221,7 @@ class AmbiguityDetector:
         ]
         self._min_description_length = min_description_length
 
-    def detect(self, requirements: WorkflowRequirements) -> List[Ambiguity]:
+    def detect(self, requirements: WorkflowRequirements) -> list[Ambiguity]:
         """Detect all ambiguities in requirements.
 
         Args:
@@ -253,7 +249,7 @@ class AmbiguityDetector:
 
         return ambiguities
 
-    def _check_functional_gaps(self, requirements: WorkflowRequirements) -> List[Ambiguity]:
+    def _check_functional_gaps(self, requirements: WorkflowRequirements) -> list[Ambiguity]:
         """Check for missing functional requirements."""
         gaps = []
 
@@ -297,7 +293,7 @@ class AmbiguityDetector:
 
         return gaps
 
-    def _check_structural_conflicts(self, requirements: WorkflowRequirements) -> List[Ambiguity]:
+    def _check_structural_conflicts(self, requirements: WorkflowRequirements) -> list[Ambiguity]:
         """Check for structural inconsistencies."""
         conflicts = []
 
@@ -346,7 +342,7 @@ class AmbiguityDetector:
 
         return conflicts
 
-    def _check_vagueness(self, requirements: WorkflowRequirements) -> List[Ambiguity]:
+    def _check_vagueness(self, requirements: WorkflowRequirements) -> list[Ambiguity]:
         """Check for vague descriptions."""
         vague = []
 
@@ -379,7 +375,7 @@ class AmbiguityDetector:
 
         return vague
 
-    def _check_feasibility(self, requirements: WorkflowRequirements) -> List[Ambiguity]:
+    def _check_feasibility(self, requirements: WorkflowRequirements) -> list[Ambiguity]:
         """Check for infeasible constraints."""
         infeasible = []
 
@@ -413,14 +409,14 @@ class AmbiguityDetector:
 
         return infeasible
 
-    def _build_dependency_graph(self, requirements: WorkflowRequirements) -> Dict[str, List[str]]:
+    def _build_dependency_graph(self, requirements: WorkflowRequirements) -> dict[str, list[str]]:
         """Build dependency graph from requirements."""
         graph = {}
         for task_id, deps in requirements.structural.dependencies.items():
             graph[task_id] = deps
         return graph
 
-    def _detect_cycles(self, graph: Dict[str, List[str]]) -> List[List[str]]:
+    def _detect_cycles(self, graph: dict[str, list[str]]) -> list[list[str]]:
         """Detect cycles in dependency graph using DFS.
 
         Args:
@@ -499,7 +495,7 @@ class AmbiguityResolver:
     async def resolve(
         self,
         requirements: WorkflowRequirements,
-        ambiguities: List[Ambiguity],
+        ambiguities: list[Ambiguity],
         strategy: str = "interactive",
     ) -> WorkflowRequirements:
         """Resolve ambiguities using specified strategy.
@@ -532,7 +528,7 @@ class AmbiguityResolver:
     async def _resolve_interactively(
         self,
         requirements: WorkflowRequirements,
-        ambiguities: List[Ambiguity],
+        ambiguities: list[Ambiguity],
     ) -> WorkflowRequirements:
         """Resolve by asking user questions.
 
@@ -554,7 +550,7 @@ class AmbiguityResolver:
     async def _resolve_with_assumptions(
         self,
         requirements: WorkflowRequirements,
-        ambiguities: List[Ambiguity],
+        ambiguities: list[Ambiguity],
     ) -> WorkflowRequirements:
         """Resolve by making assumptions.
 
@@ -574,7 +570,7 @@ class AmbiguityResolver:
     def _resolve_with_defaults(
         self,
         requirements: WorkflowRequirements,
-        ambiguities: List[Ambiguity],
+        ambiguities: list[Ambiguity],
     ) -> WorkflowRequirements:
         """Resolve using template defaults.
 
@@ -627,7 +623,7 @@ class AmbiguityResolver:
     def _apply_functional_resolution(
         self,
         requirements: WorkflowRequirements,
-        parts: List[str],
+        parts: list[str],
         ambiguity: Ambiguity,
     ) -> WorkflowRequirements:
         """Apply resolution to functional requirements."""
@@ -654,7 +650,7 @@ class AmbiguityResolver:
     def _apply_structural_resolution(
         self,
         requirements: WorkflowRequirements,
-        parts: List[str],
+        parts: list[str],
         ambiguity: Ambiguity,
     ) -> WorkflowRequirements:
         """Apply resolution to structural requirements."""
@@ -669,7 +665,7 @@ class AmbiguityResolver:
     def _apply_quality_resolution(
         self,
         requirements: WorkflowRequirements,
-        parts: List[str],
+        parts: list[str],
         ambiguity: Ambiguity,
     ) -> WorkflowRequirements:
         """Apply resolution to quality requirements."""
@@ -689,7 +685,7 @@ class AmbiguityResolver:
     def _apply_context_resolution(
         self,
         requirements: WorkflowRequirements,
-        parts: List[str],
+        parts: list[str],
         ambiguity: Ambiguity,
     ) -> WorkflowRequirements:
         """Apply resolution to context requirements."""

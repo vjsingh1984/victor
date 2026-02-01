@@ -18,7 +18,7 @@ Part of HIGH-005: Initialization Complexity reduction.
 """
 
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.builders.base import FactoryAwareBuilder
 from victor.agent.session_state_manager import create_session_state_manager
@@ -43,10 +43,10 @@ class SessionServicesBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> dict[str, Any]:  # type: ignore[override]
         """Build session state and core services and attach them to orchestrator."""
         factory = self._ensure_factory()
-        components: Dict[str, Any] = {}
+        components: dict[str, Any] = {}
 
         # Initialize tool call budget using adapter recommendations (via factory)
         orchestrator.tool_budget = factory.initialize_tool_budget(

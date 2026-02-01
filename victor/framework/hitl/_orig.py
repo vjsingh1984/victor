@@ -61,13 +61,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Tuple,
 )
+from collections.abc import Awaitable, Callable
 
 
 class ApprovalStatus(str, Enum):
@@ -108,7 +104,7 @@ class ApprovalRequest:
     id: str
     title: str
     description: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     timeout_seconds: int = 300
     status: ApprovalStatus = ApprovalStatus.PENDING
     response: Optional[str] = None
@@ -135,7 +131,7 @@ class ApprovalRequest:
         """Check if request timed out."""
         return self.status == ApprovalStatus.TIMEOUT
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -153,7 +149,7 @@ class ApprovalRequest:
 # Type alias for approval handler functions
 ApprovalHandler = Callable[
     [ApprovalRequest],
-    Awaitable[Tuple[ApprovalStatus, Optional[str], Optional[str]]],
+    Awaitable[tuple[ApprovalStatus, Optional[str], Optional[str]]],
 ]
 
 
@@ -174,7 +170,7 @@ class HITLCheckpoint:
     """
 
     id: str
-    context: Dict[str, Any]
+    context: dict[str, Any]
     created_at: float = field(default_factory=time.time)
 
 
@@ -217,13 +213,13 @@ class HITLController:
         """
         self._approval_handler = approval_handler
         self._paused = False
-        self._checkpoints: Dict[str, HITLCheckpoint] = {}
-        self._requests: Dict[str, ApprovalRequest] = {}
+        self._checkpoints: dict[str, HITLCheckpoint] = {}
+        self._requests: dict[str, ApprovalRequest] = {}
 
         # Callbacks
-        self._on_pause_callbacks: List[Callable[[str, Dict[str, Any]], None]] = []
-        self._on_resume_callbacks: List[Callable[[str], None]] = []
-        self._on_approval_request_callbacks: List[Callable[[ApprovalRequest], None]] = []
+        self._on_pause_callbacks: list[Callable[[str, dict[str, Any]], None]] = []
+        self._on_resume_callbacks: list[Callable[[str], None]] = []
+        self._on_approval_request_callbacks: list[Callable[[ApprovalRequest], None]] = []
 
     # =========================================================================
     # Pause/Resume Properties and Methods
@@ -234,7 +230,7 @@ class HITLController:
         """Check if controller is currently paused."""
         return self._paused
 
-    def interrupt(self, context: Optional[Dict[str, Any]] = None) -> str:
+    def interrupt(self, context: Optional[dict[str, Any]] = None) -> str:
         """Interrupt the workflow and create a checkpoint.
 
         Pauses the workflow and stores the current context for later
@@ -260,7 +256,7 @@ class HITLController:
 
         return checkpoint_id
 
-    def resume(self, checkpoint_id: str) -> Dict[str, Any]:
+    def resume(self, checkpoint_id: str) -> dict[str, Any]:
         """Resume from a checkpoint.
 
         Args:
@@ -284,7 +280,7 @@ class HITLController:
 
         return checkpoint.context
 
-    def get_checkpoint_context(self, checkpoint_id: str) -> Dict[str, Any]:
+    def get_checkpoint_context(self, checkpoint_id: str) -> dict[str, Any]:
         """Get the context stored in a checkpoint.
 
         Args:
@@ -309,7 +305,7 @@ class HITLController:
         self,
         title: str,
         description: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         timeout_seconds: int = 300,
     ) -> ApprovalRequest:
         """Create a new approval request.
@@ -356,7 +352,7 @@ class HITLController:
 
         return self._requests[request_id]
 
-    def get_pending_requests(self) -> List[ApprovalRequest]:
+    def get_pending_requests(self) -> list[ApprovalRequest]:
         """Get all pending approval requests.
 
         Returns:
@@ -525,7 +521,7 @@ class HITLController:
 
     def on_pause(
         self,
-        callback: Callable[[str, Dict[str, Any]], None],
+        callback: Callable[[str, dict[str, Any]], None],
     ) -> None:
         """Register callback for pause events.
 

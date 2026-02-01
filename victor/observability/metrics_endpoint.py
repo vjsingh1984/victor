@@ -37,11 +37,9 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import time
-from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +172,6 @@ def mount_observability_routes(
     @app.get(ready_path)
     async def readiness_probe():
         """Kubernetes readiness probe - is the service ready to serve traffic?"""
-        from victor.core.health import HealthStatus
 
         try:
             from victor.observability.production_health import get_production_health_checker

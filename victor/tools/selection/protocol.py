@@ -54,11 +54,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStage
-    from victor.protocols.classification import IClassificationResult as ClassificationResult
+    pass
 
 
 @dataclass
@@ -111,16 +110,16 @@ class CrossVerticalToolSelectionContext:
     """
 
     prompt: str
-    conversation_history: List[Dict[str, Any]] = field(default_factory=list)
+    conversation_history: list[dict[str, Any]] = field(default_factory=list)
     current_stage: Optional[str] = None
     task_type: Optional[str] = None
     provider_name: str = ""
     model_name: str = ""
     cost_budget: float = 1.0
-    enabled_tools: Optional[List[str]] = None
-    disabled_tools: Optional[List[str]] = None
+    enabled_tools: Optional[list[str]] = None
+    disabled_tools: Optional[list[str]] = None
     vertical: Optional[str] = None
-    recent_tools: List[str] = field(default_factory=list)
+    recent_tools: list[str] = field(default_factory=list)
     turn_number: int = 0
     classification_result: Optional[Any] = None  # ClassificationResult
     max_tools: int = 10
@@ -130,7 +129,7 @@ class CrossVerticalToolSelectionContext:
     def from_agent_context(
         cls,
         prompt: str,
-        agent_context: Dict[str, Any],
+        agent_context: dict[str, Any],
     ) -> "CrossVerticalToolSelectionContext":
         """Create from agent's internal context dictionary.
 
@@ -252,7 +251,7 @@ class ToolSelectionStrategy(Protocol):
         self,
         context: ToolSelectionContext,
         max_tools: int = 10,
-    ) -> List[str]:
+    ) -> list[str]:
         """Select relevant tools for the context.
 
         Args:
@@ -289,7 +288,7 @@ class ToolSelectionStrategy(Protocol):
         self,
         tool_name: str,
         success: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record tool execution for learning (optional).
 
@@ -352,7 +351,7 @@ class BaseToolSelectionStrategy(ABC):
         self,
         context: ToolSelectionContext,
         max_tools: int = 10,
-    ) -> List[str]:
+    ) -> list[str]:
         """Select relevant tools for the context."""
         ...
 
@@ -374,7 +373,7 @@ class BaseToolSelectionStrategy(ABC):
         self,
         tool_name: str,
         success: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Default: no-op for learning.
 

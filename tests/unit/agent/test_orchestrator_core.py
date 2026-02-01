@@ -2926,7 +2926,6 @@ class TestGetRecentSessions:
 
     def test_returns_sessions_from_memory_manager(self, orchestrator):
         """Test returns sessions from memory manager."""
-        from datetime import datetime
 
         # Mock the MemoryManager's get_recent_sessions method to return session data
         mock_manager = MagicMock()

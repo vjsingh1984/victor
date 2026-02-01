@@ -43,7 +43,7 @@ Usage:
 """
 
 import logging
-from typing import Any, Dict, Optional, Set, Type
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class ComponentAccessorMixin:
 
     # Component name to private attribute mapping
     # This is used by __getattr__ to find the correct private attribute
-    _component_map: Dict[str, str] = {
+    _component_map: dict[str, str] = {
         "conversation_controller": "_conversation_controller",
         "tool_pipeline": "_tool_pipeline",
         "streaming_controller": "_streaming_controller",
@@ -129,7 +129,7 @@ class ComponentAccessorMixin:
     }
 
     # Attributes that should raise AttributeError instead of being handled
-    _component_exclusions: Set[str] = {
+    _component_exclusions: set[str] = {
         # Internal attributes that should not be accessed
         "_component_map",
         "_component_exclusions",
@@ -224,7 +224,7 @@ class ComponentAccessorMixin:
             hasattr(self, private_attr) and object.__getattribute__(self, private_attr) is not None
         )
 
-    def get_component_names(self) -> Set[str]:
+    def get_component_names(self) -> set[str]:
         """Get all registered component names.
 
         Returns:

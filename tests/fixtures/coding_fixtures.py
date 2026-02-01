@@ -19,7 +19,7 @@ code review scenarios for comprehensive testing.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from victor.protocols.lsp_types import (
     CompletionItem,
@@ -229,7 +229,7 @@ def apply_func(
 # =============================================================================
 
 
-def create_mock_function_node(name: str, start_line: int = 1) -> Dict[str, Any]:
+def create_mock_function_node(name: str, start_line: int = 1) -> dict[str, Any]:
     """Create a mock function AST node."""
     return {
         "type": "function_definition",
@@ -246,9 +246,9 @@ def create_mock_function_node(name: str, start_line: int = 1) -> Dict[str, Any]:
 
 def create_mock_class_node(
     name: str,
-    bases: List[str] | None = None,
+    bases: list[str] | None = None,
     start_line: int = 1,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a mock class AST node."""
     return {
         "type": "class_definition",
@@ -264,9 +264,9 @@ def create_mock_class_node(
 
 def create_mock_import_node(
     module: str,
-    names: List[str] | None = None,
+    names: list[str] | None = None,
     start_line: int = 1,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a mock import AST node."""
     return {
         "type": "import_statement",
@@ -281,7 +281,7 @@ def create_mock_variable_node(
     name: str,
     value_type: str = "Any",
     start_line: int = 1,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a mock variable AST node."""
     return {
         "type": "assignment",
@@ -293,9 +293,9 @@ def create_mock_variable_node(
 
 def create_mock_call_node(
     func: str,
-    args: List[str] | None = None,
+    args: list[str] | None = None,
     start_line: int = 1,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a mock function call AST node."""
     return {
         "type": "call",
@@ -400,7 +400,7 @@ def create_mock_symbol(
     detail: str = "",
     range_start_line: int = 1,
     range_end_line: int = 2,
-    children: List["DocumentSymbol"] | None = None,
+    children: list["DocumentSymbol"] | None = None,
 ) -> DocumentSymbol:
     """Create a mock document symbol."""
     return DocumentSymbol(
@@ -532,7 +532,7 @@ class CodeReviewScenario:
         code: str,
         file_path: str,
         expected_findings: int,
-        categories: List[str] | None = None,
+        categories: list[str] | None = None,
     ):
         self.name = name
         self.code = code
@@ -598,7 +598,7 @@ def create_sample_file(
 
 def create_sample_project(
     tmp_path: Path,
-    files: Dict[str, str] | None = None,
+    files: dict[str, str] | None = None,
 ) -> Path:
     """Create a sample project structure with multiple files."""
     if files is None:
@@ -616,7 +616,7 @@ def create_sample_project(
     return tmp_path
 
 
-def create_mock_syntax_error_node() -> Dict[str, Any]:
+def create_mock_syntax_error_node() -> dict[str, Any]:
     """Create a mock AST node representing a syntax error."""
     return {
         "type": "error",
@@ -626,7 +626,7 @@ def create_mock_syntax_error_node() -> Dict[str, Any]:
     }
 
 
-def create_mock_dependency_graph() -> Dict[str, List[str]]:
+def create_mock_dependency_graph() -> dict[str, list[str]]:
     """Create a mock import dependency graph."""
     return {
         "main.py": ["utils.py", "config.py"],
@@ -636,7 +636,7 @@ def create_mock_dependency_graph() -> Dict[str, List[str]]:
     }
 
 
-def create_mock_call_graph() -> Dict[str, List[str]]:
+def create_mock_call_graph() -> dict[str, list[str]]:
     """Create a mock function call graph."""
     return {
         "main": ["process_data", "validate_input"],
@@ -648,7 +648,7 @@ def create_mock_call_graph() -> Dict[str, List[str]]:
     }
 
 
-def create_mock_code_metrics() -> Dict[str, Any]:
+def create_mock_code_metrics() -> dict[str, Any]:
     """Create mock code complexity metrics."""
     return {
         "total_lines": 150,
@@ -798,9 +798,8 @@ def create_mock_hover(
     contents: str,
     range: Range | None = None,
     kind: str = "markdown",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a mock hover response."""
-    from victor.protocols.lsp_types import Hover
 
     return {
         "contents": {
@@ -814,9 +813,9 @@ def create_mock_hover(
 def create_mock_code_action(
     title: str,
     kind: str,
-    edit: Dict[str, Any] | None = None,
-    command: Dict[str, Any] | None = None,
-) -> Dict[str, Any]:
+    edit: dict[str, Any] | None = None,
+    command: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Create a mock code action."""
     return {
         "title": title,
@@ -828,9 +827,9 @@ def create_mock_code_action(
 
 def create_mock_code_lens(
     range: Range,
-    command: Dict[str, Any] | None = None,
+    command: dict[str, Any] | None = None,
     data: Any | None = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a mock code lens."""
     return {
         "range": range.to_dict(),
@@ -913,8 +912,8 @@ def create_mock_tree_sitter_node(
     text: str,
     start_point: tuple = (0, 0),
     end_point: tuple = (0, 10),
-    children: List[Dict[str, Any]] | None = None,
-) -> Dict[str, Any]:
+    children: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Create a mock tree-sitter node for testing.
 
     Args:
@@ -1133,7 +1132,7 @@ def create_mock_location(
     start_char: int = 0,
     end_line: int = 0,
     end_char: int = 10,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a mock location."""
     from victor.protocols.lsp_types import Location
 
@@ -1186,7 +1185,7 @@ def create_mock_test_scenario(
     content: str,
     expected_diagnostics: int = 0,
     expected_symbols: int = 0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a complete test scenario with metadata.
 
     Args:

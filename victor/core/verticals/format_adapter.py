@@ -19,7 +19,7 @@ Usage:
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional, Union
 
 
 @dataclass
@@ -35,10 +35,10 @@ class ModeConfig:
     max_iterations: int = 30
     temperature: float = 0.7
     description: str = ""
-    allowed_stages: Optional[List[str]] = None
+    allowed_stages: Optional[list[str]] = None
     exploration_multiplier: float = 1.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         result = {
             "name": self.name,
@@ -65,7 +65,7 @@ class VerticalFormatAdapter:
     """
 
     @staticmethod
-    def normalize_mode_config(mode_config: Union["ModeConfig", Dict[str, Any], Any]) -> ModeConfig:
+    def normalize_mode_config(mode_config: Union["ModeConfig", dict[str, Any], Any]) -> ModeConfig:
         """Convert any mode config format to standard ModeConfig.
 
         Handles:
@@ -114,8 +114,8 @@ class VerticalFormatAdapter:
 
     @staticmethod
     def normalize_mode_configs(
-        configs: Dict[str, Union["ModeConfig", Dict[str, Any], Any]],
-    ) -> Dict[str, ModeConfig]:
+        configs: dict[str, Union["ModeConfig", dict[str, Any], Any]],
+    ) -> dict[str, ModeConfig]:
         """Normalize all mode configs in a dictionary.
 
         Args:
@@ -130,7 +130,7 @@ class VerticalFormatAdapter:
         }
 
     @staticmethod
-    def normalize_task_type_hint(hint: Union[Dict[str, Any], Any]) -> Dict[str, Any]:
+    def normalize_task_type_hint(hint: dict[str, Any] | Any) -> dict[str, Any]:
         """Normalize a task type hint to consistent structure.
 
         Ensures all task type hints have required fields:
@@ -174,7 +174,7 @@ class VerticalFormatAdapter:
         }
 
     @staticmethod
-    def normalize_task_type_hints(hints: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    def normalize_task_type_hints(hints: dict[str, Any]) -> dict[str, dict[str, Any]]:
         """Normalize all task type hints in a dictionary.
 
         Args:
@@ -189,7 +189,7 @@ class VerticalFormatAdapter:
         }
 
     @staticmethod
-    def normalize_safety_pattern(pattern: Union[Dict[str, Any], Any]) -> Dict[str, Any]:
+    def normalize_safety_pattern(pattern: dict[str, Any] | Any) -> dict[str, Any]:
         """Normalize a safety pattern to consistent structure.
 
         Args:
@@ -232,7 +232,7 @@ class VerticalFormatAdapter:
         }
 
     @staticmethod
-    def normalize_safety_patterns(patterns: List[Any]) -> List[Dict[str, Any]]:
+    def normalize_safety_patterns(patterns: list[Any]) -> list[dict[str, Any]]:
         """Normalize all safety patterns in a list.
 
         Args:
@@ -244,7 +244,7 @@ class VerticalFormatAdapter:
         return [VerticalFormatAdapter.normalize_safety_pattern(p) for p in patterns]
 
     @staticmethod
-    def normalize_stage_definition(stage: Union[Dict[str, Any], Any]) -> Dict[str, Any]:
+    def normalize_stage_definition(stage: dict[str, Any] | Any) -> dict[str, Any]:
         """Normalize a stage definition to consistent structure.
 
         Args:
@@ -281,7 +281,7 @@ class VerticalFormatAdapter:
         }
 
     @staticmethod
-    def normalize_stage_definitions(stages: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    def normalize_stage_definitions(stages: dict[str, Any]) -> dict[str, dict[str, Any]]:
         """Normalize all stage definitions in a dictionary.
 
         Args:

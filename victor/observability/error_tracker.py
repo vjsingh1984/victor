@@ -28,7 +28,7 @@ import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -39,9 +39,9 @@ class ErrorRecord:
     error_type: str
     error_message: str
     correlation_id: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -83,9 +83,9 @@ class ErrorTracker:
         Args:
             max_history: Maximum number of error records to keep in memory
         """
-        self._errors: List[ErrorRecord] = []
-        self._error_counts: Dict[str, int] = defaultdict(int)
-        self._error_rates: Dict[str, List[float]] = defaultdict(list)
+        self._errors: list[ErrorRecord] = []
+        self._error_counts: dict[str, int] = defaultdict(int)
+        self._error_rates: dict[str, list[float]] = defaultdict(list)
         self._lock = threading.Lock()
         self._max_history = max_history
 
@@ -94,7 +94,7 @@ class ErrorTracker:
         error_type: str,
         error_message: str,
         correlation_id: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record an error occurrence.
 
@@ -147,7 +147,7 @@ class ErrorTracker:
         if len(self._error_rates[error_type]) > 24:
             self._error_rates[error_type].pop(0)
 
-    def get_error_summary(self) -> Dict[str, Any]:
+    def get_error_summary(self) -> dict[str, Any]:
         """Get error summary statistics.
 
         Returns:
@@ -181,7 +181,7 @@ class ErrorTracker:
                 return self._error_rates[error_type][-1]
             return 0.0
 
-    def get_errors_by_type(self, error_type: str) -> List[ErrorRecord]:
+    def get_errors_by_type(self, error_type: str) -> list[ErrorRecord]:
         """Get all errors of a specific type.
 
         Args:
@@ -193,7 +193,7 @@ class ErrorTracker:
         with self._lock:
             return [e for e in self._errors if e.error_type == error_type]
 
-    def get_errors_by_timeframe(self, hours: int = 24) -> List[ErrorRecord]:
+    def get_errors_by_timeframe(self, hours: int = 24) -> list[ErrorRecord]:
         """Get errors from the last N hours.
 
         Args:

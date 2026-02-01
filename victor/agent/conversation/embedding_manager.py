@@ -22,7 +22,7 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional, cast
 
 from victor.agent.protocols import IEmbeddingManager
 
@@ -87,8 +87,8 @@ class EmbeddingManager(IEmbeddingManager):
         self,
         query: str,
         k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Any]:
+        filters: Optional[dict[str, Any]] = None,
+    ) -> list[Any]:
         """Perform semantic search.
 
         Args:
@@ -113,7 +113,7 @@ class EmbeddingManager(IEmbeddingManager):
                 k=k,
                 filters=filters,
             )
-            return cast(List[Any], results)
+            return cast(list[Any], results)
         except Exception as e:
             logger.error(f"Semantic search failed: {e}")
             return []
@@ -130,7 +130,7 @@ class EmbeddingManager(IEmbeddingManager):
         self,
         message_id: str,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> bool:
         """Add a message to the embedding store.
 

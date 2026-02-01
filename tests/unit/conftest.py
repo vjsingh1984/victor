@@ -15,7 +15,6 @@
 """Pytest fixtures for unit tests."""
 
 import logging
-import sys
 
 import pytest
 

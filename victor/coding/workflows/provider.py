@@ -50,7 +50,7 @@ Available workflows (all YAML-defined):
 """
 
 import logging
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from victor.framework.workflows import BaseYAMLWorkflowProvider
 
@@ -90,7 +90,7 @@ class CodingWorkflowProvider(BaseYAMLWorkflowProvider):
         """
         return "victor.coding.escape_hatches"
 
-    def get_auto_workflows(self) -> List[Tuple[str, str]]:
+    def get_auto_workflows(self) -> list[tuple[str, str]]:
         """Get automatic workflow triggers based on query patterns.
 
         Returns patterns that can trigger workflows automatically

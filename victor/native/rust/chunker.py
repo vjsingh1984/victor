@@ -26,7 +26,7 @@ Performance characteristics:
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 
 try:
     import victor_native  # type: ignore[import-not-found]
@@ -60,7 +60,7 @@ class RustTextChunker(InstrumentedAccelerator):
     def get_version(self) -> Optional[str]:
         return self._version
 
-    def chunk_with_overlap(self, text: str, chunk_size: int, overlap: int) -> List[ChunkInfo]:
+    def chunk_with_overlap(self, text: str, chunk_size: int, overlap: int) -> list[ChunkInfo]:
         """Chunk text with overlap, respecting line boundaries.
 
         Delegates to Rust implementation with pre-computed line boundaries.
@@ -108,7 +108,7 @@ class RustTextChunker(InstrumentedAccelerator):
         with self._timed_call("line_counting"):
             return victor_native.count_lines(text)
 
-    def find_line_boundaries(self, text: str) -> List[int]:
+    def find_line_boundaries(self, text: str) -> list[int]:
         """Find byte offsets of all line starts.
 
         Delegates to Rust single-pass implementation.

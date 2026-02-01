@@ -35,8 +35,8 @@ References:
 
 import json
 import logging
-import os
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -141,12 +141,12 @@ class FireworksProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Fireworks."""
@@ -174,12 +174,12 @@ class FireworksProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Fireworks."""
@@ -190,7 +190,7 @@ class FireworksProvider(BaseProvider, HTTPErrorHandlerMixin):
 
             async with self.client.stream("POST", "/chat/completions", json=payload) as response:
                 response.raise_for_status()
-                accumulated_tool_calls: List[Dict[str, Any]] = []
+                accumulated_tool_calls: list[dict[str, Any]] = []
 
                 async for line in response.aiter_lines():
                     if not line.strip() or not line.startswith("data: "):
@@ -224,7 +224,7 @@ class FireworksProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     def _build_request_payload(
         self, messages, model, temperature, max_tokens, tools, stream, **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         formatted_messages = []
         for msg in messages:
             formatted_msg = {"role": msg.role, "content": msg.content}
@@ -272,7 +272,7 @@ class FireworksProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return payload
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         choices = result.get("choices", [])
         if not choices:
             return CompletionResponse(
@@ -309,7 +309,7 @@ class FireworksProvider(BaseProvider, HTTPErrorHandlerMixin):
             metadata=None,
         )
 
-    def _normalize_tool_calls(self, tool_calls) -> Optional[List[Dict[str, Any]]]:
+    def _normalize_tool_calls(self, tool_calls) -> Optional[list[dict[str, Any]]]:
         if not tool_calls:
             return None
         normalized = []

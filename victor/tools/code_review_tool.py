@@ -28,7 +28,7 @@ Ruby, PHP, Kotlin, Swift, Scala, Bash, SQL, Lua, Elixir, Haskell, R
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
@@ -37,7 +37,6 @@ from victor.tools.language_analyzer import (
     detect_language,
     get_analyzer_for_file,
     supported_extensions,
-    supported_languages,
     EXTENSION_TO_LANGUAGE,
     LANGUAGE_GLOB_PATTERNS,
 )
@@ -48,7 +47,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MAX_COMPLEXITY: int = 10
 
 
-def _issue_to_dict(issue: AnalysisIssue) -> Dict[str, Any]:
+def _issue_to_dict(issue: AnalysisIssue) -> dict[str, Any]:
     """Convert AnalysisIssue to dictionary format."""
     return {
         "type": issue.type,
@@ -64,9 +63,9 @@ def _issue_to_dict(issue: AnalysisIssue) -> Dict[str, Any]:
 
 def _analyze_file(
     file_path: Path,
-    aspects: List[str],
+    aspects: list[str],
     max_complexity: int,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Analyze a single file using the language analyzer.
 
     Args:
@@ -105,7 +104,7 @@ def _analyze_file(
     return issues
 
 
-def _get_glob_patterns_for_languages(languages: Optional[List[str]] = None) -> List[str]:
+def _get_glob_patterns_for_languages(languages: Optional[list[str]] = None) -> list[str]:
     """Get glob patterns for specified languages or all supported languages.
 
     Args:
@@ -134,10 +133,10 @@ def _get_glob_patterns_for_languages(languages: Optional[List[str]] = None) -> L
 def _build_report(
     path: Path,
     files_reviewed: int,
-    aspects: List[str],
-    results: Dict[str, Dict[str, Any]],
-    filtered_issues: List[Dict[str, Any]],
-    issues_by_severity: Dict[str, int],
+    aspects: list[str],
+    results: dict[str, dict[str, Any]],
+    filtered_issues: list[dict[str, Any]],
+    issues_by_severity: dict[str, int],
     languages_found: set[Any],
 ) -> str:
     """Build comprehensive code review report."""
@@ -248,13 +247,13 @@ def _build_report(
 )
 async def code_review(
     path: str,
-    aspects: Optional[List[str]] = None,
+    aspects: Optional[list[str]] = None,
     file_pattern: Optional[str] = None,
-    languages: Optional[List[str]] = None,
+    languages: Optional[list[str]] = None,
     severity: str = "low",
     include_metrics: bool = False,
     max_issues: int = 50,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Comprehensive code review for automated quality analysis.
 
@@ -384,7 +383,7 @@ async def code_review(
         }
 
     # Initialize results
-    results: Dict[str, Dict[str, Any]] = {aspect: {"issues": [], "count": 0} for aspect in aspects}
+    results: dict[str, dict[str, Any]] = {aspect: {"issues": [], "count": 0} for aspect in aspects}
     all_issues = []
     files_reviewed = 0
     languages_found = set()

@@ -63,12 +63,8 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
     runtime_checkable,
 )
 
@@ -117,10 +113,10 @@ class StageDefinition:
     name: str
     display_name: str = ""
     description: str = ""
-    keywords: List[str] = field(default_factory=list)
-    tools: Set[str] = field(default_factory=set)
+    keywords: list[str] = field(default_factory=list)
+    tools: set[str] = field(default_factory=set)
     order: int = 0
-    can_transition_to: Optional[Set[str]] = None
+    can_transition_to: Optional[set[str]] = None
     min_confidence: float = 0.5
 
     def __post_init__(self) -> None:
@@ -147,7 +143,7 @@ class StageTransition:
     confidence: float
     trigger: str
     timestamp: float
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -179,7 +175,7 @@ class StageManagerProtocol(Protocol):
         """
         ...
 
-    def get_stage_tools(self) -> Set[str]:
+    def get_stage_tools(self) -> set[str]:
         """Get tools recommended for current stage.
 
         Returns:
@@ -187,7 +183,7 @@ class StageManagerProtocol(Protocol):
         """
         ...
 
-    def record_tool(self, tool_name: str, args: Dict[str, Any]) -> None:
+    def record_tool(self, tool_name: str, args: dict[str, Any]) -> None:
         """Record tool execution and trigger stage detection.
 
         Args:
@@ -280,7 +276,7 @@ class StageManager:
     def __init__(
         self,
         config: Optional[StageManagerConfig] = None,
-        custom_stages: Optional[Dict[str, StageDefinition]] = None,
+        custom_stages: Optional[dict[str, StageDefinition]] = None,
         hooks: Optional["StateHookManager"] = None,
         event_bus: Optional["EventBus"] = None,
     ) -> None:
@@ -308,7 +304,7 @@ class StageManager:
         self._machine.BACKWARD_TRANSITION_THRESHOLD = self._config.backward_confidence_threshold
 
         # Build custom stage tool mapping
-        self._custom_stage_tools: Dict[str, Set[str]] = {
+        self._custom_stage_tools: dict[str, set[str]] = {
             name: defn.tools for name, defn in self._custom_stages.items()
         }
 
@@ -342,7 +338,7 @@ class StageManager:
         """
         return self._machine.get_stage().name.lower()
 
-    def get_stage_tools(self) -> Set[str]:
+    def get_stage_tools(self) -> set[str]:
         """Get tools recommended for current stage.
 
         First checks custom stage definitions, then falls back to
@@ -360,7 +356,7 @@ class StageManager:
         # Fall back to standard mapping
         return self._machine.get_stage_tools()
 
-    def record_tool(self, tool_name: str, args: Dict[str, Any]) -> None:
+    def record_tool(self, tool_name: str, args: dict[str, Any]) -> None:
         """Record tool execution and trigger stage detection.
 
         Args:
@@ -445,7 +441,7 @@ class StageManager:
         """
         self._machine._transition_to(stage, confidence, force=True)
 
-    def get_state_summary(self) -> Dict[str, Any]:
+    def get_state_summary(self) -> dict[str, Any]:
         """Get detailed summary of current state.
 
         Returns:
@@ -453,7 +449,7 @@ class StageManager:
         """
         return self._machine.get_state_summary()
 
-    def get_transition_history(self) -> List[Dict[str, Any]]:
+    def get_transition_history(self) -> list[dict[str, Any]]:
         """Get the transition history.
 
         Returns:
@@ -461,7 +457,7 @@ class StageManager:
         """
         return self._machine.transition_history
 
-    def get_transitions_summary(self) -> Dict[str, Any]:
+    def get_transitions_summary(self) -> dict[str, Any]:
         """Get summary statistics of transitions.
 
         Returns:
@@ -505,7 +501,7 @@ class StageManager:
         """
         return self._custom_stages.get(stage_name)
 
-    def get_all_stage_definitions(self) -> Dict[str, StageDefinition]:
+    def get_all_stage_definitions(self) -> dict[str, StageDefinition]:
         """Get all registered custom stage definitions.
 
         Returns:
@@ -517,7 +513,7 @@ class StageManager:
     # Serialization
     # =========================================================================
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize stage manager state.
 
         Returns:
@@ -538,8 +534,8 @@ class StageManager:
     @classmethod
     def from_dict(
         cls,
-        data: Dict[str, Any],
-        custom_stages: Optional[Dict[str, StageDefinition]] = None,
+        data: dict[str, Any],
+        custom_stages: Optional[dict[str, StageDefinition]] = None,
     ) -> "StageManager":
         """Restore stage manager from dictionary.
 
@@ -579,7 +575,7 @@ class StageManager:
 
 def create_stage_manager(
     config: Optional[StageManagerConfig] = None,
-    custom_stages: Optional[Dict[str, StageDefinition]] = None,
+    custom_stages: Optional[dict[str, StageDefinition]] = None,
     hooks: Optional["StateHookManager"] = None,
     event_bus: Optional["EventBus"] = None,
 ) -> StageManager:
@@ -607,7 +603,7 @@ def create_stage_manager(
 # =============================================================================
 
 
-def get_coding_stages() -> Dict[str, StageDefinition]:
+def get_coding_stages() -> dict[str, StageDefinition]:
     """Get standard stage definitions for coding vertical.
 
     Returns:
@@ -673,7 +669,7 @@ def get_coding_stages() -> Dict[str, StageDefinition]:
     }
 
 
-def get_data_analysis_stages() -> Dict[str, StageDefinition]:
+def get_data_analysis_stages() -> dict[str, StageDefinition]:
     """Get standard stage definitions for data analysis vertical.
 
     Returns:
@@ -731,7 +727,7 @@ def get_data_analysis_stages() -> Dict[str, StageDefinition]:
     }
 
 
-def get_research_stages() -> Dict[str, StageDefinition]:
+def get_research_stages() -> dict[str, StageDefinition]:
     """Get standard stage definitions for research vertical.
 
     Returns:

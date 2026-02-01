@@ -48,7 +48,8 @@ Usage:
 import logging
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 from victor.providers.base import (
     BaseProvider,
@@ -118,7 +119,7 @@ class ProviderConfig:
     enable_resilience: bool = True
     circuit_breaker_config: Optional[CircuitBreakerConfig] = None
     retry_config: Optional[ProviderRetryConfig] = None
-    fallback_providers: List["ProviderConfig"] = field(default_factory=list)
+    fallback_providers: list["ProviderConfig"] = field(default_factory=list)
 
     # Rate limiting settings
     enable_rate_limiting: bool = True
@@ -130,7 +131,7 @@ class ProviderConfig:
     metrics_history_size: int = 1000
 
     # Provider-specific settings
-    extra_kwargs: Dict[str, Any] = field(default_factory=dict)
+    extra_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
 class ManagedProvider:
@@ -198,9 +199,9 @@ class ManagedProvider:
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         model: Optional[str] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        tools: Optional[list[dict[str, Any]]] = None,
         priority: RequestPriority = RequestPriority.NORMAL,
         **kwargs: Any,
     ) -> CompletionResponse:
@@ -237,9 +238,9 @@ class ManagedProvider:
 
     async def stream_chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         model: Optional[str] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        tools: Optional[list[dict[str, Any]]] = None,
         priority: RequestPriority = RequestPriority.NORMAL,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
@@ -296,7 +297,7 @@ class ManagedProvider:
             async for chunk in base_stream:
                 yield chunk
 
-    def get_metrics(self) -> Optional[Dict[str, Any]]:
+    def get_metrics(self) -> Optional[dict[str, Any]]:
         """Get collected metrics.
 
         Returns:
@@ -312,8 +313,8 @@ class ManagedProvider:
         }
 
     def _convert_tools_to_definitions(
-        self, tools: Optional[List[Dict[str, Any]]]
-    ) -> Optional[List[ToolDefinition]]:
+        self, tools: Optional[list[dict[str, Any]]]
+    ) -> Optional[list[ToolDefinition]]:
         """Convert dict tools to ToolDefinitions.
 
         Args:
@@ -334,7 +335,7 @@ class ManagedProvider:
             for tool in tools
         ]
 
-    def get_resilience_stats(self) -> Optional[Dict[str, Any]]:
+    def get_resilience_stats(self) -> Optional[dict[str, Any]]:
         """Get resilience statistics.
 
         Returns:
@@ -345,7 +346,7 @@ class ManagedProvider:
 
         return self._resilient_provider.get_stats()
 
-    def get_rate_limit_stats(self) -> Optional[Dict[str, Any]]:
+    def get_rate_limit_stats(self) -> Optional[dict[str, Any]]:
         """Get rate limiting statistics.
 
         Returns:
@@ -424,7 +425,7 @@ class ManagedProviderFactory:
         enable_resilience: bool = True,
         enable_rate_limiting: bool = True,
         enable_metrics: bool = True,
-        fallback_configs: Optional[List[ProviderConfig]] = None,
+        fallback_configs: Optional[list[ProviderConfig]] = None,
         **kwargs: Any,
     ) -> ManagedProvider:
         """Create an enhanced provider with shared infrastructure.
@@ -470,7 +471,7 @@ class ManagedProviderFactory:
             ManagedProvider with all integrations
         """
         # Build provider kwargs
-        provider_kwargs: Dict[str, Any] = {}
+        provider_kwargs: dict[str, Any] = {}
         if config.api_key:
             provider_kwargs["api_key"] = config.api_key
         if config.base_url:
@@ -491,7 +492,7 @@ class ManagedProviderFactory:
             # Create fallback providers
             fallback_providers = []
             for fb_config in config.fallback_providers:
-                fb_kwargs: Dict[str, Any] = {}
+                fb_kwargs: dict[str, Any] = {}
                 if fb_config.api_key:
                     fb_kwargs["api_key"] = fb_config.api_key
                 if fb_config.base_url:
@@ -544,7 +545,7 @@ class ManagedProviderFactory:
     async def create_with_fallbacks(
         cls,
         primary_config: ProviderConfig,
-        fallback_configs: List[ProviderConfig],
+        fallback_configs: list[ProviderConfig],
     ) -> ManagedProvider:
         """Create provider with explicit fallback chain.
 

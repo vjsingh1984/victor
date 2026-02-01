@@ -22,7 +22,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.agent.coordinators.tool_call_protocol import (
     IToolCallCoordinator,
@@ -81,9 +81,9 @@ class ToolCallCoordinator(IToolCallCoordinator):
 
     async def handle_tool_calls(
         self,
-        tool_calls: List[ToolCall],
+        tool_calls: list[ToolCall],
         context: ToolCallContext,
-    ) -> List[ToolCallResult]:
+    ) -> list[ToolCallResult]:
         """Handle multiple tool calls with validation, execution, and retry.
 
         Args:
@@ -100,7 +100,7 @@ class ToolCallCoordinator(IToolCallCoordinator):
         if not tool_calls:
             return []
 
-        results: List[ToolCallResult] = []
+        results: list[ToolCallResult] = []
 
         for tool_call in tool_calls:
             # Validate tool call
@@ -132,7 +132,7 @@ class ToolCallCoordinator(IToolCallCoordinator):
         self,
         tool_call: ToolCall,
         context: ToolCallContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """Validate a single tool call.
 
         Args:
@@ -194,7 +194,7 @@ class ToolCallCoordinator(IToolCallCoordinator):
     async def execute_tool_with_retry(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         context: ToolCallContext,
     ) -> ToolCallResult:
         """Execute a single tool with retry logic.
@@ -331,8 +331,8 @@ class ToolCallCoordinator(IToolCallCoordinator):
 
     def parse_tool_calls(
         self,
-        raw_calls: List[Dict[str, Any]],
-    ) -> List[ToolCall]:
+        raw_calls: list[dict[str, Any]],
+    ) -> list[ToolCall]:
         """Parse raw tool calls from LLM response.
 
         Normalizes tool call format across different providers and handles
@@ -382,9 +382,9 @@ class ToolCallCoordinator(IToolCallCoordinator):
 
     def validate_tool_calls(
         self,
-        tool_calls: List[ToolCall],
+        tool_calls: list[ToolCall],
         context: ToolCallContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """Validate tool calls against budget and constraints.
 
         Checks:
@@ -414,7 +414,7 @@ class ToolCallCoordinator(IToolCallCoordinator):
     def format_tool_output(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         output: Any,
     ) -> str:
         """Format tool output for inclusion in LLM context.

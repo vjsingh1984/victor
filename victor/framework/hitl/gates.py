@@ -20,27 +20,18 @@ human-in-the-loop scenarios in agent workflows.
 
 from __future__ import annotations
 
-import asyncio
 import time
 import uuid
-from dataclasses import dataclass, field
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    List,
     Optional,
     TypeVar,
-    Union,
 )
+from collections.abc import Awaitable, Callable
 
 from victor.framework.hitl.protocols import (
     BaseHITLGate,
-    BaseHITLResponse,
-    FallbackBehavior,
     FallbackStrategy,
-    HITLGateProtocol,
     HITLResponseProtocol,
     InputValidationProtocol,
 )
@@ -68,7 +59,7 @@ class ApprovalResponse:
         reason: Optional[str] = None,
         responder: Optional[str] = None,
         created_at: float = 0.0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ):
         """Initialize approval response."""
         self.gate_id = gate_id
@@ -103,7 +94,7 @@ class ApprovalResponse:
         assert isinstance(value, bool)
         return value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "gate_id": self.gate_id,
@@ -131,7 +122,7 @@ class TextResponse:
         reason: Optional[str] = None,
         responder: Optional[str] = None,
         created_at: float = 0.0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ):
         """Initialize text response."""
         self.gate_id = gate_id
@@ -171,7 +162,7 @@ class TextResponse:
         assert isinstance(value, bool)
         return value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "gate_id": self.gate_id,
@@ -201,7 +192,7 @@ class ChoiceResponse:
         reason: Optional[str] = None,
         responder: Optional[str] = None,
         created_at: float = 0.0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ):
         """Initialize choice response."""
         self.gate_id = gate_id
@@ -242,7 +233,7 @@ class ChoiceResponse:
         assert isinstance(value, bool)
         return value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "gate_id": self.gate_id,
@@ -268,11 +259,11 @@ class ReviewResponse:
         self,
         gate_id: str,
         approved: bool,
-        modifications: Optional[Dict[str, Any]] = None,
+        modifications: Optional[dict[str, Any]] = None,
         comments: Optional[str] = None,
         responder: Optional[str] = None,
         created_at: float = 0.0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ):
         """Initialize review response."""
         self.gate_id = gate_id
@@ -284,7 +275,7 @@ class ReviewResponse:
         self.metadata = metadata or {}
 
     @property
-    def value(self) -> Optional[Dict[str, Any]]:
+    def value(self) -> Optional[dict[str, Any]]:
         """Return the modifications value."""
         return self.modifications
 
@@ -312,7 +303,7 @@ class ReviewResponse:
         assert isinstance(value, bool)
         return value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "gate_id": self.gate_id,
@@ -399,7 +390,7 @@ class PatternValidator(Validator):
 class ChoiceValidator(Validator):
     """Validator for choice selection."""
 
-    def __init__(self, choices: List[str]):
+    def __init__(self, choices: list[str]):
         """Initialize choice validator.
 
         Args:
@@ -436,7 +427,7 @@ class ApprovalGate(BaseHITLGate):
         self,
         title: str,
         description: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         timeout_seconds: float = 300.0,
         fallback_strategy: Optional[FallbackStrategy] = None,
         show_details: bool = False,
@@ -467,7 +458,7 @@ class ApprovalGate(BaseHITLGate):
         self.show_details = show_details
         self.require_reason_on_reject = require_reason_on_reject
 
-    def with_context(self, context: Dict[str, Any]) -> "ApprovalGate":
+    def with_context(self, context: dict[str, Any]) -> "ApprovalGate":
         """Create a new gate with merged context."""
         return ApprovalGate(
             title=self.title,
@@ -505,7 +496,7 @@ class ApprovalGate(BaseHITLGate):
 
     async def execute(
         self,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         handler: Optional[Callable[..., Awaitable[HITLResponseProtocol]]] = None,
     ) -> ApprovalResponse:
         """Execute the approval gate.
@@ -566,7 +557,7 @@ class TextInputGate(BaseHITLGate):
         required: bool = True,
         min_length: int = 0,
         max_length: int = 10000,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         timeout_seconds: float = 300.0,
         fallback_strategy: Optional[FallbackStrategy] = None,
     ):
@@ -584,7 +575,7 @@ class TextInputGate(BaseHITLGate):
             timeout_seconds: Timeout in seconds
             fallback_strategy: Fallback strategy
         """
-        validators: List[InputValidationProtocol] = []
+        validators: list[InputValidationProtocol] = []
         if required:
             validators.append(RequiredValidator())
         if min_length > 0 or max_length < 10000:
@@ -608,7 +599,7 @@ class TextInputGate(BaseHITLGate):
         self._min_length = min_length
         self._max_length = max_length
 
-    def with_context(self, context: Dict[str, Any]) -> "TextInputGate":
+    def with_context(self, context: dict[str, Any]) -> "TextInputGate":
         """Create a new gate with merged context."""
         return TextInputGate(
             title=self.title,
@@ -655,7 +646,7 @@ class TextInputGate(BaseHITLGate):
 
     async def execute(
         self,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         handler: Optional[Callable[..., Awaitable[HITLResponseProtocol]]] = None,
     ) -> TextResponse:
         """Execute the text input gate.
@@ -720,10 +711,10 @@ class ChoiceInputGate(BaseHITLGate):
         self,
         title: str,
         prompt: str,
-        choices: List[str],
+        choices: list[str],
         default_index: int = 0,
         allow_multiple: bool = False,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         timeout_seconds: float = 300.0,
         fallback_strategy: Optional[FallbackStrategy] = None,
     ):
@@ -756,7 +747,7 @@ class ChoiceInputGate(BaseHITLGate):
         self.default_index = default_index
         self.allow_multiple = allow_multiple
 
-    def with_context(self, context: Dict[str, Any]) -> "ChoiceInputGate":
+    def with_context(self, context: dict[str, Any]) -> "ChoiceInputGate":
         """Create a new gate with merged context."""
         return ChoiceInputGate(
             title=self.title,
@@ -797,7 +788,7 @@ class ChoiceInputGate(BaseHITLGate):
 
     async def execute(
         self,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         handler: Optional[Callable[..., Awaitable[HITLResponseProtocol]]] = None,
     ) -> ChoiceResponse:
         """Execute the choice input gate.
@@ -864,7 +855,7 @@ class ConfirmationDialogGate(BaseHITLGate):
         title: str,
         prompt: str,
         default_approved: bool = False,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         timeout_seconds: float = 60.0,
     ):
         """Initialize confirmation dialog.
@@ -890,7 +881,7 @@ class ConfirmationDialogGate(BaseHITLGate):
 
     async def execute(
         self,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         handler: Optional[Callable[..., Awaitable[HITLResponseProtocol]]] = None,
     ) -> ApprovalResponse:
         """Execute the confirmation dialog.
@@ -948,7 +939,7 @@ class ReviewGate(BaseHITLGate):
         content: str,
         prompt: str = "Review the content below",
         allow_modifications: bool = True,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         timeout_seconds: float = 600.0,
         fallback_strategy: Optional[FallbackStrategy] = None,
     ):
@@ -978,7 +969,7 @@ class ReviewGate(BaseHITLGate):
 
     async def execute(
         self,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         handler: Optional[Callable[..., Awaitable[HITLResponseProtocol]]] = None,
     ) -> ReviewResponse:
         """Execute the review gate.

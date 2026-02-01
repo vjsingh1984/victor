@@ -39,7 +39,7 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 import yaml
 
@@ -102,10 +102,10 @@ class TeamMemberSpec:
     name: str
     goal: str
     backstory: str = ""
-    expertise: List[str] = field(default_factory=list)
+    expertise: list[str] = field(default_factory=list)
     personality: str = ""
     tool_budget: int = 15
-    allowed_tools: Optional[List[str]] = None
+    allowed_tools: Optional[list[str]] = None
     can_delegate: bool = False
     max_delegation_depth: int = 0
     memory: bool = False
@@ -136,7 +136,7 @@ class TeamMemberSpec:
         )
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TeamMemberSpec":
+    def from_dict(cls, data: dict[str, Any]) -> "TeamMemberSpec":
         """Create from dictionary.
 
         Args:
@@ -195,20 +195,20 @@ class TeamTemplate:
     display_name: str
     description: str
     formation: str
-    members: List[TeamMemberSpec]
+    members: list[TeamMemberSpec]
     version: str = "0.5.0"
     author: str = "Victor AI"
     vertical: str = "general"
     long_description: str = ""
-    use_cases: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    use_cases: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     complexity: str = "standard"
     max_iterations: int = 50
     total_tool_budget: int = 100
     timeout_seconds: int = 600
-    config: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    examples: List[Dict[str, Any]] = field(default_factory=list)
+    config: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    examples: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate template configuration."""
@@ -232,7 +232,7 @@ class TeamTemplate:
     def to_team_config(
         self,
         goal: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         **overrides: Any,
     ) -> TeamConfig:
         """Convert to executable TeamConfig.
@@ -299,7 +299,7 @@ class TeamTemplate:
             output_key=output_key or f"{node_id}_result",
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
 
         Returns:
@@ -345,7 +345,7 @@ class TeamTemplate:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TeamTemplate":
+    def from_dict(cls, data: dict[str, Any]) -> "TeamTemplate":
         """Create from dictionary.
 
         Args:
@@ -450,8 +450,8 @@ class TeamTemplateRegistry:
         if template_dir is None:
             template_dir = Path(__file__).parent / "templates"
         self._template_dir = Path(template_dir)
-        self._templates: Dict[str, TeamTemplate] = {}
-        self._manually_registered: Set[str] = set()
+        self._templates: dict[str, TeamTemplate] = {}
+        self._manually_registered: set[str] = set()
         self._loaded = False
 
     @classmethod
@@ -538,8 +538,8 @@ class TeamTemplateRegistry:
         vertical: Optional[str] = None,
         formation: Optional[str] = None,
         complexity: Optional[str] = None,
-        tags: Optional[Set[str]] = None,
-    ) -> List[str]:
+        tags: Optional[set[str]] = None,
+    ) -> list[str]:
         """List templates with optional filters.
 
         Args:
@@ -575,7 +575,7 @@ class TeamTemplateRegistry:
         query: str,
         vertical: Optional[str] = None,
         formation: Optional[str] = None,
-    ) -> List[TeamTemplate]:
+    ) -> list[TeamTemplate]:
         """Search templates by query string.
 
         Args:
@@ -618,7 +618,7 @@ class TeamTemplateRegistry:
 
         return results
 
-    def get_by_vertical(self, vertical: str) -> List[TeamTemplate]:
+    def get_by_vertical(self, vertical: str) -> list[TeamTemplate]:
         """Get all templates for a vertical.
 
         Args:
@@ -630,7 +630,7 @@ class TeamTemplateRegistry:
         self.load_templates()
         return [t for t in self._templates.values() if t.vertical == vertical]
 
-    def get_by_formation(self, formation: str) -> List[TeamTemplate]:
+    def get_by_formation(self, formation: str) -> list[TeamTemplate]:
         """Get all templates with a formation.
 
         Args:
@@ -670,7 +670,7 @@ class TeamTemplateRegistry:
         # Return first match or None
         return results[0] if results else None
 
-    def validate_template(self, template: TeamTemplate) -> List[str]:
+    def validate_template(self, template: TeamTemplate) -> list[str]:
         """Validate template configuration.
 
         Args:
@@ -776,7 +776,7 @@ def get_template(name: str) -> Optional[TeamTemplate]:
     return registry.get_template(name)
 
 
-def list_templates(**filters: Any) -> List[str]:
+def list_templates(**filters: Any) -> list[str]:
     """List templates with optional filters.
 
     Args:
@@ -793,7 +793,7 @@ def search_templates(
     query: str,
     vertical: Optional[str] = None,
     formation: Optional[str] = None,
-) -> List[TeamTemplate]:
+) -> list[TeamTemplate]:
     """Search templates.
 
     Args:

@@ -51,7 +51,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -123,12 +123,12 @@ class DashboardReport:
     """
 
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    circuit_breakers: Dict[str, CircuitBreakerMetrics] = field(default_factory=dict)
-    health: Dict[str, HealthMetrics] = field(default_factory=dict)
-    resilience: Dict[str, ResilienceMetrics] = field(default_factory=dict)
-    summary: Dict[str, Any] = field(default_factory=dict)
+    circuit_breakers: dict[str, CircuitBreakerMetrics] = field(default_factory=dict)
+    health: dict[str, HealthMetrics] = field(default_factory=dict)
+    resilience: dict[str, ResilienceMetrics] = field(default_factory=dict)
+    summary: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "timestamp": self.timestamp,
@@ -168,10 +168,10 @@ class ResilienceMetricsExporter:
 
     def __init__(self):
         """Initialize metrics exporter."""
-        self._circuit_breakers: Dict[str, Any] = {}
+        self._circuit_breakers: dict[str, Any] = {}
         self._health_checker: Optional[Any] = None
-        self._resilient_providers: Dict[str, Any] = {}
-        self._custom_metrics: Dict[str, Any] = {}
+        self._resilient_providers: dict[str, Any] = {}
+        self._custom_metrics: dict[str, Any] = {}
 
         logger.debug("ResilienceMetricsExporter initialized")
 
@@ -213,7 +213,7 @@ class ResilienceMetricsExporter:
         """
         self._custom_metrics[name] = value
 
-    def _collect_circuit_breaker_metrics(self) -> Dict[str, CircuitBreakerMetrics]:
+    def _collect_circuit_breaker_metrics(self) -> dict[str, CircuitBreakerMetrics]:
         """Collect metrics from all registered circuit breakers."""
         metrics = {}
 
@@ -250,9 +250,9 @@ class ResilienceMetricsExporter:
 
         return metrics
 
-    def _collect_health_metrics(self) -> Dict[str, HealthMetrics]:
+    def _collect_health_metrics(self) -> dict[str, HealthMetrics]:
         """Collect metrics from health checker."""
-        metrics: Dict[str, Any] = {}
+        metrics: dict[str, Any] = {}
 
         if not self._health_checker:
             return metrics
@@ -293,7 +293,7 @@ class ResilienceMetricsExporter:
 
         return metrics
 
-    def _collect_resilience_metrics(self) -> Dict[str, ResilienceMetrics]:
+    def _collect_resilience_metrics(self) -> dict[str, ResilienceMetrics]:
         """Collect metrics from resilient providers."""
         metrics = {}
 
@@ -340,10 +340,10 @@ class ResilienceMetricsExporter:
 
     def _generate_summary(
         self,
-        cb_metrics: Dict[str, CircuitBreakerMetrics],
-        health_metrics: Dict[str, HealthMetrics],
-        resilience_metrics: Dict[str, ResilienceMetrics],
-    ) -> Dict[str, Any]:
+        cb_metrics: dict[str, CircuitBreakerMetrics],
+        health_metrics: dict[str, HealthMetrics],
+        resilience_metrics: dict[str, ResilienceMetrics],
+    ) -> dict[str, Any]:
         """Generate summary statistics."""
         summary = {
             "total_providers": len(health_metrics) or len(resilience_metrics),

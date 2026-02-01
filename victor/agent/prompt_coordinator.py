@@ -48,21 +48,16 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 from victor.framework.prompt_builder import PromptBuilder
 
 if TYPE_CHECKING:
     from victor.agent.vertical_context import VerticalContext
-    from victor.core.verticals.protocols import PromptContributorProtocol
-    from victor.core.vertical_types import TaskTypeHint
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +82,7 @@ class TaskContext:
     stage: Optional[str] = None
     model: Optional[str] = None
     provider: Optional[str] = None
-    additional_context: Dict[str, Any] = field(default_factory=dict)
+    additional_context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -171,13 +166,13 @@ class PromptCoordinator:
         self._on_prompt_built = on_prompt_built
 
         # Custom task hints (override vertical hints)
-        self._task_hints: Dict[str, str] = {}
+        self._task_hints: dict[str, str] = {}
 
         # Additional sections added at runtime
-        self._additional_sections: Dict[str, str] = {}
+        self._additional_sections: dict[str, str] = {}
 
         # Safety rules
-        self._safety_rules: List[str] = []
+        self._safety_rules: list[str] = []
 
         logger.debug(
             f"PromptCoordinator initialized with grounding_mode={self._config.default_grounding_mode}"
@@ -429,7 +424,7 @@ class PromptCoordinator:
         """
         self._base_identity = identity
 
-    def get_all_task_hints(self) -> Dict[str, str]:
+    def get_all_task_hints(self) -> dict[str, str]:
         """Get all configured task hints.
 
         Returns:

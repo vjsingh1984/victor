@@ -28,7 +28,8 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.benchmark.assistant import BenchmarkVertical
 from victor.benchmark.task_bridge import (
@@ -74,7 +75,7 @@ class ExecutionTrace:
     tokens_output: int = 0
 
     # Execution metrics
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     turns: int = 0
 
     # Results
@@ -93,7 +94,7 @@ class ExecutionTrace:
             return self.end_time - self.start_time
         return time.time() - self.start_time
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "task_id": self.task_id,
@@ -332,7 +333,6 @@ class BenchmarkAgent:
             ExecutionTrace with metrics and generated code
         """
         from victor.benchmark.workflows import BenchmarkWorkflowProvider
-        from victor.workflows.streaming import WorkflowEventType
 
         trace = ExecutionTrace(task_id=task.task_id)
         self._current_trace = trace
@@ -360,7 +360,7 @@ class BenchmarkAgent:
 
             # Execute workflow with streaming for progress tracking
             # Uses the new UnifiedWorkflowCompiler-based streaming API
-            final_context: Dict[str, Any] = {}
+            final_context: dict[str, Any] = {}
             try:
 
                 async def execute_workflow() -> None:
@@ -453,7 +453,7 @@ class BenchmarkAgent:
         self,
         task: BenchmarkTask,
         workspace_path: Optional[Path] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build workflow context from benchmark task.
 
         Args:
@@ -463,7 +463,7 @@ class BenchmarkAgent:
         Returns:
             Context dict for workflow execution
         """
-        context: Dict[str, Any] = {
+        context: dict[str, Any] = {
             "task_id": task.task_id,
             "problem_id": task.task_id,
             "task_description": task.description or task.prompt,

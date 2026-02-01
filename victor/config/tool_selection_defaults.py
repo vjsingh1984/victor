@@ -39,7 +39,7 @@ Usage:
 """
 
 from dataclasses import dataclass
-from typing import Final, FrozenSet, List, Set
+from typing import Final
 
 
 # =============================================================================
@@ -217,7 +217,7 @@ class IdempotentTools:
     """
 
     # Frozen set of tool names that are idempotent
-    IDEMPOTENT_TOOLS: Final[FrozenSet[str]] = frozenset(
+    IDEMPOTENT_TOOLS: Final[frozenset[str]] = frozenset(
         {
             "read",
             "grep",

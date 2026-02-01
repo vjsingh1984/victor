@@ -40,7 +40,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 @dataclass
@@ -61,7 +61,7 @@ class SwitchResult:
     to_provider: str
     model: str | None = None
     error_message: str | None = None
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
@@ -82,7 +82,7 @@ class HealthStatus:
     latency_ms: float | None = None
     error_message: str | None = None
     last_check: str | None = None
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @runtime_checkable

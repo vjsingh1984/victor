@@ -10,8 +10,7 @@ import asyncio
 import io
 import logging
 import sys
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from rich.console import Console

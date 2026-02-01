@@ -18,8 +18,7 @@ Tests the conversation message management coordinator extracted from
 the monolithic orchestrator as part of Track 4 Phase 1 refactoring.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, call
+from unittest.mock import Mock
 
 from victor.agent.coordinators.conversation_coordinator import ConversationCoordinator
 

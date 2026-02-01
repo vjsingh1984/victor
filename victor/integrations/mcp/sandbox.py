@@ -24,13 +24,12 @@ import asyncio
 import logging
 import os
 import resource
-import signal
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +49,13 @@ class SandboxConfig:
     graceful_shutdown_seconds: float = 5.0  # Time to wait for graceful exit
 
     # Filesystem restrictions
-    allowed_paths: List[str] = field(default_factory=list)  # Writable paths
-    read_only_paths: List[str] = field(default_factory=list)  # Read-only paths
+    allowed_paths: list[str] = field(default_factory=list)  # Writable paths
+    read_only_paths: list[str] = field(default_factory=list)  # Read-only paths
     temp_dir: Optional[str] = None  # Custom temp directory
 
     # Network restrictions (Linux only)
     allow_network: bool = True  # Allow network access
-    allowed_hosts: List[str] = field(default_factory=list)  # Allowed hosts
+    allowed_hosts: list[str] = field(default_factory=list)  # Allowed hosts
 
     # Isolation level
     use_namespace: bool = False  # Use Linux namespaces (requires root)
@@ -121,7 +120,7 @@ def _drop_privileges() -> None:
             logger.warning(f"Failed to drop privileges: {e}")
 
 
-def _setup_sandbox_env(config: SandboxConfig) -> Dict[str, str]:
+def _setup_sandbox_env(config: SandboxConfig) -> dict[str, str]:
     """Set up sandboxed environment variables.
 
     Args:
@@ -180,7 +179,7 @@ class SandboxedProcess:
             config: Sandbox configuration
         """
         self.config = config or SandboxConfig()
-        self._processes: Dict[int, subprocess.Popen[str]] = {}
+        self._processes: dict[int, subprocess.Popen[str]] = {}
 
     def _create_preexec_fn(self) -> Callable[[], None]:
         """Create preexec function for subprocess.
@@ -205,9 +204,9 @@ class SandboxedProcess:
 
     async def start(
         self,
-        command: List[str],
+        command: list[str],
         cwd: Optional[str] = None,
-        env: Optional[Dict[str, str]] = None,
+        env: Optional[dict[str, str]] = None,
     ) -> subprocess.Popen[str]:
         """Start a sandboxed subprocess.
 
@@ -259,9 +258,9 @@ class SandboxedProcess:
 
     async def _start_basic(
         self,
-        command: List[str],
+        command: list[str],
         cwd: Optional[str],
-        env: Dict[str, str],
+        env: dict[str, str],
     ) -> subprocess.Popen[str]:
         """Start process with basic resource limits.
 
@@ -287,9 +286,9 @@ class SandboxedProcess:
 
     async def _start_macos(
         self,
-        command: List[str],
+        command: list[str],
         cwd: Optional[str],
-        env: Dict[str, str],
+        env: dict[str, str],
     ) -> subprocess.Popen[str]:
         """Start process with macOS sandbox-exec.
 
@@ -331,9 +330,9 @@ class SandboxedProcess:
 
     async def _start_linux(
         self,
-        command: List[str],
+        command: list[str],
         cwd: Optional[str],
-        env: Dict[str, str],
+        env: dict[str, str],
     ) -> subprocess.Popen[str]:
         """Start process with Linux sandboxing.
 
@@ -483,7 +482,7 @@ class SandboxedProcess:
             if process:
                 await self.terminate(process)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get sandbox statistics.
 
         Returns:
@@ -525,7 +524,7 @@ def create_sandboxed_mcp_client(
             # Override process type to match our sandbox (uses text=True)
             self.process: Optional[subprocess.Popen[str]] = None
 
-        async def connect(self, command: List[str]) -> bool:
+        async def connect(self, command: list[str]) -> bool:
             """Connect using sandboxed process."""
             self._command = command
 

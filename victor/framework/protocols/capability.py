@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 class CapabilityType(str, Enum):
@@ -171,7 +171,7 @@ class CapabilityRegistryProtocol(Protocol):
             orch.invoke_capability("enabled_tools", tools, min_version="1.1")
     """
 
-    def get_capabilities(self) -> Dict[str, OrchestratorCapability]:
+    def get_capabilities(self) -> dict[str, OrchestratorCapability]:
         """Get all registered capabilities.
 
         Returns:
@@ -259,7 +259,7 @@ class CapabilityRegistryProtocol(Protocol):
 
     def get_capabilities_by_type(
         self, capability_type: CapabilityType
-    ) -> Dict[str, OrchestratorCapability]:
+    ) -> dict[str, OrchestratorCapability]:
         """Get all capabilities of a specific type.
 
         Args:

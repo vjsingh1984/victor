@@ -36,10 +36,10 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.native.protocols import NativeSymbol, SymbolType
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class AstQueryResult:
         duration_ms: Query execution time in milliseconds
     """
 
-    captures: List[Dict[str, Any]]
+    captures: list[dict[str, Any]]
     matches: int
     duration_ms: float
 
@@ -113,7 +113,7 @@ class ParseStats:
         """Cache hit rate as a percentage."""
         return (self.cache_hits / self.total_parses * 100) if self.total_parses > 0 else 0.0
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         """Convert to dictionary for serialization."""
         return {
             "total_parses": float(self.total_parses),
@@ -245,8 +245,8 @@ class AstProcessorAccelerator:
     def _init_python_fallback(self) -> None:
         """Initialize Python tree-sitter fallback."""
         logger.warning("Using Python fallback for AST processing")
-        self._cache: Dict[str, Any] = {}
-        self._parsers: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
+        self._parsers: dict[str, Any] = {}
 
     @property
     def rust_available(self) -> bool:
@@ -501,8 +501,8 @@ class AstProcessorAccelerator:
     def extract_symbols(
         self,
         ast: Any,
-        symbol_types: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        symbol_types: Optional[list[str]] = None,
+    ) -> list[dict[str, Any]]:
         """Extract symbols from AST.
 
         Args:
@@ -583,9 +583,9 @@ class AstProcessorAccelerator:
 
     def extract_symbols_parallel(
         self,
-        files: List[Tuple[str, str]],  # (language, source_code)
-        symbol_types: Optional[List[str]] = None,
-    ) -> Dict[int, List[Dict[str, Any]]]:
+        files: list[tuple[str, str]],  # (language, source_code)
+        symbol_types: Optional[list[str]] = None,
+    ) -> dict[int, list[dict[str, Any]]]:
         """Extract symbols from multiple files in parallel.
 
         Args:
@@ -632,9 +632,9 @@ class AstProcessorAccelerator:
 
     def _python_extract_symbols_sequential(
         self,
-        files: List[Tuple[str, str]],
-        symbol_types: Optional[List[str]] = None,
-    ) -> Dict[int, List[Dict[str, Any]]]:
+        files: list[tuple[str, str]],
+        symbol_types: Optional[list[str]] = None,
+    ) -> dict[int, list[dict[str, Any]]]:
         """Python fallback for sequential symbol extraction."""
         results = {}
         for idx, (language, source) in enumerate(files):
@@ -647,7 +647,7 @@ class AstProcessorAccelerator:
                 results[idx] = []
         return results
 
-    def get_supported_languages(self) -> List[str]:
+    def get_supported_languages(self) -> list[str]:
         """Get list of supported programming languages.
 
         Returns:
@@ -660,7 +660,7 @@ class AstProcessorAccelerator:
         return list(self._LANGUAGE_MAP.keys())
 
     @property
-    def cache_stats(self) -> Dict[str, Any]:
+    def cache_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:
@@ -683,7 +683,7 @@ class AstProcessorAccelerator:
             }
 
     @property
-    def parse_stats(self) -> Dict[str, float]:
+    def parse_stats(self) -> dict[str, float]:
         """Get parse operation statistics.
 
         Returns:

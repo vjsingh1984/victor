@@ -47,7 +47,7 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 import yaml
 
@@ -88,19 +88,19 @@ class VerticalRLConfig(BaseRLConfig):
     """
 
     # Coding-specific: tools that conflict
-    conflicting_tools: Dict[str, set] = field(default_factory=dict)
+    conflicting_tools: dict[str, set] = field(default_factory=dict)
 
     # DataAnalysis-specific: output length preferences
-    preferred_output_length: Dict[str, str] = field(default_factory=dict)
+    preferred_output_length: dict[str, str] = field(default_factory=dict)
 
     # Research-specific: provider preferences
-    preferred_providers_by_task: Dict[str, List[str]] = field(default_factory=dict)
+    preferred_providers_by_task: dict[str, list[str]] = field(default_factory=dict)
 
     def get_preferred_output_length(self, task_type: str) -> str:
         """Get preferred output length for task type (DataAnalysis)."""
         return self.preferred_output_length.get(task_type.lower(), "medium")
 
-    def get_preferred_providers(self, task_type: str) -> List[str]:
+    def get_preferred_providers(self, task_type: str) -> list[str]:
         """Get preferred providers for task type (Research)."""
         return self.preferred_providers_by_task.get(
             task_type.lower(),
@@ -128,10 +128,10 @@ class RLConfigFactory:
         config = RLConfigFactory.create_from_yaml(Path("my_rl.yaml"), "custom")
     """
 
-    _cache: Dict[str, BaseRLConfig] = {}
+    _cache: dict[str, BaseRLConfig] = {}
     _lock = threading.Lock()
     _configs_loaded: bool = False
-    _yaml_configs: Dict[str, Dict[str, Any]] = {}
+    _yaml_configs: dict[str, dict[str, Any]] = {}
 
     @classmethod
     def create(cls, vertical: str) -> BaseRLConfig:
@@ -228,13 +228,13 @@ class RLConfigFactory:
         return cls._builtin_config(vertical)
 
     @classmethod
-    def _config_from_dict(cls, data: Dict[str, Any]) -> BaseRLConfig:
+    def _config_from_dict(cls, data: dict[str, Any]) -> BaseRLConfig:
         """Create config from dictionary data."""
         if not data:
             return BaseRLConfig()
 
         # Parse active learners
-        active_learners: List[LearnerType] = []
+        active_learners: list[LearnerType] = []
         for learner_str in data.get("active_learners", []):
             learner = _learner_type_from_str(learner_str)
             if learner:
@@ -498,8 +498,8 @@ class GenericRLHooks:
     def get_tool_recommendation(
         self,
         task_type: str,
-        available_tools: Optional[List[str]] = None,
-    ) -> List[str]:
+        available_tools: Optional[list[str]] = None,
+    ) -> list[str]:
         """Get tool recommendations for a task type.
 
         Args:

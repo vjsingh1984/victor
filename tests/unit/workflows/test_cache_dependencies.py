@@ -3,10 +3,9 @@
 """Tests for DependencyGraph and CascadingInvalidator."""
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Optional
 from unittest.mock import MagicMock
 
-import pytest
 
 from victor.workflows.cache import (
     DependencyGraph,
@@ -21,15 +20,15 @@ class MockNode:
     """Mock workflow node for testing."""
 
     id: str
-    next_nodes: Optional[List[str]] = None
-    branches: Optional[Dict[str, str]] = None
+    next_nodes: Optional[list[str]] = None
+    branches: Optional[dict[str, str]] = None
 
 
 @dataclass
 class MockWorkflow:
     """Mock workflow definition for testing."""
 
-    nodes: Dict[str, MockNode]
+    nodes: dict[str, MockNode]
 
 
 class TestDependencyGraph:

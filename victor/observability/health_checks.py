@@ -34,9 +34,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Optional
+from collections.abc import Callable
 
-from victor.core.health import HealthStatus, ComponentHealth, HealthChecker
+from victor.core.health import HealthStatus, ComponentHealth
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +59,10 @@ class HealthIssue:
     severity: SeverityLevel
     message: str
     timestamp: datetime
-    details: Optional[Dict[str, Any]] = None
+    details: Optional[dict[str, Any]] = None
     suggestion: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "component": self.component,
@@ -282,7 +283,7 @@ class PerformanceHealthCheck(HealthCheck):
         latency_threshold_ms: float = 1000.0,
         error_rate_threshold: float = 0.05,
         throughput_threshold: float = 1.0,
-        metrics_provider: Optional[Callable[[], Dict[str, Any]]] = None,
+        metrics_provider: Optional[Callable[[], dict[str, Any]]] = None,
         critical: bool = True,
     ) -> None:
         """Initialize performance health check.
@@ -411,9 +412,9 @@ class DegradationDetector:
     def check_for_degradation(
         self,
         feature_name: str,
-        current_metrics: Dict[str, float],
-        historical_metrics: List[Dict[str, float]],
-    ) -> List[HealthIssue]:
+        current_metrics: dict[str, float],
+        historical_metrics: list[dict[str, float]],
+    ) -> list[HealthIssue]:
         """Check for performance degradation.
 
         Args:
@@ -541,7 +542,7 @@ class FeatureHealthChecker:
 
     def __init__(self) -> None:
         """Initialize feature health checker."""
-        self._health_checks: List[HealthCheck] = []
+        self._health_checks: list[HealthCheck] = []
         self._degradation_detector = DegradationDetector()
 
     def add_resource_check(
@@ -598,7 +599,7 @@ class FeatureHealthChecker:
         latency_threshold_ms: float = 1000.0,
         error_rate_threshold: float = 0.05,
         throughput_threshold: float = 1.0,
-        metrics_provider: Optional[Callable[[], Dict[str, Any]]] = None,
+        metrics_provider: Optional[Callable[[], dict[str, Any]]] = None,
         critical: bool = True,
     ) -> None:
         """Add performance health check.
@@ -622,7 +623,7 @@ class FeatureHealthChecker:
             )
         )
 
-    async def check_all(self) -> List[ComponentHealth]:
+    async def check_all(self) -> list[ComponentHealth]:
         """Run all health checks.
 
         Returns:
@@ -650,9 +651,9 @@ class FeatureHealthChecker:
     async def check_feature_degradation(
         self,
         feature_name: str,
-        current_metrics: Dict[str, float],
-        historical_metrics: List[Dict[str, float]],
-    ) -> List[HealthIssue]:
+        current_metrics: dict[str, float],
+        historical_metrics: list[dict[str, float]],
+    ) -> list[HealthIssue]:
         """Check for feature performance degradation.
 
         Args:

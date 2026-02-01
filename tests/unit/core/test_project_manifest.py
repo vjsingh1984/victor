@@ -15,7 +15,6 @@
 """Tests for project_manifest module - achieving 70%+ coverage."""
 
 import json
-import os
 import pytest
 import tempfile
 from pathlib import Path

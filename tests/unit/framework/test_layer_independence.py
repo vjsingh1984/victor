@@ -46,10 +46,7 @@ Success Criteria:
 from __future__ import annotations
 
 import ast
-import importlib
-import sys
 from pathlib import Path
-from typing import Dict, List, Set
 
 import pytest
 
@@ -59,7 +56,7 @@ import pytest
 # =============================================================================
 
 
-def get_imports_from_file(file_path: Path) -> Dict[str, List[str]]:
+def get_imports_from_file(file_path: Path) -> dict[str, list[str]]:
     """Extract all imports from a Python file.
 
     Args:
@@ -88,7 +85,7 @@ def get_imports_from_file(file_path: Path) -> Dict[str, List[str]]:
     return imports
 
 
-def get_framework_files() -> List[Path]:
+def get_framework_files() -> list[Path]:
     """Get all Python files in the framework layer.
 
     Returns:
@@ -197,7 +194,7 @@ class TestFrameworkLayerIndependence:
     """Verify framework doesn't import types from agent layer."""
 
     @pytest.fixture
-    def framework_imports(self) -> Dict[str, Dict[str, List[str]]]:
+    def framework_imports(self) -> dict[str, dict[str, list[str]]]:
         """Get all imports from framework files.
 
         Returns:
@@ -328,12 +325,6 @@ class TestProtocolUsage:
     def test_framework_can_use_integration_protocols(self):
         """Framework should be able to use integration protocols."""
         from victor.protocols.integration import (
-            IConversationStateManager,
-            IOrchestratorBridge,
-            IProviderAccess,
-            ISubAgentCoordinator,
-            IToolAccessProvider,
-            IVerticalContextProvider,
             adapt_to_conversation_state_manager,
             adapt_to_subagent_coordinator,
             adapt_to_vertical_context_provider,
@@ -348,10 +339,7 @@ class TestProtocolUsage:
         """Integration protocols should define all required interfaces."""
         from victor.protocols.integration import (
             IConversationStateManager,
-            IOrchestratorBridge,
-            IProviderAccess,
             ISubAgentCoordinator,
-            IToolAccessProvider,
             IVerticalContextProvider,
         )
 
@@ -495,7 +483,6 @@ class TestLayerBoundaries:
     def test_framework_does_not_redefine_core_types(self):
         """Framework should not redefine types that exist in core."""
         import victor.framework.state as framework_state
-        import victor.framework.teams as framework_teams
 
         # Framework should use aliases, not redefine
         # Check that Stage is an alias, not a new class definition
@@ -624,8 +611,6 @@ class TestLayerIndependenceSummary:
         """
         # Import core types
         from victor.core.state import ConversationStage
-        from victor.core.teams import SubAgentRole
-        from victor.core.verticals.context import VerticalContext
 
         # Import integration protocols
         from victor.protocols.integration import (

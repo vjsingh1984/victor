@@ -22,7 +22,7 @@ import asyncio
 import json
 import sys
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -38,7 +38,6 @@ from victor.integrations.mcp.protocol import (
     MCPResourceContent,
     MCPServerInfo,
     MCPTool,
-    MCPToolCallResult,
 )
 from victor.tools.base import BaseTool, ToolParameter
 from victor.tools.registry import ToolRegistry
@@ -80,7 +79,7 @@ class MCPServer:
         )
 
         self.initialized = False
-        self.resources: List[MCPResource] = []
+        self.resources: list[MCPResource] = []
         self._running = False  # For graceful shutdown of stdio server
         self._reader: Optional[asyncio.StreamReader] = None
         self._writer_transport: Optional[asyncio.WriteTransport] = None
@@ -105,7 +104,7 @@ class MCPServer:
         mcp_params = []
 
         # Handle both formats: List[ToolParameter] and Dict (JSON Schema)
-        tool_params: List[ToolParameter] = []
+        tool_params: list[ToolParameter] = []
 
         if isinstance(tool.parameters, dict):
             # JSON Schema format: convert to list
@@ -153,7 +152,7 @@ class MCPServer:
             parameters=mcp_params,
         )
 
-    async def handle_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_message(self, message: dict[str, Any]) -> dict[str, Any]:
         """Handle incoming MCP message.
 
         Args:
@@ -190,7 +189,7 @@ class MCPServer:
         except Exception as e:
             return self._create_error(None, -32700, f"Parse error: {str(e)}")
 
-    async def _handle_initialize(self, msg_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_initialize(self, msg_id: str, params: dict[str, Any]) -> dict[str, Any]:
         """Handle initialize request.
 
         Args:
@@ -211,7 +210,7 @@ class MCPServer:
             },
         )
 
-    async def _handle_list_tools(self, msg_id: str) -> Dict[str, Any]:
+    async def _handle_list_tools(self, msg_id: str) -> dict[str, Any]:
         """Handle list tools request.
 
         Args:
@@ -230,7 +229,7 @@ class MCPServer:
 
         return self._create_response(msg_id, {"tools": tools})
 
-    async def _handle_call_tool(self, msg_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_call_tool(self, msg_id: str, params: dict[str, Any]) -> dict[str, Any]:
         """Handle call tool request.
 
         Args:
@@ -251,7 +250,7 @@ class MCPServer:
 
         try:
             # Create minimal context for tool execution
-            context: Dict[str, Any] = {}
+            context: dict[str, Any] = {}
             result = await self.tool_registry.execute(tool_name, context, **tool_args)
 
             # Return standard MCP format per modelcontextprotocol.io specification:
@@ -274,7 +273,7 @@ class MCPServer:
         except Exception as e:
             return self._create_error(msg_id, -32603, f"Tool execution error: {str(e)}")
 
-    async def _handle_list_resources(self, msg_id: str) -> Dict[str, Any]:
+    async def _handle_list_resources(self, msg_id: str) -> dict[str, Any]:
         """Handle list resources request.
 
         Args:
@@ -289,7 +288,7 @@ class MCPServer:
         resources = [r.model_dump() for r in self.resources]
         return self._create_response(msg_id, {"resources": resources})
 
-    async def _handle_read_resource(self, msg_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_read_resource(self, msg_id: str, params: dict[str, Any]) -> dict[str, Any]:
         """Handle read resource request.
 
         Args:
@@ -339,7 +338,7 @@ class MCPServer:
 
         return self._create_error(msg_id, -32001, "Resource type not supported")
 
-    def _create_response(self, msg_id: str, result: Any) -> Dict[str, Any]:
+    def _create_response(self, msg_id: str, result: Any) -> dict[str, Any]:
         """Create success response.
 
         Args:
@@ -351,7 +350,7 @@ class MCPServer:
         """
         return {"jsonrpc": "2.0", "id": msg_id, "result": result}
 
-    def _create_error(self, msg_id: Optional[str], code: int, message: str) -> Dict[str, Any]:
+    def _create_error(self, msg_id: Optional[str], code: int, message: str) -> dict[str, Any]:
         """Create error response.
 
         Args:
@@ -370,7 +369,7 @@ class MCPServer:
 
     async def _setup_async_stdio(
         self,
-    ) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+    ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         """Set up async stdin/stdout streams.
 
         Returns:
@@ -406,7 +405,7 @@ class MCPServer:
 
         return reader, writer
 
-    async def _write_response(self, writer: asyncio.StreamWriter, response: Dict[str, Any]) -> None:
+    async def _write_response(self, writer: asyncio.StreamWriter, response: dict[str, Any]) -> None:
         """Write a JSON response to the output stream.
 
         Args:
@@ -550,7 +549,7 @@ class MCPServer:
         self._running = False
         self._cleanup_stdio()
 
-    def get_server_info(self) -> Dict[str, Any]:
+    def get_server_info(self) -> dict[str, Any]:
         """Get server information.
 
         Returns:
@@ -564,7 +563,7 @@ class MCPServer:
             "resources_count": len(self.resources),
         }
 
-    def get_tool_definitions(self) -> List[Dict[str, Any]]:
+    def get_tool_definitions(self) -> list[dict[str, Any]]:
         """Get all tool definitions in MCP format.
 
         Returns:

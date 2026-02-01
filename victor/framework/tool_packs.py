@@ -42,7 +42,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Union, cast
+from typing import Any, Optional, cast
 
 logger = logging.getLogger(__name__)
 
@@ -69,11 +69,11 @@ class ToolPack:
     """
 
     name: str
-    tools: List[str] = field(default_factory=list)
+    tools: list[str] = field(default_factory=list)
     description: str = ""
     extends: Optional[str] = None
-    excludes: List[str] = field(default_factory=list)
-    metadata: Dict[str, object] = field(default_factory=dict)
+    excludes: list[str] = field(default_factory=list)
+    metadata: dict[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate tool pack configuration."""
@@ -98,7 +98,7 @@ class ToolPackRegistry:
     """
 
     def __init__(self) -> None:
-        self._packs: Dict[str, ToolPack] = {}
+        self._packs: dict[str, ToolPack] = {}
 
     def register(self, pack: ToolPack) -> None:
         """Register a tool pack.
@@ -130,7 +130,7 @@ class ToolPackRegistry:
         self,
         name: str,
         include_metadata: bool = False,
-    ) -> Union[List[str], Dict[str, Any]]:
+    ) -> list[str] | dict[str, Any]:
         """Resolve tool pack with all inherited tools.
 
         Args:
@@ -149,11 +149,11 @@ class ToolPackRegistry:
                 f"ToolPack '{name}' not found. " f"Available: {available if available else 'none'}"
             )
 
-        tools: List[str] = []  # Use list to preserve order
-        seen: Set[str] = set()  # Track seen tools to avoid duplicates
-        excluded_global: Set[str] = set()  # Track tools excluded by any pack
-        visited: Set[str] = set()
-        metadata: Dict[str, object] = {}
+        tools: list[str] = []  # Use list to preserve order
+        seen: set[str] = set()  # Track seen tools to avoid duplicates
+        excluded_global: set[str] = set()  # Track tools excluded by any pack
+        visited: set[str] = set()
+        metadata: dict[str, object] = {}
 
         def _resolve_pack(pack_name: str) -> None:
             """Recursively resolve pack and its parents."""
@@ -197,7 +197,7 @@ class ToolPackRegistry:
 
         return final_tools
 
-    def list_packs(self) -> List[str]:
+    def list_packs(self) -> list[str]:
         """List all registered pack names.
 
         Returns:
@@ -205,13 +205,13 @@ class ToolPackRegistry:
         """
         return list(self._packs.keys())
 
-    def get_dependency_graph(self) -> Dict[str, List[str]]:
+    def get_dependency_graph(self) -> dict[str, list[str]]:
         """Get dependency graph of all packs.
 
         Returns:
             Dict mapping pack name to list of packs that extend it
         """
-        graph: Dict[str, List[str]] = {}
+        graph: dict[str, list[str]] = {}
 
         for pack_name, pack in self._packs.items():
             if pack.extends:
@@ -429,7 +429,7 @@ def register_default_packs(registry: Optional[ToolPackRegistry] = None) -> None:
 def resolve_tool_pack(
     name: str,
     registry: Optional[ToolPackRegistry] = None,
-) -> List[str]:
+) -> list[str]:
     """Resolve tool pack to list of tool names.
 
     This is the primary convenience function for verticals to use.
@@ -461,8 +461,8 @@ def resolve_tool_pack(
 def create_custom_pack(
     name: str,
     extends: str,
-    additional_tools: List[str],
-    excludes: Optional[List[str]] = None,
+    additional_tools: list[str],
+    excludes: Optional[list[str]] = None,
     description: Optional[str] = None,
 ) -> ToolPack:
     """Create a custom tool pack extending a base pack.

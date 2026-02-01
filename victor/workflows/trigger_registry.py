@@ -51,7 +51,7 @@ import logging
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ class WorkflowTrigger:
     pattern: str
     workflow_name: str
     vertical: str
-    task_types: List[str] = field(default_factory=list)
+    task_types: list[str] = field(default_factory=list)
     priority: int = 0
     description: str = ""
 
@@ -144,9 +144,9 @@ class WorkflowTriggerRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._triggers: List[WorkflowTrigger] = []
-        self._by_vertical: Dict[str, List[WorkflowTrigger]] = {}
-        self._by_task_type: Dict[str, List[WorkflowTrigger]] = {}
+        self._triggers: list[WorkflowTrigger] = []
+        self._by_vertical: dict[str, list[WorkflowTrigger]] = {}
+        self._by_task_type: dict[str, list[WorkflowTrigger]] = {}
         self._lock = threading.RLock()
 
     def register(self, trigger: WorkflowTrigger) -> None:
@@ -177,7 +177,7 @@ class WorkflowTriggerRegistry:
     def register_from_vertical(
         self,
         vertical: str,
-        triggers: List[Tuple[str, str]],
+        triggers: list[tuple[str, str]],
     ) -> int:
         """Register triggers from a vertical's get_auto_workflows() output.
 
@@ -209,7 +209,7 @@ class WorkflowTriggerRegistry:
         self,
         query: str,
         preferred_vertical: Optional[str] = None,
-    ) -> Optional[Tuple[str, str]]:
+    ) -> Optional[tuple[str, str]]:
         """Find a workflow matching a query.
 
         Searches all registered triggers for a pattern match.
@@ -241,7 +241,7 @@ class WorkflowTriggerRegistry:
         self,
         task_type: str,
         preferred_vertical: Optional[str] = None,
-    ) -> Optional[Tuple[str, str]]:
+    ) -> Optional[tuple[str, str]]:
         """Find a workflow by task type.
 
         Args:
@@ -272,7 +272,7 @@ class WorkflowTriggerRegistry:
 
             return None
 
-    def get_triggers_for_vertical(self, vertical: str) -> List[WorkflowTrigger]:
+    def get_triggers_for_vertical(self, vertical: str) -> list[WorkflowTrigger]:
         """Get all triggers for a vertical.
 
         Args:
@@ -284,7 +284,7 @@ class WorkflowTriggerRegistry:
         with self._lock:
             return list(self._by_vertical.get(vertical, []))
 
-    def list_verticals(self) -> List[str]:
+    def list_verticals(self) -> list[str]:
         """List all verticals with registered triggers.
 
         Returns:
@@ -293,7 +293,7 @@ class WorkflowTriggerRegistry:
         with self._lock:
             return list(self._by_vertical.keys())
 
-    def list_task_types(self) -> List[str]:
+    def list_task_types(self) -> list[str]:
         """List all registered task types.
 
         Returns:
@@ -310,7 +310,7 @@ class WorkflowTriggerRegistry:
             self._by_task_type.clear()
             logger.debug("Cleared workflow trigger registry")
 
-    def to_auto_workflows(self, vertical: str) -> List[Tuple[str, str]]:
+    def to_auto_workflows(self, vertical: str) -> list[tuple[str, str]]:
         """Get triggers in get_auto_workflows() format.
 
         This provides backward compatibility for verticals that
@@ -366,7 +366,7 @@ def register_trigger(trigger: WorkflowTrigger) -> None:
 def find_workflow_for_query(
     query: str,
     preferred_vertical: Optional[str] = None,
-) -> Optional[Tuple[str, str]]:
+) -> Optional[tuple[str, str]]:
     """Find a workflow for a query.
 
     Convenience function that delegates to the registry.

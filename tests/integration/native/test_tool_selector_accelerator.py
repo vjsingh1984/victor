@@ -18,9 +18,7 @@ Tests the Rust-backed tool selection accelerator with comprehensive
 coverage of all operations, error handling, and fallback behavior.
 """
 
-import math
 import random
-from typing import List
 
 import numpy as np
 import pytest
@@ -55,21 +53,21 @@ def reset_accelerator():
 
 
 @pytest.fixture
-def query_embedding() -> List[float]:
+def query_embedding() -> list[float]:
     """Sample query embedding (384 dimensions)."""
     random.seed(42)
     return [random.random() for _ in range(384)]
 
 
 @pytest.fixture
-def tool_embeddings() -> List[List[float]]:
+def tool_embeddings() -> list[list[float]]:
     """Sample tool embeddings (100 tools, 384 dimensions each)."""
     random.seed(43)
     return [[random.random() for _ in range(384)] for _ in range(100)]
 
 
 @pytest.fixture
-def tool_names() -> List[str]:
+def tool_names() -> list[str]:
     """Sample tool names."""
     return [
         "read_file",

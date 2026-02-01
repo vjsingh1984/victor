@@ -49,7 +49,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.evaluation.agent_adapter import AdapterConfig, VictorAgentAdapter
 from victor.evaluation.agentic_harness import AgenticExecutionTrace

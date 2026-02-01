@@ -18,7 +18,7 @@ This protocol defines the interface for coordinating tool call operations,
 including validation, parsing, execution, and retry logic.
 """
 
-from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
+from typing import Any, Optional, Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.tool_calling.base import ToolCall
@@ -65,7 +65,7 @@ class ToolCallResult:
     def __init__(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         output: Any,
         error: Optional[str] = None,
         duration_ms: float = 0.0,
@@ -78,7 +78,7 @@ class ToolCallResult:
         self.duration_ms = duration_ms
         self.success = success
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary format."""
         return {
             "tool_name": self.tool_name,
@@ -116,9 +116,9 @@ class IToolCallCoordinator(Protocol):
 
     async def handle_tool_calls(
         self,
-        tool_calls: List["ToolCall"],
+        tool_calls: list["ToolCall"],
         context: ToolCallContext,
-    ) -> List[ToolCallResult]:
+    ) -> list[ToolCallResult]:
         """Handle multiple tool calls with validation, execution, and retry.
 
         Args:
@@ -137,7 +137,7 @@ class IToolCallCoordinator(Protocol):
     async def execute_tool_with_retry(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         context: ToolCallContext,
     ) -> ToolCallResult:
         """Execute a single tool with retry logic.
@@ -160,8 +160,8 @@ class IToolCallCoordinator(Protocol):
 
     def parse_tool_calls(
         self,
-        raw_calls: List[Dict[str, Any]],
-    ) -> List["ToolCall"]:
+        raw_calls: list[dict[str, Any]],
+    ) -> list["ToolCall"]:
         """Parse raw tool calls from LLM response.
 
         Normalizes tool call format across different providers and handles
@@ -180,9 +180,9 @@ class IToolCallCoordinator(Protocol):
 
     def validate_tool_calls(
         self,
-        tool_calls: List["ToolCall"],
+        tool_calls: list["ToolCall"],
         context: ToolCallContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """Validate tool calls against budget and constraints.
 
         Checks:
@@ -206,7 +206,7 @@ class IToolCallCoordinator(Protocol):
     def format_tool_output(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         output: Any,
     ) -> str:
         """Format tool output for inclusion in LLM context.

@@ -70,7 +70,6 @@ INTERNAL CODE POLICY:
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, FrozenSet, Optional, Set
 
 
 @dataclass(frozen=True)
@@ -84,10 +83,10 @@ class ToolNameEntry:
     """
 
     canonical: str
-    aliases: FrozenSet[str] = field(default_factory=frozenset)
-    deprecated: FrozenSet[str] = field(default_factory=frozenset)
+    aliases: frozenset[str] = field(default_factory=frozenset)
+    deprecated: frozenset[str] = field(default_factory=frozenset)
 
-    def all_names(self) -> Set[str]:
+    def all_names(self) -> set[str]:
         """Return all valid names (canonical + aliases)."""
         return {self.canonical} | set(self.aliases)
 
@@ -207,7 +206,7 @@ class ToolNames:
 # =============================================================================
 # ALIAS REGISTRY: Maps legacy names to canonical names
 # =============================================================================
-TOOL_ALIASES: Dict[str, str] = {
+TOOL_ALIASES: dict[str, str] = {
     # Filesystem
     "read_file": ToolNames.READ,
     "write_file": ToolNames.WRITE,
@@ -276,7 +275,7 @@ TOOL_ALIASES: Dict[str, str] = {
 }
 
 # Build reverse lookup: canonical → set of aliases
-CANONICAL_TO_ALIASES: Dict[str, Set[str]] = {}
+CANONICAL_TO_ALIASES: dict[str, set[str]] = {}
 for alias, canonical in TOOL_ALIASES.items():
     if canonical not in CANONICAL_TO_ALIASES:
         CANONICAL_TO_ALIASES[canonical] = set()
@@ -301,7 +300,7 @@ def get_canonical_name(name: str) -> str:
     return TOOL_ALIASES.get(name, name)
 
 
-def get_aliases(canonical_name: str) -> Set[str]:
+def get_aliases(canonical_name: str) -> set[str]:
     """Get all aliases for a canonical tool name.
 
     Args:
@@ -329,7 +328,7 @@ def is_valid_tool_name(name: str) -> bool:
     return name in CANONICAL_TO_ALIASES or hasattr(ToolNames, name.upper())
 
 
-def get_all_canonical_names() -> Set[str]:
+def get_all_canonical_names() -> set[str]:
     """Get all canonical tool names.
 
     Returns:
@@ -342,7 +341,7 @@ def get_all_canonical_names() -> Set[str]:
     }
 
 
-def get_name_mapping() -> Dict[str, str]:
+def get_name_mapping() -> dict[str, str]:
     """Get full mapping of all names (canonical + aliases) to canonical.
 
     Returns:

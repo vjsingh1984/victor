@@ -66,13 +66,13 @@ class ResearchRoleConfig:
     """
 
     base_role: str
-    tools: List[str]
+    tools: list[str]
     tool_budget: int
     description: str = ""
 
 
 # Research-specific roles with tool allocations
-RESEARCH_ROLES: Dict[str, ResearchRoleConfig] = {
+RESEARCH_ROLES: dict[str, ResearchRoleConfig] = {
     "primary_researcher": ResearchRoleConfig(
         base_role="researcher",
         tools=[
@@ -159,7 +159,7 @@ class ResearchTeamSpec:
     name: str
     description: str
     formation: TeamFormation
-    members: List[TeamMemberSpec]
+    members: list[TeamMemberSpec]
     total_tool_budget: int = 100
     max_iterations: int = 50
 
@@ -190,7 +190,7 @@ class ResearchTeamSpec:
 
 
 # Pre-defined team specifications with rich personas
-RESEARCH_TEAM_SPECS: Dict[str, TeamSpec] = {
+RESEARCH_TEAM_SPECS: dict[str, TeamSpec] = {
     "deep_research_team": TeamSpec(
         name="Deep Research Team",
         description="Comprehensive multi-source research with verification and synthesis",
@@ -636,7 +636,7 @@ def get_role_config(role_name: str) -> Optional[ResearchRoleConfig]:
     return RESEARCH_ROLES.get(role_name.lower())
 
 
-def list_team_types() -> List[str]:
+def list_team_types() -> list[str]:
     """List all available team types.
 
     Returns:
@@ -645,7 +645,7 @@ def list_team_types() -> List[str]:
     return list(RESEARCH_TEAM_SPECS.keys())
 
 
-def list_roles() -> List[str]:
+def list_roles() -> list[str]:
     """List all available Research roles.
 
     Returns:
@@ -661,7 +661,7 @@ class ResearchTeamSpecProvider:
     ISP compliance across all verticals.
     """
 
-    def get_team_specs(self) -> Dict[str, TeamSpec]:
+    def get_team_specs(self) -> dict[str, TeamSpec]:
         """Get all Research team specifications.
 
         Returns:
@@ -680,7 +680,7 @@ class ResearchTeamSpecProvider:
         """
         return get_team_for_task(task_type)
 
-    def list_team_types(self) -> List[str]:
+    def list_team_types(self) -> list[str]:
         """List all available team types.
 
         Returns:

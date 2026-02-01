@@ -49,7 +49,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.storage.embeddings.task_classifier import TaskTypeClassifier
@@ -134,15 +134,15 @@ class ClassificationResult:
     context_boost: float = 0.0
 
     # Debugging metadata
-    matched_keywords: List[KeywordMatch] = field(default_factory=list)
-    negated_keywords: List[KeywordMatch] = field(default_factory=list)
-    context_signals: List[str] = field(default_factory=list)
+    matched_keywords: list[KeywordMatch] = field(default_factory=list)
+    negated_keywords: list[KeywordMatch] = field(default_factory=list)
+    context_signals: list[str] = field(default_factory=list)
 
     # Actionable outputs
     recommended_tool_budget: int = 20
     temperature_adjustment: float = 0.0
 
-    def to_legacy_dict(self) -> Dict[str, Any]:
+    def to_legacy_dict(self) -> dict[str, Any]:
         """Convert to legacy _classify_task_keywords format for backward compatibility."""
         coarse_type = self.task_type.value
         if coarse_type == "generation":
@@ -168,7 +168,7 @@ class ClassificationResult:
 # =============================================================================
 
 # Action keywords with weights (higher = stronger signal)
-ACTION_KEYWORDS: List[Tuple[str, float]] = [
+ACTION_KEYWORDS: list[tuple[str, float]] = [
     ("execute", 1.0),
     ("apply", 1.0),  # Strong action signal - "apply the fix", "apply changes"
     ("run", 0.9),
@@ -184,7 +184,7 @@ ACTION_KEYWORDS: List[Tuple[str, float]] = [
     ("merge", 0.8),
 ]
 
-GENERATION_KEYWORDS: List[Tuple[str, float]] = [
+GENERATION_KEYWORDS: list[tuple[str, float]] = [
     ("create", 0.9),
     ("generate", 1.0),
     ("write", 0.8),
@@ -194,7 +194,7 @@ GENERATION_KEYWORDS: List[Tuple[str, float]] = [
     ("scaffold", 1.0),
 ]
 
-ANALYSIS_KEYWORDS: List[Tuple[str, float]] = [
+ANALYSIS_KEYWORDS: list[tuple[str, float]] = [
     ("analyze", 1.0),
     ("analysis", 1.0),
     ("review", 0.9),
@@ -215,7 +215,7 @@ ANALYSIS_KEYWORDS: List[Tuple[str, float]] = [
     ("structure", 0.7),
 ]
 
-ANALYSIS_QUESTION_PATTERNS: List[Tuple[str, float]] = [
+ANALYSIS_QUESTION_PATTERNS: list[tuple[str, float]] = [
     ("what are the", 0.8),
     ("how does", 0.8),
     ("how do", 0.8),
@@ -226,7 +226,7 @@ ANALYSIS_QUESTION_PATTERNS: List[Tuple[str, float]] = [
     ("why does", 0.7),
 ]
 
-SEARCH_KEYWORDS: List[Tuple[str, float]] = [
+SEARCH_KEYWORDS: list[tuple[str, float]] = [
     ("find", 0.8),
     ("search", 0.9),
     ("locate", 0.9),
@@ -240,7 +240,7 @@ SEARCH_KEYWORDS: List[Tuple[str, float]] = [
     ("project structure", 0.8),
 ]
 
-EDIT_KEYWORDS: List[Tuple[str, float]] = [
+EDIT_KEYWORDS: list[tuple[str, float]] = [
     ("fix", 0.9),
     ("refactor", 1.0),
     ("modify", 0.9),
@@ -253,7 +253,7 @@ EDIT_KEYWORDS: List[Tuple[str, float]] = [
 ]
 
 # Execution-specific keywords (subset of action)
-EXECUTION_KEYWORDS: List[Tuple[str, float]] = [
+EXECUTION_KEYWORDS: list[tuple[str, float]] = [
     ("execute", 1.0),
     ("run", 0.9),
     ("start", 0.7),
@@ -264,7 +264,7 @@ EXECUTION_KEYWORDS: List[Tuple[str, float]] = [
 # =============================================================================
 
 # Patterns that negate keywords (compiled for performance)
-NEGATION_PATTERNS: List[re.Pattern[str]] = [
+NEGATION_PATTERNS: list[re.Pattern[str]] = [
     # "don't/do not analyze"
     re.compile(r"\b(don't|do\s+not|no\s+need\s+to|skip|without|avoid)\s+(\w+\s+)*", re.IGNORECASE),
     # "not to analyze"
@@ -279,7 +279,7 @@ NEGATION_PATTERNS: List[re.Pattern[str]] = [
 
 # Positive override patterns that cancel earlier negation
 # These indicate a shift from "don't X" to "do Y" in the same sentence
-POSITIVE_OVERRIDE_PATTERNS: List[re.Pattern[str]] = [
+POSITIVE_OVERRIDE_PATTERNS: list[re.Pattern[str]] = [
     # "but do/but please" - signals positive intent after negation
     re.compile(r"\bbut\s+(do|please|just|actually)\b", re.IGNORECASE),
     # "just X" after comma/semicolon - "don't analyze, just run"
@@ -409,8 +409,8 @@ def _is_keyword_negated(message: str, keyword: str, position: int) -> bool:
 
 
 def _find_keywords_with_positions(
-    message: str, keywords: List[Tuple[str, float]]
-) -> List[KeywordMatch]:
+    message: str, keywords: list[tuple[str, float]]
+) -> list[KeywordMatch]:
     """Find all keyword matches with positions and weights.
 
     Args:
@@ -446,7 +446,7 @@ def _find_keywords_with_positions(
     return matches
 
 
-def _calculate_category_score(matches: List[KeywordMatch]) -> Tuple[float, int]:
+def _calculate_category_score(matches: list[KeywordMatch]) -> tuple[float, int]:
     """Calculate weighted score for a category, accounting for negation.
 
     Args:
@@ -503,7 +503,7 @@ class UnifiedTaskClassifier:
         self._semantic_classifier: Optional["TaskTypeClassifier"] = None
 
         # Classification cache with TTL
-        self._cache: Dict[str, Tuple[ClassificationResult, float]] = {}
+        self._cache: dict[str, tuple[ClassificationResult, float]] = {}
         self._cache_hits = 0
         self._cache_misses = 0
 
@@ -571,7 +571,7 @@ class UnifiedTaskClassifier:
         key = self._get_cache_key(message)
         self._cache[key] = (result, time.time())
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache performance statistics.
 
         Returns:
@@ -790,7 +790,7 @@ class UnifiedTaskClassifier:
     def classify_with_context(
         self,
         message: str,
-        history: List[Dict[str, Any]],
+        history: list[dict[str, Any]],
         max_history: int = 5,
     ) -> ClassificationResult:
         """Classify with conversation context for improved accuracy.
@@ -815,7 +815,7 @@ class UnifiedTaskClassifier:
         # Analyze recent history
         recent = history[-max_history:]
         context_signals = []
-        history_types: Dict[ClassifierTaskType, int] = {}
+        history_types: dict[ClassifierTaskType, int] = {}
 
         for msg in recent:
             if msg.get("role") == "user":
@@ -859,7 +859,7 @@ class UnifiedTaskClassifier:
     def classify_with_ensemble(
         self,
         message: str,
-        history: Optional[List[Dict[str, Any]]] = None,
+        history: Optional[list[dict[str, Any]]] = None,
     ) -> ClassificationResult:
         """Classify using ensemble of keyword, semantic, and context.
 
@@ -999,7 +999,7 @@ def classify_task(message: str) -> ClassificationResult:
     return get_unified_classifier().classify(message)
 
 
-def classify_task_with_context(message: str, history: List[Dict[str, Any]]) -> ClassificationResult:
+def classify_task_with_context(message: str, history: list[dict[str, Any]]) -> ClassificationResult:
     """Convenience function for context-aware classification.
 
     Args:

@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.processing.serialization.strategy import (
     SerializationFormat,
@@ -131,8 +131,8 @@ class IntelligentFormatSelector:
 
     def __init__(self) -> None:
         """Initialize selector."""
-        self._format_cache: Dict[str, SerializationFormat] = {}
-        self._tool_format_stats: Dict[str, Dict[str, Dict[str, float]]] = {}
+        self._format_cache: dict[str, SerializationFormat] = {}
+        self._tool_format_stats: dict[str, dict[str, dict[str, float]]] = {}
 
     def select_best_format(
         self,
@@ -140,8 +140,8 @@ class IntelligentFormatSelector:
         characteristics: DataCharacteristics,
         config: SerializationConfig,
         context: SelectionContext,
-        encoder_scores: Dict[SerializationFormat, float],
-    ) -> Tuple[SerializationFormat, str]:
+        encoder_scores: dict[SerializationFormat, float],
+    ) -> tuple[SerializationFormat, str]:
         """Select the best format based on all available information.
 
         Args:
@@ -182,11 +182,11 @@ class IntelligentFormatSelector:
 
     def _build_candidates(
         self,
-        encoder_scores: Dict[SerializationFormat, float],
+        encoder_scores: dict[SerializationFormat, float],
         config: SerializationConfig,
         context: SelectionContext,
         characteristics: DataCharacteristics,
-    ) -> List[FormatScore]:
+    ) -> list[FormatScore]:
         """Build scored candidate list.
 
         Args:
@@ -266,7 +266,7 @@ class IntelligentFormatSelector:
         self,
         tool_name: str,
         provider: Optional[str],
-    ) -> Dict[str, Dict[str, float]]:
+    ) -> dict[str, dict[str, float]]:
         """Load format statistics for a tool from metrics.
 
         Args:

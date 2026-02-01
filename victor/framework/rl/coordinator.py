@@ -28,9 +28,8 @@ Database:
 
 import asyncio
 import logging
-import sqlite3
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.database import get_database
@@ -224,7 +223,6 @@ class AsyncWriterQueue:
         Returns:
             Number of outcomes written
         """
-        from datetime import datetime as dt
 
         db = self.coordinator.db
         cursor = db.cursor()
@@ -271,7 +269,7 @@ class AsyncWriterQueue:
             db.rollback()
             return 0
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get writer queue metrics.
 
         Returns:
@@ -476,7 +474,7 @@ class RLCoordinator:
         self.db_path = self._db_manager.db_path
 
         # Registry of learners
-        self._learners: Dict[str, BaseLearner] = {}
+        self._learners: dict[str, BaseLearner] = {}
 
         # Async writer queue for non-blocking outcome recording
         self._writer_queue: Optional[AsyncWriterQueue] = None
@@ -645,7 +643,7 @@ class RLCoordinator:
 
                 # TeamCompositionLearner has different signature - uses db_path instead of db_connection
                 # Note: TeamCompositionLearner doesn't inherit from BaseLearner
-                _ = TeamCompositionLearner(learning_rate=0.1)  # noqa: F841
+                _ = TeamCompositionLearner(learning_rate=0.1)
                 return None  # Return None since it's not compatible with BaseLearner protocol
             elif name == "cross_vertical":
                 from victor.framework.rl.learners.cross_vertical import CrossVerticalLearner
@@ -875,7 +873,7 @@ class RLCoordinator:
 
     async def get_all_recommendations_async(
         self, provider: str, model: str, task_type: str
-    ) -> Dict[str, RLRecommendation]:
+    ) -> dict[str, RLRecommendation]:
         """Async version of get_all_recommendations.
 
         Args:
@@ -888,7 +886,7 @@ class RLCoordinator:
         """
         return await asyncio.to_thread(self.get_all_recommendations, provider, model, task_type)
 
-    async def export_metrics_async(self) -> Dict[str, Any]:
+    async def export_metrics_async(self) -> dict[str, Any]:
         """Async version of export_metrics.
 
         Returns:
@@ -896,7 +894,7 @@ class RLCoordinator:
         """
         return await asyncio.to_thread(self.export_metrics)
 
-    async def get_stats_async(self) -> Dict[str, Any]:
+    async def get_stats_async(self) -> dict[str, Any]:
         """Async version of get_stats.
 
         Returns:
@@ -904,7 +902,7 @@ class RLCoordinator:
         """
         return await asyncio.to_thread(self.get_stats)
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export all learned values and metrics for monitoring.
 
         Returns:
@@ -933,7 +931,7 @@ class RLCoordinator:
 
     def get_all_recommendations(
         self, provider: str, model: str, task_type: str
-    ) -> Dict[str, RLRecommendation]:
+    ) -> dict[str, RLRecommendation]:
         """Get recommendations from all learners for given context.
 
         Useful for displaying all learned values for a specific provider/model/task.
@@ -963,7 +961,7 @@ class RLCoordinator:
         """
         return list(self._learners.keys())
 
-    def export_all_learner_data(self) -> Dict[str, Any]:
+    def export_all_learner_data(self) -> dict[str, Any]:
         """Export all learner data for training/analysis.
 
         Returns:
@@ -985,7 +983,7 @@ class RLCoordinator:
                 data[name] = {"error": str(e)}
         return data
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get coordinator-level statistics.
 
         Returns:
@@ -1083,7 +1081,7 @@ class RLCoordinator:
             return 0
         return await self._writer_queue._do_flush()
 
-    def get_writer_queue_metrics(self) -> Optional[Dict[str, Any]]:
+    def get_writer_queue_metrics(self) -> Optional[dict[str, Any]]:
         """Get writer queue metrics.
 
         Returns:

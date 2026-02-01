@@ -55,14 +55,14 @@ import os
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Protocol, Set, Tuple
+from typing import Any, Optional, Protocol
 
 logger = logging.getLogger(__name__)
 
 
 # Progressive parameter normalization mapping
 # Maps various parameter names to canonical forms for semantic comparison
-PARAMETER_ALIASES: Dict[str, str] = {
+PARAMETER_ALIASES: dict[str, str] = {
     # File path parameters
     "file_path": "path",
     "filepath": "path",
@@ -99,7 +99,7 @@ PARAMETER_ALIASES: Dict[str, str] = {
 }
 
 # Tool groups that access same resource types
-TOOL_RESOURCE_GROUPS: Dict[str, Set[str]] = {
+TOOL_RESOURCE_GROUPS: dict[str, set[str]] = {
     "file_read": {
         "read",
         "read_file",
@@ -171,7 +171,7 @@ class LoopDetectionResult:
     consecutive_count: int = 0
     max_allowed: int = 0
     recommendation: str = ""
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
     @property
     def should_warn(self) -> bool:
@@ -258,17 +258,17 @@ class ToolLoopDetector:
         self._call_history: deque[ToolCallRecord] = deque(maxlen=self.config.window_size)
 
         # Track consecutive same calls: (tool, args_hash) → count
-        self._consecutive_counts: Dict[Tuple[str, str], int] = defaultdict(int)
-        self._last_call_key: Optional[Tuple[str, str]] = None
+        self._consecutive_counts: dict[tuple[str, str], int] = defaultdict(int)
+        self._last_call_key: Optional[tuple[str, str]] = None
 
         # Track resource access: resource_key → list of (tool, is_read)
-        self._resource_access: Dict[str, List[Tuple[str, bool]]] = defaultdict(list)
+        self._resource_access: dict[str, list[tuple[str, bool]]] = defaultdict(list)
 
         # Track result hashes for diminishing returns
         self._result_hashes: deque[str] = deque(maxlen=10)
 
         # Observers for loop notifications
-        self._observers: List[LoopObserver] = []
+        self._observers: list[LoopObserver] = []
 
         # Stats
         self._total_calls: int = 0
@@ -335,7 +335,7 @@ class ToolLoopDetector:
 
         return normalized
 
-    def _normalize_arguments(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_arguments(self, arguments: dict[str, Any]) -> dict[str, Any]:
         """Normalize arguments for semantic comparison.
 
         This applies:
@@ -386,7 +386,7 @@ class ToolLoopDetector:
                 return group_name
         return None
 
-    def _hash_arguments(self, arguments: Dict[str, Any]) -> str:
+    def _hash_arguments(self, arguments: dict[str, Any]) -> str:
         """Create a stable hash of tool arguments.
 
         Uses normalized arguments for semantic equivalence detection.
@@ -401,7 +401,7 @@ class ToolLoopDetector:
         # MD5 used for tool loop detection, not security
         return hashlib.md5(content, usedforsecurity=False).hexdigest()[:12]
 
-    def _extract_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+    def _extract_resource_key(self, tool_name: str, arguments: dict[str, Any]) -> Optional[str]:
         """Extract resource key from tool call (e.g., file path).
 
         Uses normalized arguments to extract a canonical resource key,
@@ -612,7 +612,7 @@ class ToolLoopDetector:
     def record_tool_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         result_hash: Optional[str] = None,
         timestamp: float = 0.0,
     ) -> LoopDetectionResult:
@@ -643,7 +643,7 @@ class ToolLoopDetector:
         self._call_history.append(record)
 
         # Run all detection strategies
-        results: List[LoopDetectionResult] = []
+        results: list[LoopDetectionResult] = []
 
         # Strategy 1: Same-argument detection
         results.append(self._detect_same_argument_loop(tool_name, args_hash))
@@ -681,7 +681,7 @@ class ToolLoopDetector:
 
         return LoopDetectionResult()
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get detector statistics.
 
         Returns:

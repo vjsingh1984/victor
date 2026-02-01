@@ -21,7 +21,7 @@ Supports: list[Any], outdated, security, generate, update, tree, check.
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 import logging
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -54,7 +54,7 @@ def _version_satisfies(current: str, constraint: str) -> bool:
     return False
 
 
-async def _do_list() -> Dict[str, Any]:
+async def _do_list() -> dict[str, Any]:
     """List all installed packages."""
     success, stdout, stderr = await run_pip_async("list", "--format=json")
     if not success:
@@ -70,7 +70,7 @@ async def _do_list() -> Dict[str, Any]:
     report.append("=" * 70)
     report.append(f"\nTotal: {len(packages)} packages\n")
 
-    by_letter: Dict[str, List[Dict[str, Any]]] = {}
+    by_letter: dict[str, list[dict[str, Any]]] = {}
     for pkg in packages:
         letter = pkg["name"][0].upper()
         if letter not in by_letter:
@@ -94,7 +94,7 @@ async def _do_list() -> Dict[str, Any]:
     }
 
 
-async def _do_outdated() -> Dict[str, Any]:
+async def _do_outdated() -> dict[str, Any]:
     """Check for outdated packages."""
     success, stdout, stderr = await run_pip_async("list", "--outdated", "--format=json")
     if not success:
@@ -164,7 +164,7 @@ async def _do_outdated() -> Dict[str, Any]:
     }
 
 
-async def _do_security() -> Dict[str, Any]:
+async def _do_security() -> dict[str, Any]:
     """Check for security vulnerabilities."""
     success, stdout, stderr = await run_pip_async("list", "--format=json")
     if not success:
@@ -215,7 +215,7 @@ async def _do_security() -> Dict[str, Any]:
     }
 
 
-async def _do_generate(output: str) -> Dict[str, Any]:
+async def _do_generate(output: str) -> dict[str, Any]:
     """Generate requirements file."""
     success, stdout, stderr = await run_pip_async("freeze")
     if not success:
@@ -240,7 +240,7 @@ async def _do_generate(output: str) -> Dict[str, Any]:
         return {"success": False, "error": f"Failed to write file: {str(e)}"}
 
 
-async def _do_update(packages: List[str], dry_run: bool) -> Dict[str, Any]:
+async def _do_update(packages: list[str], dry_run: bool) -> dict[str, Any]:
     """Update packages."""
     if not packages:
         return {"success": False, "error": "No packages specified for update"}
@@ -270,7 +270,7 @@ async def _do_update(packages: List[str], dry_run: bool) -> Dict[str, Any]:
     }
 
 
-async def _do_tree(package: Optional[str]) -> Dict[str, Any]:
+async def _do_tree(package: Optional[str]) -> dict[str, Any]:
     """Show dependency tree."""
     # Check if pipdeptree is installed
     success, stdout, stderr = await run_pip_async("show", "pipdeptree")
@@ -291,7 +291,7 @@ async def _do_tree(package: Optional[str]) -> Dict[str, Any]:
     return {"success": True, "tree": result.stdout, "package": package}
 
 
-async def _do_check(requirements_file: str) -> Dict[str, Any]:
+async def _do_check(requirements_file: str) -> dict[str, Any]:
     """Check requirements satisfaction."""
     req_path = Path(requirements_file)
     if not req_path.exists():
@@ -375,12 +375,12 @@ async def _do_check(requirements_file: str) -> Dict[str, Any]:
 )
 async def dependency(
     action: str,
-    packages: Optional[List[str]] = None,
+    packages: Optional[list[str]] = None,
     package: Optional[str] = None,
     output: str = "requirements.txt",
     requirements_file: str = "requirements.txt",
     dry_run: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Python dependency management: list[Any], outdated, security, generate, update, tree, check.
 
     Actions: list (packages), outdated, security (vulns), generate (requirements.txt),

@@ -52,8 +52,7 @@ Example:
     ingestion_pattern = RAG_COMPOSED_PATTERNS["document_ingestion"]
 """
 
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 from victor.framework.tool_naming import ToolNames
@@ -73,7 +72,7 @@ RAGToolDependencyProvider = create_vertical_tool_dependency_provider()
 
 
 # Uses canonical ToolNames constants for consistency
-RAG_COMPOSED_PATTERNS: Dict[str, Dict[str, Any]] = {
+RAG_COMPOSED_PATTERNS: dict[str, dict[str, Any]] = {
     "document_ingestion": {
         "description": "Ingest documents from local files",
         "sequence": [ToolNames.LS, ToolNames.READ, "rag_ingest", "rag_stats"],
@@ -212,7 +211,7 @@ def reset_rag_tool_graph() -> None:
     _rag_tool_graph = None
 
 
-def get_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
+def get_composed_pattern(pattern_name: str) -> Optional[dict[str, Any]]:
     """Get a composed tool pattern by name.
 
     Args:
@@ -230,7 +229,7 @@ def get_composed_pattern(pattern_name: str) -> Optional[Dict[str, Any]]:
     return RAG_COMPOSED_PATTERNS.get(pattern_name)
 
 
-def list_composed_patterns() -> List[str]:
+def list_composed_patterns() -> list[str]:
     """List all available composed tool patterns.
 
     Returns:

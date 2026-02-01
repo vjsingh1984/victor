@@ -41,16 +41,11 @@ from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
     runtime_checkable,
 )
+from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStage
@@ -155,7 +150,7 @@ class IAgent(Protocol):
         """Agent orchestrator instance."""
         ...
 
-    async def execute(self, task: str, context: Dict[str, Any]) -> str:
+    async def execute(self, task: str, context: dict[str, Any]) -> str:
         """Execute a task.
 
         Args:
@@ -253,7 +248,7 @@ class AgentToolSelectionContext:
     task_type: str = "default"
 
     # Recent tool execution history
-    recent_tools: List[str] = field(default_factory=list)
+    recent_tools: list[str] = field(default_factory=list)
 
     # Current conversation turn number
     turn_number: int = 0
@@ -265,10 +260,10 @@ class AgentToolSelectionContext:
     max_tools: int = 15
 
     # Planned tools from dependency planning (tool names pre-selected)
-    planned_tools: Optional[List[str]] = None
+    planned_tools: Optional[list[str]] = None
 
     # Additional metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # Backward compatibility alias
@@ -321,7 +316,7 @@ class ToolRegistryProtocol(Protocol):
         """Get a tool by name."""
         ...
 
-    def list_tools(self) -> List[str]:
+    def list_tools(self) -> list[str]:
         """List all registered tool names."""
         ...
 
@@ -355,7 +350,7 @@ class ToolPipelineProtocol(Protocol):
         """Maximum tool calls allowed."""
         ...
 
-    async def execute(self, tool_name: str, arguments: Dict[str, Any]) -> "ToolCallResult":
+    async def execute(self, tool_name: str, arguments: dict[str, Any]) -> "ToolCallResult":
         """Execute a tool call.
 
         Args:
@@ -401,7 +396,7 @@ class ToolExecutorProtocol(Protocol):
     def execute(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         context: Optional[Any] = None,
     ) -> Any:
         """Execute a tool synchronously.
@@ -419,7 +414,7 @@ class ToolExecutorProtocol(Protocol):
     async def aexecute(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         context: Optional[Any] = None,
     ) -> Any:
         """Execute a tool asynchronously.
@@ -437,7 +432,7 @@ class ToolExecutorProtocol(Protocol):
     def validate_arguments(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
     ) -> bool:
         """Validate tool arguments before execution.
 
@@ -499,7 +494,7 @@ class IToolSelectionCoordinator(Protocol):
     def route_search_query(
         self,
         query: str,
-        available_tools: Set[str],
+        available_tools: set[str],
     ) -> str:
         """Route a search query to the appropriate tool.
 
@@ -518,8 +513,8 @@ class IToolSelectionCoordinator(Protocol):
     def detect_mentioned_tools(
         self,
         prompt: str,
-        available_tools: Optional[Set[str]] = None,
-    ) -> Set[str]:
+        available_tools: Optional[set[str]] = None,
+    ) -> set[str]:
         """Detect tools mentioned in a prompt.
 
         Scans the prompt for explicit tool mentions (e.g., "use grep to
@@ -537,7 +532,7 @@ class IToolSelectionCoordinator(Protocol):
     def classify_task_keywords(
         self,
         task: str,
-        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        conversation_history: Optional[list[dict[str, Any]]] = None,
     ) -> str:
         """Classify task type using keyword analysis.
 
@@ -593,7 +588,7 @@ class IToolSelectionCoordinator(Protocol):
     def extract_required_files(
         self,
         prompt: str,
-    ) -> Set[str]:
+    ) -> set[str]:
         """Extract required files from a prompt.
 
         Parses the prompt to find file paths that are explicitly mentioned
@@ -610,7 +605,7 @@ class IToolSelectionCoordinator(Protocol):
     def extract_required_outputs(
         self,
         prompt: str,
-    ) -> Set[str]:
+    ) -> set[str]:
         """Extract required outputs from a prompt.
 
         Parses the prompt to find output specifications (file paths,
@@ -641,7 +636,7 @@ class ConversationControllerProtocol(Protocol):
         """Add a message to conversation history."""
         ...
 
-    def get_messages(self) -> List[Dict[str, Any]]:
+    def get_messages(self) -> list[dict[str, Any]]:
         """Get all messages in conversation."""
         ...
 
@@ -677,7 +672,7 @@ class ConversationStateMachineProtocol(Protocol):
         """Get current conversation stage (alias)."""
         ...
 
-    def record_tool_execution(self, tool_name: str, args: Dict[str, Any]) -> None:
+    def record_tool_execution(self, tool_name: str, args: dict[str, Any]) -> None:
         """Record tool execution for stage inference."""
         ...
 
@@ -697,7 +692,7 @@ class MessageHistoryProtocol(Protocol):
         """Add a message."""
         ...
 
-    def get_messages_for_provider(self) -> List[Any]:
+    def get_messages_for_provider(self) -> list[Any]:
         """Get all messages for provider."""
         ...
 
@@ -732,7 +727,7 @@ class StreamingToolChunk:
     chunk_type: str  # "start", "progress", "result", "error", "cache_hit"
     content: Any
     is_final: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @runtime_checkable
@@ -752,8 +747,8 @@ class StreamingToolAdapterProtocol(Protocol):
 
     async def execute_streaming(
         self,
-        tool_calls: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None,
+        tool_calls: list[dict[str, Any]],
+        context: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator["StreamingToolChunk"]:
         """Execute tools with streaming output.
 
@@ -776,9 +771,9 @@ class StreamingToolAdapterProtocol(Protocol):
     async def execute_streaming_single(
         self,
         tool_name: str,
-        tool_args: Dict[str, Any],
+        tool_args: dict[str, Any],
         tool_call_id: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator["StreamingToolChunk"]:
         """Execute a single tool with streaming output.
 
@@ -842,7 +837,7 @@ class TaskAnalyzerProtocol(Protocol):
     Analyzes user prompts for complexity, intent, and routing.
     """
 
-    def analyze(self, prompt: str) -> Dict[str, Any]:
+    def analyze(self, prompt: str) -> dict[str, Any]:
         """Analyze a user prompt.
 
         Returns:
@@ -876,7 +871,7 @@ class ComplexityClassifierProtocol(Protocol):
 class ActionAuthorizerProtocol(Protocol):
     """Protocol for action authorization."""
 
-    def authorize(self, action: str, context: Dict[str, Any]) -> bool:
+    def authorize(self, action: str, context: dict[str, Any]) -> bool:
         """Check if an action is authorized.
 
         Returns:
@@ -914,7 +909,7 @@ class ObservabilityProtocol(Protocol):
     Provides event emission for monitoring and tracing.
     """
 
-    def on_tool_start(self, tool_name: str, arguments: Dict[str, Any], tool_id: str) -> None:
+    def on_tool_start(self, tool_name: str, arguments: dict[str, Any], tool_id: str) -> None:
         """Called when tool execution starts."""
         ...
 
@@ -933,7 +928,7 @@ class ObservabilityProtocol(Protocol):
         """Wire state machine for automatic state change events."""
         ...
 
-    def on_error(self, error: Exception, context: Dict[str, Any]) -> None:
+    def on_error(self, error: Exception, context: dict[str, Any]) -> None:
         """Called when an error occurs."""
         ...
 
@@ -942,7 +937,7 @@ class ObservabilityProtocol(Protocol):
 class MetricsCollectorProtocol(Protocol):
     """Protocol for metrics collection."""
 
-    def on_tool_start(self, tool_name: str, arguments: Dict[str, Any], iteration: int) -> None:
+    def on_tool_start(self, tool_name: str, arguments: dict[str, Any], iteration: int) -> None:
         """Record tool start metrics."""
         ...
 
@@ -964,15 +959,15 @@ class MetricsCollectorProtocol(Protocol):
 class ToolCacheProtocol(Protocol):
     """Protocol for tool result caching."""
 
-    def get(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[Any]:
+    def get(self, tool_name: str, arguments: dict[str, Any]) -> Optional[Any]:
         """Get cached result for a tool call."""
         ...
 
-    def set(self, tool_name: str, arguments: Dict[str, Any], result: Any) -> None:
+    def set(self, tool_name: str, arguments: dict[str, Any], result: Any) -> None:
         """Cache a tool result."""
         ...
 
-    def invalidate(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def invalidate(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Invalidate a cached result."""
         ...
 
@@ -994,7 +989,7 @@ class TaskTrackerProtocol(Protocol):
         """Mark task as complete."""
         ...
 
-    def get_active_tasks(self) -> List[Dict[str, Any]]:
+    def get_active_tasks(self) -> list[dict[str, Any]]:
         """Get all active tasks."""
         ...
 
@@ -1016,7 +1011,7 @@ class ToolOutputFormatterProtocol(Protocol):
         self,
         tool_name: str,
         result: Any,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Format tool output for LLM consumption.
 
@@ -1049,7 +1044,7 @@ class ResponseSanitizerProtocol(Protocol):
 class ArgumentNormalizerProtocol(Protocol):
     """Protocol for argument normalization."""
 
-    def normalize(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def normalize(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Normalize tool arguments.
 
         Handles malformed arguments, type coercion, etc.
@@ -1105,7 +1100,7 @@ class WorkflowRegistryProtocol(Protocol):
         """Get a workflow by name."""
         ...
 
-    def list_workflows(self) -> List[str]:
+    def list_workflows(self) -> list[str]:
         """List registered workflow names."""
         ...
 
@@ -1128,7 +1123,7 @@ class UsageAnalyticsProtocol(Protocol):
         tool_name: str,
         score: float,
         selected: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record a tool selection decision."""
         ...
@@ -1153,7 +1148,7 @@ class ToolSequenceTrackerProtocol(Protocol):
 
     def get_next_tool_suggestions(
         self, current_tool: str, top_k: int = 3
-    ) -> List[Tuple[str, float]]:
+    ) -> list[tuple[str, float]]:
         """Get suggested next tools based on patterns."""
         ...
 
@@ -1171,7 +1166,7 @@ class ContextCompactorProtocol(Protocol):
         ...
 
     def truncate_tool_result(
-        self, tool_name: str, result: str, context: Optional[Dict[str, Any]] = None
+        self, tool_name: str, result: str, context: Optional[dict[str, Any]] = None
     ) -> str:
         """Truncate tool result if needed."""
         ...
@@ -1281,7 +1276,7 @@ class ProviderLifecycleProtocol(Protocol):
         """
         ...
 
-    def get_prompt_contributors(self) -> List[Any]:
+    def get_prompt_contributors(self) -> list[Any]:
         """Get prompt contributors from vertical extensions.
 
         Returns:
@@ -1295,7 +1290,7 @@ class ProviderLifecycleProtocol(Protocol):
         model: str,
         tool_adapter: Any,
         capabilities: Any,
-        prompt_contributors: List[Any],
+        prompt_contributors: list[Any],
     ) -> Any:
         """Create a new SystemPromptBuilder with given parameters.
 
@@ -1335,7 +1330,7 @@ class FileOperationsCapabilityProtocol(Protocol):
     multiple verticals.
     """
 
-    def get_tools(self) -> Set[str]:
+    def get_tools(self) -> set[str]:
         """Get tool names for this capability.
 
         Returns:
@@ -1343,7 +1338,7 @@ class FileOperationsCapabilityProtocol(Protocol):
         """
         ...
 
-    def get_tool_list(self) -> List[str]:
+    def get_tool_list(self) -> list[str]:
         """Get tool names as a list.
 
         Returns:
@@ -1405,7 +1400,7 @@ class StageTransitionProtocol(Protocol):
         """
         ...
 
-    def get_valid_transitions(self) -> List["ConversationStage"]:
+    def get_valid_transitions(self) -> list["ConversationStage"]:
         """Get list of valid transition targets from current stage.
 
         Returns:
@@ -1447,7 +1442,7 @@ class StageTransitionProtocol(Protocol):
         ...
 
     @property
-    def transition_history(self) -> List[Dict[str, Any]]:
+    def transition_history(self) -> list[dict[str, Any]]:
         """Get the transition history.
 
         Returns:
@@ -1472,7 +1467,7 @@ class ToolDeduplicationTrackerProtocol(Protocol):
     Tracks recent tool calls to detect and prevent redundant operations.
     """
 
-    def add_call(self, tool_name: str, args: Dict[str, Any]) -> None:
+    def add_call(self, tool_name: str, args: dict[str, Any]) -> None:
         """Add a tool call to the tracker.
 
         Args:
@@ -1481,7 +1476,7 @@ class ToolDeduplicationTrackerProtocol(Protocol):
         """
         ...
 
-    def is_redundant(self, tool_name: str, args: Dict[str, Any], explain: bool = False) -> bool:
+    def is_redundant(self, tool_name: str, args: dict[str, Any], explain: bool = False) -> bool:
         """Check if a tool call is redundant given recent history.
 
         Args:
@@ -1498,7 +1493,7 @@ class ToolDeduplicationTrackerProtocol(Protocol):
         """Clear all tracked tool calls."""
         ...
 
-    def get_recent_calls(self, limit: Optional[int] = None) -> List[Any]:
+    def get_recent_calls(self, limit: Optional[int] = None) -> list[Any]:
         """Get recent tool calls.
 
         Args:
@@ -1537,8 +1532,8 @@ class ConversationEmbeddingStoreProtocol(Protocol):
         session_id: Optional[str] = None,
         limit: int = 10,
         min_similarity: float = 0.3,
-        exclude_message_ids: Optional[List[str]] = None,
-    ) -> List[Any]:
+        exclude_message_ids: Optional[list[str]] = None,
+    ) -> list[Any]:
         """Search for semantically similar messages.
 
         Args:
@@ -1564,7 +1559,7 @@ class ConversationEmbeddingStoreProtocol(Protocol):
         """
         ...
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get store statistics."""
         ...
 
@@ -1592,13 +1587,13 @@ class RecoveryHandlerProtocol(Protocol):
     def detect_failure(
         self,
         content: str,
-        tool_calls: Optional[List[Dict[str, Any]]],
-        mentioned_tools: Optional[List[str]],
+        tool_calls: Optional[list[dict[str, Any]]],
+        mentioned_tools: Optional[list[str]],
         elapsed_time: float,
         session_idle_timeout: float,
         quality_score: float,
         consecutive_failures: int,
-        recent_responses: Optional[List[str]],
+        recent_responses: Optional[list[str]],
         context_utilization: Optional[float],
     ) -> Optional[Any]:
         """Detect failure type from response characteristics.
@@ -1622,8 +1617,8 @@ class RecoveryHandlerProtocol(Protocol):
         session_idle_timeout: float,
         current_temperature: float,
         consecutive_failures: int,
-        mentioned_tools: Optional[List[str]],
-        recent_responses: Optional[List[str]],
+        mentioned_tools: Optional[list[str]],
+        recent_responses: Optional[list[str]],
         quality_score: float,
         task_type: str,
         is_analysis_task: bool,
@@ -1645,7 +1640,7 @@ class RecoveryHandlerProtocol(Protocol):
         """Reset recovery state for a new session."""
         ...
 
-    def get_diagnostics(self) -> Dict[str, Any]:
+    def get_diagnostics(self) -> dict[str, Any]:
         """Get diagnostic information about recovery system."""
         ...
 
@@ -1711,7 +1706,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def check_blocked_threshold(self, ctx: Any, all_blocked: bool) -> Optional[Tuple[Any, bool]]:
+    def check_blocked_threshold(self, ctx: Any, all_blocked: bool) -> Optional[tuple[Any, bool]]:
         """Check if too many tools have been blocked.
 
         Returns:
@@ -1719,7 +1714,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def check_force_action(self, ctx: Any) -> Tuple[bool, Optional[str]]:
+    def check_force_action(self, ctx: Any) -> tuple[bool, Optional[str]]:
         """Check if recovery handler recommends force action.
 
         Returns:
@@ -1727,7 +1722,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def handle_empty_response(self, ctx: Any) -> Tuple[Optional[Any], bool]:
+    def handle_empty_response(self, ctx: Any) -> tuple[Optional[Any], bool]:
         """Handle empty model response.
 
         Returns:
@@ -1736,7 +1731,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         ...
 
     def handle_blocked_tool(
-        self, ctx: Any, tool_name: str, tool_args: Dict[str, Any], block_reason: str
+        self, ctx: Any, tool_name: str, tool_args: dict[str, Any], block_reason: str
     ) -> Any:
         """Handle blocked tool call.
 
@@ -1745,7 +1740,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def handle_force_tool_execution(self, ctx: Any) -> Tuple[bool, Optional[List[Any]]]:
+    def handle_force_tool_execution(self, ctx: Any) -> tuple[bool, Optional[list[Any]]]:
         """Handle forced tool execution.
 
         Returns:
@@ -1753,7 +1748,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def handle_force_completion(self, ctx: Any) -> Optional[List[Any]]:
+    def handle_force_completion(self, ctx: Any) -> Optional[list[Any]]:
         """Handle forced completion.
 
         Returns:
@@ -1761,7 +1756,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def handle_loop_warning(self, ctx: Any) -> Optional[List[Any]]:
+    def handle_loop_warning(self, ctx: Any) -> Optional[list[Any]]:
         """Handle loop detection warning.
 
         Returns:
@@ -1773,8 +1768,8 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         self,
         ctx: Any,
         full_content: str,
-        tool_calls: Optional[List[Dict[str, Any]]],
-        mentioned_tools: Optional[List[str]],
+        tool_calls: Optional[list[dict[str, Any]]],
+        mentioned_tools: Optional[list[str]],
         message_adder: Any,
     ) -> Any:
         """Handle response using the recovery integration.
@@ -1795,8 +1790,8 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         ...
 
     def filter_blocked_tool_calls(
-        self, ctx: Any, tool_calls: List[Dict[str, Any]]
-    ) -> Tuple[List[Dict[str, Any]], List[Any], int]:
+        self, ctx: Any, tool_calls: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], list[Any], int]:
         """Filter out blocked tool calls.
 
         Returns:
@@ -1805,8 +1800,8 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         ...
 
     def truncate_tool_calls(
-        self, ctx: Any, tool_calls: List[Dict[str, Any]], max_calls: int
-    ) -> Tuple[List[Dict[str, Any]], bool]:
+        self, ctx: Any, tool_calls: list[dict[str, Any]], max_calls: int
+    ) -> tuple[list[dict[str, Any]], bool]:
         """Truncate tool calls to budget limit.
 
         Returns:
@@ -1814,7 +1809,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def get_recovery_prompts(self, ctx: Any) -> List[str]:
+    def get_recovery_prompts(self, ctx: Any) -> list[str]:
         """Get recovery prompts for current context.
 
         Returns:
@@ -1838,7 +1833,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def format_completion_metrics(self, ctx: Any) -> Dict[str, Any]:
+    def format_completion_metrics(self, ctx: Any) -> dict[str, Any]:
         """Format completion metrics for display.
 
         Returns:
@@ -1846,7 +1841,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def format_budget_exhausted_metrics(self, ctx: Any) -> Dict[str, Any]:
+    def format_budget_exhausted_metrics(self, ctx: Any) -> dict[str, Any]:
         """Format budget exhausted metrics.
 
         Returns:
@@ -1854,7 +1849,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def generate_tool_result_chunks(self, results: List[Any], ctx: Any) -> List[Any]:
+    def generate_tool_result_chunks(self, results: list[Any], ctx: Any) -> list[Any]:
         """Generate stream chunks from tool results.
 
         Returns:
@@ -1878,7 +1873,7 @@ class ChunkGeneratorProtocol(Protocol):
     """
 
     def generate_tool_start_chunk(
-        self, tool_name: str, tool_args: Dict[str, Any], status_msg: str
+        self, tool_name: str, tool_args: dict[str, Any], status_msg: str
     ) -> Any:
         """Generate chunk indicating tool execution start.
 
@@ -1892,7 +1887,7 @@ class ChunkGeneratorProtocol(Protocol):
         """
         ...
 
-    def generate_tool_result_chunks(self, result: Dict[str, Any]) -> List[Any]:
+    def generate_tool_result_chunks(self, result: dict[str, Any]) -> list[Any]:
         """Generate chunks for tool execution result.
 
         Args:
@@ -1963,7 +1958,7 @@ class ChunkGeneratorProtocol(Protocol):
         """
         ...
 
-    def get_budget_exhausted_chunks(self, stream_ctx: Any) -> List[Any]:
+    def get_budget_exhausted_chunks(self, stream_ctx: Any) -> list[Any]:
         """Get chunks for budget exhaustion warning.
 
         Args:
@@ -1988,8 +1983,8 @@ class ToolPlannerProtocol(Protocol):
     """
 
     def plan_tools(
-        self, goals: List[str], available_inputs: Optional[List[str]] = None
-    ) -> List[Any]:
+        self, goals: list[str], available_inputs: Optional[list[str]] = None
+    ) -> list[Any]:
         """Plan a sequence of tools to satisfy goals.
 
         Args:
@@ -2001,7 +1996,7 @@ class ToolPlannerProtocol(Protocol):
         """
         ...
 
-    def infer_goals_from_message(self, user_message: str) -> List[str]:
+    def infer_goals_from_message(self, user_message: str) -> list[str]:
         """Infer planning goals from user request.
 
         Args:
@@ -2013,8 +2008,8 @@ class ToolPlannerProtocol(Protocol):
         ...
 
     def filter_tools_by_intent(
-        self, tools: List[Any], current_intent: Optional[Any] = None
-    ) -> List[Any]:
+        self, tools: list[Any], current_intent: Optional[Any] = None
+    ) -> list[Any]:
         """Filter tools based on detected user intent.
 
         Args:
@@ -2136,7 +2131,7 @@ class DebugLoggerProtocol(Protocol):
     def log_tool_call(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         iteration: int,
     ) -> None:
         """Log tool call."""
@@ -2185,7 +2180,7 @@ class ReminderManagerProtocol(Protocol):
 
     def update_state(
         self,
-        observed_files: Optional[Set[str]] = None,
+        observed_files: Optional[set[str]] = None,
         executed_tool: Optional[str] = None,
         tool_calls: Optional[int] = None,
         tool_budget: Optional[int] = None,
@@ -2230,7 +2225,7 @@ class RLCoordinatorProtocol(Protocol):
         """Get recommendation from a learner."""
         ...
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export all learned values and metrics for monitoring."""
         ...
 
@@ -2253,8 +2248,8 @@ class SafetyCheckerProtocol(Protocol):
     async def check_and_confirm(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
-    ) -> Tuple[bool, Optional[str]]:
+        arguments: dict[str, Any],
+    ) -> tuple[bool, Optional[str]]:
         """Check operation safety and request confirmation if needed.
 
         Returns:
@@ -2284,13 +2279,13 @@ class AutoCommitterProtocol(Protocol):
         """Check if workspace is a git repository."""
         ...
 
-    def has_changes(self, files: Optional[List[str]] = None) -> bool:
+    def has_changes(self, files: Optional[list[str]] = None) -> bool:
         """Check if there are uncommitted changes."""
         ...
 
     def commit_changes(
         self,
-        files: Optional[List[str]] = None,
+        files: Optional[list[str]] = None,
         description: str = "AI-assisted changes",
         change_type: Optional[str] = None,
         scope: Optional[str] = None,
@@ -2316,7 +2311,7 @@ class MCPBridgeProtocol(Protocol):
         """
         ...
 
-    def get_tool_definitions(self) -> List[Dict[str, Any]]:
+    def get_tool_definitions(self) -> list[dict[str, Any]]:
         """Return MCP tools as Victor tool definitions with a name prefix."""
         ...
 
@@ -2342,7 +2337,7 @@ class ToolDependencyGraphProtocol(Protocol):
         """
         ...
 
-    def get_dependencies(self, tool: str) -> List[str]:
+    def get_dependencies(self, tool: str) -> list[str]:
         """Get dependencies for a tool.
 
         Args:
@@ -2353,7 +2348,7 @@ class ToolDependencyGraphProtocol(Protocol):
         """
         ...
 
-    def get_execution_order(self, tools: List[str]) -> List[str]:
+    def get_execution_order(self, tools: list[str]) -> list[str]:
         """Get optimal execution order for a list of tools.
 
         Args:
@@ -2380,7 +2375,7 @@ class ToolPluginRegistryProtocol(Protocol):
         """
         ...
 
-    def discover_tools(self) -> List[Any]:
+    def discover_tools(self) -> list[Any]:
         """Discover and load tools from registered plugins.
 
         Returns:
@@ -2424,7 +2419,7 @@ class ProviderRegistryProtocol(Protocol):
         """
         ...
 
-    def list_providers(self) -> List[str]:
+    def list_providers(self) -> list[str]:
         """Get list of registered provider names.
 
         Returns:
@@ -2481,7 +2476,7 @@ class UsageLoggerProtocol(Protocol):
         """
         ...
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get usage statistics.
 
         Returns:
@@ -2512,7 +2507,7 @@ class StreamingMetricsCollectorProtocol(Protocol):
         """
         ...
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get collected metrics.
 
         Returns:
@@ -2598,9 +2593,9 @@ class ParallelExecutorProtocol(Protocol):
 
     async def execute_parallel(
         self,
-        tool_calls: List[Any],
+        tool_calls: list[Any],
         **kwargs: Any,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Execute multiple tool calls in parallel.
 
         Args:
@@ -2908,8 +2903,8 @@ class ToolAccessDecision:
     reason: str
     source: str  # Which layer decided (e.g., "mode", "safety")
     precedence_level: int = 0
-    checked_layers: List[str] = field(default_factory=list)
-    layer_results: Dict[str, bool] = field(default_factory=dict)
+    checked_layers: list[str] = field(default_factory=list)
+    layer_results: dict[str, bool] = field(default_factory=dict)
 
     def explain(self) -> str:
         """Get detailed explanation of the decision."""
@@ -2943,9 +2938,9 @@ class ToolAccessContext:
     conversation_stage: Optional["ConversationStage"] = None
     intent: Optional[Any] = None  # ActionIntent
     current_mode: Optional[str] = None
-    session_enabled_tools: Optional[Set[str]] = None
+    session_enabled_tools: Optional[set[str]] = None
     vertical_name: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @runtime_checkable
@@ -2977,8 +2972,8 @@ class IToolAccessController(Protocol):
         ...
 
     def filter_tools(
-        self, tools: List[str], context: Optional[ToolAccessContext] = None
-    ) -> Tuple[List[str], List[ToolAccessDecision]]:
+        self, tools: list[str], context: Optional[ToolAccessContext] = None
+    ) -> tuple[list[str], list[ToolAccessDecision]]:
         """Filter a list of tools to only allowed ones.
 
         Args:
@@ -2990,7 +2985,7 @@ class IToolAccessController(Protocol):
         """
         ...
 
-    def get_allowed_tools(self, context: Optional[ToolAccessContext] = None) -> Set[str]:
+    def get_allowed_tools(self, context: Optional[ToolAccessContext] = None) -> set[str]:
         """Get all tools allowed in the given context.
 
         Args:
@@ -3184,7 +3179,7 @@ class IBudgetManager(Protocol):
         """
         ...
 
-    def get_prompt_budget_info(self) -> Dict[str, Any]:
+    def get_prompt_budget_info(self) -> dict[str, Any]:
         """Get budget information for system prompts.
 
         Returns:
@@ -3225,11 +3220,11 @@ class UnifiedMemoryCoordinatorProtocol(Protocol):
         self,
         query: str,
         limit: int = 20,
-        memory_types: Optional[List[Any]] = None,
+        memory_types: Optional[list[Any]] = None,
         session_id: Optional[str] = None,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: Optional[dict[str, Any]] = None,
         min_relevance: float = 0.0,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Search across all registered memory providers.
 
         Args:
@@ -3251,7 +3246,7 @@ class UnifiedMemoryCoordinatorProtocol(Protocol):
         query: str,
         limit: int = 20,
         **kwargs: Any,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Search a specific memory type.
 
         Args:
@@ -3270,7 +3265,7 @@ class UnifiedMemoryCoordinatorProtocol(Protocol):
         memory_type: Any,
         key: str,
         value: Any,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> bool:
         """Store a value in a specific memory type.
 
@@ -3320,7 +3315,7 @@ class UnifiedMemoryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def get_registered_types(self) -> List[Any]:
+    def get_registered_types(self) -> list[Any]:
         """Get list of registered memory types.
 
         Returns:
@@ -3328,7 +3323,7 @@ class UnifiedMemoryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get coordinator statistics.
 
         Returns:
@@ -3350,7 +3345,7 @@ class ToolCoordinatorProtocol(Protocol):
     interface. Consolidates tool-related operations from AgentOrchestrator.
     """
 
-    async def select_tools(self, context: Any) -> List[Any]:
+    async def select_tools(self, context: Any) -> list[Any]:
         """Select appropriate tools for the current context.
 
         Args:
@@ -3379,7 +3374,7 @@ class ToolCoordinatorProtocol(Protocol):
 
     async def execute_tool_calls(
         self,
-        tool_calls: List[Dict[str, Any]],
+        tool_calls: list[dict[str, Any]],
         context: Optional[Any] = None,
     ) -> Any:
         """Execute tool calls through the pipeline.
@@ -3444,7 +3439,7 @@ class StateCoordinatorProtocol(Protocol):
         """
         ...
 
-    def get_message_history(self) -> List[Any]:
+    def get_message_history(self) -> list[Any]:
         """Get the full message history.
 
         Returns:
@@ -3456,7 +3451,7 @@ class StateCoordinatorProtocol(Protocol):
         self,
         limit: int = 10,
         include_system: bool = False,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Get recent messages from history.
 
         Args:
@@ -3584,7 +3579,7 @@ class VerticalStorageProtocol(Protocol):
         middleware = storage.get_middleware()
     """
 
-    def set_middleware(self, middleware: List[Any]) -> None:
+    def set_middleware(self, middleware: list[Any]) -> None:
         """Store middleware configuration.
 
         Args:
@@ -3592,7 +3587,7 @@ class VerticalStorageProtocol(Protocol):
         """
         ...
 
-    def get_middleware(self) -> List[Any]:
+    def get_middleware(self) -> list[Any]:
         """Retrieve middleware configuration.
 
         Returns:
@@ -3600,7 +3595,7 @@ class VerticalStorageProtocol(Protocol):
         """
         ...
 
-    def set_safety_patterns(self, patterns: List[Any]) -> None:
+    def set_safety_patterns(self, patterns: list[Any]) -> None:
         """Store safety patterns.
 
         Args:
@@ -3608,7 +3603,7 @@ class VerticalStorageProtocol(Protocol):
         """
         ...
 
-    def get_safety_patterns(self) -> List[Any]:
+    def get_safety_patterns(self) -> list[Any]:
         """Retrieve safety patterns.
 
         Returns:
@@ -3616,7 +3611,7 @@ class VerticalStorageProtocol(Protocol):
         """
         ...
 
-    def set_team_specs(self, specs: Dict[str, Any]) -> None:
+    def set_team_specs(self, specs: dict[str, Any]) -> None:
         """Store team specifications.
 
         Args:
@@ -3624,7 +3619,7 @@ class VerticalStorageProtocol(Protocol):
         """
         ...
 
-    def get_team_specs(self) -> Dict[str, Any]:
+    def get_team_specs(self) -> dict[str, Any]:
         """Retrieve team specifications.
 
         Returns:
@@ -3764,7 +3759,7 @@ class IProviderSwitcher(Protocol):
         """
         ...
 
-    def get_switch_history(self) -> List[Dict[str, Any]]:
+    def get_switch_history(self) -> list[dict[str, Any]]:
         """Get history of provider switches.
 
         Returns:
@@ -3829,7 +3824,7 @@ class IProviderEventEmitter(Protocol):
     Separated to support different event implementations.
     """
 
-    def emit_switch_event(self, event: Dict[str, Any]) -> None:
+    def emit_switch_event(self, event: dict[str, Any]) -> None:
         """Emit provider switch event.
 
         Args:
@@ -3904,7 +3899,7 @@ class IMessageStore(Protocol):
         """
         ...
 
-    def get_messages(self, limit: Optional[int] = None) -> List[Any]:
+    def get_messages(self, limit: Optional[int] = None) -> list[Any]:
         """Retrieve messages.
 
         Args:
@@ -3995,8 +3990,8 @@ class IEmbeddingManager(Protocol):
         ...
 
     async def semantic_search(
-        self, query: str, k: int = 5, filters: Optional[Dict[str, Any]] = None
-    ) -> List[Any]:
+        self, query: str, k: int = 5, filters: Optional[dict[str, Any]] = None
+    ) -> list[Any]:
         """Perform semantic search.
 
         Args:
@@ -4087,7 +4082,7 @@ class IModeCompletionChecker(Protocol):
     Separated from budget tracking to follow ISP.
     """
 
-    def should_early_exit(self, mode: str, response: str) -> Tuple[bool, str]:
+    def should_early_exit(self, mode: str, response: str) -> tuple[bool, str]:
         """Check if should exit mode early.
 
         Args:

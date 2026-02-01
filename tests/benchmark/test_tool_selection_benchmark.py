@@ -44,14 +44,13 @@ from __future__ import annotations
 import gc
 import logging
 import os
-import sys
 import threading
 import time
 import tracemalloc
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from unittest.mock import MagicMock
 
 import pytest
@@ -121,7 +120,7 @@ class BenchmarkResult:
     cache_misses: int = 0
     hit_rate: float = 0.0
     memory_used: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_markdown_row(self) -> str:
         """Convert to markdown table row."""
@@ -148,7 +147,7 @@ class BenchmarkSuite:
     """
 
     name: str
-    results: List[BenchmarkResult] = field(default_factory=list)
+    results: list[BenchmarkResult] = field(default_factory=list)
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 
@@ -222,7 +221,7 @@ BENCHMARK_QUERIES = [
 class MockTool:
     """Mock tool for benchmarking."""
 
-    def __init__(self, name: str, description: str, keywords: List[str] | None = None):
+    def __init__(self, name: str, description: str, keywords: list[str] | None = None):
         self.name = name
         self.description = description
         self.keywords = keywords or []
@@ -239,7 +238,7 @@ class MockToolRegistry:
         self.num_tools = num_tools
         self._tools = self._create_mock_tools(num_tools)
 
-    def _create_mock_tools(self, num_tools: int) -> List[MockTool]:
+    def _create_mock_tools(self, num_tools: int) -> list[MockTool]:
         """Create mock tools with realistic descriptions."""
         tools = []
         tool_templates = [
@@ -270,7 +269,7 @@ class MockToolRegistry:
 
         return tools
 
-    def list_tools(self) -> List[MockTool]:
+    def list_tools(self) -> list[MockTool]:
         return self._tools
 
 
@@ -398,7 +397,7 @@ def run_benchmark(
     return result
 
 
-def simulate_uncached_selection(tools: List[str]) -> float:
+def simulate_uncached_selection(tools: list[str]) -> float:
     """Simulate uncached tool selection (baseline).
 
     This simulates the time for:

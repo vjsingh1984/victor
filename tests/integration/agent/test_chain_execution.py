@@ -25,12 +25,9 @@ from __future__ import annotations
 
 import asyncio
 import pytest
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
 
 from victor.framework.chain_registry import (
-    ChainRegistry,
-    ChainMetadata,
     get_chain_registry,
     register_chain,
     get_chain,
@@ -41,17 +38,9 @@ from victor.framework.chain_registry import (
 from victor.tools.composition import (
     Runnable,
     RunnableConfig,
-    RunnableSequence,
     RunnableParallel,
     RunnableBranch,
     RunnableLambda,
-    RunnablePassthrough,
-    as_runnable,
-    chain as chain_helper,
-    parallel,
-    branch,
-    extract_output,
-    map_keys,
 )
 
 
@@ -78,7 +67,7 @@ def mock_tool():
         description = "A mock tool for testing"
         parameters = {"type": "object", "properties": {"input": {"type": "string"}}}
 
-        async def execute(self, ctx: Dict[str, Any], **kwargs) -> ToolResult:
+        async def execute(self, ctx: dict[str, Any], **kwargs) -> ToolResult:
             return ToolResult(
                 success=True,
                 output={"processed": kwargs.get("input", "default")},

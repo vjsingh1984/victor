@@ -42,7 +42,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 from victor.config.orchestrator_constants import (
     COMPACTION_CONFIG,
@@ -218,7 +218,7 @@ class CompactionAction:
     tokens_freed: int = 0
     truncations_applied: int = 0
     new_utilization: float = 0.0
-    details: List[str] = field(default_factory=list)
+    details: list[str] = field(default_factory=list)
 
     @property
     def action_taken(self) -> bool:
@@ -338,7 +338,7 @@ class ContextCompactor:
                 return True
         return False
 
-    def _assign_priority(self, message: Dict[str, Any]) -> MessagePriority:
+    def _assign_priority(self, message: dict[str, Any]) -> MessagePriority:
         """Assign priority level to a message for compaction decisions.
 
         Priority levels determine which messages are compacted first:
@@ -429,7 +429,7 @@ class ContextCompactor:
                 )
                 if recommendation is not None:
                     # recommendation.value is a dict with "action" and "config"
-                    value_dict = cast(Dict[str, Any], recommendation.value)
+                    value_dict = cast(dict[str, Any], recommendation.value)
                     rl_action = value_dict.get("action")
                     rl_config = value_dict.get("config", {})
                     self._last_rl_action = rl_action
@@ -564,7 +564,7 @@ class ContextCompactor:
         finally:
             self._last_rl_action = None
 
-    def should_compact(self) -> Tuple[bool, CompactionTrigger]:
+    def should_compact(self) -> tuple[bool, CompactionTrigger]:
         """Check if compaction should be performed.
 
         Returns:
@@ -701,7 +701,7 @@ class ContextCompactor:
                     priority_indices.add(i)
 
         # Build truncated output
-        result_lines: List[str] = []
+        result_lines: list[str] = []
         char_count = 0
         half_lines = max(1, max_lines // 2)
 
@@ -723,7 +723,7 @@ class ContextCompactor:
 
         # Keep last portion and any priority lines in between
         remaining_chars = max_chars - char_count - 50  # Leave room for marker
-        remaining_lines: List[str] = []
+        remaining_lines: list[str] = []
 
         for i, line in enumerate(lines[-half_lines:]):
             actual_idx = len(lines) - half_lines + i
@@ -826,7 +826,7 @@ class ContextCompactor:
     # Statistics and Metrics
     # ========================================================================
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get compactor statistics.
 
         Returns:
@@ -861,7 +861,7 @@ class ContextCompactor:
             "truncation_enabled": self.config.enable_tool_truncation,
         }
 
-    def get_compaction_history(self) -> List[str]:
+    def get_compaction_history(self) -> list[str]:
         """Get summaries of past compactions.
 
         Returns:
@@ -926,7 +926,7 @@ class ContextCompactor:
 
         return action
 
-    async def should_compact_async(self) -> Tuple[bool, CompactionTrigger]:
+    async def should_compact_async(self) -> tuple[bool, CompactionTrigger]:
         """Check if compaction should be performed (async).
 
         Returns:
@@ -1028,7 +1028,7 @@ class ContextCompactor:
 
         logger.debug("ContextCompactor: Stopped background monitoring")
 
-    def get_async_statistics(self) -> Dict[str, Any]:
+    def get_async_statistics(self) -> dict[str, Any]:
         """Get async compactor statistics.
 
         Returns:

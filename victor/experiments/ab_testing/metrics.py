@@ -21,7 +21,7 @@ import sqlite3
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import numpy as np
 from scipy import stats  # type: ignore[import-untyped]
@@ -67,15 +67,15 @@ class MetricsCollector:
         self.buffer_size = buffer_size
 
         # Metrics buffer
-        self._metrics_buffer: List[ExecutionMetrics] = []
+        self._metrics_buffer: list[ExecutionMetrics] = []
 
         # In-memory aggregation cache
-        self._aggregation_cache: Dict[str, Dict[str, List[float]]] = defaultdict(
+        self._aggregation_cache: dict[str, dict[str, list[float]]] = defaultdict(
             lambda: defaultdict(list)
         )
 
         # Event subscription handles
-        self._subscription_handles: List[Any] = []
+        self._subscription_handles: list[Any] = []
 
     async def start(self) -> None:
         """Start collecting metrics from ObservabilityBus."""
@@ -276,7 +276,7 @@ class MetricsCollector:
 
     def _compute_aggregated_metrics(
         self,
-        cache: Dict[str, List[float]],
+        cache: dict[str, list[float]],
         variant_id: str,
     ) -> AggregatedMetrics:
         """Compute aggregated metrics from cache.
@@ -387,7 +387,7 @@ class MetricsCollector:
     async def get_all_variant_metrics(
         self,
         experiment_id: str,
-    ) -> Dict[str, AggregatedMetrics]:
+    ) -> dict[str, AggregatedMetrics]:
         """Get aggregated metrics for all variants in an experiment.
 
         Args:
@@ -426,7 +426,7 @@ class MetricsCollector:
         experiment_id: str,
         variant_id: Optional[str] = None,
         limit: int = 100,
-    ) -> List[ExecutionMetrics]:
+    ) -> list[ExecutionMetrics]:
         """Get raw execution metrics.
 
         Args:

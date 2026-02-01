@@ -22,10 +22,8 @@ Run with:
     pytest tests/smoke/test_coordinator_smoke.py -v -m smoke
 """
 
-import asyncio
 import pytest
-from typing import Optional
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock
 
 from victor.config.settings import Settings
 from victor.agent.orchestrator import AgentOrchestrator
@@ -423,7 +421,7 @@ class TestToolCallsSmokeTests:
     async def test_tool_execution(self):
         """Test basic tool execution."""
         from victor.tools.base import BaseTool
-        from typing import Dict, Any
+        from typing import Any
 
         # Create a simple test tool with all required abstract methods
         class TestTool(BaseTool):
@@ -436,7 +434,7 @@ class TestToolCallsSmokeTests:
                 },
             }
 
-            def execute(self, **kwargs) -> Dict[str, Any]:
+            def execute(self, **kwargs) -> dict[str, Any]:
                 return {"result": "success"}
 
         tool = TestTool()
@@ -688,7 +686,7 @@ class TestErrorRecoverySmokeTests:
 
     def test_http_error_handler_mixin(self):
         """Test HTTPErrorHandlerMixin can be used."""
-        from victor.providers.error_handler import HTTPErrorHandlerMixin, handle_provider_error
+        from victor.providers.error_handler import handle_provider_error
 
         # Test standalone function
         try:

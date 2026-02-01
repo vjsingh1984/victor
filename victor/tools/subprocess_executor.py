@@ -36,7 +36,7 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class CommandResult:
     working_dir: Optional[str] = None
     duration_ms: Optional[float] = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
         return {
             "success": self.success,
@@ -225,11 +225,11 @@ def check_pip_available() -> bool:
 
 
 def run_command(
-    args: Union[str, List[str]],
-    working_dir: Optional[Union[str, Path]] = None,
+    args: str | list[str],
+    working_dir: Optional[str | Path] = None,
     timeout: int = 60,
     check_dangerous: bool = True,
-    env: Optional[Dict[str, str]] = None,
+    env: Optional[dict[str, str]] = None,
     shell: bool = False,
 ) -> CommandResult:
     """Execute a command synchronously and return structured result.
@@ -367,10 +367,10 @@ def run_command(
 
 async def run_command_async(
     command: str,
-    working_dir: Optional[Union[str, Path]] = None,
+    working_dir: Optional[str | Path] = None,
     timeout: int = 60,
     check_dangerous: bool = True,
-    env: Optional[Dict[str, str]] = None,
+    env: Optional[dict[str, str]] = None,
 ) -> CommandResult:
     """Execute a shell command asynchronously and return structured result.
 
@@ -488,9 +488,9 @@ async def run_command_async(
 
 def run_git(
     *args: str,
-    working_dir: Optional[Union[str, Path]] = None,
+    working_dir: Optional[str | Path] = None,
     timeout: int = 30,
-) -> Tuple[bool, str, str]:
+) -> tuple[bool, str, str]:
     """Execute a git command.
 
     Args:
@@ -517,7 +517,7 @@ def run_git(
 def run_docker(
     *args: str,
     timeout: int = 300,
-) -> Tuple[bool, str, str]:
+) -> tuple[bool, str, str]:
     """Execute a docker command.
 
     Args:
@@ -541,9 +541,9 @@ def run_docker(
 
 def run_npm(
     *args: str,
-    working_dir: Optional[Union[str, Path]] = None,
+    working_dir: Optional[str | Path] = None,
     timeout: int = 300,
-) -> Tuple[bool, str, str]:
+) -> tuple[bool, str, str]:
     """Execute an npm command.
 
     Args:
@@ -570,7 +570,7 @@ def run_npm(
 def run_pip(
     *args: str,
     timeout: int = 300,
-) -> Tuple[bool, str, str]:
+) -> tuple[bool, str, str]:
     """Execute a pip command.
 
     Args:
@@ -591,9 +591,9 @@ def run_pip(
 
 async def run_git_async(
     *args: str,
-    working_dir: Optional[Union[str, Path]] = None,
+    working_dir: Optional[str | Path] = None,
     timeout: int = 30,
-) -> Tuple[bool, str, str]:
+) -> tuple[bool, str, str]:
     """Execute a git command asynchronously.
 
     Args:
@@ -621,7 +621,7 @@ async def run_git_async(
 async def run_docker_async(
     *args: str,
     timeout: int = 300,
-) -> Tuple[bool, str, str]:
+) -> tuple[bool, str, str]:
     """Execute a docker command asynchronously.
 
     Args:
@@ -646,9 +646,9 @@ async def run_docker_async(
 
 async def run_npm_async(
     *args: str,
-    working_dir: Optional[Union[str, Path]] = None,
+    working_dir: Optional[str | Path] = None,
     timeout: int = 300,
-) -> Tuple[bool, str, str]:
+) -> tuple[bool, str, str]:
     """Execute an npm command asynchronously.
 
     Args:
@@ -676,7 +676,7 @@ async def run_npm_async(
 async def run_pip_async(
     *args: str,
     timeout: int = 300,
-) -> Tuple[bool, str, str]:
+) -> tuple[bool, str, str]:
     """Execute a pip command asynchronously.
 
     Args:
@@ -701,7 +701,7 @@ async def run_pip_async(
 # =============================================================================
 
 
-def parse_git_status(stdout: str) -> Dict[str, List[str]]:
+def parse_git_status(stdout: str) -> dict[str, list[str]]:
     """Parse git status output into categorized files.
 
     Args:
@@ -710,7 +710,7 @@ def parse_git_status(stdout: str) -> Dict[str, List[str]]:
     Returns:
         Dictionary with 'staged', 'modified', 'untracked' file lists.
     """
-    result: Dict[str, List[str]] = {
+    result: dict[str, list[str]] = {
         "staged": [],
         "modified": [],
         "untracked": [],
@@ -736,7 +736,7 @@ def parse_git_status(stdout: str) -> Dict[str, List[str]]:
     return result
 
 
-def parse_docker_ps(stdout: str) -> List[Dict[str, str]]:
+def parse_docker_ps(stdout: str) -> list[dict[str, str]]:
     """Parse docker ps output into container information.
 
     Args:

@@ -37,13 +37,13 @@ Usage:
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
-from victor.framework.chain_registry import ChainRegistry, ChainMetadata, reset_chain_registry
+from victor.framework.chain_registry import ChainRegistry, reset_chain_registry
 from victor.framework.persona_registry import PersonaRegistry, PersonaSpec, reset_persona_registry
 from victor.framework.middleware import (
     GitSafetyMiddleware,
@@ -81,7 +81,7 @@ def create_mock_chain(n: int) -> Any:
     return mock
 
 
-def create_persona_spec(n: int, expertise_areas: List[str] | None = None) -> PersonaSpec:
+def create_persona_spec(n: int, expertise_areas: list[str] | None = None) -> PersonaSpec:
     """Create a test persona spec.
 
     Args:
@@ -108,7 +108,7 @@ class MockCapability:
     def __init__(self, name: str):
         self.name = name
 
-    def apply(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    def apply(self, context: dict[str, Any]) -> dict[str, Any]:
         """Mock apply method."""
         return {**context, f"applied_{self.name}": True}
 
@@ -130,10 +130,10 @@ class TestCapabilityProvider(BaseCapabilityProvider[MockCapability]):
             for i in range(num_capabilities)
         }
 
-    def get_capabilities(self) -> Dict[str, MockCapability]:
+    def get_capabilities(self) -> dict[str, MockCapability]:
         return self._capabilities
 
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+    def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
         return self._metadata
 
 
@@ -726,7 +726,6 @@ class TestMiddlewarePerformance:
 
         Expected: < 1ms for 10 middleware
         """
-        from victor.core.vertical_types import MiddlewarePriority
         from victor.framework.middleware import LoggingMiddleware, MetricsMiddleware
 
         middleware_list = [

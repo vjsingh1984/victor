@@ -49,7 +49,8 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
+from collections.abc import Callable
 
 from victor.storage.cache.config import CacheConfig
 from victor.storage.cache.tiered_cache import TieredCache
@@ -88,7 +89,7 @@ class CacheStats:
     disk_misses: int = 0
     total_sets: int = 0
     total_evictions: int = 0
-    namespaces: List[str] = field(default_factory=list)
+    namespaces: list[str] = field(default_factory=list)
 
     @property
     def hit_rate(self) -> float:
@@ -246,7 +247,7 @@ class CacheManager:
         """
         self._config = config or CacheConfig()
         self._cache = TieredCache(self._config)
-        self._namespaces: Dict[str, CacheNamespace] = {}
+        self._namespaces: dict[str, CacheNamespace] = {}
         self._lock = threading.Lock()
 
     @property

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class DocumentType(Enum):
@@ -89,14 +89,14 @@ class Chunk:
     end_char: int
     chunk_index: int = 0
     doc_type: str = "text"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def length(self) -> int:
         """Length of chunk content."""
         return len(self.content)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "content": self.content,
@@ -122,7 +122,7 @@ class SourceContent:
     content: str
     source: str
     doc_type: DocumentType = DocumentType.AUTO
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 __all__ = [

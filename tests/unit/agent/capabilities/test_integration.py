@@ -14,7 +14,6 @@
 
 """Integration tests for capability system."""
 
-import pytest
 
 from victor.agent.capability_registry import get_capability_registry, get_method_for_capability
 from victor.agent.capabilities.base import CapabilitySpec

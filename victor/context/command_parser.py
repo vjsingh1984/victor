@@ -33,7 +33,7 @@ SOLID Principles Applied:
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Set
+from typing import Optional, Any
 import re
 import logging
 import asyncio
@@ -51,7 +51,7 @@ class ContextItem:
     source: str  # Original reference (URL, path, etc.)
     content: str  # Resolved content
     tokens: int = 0  # Token count (set after resolution)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     success: bool = True
     error: Optional[str] = None
 
@@ -77,7 +77,7 @@ class ContextResolver(ABC):
         pass
 
     @abstractmethod
-    async def resolve(self, argument: str, context: Dict[str, Any]) -> ContextItem:
+    async def resolve(self, argument: str, context: dict[str, Any]) -> ContextItem:
         """
         Resolve the command and return context item.
 
@@ -108,7 +108,7 @@ class URLResolver(ContextResolver):
     def command_type(self) -> str:
         return "url"
 
-    async def resolve(self, argument: str, context: Dict[str, Any]) -> ContextItem:
+    async def resolve(self, argument: str, context: dict[str, Any]) -> ContextItem:
         url = argument.strip()
 
         # Validate URL
@@ -193,7 +193,7 @@ class FileResolver(ContextResolver):
     def __init__(
         self,
         max_file_size: int = 500000,
-        allowed_extensions: Optional[Set[str]] = None,
+        allowed_extensions: Optional[set[str]] = None,
     ) -> None:
         self.max_file_size = max_file_size
         self.allowed_extensions = allowed_extensions
@@ -202,7 +202,7 @@ class FileResolver(ContextResolver):
     def command_type(self) -> str:
         return "file"
 
-    async def resolve(self, argument: str, context: Dict[str, Any]) -> ContextItem:
+    async def resolve(self, argument: str, context: dict[str, Any]) -> ContextItem:
         working_dir = Path(context.get("working_directory", "."))
         file_path_str = argument.strip()
 
@@ -293,7 +293,7 @@ class FolderResolver(ContextResolver):
         max_files: int = 100,
         include_file_previews: bool = True,
         preview_lines: int = 10,
-        ignore_patterns: Optional[List[str]] = None,
+        ignore_patterns: Optional[list[str]] = None,
     ) -> None:
         self.max_depth = max_depth
         self.max_files = max_files
@@ -327,7 +327,7 @@ class FolderResolver(ContextResolver):
         return False
 
     def _build_tree(
-        self, path: Path, prefix: str = "", depth: int = 0, file_count: Optional[List[int]] = None
+        self, path: Path, prefix: str = "", depth: int = 0, file_count: Optional[list[int]] = None
     ) -> str:
         """Build a tree representation of the folder."""
         if file_count is None:
@@ -366,7 +366,7 @@ class FolderResolver(ContextResolver):
 
         return "".join(lines)
 
-    async def resolve(self, argument: str, context: Dict[str, Any]) -> ContextItem:
+    async def resolve(self, argument: str, context: dict[str, Any]) -> ContextItem:
         working_dir = Path(context.get("working_directory", "."))
         folder_path_str = argument.strip()
 
@@ -448,7 +448,7 @@ class ProblemsResolver(ContextResolver):
     def command_type(self) -> str:
         return "problems"
 
-    async def resolve(self, argument: str, context: Dict[str, Any]) -> ContextItem:
+    async def resolve(self, argument: str, context: dict[str, Any]) -> ContextItem:
         # Get diagnostics from LSP or workspace
         diagnostics = context.get("diagnostics", [])
         workspace_errors = context.get("workspace_errors", [])
@@ -497,14 +497,14 @@ class ContextCommandParser:
         re.IGNORECASE,
     )
 
-    def __init__(self, resolvers: Optional[Dict[str, ContextResolver]] = None) -> None:
+    def __init__(self, resolvers: Optional[dict[str, ContextResolver]] = None) -> None:
         """
         Initialize the parser with resolvers.
 
         Args:
             resolvers: Map of command type to resolver. If None, uses defaults.
         """
-        self._resolvers: Dict[str, ContextResolver] = {}
+        self._resolvers: dict[str, ContextResolver] = {}
 
         if resolvers:
             self._resolvers = resolvers
@@ -519,7 +519,7 @@ class ContextCommandParser:
         """Register a context resolver."""
         self._resolvers[resolver.command_type.lower()] = resolver
 
-    def parse(self, text: str) -> List[ParsedCommand]:
+    def parse(self, text: str) -> list[ParsedCommand]:
         """
         Parse @-commands from text.
 
@@ -559,8 +559,8 @@ class ContextCommandParser:
         return self.COMMAND_PATTERN.sub("", text).strip()
 
     async def resolve(
-        self, text: str, context: Optional[Dict[str, Any]] = None
-    ) -> tuple[str, List[ContextItem]]:
+        self, text: str, context: Optional[dict[str, Any]] = None
+    ) -> tuple[str, list[ContextItem]]:
         """
         Parse and resolve all @-commands in text.
 
@@ -608,7 +608,7 @@ def create_default_parser() -> ContextCommandParser:
 # Convenience function
 async def resolve_context_commands(
     text: str, working_directory: str = "."
-) -> tuple[str, List[ContextItem]]:
+) -> tuple[str, list[ContextItem]]:
     """
     Convenience function to parse and resolve context commands.
 

@@ -16,8 +16,8 @@
 
 import json
 import logging
-import os
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 from anthropic import AsyncAnthropic
 from anthropic.types import Message as AnthropicMessage
@@ -26,8 +26,6 @@ logger = logging.getLogger(__name__)
 
 from victor.core.errors import (
     ProviderConnectionError as CoreProviderConnectionError,
-    ProviderTimeoutError as CoreProviderTimeoutError,
-    ValidationError,
 )
 from victor.providers.base import (
     BaseProvider,
@@ -95,12 +93,12 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Anthropic.
@@ -172,12 +170,12 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Anthropic with tool-use support."""
@@ -212,9 +210,9 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
             if tools:
                 request_params["tools"] = self._convert_tools(tools)
 
-            tool_calls: Dict[str, Dict[str, Any]] = {}
-            block_index_to_id: Dict[int, str] = {}
-            usage: Optional[Dict[str, int]] = None
+            tool_calls: dict[str, dict[str, Any]] = {}
+            block_index_to_id: dict[int, str] = {}
+            usage: Optional[dict[str, int]] = None
 
             async with self.client.messages.stream(**request_params) as stream:
                 async for event in stream:
@@ -346,7 +344,7 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
             # Catch-all for truly unexpected errors
             raise self._handle_error(e, self.name)
 
-    def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def _convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert standard tools to Anthropic format."""
         return convert_tools_to_anthropic_format(tools)
 
@@ -415,7 +413,7 @@ class AnthropicProvider(BaseProvider, HTTPErrorHandlerMixin):
                 return raw_args
         return raw_args
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List available Anthropic Claude models.
 
         Returns a curated list of currently available Claude models.

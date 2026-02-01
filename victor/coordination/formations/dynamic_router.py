@@ -63,7 +63,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.types import AgentMessage, MemberResult
@@ -110,8 +110,8 @@ class DynamicRouterFormation(BaseFormationStrategy):
 
     def __init__(
         self,
-        category_to_role: Optional[Dict[str, str]] = None,
-        keyword_to_agent: Optional[Dict[str, str]] = None,
+        category_to_role: Optional[dict[str, str]] = None,
+        keyword_to_agent: Optional[dict[str, str]] = None,
     ):
         """Initialize the dynamic router formation.
 
@@ -157,10 +157,10 @@ class DynamicRouterFormation(BaseFormationStrategy):
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute task by routing to appropriate agent.
 
         Args:

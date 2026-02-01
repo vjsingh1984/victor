@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Type
+from typing import Any
 
 import yaml
 
@@ -69,10 +69,10 @@ class Capability:
         description: str = "",
         version: str = "0.5.0",
         enabled: bool = True,
-        dependencies: List[str] | None = None,
+        dependencies: list[str] | None = None,
         handler: str | None = None,
-        config: Dict[str, Any] | None = None,
-        metadata: Dict[str, Any] | None = None,
+        config: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ):
         self.name = name
         self.type = type
@@ -100,8 +100,8 @@ class CapabilitySet:
     def __init__(
         self,
         vertical_name: str,
-        capabilities: Dict[str, Capability] | None = None,
-        handlers: Dict[str, str] | None = None,
+        capabilities: dict[str, Capability] | None = None,
+        handlers: dict[str, str] | None = None,
     ):
         self.vertical_name = vertical_name
         self.capabilities = capabilities or {}
@@ -118,7 +118,7 @@ class CapabilitySet:
         """
         return self.capabilities.get(name)
 
-    def list_capabilities(self, capability_type: str | None = None) -> List[str]:
+    def list_capabilities(self, capability_type: str | None = None) -> list[str]:
         """List capabilities by type.
 
         Args:
@@ -159,7 +159,7 @@ class CapabilityLoader:
         review_cap = loader.get_capability("code_review")
     """
 
-    _instances: Dict[str, "CapabilityLoader"] = {}
+    _instances: dict[str, "CapabilityLoader"] = {}
 
     def __init__(self, config_dir: Path | None = None):
         """Initialize capability loader.
@@ -170,7 +170,7 @@ class CapabilityLoader:
         if config_dir is None:
             config_dir = Path(__file__).parent.parent.parent / "config" / "capabilities"
         self._config_dir = Path(config_dir)
-        self._capability_sets: Dict[str, CapabilitySet] = {}
+        self._capability_sets: dict[str, CapabilitySet] = {}
 
     @classmethod
     def from_vertical(cls, vertical_name: str) -> "CapabilityLoader":
@@ -282,7 +282,7 @@ class CapabilityLoader:
 
     def list_capabilities(
         self, vertical_name: str, capability_type: str | None = None
-    ) -> List[str]:
+    ) -> list[str]:
         """List capabilities for a vertical.
 
         Args:

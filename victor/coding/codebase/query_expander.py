@@ -24,7 +24,7 @@ This vertical-specific module:
 """
 
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Optional
 
 from victor.framework.search.query_expansion import (
     QueryExpander as FrameworkQueryExpander,
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # Conceptual query expansions for semantic code search
 # Maps conceptual terms to implementation-specific variations
-SEMANTIC_QUERY_EXPANSIONS: Dict[str, List[str]] = {
+SEMANTIC_QUERY_EXPANSIONS: dict[str, list[str]] = {
     # Tool/Plugin Architecture
     "tool registration": [
         "register tool",
@@ -288,7 +288,7 @@ class QueryExpander:
         ['tool registration', 'register tool', '@tool decorator', ...]
     """
 
-    def __init__(self, expansions: Optional[Dict[str, List[str]]] = None):
+    def __init__(self, expansions: Optional[dict[str, list[str]]] = None):
         """Initialize query expander.
 
         Args:
@@ -297,7 +297,7 @@ class QueryExpander:
         self.expansions = expansions or SEMANTIC_QUERY_EXPANSIONS
         self._base = FrameworkQueryExpander(QueryExpansionConfig(expansions=self.expansions))
 
-    def expand_query(self, query: str, max_expansions: int = 5) -> List[str]:
+    def expand_query(self, query: str, max_expansions: int = 5) -> list[str]:
         """Expand query with synonyms and related terms.
 
         Args:
@@ -326,7 +326,7 @@ class QueryExpander:
         """
         return self._base.is_expandable(query)
 
-    def get_expansion_terms(self, query: str) -> Set[str]:
+    def get_expansion_terms(self, query: str) -> set[str]:
         """Get all expansion terms for a query without deduplication.
 
         Args:
@@ -354,7 +354,7 @@ def get_query_expander() -> QueryExpander:
     return _query_expander
 
 
-def expand_query(query: str, max_expansions: int = 5) -> List[str]:
+def expand_query(query: str, max_expansions: int = 5) -> list[str]:
     """Convenience function to expand a query using global expander.
 
     Args:

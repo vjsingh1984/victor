@@ -14,20 +14,15 @@ Phase 7.5: Externalize tool configuration from _internal.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
-    Union,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
@@ -52,12 +47,12 @@ class ToolConfiguratorProtocol(Protocol):
     def configure(
         self,
         orchestrator: "AgentOrchestrator",
-        tools: Union["ToolSet", List[str]],
+        tools: "ToolSet" | list[str],
     ) -> None:
         """Apply tool configuration to orchestrator."""
         ...
 
-    def get_enabled_tools(self) -> Set[str]:
+    def get_enabled_tools(self) -> set[str]:
         """Get set of currently enabled tool names."""
         ...
 
@@ -68,9 +63,9 @@ class ToolFilterProtocol(Protocol):
 
     def filter(
         self,
-        available_tools: Set[str],
-        context: Dict[str, Any],
-    ) -> Set[str]:
+        available_tools: set[str],
+        context: dict[str, Any],
+    ) -> set[str]:
         """Filter available tools based on context."""
         ...
 
@@ -107,10 +102,10 @@ class ToolConfigEntry:
     category: ToolCategory = ToolCategory.CUSTOM
     priority: int = 0  # Higher = more likely to be selected
     cost_tier: str = "low"
-    constraints: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    constraints: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -128,10 +123,10 @@ class ToolConfigResult:
     """Result of tool configuration operation."""
 
     success: bool
-    enabled_tools: Set[str]
-    disabled_tools: Set[str]
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    enabled_tools: set[str]
+    disabled_tools: set[str]
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 # =============================================================================
@@ -175,9 +170,9 @@ class ToolConfigurator:
 
     def __init__(self) -> None:
         """Initialize configurator."""
-        self._tool_catalog: Dict[str, ToolConfigEntry] = {}
-        self._filters: List[ToolFilterProtocol] = []
-        self._hooks: Dict[str, List[Callable[..., Any]]] = {
+        self._tool_catalog: dict[str, ToolConfigEntry] = {}
+        self._filters: list[ToolFilterProtocol] = []
+        self._hooks: dict[str, list[Callable[..., Any]]] = {
             "pre_configure": [],
             "post_configure": [],
         }
@@ -200,7 +195,6 @@ class ToolConfigurator:
         Returns:
             Configuration result
         """
-        from victor.framework.tools import ToolSet
 
         enabled_tools = set(toolset.get_tool_names())
         return self._apply_tools(orchestrator, enabled_tools, ToolConfigMode.REPLACE)
@@ -208,7 +202,7 @@ class ToolConfigurator:
     def configure(
         self,
         orchestrator: "AgentOrchestrator",
-        tools: Union["ToolSet", List[str], Set[str]],
+        tools: "ToolSet" | list[str] | set[str],
         mode: ToolConfigMode = ToolConfigMode.REPLACE,
     ) -> ToolConfigResult:
         """Configure tools on orchestrator.
@@ -257,9 +251,9 @@ class ToolConfigurator:
     def _apply_tools(
         self,
         orchestrator: "AgentOrchestrator",
-        enabled_tools: Set[str],
+        enabled_tools: set[str],
         mode: ToolConfigMode,
-        excluded: Optional[Set[str]] = None,
+        excluded: Optional[set[str]] = None,
     ) -> ToolConfigResult:
         """Internal method to apply tool configuration.
 
@@ -273,8 +267,8 @@ class ToolConfigurator:
             Configuration result
         """
         excluded = excluded or set()
-        errors: List[str] = []
-        warnings: List[str] = []
+        errors: list[str] = []
+        warnings: list[str] = []
 
         # Run pre-configure hooks
         for hook in self._hooks.get("pre_configure", []):
@@ -339,7 +333,7 @@ class ToolConfigurator:
     # Orchestrator Interaction
     # -------------------------------------------------------------------------
 
-    def _get_available_tools(self, orchestrator: "AgentOrchestrator") -> Set[str]:
+    def _get_available_tools(self, orchestrator: "AgentOrchestrator") -> set[str]:
         """Get all available tools from orchestrator.
 
         Args:
@@ -369,7 +363,7 @@ class ToolConfigurator:
 
         return set()
 
-    def _get_current_tools(self, orchestrator: "AgentOrchestrator") -> Set[str]:
+    def _get_current_tools(self, orchestrator: "AgentOrchestrator") -> set[str]:
         """Get currently enabled tools.
 
         Args:
@@ -389,7 +383,7 @@ class ToolConfigurator:
     def _set_orchestrator_tools(
         self,
         orchestrator: "AgentOrchestrator",
-        tools: Set[str],
+        tools: set[str],
     ) -> None:
         """Set enabled tools on orchestrator.
 
@@ -473,11 +467,11 @@ class ToolConfigurator:
 class ToolConfig:
     """Immutable tool configuration."""
 
-    enabled_tools: Set[str] = field(default_factory=set)
-    disabled_tools: Set[str] = field(default_factory=set)
+    enabled_tools: set[str] = field(default_factory=set)
+    disabled_tools: set[str] = field(default_factory=set)
     mode: ToolConfigMode = ToolConfigMode.REPLACE
-    categories: Set[ToolCategory] = field(default_factory=set)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    categories: set[ToolCategory] = field(default_factory=set)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def with_enabled(self, *tools: str) -> "ToolConfig":
         """Create new config with additional enabled tools."""
@@ -521,7 +515,7 @@ class ToolConfigBuilder:
     """
 
     @staticmethod
-    def get_category_tools(category: ToolCategory) -> Set[str]:
+    def get_category_tools(category: ToolCategory) -> set[str]:
         """Get tools for a category using the registry.
 
         This replaces static CATEGORY_TOOLS with dynamic registry lookup.
@@ -537,11 +531,11 @@ class ToolConfigBuilder:
 
     def __init__(self) -> None:
         """Initialize builder."""
-        self._enabled: Set[str] = set()
-        self._disabled: Set[str] = set()
+        self._enabled: set[str] = set()
+        self._disabled: set[str] = set()
         self._mode: ToolConfigMode = ToolConfigMode.REPLACE
-        self._categories: Set[ToolCategory] = set()
-        self._metadata: Dict[str, Any] = {}
+        self._categories: set[ToolCategory] = set()
+        self._metadata: dict[str, Any] = {}
 
     def mode(self, mode: ToolConfigMode) -> "ToolConfigBuilder":
         """Set configuration mode.
@@ -667,7 +661,7 @@ def configure_tools_from_toolset(
 
 def configure_tools(
     orchestrator: "AgentOrchestrator",
-    tools: Union["ToolSet", List[str], Set[str]],
+    tools: "ToolSet" | list[str] | set[str],
     mode: ToolConfigMode = ToolConfigMode.REPLACE,
 ) -> ToolConfigResult:
     """Convenience function to configure tools.
@@ -703,9 +697,9 @@ class AirgappedFilter:
 
     def filter(
         self,
-        available_tools: Set[str],
-        context: Dict[str, Any],
-    ) -> Set[str]:
+        available_tools: set[str],
+        context: dict[str, Any],
+    ) -> set[str]:
         """Remove network tools.
 
         Args:
@@ -732,9 +726,9 @@ class CostTierFilter:
 
     def filter(
         self,
-        available_tools: Set[str],
-        context: Dict[str, Any],
-    ) -> Set[str]:
+        available_tools: set[str],
+        context: dict[str, Any],
+    ) -> set[str]:
         """Filter by cost tier.
 
         Args:
@@ -769,9 +763,9 @@ class SecurityFilter:
 
     def filter(
         self,
-        available_tools: Set[str],
-        context: Dict[str, Any],
-    ) -> Set[str]:
+        available_tools: set[str],
+        context: dict[str, Any],
+    ) -> set[str]:
         """Filter dangerous tools.
 
         Args:

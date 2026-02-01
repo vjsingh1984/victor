@@ -25,8 +25,7 @@ following SRP (Single Responsibility Principle).
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
-from typing import Set
+from unittest.mock import Mock
 
 from victor.agent.coordinators.tool_access_coordinator import (
     ToolAccessCoordinator,

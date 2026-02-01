@@ -19,15 +19,12 @@ but was not wired into step handlers (dead code). These tests verify the
 adapter is properly integrated.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
-from typing import Dict, List, Any
+from unittest.mock import MagicMock
+from typing import Any
 
-from victor.agent.vertical_context import VerticalContext, create_vertical_context
+from victor.agent.vertical_context import create_vertical_context
 from victor.core.verticals.prompt_adapter import (
     PromptContributorAdapter,
-    CompositePromptContributor,
-    create_prompt_adapter,
 )
 from victor.core.verticals.protocols import TaskTypeHint
 from victor.framework.step_handlers import PromptStepHandler
@@ -41,7 +38,7 @@ from victor.framework.step_handlers import PromptStepHandler
 class MockContributorLegacyFormat:
     """Legacy format contributor (dict-based hints)."""
 
-    def get_task_type_hints(self) -> Dict[str, dict]:
+    def get_task_type_hints(self) -> dict[str, dict]:
         """Return hints in legacy dict format."""
         return {
             "edit": {"hint": "Read file first", "tool_budget": 5},
@@ -61,7 +58,7 @@ class MockContributorLegacyFormat:
 class MockContributorStringFormat:
     """String format contributor (simple string hints)."""
 
-    def get_task_type_hints(self) -> Dict[str, str]:
+    def get_task_type_hints(self) -> dict[str, str]:
         """Return hints in simple string format."""
         return {
             "refactor": "Preserve existing tests",
@@ -81,7 +78,7 @@ class MockContributorStringFormat:
 class MockContributorProtocolFormat:
     """Protocol-compliant contributor (TaskTypeHint objects)."""
 
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
         """Return hints as TaskTypeHint objects."""
         return {
             "implement": TaskTypeHint(
@@ -106,8 +103,8 @@ class MockOrchestrator:
     """Mock orchestrator for testing."""
 
     def __init__(self):
-        self._task_hints: Dict[str, Any] = {}
-        self._prompt_sections: List[str] = []
+        self._task_hints: dict[str, Any] = {}
+        self._prompt_sections: list[str] = []
         self.prompt_builder = MagicMock()
         self.prompt_builder.set_task_type_hints = MagicMock()
         self.prompt_builder.add_prompt_section = MagicMock()

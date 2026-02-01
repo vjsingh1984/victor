@@ -42,7 +42,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, Tuple, List, Optional, Any, runtime_checkable, TYPE_CHECKING
+from typing import Protocol, Any, runtime_checkable, TYPE_CHECKING
 from enum import Enum
 
 if TYPE_CHECKING:
@@ -82,7 +82,7 @@ class ProviderCapabilities:
     quality_threshold: float = 0.80
     supports_thinking_tags: bool = False
     thinking_tag_format: str = ""
-    continuation_markers: List[str] = field(default_factory=list)
+    continuation_markers: list[str] = field(default_factory=list)
     max_continuation_attempts: int = 5
     tool_call_format: ToolCallFormat = ToolCallFormat.OPENAI
     output_deduplication: bool = False
@@ -163,7 +163,7 @@ class IProviderAdapter(Protocol):
         """
         ...
 
-    def extract_thinking_content(self, response: str) -> Tuple[str, str]:
+    def extract_thinking_content(self, response: str) -> tuple[str, str]:
         """Extract thinking tags and content separately.
 
         Args:
@@ -175,7 +175,7 @@ class IProviderAdapter(Protocol):
         """
         ...
 
-    def normalize_tool_calls(self, raw_calls: List[Any]) -> List[ToolCall]:
+    def normalize_tool_calls(self, raw_calls: list[Any]) -> list[ToolCall]:
         """Normalize tool calls to standard format.
 
         Args:
@@ -186,7 +186,7 @@ class IProviderAdapter(Protocol):
         """
         ...
 
-    def should_retry(self, error: Exception) -> Tuple[bool, float]:
+    def should_retry(self, error: Exception) -> tuple[bool, float]:
         """Determine if error is retryable and backoff time.
 
         Args:
@@ -229,7 +229,7 @@ class BaseProviderAdapter:
 
         return False
 
-    def extract_thinking_content(self, response: str) -> Tuple[str, str]:
+    def extract_thinking_content(self, response: str) -> tuple[str, str]:
         """Default thinking content extraction.
 
         Returns the full response as main content if no thinking tags.
@@ -240,7 +240,7 @@ class BaseProviderAdapter:
         # Default implementation - subclasses should override
         return ("", response)
 
-    def normalize_tool_calls(self, raw_calls: List[Any]) -> List[ToolCall]:
+    def normalize_tool_calls(self, raw_calls: list[Any]) -> list[ToolCall]:
         """Default tool call normalization for OpenAI format.
 
         Args:
@@ -274,7 +274,7 @@ class BaseProviderAdapter:
                 )
         return normalized
 
-    def should_retry(self, error: Exception) -> Tuple[bool, float]:
+    def should_retry(self, error: Exception) -> tuple[bool, float]:
         """Default retry logic with exponential backoff.
 
         Returns (True, backoff_seconds) for retryable errors.
@@ -350,7 +350,7 @@ class DeepSeekAdapter(BaseProviderAdapter):
 
         return False
 
-    def extract_thinking_content(self, response: str) -> Tuple[str, str]:
+    def extract_thinking_content(self, response: str) -> tuple[str, str]:
         """Extract <think>...</think> tags from DeepSeek responses."""
         import re
 
@@ -443,7 +443,7 @@ class AnthropicAdapter(BaseProviderAdapter):
             requires_thinking_time=False,  # Responds quickly
         )
 
-    def normalize_tool_calls(self, raw_calls: List[Any]) -> List[ToolCall]:
+    def normalize_tool_calls(self, raw_calls: list[Any]) -> list[ToolCall]:
         """Normalize Anthropic's content block format."""
         normalized = []
         for i, call in enumerate(raw_calls):
@@ -512,7 +512,7 @@ class GoogleAdapter(BaseProviderAdapter):
             requires_thinking_time=False,  # Responds reasonably fast
         )
 
-    def normalize_tool_calls(self, raw_calls: List[Any]) -> List[ToolCall]:
+    def normalize_tool_calls(self, raw_calls: list[Any]) -> list[ToolCall]:
         """Normalize Google's FunctionCall format."""
         normalized = []
         for i, call in enumerate(raw_calls):
@@ -625,7 +625,7 @@ class LMStudioAdapter(BaseProviderAdapter):
         model_lower = model.lower()
         return any(pattern in model_lower for pattern in self.TOOL_CAPABLE_MODELS)
 
-    def extract_thinking_content(self, response: str) -> Tuple[str, str]:
+    def extract_thinking_content(self, response: str) -> tuple[str, str]:
         """Extract <think>...</think> tags from LMStudio model responses.
 
         Handles Qwen3 and DeepSeek-R1 models that output thinking tags.
@@ -668,7 +668,7 @@ class LMStudioAdapter(BaseProviderAdapter):
 
         return False
 
-    def should_retry(self, error: Exception) -> Tuple[bool, float]:
+    def should_retry(self, error: Exception) -> tuple[bool, float]:
         """LMStudio-specific retry logic for local server issues."""
         error_str = str(error).lower()
 
@@ -759,7 +759,7 @@ class LlamaCppAdapter(BaseProviderAdapter):
             requires_thinking_time=True,  # CPU inference is slow
         )
 
-    def should_retry(self, error: Exception) -> Tuple[bool, float]:
+    def should_retry(self, error: Exception) -> tuple[bool, float]:
         """llama.cpp-specific retry logic for CPU inference issues."""
         error_str = str(error).lower()
 
@@ -807,7 +807,7 @@ class GroqAdapter(BaseProviderAdapter):
             requires_thinking_time=False,  # Ultra-fast inference
         )
 
-    def should_retry(self, error: Exception) -> Tuple[bool, float]:
+    def should_retry(self, error: Exception) -> tuple[bool, float]:
         """Groq-specific retry for rate limiting (free tier)."""
         error_str = str(error).lower()
 
@@ -995,7 +995,7 @@ class BedrockAdapter(BaseProviderAdapter):
             requires_thinking_time=False,  # Fast responses
         )
 
-    def normalize_tool_calls(self, raw_calls: List[Any]) -> List[ToolCall]:
+    def normalize_tool_calls(self, raw_calls: list[Any]) -> list[ToolCall]:
         """Normalize Bedrock's tool calls (varies by underlying model)."""
         normalized = []
         for i, call in enumerate(raw_calls):
@@ -1053,7 +1053,7 @@ class VertexAIAdapter(BaseProviderAdapter):
             requires_thinking_time=False,  # Reasonably fast
         )
 
-    def normalize_tool_calls(self, raw_calls: List[Any]) -> List[ToolCall]:
+    def normalize_tool_calls(self, raw_calls: list[Any]) -> list[ToolCall]:
         """Use Google adapter's normalization for Vertex."""
         google_adapter = GoogleAdapter()
         return google_adapter.normalize_tool_calls(raw_calls)
@@ -1148,7 +1148,7 @@ class ReplicateAdapter(BaseProviderAdapter):
             requires_thinking_time=True,  # Cold start delays
         )
 
-    def should_retry(self, error: Exception) -> Tuple[bool, float]:
+    def should_retry(self, error: Exception) -> tuple[bool, float]:
         """Replicate-specific retry for cold starts."""
         error_str = str(error).lower()
 

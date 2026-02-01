@@ -1,6 +1,6 @@
 """Data Analysis Prompt Contributor - Task hints for data science workflows."""
 
-from typing import Dict, Optional
+from typing import Optional
 
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
 from victor.core.vertical_types import StandardTaskHints
@@ -9,7 +9,7 @@ from victor.core.vertical_types import StandardTaskHints
 # Data analysis-specific task type hints
 # Keys align with TaskTypeClassifier task types (data_analysis, visualization)
 # Also includes granular hints for specific analysis methods
-DATA_ANALYSIS_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
+DATA_ANALYSIS_TASK_TYPE_HINTS: dict[str, TaskTypeHint] = {
     # Classifier task types (matched by TaskTypeClassifier)
     "data_analysis": TaskTypeHint(
         task_type="data_analysis",
@@ -121,7 +121,7 @@ DATA_ANALYSIS_TASK_TYPE_HINTS = StandardTaskHints.merge_with(DATA_ANALYSIS_TASK_
 class DataAnalysisPromptContributor(PromptContributorProtocol):
     """Contributes data analysis-specific prompts and task hints."""
 
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
         """Return data analysis-specific task type hints.
 
         Returns:

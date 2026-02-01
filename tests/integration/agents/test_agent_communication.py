@@ -30,7 +30,7 @@ Tests exercise the real implementations in:
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 import pytest
 
@@ -60,10 +60,10 @@ class CommunicationTestRole:
     """Role for communication testing."""
 
     name: str = "comm_test_role"
-    capabilities: Set[AgentCapability] = field(
+    capabilities: set[AgentCapability] = field(
         default_factory=lambda: {AgentCapability.COMMUNICATE}
     )
-    allowed_tools: Set[str] = field(default_factory=set)
+    allowed_tools: set[str] = field(default_factory=set)
     tool_budget: int = 10
 
     def get_system_prompt_section(self) -> str:
@@ -86,8 +86,8 @@ class CommunicationTestAgent:
         self.response_content = response_content
 
         # Tracking
-        self.received_messages: List[AgentMessage] = []
-        self.sent_responses: List[AgentMessage] = []
+        self.received_messages: list[AgentMessage] = []
+        self.sent_responses: list[AgentMessage] = []
 
     @property
     def id(self) -> str:
@@ -101,7 +101,7 @@ class CommunicationTestAgent:
     def persona(self):
         return self._persona
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> str:
         return f"Task executed by {self.id}"
 
     async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
@@ -147,7 +147,7 @@ def shared_memory() -> TeamSharedMemory:
 
 
 @pytest.fixture
-def three_comm_agents() -> List[CommunicationTestAgent]:
+def three_comm_agents() -> list[CommunicationTestAgent]:
     """Create three agents for communication tests."""
     return [
         CommunicationTestAgent("agent_1"),
@@ -170,7 +170,7 @@ class TestBroadcastMessaging:
     async def test_broadcast_delivers_to_all_members(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_comm_agents: List[CommunicationTestAgent],
+        three_comm_agents: list[CommunicationTestAgent],
     ):
         """Broadcast delivers message to all team members."""
         for agent in three_comm_agents:
@@ -193,7 +193,7 @@ class TestBroadcastMessaging:
     async def test_broadcast_returns_all_responses(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_comm_agents: List[CommunicationTestAgent],
+        three_comm_agents: list[CommunicationTestAgent],
     ):
         """Broadcast returns responses from all members."""
         for agent in three_comm_agents:
@@ -215,7 +215,7 @@ class TestBroadcastMessaging:
     async def test_broadcast_responses_contain_correct_senders(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_comm_agents: List[CommunicationTestAgent],
+        three_comm_agents: list[CommunicationTestAgent],
     ):
         """Broadcast responses correctly identify senders."""
         for agent in three_comm_agents:
@@ -238,7 +238,7 @@ class TestBroadcastMessaging:
     async def test_broadcast_preserves_message_type(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_comm_agents: List[CommunicationTestAgent],
+        three_comm_agents: list[CommunicationTestAgent],
     ):
         """Broadcast preserves the original message type."""
         for agent in three_comm_agents:
@@ -260,7 +260,7 @@ class TestBroadcastMessaging:
     async def test_broadcast_preserves_metadata(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_comm_agents: List[CommunicationTestAgent],
+        three_comm_agents: list[CommunicationTestAgent],
     ):
         """Broadcast preserves message metadata."""
         for agent in three_comm_agents:
@@ -297,7 +297,7 @@ class TestDirectMessaging:
     async def test_direct_message_to_specific_agent(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_comm_agents: List[CommunicationTestAgent],
+        three_comm_agents: list[CommunicationTestAgent],
     ):
         """Direct message is delivered only to specified agent."""
         for agent in three_comm_agents:
@@ -345,7 +345,7 @@ class TestDirectMessaging:
     async def test_direct_message_to_nonexistent_agent(
         self,
         coordinator: UnifiedTeamCoordinator,
-        three_comm_agents: List[CommunicationTestAgent],
+        three_comm_agents: list[CommunicationTestAgent],
     ):
         """Direct message to nonexistent agent returns None."""
         for agent in three_comm_agents:

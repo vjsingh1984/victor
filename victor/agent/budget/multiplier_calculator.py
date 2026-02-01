@@ -22,9 +22,8 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
-from typing import Optional
 
-from victor.agent.protocols import BudgetType, IMultiplierCalculator
+from victor.agent.protocols import IMultiplierCalculator
 
 logger = logging.getLogger(__name__)
 

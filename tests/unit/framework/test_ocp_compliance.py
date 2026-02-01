@@ -22,11 +22,8 @@ CRITICAL: These tests ensure the framework can load new verticals without
 hardcoded imports, which is essential for the plugin architecture.
 """
 
-import ast
-import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Set, Tuple
 
 import pytest
 

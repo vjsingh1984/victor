@@ -19,7 +19,6 @@ including error handling, reporting, and recovery.
 """
 
 import pytest
-from pathlib import Path
 
 from victor.core.errors import (
     ProviderNotFoundError,

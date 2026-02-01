@@ -60,7 +60,6 @@ Example:
 from __future__ import annotations
 
 import logging
-import sys
 import threading
 import time
 import tracemalloc
@@ -70,14 +69,11 @@ from enum import Enum
 from functools import wraps
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Set,
     TypeVar,
     cast,
 )
+from collections.abc import Callable
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -115,7 +111,7 @@ class LoadingStats:
     """
 
     total_load_time_ms: float = 0.0
-    component_load_times: Dict[str, float] = field(default_factory=dict)
+    component_load_times: dict[str, float] = field(default_factory=dict)
     hit_count: int = 0
     miss_count: int = 0
     memory_usage_bytes: int = 0
@@ -156,7 +152,7 @@ class ComponentDescriptor:
 
     key: str
     loader: Callable[[], Any]
-    dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
     loaded: bool = False
     instance: Optional[Any] = None
     load_time_ms: float = 0.0
@@ -215,9 +211,9 @@ class LazyComponentLoader:
             adaptive_threshold: Access frequency threshold for adaptive preloading
             max_cache_size: Maximum number of components to keep loaded
         """
-        self._components: Dict[str, ComponentDescriptor] = {}
+        self._components: dict[str, ComponentDescriptor] = {}
         self._lock = threading.RLock()
-        self._loading: Set[str] = set()
+        self._loading: set[str] = set()
         self._stats = LoadingStats()
         self._enable_memory_tracking = False
 
@@ -225,20 +221,20 @@ class LazyComponentLoader:
         self._strategy = strategy
         self._adaptive_threshold = adaptive_threshold
         self._max_cache_size = max_cache_size
-        self._dependency_graph: Dict[str, Set[str]] = defaultdict(set)
+        self._dependency_graph: dict[str, set[str]] = defaultdict(set)
 
         # Service container integration
         self._container: Optional[ServiceContainer] = None
 
         # LRU access tracking
         self._access_counter: int = 0
-        self._access_order: Dict[str, int] = {}
+        self._access_order: dict[str, int] = {}
 
     def register_component(
         self,
         key: str,
         loader: Callable[[], Any],
-        dependencies: Optional[List[str]] = None,
+        dependencies: Optional[list[str]] = None,
     ) -> None:
         """Register a component for lazy loading.
 
@@ -323,7 +319,7 @@ class LazyComponentLoader:
         else:  # LAZY (default)
             return self._load_component(key)
 
-    def preload_components(self, keys: List[str]) -> None:
+    def preload_components(self, keys: list[str]) -> None:
         """Preload multiple components.
 
         Useful for loading critical components during initialization
@@ -367,7 +363,7 @@ class LazyComponentLoader:
                 self._access_order.pop(key, None)
                 logger.debug(f"Unloaded component: {key}")
 
-    def get_loaded_components(self) -> List[str]:
+    def get_loaded_components(self) -> list[str]:
         """Get list of currently loaded components.
 
         Returns:
@@ -463,7 +459,7 @@ class LazyComponentLoader:
         descriptor = self._components.get(key)
         return descriptor.loaded if descriptor else False
 
-    def list_loaded(self) -> List[str]:
+    def list_loaded(self) -> list[str]:
         """List all currently loaded components.
 
         Returns:
@@ -472,7 +468,7 @@ class LazyComponentLoader:
         with self._lock:
             return [key for key, desc in self._components.items() if desc.loaded]
 
-    def list_registered(self) -> List[str]:
+    def list_registered(self) -> list[str]:
         """List all registered components.
 
         Returns:
@@ -738,7 +734,7 @@ class LazyComponentLoader:
     def _has_circular_dependency(
         self,
         key: str,
-        dependencies: List[str],
+        dependencies: list[str],
     ) -> bool:
         """Check for circular dependencies in component graph.
 

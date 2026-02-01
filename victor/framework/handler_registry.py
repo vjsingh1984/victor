@@ -37,8 +37,9 @@ Example:
 
 import importlib
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from dataclasses import dataclass
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ class HandlerRegistry:
 
     def __init__(self) -> None:
         """Initialize empty handler registry."""
-        self._handlers: Dict[str, HandlerEntry] = {}
+        self._handlers: dict[str, HandlerEntry] = {}
 
     @classmethod
     def get_instance(cls) -> "HandlerRegistry":
@@ -175,7 +176,7 @@ class HandlerRegistry:
         """
         return name in self._handlers
 
-    def list_handlers(self) -> List[str]:
+    def list_handlers(self) -> list[str]:
         """List all registered handler names.
 
         Returns:
@@ -183,7 +184,7 @@ class HandlerRegistry:
         """
         return list(self._handlers.keys())
 
-    def list_entries(self) -> List[HandlerEntry]:
+    def list_entries(self) -> list[HandlerEntry]:
         """List all handler entries with metadata.
 
         Returns:
@@ -191,7 +192,7 @@ class HandlerRegistry:
         """
         return list(self._handlers.values())
 
-    def list_by_vertical(self, vertical: str) -> List[str]:
+    def list_by_vertical(self, vertical: str) -> list[str]:
         """List handlers for a specific vertical.
 
         Args:
@@ -210,7 +211,7 @@ class HandlerRegistry:
     def register_from_vertical(
         self,
         vertical_name: str,
-        handlers: Dict[str, Any],
+        handlers: dict[str, Any],
         replace: bool = False,
     ) -> int:
         """Bulk register handlers from a vertical.
@@ -239,7 +240,7 @@ class HandlerRegistry:
         *,
         direction: str = "bidirectional",
         replace: bool = False,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """Bridge to workflows/executor.py global handler dict.
 
         Synchronizes handlers between this registry and the executor's
@@ -375,7 +376,7 @@ class HandlerRegistry:
         logger.info(f"Discovered {count} handlers from {module_path}")
         return count
 
-    def list_verticals(self) -> List[str]:
+    def list_verticals(self) -> list[str]:
         """List all verticals with registered handlers.
 
         Returns:
@@ -443,7 +444,7 @@ def sync_handlers_with_executor(
     *,
     direction: str = "bidirectional",
     replace: bool = False,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Sync global handler registry with executor.
 
     Convenience function for `get_handler_registry().sync_with_executor(...)`.
@@ -531,7 +532,7 @@ def handler_decorator(
     vertical: Optional[str] = None,
     description: Optional[str] = None,
     replace: bool = False,
-) -> Callable[[Type[Any]], Type[Any]]:
+) -> Callable[[type[Any]], type[Any]]:
     """Class decorator for automatic handler registration.
 
     Phase 1.3: Provides decorator-based auto-registration for handlers,
@@ -567,7 +568,7 @@ def handler_decorator(
             pass
     """
 
-    def decorator(cls: Type[Any]) -> Type[Any]:
+    def decorator(cls: type[Any]) -> type[Any]:
         # Determine vertical (explicit or auto-detect)
         final_vertical = vertical
         if final_vertical is None:

@@ -18,7 +18,7 @@ Provides pre-built configurations for common vertical patterns,
 eliminating duplication across vertical assistants.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 
 class VerticalConfigRegistry:
@@ -36,7 +36,7 @@ class VerticalConfigRegistry:
     """
 
     # Provider hints templates
-    _provider_hints: Dict[str, Dict[str, Any]] = {
+    _provider_hints: dict[str, dict[str, Any]] = {
         "coding": {
             "preferred_providers": ["anthropic", "openai"],
             "preferred_models": [
@@ -78,7 +78,7 @@ class VerticalConfigRegistry:
     }
 
     # Evaluation criteria templates
-    _evaluation_criteria: Dict[str, List[str]] = {
+    _evaluation_criteria: dict[str, list[str]] = {
         "coding": [
             "Code correctness and functionality",
             "Test coverage and validation",
@@ -128,7 +128,7 @@ class VerticalConfigRegistry:
     }
 
     @classmethod
-    def get_provider_hints(cls, vertical_name: str) -> Dict[str, Any]:
+    def get_provider_hints(cls, vertical_name: str) -> dict[str, Any]:
         """Get provider hints for a vertical.
 
         Args:
@@ -143,7 +143,7 @@ class VerticalConfigRegistry:
         return cls._provider_hints[vertical_name].copy()
 
     @classmethod
-    def get_evaluation_criteria(cls, vertical_name: str) -> List[str]:
+    def get_evaluation_criteria(cls, vertical_name: str) -> list[str]:
         """Get evaluation criteria for a vertical.
 
         Args:
@@ -158,7 +158,7 @@ class VerticalConfigRegistry:
         return cls._evaluation_criteria[vertical_name].copy()
 
     @classmethod
-    def register_provider_hints(cls, key: str, hints: Dict[str, Any]) -> None:
+    def register_provider_hints(cls, key: str, hints: dict[str, Any]) -> None:
         """Register custom provider hints (for extensibility).
 
         Args:
@@ -168,7 +168,7 @@ class VerticalConfigRegistry:
         cls._provider_hints[key] = hints
 
     @classmethod
-    def register_evaluation_criteria(cls, key: str, criteria: List[str]) -> None:
+    def register_evaluation_criteria(cls, key: str, criteria: list[str]) -> None:
         """Register custom evaluation criteria (for extensibility).
 
         Args:

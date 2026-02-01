@@ -88,23 +88,17 @@ from __future__ import annotations
 
 import logging
 import sys
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
     Any,
     ClassVar,
-    Dict,
-    KeysView,
-    List,
     Optional,
-    Set,
-    Type,
     TYPE_CHECKING,
-    Union,
     cast,
 )
-from typing import Protocol as TypingProtocol
+from collections.abc import KeysView
 
 from victor.framework.tools import ToolSet
 
@@ -117,8 +111,6 @@ from victor.core.verticals.workflow_provider import VerticalWorkflowProvider
 from victor.core.verticals.protocol_loader import ProtocolBasedExtensionLoader
 
 if TYPE_CHECKING:
-    from victor.core.verticals.protocols import VerticalExtensions
-    from importlib.metadata import EntryPoint
     from victor.core.verticals.extension_registry import ExtensionRegistry
 
 # Import StageDefinition from core for centralized definition
@@ -147,12 +139,12 @@ class VerticalConfig:
     tools: ToolSet
     system_prompt: str
     name: str = ""
-    stages: Dict[str, StageDefinition] = field(default_factory=dict)
-    provider_hints: Dict[str, Any] = field(default_factory=dict)
-    evaluation_criteria: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    stages: dict[str, StageDefinition] = field(default_factory=dict)
+    provider_hints: dict[str, Any] = field(default_factory=dict)
+    evaluation_criteria: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_agent_kwargs(self) -> Dict[str, Any]:
+    def to_agent_kwargs(self) -> dict[str, Any]:
         """Convert to kwargs for Agent.create().
 
         Returns:
@@ -163,7 +155,7 @@ class VerticalConfig:
             # System prompt is typically handled separately
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary for dict-like access.
 
         Returns:
@@ -253,7 +245,7 @@ class VerticalConfig:
             self._dynamic_values = {}
         self._dynamic_values[key] = value
 
-    def to_dict_with_dynamic(self) -> Dict[str, Any]:
+    def to_dict_with_dynamic(self) -> dict[str, Any]:
         """Convert to dictionary including dynamic values.
 
         Returns:
@@ -361,7 +353,7 @@ class VerticalBase(
     """
 
     # Config cache (keyed by class name, stores VerticalConfig)
-    _config_cache: Dict[str, "VerticalConfig"] = {}
+    _config_cache: dict[str, "VerticalConfig"] = {}
 
     # Extension registry for dynamic extension registration (OCP-compliant)
     _extension_registry: ClassVar[Optional["ExtensionRegistry"]] = None
@@ -371,7 +363,7 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         """Get the list of tool names for this vertical.
 
         YAML-First: Attempts to load tools from YAML configuration.
@@ -407,7 +399,7 @@ class VerticalBase(
         )
 
     @classmethod
-    def _get_tools_from_yaml(cls) -> Optional[List[str]]:
+    def _get_tools_from_yaml(cls) -> Optional[list[str]]:
         """Load tools from YAML configuration.
 
         Returns:
@@ -513,7 +505,6 @@ class VerticalBase(
 
                     if source == "builder":
                         # Use PromptBuilder factory function
-                        from victor.framework.prompt_builder import PromptBuilder
 
                         builder_factory_name = prompt_config.get("builder_factory")
                         if builder_factory_name:
@@ -594,7 +585,7 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def get_stages(cls) -> Dict[str, StageDefinition]:
+    def get_stages(cls) -> dict[str, StageDefinition]:
         """Get stage definitions for this vertical.
 
         Default implementation provides a comprehensive 7-stage workflow
@@ -1000,7 +991,7 @@ class VerticalBase(
     # =========================================================================
 
     @classmethod
-    def implements_protocol(cls, protocol_type: Type[Any]) -> bool:
+    def implements_protocol(cls, protocol_type: type[Any]) -> bool:
         """Check if this vertical implements a specific protocol.
 
         This method provides ISP-compliant protocol checking, allowing verticals
@@ -1023,7 +1014,7 @@ class VerticalBase(
         return ProtocolBasedExtensionLoader.implements_protocol(cls, protocol_type)
 
     @classmethod
-    def register_protocol(cls, protocol_type: Type[Any]) -> None:
+    def register_protocol(cls, protocol_type: type[Any]) -> None:
         """Register this vertical as implementing a protocol.
 
         This method allows verticals to explicitly declare protocol conformance,
@@ -1047,7 +1038,7 @@ class VerticalBase(
         ProtocolBasedExtensionLoader.register_protocol(protocol_type, cls)
 
     @classmethod
-    def list_implemented_protocols(cls) -> List[Type[Any]]:
+    def list_implemented_protocols(cls) -> list[type[Any]]:
         """List all protocols explicitly implemented by this vertical.
 
         Returns:
@@ -1123,7 +1114,7 @@ class VerticalBase(
         registry.register_extension(extension)
 
     @classmethod
-    def get_extensions_by_type(cls, extension_type: str) -> List[Any]:
+    def get_extensions_by_type(cls, extension_type: str) -> list[Any]:
         """Get all registered extensions of a specific type.
 
         Retrieves dynamic extensions from the registry, enabling OCP
@@ -1186,7 +1177,7 @@ class VerticalBase(
         return registry.get_mode(cls.name, mode_name)
 
     @classmethod
-    def list_modes(cls) -> List[str]:
+    def list_modes(cls) -> list[str]:
         """List available modes for this vertical.
 
         Returns:
@@ -1253,7 +1244,7 @@ class VerticalBase(
         return registry.get_capabilities(cls.name)
 
     @classmethod
-    def list_capability_names(cls) -> List[str]:
+    def list_capability_names(cls) -> list[str]:
         """List available capability names for this vertical.
 
         Returns:
@@ -1287,7 +1278,7 @@ class VerticalBase(
         return loader.get_capability_set(cls.name)
 
     @classmethod
-    def list_capabilities_by_type(cls, capability_type: str | None = None) -> List[str]:
+    def list_capabilities_by_type(cls, capability_type: str | None = None) -> list[str]:
         """List capabilities by type.
 
         Args:
@@ -1347,7 +1338,7 @@ class VerticalBase(
         return provider.get_team(team_name)
 
     @classmethod
-    def list_teams(cls) -> List[str]:
+    def list_teams(cls) -> list[str]:
         """List available teams for this vertical.
 
         Returns:
@@ -1416,8 +1407,8 @@ class VerticalRegistry:
         security = "victor_security:SecurityAssistant"
     """
 
-    _registry: Dict[str, Type[VerticalBase]] = {}
-    _lazy_imports: Dict[str, str] = {}  # Map of vertical_name -> import_path
+    _registry: dict[str, type[VerticalBase]] = {}
+    _lazy_imports: dict[str, str] = {}  # Map of vertical_name -> import_path
     _external_discovered: bool = False
     ENTRY_POINT_GROUP: str = "victor.verticals"
 
@@ -1436,7 +1427,7 @@ class VerticalRegistry:
         cls._lazy_imports[normalize_vertical_name(name)] = import_path
 
     @classmethod
-    def register(cls, vertical: Type[VerticalBase]) -> None:
+    def register(cls, vertical: type[VerticalBase]) -> None:
         """Register a vertical.
 
         Args:
@@ -1465,7 +1456,7 @@ class VerticalRegistry:
             del cls._registry[normalized]
 
     @classmethod
-    def get(cls, name: str) -> Optional[Type[VerticalBase]]:
+    def get(cls, name: str) -> Optional[type[VerticalBase]]:
         """Get a vertical by name.
 
         Args:
@@ -1495,7 +1486,7 @@ class VerticalRegistry:
                 if not isinstance(vertical_class_any, type):
                     return None
 
-                vertical_class: Optional[Type[VerticalBase]] = vertical_class_any
+                vertical_class: Optional[type[VerticalBase]] = vertical_class_any
                 if vertical_class is None or not issubclass(vertical_class, VerticalBase):
                     return None
 
@@ -1515,7 +1506,7 @@ class VerticalRegistry:
         return None
 
     @classmethod
-    def list_all(cls) -> List[tuple[str, Type[VerticalBase]]]:
+    def list_all(cls) -> list[tuple[str, type[VerticalBase]]]:
         """List all registered verticals.
 
         Returns:
@@ -1527,7 +1518,7 @@ class VerticalRegistry:
         return list(cls._registry.items())
 
     @classmethod
-    def list_names(cls) -> List[str]:
+    def list_names(cls) -> list[str]:
         """List all registered vertical names.
 
         Returns:
@@ -1557,7 +1548,7 @@ class VerticalRegistry:
             _register_and_discover_verticals()
 
     @classmethod
-    def discover_external_verticals(cls) -> Dict[str, Type[VerticalBase]]:
+    def discover_external_verticals(cls) -> dict[str, type[VerticalBase]]:
         """Discover and register external verticals from entry points.
 
         Scans installed packages for the 'victor.verticals' entry point group
@@ -1579,7 +1570,7 @@ class VerticalRegistry:
         from importlib.metadata import entry_points
 
         logger = logging.getLogger(__name__)
-        discovered: Dict[str, Type[VerticalBase]] = {}
+        discovered: dict[str, type[VerticalBase]] = {}
 
         # Avoid re-discovery on repeated calls
         if cls._external_discovered:

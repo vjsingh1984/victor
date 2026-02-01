@@ -50,7 +50,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Awaitable, Optional, Set
+from typing import Any, Optional
+from collections.abc import Awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ class TaskManager:
     def __init__(self) -> None:
         """Initialize the TaskManager."""
         # Use a set to track tasks efficiently
-        self._background_tasks: Set[asyncio.Task[Any]] = set()
+        self._background_tasks: set[asyncio.Task[Any]] = set()
 
     def create_tracked_task(
         self,

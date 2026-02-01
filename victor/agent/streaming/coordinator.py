@@ -57,7 +57,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Protocol, TYPE_CHECKING
+from typing import Any, Optional, Protocol, TYPE_CHECKING
+from collections.abc import Callable
 
 from victor.agent.streaming.context import StreamingChatContext
 from victor.agent.streaming.iteration import (
@@ -78,7 +79,7 @@ logger = logging.getLogger(__name__)
 class LoopDetectorProtocol(Protocol):
     """Protocol for loop detection."""
 
-    def check_stop(self, tool_calls: List[Dict[str, Any]], content: str) -> tuple[bool, str, str]:
+    def check_stop(self, tool_calls: list[dict[str, Any]], content: str) -> tuple[bool, str, str]:
         """Check if loop should stop.
 
         Returns:
@@ -258,7 +259,7 @@ class IterationCoordinator:
     def check_loop_detection(
         self,
         ctx: StreamingChatContext,
-        tool_calls: List[Dict[str, Any]],
+        tool_calls: list[dict[str, Any]],
         content: str,
     ) -> tuple[bool, Optional[IterationResult]]:
         """Check loop detection and return stop decision.
@@ -343,8 +344,8 @@ class IterationCoordinator:
     def check_budget_for_tools(
         self,
         ctx: StreamingChatContext,
-        tool_calls: List[Dict[str, Any]],
-    ) -> tuple[List[Dict[str, Any]], List[StreamChunk]]:
+        tool_calls: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], list[StreamChunk]]:
         """Check budget and potentially truncate tool calls.
 
         Args:
@@ -354,7 +355,7 @@ class IterationCoordinator:
         Returns:
             Tuple of (allowed_tool_calls, warning_chunks).
         """
-        chunks: List[StreamChunk] = []
+        chunks: list[StreamChunk] = []
 
         if ctx.is_budget_exhausted():
             chunks.extend(self._handler.get_budget_exhausted_chunks(ctx))
@@ -373,9 +374,9 @@ class IterationCoordinator:
     def filter_blocked_tools(
         self,
         ctx: StreamingChatContext,
-        tool_calls: List[Dict[str, Any]],
-        block_checker: Callable[[str, Dict[str, Any]], Optional[str]],
-    ) -> tuple[List[Dict[str, Any]], List[StreamChunk], bool]:
+        tool_calls: list[dict[str, Any]],
+        block_checker: Callable[[str, dict[str, Any]], Optional[str]],
+    ) -> tuple[list[dict[str, Any]], list[StreamChunk], bool]:
         """Filter out blocked tool calls.
 
         Args:

@@ -1,5 +1,4 @@
 import asyncio
-from typing import Dict
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
@@ -46,7 +45,7 @@ async def _run_twice_with_cache(tmpdir: str) -> int:
 
     call_count = {"count": 0}
 
-    async def fake_execute(name: str, context: Dict, **kwargs) -> ToolResult:
+    async def fake_execute(name: str, context: dict, **kwargs) -> ToolResult:
         call_count["count"] += 1
         return ToolResult(success=True, output={"ok": True})
 

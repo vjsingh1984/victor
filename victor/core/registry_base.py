@@ -52,7 +52,7 @@ from __future__ import annotations
 import logging
 import threading
 from abc import ABC
-from typing import Any, ClassVar, Dict, Generic, List, Optional, Set, TypeVar, cast
+from typing import Any, ClassVar, Generic, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +175,7 @@ class ItemRegistry(SingletonRegistry[T], Generic[T]):
     def __init__(self) -> None:
         """Initialize the item registry with empty storage."""
         super().__init__()
-        self._items: Dict[str, Any] = {}
+        self._items: dict[str, Any] = {}
         self._items_lock: threading.RLock = threading.RLock()
 
     def register(self, name: str, item: Any) -> None:
@@ -229,7 +229,7 @@ class ItemRegistry(SingletonRegistry[T], Generic[T]):
         with self._items_lock:
             return name in self._items
 
-    def list_names(self) -> List[str]:
+    def list_names(self) -> list[str]:
         """Get list of all registered item names.
 
         Returns:
@@ -238,7 +238,7 @@ class ItemRegistry(SingletonRegistry[T], Generic[T]):
         with self._items_lock:
             return list(self._items.keys())
 
-    def list_items(self) -> List[Any]:
+    def list_items(self) -> list[Any]:
         """Get list of all registered items.
 
         Returns:

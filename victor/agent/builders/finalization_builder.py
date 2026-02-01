@@ -17,7 +17,7 @@
 Part of HIGH-005: Initialization Complexity reduction.
 """
 
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.builders.base import FactoryAwareBuilder
 from victor.agent.vertical_context import create_vertical_context
@@ -44,10 +44,10 @@ class FinalizationBuilder(FactoryAwareBuilder):
         """
         super().__init__(settings, factory)
 
-    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> Dict[str, Any]:  # type: ignore[override]
+    def build(self, orchestrator: "AgentOrchestrator", **_kwargs: Any) -> dict[str, Any]:  # type: ignore[override]
         """Finalize component wiring and lifecycle configuration."""
         factory = self._ensure_factory()
-        components: Dict[str, Any] = {}
+        components: dict[str, Any] = {}
 
         # Wire component dependencies (via factory)
         factory.wire_component_dependencies(
@@ -62,7 +62,6 @@ class FinalizationBuilder(FactoryAwareBuilder):
         components["vertical_context"] = orchestrator._vertical_context
 
         # Initialize VerticalIntegrationAdapter for single-source vertical methods
-        from victor.protocols.agent import IAgentOrchestrator
 
         orchestrator._vertical_integration_adapter = VerticalIntegrationAdapter(
             orchestrator  # type: ignore[arg-type]

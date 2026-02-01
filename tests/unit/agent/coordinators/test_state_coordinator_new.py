@@ -22,14 +22,13 @@ Tests the state coordination functionality including:
 """
 
 import pytest
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock
 from dataclasses import dataclass
 
 from victor.agent.coordinators.state_coordinator import (
     StateCoordinator,
     StateScope,
     StateChange,
-    StateObserver,
     create_state_coordinator,
 )
 

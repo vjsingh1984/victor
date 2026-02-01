@@ -22,9 +22,7 @@ Tests the comprehensive workflow validation and linting system including:
 """
 
 import pytest
-import tempfile
-from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 from victor.workflows.linter import WorkflowLinter, LinterResult, lint_dict
 from victor.workflows.validation_rules import (
@@ -76,7 +74,7 @@ class TestNodeIDFormatRule:
     """Tests for NodeIDFormatRule."""
 
     @pytest.fixture
-    def valid_workflow(self) -> Dict[str, Any]:
+    def valid_workflow(self) -> dict[str, Any]:
         """Valid workflow for testing."""
         return {
             "workflows": {
@@ -138,7 +136,7 @@ class TestRequiredFieldsRule:
     """Tests for RequiredFieldsRule."""
 
     @pytest.fixture
-    def workflow_template(self) -> Dict[str, Any]:
+    def workflow_template(self) -> dict[str, Any]:
         """Workflow template for testing."""
         return {
             "workflows": {
@@ -193,7 +191,7 @@ class TestConnectionReferencesRule:
     """Tests for ConnectionReferencesRule."""
 
     @pytest.fixture
-    def workflow_template(self) -> Dict[str, Any]:
+    def workflow_template(self) -> dict[str, Any]:
         """Workflow template for testing."""
         return {
             "workflows": {
@@ -329,7 +327,7 @@ class TestTeamFormationRule:
     """Tests for TeamFormationRule."""
 
     @pytest.fixture
-    def workflow_template(self) -> Dict[str, Any]:
+    def workflow_template(self) -> dict[str, Any]:
         """Workflow template for testing."""
         return {
             "workflows": {
@@ -414,7 +412,7 @@ class TestGoalQualityRule:
     """Tests for GoalQualityRule."""
 
     @pytest.fixture
-    def workflow_template(self) -> Dict[str, Any]:
+    def workflow_template(self) -> dict[str, Any]:
         """Workflow template for testing."""
         return {
             "workflows": {
@@ -468,7 +466,7 @@ class TestToolBudgetRule:
     """Tests for ToolBudgetRule."""
 
     @pytest.fixture
-    def workflow_template(self) -> Dict[str, Any]:
+    def workflow_template(self) -> dict[str, Any]:
         """Workflow template for testing."""
         return {
             "workflows": {
@@ -675,7 +673,7 @@ class TestWorkflowLinter:
     """Tests for WorkflowLinter."""
 
     @pytest.fixture
-    def valid_workflow(self) -> Dict[str, Any]:
+    def valid_workflow(self) -> dict[str, Any]:
         """Valid workflow for testing."""
         return {
             "workflows": {

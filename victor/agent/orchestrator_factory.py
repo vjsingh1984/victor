@@ -34,7 +34,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 from rich.console import Console
 
@@ -54,7 +55,6 @@ if TYPE_CHECKING:
     from victor.agent.search_router import SearchRouter
     from victor.agent.metrics_collector import MetricsCollector
     from victor.agent.conversation_controller import ConversationController
-    from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.usage_analytics import UsageAnalytics
@@ -229,7 +229,7 @@ class OrchestratorComponents:
     # New coordinators (Stream E4)
     coordinators: CoordinatorComponents = field(default_factory=CoordinatorComponents)
     # Raw attribute snapshot (Phase 1 compatibility bridge)
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
 
 
 class OrchestratorFactory(ModeAwareMixin):
@@ -268,7 +268,7 @@ class OrchestratorFactory(ModeAwareMixin):
         console: Optional["Console"] = None,
         provider_name: Optional[str] = None,
         profile_name: Optional[str] = None,
-        tool_selection: Optional[Dict[str, Any]] = None,
+        tool_selection: Optional[dict[str, Any]] = None,
         thinking: bool = False,
     ):
         """Initialize the factory with core configuration.
@@ -304,7 +304,7 @@ class OrchestratorFactory(ModeAwareMixin):
         # Lazy-initialized container
         self._container = None
 
-    def _builder_sequence(self) -> List[type]:
+    def _builder_sequence(self) -> list[type]:
         """Return the ordered builder sequence for orchestrator initialization."""
         from victor.agent.builders.provider_layer_builder import ProviderLayerBuilder
         from victor.agent.builders.prompting_builder import PromptingBuilder
@@ -587,7 +587,7 @@ class OrchestratorFactory(ModeAwareMixin):
     # Coordinator Creation Methods (Phase 1.4)
     # ==========================================================================
 
-    def create_config_coordinator(self, config_providers: Optional[List[Any]] = None) -> Any:
+    def create_config_coordinator(self, config_providers: Optional[list[Any]] = None) -> Any:
         """Create configuration coordinator.
 
         Args:
@@ -600,7 +600,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return ConfigCoordinator(providers=config_providers or [])
 
-    def create_prompt_coordinator(self, prompt_contributors: Optional[List[Any]] = None) -> Any:
+    def create_prompt_coordinator(self, prompt_contributors: Optional[list[Any]] = None) -> Any:
         """Create prompt coordinator.
 
         Args:
@@ -613,7 +613,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
         return PromptCoordinator(contributors=prompt_contributors or [])
 
-    def create_context_coordinator(self, compaction_strategies: Optional[List[Any]] = None) -> Any:
+    def create_context_coordinator(self, compaction_strategies: Optional[list[Any]] = None) -> Any:
         """Create context coordinator.
 
         Args:
@@ -628,7 +628,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_analytics_coordinator(
         self,
-        analytics_exporters: Optional[List[Any]] = None,
+        analytics_exporters: Optional[list[Any]] = None,
         enable_console_exporter: bool = False,
     ) -> Any:
         """Create analytics coordinator.
@@ -946,7 +946,7 @@ class OrchestratorFactory(ModeAwareMixin):
             self._tool_call_tracer = None
             return (None, None)
 
-        from victor.core.events import ObservabilityBus, get_observability_bus
+        from victor.core.events import get_observability_bus
         from victor.observability.tracing import ExecutionTracer, ToolCallTracer
 
         # Get ObservabilityBus from DI container
@@ -1025,7 +1025,7 @@ class OrchestratorFactory(ModeAwareMixin):
 
     def create_memory_components(
         self, provider_name: str, tool_capable: bool = True
-    ) -> Tuple[Optional[Any], Optional[str]]:
+    ) -> tuple[Optional[Any], Optional[str]]:
         """Create conversation memory components.
 
         Args:
@@ -1099,7 +1099,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.debug("Using basic usage logger (enhanced version not available)")
         return usage_logger
 
-    def create_middleware_chain(self) -> Tuple[Optional[Any], Optional[Any]]:
+    def create_middleware_chain(self) -> tuple[Optional[Any], Optional[Any]]:
         """Create middleware chain with vertical extensions.
 
         Returns:
@@ -2278,7 +2278,6 @@ class OrchestratorFactory(ModeAwareMixin):
             Tuple of (provider or pool, is_pool_enabled)
         """
         from victor.providers.provider_pool import (
-            ProviderPool,
             ProviderPoolConfig,
             PoolStrategy,
             create_provider_pool,
@@ -2500,10 +2499,9 @@ class OrchestratorFactory(ModeAwareMixin):
             Tuple of (observed_files, executed_tools, failed_tool_signatures,
                      tool_capability_warned)
         """
-        from typing import List
 
-        observed_files: List[str] = []
-        executed_tools: List[str] = []
+        observed_files: list[str] = []
+        executed_tools: list[str] = []
         failed_tool_signatures: set[tuple[str, str]] = set()
         tool_capability_warned = False
 
@@ -3012,7 +3010,7 @@ class OrchestratorFactory(ModeAwareMixin):
                 task = config.task or task
 
                 # Merge config settings with kwargs (kwargs override config)
-                merged_kwargs: Dict[str, Any] = {}
+                merged_kwargs: dict[str, Any] = {}
 
                 # Common settings
                 if config.provider != "anthropic":

@@ -39,7 +39,7 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from victor.providers.base import ToolDefinition
 from victor.tools.enums import CostTier
@@ -71,7 +71,7 @@ class GraphBuildResult:
     """
 
     tools_registered: int = 0
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class ToolGraphBuilder:
@@ -217,8 +217,8 @@ class ToolGraphBuilder:
     def _add_tool(
         self,
         name: str,
-        inputs: List[str],
-        outputs: List[str],
+        inputs: list[str],
+        outputs: list[str],
         cost_tier: CostTier,
     ) -> int:
         """Add a tool to the dependency graph.
@@ -254,8 +254,8 @@ class ToolGraphBuilder:
             return 0
 
     def plan_for_goals(
-        self, goals: List[str], available_inputs: Optional[List[str]] = None
-    ) -> List[ToolDefinition]:
+        self, goals: list[str], available_inputs: Optional[list[str]] = None
+    ) -> list[ToolDefinition]:
         """Plan a sequence of tools to satisfy goals using the dependency graph.
 
         Args:
@@ -270,7 +270,7 @@ class ToolGraphBuilder:
 
         available = available_inputs or []
         plan_names = self._tool_graph.plan(goals, available)
-        tool_defs: List[ToolDefinition] = []
+        tool_defs: list[ToolDefinition] = []
 
         for name in plan_names:
             tool = self._registry.get(name)
@@ -285,7 +285,7 @@ class ToolGraphBuilder:
 
         return tool_defs
 
-    def infer_goals_from_message(self, user_message: str) -> List[str]:
+    def infer_goals_from_message(self, user_message: str) -> list[str]:
         """Infer planning goals from user request.
 
         Uses keyword matching to identify what the user wants to achieve.
@@ -297,7 +297,7 @@ class ToolGraphBuilder:
             List of inferred goal names
         """
         text = user_message.lower()
-        goals: List[str] = []
+        goals: list[str] = []
 
         if any(kw in text for kw in ["summarize", "summary", "analyze", "overview"]):
             goals.append("summary")

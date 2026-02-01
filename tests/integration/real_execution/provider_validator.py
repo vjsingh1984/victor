@@ -23,7 +23,7 @@ This module provides robust API key validation that checks:
 import os
 import re
 import asyncio
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 from dataclasses import dataclass
 
 
@@ -89,7 +89,7 @@ class ProviderValidator:
 
     def __init__(self):
         """Initialize provider validator."""
-        self._cache: Dict[str, ProviderValidationResult] = {}
+        self._cache: dict[str, ProviderValidationResult] = {}
 
     def classify_error(self, error_message: str) -> str:
         """Classify error type from error message.
@@ -313,8 +313,8 @@ class ProviderValidator:
         return env_vars.get(provider_name.lower(), "")
 
     async def validate_all_providers(
-        self, providers_config: Dict[str, Dict]
-    ) -> Dict[str, ProviderValidationResult]:
+        self, providers_config: dict[str, dict]
+    ) -> dict[str, ProviderValidationResult]:
         """Validate all providers concurrently.
 
         Args:

@@ -32,7 +32,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Protocol, Type, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from collections.abc import Callable
 
 from victor.core.container import (
     ServiceContainer,
@@ -41,8 +42,7 @@ from victor.core.container import (
 )
 
 if TYPE_CHECKING:
-    from victor.framework.agent import Agent
-    from victor.framework.agent_components import AgentBuilder, AgentBridge, AgentSession
+    from victor.framework.agent_components import AgentBuilder, AgentBridge
     from victor.framework.event_registry import EventRegistry
     from victor.framework.tool_config import ToolConfigurator
 
@@ -158,7 +158,7 @@ class TeamRegistryService(Protocol):
     """Protocol for team registry services."""
 
     def register_from_vertical(
-        self, vertical: str, specs: Dict[str, Any], replace: bool = False
+        self, vertical: str, specs: dict[str, Any], replace: bool = False
     ) -> None:
         """Register team specs from a vertical."""
         ...
@@ -291,9 +291,6 @@ def _create_agent_bridge(container: ServiceContainer) -> Optional["AgentBridge"]
     Note: This creates a placeholder bridge. For production use, the bridge
     should be created with an actual Agent instance.
     """
-    from victor.framework.agent_components import AgentBridge, BridgeConfiguration
-    from victor.framework.agent import Agent
-    from victor.framework.config import AgentConfig
     from victor.core.protocols import OrchestratorProtocol
 
     # Create a minimal orchestrator wrapper for the bridge
@@ -351,7 +348,7 @@ def _create_agent_bridge(container: ServiceContainer) -> Optional["AgentBridge"]
 class ServiceRegistration:
     """Describes a service to register."""
 
-    service_type: Type[Any]
+    service_type: type[Any]
     factory: Callable[[ServiceContainer], Any]
     lifetime: ServiceLifetime
     description: str

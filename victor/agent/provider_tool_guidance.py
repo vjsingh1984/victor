@@ -17,8 +17,7 @@ Addresses GAP-7: Over-exploration without synthesis
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional, cast
-from dataclasses import dataclass
+from typing import Any, cast
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,7 +32,7 @@ class ToolGuidanceStrategy(ABC):
     """
 
     @abstractmethod
-    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: list[str]) -> str:
         """
         Return provider-specific tool usage guidance.
 
@@ -47,7 +46,7 @@ class ToolGuidanceStrategy(ABC):
         pass
 
     @abstractmethod
-    def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:
+    def should_consolidate_calls(self, tool_history: list[dict[str, Any]]) -> bool:
         """
         Determine if recent tool calls should be consolidated.
 
@@ -101,7 +100,7 @@ class ToolGuidanceStrategy(ABC):
         """
         pass
 
-    def adjust_tool_scores(self, tool_scores: Dict[str, float]) -> Dict[str, float]:
+    def adjust_tool_scores(self, tool_scores: dict[str, float]) -> dict[str, float]:
         """
         Adjust tool scores based on provider preferences.
 
@@ -136,11 +135,11 @@ class GrokToolGuidance(ToolGuidanceStrategy):
         "shell",
     }
 
-    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: list[str]) -> str:
         # Grok handles tools well, minimal guidance needed
         return ""
 
-    def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:
+    def should_consolidate_calls(self, tool_history: list[dict[str, Any]]) -> bool:
         # Grok already consolidates well
         return False
 
@@ -182,7 +181,7 @@ class DeepSeekToolGuidance(ToolGuidanceStrategy):
         "code_metrics",
     }
 
-    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: list[str]) -> str:
         base_guidance = """
 IMPORTANT - Tool Usage Guidelines:
 1. Be efficient with tool calls - minimize redundant operations
@@ -214,7 +213,7 @@ Focus on depth over breadth when exploring.
 """
             )
 
-    def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:
+    def should_consolidate_calls(self, tool_history: list[dict[str, Any]]) -> bool:
         if len(tool_history) < 2:
             return False
 
@@ -292,7 +291,7 @@ class OllamaToolGuidance(ToolGuidanceStrategy):
     }
     AVOIDED_TOOLS = {"web_search", "web_fetch"}  # Air-gapped environments
 
-    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: list[str]) -> str:
         tools_str = ", ".join(available_tools[:5])  # Limit displayed tools
 
         return f"""
@@ -307,7 +306,7 @@ Guidelines:
 5. Synthesize findings clearly in your response
 """
 
-    def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:
+    def should_consolidate_calls(self, tool_history: list[dict[str, Any]]) -> bool:
         # More aggressive consolidation for local models
         if len(tool_history) < 2:
             return False
@@ -356,11 +355,11 @@ class AnthropicToolGuidance(ToolGuidanceStrategy):
         "edit_file",
     }
 
-    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: list[str]) -> str:
         # Claude handles tools well, minimal guidance needed
         return ""
 
-    def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:
+    def should_consolidate_calls(self, tool_history: list[dict[str, Any]]) -> bool:
         # Claude typically manages tool usage well
         return False
 
@@ -401,12 +400,12 @@ class OpenAIToolGuidance(ToolGuidanceStrategy):
         "list_directory",
     }
 
-    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: list[str]) -> str:
         if task_type == "simple":
             return "Be efficient with tool calls."
         return ""
 
-    def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:
+    def should_consolidate_calls(self, tool_history: list[dict[str, Any]]) -> bool:
         # Check for obvious redundancy
         if len(tool_history) < 3:
             return False
@@ -449,10 +448,10 @@ class DefaultToolGuidance(ToolGuidanceStrategy):
     different providers.
     """
 
-    def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
+    def get_guidance_prompt(self, task_type: str, available_tools: list[str]) -> str:
         return "Use tools efficiently and synthesize findings clearly."
 
-    def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:
+    def should_consolidate_calls(self, tool_history: list[dict[str, Any]]) -> bool:
         return len(tool_history) >= 5
 
     def get_max_exploration_depth(self, task_complexity: str) -> int:
@@ -474,10 +473,10 @@ class DefaultToolGuidance(ToolGuidanceStrategy):
 
 
 # Strategy registry (cached instances)
-_strategy_cache: Dict[str, ToolGuidanceStrategy] = {}
+_strategy_cache: dict[str, ToolGuidanceStrategy] = {}
 
 # Provider name mappings
-_provider_mappings: Dict[str, type] = {
+_provider_mappings: dict[str, type] = {
     "grok": GrokToolGuidance,
     "xai": GrokToolGuidance,
     "deepseek": DeepSeekToolGuidance,

@@ -47,7 +47,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.types import AgentMessage, MemberResult
@@ -96,7 +96,7 @@ class ReflectionFormation(BaseFormationStrategy):
     def __init__(
         self,
         max_iterations: int = 3,
-        satisfaction_keywords: Optional[List[str]] = None,
+        satisfaction_keywords: Optional[list[str]] = None,
     ):
         """Initialize the reflection formation.
 
@@ -118,10 +118,10 @@ class ReflectionFormation(BaseFormationStrategy):
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute reflection loop: generator → critic → refine → repeat.
 
         Args:
@@ -240,7 +240,7 @@ class ReflectionFormation(BaseFormationStrategy):
 
         return has_generator and has_critic
 
-    def get_required_roles(self) -> Optional[List[str]]:
+    def get_required_roles(self) -> Optional[list[str]]:
         """Get required roles for reflection formation.
 
         Returns:

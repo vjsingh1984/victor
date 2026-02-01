@@ -46,7 +46,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.conversation_controller import ConversationController
@@ -117,11 +117,11 @@ class LifecycleManager:
         self._provider: Optional[Any] = None
         self._code_manager: Optional[Any] = None
         self._semantic_selector: Optional[Any] = None
-        self._background_tasks: List[Any] = []
+        self._background_tasks: list[Any] = []
         self._usage_logger: Optional[Any] = None
 
         # Orchestrator-specific callbacks for shutdown
-        from typing import Callable
+        from collections.abc import Callable
 
         self._flush_analytics_callback: Optional[Callable[[], Any]] = None
         self._stop_health_monitoring_callback: Optional[Callable[[], Any]] = None
@@ -167,7 +167,7 @@ class LifecycleManager:
 
         logger.debug("Conversation and session state reset (including optimization components)")
 
-    async def graceful_shutdown(self) -> Dict[str, bool]:
+    async def graceful_shutdown(self) -> dict[str, bool]:
         """Perform graceful shutdown of all orchestrator components.
 
         Flushes analytics, stops health monitoring, and cleans up resources.
@@ -176,7 +176,7 @@ class LifecycleManager:
         Returns:
             Dictionary with shutdown status for each component
         """
-        results: Dict[str, bool] = {}
+        results: dict[str, bool] = {}
 
         # Flush analytics data
         try:
@@ -311,7 +311,7 @@ class LifecycleManager:
             # Mark as shut down even if exceptions occurred
             self._is_shutdown = True
 
-    def get_session_stats(self) -> Dict[str, Any]:
+    def get_session_stats(self) -> dict[str, Any]:
         """Get statistics for current session.
 
         Returns:
@@ -481,7 +481,7 @@ class LifecycleManager:
     async def get_session_status(
         self,
         session_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get status of a session.
 
         Returns health and resource usage information for
@@ -515,7 +515,7 @@ class LifecycleManager:
     # INTERNAL METHODS (for orchestrator integration)
     # =========================================================================
 
-    async def _flush_analytics(self) -> Dict[str, bool]:
+    async def _flush_analytics(self) -> dict[str, bool]:
         """Flush analytics data.
 
         Calls the orchestrator callback if set.
@@ -573,7 +573,7 @@ class LifecycleManager:
         """
         self._semantic_selector = semantic_selector
 
-    def set_background_tasks(self, tasks: List[Any]) -> None:
+    def set_background_tasks(self, tasks: list[Any]) -> None:
         """Set background tasks for cancellation during shutdown.
 
         Args:

@@ -21,9 +21,7 @@ Or headless: locust -f tests/load/locustfiles/locustfile_chat.py --headless --us
 """
 
 import random
-import time
 from datetime import datetime
-from typing import List, Dict
 
 from locust import HttpUser, task, between, events
 
@@ -45,7 +43,7 @@ class ChatUser(HttpUser):
         super().__init__(*args, **kwargs)
         self.provider = "anthropic"
         self.model = "claude-sonnet-4-5"
-        self.conversation_history: List[Dict] = []
+        self.conversation_history: list[dict] = []
         self.turn_count = 0
         self.max_turns = random.randint(5, 15)
 

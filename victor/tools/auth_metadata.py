@@ -51,10 +51,10 @@ Usage:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from threading import RLock
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +106,8 @@ class ToolAuthMetadata:
     """
 
     name: str
-    categories: List[str]
-    capabilities: List[str]
+    categories: list[str]
+    capabilities: list[str]
     safety: ToolSafety
     domain: str
     cost_tier: int = 1
@@ -218,10 +218,10 @@ class ToolAuthMetadataRegistry:
         if ToolAuthMetadataRegistry._instance is not None:
             raise RuntimeError("Use get_instance() to get the singleton instance")
 
-        self._metadata: Dict[str, ToolAuthMetadata] = {}
-        self._categories: Dict[str, Set[str]] = {}
-        self._capabilities: Dict[str, Set[str]] = {}
-        self._domains: Dict[str, Set[str]] = {}
+        self._metadata: dict[str, ToolAuthMetadata] = {}
+        self._categories: dict[str, set[str]] = {}
+        self._capabilities: dict[str, set[str]] = {}
+        self._domains: dict[str, set[str]] = {}
 
     @classmethod
     def get_instance(cls) -> "ToolAuthMetadataRegistry":
@@ -314,7 +314,7 @@ class ToolAuthMetadataRegistry:
         metadata = self.get(tool_name)
         return metadata.has_capability(capability) if metadata else False
 
-    def get_tools_by_category(self, category: str) -> List[str]:
+    def get_tools_by_category(self, category: str) -> list[str]:
         """Get all tools in a category.
 
         Args:
@@ -327,7 +327,7 @@ class ToolAuthMetadataRegistry:
             tools = self._categories.get(category, set())
             return sorted(tools)
 
-    def get_tools_by_capability(self, capability: str) -> List[str]:
+    def get_tools_by_capability(self, capability: str) -> list[str]:
         """Get all tools with a capability.
 
         Args:
@@ -340,7 +340,7 @@ class ToolAuthMetadataRegistry:
             tools = self._capabilities.get(capability, set())
             return sorted(tools)
 
-    def get_tools_by_domain(self, domain: str) -> List[str]:
+    def get_tools_by_domain(self, domain: str) -> list[str]:
         """Get all tools in a domain.
 
         Args:
@@ -353,7 +353,7 @@ class ToolAuthMetadataRegistry:
             tools = self._domains.get(domain, set())
             return sorted(tools)
 
-    def list_all_tools(self) -> List[str]:
+    def list_all_tools(self) -> list[str]:
         """List all registered tools.
 
         Returns:
@@ -362,7 +362,7 @@ class ToolAuthMetadataRegistry:
         with self._lock:
             return sorted(self._metadata.keys())
 
-    def list_categories(self) -> List[str]:
+    def list_categories(self) -> list[str]:
         """List all categories.
 
         Returns:
@@ -371,7 +371,7 @@ class ToolAuthMetadataRegistry:
         with self._lock:
             return sorted(self._categories.keys())
 
-    def list_capabilities(self) -> List[str]:
+    def list_capabilities(self) -> list[str]:
         """List all capabilities.
 
         Returns:
@@ -380,7 +380,7 @@ class ToolAuthMetadataRegistry:
         with self._lock:
             return sorted(self._capabilities.keys())
 
-    def list_domains(self) -> List[str]:
+    def list_domains(self) -> list[str]:
         """List all domains.
 
         Returns:
@@ -389,7 +389,7 @@ class ToolAuthMetadataRegistry:
         with self._lock:
             return sorted(self._domains.keys())
 
-    def get_metadata_summary(self) -> Dict[str, Any]:
+    def get_metadata_summary(self) -> dict[str, Any]:
         """Get summary of registered metadata.
 
         Returns:
@@ -433,8 +433,8 @@ def get_tool_auth_metadata_registry() -> ToolAuthMetadataRegistry:
 
 def register_tool_auth_metadata(
     name: str,
-    categories: List[str],
-    capabilities: List[str],
+    categories: list[str],
+    capabilities: list[str],
     safety: ToolSafety,
     domain: str,
     cost_tier: int = 1,

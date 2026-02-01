@@ -32,10 +32,10 @@ Example:
 """
 
 import re
-from typing import Dict, List, Optional, Set
+from typing import Optional
 
 # Default identifier patterns
-PATTERNS: Dict[str, str] = {
+PATTERNS: dict[str, str] = {
     "camelcase": r"\b([A-Z][a-zA-Z0-9]*(?:[A-Z][a-zA-Z0-9]*)+)\b",
     "snake_case": r"\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\b",
     "dotted": r"\b([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)+)\b",
@@ -43,7 +43,7 @@ PATTERNS: Dict[str, str] = {
 }
 
 # Common words to exclude from identifier extraction
-COMMON_WORDS: Set[str] = {
+COMMON_WORDS: set[str] = {
     "the",
     "and",
     "for",
@@ -96,11 +96,11 @@ COMMON_WORDS: Set[str] = {
 
 def extract_identifiers(
     text: str,
-    patterns: Optional[Dict[str, str]] = None,
+    patterns: Optional[dict[str, str]] = None,
     min_length: int = 2,
     max_identifiers: int = 50,
-    exclude_words: Optional[Set[str]] = None,
-) -> List[str]:
+    exclude_words: Optional[set[str]] = None,
+) -> list[str]:
     """Extract identifiers from text using configurable patterns.
 
     Args:
@@ -124,7 +124,7 @@ def extract_identifiers(
     patterns = patterns or PATTERNS
     exclude = exclude_words if exclude_words is not None else COMMON_WORDS
 
-    found: List[str] = []
+    found: list[str] = []
 
     for pattern_name, pattern in patterns.items():
         try:
@@ -137,8 +137,8 @@ def extract_identifiers(
             continue
 
     # Deduplicate while preserving order
-    seen: Set[str] = set()
-    result: List[str] = []
+    seen: set[str] = set()
+    result: list[str] = []
     for item in found:
         if item not in seen:
             seen.add(item)
@@ -147,7 +147,7 @@ def extract_identifiers(
     return result[:max_identifiers]
 
 
-def extract_camelcase(text: str, min_length: int = 2) -> List[str]:
+def extract_camelcase(text: str, min_length: int = 2) -> list[str]:
     """Extract CamelCase identifiers (class names).
 
     Args:
@@ -164,7 +164,7 @@ def extract_camelcase(text: str, min_length: int = 2) -> List[str]:
     )
 
 
-def extract_snake_case(text: str, min_length: int = 2) -> List[str]:
+def extract_snake_case(text: str, min_length: int = 2) -> list[str]:
     """Extract snake_case identifiers (function names).
 
     Args:
@@ -181,7 +181,7 @@ def extract_snake_case(text: str, min_length: int = 2) -> List[str]:
     )
 
 
-def extract_dotted_paths(text: str) -> List[str]:
+def extract_dotted_paths(text: str) -> list[str]:
     """Extract dotted paths (module.function).
 
     Args:
@@ -197,7 +197,7 @@ def extract_dotted_paths(text: str) -> List[str]:
     )
 
 
-def extract_quoted_identifiers(text: str) -> List[str]:
+def extract_quoted_identifiers(text: str) -> list[str]:
     """Extract backtick-quoted identifiers.
 
     Args:
@@ -229,8 +229,8 @@ class IdentifierExtractor:
 
     def __init__(
         self,
-        patterns: Optional[Dict[str, str]] = None,
-        exclude_words: Optional[Set[str]] = None,
+        patterns: Optional[dict[str, str]] = None,
+        exclude_words: Optional[set[str]] = None,
         min_length: int = 2,
         max_identifiers: int = 50,
     ) -> None:
@@ -247,7 +247,7 @@ class IdentifierExtractor:
         self.min_length = min_length
         self.max_identifiers = max_identifiers
 
-    def extract(self, text: str) -> List[str]:
+    def extract(self, text: str) -> list[str]:
         """Extract identifiers using configured patterns.
 
         Args:

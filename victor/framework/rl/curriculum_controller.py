@@ -37,7 +37,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import IntEnum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class StageConfig:
     name: str
     max_tools: int
     max_iterations: int
-    allowed_task_types: Set[str]
+    allowed_task_types: set[str]
     tool_budget: int = 10
     success_threshold: float = 0.75
     min_samples: int = 20
@@ -246,7 +246,7 @@ class CurriculumController:
     def __init__(
         self,
         db_connection: Optional[Any] = None,
-        stages: Optional[Dict[CurriculumStage, StageConfig]] = None,
+        stages: Optional[dict[CurriculumStage, StageConfig]] = None,
     ):
         """Initialize curriculum controller.
 
@@ -258,13 +258,13 @@ class CurriculumController:
         self.stages = stages or self.DEFAULT_STAGES
 
         # Per-context stage tracking
-        self._context_stages: Dict[str, CurriculumStage] = {}
+        self._context_stages: dict[str, CurriculumStage] = {}
 
         # Per-context, per-stage metrics
-        self._metrics: Dict[str, Dict[CurriculumStage, StageMetrics]] = {}
+        self._metrics: dict[str, dict[CurriculumStage, StageMetrics]] = {}
 
         # Recent outcomes for regression detection
-        self._recent_outcomes: Dict[str, List[bool]] = {}
+        self._recent_outcomes: dict[str, list[bool]] = {}
 
         if db_connection:
             self._ensure_tables()
@@ -380,7 +380,7 @@ class CurriculumController:
         stage = self.get_stage(context_key)
         return self.stages[stage]
 
-    def get_constraints(self, context_key: str) -> Dict[str, Any]:
+    def get_constraints(self, context_key: str) -> dict[str, Any]:
         """Get constraints for a context based on current stage.
 
         Args:
@@ -697,7 +697,7 @@ class CurriculumController:
 
         self.db.commit()
 
-    def get_progress_summary(self, context_key: str) -> Dict[str, Any]:
+    def get_progress_summary(self, context_key: str) -> dict[str, Any]:
         """Get progress summary for a context.
 
         Args:
@@ -737,7 +737,7 @@ class CurriculumController:
             "can_advance": self.should_advance(context_key),
         }
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export curriculum metrics.
 
         Returns:

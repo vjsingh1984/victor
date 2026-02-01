@@ -29,10 +29,9 @@ Migration Notes:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import traceback
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional
 
 from victor.observability.emitters.base import IErrorEventEmitter
 from victor.core.events import ObservabilityBus, SyncEventWrapper
@@ -105,7 +104,7 @@ class ErrorEventEmitter(IErrorEventEmitter):
     async def emit_async(
         self,
         topic: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> bool:
         """Emit an error event asynchronously.
 
@@ -136,8 +135,8 @@ class ErrorEventEmitter(IErrorEventEmitter):
 
     def emit(
         self,
-        event_or_topic: Union[MessagingEvent, str] | None = None,
-        data: Optional[Dict[str, Any]] = None,
+        event_or_topic: MessagingEvent | str | None = None,
+        data: Optional[dict[str, Any]] = None,
         *,
         topic: Optional[str] = None,
     ) -> None:
@@ -194,7 +193,7 @@ class ErrorEventEmitter(IErrorEventEmitter):
         self,
         error: Exception,
         recoverable: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         **metadata: Any,
     ) -> bool:
         """Emit error event asynchronously.
@@ -227,7 +226,7 @@ class ErrorEventEmitter(IErrorEventEmitter):
         self,
         error: Exception,
         recoverable: bool,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         **metadata: Any,
     ) -> None:
         """Emit error event (sync wrapper).

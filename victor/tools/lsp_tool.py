@@ -19,7 +19,7 @@ Supports: status, start, stop, completions, hover, definition, references,
 diagnostics, open, close.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
@@ -54,7 +54,7 @@ KIND_NAMES = {
 }
 
 
-async def _do_status() -> Dict[str, Any]:
+async def _do_status() -> dict[str, Any]:
     """Get LSP status."""
     from victor.coding.lsp.manager import get_lsp_manager
 
@@ -86,7 +86,7 @@ async def _do_status() -> Dict[str, Any]:
     }
 
 
-async def _do_start(language: str) -> Dict[str, Any]:
+async def _do_start(language: str) -> dict[str, Any]:
     """Start a language server."""
     from victor.coding.lsp.manager import get_lsp_manager
     from victor.coding.lsp.config import LANGUAGE_SERVERS
@@ -121,7 +121,7 @@ async def _do_start(language: str) -> Dict[str, Any]:
         }
 
 
-async def _do_stop(language: str) -> Dict[str, Any]:
+async def _do_stop(language: str) -> dict[str, Any]:
     """Stop a language server."""
     from victor.coding.lsp.manager import get_lsp_manager
 
@@ -142,7 +142,7 @@ async def _do_completions(
     line: Optional[int],
     character: Optional[int],
     max_items: int = 20,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get code completions."""
     from victor.coding.lsp.manager import get_lsp_manager
 
@@ -174,7 +174,7 @@ async def _do_completions(
 
 async def _do_hover(
     file_path: str, line: Optional[int], character: Optional[int]
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get hover information."""
     from victor.coding.lsp.manager import get_lsp_manager
 
@@ -197,7 +197,7 @@ async def _do_hover(
 
 async def _do_definition(
     file_path: str, line: Optional[int], character: Optional[int]
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Go to definition."""
     from victor.coding.lsp.manager import get_lsp_manager
 
@@ -224,7 +224,7 @@ async def _do_references(
     line: Optional[int],
     character: Optional[int],
     max_results: int = 50,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Find references."""
     from victor.coding.lsp.manager import get_lsp_manager
 
@@ -246,7 +246,7 @@ async def _do_references(
     }
 
 
-async def _do_diagnostics(file_path: str) -> Dict[str, Any]:
+async def _do_diagnostics(file_path: str) -> dict[str, Any]:
     """Get diagnostics."""
     import asyncio
     from victor.coding.lsp.manager import get_lsp_manager
@@ -271,7 +271,7 @@ async def _do_diagnostics(file_path: str) -> Dict[str, Any]:
     }
 
 
-async def _do_open(file_path: str) -> Dict[str, Any]:
+async def _do_open(file_path: str) -> dict[str, Any]:
     """Open a file in LSP."""
     from victor.coding.lsp.manager import get_lsp_manager
 
@@ -290,7 +290,7 @@ async def _do_open(file_path: str) -> Dict[str, Any]:
         }
 
 
-async def _do_close(file_path: str) -> Dict[str, Any]:
+async def _do_close(file_path: str) -> dict[str, Any]:
     """Close a file in LSP."""
     from victor.coding.lsp.manager import get_lsp_manager
 
@@ -318,7 +318,7 @@ async def lsp(
     character: Optional[int] = None,
     max_items: int = 20,
     max_results: int = 50,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Language Server Protocol operations for code intelligence.
 
     Actions: status, start, stop, completions, hover, definition, references, diagnostics.

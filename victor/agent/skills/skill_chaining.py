@@ -77,11 +77,12 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
+from collections.abc import Callable
 from uuid import uuid4
 
 from victor.core.events import UnifiedEventType
-from victor.framework.graph import StateGraph, CompiledGraph, END
+from victor.framework.graph import StateGraph, END
 
 from .skill_discovery import Skill
 
@@ -121,10 +122,10 @@ class DataFlow:
 
     source_step_id: str
     target_step_id: str
-    data_mapping: Dict[str, str] = field(default_factory=dict)
+    data_mapping: dict[str, str] = field(default_factory=dict)
     required: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "source_step_id": self.source_step_id,
@@ -159,18 +160,18 @@ class ChainStep:
     skill_name: str = ""
     skill_id: str = ""
     description: str = ""
-    dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
     expected_outcome: str = ""
     timeout_seconds: int = 300
     retry_policy: RetryPolicy = RetryPolicy.NONE
     retry_count: int = 0
     retry_delay_seconds: float = 1.0
-    inputs: Dict[str, Any] = field(default_factory=dict)
-    outputs: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    inputs: dict[str, Any] = field(default_factory=dict)
+    outputs: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     parallelizable: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "id": self.id,
@@ -213,12 +214,12 @@ class SkillChain:
     name: str = ""
     description: str = ""
     goal: str = ""
-    steps: List[ChainStep] = field(default_factory=list)
-    data_flows: List[DataFlow] = field(default_factory=list)
+    steps: list[ChainStep] = field(default_factory=list)
+    data_flows: list[DataFlow] = field(default_factory=list)
     status: ChainExecutionStatus = ChainExecutionStatus.PENDING
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     max_parallel_steps: int = 3
     execution_strategy: str = "sequential"  # sequential, parallel, adaptive
 
@@ -268,7 +269,7 @@ class SkillChain:
                 return step
         return None
 
-    def get_dependent_steps(self, step_id: str) -> List[ChainStep]:
+    def get_dependent_steps(self, step_id: str) -> list[ChainStep]:
         """Get steps that depend on the given step.
 
         Args:
@@ -279,7 +280,7 @@ class SkillChain:
         """
         return [s for s in self.steps if step_id in s.dependencies]
 
-    def get_parallelizable_steps(self) -> List[List[ChainStep]]:
+    def get_parallelizable_steps(self) -> list[list[ChainStep]]:
         """Get groups of steps that can execute in parallel.
 
         Returns:
@@ -289,7 +290,7 @@ class SkillChain:
             return [[step] for step in self.steps]
 
         # Group by dependency level
-        step_levels: List[List[ChainStep]] = []
+        step_levels: list[list[ChainStep]] = []
         step_map = {step.id: step for step in self.steps}
         visited = set()
 
@@ -305,7 +306,7 @@ class SkillChain:
                     max_dep_level = max(max_dep_level, dep_level + 1)
             return max_dep_level
 
-        level_map: Dict[int, List[ChainStep]] = {}
+        level_map: dict[int, list[ChainStep]] = {}
         for step in self.steps:
             if step.id not in visited:
                 level = get_level(step)
@@ -320,7 +321,7 @@ class SkillChain:
 
         return step_levels
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "id": self.id,
@@ -362,7 +363,7 @@ class StepResult:
     duration_seconds: float = 0.0
     retry_count: int = 0
     cached: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -386,14 +387,14 @@ class ChainResult:
     chain_id: str
     chain_name: str = ""
     status: ChainExecutionStatus = ChainExecutionStatus.PENDING
-    step_results: Dict[str, StepResult] = field(default_factory=dict)
-    intermediate_results: Dict[str, Any] = field(default_factory=dict)
+    step_results: dict[str, StepResult] = field(default_factory=dict)
+    intermediate_results: dict[str, Any] = field(default_factory=dict)
     final_output: Any = None
-    outcomes: List[str] = field(default_factory=list)
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    failures: List[str] = field(default_factory=list)
+    outcomes: list[str] = field(default_factory=list)
+    metrics: dict[str, Any] = field(default_factory=dict)
+    failures: list[str] = field(default_factory=list)
     execution_time: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def success(self) -> bool:
@@ -405,7 +406,7 @@ class ChainResult:
         """Get total execution duration."""
         return self.execution_time
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "chain_id": self.chain_id,
@@ -446,10 +447,10 @@ class ValidationResult:
     """
 
     valid: bool
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    data_flow_errors: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    data_flow_errors: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -477,10 +478,10 @@ class ChainStats:
     data_flow_complexity: float = 0.0
     retry_overhead: float = 0.0
     parallel_potential: float = 1.0
-    critical_path: List[str] = field(default_factory=list)
-    bottlenecks: List[str] = field(default_factory=list)
+    critical_path: list[str] = field(default_factory=list)
+    bottlenecks: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "total_steps": self.total_steps,
@@ -515,7 +516,7 @@ class SkillChainer:
     def __init__(
         self,
         event_bus: Optional[Any] = None,
-        skill_executor: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
+        skill_executor: Optional[Callable[[str, dict[str, Any]], Any]] = None,
         tool_pipeline: Optional[Any] = None,
     ):
         """Initialize SkillChainer.
@@ -528,14 +529,14 @@ class SkillChainer:
         self._event_bus = event_bus
         self._skill_executor = skill_executor
         self._tool_pipeline = tool_pipeline
-        self._executing_chains: Set[str] = set()
-        self._chain_cache: Dict[str, SkillChain] = {}
+        self._executing_chains: set[str] = set()
+        self._chain_cache: dict[str, SkillChain] = {}
 
     async def plan_chain(
         self,
         goal: str,
-        available_skills: List[Skill],
-        context: Optional[Dict[str, Any]] = None,
+        available_skills: list[Skill],
+        context: Optional[dict[str, Any]] = None,
         max_steps: int = 10,
     ) -> SkillChain:
         """Plan a skill chain to achieve the given goal.
@@ -589,7 +590,7 @@ class SkillChainer:
 
         # Build chain steps with dependencies
         steps = []
-        step_map: Dict[str, ChainStep] = {}
+        step_map: dict[str, ChainStep] = {}
 
         for i, skill in enumerate(selected_skills):
             # Determine dependencies based on skill dependency analysis
@@ -665,7 +666,7 @@ class SkillChainer:
     async def execute_chain(
         self,
         chain: SkillChain,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         parallel: bool = False,
         use_stategraph: bool = True,
     ) -> ChainResult:
@@ -991,8 +992,8 @@ class SkillChainer:
     async def suggest_chain_alternatives(
         self,
         chain: SkillChain,
-        available_skills: List[Skill],
-    ) -> List[SkillChain]:
+        available_skills: list[Skill],
+    ) -> list[SkillChain]:
         """Suggest alternative chains.
 
         Generates alternative chains by:
@@ -1079,7 +1080,7 @@ class SkillChainer:
     def _calculate_skill_relevance(
         self,
         goal: str,
-        goal_words: Set[str],
+        goal_words: set[str],
         skill: Skill,
     ) -> float:
         """Calculate relevance score of a skill to the goal.
@@ -1117,9 +1118,9 @@ class SkillChainer:
 
     def _analyze_skill_dependencies(
         self,
-        skills: List[Skill],
-        goal_words: Set[str],
-    ) -> Dict[str, List[str]]:
+        skills: list[Skill],
+        goal_words: set[str],
+    ) -> dict[str, list[str]]:
         """Analyze dependencies between skills.
 
         Args:
@@ -1137,7 +1138,7 @@ class SkillChainer:
         analyze_skills = {"analyze", "check", "validate", "verify", "inspect"}
         write_skills = {"write", "save", "update", "modify", "create"}
 
-        dependencies: Dict[str, List[str]] = {}
+        dependencies: dict[str, list[str]] = {}
 
         for i, skill in enumerate(skills):
             skill_lower = skill.name.lower()
@@ -1164,7 +1165,7 @@ class SkillChainer:
 
         return dependencies
 
-    def _determine_execution_strategy(self, steps: List[ChainStep]) -> str:
+    def _determine_execution_strategy(self, steps: list[ChainStep]) -> str:
         """Determine optimal execution strategy for the chain.
 
         Args:
@@ -1183,7 +1184,7 @@ class SkillChainer:
         else:
             return "sequential"
 
-    def _create_data_flows(self, steps: List[ChainStep]) -> List[DataFlow]:
+    def _create_data_flows(self, steps: list[ChainStep]) -> list[DataFlow]:
         """Create data flows between chain steps.
 
         Args:
@@ -1259,7 +1260,7 @@ class SkillChainer:
             parallelizable=step.parallelizable,
         )
 
-    def _resolve_execution_order(self, chain: SkillChain) -> List[List[ChainStep]]:
+    def _resolve_execution_order(self, chain: SkillChain) -> list[list[ChainStep]]:
         """Resolve execution order based on dependencies.
 
         Args:
@@ -1306,7 +1307,7 @@ class SkillChainer:
     async def _execute_with_stategraph(
         self,
         chain: SkillChain,
-        context: Optional[Dict[str, Any]],
+        context: Optional[dict[str, Any]],
         parallel: bool,
     ) -> ChainResult:
         """Execute chain using StateGraph.
@@ -1325,10 +1326,10 @@ class SkillChainer:
         from typing import TypedDict
 
         class ChainState(TypedDict):
-            step_results: Dict[str, Any]
+            step_results: dict[str, Any]
             current_step: Optional[str]
-            context: Dict[str, Any]
-            errors: List[str]
+            context: dict[str, Any]
+            errors: list[str]
 
         # Create graph
         graph = StateGraph[ChainState](ChainState)  # type: ignore[type-var]
@@ -1431,7 +1432,7 @@ class SkillChainer:
     async def _execute_direct(
         self,
         chain: SkillChain,
-        context: Optional[Dict[str, Any]],
+        context: Optional[dict[str, Any]],
         parallel: bool,
     ) -> ChainResult:
         """Execute chain directly (without StateGraph).
@@ -1444,7 +1445,6 @@ class SkillChainer:
         Returns:
             Chain execution result
         """
-        import time
 
         result = ChainResult(
             chain_id=chain.id,
@@ -1528,7 +1528,7 @@ class SkillChainer:
     async def _execute_step(
         self,
         step: ChainStep,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> StepResult:
         """Execute a single chain step.
 
@@ -1644,7 +1644,7 @@ class SkillChainer:
         self,
         func: Callable[..., Any],
         skill_name: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         timeout: int,
     ) -> Any:
         """Execute function with timeout.
@@ -1709,7 +1709,7 @@ class SkillChainer:
         """
         step_map = {step.id: step for step in chain.steps}
 
-        def get_depth(step_id: str, visited: Set[str]) -> int:
+        def get_depth(step_id: str, visited: set[str]) -> int:
             if step_id in visited:
                 return 0  # Cycle detected
 
@@ -1748,7 +1748,7 @@ class SkillChainer:
         variance = sum((t - avg_timeout) ** 2 for t in timeouts) / len(timeouts)
         return min(variance / (avg_timeout**2), 1.0)
 
-    def _find_critical_path(self, chain: SkillChain) -> List[str]:
+    def _find_critical_path(self, chain: SkillChain) -> list[str]:
         """Find critical path (longest dependency chain).
 
         Args:
@@ -1759,7 +1759,7 @@ class SkillChainer:
         """
         step_map = {step.id: step for step in chain.steps}
 
-        def get_path_length(step_id: str, visited: Set[str]) -> int:
+        def get_path_length(step_id: str, visited: set[str]) -> int:
             if step_id in visited:
                 return 0  # Cycle detected
 
@@ -1800,7 +1800,7 @@ class SkillChainer:
 
         return list(reversed(path))
 
-    def _identify_bottlenecks(self, chain: SkillChain) -> List[str]:
+    def _identify_bottlenecks(self, chain: SkillChain) -> list[str]:
         """Identify potential bottleneck steps.
 
         Args:
@@ -1826,7 +1826,7 @@ class SkillChainer:
 
         return bottlenecks
 
-    async def _publish_event(self, event_type: UnifiedEventType, data: Dict[str, Any]) -> None:
+    async def _publish_event(self, event_type: UnifiedEventType, data: dict[str, Any]) -> None:
         """Publish event to event bus.
 
         Args:

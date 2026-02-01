@@ -28,7 +28,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.framework.prompt_builder_template import PromptBuilderTemplate
 
@@ -50,7 +50,7 @@ class ResearchPromptTemplate(PromptBuilderTemplate):
 
     vertical_name: str = "research"
 
-    def get_grounding(self) -> Optional[Dict[str, Any]]:
+    def get_grounding(self) -> Optional[dict[str, Any]]:
         """Get grounding configuration for the prompt.
 
         Returns:
@@ -62,7 +62,7 @@ class ResearchPromptTemplate(PromptBuilderTemplate):
             "priority": 10,
         }
 
-    def get_rules(self) -> List[str]:
+    def get_rules(self) -> list[str]:
         """Get list of rules for the prompt.
 
         Returns:
@@ -84,7 +84,7 @@ class ResearchPromptTemplate(PromptBuilderTemplate):
         """
         return 20
 
-    def get_checklist(self) -> List[str]:
+    def get_checklist(self) -> list[str]:
         """Get checklist items for the prompt.
 
         Returns:

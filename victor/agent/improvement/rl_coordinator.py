@@ -66,18 +66,15 @@ Usage:
 from __future__ import annotations
 
 import logging
-import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import numpy as np
 
 from victor.agent.improvement.proficiency_tracker import (
     ProficiencyTracker,
-    TaskOutcome,
-    TrendDirection,
 )
 from victor.framework.rl import RLCoordinator, RLOutcome
 
@@ -117,11 +114,11 @@ class Reward:
 
     value: float
     shaped_value: float
-    components: Dict[str, float]
+    components: dict[str, float]
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "value": self.value,
@@ -145,8 +142,8 @@ class Policy:
     """
 
     task_type: str
-    q_table: Dict[str, Dict[str, float]]
-    action_space: List[str]
+    q_table: dict[str, dict[str, float]]
+    action_space: list[str]
     last_updated: str
     total_updates: int = 0
 
@@ -168,7 +165,7 @@ class Policy:
 
         return max(actions.items(), key=lambda x: x[1])[0]
 
-    def get_action_values(self, state: str) -> Dict[str, float]:
+    def get_action_values(self, state: str) -> dict[str, float]:
         """Get action values for state.
 
         Args:
@@ -179,7 +176,7 @@ class Policy:
         """
         return self.q_table.get(state, {})
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "task_type": self.task_type,
@@ -208,7 +205,7 @@ class Hyperparameters:
     reward_scale: float = 1.0
     penalty_scale: float = 1.0
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         """Convert to dictionary."""
         return {
             "learning_rate": self.learning_rate,
@@ -219,7 +216,7 @@ class Hyperparameters:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, float]) -> "Hyperparameters":
+    def from_dict(cls, data: dict[str, float]) -> "Hyperparameters":
         """Create from dictionary."""
         return cls(**data)
 
@@ -331,7 +328,7 @@ class EnhancedRLCoordinator:
         self._reward_strategy = reward_strategy
 
         # Policy storage
-        self._policies: Dict[str, Policy] = {}
+        self._policies: dict[str, Policy] = {}
 
         # Hyperparameters
         self._hyperparameters = Hyperparameters()
@@ -409,13 +406,13 @@ class EnhancedRLCoordinator:
 
     def _baseline_reward(
         self, outcome: RLOutcome, base_reward: float
-    ) -> Tuple[float, Dict[str, float]]:
+    ) -> tuple[float, dict[str, float]]:
         """Baseline reward (success/failure only)."""
         return base_reward, {"base": base_reward}
 
     def _quality_adjusted_reward(
         self, outcome: RLOutcome, base_reward: float
-    ) -> Tuple[float, Dict[str, float]]:
+    ) -> tuple[float, dict[str, float]]:
         """Quality-adjusted reward."""
         quality_multiplier = (
             outcome.quality_score if outcome.success else (1.0 - outcome.quality_score)
@@ -425,7 +422,7 @@ class EnhancedRLCoordinator:
 
     def _proficiency_aware_reward(
         self, outcome: RLOutcome, base_reward: float
-    ) -> Tuple[float, Dict[str, float]]:
+    ) -> tuple[float, dict[str, float]]:
         """Proficiency-aware reward.
 
         Adjusts reward based on tool proficiency. If tool is performing poorly,
@@ -467,7 +464,7 @@ class EnhancedRLCoordinator:
 
     def _time_penalty_reward(
         self, outcome: RLOutcome, base_reward: float
-    ) -> Tuple[float, Dict[str, float]]:
+    ) -> tuple[float, dict[str, float]]:
         """Time-penalty reward."""
         duration = outcome.metadata.get("duration_ms", 0) / 1000.0  # Convert to seconds
 
@@ -479,7 +476,7 @@ class EnhancedRLCoordinator:
 
     def _cost_aware_reward(
         self, outcome: RLOutcome, base_reward: float
-    ) -> Tuple[float, Dict[str, float]]:
+    ) -> tuple[float, dict[str, float]]:
         """Cost-aware reward."""
         # Get cost from metadata
         cost = outcome.metadata.get("cost", 0.0)
@@ -555,7 +552,7 @@ class EnhancedRLCoordinator:
         return self._policies.get(task_type)
 
     def select_action(
-        self, task: str, available_actions: List[Action], state: str = "default"
+        self, task: str, available_actions: list[Action], state: str = "default"
     ) -> Optional[Action]:
         """Select action using policy.
 
@@ -624,7 +621,7 @@ class EnhancedRLCoordinator:
 
     def optimize_hyperparameters(
         self,
-        performance_data: List[Dict[str, Any]],
+        performance_data: list[dict[str, Any]],
         optimization_iterations: int = 10,
     ) -> Hyperparameters:
         """Optimize hyperparameters using performance data.
@@ -680,7 +677,7 @@ class EnhancedRLCoordinator:
         return best_hyperparams
 
     def _evaluate_hyperparameters(
-        self, hyperparams: Hyperparameters, performance_data: List[Dict[str, Any]]
+        self, hyperparams: Hyperparameters, performance_data: list[dict[str, Any]]
     ) -> float:
         """Evaluate hyperparameters on performance data.
 
@@ -849,7 +846,7 @@ class EnhancedRLCoordinator:
         except Exception:
             logger.debug("EnhancedRLCoordinator: No saved hyperparameters found, using defaults")
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export coordinator metrics.
 
         Returns:

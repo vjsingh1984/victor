@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ OUTPUT_REQUIREMENT_PATTERNS = [
 ]
 
 
-def extract_file_paths_from_text(text: str) -> List[str]:
+def extract_file_paths_from_text(text: str) -> list[str]:
     """Extract file paths mentioned in text.
 
     This function scans text for common file path patterns and returns
@@ -99,7 +99,7 @@ def extract_file_paths_from_text(text: str) -> List[str]:
     return sorted(valid_paths)
 
 
-def extract_output_requirements_from_text(text: str) -> List[str]:
+def extract_output_requirements_from_text(text: str) -> list[str]:
     """Extract output file requirements from text.
 
     This function scans text for patterns indicating where output should
@@ -133,7 +133,7 @@ def extract_output_requirements_from_text(text: str) -> List[str]:
 
 def format_tool_output_for_log(
     tool_name: str,
-    args: Dict[str, Any],
+    args: dict[str, Any],
     output: Any,
     max_length: int = 500,
 ) -> str:

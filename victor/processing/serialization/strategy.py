@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 
 class SerializationFormat(Enum):
@@ -108,7 +108,7 @@ class DataCharacteristics:
     # Repetition metrics (for reference encoding)
     key_repetition_ratio: float = 0.0  # How often keys repeat
     value_repetition_ratio: float = 0.0  # How often values repeat
-    common_values: Dict[str, int] = field(default_factory=dict)  # value -> count
+    common_values: dict[str, int] = field(default_factory=dict)  # value -> count
 
     # Content characteristics
     has_nested_objects: bool = False
@@ -121,8 +121,8 @@ class DataCharacteristics:
     estimated_json_chars: int = 0
 
     # Field information (for uniform arrays)
-    field_names: List[str] = field(default_factory=list)
-    field_types: Dict[str, str] = field(default_factory=dict)
+    field_names: list[str] = field(default_factory=list)
+    field_types: dict[str, str] = field(default_factory=dict)
 
     def is_tabular(self) -> bool:
         """Check if data is suitable for tabular format (TOON/CSV)."""
@@ -192,7 +192,7 @@ class SerializationConfig:
     preferred_format: Optional[SerializationFormat] = None
 
     # Formats to consider for auto-selection (order = preference)
-    allowed_formats: List[SerializationFormat] = field(
+    allowed_formats: list[SerializationFormat] = field(
         default_factory=lambda: [
             SerializationFormat.TOON,
             SerializationFormat.CSV,
@@ -202,7 +202,7 @@ class SerializationConfig:
     )
 
     # Formats to never use
-    disabled_formats: Set[SerializationFormat] = field(default_factory=set)
+    disabled_formats: set[SerializationFormat] = field(default_factory=set)
 
     # Minimum array size to consider tabular formats
     min_array_size_for_tabular: int = 3
@@ -287,13 +287,13 @@ class SerializationResult:
     estimated_savings_percent: float = 0.0
 
     # For reference encoding
-    reference_table: Optional[Dict[str, str]] = None
+    reference_table: Optional[dict[str, str]] = None
 
     # Analysis metadata (if debug mode)
     characteristics: Optional[DataCharacteristics] = None
 
     # Any warnings during serialization
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def full_content(self) -> str:
@@ -302,7 +302,7 @@ class SerializationResult:
             return f"{self.format_hint}\n\n{self.content}"
         return self.content
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for logging/debugging."""
         return {
             "format": self.format.value,
@@ -317,7 +317,7 @@ class SerializationResult:
 
 
 # Format descriptions for hints
-FORMAT_DESCRIPTIONS: Dict[SerializationFormat, str] = {
+FORMAT_DESCRIPTIONS: dict[SerializationFormat, str] = {
     SerializationFormat.JSON: "Standard JSON object/array notation.",
     SerializationFormat.JSON_MINIFIED: "Compact JSON without whitespace.",
     SerializationFormat.TOON: (

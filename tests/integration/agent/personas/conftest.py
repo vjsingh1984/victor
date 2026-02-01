@@ -19,7 +19,6 @@ and version conflicts from persisting personas to the actual YAML file.
 """
 
 from pathlib import Path
-from typing import Dict
 
 import pytest
 

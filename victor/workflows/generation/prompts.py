@@ -35,13 +35,9 @@ Example:
     )
 """
 
-import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.workflows.generation.types import (
-    ErrorCategory,
-    ErrorSeverity,
-    WorkflowValidationError,
     WorkflowGenerationValidationResult,
 )
 from victor.workflows.generation.error_reporter import ErrorReporter
@@ -76,9 +72,9 @@ class RefinementPromptBuilder:
     def build(
         self,
         user_request: str,
-        workflow_dict: Dict[str, Any],
+        workflow_dict: dict[str, Any],
         validation_result: WorkflowGenerationValidationResult,
-        examples: Optional[List[Dict[str, Any]]] = None,
+        examples: Optional[list[dict[str, Any]]] = None,
         iteration: int = 0,
     ) -> str:
         """Build refinement prompt for LLM.
@@ -138,7 +134,7 @@ This is refinement iteration #{iteration + 1}. Previous attempts to fix this wor
 
 **Critical:** You must fix all critical and error-level issues. Warnings should be addressed if possible."""
 
-    def _current_workflow(self, workflow_dict: Dict[str, Any]) -> str:
+    def _current_workflow(self, workflow_dict: dict[str, Any]) -> str:
         """Show current workflow YAML."""
         import yaml
 
@@ -150,7 +146,7 @@ This is refinement iteration #{iteration + 1}. Previous attempts to fix this wor
 {yaml_str}
 ```"""
 
-    def _examples_section(self, examples: List[Dict[str, Any]]) -> str:
+    def _examples_section(self, examples: list[dict[str, Any]]) -> str:
         """Few-shot examples section."""
         sections = []
         for i, example in enumerate(examples, 1):
@@ -460,7 +456,7 @@ entry_point: task1
     @classmethod
     def get_examples_for_errors(
         cls, validation_result: WorkflowGenerationValidationResult
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get relevant examples based on validation errors.
 
         Args:
@@ -500,7 +496,7 @@ entry_point: task1
         return examples[:5]
 
     @classmethod
-    def get_all_examples(cls) -> Dict[str, Dict[str, Any]]:
+    def get_all_examples(cls) -> dict[str, dict[str, Any]]:
         """Get all examples.
 
         Returns:
@@ -531,7 +527,7 @@ entry_point: task1
 
 def build_refinement_prompt(
     user_request: str,
-    workflow_dict: Dict[str, Any],
+    workflow_dict: dict[str, Any],
     validation_result: WorkflowGenerationValidationResult,
     include_examples: bool = True,
     iteration: int = 0,

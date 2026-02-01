@@ -49,10 +49,6 @@ Total: 15 integration tests
 import asyncio
 import pytest
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
-from dataclasses import dataclass, field
 
 
 # ============================================================================
@@ -301,8 +297,6 @@ async def test_coding_devops_tool_coordination():
     2. Execute in coordinated workflow
     3. Verify tool dependencies and ordering
     """
-    from victor.coding import CodingAssistant
-    from victor.devops import DevOpsAssistant
 
     # Mock tool selection across verticals
     coding_tools = ["read", "write", "code_search"]
@@ -344,8 +338,6 @@ async def test_research_to_implementation_workflow():
     2. Coding vertical implements based on research
     3. Verify knowledge transfer
     """
-    from victor.research import ResearchAssistant
-    from victor.coding import CodingAssistant
 
     # Mock research findings
     research_findings = {
@@ -399,8 +391,6 @@ async def test_documentation_generation_from_research(sample_codebase):
     2. Coding vertical generates documentation
     3. Verify documentation quality
     """
-    from victor.research import ResearchAssistant
-    from victor.coding import CodingAssistant
 
     # Mock research data
     api_research = {
@@ -465,8 +455,6 @@ async def test_research_coding_context_sharing():
     2. Coding vertical uses shared context
     3. Verify context propagation
     """
-    from victor.research import ResearchAssistant
-    from victor.coding import CodingAssistant
 
     # Mock research context
     research_context = {
@@ -599,8 +587,6 @@ async def test_code_documentation_from_knowledge_base(sample_document_store, sam
     2. Coding vertical documents code
     3. Verify documentation matches knowledge base
     """
-    from victor.rag import RAGAssistant
-    from victor.coding import CodingAssistant
 
     # Mock knowledge base retrieval
     kb_content = {
@@ -657,8 +643,6 @@ async def test_rag_coding_semantic_search_integration(sample_document_store):
     2. RAG performs semantic search
     3. Coding applies relevant knowledge
     """
-    from victor.rag import RAGAssistant
-    from victor.coding import CodingAssistant
 
     # Mock code concept extraction
     code_concepts = ["authentication", "JWT", "security", "token validation"]
@@ -734,8 +718,6 @@ async def test_research_data_analysis_workflow(sample_dataset):
     2. DataAnalysis vertical processes data
     3. Verify analysis follows research
     """
-    from victor.research import ResearchAssistant
-    from victor.dataanalysis import DataAnalysisAssistant
 
     # Mock research on analysis methodology
     analysis_research = {
@@ -785,8 +767,6 @@ async def test_data_driven_research_report(sample_dataset):
     2. Research vertical generates insights
     3. Verify report quality
     """
-    from victor.dataanalysis import DataAnalysisAssistant
-    from victor.research import ResearchAssistant
 
     # Mock analysis results
     analysis_results = {
@@ -852,8 +832,6 @@ async def test_research_dataanalysis_visualization_workflow(sample_dataset):
     2. DataAnalysis creates visualization
     3. Verify visualization answers question
     """
-    from victor.research import ResearchAssistant
-    from victor.dataanalysis import DataAnalysisAssistant
 
     # Mock research question
     research_question = {
@@ -896,9 +874,6 @@ async def test_three_vertical_research_coding_devops_workflow(sample_codebase):
     3. DevOps: Create deployment configuration
     4. Verify complete workflow
     """
-    from victor.research import ResearchAssistant
-    from victor.coding import CodingAssistant
-    from victor.devops import DevOpsAssistant
 
     # Stage 1: Research findings
     research_output = {
@@ -997,9 +972,6 @@ async def test_vertical_handoff_state_management():
     3. State handed off to DevOps vertical
     4. Verify state consistency
     """
-    from victor.coding import CodingAssistant
-    from victor.research import ResearchAssistant
-    from victor.devops import DevOpsAssistant
 
     # Initial state from Coding
     coding_state = {
@@ -1068,10 +1040,6 @@ async def test_complex_four_vertical_workflow(
     4. DataAnalysis: Validate with data
     5. Verify complete pipeline
     """
-    from victor.research import ResearchAssistant
-    from victor.rag import RAGAssistant
-    from victor.coding import CodingAssistant
-    from victor.dataanalysis import DataAnalysisAssistant
 
     # Stage 1: Research - Problem investigation
     research_output = {

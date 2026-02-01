@@ -21,7 +21,7 @@ security scanning operations.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 from victor.core.security.patterns.types import SafetyPattern
 from victor.core.security.patterns.secrets import SecretScanner
@@ -38,7 +38,7 @@ class SecurityAnalysisSafetyExtension(SafetyExtensionProtocol):
     def __init__(self) -> None:
         """Initialize the safety extension."""
         self._secret_scanner = SecretScanner()
-        self._custom_patterns: List[SafetyPattern] = []
+        self._custom_patterns: list[SafetyPattern] = []
 
     def add_dangerous_pattern(self, pattern: str) -> None:
         """Add a custom dangerous pattern.
@@ -54,7 +54,7 @@ class SecurityAnalysisSafetyExtension(SafetyExtensionProtocol):
         )
         self._custom_patterns.append(custom_pattern)
 
-    def get_bash_patterns(self) -> List[SafetyPattern]:
+    def get_bash_patterns(self) -> list[SafetyPattern]:
         """Get security-specific bash command patterns.
 
         Returns:
@@ -95,7 +95,7 @@ class SecurityAnalysisSafetyExtension(SafetyExtensionProtocol):
         ]
         return security_patterns + self._custom_patterns
 
-    def get_file_patterns(self) -> List[SafetyPattern]:
+    def get_file_patterns(self) -> list[SafetyPattern]:
         """Get security-specific file operation patterns.
 
         Returns:
@@ -134,7 +134,7 @@ class SecurityAnalysisSafetyExtension(SafetyExtensionProtocol):
             ),
         ]
 
-    def get_tool_restrictions(self) -> Dict[str, List[str]]:
+    def get_tool_restrictions(self) -> dict[str, list[str]]:
         """Get tool-specific argument restrictions.
 
         Returns:
@@ -159,7 +159,7 @@ class SecurityAnalysisSafetyExtension(SafetyExtensionProtocol):
         """
         return "security_analysis"
 
-    def scan_for_secrets(self, content: str) -> List[Dict[str, Any]]:
+    def scan_for_secrets(self, content: str) -> list[dict[str, Any]]:
         """Scan content for potential secrets.
 
         Args:

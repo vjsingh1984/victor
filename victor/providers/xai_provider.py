@@ -26,8 +26,8 @@ References:
 
 import json
 import logging
-import os
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -50,7 +50,7 @@ DEFAULT_BASE_URL = "https://api.x.ai/v1"
 
 # Available xAI Grok models
 # Reference: https://docs.x.ai/docs/models
-XAI_MODELS: Dict[str, Dict[str, Any]] = {
+XAI_MODELS: dict[str, dict[str, Any]] = {
     "grok-2": {
         "description": "Grok-2 flagship model",
         "context_window": 131072,  # 128K tokens
@@ -168,12 +168,12 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str = "grok-2-1212",
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to xAI.
@@ -233,12 +233,12 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
     async def stream(  # type: ignore[override,misc]
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str = "grok-2-1212",
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from xAI with tool call accumulation.
@@ -276,7 +276,7 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             async with self.client.stream("POST", "/chat/completions", json=payload) as response:
                 response.raise_for_status()
 
-                accumulated_tool_calls: List[Dict[str, Any]] = []
+                accumulated_tool_calls: list[dict[str, Any]] = []
                 has_sent_final = False
 
                 async for line in response.aiter_lines():
@@ -325,20 +325,20 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                 raw_error=e,
             )
 
-    def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def _convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert standard tools to xAI format (OpenAI-compatible)."""
         return convert_tools_to_openai_format(tools)
 
     def _build_request_payload(
         self,
-        messages: List[Message],
+        messages: list[Message],
         model: str,
         temperature: float,
         max_tokens: int,
-        tools: Optional[List[ToolDefinition]],
+        tools: Optional[list[ToolDefinition]],
         stream: bool,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build request payload for xAI's OpenAI-compatible API.
 
         Args:
@@ -356,7 +356,7 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         # Build messages in OpenAI format
         formatted_messages = []
         for msg in messages:
-            formatted_msg: Dict[str, Any] = {
+            formatted_msg: dict[str, Any] = {
                 "role": msg.role,
                 "content": msg.content,
             }
@@ -365,7 +365,7 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
                 formatted_msg["tool_call_id"] = msg.tool_call_id
             formatted_messages.append(formatted_msg)
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "messages": formatted_messages,
             "temperature": temperature,
@@ -387,8 +387,8 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         return payload
 
     def _normalize_tool_calls(
-        self, tool_calls: Optional[List[Dict[str, Any]]]
-    ) -> Optional[List[Dict[str, Any]]]:
+        self, tool_calls: Optional[list[dict[str, Any]]]
+    ) -> Optional[list[dict[str, Any]]]:
         """Normalize tool calls from OpenAI format.
 
         Converts:
@@ -434,7 +434,7 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
 
         return normalized if normalized else None
 
-    def _parse_response(self, result: Dict[str, Any], model: str) -> CompletionResponse:
+    def _parse_response(self, result: dict[str, Any], model: str) -> CompletionResponse:
         """Parse xAI API response.
 
         Args:
@@ -486,7 +486,7 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
         )
 
     def _parse_stream_chunk(
-        self, chunk_data: Dict[str, Any], accumulated_tool_calls: List[Dict[str, Any]]
+        self, chunk_data: dict[str, Any], accumulated_tool_calls: list[dict[str, Any]]
     ) -> Optional[StreamChunk]:
         """Parse streaming chunk from xAI with tool call accumulation.
 
@@ -551,7 +551,7 @@ class XAIProvider(BaseProvider, HTTPErrorHandlerMixin):
             is_final=finish_reason is not None,
         )
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List available xAI models.
 
         Returns:

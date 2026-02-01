@@ -22,7 +22,7 @@ Install gopygo with: pip install gopygo
 
 import logging
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from ..types import ExtractedSymbol
 from .base import BaseLanguageProcessor
@@ -67,7 +67,7 @@ class GoExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: Optional[str] = None,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract symbols from Go code.
 
         Args:
@@ -93,7 +93,7 @@ class GoExtractor(BaseLanguageProcessor):
         self,
         code: str,
         file_path: Path,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract symbols using gopygo.
 
         Args:
@@ -106,7 +106,7 @@ class GoExtractor(BaseLanguageProcessor):
         if not GOPYGO_AVAILABLE:
             return []
 
-        symbols: List[ExtractedSymbol] = []
+        symbols: list[ExtractedSymbol] = []
 
         try:
             # Parse Go code
@@ -151,7 +151,7 @@ class GoExtractor(BaseLanguageProcessor):
         self,
         decl: Any,
         file_path: Path,
-        symbols: List[ExtractedSymbol],
+        symbols: list[ExtractedSymbol],
     ) -> None:
         """Extract symbols from a declaration."""
         decl_type = type(decl).__name__
@@ -243,6 +243,6 @@ class GoExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: Optional[str] = None,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Process code and return results (BaseLanguageProcessor interface)."""
         return self.extract(code, file_path, language)

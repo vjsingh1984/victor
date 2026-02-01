@@ -25,7 +25,7 @@ Design Pattern: Protocol-based dependency inversion
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -47,12 +47,12 @@ class StageProtocol(Protocol):
         ...
 
     @property
-    def tools(self) -> Set[str]:
+    def tools(self) -> set[str]:
         """Tools associated with this stage."""
         ...
 
     @property
-    def next_stages(self) -> Set[str]:
+    def next_stages(self) -> set[str]:
         """Valid stages to transition to."""
         ...
 
@@ -85,7 +85,7 @@ class StateProtocol(Protocol):
         """
         ...
 
-    def get_stage_tools(self) -> Set[str]:
+    def get_stage_tools(self) -> set[str]:
         """Get tools for the current stage.
 
         Returns:
@@ -110,7 +110,7 @@ class TransitionValidatorProtocol(Protocol):
         self,
         current_stage: str,
         target_stage: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> tuple[bool, Optional[str]]:
         """Validate a transition.
 
@@ -138,7 +138,7 @@ class StateObserverProtocol(Protocol):
         self,
         old_stage: str,
         new_stage: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         """Called when a transition occurs.
 
@@ -160,7 +160,7 @@ class StageDetectorProtocol(Protocol):
 
     def detect_stage(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> Optional[tuple[str, float]]:
         """Detect the appropriate stage from context.
 

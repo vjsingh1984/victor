@@ -72,7 +72,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 try:
     import pandas as pd  # type: ignore[import-untyped]
@@ -82,7 +82,6 @@ except ImportError:
     PANDAS_AVAILABLE = False
     pd = None
 
-from victor.core.database import get_database
 
 logger = logging.getLogger(__name__)
 
@@ -120,12 +119,12 @@ class TaskOutcome:
     success: bool
     duration: float
     cost: float
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
     quality_score: float = 1.0
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         return {
             "success": 1 if self.success else 0,
@@ -138,7 +137,7 @@ class TaskOutcome:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TaskOutcome":
+    def from_dict(cls, data: dict[str, Any]) -> "TaskOutcome":
         """Create from dictionary."""
         errors_str = data.get("errors", "")
         errors = errors_str.split(",") if errors_str else []
@@ -176,7 +175,7 @@ class ProficiencyScore:
     last_updated: str
     quality_score: float = 1.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "success_rate": self.success_rate,
@@ -207,7 +206,7 @@ class Suggestion:
     confidence: float
     priority: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "tool": self.tool,
@@ -236,13 +235,13 @@ class ProficiencyMetrics:
     total_tools: int
     total_tasks: int
     total_outcomes: int
-    tool_scores: Dict[str, ProficiencyScore]
-    task_success_rates: Dict[str, float]
-    top_performing_tools: List[Tuple[str, float]]
-    improvement_opportunities: List[Tuple[str, float]]
+    tool_scores: dict[str, ProficiencyScore]
+    task_success_rates: dict[str, float]
+    top_performing_tools: list[tuple[str, float]]
+    improvement_opportunities: list[tuple[str, float]]
     timestamp: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "total_tools": self.total_tools,
@@ -284,7 +283,7 @@ class ImprovementTrajectory:
     moving_avg_quality: float
     trend: TrendDirection
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "task_type": self.task_type,
@@ -326,7 +325,7 @@ class MovingAverageMetrics:
     min_value: float
     max_value: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "window_size": self.window_size,
@@ -394,9 +393,9 @@ class ProficiencyTracker:
             # Raw connection passed
             self.db = db
 
-        self._cache: Dict[str, ProficiencyScore] = {}
+        self._cache: dict[str, ProficiencyScore] = {}
         self._moving_avg_window = moving_avg_window
-        self._moving_avg_cache: Dict[str, deque[Any]] = {}
+        self._moving_avg_cache: dict[str, deque[Any]] = {}
         self._ensure_tables()
 
     def _ensure_tables(self) -> None:
@@ -803,7 +802,7 @@ class ProficiencyTracker:
 
     def get_improvement_suggestions(
         self, agent_id: str, min_executions: int = 10
-    ) -> List[Suggestion]:
+    ) -> list[Suggestion]:
         """Generate improvement suggestions for an agent.
 
         Args:
@@ -942,7 +941,7 @@ class ProficiencyTracker:
             timestamp=datetime.now().isoformat(),
         )
 
-    def get_all_tools(self) -> List[str]:
+    def get_all_tools(self) -> list[str]:
         """Get all tracked tools.
 
         Returns:
@@ -952,7 +951,7 @@ class ProficiencyTracker:
         cursor.execute("SELECT tool FROM tool_proficiency")
         return [row[0] for row in cursor.fetchall()]
 
-    def get_all_tasks(self) -> List[str]:
+    def get_all_tasks(self) -> list[str]:
         """Get all tracked task types.
 
         Returns:
@@ -1045,7 +1044,7 @@ class ProficiencyTracker:
             max_value=max(successes),
         )
 
-    def compute_moving_average(self, values: List[float], window: int) -> List[float]:
+    def compute_moving_average(self, values: list[float], window: int) -> list[float]:
         """Compute simple moving average.
 
         Args:
@@ -1065,7 +1064,7 @@ class ProficiencyTracker:
 
         return moving_avgs
 
-    def detect_trend_direction(self, values: List[float], threshold: float = 0.1) -> TrendDirection:
+    def detect_trend_direction(self, values: list[float], threshold: float = 0.1) -> TrendDirection:
         """Detect trend direction from time series data.
 
         Args:
@@ -1099,7 +1098,7 @@ class ProficiencyTracker:
         else:
             return TrendDirection.STABLE
 
-    def get_top_proficiencies(self, n: int = 10) -> List[Tuple[str, ProficiencyScore]]:
+    def get_top_proficiencies(self, n: int = 10) -> list[tuple[str, ProficiencyScore]]:
         """Get top N proficiencies by success rate.
 
         Args:
@@ -1129,7 +1128,7 @@ class ProficiencyTracker:
 
         return results
 
-    def get_weaknesses(self, threshold: float = 0.7, min_executions: int = 5) -> List[str]:
+    def get_weaknesses(self, threshold: float = 0.7, min_executions: int = 5) -> list[str]:
         """Get tools with success rate below threshold.
 
         Args:
@@ -1201,7 +1200,7 @@ class ProficiencyTracker:
 
     def get_improvement_trajectory(
         self, task_type: str, limit: int = 100
-    ) -> List[ImprovementTrajectory]:
+    ) -> list[ImprovementTrajectory]:
         """Get historical improvement trajectory for a task type.
 
         Args:
@@ -1368,7 +1367,7 @@ class ProficiencyTracker:
         logger.info(f"Exported {len(df)} trajectory points for {task_type}")
         return df
 
-    def get_statistics_summary(self) -> Dict[str, Any]:
+    def get_statistics_summary(self) -> dict[str, Any]:
         """Get statistical summary of all proficiency data.
 
         Returns:
@@ -1427,7 +1426,7 @@ class ProficiencyTracker:
             "timestamp": datetime.now().isoformat(),
         }
 
-    def analyze_performance_patterns(self) -> Dict[str, Any]:
+    def analyze_performance_patterns(self) -> dict[str, Any]:
         """Analyze performance patterns across all tools and tasks.
 
         Returns:

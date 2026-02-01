@@ -41,11 +41,12 @@ Example:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Optional, Protocol
+from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
     from victor.framework.graph import StateGraph
-    from victor.workflows.definition import WorkflowDefinition, WorkflowNode
+    from victor.workflows.definition import WorkflowNode
     from victor.workflows.adapters import WorkflowState
 
 
@@ -115,7 +116,7 @@ class CompiledGraphProtocol(Protocol):
 
     async def invoke(
         self,
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         *,
         thread_id: Optional[str] = None,
         checkpoint: Optional[str] = None,
@@ -138,7 +139,7 @@ class CompiledGraphProtocol(Protocol):
 
     async def stream(
         self,
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         *,
         thread_id: Optional[str] = None,
     ) -> AsyncIterator["ExecutionEventProtocol"]:
@@ -196,7 +197,7 @@ class ExecutionResultProtocol(Protocol):
         ...
 
     @property
-    def metrics(self) -> Dict[str, Any]:
+    def metrics(self) -> dict[str, Any]:
         """Get execution metrics.
 
         Returns:
@@ -241,7 +242,7 @@ class ExecutionEventProtocol(Protocol):
         ...
 
     @property
-    def data(self) -> Dict[str, Any]:
+    def data(self) -> dict[str, Any]:
         """Get event data.
 
         Returns:

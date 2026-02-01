@@ -33,7 +33,8 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import Callable
 from enum import Enum
 from functools import wraps
 
@@ -153,7 +154,7 @@ class OperationMetrics:
             idx = min(idx, len(sorted_samples) - 1)
             return sorted_samples[idx]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get statistics as dictionary.
 
         Returns:
@@ -224,11 +225,11 @@ class PerformanceMonitor:
         self.max_operations = max_operations
 
         # Metrics storage (thread-safe)
-        self._metrics: Dict[str, OperationMetrics] = {}
+        self._metrics: dict[str, OperationMetrics] = {}
         self._lock = threading.RLock()
 
         # Alert callbacks
-        self._alert_callbacks: List[Callable[[str, float], None]] = []
+        self._alert_callbacks: list[Callable[[str, float], None]] = []
 
     def track(
         self,
@@ -285,7 +286,7 @@ class PerformanceMonitor:
             if execution_time > self.alert_threshold:
                 self._trigger_alert(operation_name, execution_time)
 
-    def get_stats(self, operation_name: str) -> Optional[Dict[str, Any]]:
+    def get_stats(self, operation_name: str) -> Optional[dict[str, Any]]:
         """Get statistics for an operation.
 
         Args:
@@ -300,7 +301,7 @@ class PerformanceMonitor:
                 return None
             return metrics.get_stats()
 
-    def get_all_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics for all operations.
 
         Returns:
@@ -311,7 +312,7 @@ class PerformanceMonitor:
 
     def get_hot_operations(
         self, min_count: int = 10, threshold: float = 1.0
-    ) -> List[Tuple[str, Dict[str, Any]]]:
+    ) -> list[tuple[str, dict[str, Any]]]:
         """Get hot (frequently called/slow) operations.
 
         Args:

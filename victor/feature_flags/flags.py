@@ -29,11 +29,11 @@ Flag Metadata:
 
 from __future__ import annotations
 
-from typing import Dict, List, Any
+from typing import Any
 
 
 # Feature flag definitions
-FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
+FEATURE_FLAGS: dict[str, dict[str, Any]] = {
     # ==========================================================================
     # Planning Capabilities
     # ==========================================================================
@@ -188,7 +188,7 @@ FEATURE_FLAGS: Dict[str, Dict[str, Any]] = {
 }
 
 
-def get_flag_metadata(flag_name: str) -> Dict[str, Any]:
+def get_flag_metadata(flag_name: str) -> dict[str, Any]:
     """Get metadata for a specific feature flag.
 
     Args:
@@ -204,7 +204,7 @@ def get_flag_metadata(flag_name: str) -> Dict[str, Any]:
     return FEATURE_FLAGS.get(flag_name, {}).copy()
 
 
-def validate_flag_dependencies(flag_name: str, enabled_flags: Dict[str, bool]) -> bool:
+def validate_flag_dependencies(flag_name: str, enabled_flags: dict[str, bool]) -> bool:
     """Validate that all dependencies for a flag are enabled.
 
     Args:
@@ -239,7 +239,7 @@ def validate_flag_dependencies(flag_name: str, enabled_flags: Dict[str, bool]) -
     return True
 
 
-def get_flags_by_category(category: str) -> Dict[str, Dict[str, Any]]:
+def get_flags_by_category(category: str) -> dict[str, dict[str, Any]]:
     """Get all flags in a specific category.
 
     Args:
@@ -260,7 +260,7 @@ def get_flags_by_category(category: str) -> Dict[str, Dict[str, Any]]:
     }
 
 
-def get_stable_flags() -> Dict[str, Dict[str, Any]]:
+def get_stable_flags() -> dict[str, dict[str, Any]]:
     """Get all flags marked as stable (safe for production).
 
     Returns:
@@ -277,7 +277,7 @@ def get_stable_flags() -> Dict[str, Dict[str, Any]]:
     }
 
 
-def get_experimental_flags() -> Dict[str, Dict[str, Any]]:
+def get_experimental_flags() -> dict[str, dict[str, Any]]:
     """Get all flags marked as experimental (not stable).
 
     Returns:
@@ -294,7 +294,7 @@ def get_experimental_flags() -> Dict[str, Dict[str, Any]]:
     }
 
 
-def get_all_flag_names() -> List[str]:
+def get_all_flag_names() -> list[str]:
     """Get list of all feature flag names.
 
     Returns:
@@ -308,7 +308,7 @@ def get_all_flag_names() -> List[str]:
     return list(FEATURE_FLAGS.keys())
 
 
-def get_flag_categories() -> List[str]:
+def get_flag_categories() -> list[str]:
     """Get list of all flag categories.
 
     Returns:

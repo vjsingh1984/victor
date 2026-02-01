@@ -48,10 +48,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
     Any,
-    Dict,
-    List,
     Optional,
-    Union,
 )
 from uuid import uuid4
 
@@ -78,8 +75,8 @@ class StateSnapshot:
 
     snapshot_id: str
     timestamp: float
-    state: Dict[str, Any]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    state: dict[str, Any]
+    metadata: dict[str, Any] = field(default_factory=dict)
     node_id: Optional[str] = None
     parent_id: Optional[str] = None
 
@@ -101,10 +98,10 @@ class StateDiff:
     snapshot_id: str
     from_snapshot_id: str
     to_snapshot_id: str
-    added_keys: Dict[str, Any]
-    removed_keys: Dict[str, Any]
-    changed_keys: Dict[str, Dict[str, Any]]
-    unchanged_keys: List[str]
+    added_keys: dict[str, Any]
+    removed_keys: dict[str, Any]
+    changed_keys: dict[str, dict[str, Any]]
+    unchanged_keys: list[str]
 
 
 @dataclass
@@ -157,14 +154,14 @@ class WorkflowStateManager:
         self.auto_capture = auto_capture
 
         # Snapshot storage
-        self._snapshots: Dict[str, StateSnapshot] = {}
-        self._snapshot_order: List[str] = []
+        self._snapshots: dict[str, StateSnapshot] = {}
+        self._snapshot_order: list[str] = []
 
         # Mutation log
-        self._mutations: List[StateMutation] = []
+        self._mutations: list[StateMutation] = []
 
         # Current state
-        self._current_state: Dict[str, Any] = {}
+        self._current_state: dict[str, Any] = {}
 
     # =========================================================================
     # Snapshot Management
@@ -172,9 +169,9 @@ class WorkflowStateManager:
 
     def capture_state(
         self,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         node_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> str:
         """Capture a state snapshot.
 
@@ -246,7 +243,7 @@ class WorkflowStateManager:
     def list_snapshots(
         self,
         limit: Optional[int] = None,
-    ) -> List[StateSnapshot]:
+    ) -> list[StateSnapshot]:
         """List snapshots in chronological order.
 
         Args:
@@ -323,7 +320,7 @@ class WorkflowStateManager:
         else:
             raise ValueError(f"Unsupported format: {format}")
 
-    def _format_state_text(self, state: Dict[str, Any]) -> str:
+    def _format_state_text(self, state: dict[str, Any]) -> str:
         """Format state as text.
 
         Args:
@@ -566,7 +563,7 @@ class WorkflowStateManager:
     def rollback_to(
         self,
         snapshot_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Rollback state to a snapshot.
 
         Args:
@@ -592,7 +589,7 @@ class WorkflowStateManager:
 
         return new_state
 
-    def rollback_n(self, n: int) -> Optional[Dict[str, Any]]:
+    def rollback_n(self, n: int) -> Optional[dict[str, Any]]:
         """Rollback N snapshots.
 
         Args:
@@ -681,7 +678,7 @@ class WorkflowStateManager:
         self,
         snapshot_id: Optional[str] = None,
         key: Optional[str] = None,
-    ) -> List[StateMutation]:
+    ) -> list[StateMutation]:
         """Get mutations.
 
         Args:
@@ -707,7 +704,7 @@ class WorkflowStateManager:
         self,
         key: str,
         limit: int = 10,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get mutation history for a key.
 
         Args:
@@ -772,7 +769,7 @@ class WorkflowStateManager:
 
     def import_state(
         self,
-        data: Union[str, Dict[str, Any]],
+        data: str | dict[str, Any],
     ) -> str:
         """Import state and create snapshot.
 
@@ -782,7 +779,7 @@ class WorkflowStateManager:
         Returns:
             New snapshot ID
         """
-        data_dict: Dict[str, Any]
+        data_dict: dict[str, Any]
         if isinstance(data, str):
             data_dict = json.loads(data)
         else:

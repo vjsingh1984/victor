@@ -49,7 +49,8 @@ import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Generator, Optional, TypeVar
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable, Generator
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ class OperationStats:
         """Ratio of Rust calls to total calls."""
         return self.rust_calls / self.calls if self.calls > 0 else 0.0
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         """Convert to dictionary for metrics export."""
         return {
             "calls_total": float(self.calls),
@@ -125,7 +126,7 @@ class NativeMetrics:
 
     def __init__(self) -> None:
         """Initialize metrics (use get_instance() instead)."""
-        self._stats: Dict[str, OperationStats] = {}
+        self._stats: dict[str, OperationStats] = {}
         self._stats_lock = threading.Lock()
 
         # Lazy-loaded observability integrations
@@ -206,7 +207,7 @@ class NativeMetrics:
         duration_ms: float,
         used_rust: bool,
         error: bool = False,
-        tags: Optional[Dict[str, str]] = None,
+        tags: Optional[dict[str, str]] = None,
     ) -> None:
         """Record a native operation call.
 
@@ -261,7 +262,7 @@ class NativeMetrics:
             except Exception as e:
                 logger.debug(f"Failed to emit to EventBus: {e}")
 
-    def get_stats(self, operation: Optional[str] = None) -> Dict[str, Any]:
+    def get_stats(self, operation: Optional[str] = None) -> dict[str, Any]:
         """Get statistics for operations.
 
         Args:
@@ -276,7 +277,7 @@ class NativeMetrics:
                 return stats.to_dict() if stats else {}
             return {op: stats.to_dict() for op, stats in self._stats.items()}
 
-    def get_summary(self) -> Dict[str, float]:
+    def get_summary(self) -> dict[str, float]:
         """Get summary statistics across all operations."""
         with self._stats_lock:
             total_calls = sum(s.calls for s in self._stats.values())
@@ -295,7 +296,7 @@ class NativeMetrics:
 
 @contextmanager
 def traced_native_call(
-    operation: str, attributes: Optional[Dict[str, Any]] = None
+    operation: str, attributes: Optional[dict[str, Any]] = None
 ) -> Generator[Any, None, None]:
     """Create an OpenTelemetry span for a native operation.
 
@@ -446,7 +447,7 @@ class InstrumentedAccelerator:
         """Get backend identifier."""
         return self._backend
 
-    def get_metrics(self) -> Dict[str, float]:
+    def get_metrics(self) -> dict[str, float]:
         """Get performance metrics for this accelerator."""
         with self._lock:
             return {

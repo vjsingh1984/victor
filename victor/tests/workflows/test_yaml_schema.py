@@ -26,11 +26,8 @@ Tests the YAML loader's ability to parse and validate workflow definitions:
 """
 
 import pytest
-import yaml
-from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, cast
-from unittest.mock import MagicMock, patch
+from typing import Any, cast
 
 
 class TestYAMLWorkflowParsing:
@@ -497,7 +494,7 @@ workflows:
         assert (
             "empty_workflow" not in workflows
             or (
-                len(cast(Dict[str, Any], workflows.get("empty_workflow", {})).get("nodes", {}))
+                len(cast(dict[str, Any], workflows.get("empty_workflow", {})).get("nodes", {}))
                 if isinstance(workflows.get("empty_workflow"), dict)
                 else 0
             )

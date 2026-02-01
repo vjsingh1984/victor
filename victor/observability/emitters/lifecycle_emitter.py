@@ -29,11 +29,10 @@ Migration Notes:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 from victor.observability.emitters.base import ILifecycleEventEmitter
 from victor.core.events import ObservabilityBus, SyncEventWrapper
@@ -108,7 +107,7 @@ class LifecycleEventEmitter(ILifecycleEventEmitter):
     async def emit_async(
         self,
         topic: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> bool:
         """Emit a lifecycle event asynchronously.
 
@@ -139,8 +138,8 @@ class LifecycleEventEmitter(ILifecycleEventEmitter):
 
     def emit(
         self,
-        event: Union["MessagingEvent", str],
-        data: Optional[Dict[str, Any]] = None,
+        event: "MessagingEvent" | str,
+        data: Optional[dict[str, Any]] = None,
         *,
         topic: Optional[str] = None,
     ) -> None:

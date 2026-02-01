@@ -25,7 +25,8 @@ import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.observability.profiler.protocol import (
     CallGraphNode,

@@ -24,7 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from uuid import uuid4
 
 
@@ -70,9 +70,9 @@ class ConversationParticipant:
     id: str
     role: str
     name: str = ""
-    capabilities: List[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     persona: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -102,12 +102,12 @@ class ConversationalMessage:
     sender: str
     content: str
     message_type: MessageType = MessageType.CONVERSATION
-    recipients: Optional[List[str]] = None
+    recipients: Optional[list[str]] = None
     conversation_id: str = ""
     turn_number: int = 0
     reply_to: Optional[str] = None
     timestamp: Optional[datetime] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     requires_response: bool = True
     id: str = field(default_factory=lambda: str(uuid4())[:8])
 
@@ -115,7 +115,7 @@ class ConversationalMessage:
         if self.timestamp is None:
             self.timestamp = datetime.now()
 
-    def to_agent_message(self) -> Dict[str, Any]:
+    def to_agent_message(self) -> dict[str, Any]:
         """Convert to canonical AgentMessage format.
 
         Returns:
@@ -137,7 +137,7 @@ class ConversationalMessage:
 
     @classmethod
     def from_agent_message(
-        cls, msg: Dict[str, Any], conversation_id: str = ""
+        cls, msg: dict[str, Any], conversation_id: str = ""
     ) -> "ConversationalMessage":
         """Create from canonical AgentMessage format.
 
@@ -188,14 +188,14 @@ class ConversationContext:
     conversation_id: str
     topic: str
     protocol: str
-    participants: Dict[str, ConversationParticipant] = field(default_factory=dict)
+    participants: dict[str, ConversationParticipant] = field(default_factory=dict)
     current_turn: int = 0
     current_speaker: Optional[str] = None
     started_at: Optional[datetime] = None
-    shared_state: Dict[str, Any] = field(default_factory=dict)
+    shared_state: dict[str, Any] = field(default_factory=dict)
     is_terminated: bool = False
     termination_reason: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.started_at is None:
@@ -209,7 +209,7 @@ class ConversationContext:
         """Get participant by ID."""
         return self.participants.get(participant_id)
 
-    def list_participants(self) -> List[ConversationParticipant]:
+    def list_participants(self) -> list[ConversationParticipant]:
         """List all participants."""
         return list(self.participants.values())
 
@@ -239,13 +239,13 @@ class ConversationResult:
     status: ConversationStatus
     outcome: Optional[str] = None
     summary: Optional[str] = None
-    votes: Optional[Dict[str, int]] = None
+    votes: Optional[dict[str, int]] = None
     final_speaker: Optional[str] = None
     total_turns: int = 0
     duration_seconds: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "conversation_id": self.conversation_id,
@@ -276,7 +276,7 @@ class ConversationalTurn:
     turn_number: int
     speaker: str
     message: ConversationalMessage
-    responses: List[ConversationalMessage] = field(default_factory=list)
+    responses: list[ConversationalMessage] = field(default_factory=list)
     timestamp: Optional[datetime] = None
     duration_seconds: float = 0.0
 

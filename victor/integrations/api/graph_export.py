@@ -42,12 +42,10 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.framework.graph import CompiledGraph, Node, Edge
-    from victor.workflows.definition import WorkflowDefinition
-    from victor.workflows.visualization import WorkflowVisualizer
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -94,16 +92,16 @@ class GraphNode:
     type: NodeType
     description: str = ""
     status: NodeStatus = NodeStatus.PENDING
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    position: Optional[Dict[str, float]] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    position: Optional[dict[str, float]] = None
 
-    def to_cytoscape_dict(self) -> Dict[str, Any]:
+    def to_cytoscape_dict(self) -> dict[str, Any]:
         """Convert to Cytoscape.js element format.
 
         Returns:
             Dictionary compatible with Cytoscape.js element format
         """
-        element: Dict[str, Any] = {
+        element: dict[str, Any] = {
             "data": {
                 "id": self.id,
                 "label": self.name,
@@ -143,9 +141,9 @@ class GraphEdge:
     target: str
     label: Optional[str] = None
     conditional: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_cytoscape_dict(self) -> Dict[str, Any]:
+    def to_cytoscape_dict(self) -> dict[str, Any]:
         """Convert to Cytoscape.js element format.
 
         Returns:
@@ -186,18 +184,18 @@ class GraphSchema:
     workflow_id: str
     name: str
     description: str
-    nodes: List[GraphNode]
-    edges: List[GraphEdge]
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
     start_node: Optional[str] = None
     entry_point: Optional[str] = None
     total_nodes: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Calculate total nodes after initialization."""
         self.total_nodes = len(self.nodes)
 
-    def to_cytoscape_dict(self) -> Dict[str, Any]:
+    def to_cytoscape_dict(self) -> dict[str, Any]:
         """Convert to Cytoscape.js format.
 
         Returns:
@@ -215,7 +213,7 @@ class GraphSchema:
             "metadata": self.metadata,
         }
 
-    def to_elements_format(self) -> Dict[str, List[Dict[str, Any]]]:
+    def to_elements_format(self) -> dict[str, list[dict[str, Any]]]:
         """Convert to Cytoscape.js elements format (nodes + edges).
 
         Returns:
@@ -557,7 +555,7 @@ class ExecutionNodeState:
     tokens_used: int = 0
     error: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "node_id": self.node_id,
@@ -597,15 +595,15 @@ class WorkflowExecutionState:
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
     current_node: Optional[str] = None
-    completed_nodes: List[str] = field(default_factory=list)
-    failed_nodes: List[str] = field(default_factory=list)
-    skipped_nodes: List[str] = field(default_factory=list)
-    node_execution_path: List[ExecutionNodeState] = field(default_factory=list)
+    completed_nodes: list[str] = field(default_factory=list)
+    failed_nodes: list[str] = field(default_factory=list)
+    skipped_nodes: list[str] = field(default_factory=list)
+    node_execution_path: list[ExecutionNodeState] = field(default_factory=list)
     total_duration_seconds: float = 0.0
     total_tool_calls: int = 0
     total_tokens: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "workflow_id": self.workflow_id,
@@ -644,7 +642,7 @@ class WorkflowExecutionState:
 
 def get_execution_state(
     workflow_id: str,
-    execution_store: Dict[str, Any],
+    execution_store: dict[str, Any],
 ) -> WorkflowExecutionState:
     """Get current execution state for a workflow.
 

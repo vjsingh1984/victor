@@ -18,7 +18,8 @@ Tests the ChatProtocol interface and conformance.
 """
 
 import pytest
-from typing import Any, AsyncIterator
+from typing import Any
+from collections.abc import AsyncIterator
 
 from victor.protocols.chat import ChatProtocol
 

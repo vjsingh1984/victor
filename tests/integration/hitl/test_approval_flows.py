@@ -25,13 +25,12 @@ These tests verify the complete approval request lifecycle including:
 import asyncio
 import pytest
 import time
-from typing import Dict, Any, Optional, Tuple
+from typing import Optional
 
 from victor.framework.hitl import (
     HITLController,
     ApprovalStatus,
     ApprovalRequest,
-    ApprovalHandler,
 )
 from victor.workflows.hitl import (
     HITLNode,
@@ -193,7 +192,7 @@ class TestCustomApprovalHandlers:
 
         async def tracking_handler(
             request: ApprovalRequest,
-        ) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
+        ) -> tuple[ApprovalStatus, Optional[str], Optional[str]]:
             received_requests.append(request)
             return ApprovalStatus.APPROVED, "Handled", "handler"
 
@@ -221,7 +220,7 @@ class TestCustomApprovalHandlers:
 
         async def policy_handler(
             request: ApprovalRequest,
-        ) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
+        ) -> tuple[ApprovalStatus, Optional[str], Optional[str]]:
             # Policy: Auto-approve low-risk, manual review for high-risk
             risk_level = request.context.get("risk_level", "unknown")
 
@@ -261,7 +260,7 @@ class TestCustomApprovalHandlers:
 
         async def notification_handler(
             request: ApprovalRequest,
-        ) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
+        ) -> tuple[ApprovalStatus, Optional[str], Optional[str]]:
             # Simulate sending notification to external service
             notification_log.append(
                 {
@@ -360,7 +359,7 @@ class TestRejectionFlowWithReasonPropagation:
 
         async def detailed_rejection_handler(
             request: ApprovalRequest,
-        ) -> Tuple[ApprovalStatus, Optional[str], Optional[str]]:
+        ) -> tuple[ApprovalStatus, Optional[str], Optional[str]]:
             # Check multiple conditions and provide detailed rejection reason
             reasons = []
 

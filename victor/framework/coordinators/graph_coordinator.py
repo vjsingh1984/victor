@@ -33,17 +33,14 @@ import time
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Dict,
-    List,
     Optional,
 )
+from collections.abc import AsyncIterator
 
 if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph
     from victor.framework.workflow_engine import WorkflowExecutionResult, WorkflowEvent
     from victor.workflows.graph_dsl import WorkflowGraph
-    from victor.workflows.graph_compiler import CompilerConfig
     from victor.workflows.node_runners import NodeRunnerRegistry
 
 logger = logging.getLogger(__name__)
@@ -102,8 +99,8 @@ class GraphExecutionCoordinator:
 
     async def execute(
         self,
-        graph: "CompiledGraph[Dict[str, Any]]",
-        initial_state: Optional[Dict[str, Any]] = None,
+        graph: "CompiledGraph[dict[str, Any]]",
+        initial_state: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
         """Execute a compiled StateGraph.
@@ -168,8 +165,8 @@ class GraphExecutionCoordinator:
 
     async def stream(
         self,
-        graph: "CompiledGraph[Dict[str, Any]]",
-        initial_state: Optional[Dict[str, Any]] = None,
+        graph: "CompiledGraph[dict[str, Any]]",
+        initial_state: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> AsyncIterator["WorkflowEvent"]:
         """Stream events from StateGraph execution.
@@ -226,7 +223,7 @@ class GraphExecutionCoordinator:
     async def execute_workflow_graph(
         self,
         graph: "WorkflowGraph[Any]",
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
         use_node_runners: bool = False,
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
@@ -304,7 +301,7 @@ class GraphExecutionCoordinator:
     async def execute_definition_compiled(
         self,
         workflow: Any,
-        initial_state: Optional[Dict[str, Any]] = None,
+        initial_state: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> "WorkflowExecutionResult":
         """Execute a WorkflowDefinition via CompiledGraph (unified execution path).

@@ -26,22 +26,15 @@ These tests verify end-to-end workflow execution, including:
 import asyncio
 import pytest
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Optional
+from unittest.mock import AsyncMock, MagicMock
 
-from victor.workflows.graph_dsl import WorkflowGraph, State
+from victor.workflows.graph_dsl import State
 from victor.workflows.definition import (
     WorkflowBuilder,
-    WorkflowDefinition,
-    AgentNode,
-    ConditionNode,
-    TransformNode,
-    ParallelNode,
 )
 from victor.workflows.executor import (
     WorkflowExecutor,
-    WorkflowContext,
-    WorkflowResult,
     NodeResult,
     ExecutorNodeStatus,
 )
@@ -55,8 +48,8 @@ class SimpleExecutionState(State):
     """Simple state for execution tests."""
 
     counter: int = 0
-    steps: List[str] = field(default_factory=list)
-    data: Dict[str, Any] = field(default_factory=dict)
+    steps: list[str] = field(default_factory=list)
+    data: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -82,9 +75,9 @@ class ConditionalState(State):
 class ParallelState(State):
     """State for parallel execution tests."""
 
-    inputs: List[str] = field(default_factory=list)
-    results: Dict[str, Any] = field(default_factory=dict)
-    completion_order: List[str] = field(default_factory=list)
+    inputs: list[str] = field(default_factory=list)
+    results: dict[str, Any] = field(default_factory=dict)
+    completion_order: list[str] = field(default_factory=list)
 
 
 # ============ Helper Functions for Tests ============
@@ -123,17 +116,17 @@ def mock_orchestrator() -> Any:
 def simple_workflow() -> Any:
     """Create a simple linear workflow for testing."""
 
-    def step_a(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def step_a(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["steps"] = ctx.get("steps", []) + ["a"]
         ctx["counter"] = ctx.get("counter", 0) + 1
         return ctx
 
-    def step_b(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def step_b(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["steps"] = ctx.get("steps", []) + ["b"]
         ctx["counter"] = ctx.get("counter", 0) + 10
         return ctx
 
-    def step_c(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def step_c(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["steps"] = ctx.get("steps", []) + ["c"]
         ctx["counter"] = ctx.get("counter", 0) + 100
         return ctx
@@ -151,11 +144,11 @@ def simple_workflow() -> Any:
 def conditional_workflow() -> Any:
     """Create a workflow with conditional branching."""
 
-    def init_value(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def init_value(ctx: dict[str, Any]) -> dict[str, Any]:
         # Value is passed via initial context
         return ctx
 
-    def route_by_value(ctx: Dict[str, Any]) -> str:
+    def route_by_value(ctx: dict[str, Any]) -> str:
         value = ctx.get("value", 0)
         if value > 50:
             return "high"
@@ -164,22 +157,22 @@ def conditional_workflow() -> Any:
         else:
             return "low"
 
-    def handle_high(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_high(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["path_taken"] = "high"
         ctx["result"] = "Processed high value"
         return ctx
 
-    def handle_medium(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_medium(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["path_taken"] = "medium"
         ctx["result"] = "Processed medium value"
         return ctx
 
-    def handle_low(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_low(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["path_taken"] = "low"
         ctx["result"] = "Processed low value"
         return ctx
 
-    def finalize(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def finalize(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["finalized"] = True
         return ctx
 
@@ -208,13 +201,13 @@ def conditional_workflow() -> Any:
 def error_workflow() -> Any:
     """Create a workflow that can fail for error handling tests."""
 
-    def maybe_fail(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def maybe_fail(ctx: dict[str, Any]) -> dict[str, Any]:
         if ctx.get("should_fail", False):
             raise ValueError("Intentional failure for testing")
         ctx["processed"] = True
         return ctx
 
-    def cleanup(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def cleanup(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["cleaned_up"] = True
         return ctx
 
@@ -284,7 +277,7 @@ class TestWorkflowExecutorE2E:
         2. When workflow completes within timeout, it succeeds
         """
 
-        def quick_transform(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def quick_transform(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["completed"] = True
             return ctx
 
@@ -361,11 +354,11 @@ class TestCheckpointFunctionality:
     async def test_resume_from_checkpoint(self, mock_orchestrator) -> None:
         """Test resuming workflow execution from a checkpoint."""
 
-        def step_a(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def step_a(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["a_executed"] = True
             return ctx
 
-        def step_b(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def step_b(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["b_executed"] = True
             return ctx
 
@@ -409,7 +402,7 @@ class TestCheckpointFunctionality:
         def capture_checkpoint(*args, **kwargs) -> Any:
             captured_checkpoints.append(kwargs)
 
-        def step_a(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def step_a(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["step"] = "a"
             ctx["data"] = {"key": "value"}
             return ctx
@@ -458,10 +451,10 @@ class TestErrorHandlingAndRetry:
     async def test_continue_on_failure_option(self, mock_orchestrator) -> None:
         """Test workflow continues on failure when configured."""
 
-        def failing_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def failing_step(ctx: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("Intentional failure")
 
-        def next_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def next_step(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["next_executed"] = True
             return ctx
 
@@ -570,7 +563,7 @@ class TestConditionalEdgeRouting:
         is built with explicit chain() calls instead of relying on auto-chaining.
         """
 
-        def route_by_item_count(ctx: Dict[str, Any]) -> str:
+        def route_by_item_count(ctx: dict[str, Any]) -> str:
             """Simple router that checks the count of items."""
             count = ctx.get("item_count", 0)
             if count == 0:
@@ -580,15 +573,15 @@ class TestConditionalEdgeRouting:
             else:
                 return "few"
 
-        def handle_empty(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def handle_empty(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["action"] = "handled_empty"
             return ctx
 
-        def handle_many(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def handle_many(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["action"] = "handled_many"
             return ctx
 
-        def handle_few(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def handle_few(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["action"] = "handled_few"
             return ctx
 
@@ -669,7 +662,7 @@ class TestParallelNodeExecution:
         execution_times = {}
 
         def create_timed_transform(name: str, delay: float = 0.1) -> Any:
-            def transform(ctx: Dict[str, Any]) -> Dict[str, Any]:
+            def transform(ctx: dict[str, Any]) -> dict[str, Any]:
                 import time
 
                 start = time.time()
@@ -718,11 +711,11 @@ class TestParallelNodeExecution:
     async def test_parallel_join_strategy_all(self, mock_orchestrator) -> None:
         """Test parallel execution with 'all' join strategy."""
 
-        def success_task(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def success_task(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["success_ran"] = True
             return ctx
 
-        def another_success(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def another_success(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["another_ran"] = True
             return ctx
 
@@ -757,7 +750,7 @@ class TestWorkflowCancellation:
         2. Workflows that complete within timeout succeed normally
         """
 
-        def quick_transform(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def quick_transform(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["quick_completed"] = True
             return ctx
 
@@ -780,7 +773,7 @@ class TestWorkflowCancellation:
         """Test that cancellation properly cleans up resources."""
         cleanup_called = {"value": False}
 
-        def transform_with_cleanup(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def transform_with_cleanup(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["processed"] = True
             return ctx
 
@@ -809,16 +802,16 @@ class TestWorkflowContextManagement:
     async def test_context_shared_across_nodes(self, mock_orchestrator) -> None:
         """Test that context is properly shared across all nodes."""
 
-        def add_key_a(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def add_key_a(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["key_a"] = "value_a"
             return ctx
 
-        def read_key_a_add_b(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def read_key_a_add_b(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["saw_key_a"] = ctx.get("key_a") == "value_a"
             ctx["key_b"] = "value_b"
             return ctx
 
-        def read_both_keys(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def read_both_keys(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["saw_both"] = ctx.get("key_a") == "value_a" and ctx.get("key_b") == "value_b"
             return ctx
 
@@ -840,7 +833,7 @@ class TestWorkflowContextManagement:
     async def test_context_modifications_persist(self, mock_orchestrator) -> None:
         """Test that context modifications from each node persist."""
 
-        def accumulate(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def accumulate(ctx: dict[str, Any]) -> dict[str, Any]:
             history = ctx.get("history", [])
             history.append(f"step_{len(history) + 1}")
             ctx["history"] = history

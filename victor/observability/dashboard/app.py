@@ -26,21 +26,20 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.config.settings import get_settings
-from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
+from victor.core.events import MessagingEvent, get_observability_bus
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
+from textual.containers import ScrollableContainer
 from textual.widgets import (
     DataTable,
     Footer,
     Header,
-    Label,
     Static,
     TabbedContent,
     TabPane,
@@ -437,7 +436,7 @@ class TimeOrderedTableView(DataTable):
             enable_dedup: Whether to track event IDs and prevent duplicates (default: False)
         """
         super().__init__(*args, **kwargs)
-        self._events: List[MessagingEvent] = []
+        self._events: list[MessagingEvent] = []
         self._max_rows = max_rows
         self._enable_dedup = enable_dedup
         self._seen_event_ids: Optional[set] = set() if enable_dedup else None
@@ -575,7 +574,7 @@ class ToolExecutionView(DataTable):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._tool_stats: Dict[str, Dict[str, Any]] = {}
+        self._tool_stats: dict[str, dict[str, Any]] = {}
 
     def on_mount(self) -> None:
         """Set up the table columns."""
@@ -696,7 +695,7 @@ class JSONLBrowser(ScrollableContainer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._events: List[MessagingEvent] = []
+        self._events: list[MessagingEvent] = []
 
     def compose(self) -> ComposeResult:
         yield Static("[dim]Load a JSONL file to browse historical events...[/]", id="jsonl-content")
@@ -1234,8 +1233,8 @@ class ObservabilityDashboard(App):
         self._subscribe_to_bus = subscribe_to_bus
         self._paused = False
         self._unsubscribe: Optional[Callable[[], None]] = None
-        self._event_buffer: List[MessagingEvent] = []
-        self._subscription_handles: List[Any] = []  # For canonical event system subscriptions
+        self._event_buffer: list[MessagingEvent] = []
+        self._subscription_handles: list[Any] = []  # For canonical event system subscriptions
 
         # Widget references
         self._stats: Optional[EventStats] = None

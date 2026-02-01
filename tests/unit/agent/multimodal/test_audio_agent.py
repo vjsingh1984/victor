@@ -16,8 +16,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import AsyncMock, Mock, mock_open, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -548,7 +547,6 @@ class TestDataClasses:
 
     def test_speech_segment_valid(self):
         """Test creating valid SpeechSegment."""
-        from datetime import datetime
 
         segment = SpeechSegment(
             speaker_id="SPEAKER_00",

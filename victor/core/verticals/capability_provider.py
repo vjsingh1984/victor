@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from victor.core.container import ServiceContainer
@@ -172,7 +172,7 @@ class CapabilityProviderRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._providers: Dict[str, ICapabilityProvider] = {}
+        self._providers: dict[str, ICapabilityProvider] = {}
 
     def register(self, provider: ICapabilityProvider) -> None:
         """Register a capability provider.

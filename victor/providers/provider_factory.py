@@ -21,7 +21,7 @@ extracting common patterns from BaseProvider._resolve_api_key().
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +42,9 @@ class ProviderConfig:
     base_url: Optional[str] = None
     timeout: int = 60
     max_retries: int = 3
-    extra_config: Dict[str, Any] = field(default_factory=dict)
+    extra_config: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary."""
         return {
             "api_key": self.api_key,
@@ -57,7 +57,7 @@ class ProviderConfig:
 
 # Common environment variable name patterns for providers
 # Maps provider name to possible environment variable names
-PROVIDER_ENV_VAR_PATTERNS: Dict[str, List[str]] = {
+PROVIDER_ENV_VAR_PATTERNS: dict[str, list[str]] = {
     "anthropic": ["ANTHROPIC_API_KEY"],
     "openai": ["OPENAI_API_KEY"],
     "groq": ["GROQ_API_KEY", "GROQCLOUD_API_KEY"],
@@ -86,7 +86,7 @@ def resolve_api_key(
     api_key: Optional[str],
     provider_name: str,
     *,
-    env_var_names: Optional[List[str]] = None,
+    env_var_names: Optional[list[str]] = None,
     use_keyring: bool = True,
     allow_empty: bool = True,
     log_warning: bool = True,
@@ -192,7 +192,7 @@ def create_provider_config(
     base_url: Optional[str] = None,
     timeout: int = 60,
     max_retries: int = 3,
-    env_var_names: Optional[List[str]] = None,
+    env_var_names: Optional[list[str]] = None,
     **extra_config: Any,
 ) -> ProviderConfig:
     """Create a ProviderConfig with resolved API key.
@@ -227,7 +227,7 @@ def create_provider_config(
     )
 
 
-def get_env_var_names_for_provider(provider_name: str) -> List[str]:
+def get_env_var_names_for_provider(provider_name: str) -> list[str]:
     """Get the standard environment variable names for a provider.
 
     Args:
@@ -248,7 +248,7 @@ def get_env_var_names_for_provider(provider_name: str) -> List[str]:
     )
 
 
-def register_provider_env_patterns(patterns: Dict[str, List[str]]) -> None:
+def register_provider_env_patterns(patterns: dict[str, list[str]]) -> None:
     """Register custom environment variable patterns for providers.
 
     This allows external plugins to register their own env var patterns.

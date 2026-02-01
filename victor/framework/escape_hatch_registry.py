@@ -48,7 +48,8 @@ from __future__ import annotations
 
 import importlib
 import logging
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, TypeVar, cast
+from typing import Any, Optional, Protocol, TypeVar
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ class ConditionFunction(Protocol):
             return "low"
     """
 
-    def __call__(self, ctx: Dict[str, Any]) -> str:
+    def __call__(self, ctx: dict[str, Any]) -> str:
         """Evaluate the condition.
 
         Args:
@@ -92,7 +93,7 @@ class TransformFunction(Protocol):
             return {"computed": ctx.get("a", 0) + ctx.get("b", 0)}
     """
 
-    def __call__(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def __call__(self, ctx: dict[str, Any]) -> dict[str, Any]:
         """Apply the transform.
 
         Args:
@@ -131,10 +132,10 @@ class EscapeHatchRegistry:
 
     # Class-level storage to persist registrations across instance resets
     # This ensures escape hatches survive singleton resets during tests
-    _class_conditions: Dict[str, Dict[str, ConditionFunction]] = {}
-    _class_transforms: Dict[str, Dict[str, TransformFunction]] = {}
-    _class_global_conditions: Dict[str, ConditionFunction] = {}
-    _class_global_transforms: Dict[str, TransformFunction] = {}
+    _class_conditions: dict[str, dict[str, ConditionFunction]] = {}
+    _class_transforms: dict[str, dict[str, TransformFunction]] = {}
+    _class_global_conditions: dict[str, ConditionFunction] = {}
+    _class_global_transforms: dict[str, TransformFunction] = {}
 
     def __init__(self) -> None:
         """Initialize escape hatch registry with persisted registrations."""
@@ -249,11 +250,11 @@ class EscapeHatchRegistry:
     def register_from_vertical(
         self,
         vertical: str,
-        conditions: Optional[Dict[str, ConditionFunction]] = None,
-        transforms: Optional[Dict[str, TransformFunction]] = None,
+        conditions: Optional[dict[str, ConditionFunction]] = None,
+        transforms: Optional[dict[str, TransformFunction]] = None,
         *,
         replace: bool = False,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """Bulk register conditions and transforms from a vertical.
 
         Convenience method for registering all escape hatches from a
@@ -307,7 +308,7 @@ class EscapeHatchRegistry:
         vertical: str,
         *,
         include_global: bool = True,
-    ) -> Tuple[Dict[str, ConditionFunction], Dict[str, TransformFunction]]:
+    ) -> tuple[dict[str, ConditionFunction], dict[str, TransformFunction]]:
         """Get all escape hatches for a vertical.
 
         Returns merged dictionaries containing both vertical-specific
@@ -320,8 +321,8 @@ class EscapeHatchRegistry:
         Returns:
             Tuple of (conditions_dict, transforms_dict)
         """
-        conditions: Dict[str, ConditionFunction] = {}
-        transforms: Dict[str, TransformFunction] = {}
+        conditions: dict[str, ConditionFunction] = {}
+        transforms: dict[str, TransformFunction] = {}
 
         # Add global first (can be overridden by vertical-specific)
         if include_global:
@@ -387,7 +388,7 @@ class EscapeHatchRegistry:
     def list_conditions(
         self,
         vertical: Optional[str] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """List all condition names.
 
         Args:
@@ -407,7 +408,7 @@ class EscapeHatchRegistry:
     def list_transforms(
         self,
         vertical: Optional[str] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """List all transform names.
 
         Args:
@@ -424,7 +425,7 @@ class EscapeHatchRegistry:
             names.update(v_transforms.keys())
         return list(names)
 
-    def list_verticals(self) -> List[str]:
+    def list_verticals(self) -> list[str]:
         """List all verticals with registered escape hatches.
 
         Returns:
@@ -456,7 +457,7 @@ class EscapeHatchRegistry:
         vertical_name: str,
         *,
         replace: bool = False,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """Auto-discover and register escape hatches from a vertical module.
 
         Attempts to import victor.{vertical_name}.escape_hatches and register
@@ -497,7 +498,7 @@ class EscapeHatchRegistry:
         self,
         *,
         replace: bool = False,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """Auto-discover and register escape hatches from all verticals.
 
         Uses VerticalDiscovery to find all verticals and load their escape

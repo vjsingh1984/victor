@@ -16,13 +16,13 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Optional, Set
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 # Cache for loaded configuration
-_categories_cache: Optional[Dict[str, Set[str]]] = None
-_presets_cache: Optional[Dict[str, Dict[str, Any]]] = None
+_categories_cache: Optional[dict[str, set[str]]] = None
+_presets_cache: Optional[dict[str, dict[str, Any]]] = None
 
 
 def get_categories_file_path() -> Path:
@@ -35,7 +35,7 @@ def get_categories_file_path() -> Path:
 
 
 @lru_cache(maxsize=1)
-def _load_yaml_config() -> Dict[str, Any]:
+def _load_yaml_config() -> dict[str, Any]:
     """Load and cache the YAML configuration.
 
     Returns:
@@ -61,7 +61,7 @@ def _load_yaml_config() -> Dict[str, Any]:
         return {"categories": {}, "presets": {}}
 
 
-def load_tool_categories() -> Dict[str, Set[str]]:
+def load_tool_categories() -> dict[str, set[str]]:
     """Load tool categories from YAML configuration.
 
     Returns a dictionary mapping category names to sets of tool names.
@@ -83,7 +83,7 @@ def load_tool_categories() -> Dict[str, Set[str]]:
     config = _load_yaml_config()
     categories_config = config.get("categories", {})
 
-    result: Dict[str, Set[str]] = {}
+    result: dict[str, set[str]] = {}
 
     for category_name, category_data in categories_config.items():
         if isinstance(category_data, dict):
@@ -99,7 +99,7 @@ def load_tool_categories() -> Dict[str, Set[str]]:
     return result
 
 
-def load_presets() -> Dict[str, Dict[str, Any]]:
+def load_presets() -> dict[str, dict[str, Any]]:
     """Load preset configurations from YAML.
 
     Presets define common tool configurations like 'default', 'minimal',
@@ -123,7 +123,7 @@ def load_presets() -> Dict[str, Dict[str, Any]]:
     return _presets_cache
 
 
-def get_preset_categories(preset_name: str) -> Set[str]:
+def get_preset_categories(preset_name: str) -> set[str]:
     """Get category names for a preset.
 
     Args:
@@ -142,7 +142,7 @@ def get_preset_categories(preset_name: str) -> Set[str]:
     return set(categories)
 
 
-def get_preset_tools(preset_name: str) -> Set[str]:
+def get_preset_tools(preset_name: str) -> set[str]:
     """Get all tool names for a preset.
 
     Resolves categories to their constituent tools and applies
@@ -163,7 +163,7 @@ def get_preset_tools(preset_name: str) -> Set[str]:
     categories = load_tool_categories()
 
     # Collect tools from included categories
-    tools: Set[str] = set()
+    tools: set[str] = set()
     for category_name in preset.get("categories", []):
         tools.update(categories.get(category_name, set()))
 
@@ -207,7 +207,7 @@ def clear_cache() -> None:
 # Fallback defaults (used if YAML loading fails)
 # =============================================================================
 
-_FALLBACK_CATEGORIES: Dict[str, Set[str]] = {
+_FALLBACK_CATEGORIES: dict[str, set[str]] = {
     "core": {"read", "write", "edit", "shell", "search", "code_search", "ls"},
     "filesystem": {
         "read",
@@ -237,7 +237,7 @@ _FALLBACK_CATEGORIES: Dict[str, Set[str]] = {
 }
 
 
-def get_fallback_categories() -> Dict[str, Set[str]]:
+def get_fallback_categories() -> dict[str, set[str]]:
     """Get fallback categories when YAML loading fails.
 
     Returns:

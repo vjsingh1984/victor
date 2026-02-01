@@ -30,7 +30,9 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, List, Optional, Pattern, Tuple
+from typing import Optional
+from re import Pattern
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +61,13 @@ class SearchRoute:
     confidence: float
     reason: str
     transformed_query: Optional[str]
-    matched_patterns: List[str]
+    matched_patterns: list[str]
 
 
 # Patterns that indicate KEYWORD search is better
 # Format: (regex_pattern, weight, description, case_sensitive)
 # Case-sensitive patterns (4th element True) are NOT compiled with IGNORECASE
-KEYWORD_SIGNALS: List[Tuple[str, float, str, bool]] = [
+KEYWORD_SIGNALS: list[tuple[str, float, str, bool]] = [
     # Quoted strings are literal searches
     (r'"[^"]+"', 1.0, "quoted_string", False),
     (r"'[^']+'", 1.0, "single_quoted_string", False),
@@ -95,7 +97,7 @@ KEYWORD_SIGNALS: List[Tuple[str, float, str, bool]] = [
 
 # Patterns that indicate SEMANTIC search is better
 # All semantic patterns are case-insensitive (4th element False)
-SEMANTIC_SIGNALS: List[Tuple[str, float, str, bool]] = [
+SEMANTIC_SIGNALS: list[tuple[str, float, str, bool]] = [
     # Conceptual queries
     (r"\bhow\s+(does|do|is|are|can|to)\b", 1.0, "how_question", False),
     (r"\bwhy\s+(does|do|is|are)\b", 1.0, "why_question", False),
@@ -149,8 +151,8 @@ class SearchRouter:
         keyword_threshold: float = 0.5,
         semantic_threshold: float = 0.5,
         hybrid_threshold: float = 0.3,
-        custom_signals: Optional[dict[str, List[Tuple[str, float, str, bool]]]] = None,
-        custom_routers: Optional[List[Callable[[str], Optional[SearchRoute]]]] = None,
+        custom_signals: Optional[dict[str, list[tuple[str, float, str, bool]]]] = None,
+        custom_routers: Optional[list[Callable[[str], Optional[SearchRoute]]]] = None,
     ):
         """Initialize the search router.
 
@@ -167,8 +169,8 @@ class SearchRouter:
         self.custom_routers = custom_routers or []
 
         # Compile patterns
-        self._keyword_patterns: List[Tuple[Pattern[str], float, str]] = []
-        self._semantic_patterns: List[Tuple[Pattern[str], float, str]] = []
+        self._keyword_patterns: list[tuple[Pattern[str], float, str]] = []
+        self._semantic_patterns: list[tuple[Pattern[str], float, str]] = []
 
         self._compile_patterns(KEYWORD_SIGNALS, self._keyword_patterns)
         self._compile_patterns(SEMANTIC_SIGNALS, self._semantic_patterns)
@@ -182,8 +184,8 @@ class SearchRouter:
 
     def _compile_patterns(
         self,
-        signals: List[Tuple[str, float, str, bool]],
-        target: List[Tuple[Pattern[str], float, str]],
+        signals: list[tuple[str, float, str, bool]],
+        target: list[tuple[Pattern[str], float, str]],
     ) -> None:
         """Compile regex patterns.
 
@@ -272,8 +274,8 @@ class SearchRouter:
     def _score_patterns(
         self,
         query: str,
-        patterns: List[Tuple[re.Pattern[str], float, str]],
-    ) -> Tuple[float, List[str]]:
+        patterns: list[tuple[re.Pattern[str], float, str]],
+    ) -> tuple[float, list[str]]:
         """Score patterns against query."""
         total_score = 0.0
         matched = []

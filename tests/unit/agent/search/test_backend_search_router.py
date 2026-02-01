@@ -19,7 +19,7 @@ fallback behavior, and result aggregation.
 """
 
 import pytest
-from typing import List, Dict, Any
+from typing import Any
 
 from victor.core.errors import SearchError
 from victor.protocols.search_router import (
@@ -37,9 +37,9 @@ class MockSearchBackend(ISearchBackend):
     def __init__(
         self,
         name: str,
-        supported_types: List[SearchType],
+        supported_types: list[SearchType],
         available: bool = True,
-        results: List[Dict[str, Any]] | None = None,
+        results: list[dict[str, Any]] | None = None,
         latency_ms: float = 50.0,
     ):
         self._backend_name = name
@@ -61,12 +61,12 @@ class MockSearchBackend(ISearchBackend):
         query: str,
         search_type: SearchType,
         context: SearchContext,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Perform mock search."""
         self.search_count += 1
         return self._results
 
-    def supported_search_types(self) -> List[SearchType]:
+    def supported_search_types(self) -> list[SearchType]:
         """Get supported search types."""
         return self._supported_types
 
@@ -467,7 +467,7 @@ class TestBackendSearchRouter:
                 query: str,
                 search_type: SearchType,
                 context: SearchContext,
-            ) -> List[Dict[str, Any]]:
+            ) -> list[dict[str, Any]]:
                 await asyncio.sleep(0.1)  # 100ms delay
                 return await super().search(query, search_type, context)
 
@@ -516,7 +516,7 @@ class TestBackendSearchRouter:
                 query: str,
                 search_type: SearchType,
                 context: SearchContext,
-            ) -> List[Dict[str, Any]]:
+            ) -> list[dict[str, Any]]:
                 self.last_context = context
                 return await super().search(query, search_type, context)
 
@@ -604,11 +604,11 @@ class TestBackendSearchRouter:
                 query: str,
                 search_type: SearchType,
                 context: SearchContext,
-            ) -> List[Dict[str, Any]]:
+            ) -> list[dict[str, Any]]:
                 self.search_count += 1
                 raise RuntimeError("Backend failure")
 
-            def supported_search_types(self) -> List[SearchType]:
+            def supported_search_types(self) -> list[SearchType]:
                 return [SearchType.SEMANTIC]
 
             def is_available(self) -> bool:

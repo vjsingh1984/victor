@@ -32,7 +32,7 @@ following the Open/Closed Principle (OCP) and Strategy pattern.
 """
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.teams.types import AgentMessage, MemberResult
@@ -72,7 +72,7 @@ class TeamContext:
         self,
         team_id: str,
         formation: str,
-        shared_state: Optional[Dict[str, Any]] = None,
+        shared_state: Optional[dict[str, Any]] = None,
         state_manager: Optional[Any] = None,
         **metadata: Any,
     ):
@@ -141,7 +141,7 @@ class TeamContext:
 
         self.shared_state[key] = value
 
-    def update(self, updates: Dict[str, Any]) -> None:
+    def update(self, updates: dict[str, Any]) -> None:
         """Update multiple values in shared state.
 
         DEPRECATED: Use state_manager.update() instead.
@@ -175,10 +175,10 @@ class BaseFormationStrategy(ABC):
     @abstractmethod
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: "AgentMessage",
-    ) -> List["MemberResult"]:
+    ) -> list["MemberResult"]:
         """Execute agents using this formation strategy.
 
         Args:
@@ -203,7 +203,7 @@ class BaseFormationStrategy(ABC):
         """
         pass
 
-    def get_required_roles(self) -> Optional[List[str]]:
+    def get_required_roles(self) -> Optional[list[str]]:
         """Get required roles for this formation (if any).
 
         Returns:
@@ -237,9 +237,9 @@ class BaseFormationStrategy(ABC):
 
     async def process_results(
         self,
-        results: List["MemberResult"],
+        results: list["MemberResult"],
         context: "TeamContext",
-    ) -> List["MemberResult"]:
+    ) -> list["MemberResult"]:
         """Process results after execution.
 
         Args:

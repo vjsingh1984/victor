@@ -38,17 +38,17 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.framework.capabilities.base_vertical_capability_provider import (
     BaseVerticalCapabilityProvider,
     CapabilityDefinition,
 )
-from victor.framework.protocols import CapabilityType, OrchestratorCapability
-from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.protocols import CapabilityType
+from victor.framework.capability_loader import CapabilityEntry
 
 if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def configure_git_safety(
     block_force_push: bool = True,
     block_main_push: bool = True,
     require_tests_before_commit: bool = False,
-    allowed_branches: Optional[List[str]] = None,
+    allowed_branches: Optional[list[str]] = None,
 ) -> None:
     """Configure git safety rules for the orchestrator.
 
@@ -131,7 +131,7 @@ def configure_code_style(
     logger.info(f"Configured code style: formatter={formatter}, linter={linter}")
 
 
-def get_code_style(orchestrator: Any) -> Dict[str, Any]:
+def get_code_style(orchestrator: Any) -> dict[str, Any]:
     """Get current code style configuration.
 
     Args:
@@ -158,7 +158,7 @@ def configure_test_requirements(
     orchestrator: Any,
     *,
     min_coverage: float = 0.0,
-    required_test_patterns: Optional[List[str]] = None,
+    required_test_patterns: Optional[list[str]] = None,
     test_framework: str = "pytest",
     run_tests_on_edit: bool = False,
 ) -> None:
@@ -187,7 +187,7 @@ def configure_test_requirements(
 def configure_language_server(
     orchestrator: Any,
     *,
-    languages: Optional[List[str]] = None,
+    languages: Optional[list[str]] = None,
     enable_hover: bool = True,
     enable_references: bool = True,
     enable_symbols: bool = True,
@@ -279,7 +279,7 @@ class CodingCapabilityProvider(BaseVerticalCapabilityProvider):
         """Initialize the coding capability provider."""
         super().__init__("coding")
 
-    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+    def _get_capability_definitions(self) -> dict[str, CapabilityDefinition]:
         """Define coding capability definitions.
 
         Returns:
@@ -385,7 +385,7 @@ class CodingCapabilityProvider(BaseVerticalCapabilityProvider):
         """Configure refactoring capability."""
         configure_refactoring(orchestrator, **kwargs)
 
-    def get_code_style(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_code_style(self, orchestrator: Any) -> dict[str, Any]:
         """Get code style configuration."""
         return get_code_style(orchestrator)
 
@@ -408,7 +408,7 @@ def _get_provider() -> CodingCapabilityProvider:
 
 
 # Generate CAPABILITIES list from provider
-CAPABILITIES: List[CapabilityEntry] = []
+CAPABILITIES: list[CapabilityEntry] = []
 
 
 def _generate_capabilities_list() -> None:
@@ -427,7 +427,7 @@ _generate_capabilities_list()
 # =============================================================================
 
 
-def get_coding_capabilities() -> List[CapabilityEntry]:
+def get_coding_capabilities() -> list[CapabilityEntry]:
     """Get all coding capability entries.
 
     Returns:
@@ -442,13 +442,12 @@ def create_coding_capability_loader() -> Any:
     Returns:
         CapabilityLoader with coding capabilities registered
     """
-    from victor.framework.capability_loader import CapabilityLoader
 
     provider = _get_provider()
     return provider.create_capability_loader()
 
 
-def get_capability_configs() -> Dict[str, Any]:
+def get_capability_configs() -> dict[str, Any]:
     """Get coding capability configurations for centralized storage.
 
     Returns default coding configuration for VerticalContext storage.

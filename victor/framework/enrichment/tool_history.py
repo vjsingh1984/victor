@@ -25,17 +25,17 @@ Example:
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 
 def get_relevant_tool_results(
-    tool_history: List[Dict[str, Any]],
-    tool_names: Optional[Set[str]] = None,
+    tool_history: list[dict[str, Any]],
+    tool_names: Optional[set[str]] = None,
     max_results: int = 10,
     min_content_length: int = 50,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Extract relevant results from tool history.
 
     Filters tool history to find successful results with substantial content.
@@ -80,8 +80,8 @@ def get_relevant_tool_results(
 
 
 def extract_tool_context(
-    tool_history: List[Dict[str, Any]],
-    tool_names: Optional[Set[str]] = None,
+    tool_history: list[dict[str, Any]],
+    tool_names: Optional[set[str]] = None,
     max_results: int = 3,
     max_content_length: int = 300,
     header: Optional[str] = None,
@@ -142,7 +142,7 @@ class ToolHistoryExtractor:
 
     def __init__(
         self,
-        tool_names: Optional[Set[str]] = None,
+        tool_names: Optional[set[str]] = None,
         max_results: int = 3,
         max_content_length: int = 300,
         min_content_length: int = 50,
@@ -163,7 +163,7 @@ class ToolHistoryExtractor:
         self._min_content_length = min_content_length
         self._header = header
 
-    def extract(self, tool_history: List[Dict[str, Any]]) -> str:
+    def extract(self, tool_history: list[dict[str, Any]]) -> str:
         """Extract context from tool history.
 
         Args:
@@ -182,8 +182,8 @@ class ToolHistoryExtractor:
 
     def get_relevant_results(
         self,
-        tool_history: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        tool_history: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """Get relevant results without formatting.
 
         Args:
@@ -219,7 +219,7 @@ class ToolHistoryExtractor:
             self._tool_names.discard(tool_name)
 
     @property
-    def tool_names(self) -> Optional[Set[str]]:
+    def tool_names(self) -> Optional[set[str]]:
         """Get tool name filter."""
         return self._tool_names
 

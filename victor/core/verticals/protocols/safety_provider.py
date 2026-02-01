@@ -38,7 +38,7 @@ Usage:
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Dict, List, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 # Import SafetyPattern for use in type hints
 # Note: Using TYPE_CHECKING to avoid circular import with security_analysis assistant
@@ -78,7 +78,7 @@ class SafetyExtensionProtocol(Protocol):
     """
 
     @abstractmethod
-    def get_bash_patterns(self) -> List[SafetyPattern]:
+    def get_bash_patterns(self) -> list[SafetyPattern]:
         """Get bash command patterns for this vertical.
 
         Returns:
@@ -86,7 +86,7 @@ class SafetyExtensionProtocol(Protocol):
         """
         ...
 
-    def get_file_patterns(self) -> List[SafetyPattern]:
+    def get_file_patterns(self) -> list[SafetyPattern]:
         """Get file operation patterns for this vertical.
 
         Returns:
@@ -94,7 +94,7 @@ class SafetyExtensionProtocol(Protocol):
         """
         return []
 
-    def get_tool_restrictions(self) -> Dict[str, List[str]]:
+    def get_tool_restrictions(self) -> dict[str, list[str]]:
         """Get tool-specific argument restrictions.
 
         Returns:

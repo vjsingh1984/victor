@@ -30,7 +30,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.providers.base import BaseProvider, Message
 
@@ -65,11 +65,11 @@ class CompletionConfig:
 class ToolFailureContext:
     """Context about tool failures for error response generation."""
 
-    failed_tools: List[Dict[str, Any]] = field(default_factory=list)
-    successful_tools: List[Dict[str, Any]] = field(default_factory=list)
+    failed_tools: list[dict[str, Any]] = field(default_factory=list)
+    successful_tools: list[dict[str, Any]] = field(default_factory=list)
     last_error: Optional[str] = None
-    files_examined: List[str] = field(default_factory=list)
-    partial_results: Dict[str, Any] = field(default_factory=dict)
+    files_examined: list[str] = field(default_factory=list)
+    partial_results: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -117,11 +117,11 @@ class ResponseCompleter:
 
     async def ensure_response(
         self,
-        messages: List[Message],
+        messages: list[Message],
         model: str,
         temperature: float,
         max_tokens: int,
-        tool_results: Optional[List[Dict[str, Any]]] = None,
+        tool_results: Optional[list[dict[str, Any]]] = None,
         failure_context: Optional[ToolFailureContext] = None,
         current_content: str = "",
     ) -> CompletionResult:
@@ -166,7 +166,7 @@ class ResponseCompleter:
 
     async def _handle_tool_failures(
         self,
-        messages: List[Message],
+        messages: list[Message],
         model: str,
         temperature: float,
         max_tokens: int,
@@ -255,7 +255,7 @@ class ResponseCompleter:
 
     async def _generate_response_with_retry(
         self,
-        messages: List[Message],
+        messages: list[Message],
         model: str,
         temperature: float,
         max_tokens: int,
@@ -422,10 +422,10 @@ class AgenticLoop:
     async def should_continue(
         self,
         iteration: int,
-        tool_calls: Optional[List[Dict[str, Any]]],
+        tool_calls: Optional[list[dict[str, Any]]],
         failure_context: ToolFailureContext,
         content: str,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Determine if the loop should continue.
 
         Args:

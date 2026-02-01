@@ -47,9 +47,8 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +74,7 @@ class ToolCallRecord:
     call_id: str
     parent_span_id: str
     tool_name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     result: Optional[Any] = None
     error: Optional[str] = None
     start_time: float = field(default_factory=time.time)
@@ -100,7 +99,7 @@ class ToolCallRecord:
         """
         return self.is_complete and self.error is None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
 
         Returns:
@@ -158,14 +157,14 @@ class ToolCallTracer:
             event_bus: EventBus instance for emitting tool call events
         """
         self._event_bus = event_bus
-        self._calls: Dict[str, ToolCallRecord] = {}
+        self._calls: dict[str, ToolCallRecord] = {}
 
         logger.info("ToolCallTracer initialized")
 
     def record_call(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         parent_span_id: str,
     ) -> str:
         """Record a tool call.
@@ -293,7 +292,7 @@ class ToolCallTracer:
         tool_name: Optional[str] = None,
         parent_span_id: Optional[str] = None,
         limit: int = 100,
-    ) -> List[ToolCallRecord]:
+    ) -> list[ToolCallRecord]:
         """Get tool calls with optional filters.
 
         Args:
@@ -317,7 +316,7 @@ class ToolCallTracer:
 
         return calls[:limit]
 
-    def get_calls_by_span(self, parent_span_id: str) -> List[ToolCallRecord]:
+    def get_calls_by_span(self, parent_span_id: str) -> list[ToolCallRecord]:
         """Get all tool calls for a specific execution span.
 
         Args:
@@ -328,7 +327,7 @@ class ToolCallTracer:
         """
         return [c for c in self._calls.values() if c.parent_span_id == parent_span_id]
 
-    def get_failed_calls(self, limit: int = 100) -> List[ToolCallRecord]:
+    def get_failed_calls(self, limit: int = 100) -> list[ToolCallRecord]:
         """Get failed tool calls.
 
         Args:
@@ -341,7 +340,7 @@ class ToolCallTracer:
         calls.sort(key=lambda c: c.start_time, reverse=True)
         return calls[:limit]
 
-    def get_all_calls(self) -> List[ToolCallRecord]:
+    def get_all_calls(self) -> list[ToolCallRecord]:
         """Get all tool calls.
 
         Returns:
@@ -366,7 +365,7 @@ class ToolCallTracer:
         self._calls.clear()
         logger.info(f"Cleared {count} tool calls from tracer")
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get statistics about recorded tool calls.
 
         Returns:
@@ -376,7 +375,7 @@ class ToolCallTracer:
             return {"total": 0}
 
         # Count by tool name
-        by_tool: Dict[str, int] = {}
+        by_tool: dict[str, int] = {}
         for call in self._calls.values():
             by_tool[call.tool_name] = by_tool.get(call.tool_name, 0) + 1
 

@@ -56,7 +56,7 @@ Usage:
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Any, Optional
 
 from victor.core.verticals.base import VerticalConfig
 from victor.core.verticals.capability_mutation import CapabilityMutation, CapabilityRollback
@@ -105,7 +105,7 @@ class MutableVerticalContext(VerticalContext):
             print(f"{mutation.capability}: {mutation.args}")
     """
 
-    def __init__(self, name: str, config: Optional[Union["VerticalConfig", Dict[str, Any]]] = None):
+    def __init__(self, name: str, config: Optional["VerticalConfig" | dict[str, Any]] = None):
         """Initialize mutable context.
 
         Args:
@@ -116,9 +116,9 @@ class MutableVerticalContext(VerticalContext):
         # VerticalConfig is a complex type that we can't construct from dict here
         actual_config: Optional["VerticalConfig"] = None if isinstance(config, dict) else config
         super().__init__(name=name, config=actual_config)
-        self._mutations: List[CapabilityMutation] = []
-        self._capability_values: Dict[str, Any] = {}
-        self._rollback_stack: List[CapabilityRollback] = []
+        self._mutations: list[CapabilityMutation] = []
+        self._capability_values: dict[str, Any] = {}
+        self._rollback_stack: list[CapabilityRollback] = []
 
     def apply_capability(self, capability_name: str, **kwargs: Any) -> None:
         """Apply a capability through context (DIP compliant).
@@ -190,7 +190,7 @@ class MutableVerticalContext(VerticalContext):
         """
         return capability_name in self._capability_values
 
-    def get_mutation_history(self) -> List[CapabilityMutation]:
+    def get_mutation_history(self) -> list[CapabilityMutation]:
         """Get history of capability changes.
 
         Returns:
@@ -206,7 +206,7 @@ class MutableVerticalContext(VerticalContext):
         """
         return len(self._mutations)
 
-    def get_recent_mutations(self, seconds: float = 300.0) -> List[CapabilityMutation]:
+    def get_recent_mutations(self, seconds: float = 300.0) -> list[CapabilityMutation]:
         """Get mutations from last N seconds.
 
         Args:
@@ -298,7 +298,7 @@ class MutableVerticalContext(VerticalContext):
         if self.config is not None and hasattr(self.config, "metadata"):
             self.config.metadata.pop("_applied_capabilities", None)
 
-    def get_mutations_by_capability(self, capability_name: str) -> List[CapabilityMutation]:
+    def get_mutations_by_capability(self, capability_name: str) -> list[CapabilityMutation]:
         """Get all mutations for a specific capability.
 
         Args:
@@ -309,7 +309,7 @@ class MutableVerticalContext(VerticalContext):
         """
         return [m for m in self._mutations if m.capability == capability_name]
 
-    def get_all_applied_capabilities(self) -> Dict[str, Any]:
+    def get_all_applied_capabilities(self) -> dict[str, Any]:
         """Get all currently applied capabilities.
 
         Returns:
@@ -317,7 +317,7 @@ class MutableVerticalContext(VerticalContext):
         """
         return dict(self._capability_values)
 
-    def export_state(self) -> Dict[str, Any]:
+    def export_state(self) -> dict[str, Any]:
         """Export current state for serialization.
 
         Useful for debugging and persistence.
@@ -340,7 +340,7 @@ class MutableVerticalContext(VerticalContext):
             "capability_values": self._capability_values,
         }
 
-    def import_state(self, state: Dict[str, Any]) -> None:
+    def import_state(self, state: dict[str, Any]) -> None:
         """Import state from serialization.
 
         Reconstructs context from previously exported state.
@@ -370,17 +370,17 @@ class MutableVerticalContext(VerticalContext):
         self._capability_values = state.get("capability_values", {})
 
     # VerticalContext compatibility methods
-    def apply_stages(self, stages: Dict[str, Any]) -> None:
+    def apply_stages(self, stages: dict[str, Any]) -> None:
         """Apply stage configuration (delegates to apply_capability)."""
         self.apply_capability("stages", stages=stages)
         super().apply_stages(stages)
 
-    def apply_middleware(self, middleware: List[Any]) -> None:
+    def apply_middleware(self, middleware: list[Any]) -> None:
         """Apply middleware (delegates to apply_capability)."""
         self.apply_capability("middleware", middleware=middleware)
         super().apply_middleware(middleware)
 
-    def apply_safety_patterns(self, patterns: List[Any]) -> None:
+    def apply_safety_patterns(self, patterns: list[Any]) -> None:
         """Apply safety patterns (delegates to apply_capability)."""
         self.apply_capability("safety_patterns", patterns=patterns)
         super().apply_safety_patterns(patterns)

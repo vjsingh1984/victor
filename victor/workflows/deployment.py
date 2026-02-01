@@ -62,11 +62,7 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Optional,
-    Type,
-    cast,
 )
 
 if TYPE_CHECKING:
@@ -185,10 +181,10 @@ class DockerConfig:
     """
 
     image: str = "victor-worker:latest"
-    environment: Dict[str, str] = field(default_factory=dict)
-    volumes: Dict[str, str] = field(default_factory=dict)
+    environment: dict[str, str] = field(default_factory=dict)
+    volumes: dict[str, str] = field(default_factory=dict)
     network: str = "bridge"
-    resource_limits: Dict[str, str] = field(default_factory=dict)
+    resource_limits: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -208,10 +204,10 @@ class KubernetesConfig:
     namespace: str = "default"
     service_account: str = "default"
     image: str = "victor-worker:latest"
-    resource_limits: Dict[str, str] = field(default_factory=dict)
-    annotations: Dict[str, str] = field(default_factory=dict)
-    labels: Dict[str, str] = field(default_factory=dict)
-    node_selector: Dict[str, str] = field(default_factory=dict)
+    resource_limits: dict[str, str] = field(default_factory=dict)
+    annotations: dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
+    node_selector: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -230,8 +226,8 @@ class ECSConfig:
     cluster: str = "default"
     task_definition: str = "victor-worker"
     launch_type: str = "FARGATE"
-    subnets: List[str] = field(default_factory=list)
-    security_groups: List[str] = field(default_factory=list)
+    subnets: list[str] = field(default_factory=list)
+    security_groups: list[str] = field(default_factory=list)
     assign_public_ip: bool = False
 
 
@@ -377,7 +373,7 @@ class EC2Config:
     region: str = "us-east-1"
     spot: bool = False
     max_spot_price: Optional[str] = None  # e.g., "0.05"
-    security_group_ids: List[str] = field(default_factory=list)
+    security_group_ids: list[str] = field(default_factory=list)
     subnet_id: str = ""
     key_name: str = ""
 
@@ -400,7 +396,7 @@ class EKSConfig:
     namespace: str = "default"
     service_account: str = "default"
     image: str = "victor-worker:latest"
-    resource_limits: Dict[str, str] = field(default_factory=dict)
+    resource_limits: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -421,7 +417,7 @@ class AKSConfig:
     namespace: str = "default"
     service_account: str = "default"
     image: str = "victor-worker:latest"
-    resource_limits: Dict[str, str] = field(default_factory=dict)
+    resource_limits: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -463,7 +459,7 @@ class GKEConfig:
     namespace: str = "default"
     service_account: str = "default"
     image: str = "victor-worker:latest"
-    resource_limits: Dict[str, str] = field(default_factory=dict)
+    resource_limits: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -521,7 +517,7 @@ class SubprocessConfig:
 
     python_path: str = "python"
     working_dir: Optional[str] = None
-    env: Dict[str, str] = field(default_factory=dict)
+    env: dict[str, str] = field(default_factory=dict)
     timeout_seconds: int = 3600
 
 
@@ -604,7 +600,7 @@ class SparkConfig:
     executor_memory: str = "4g"
     executor_cores: int = 2
     num_executors: int = 2
-    conf: Dict[str, str] = field(default_factory=dict)
+    conf: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -620,7 +616,7 @@ class RayConfig:
     """
 
     address: str = "auto"
-    runtime_env: Dict[str, Any] = field(default_factory=dict)
+    runtime_env: dict[str, Any] = field(default_factory=dict)
     num_cpus: int = 1
     num_gpus: int = 0
     memory: Optional[int] = None
@@ -732,8 +728,8 @@ class DockerComposeConfig:
 
     compose_file: str = "docker-compose.yml"
     project_name: str = "victor-workflow"
-    services: List[str] = field(default_factory=list)
-    environment: Dict[str, str] = field(default_factory=dict)
+    services: list[str] = field(default_factory=list)
+    environment: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -810,8 +806,8 @@ class DeploymentHandler(ABC):
     async def execute_node(
         self,
         node: "WorkflowNode",
-        state: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        state: dict[str, Any],
+    ) -> dict[str, Any]:
         """Execute a node on the deployment target."""
         pass
 
@@ -835,8 +831,8 @@ class LocalDeploymentHandler(DeploymentHandler):
     async def execute_node(
         self,
         node: "WorkflowNode",
-        state: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        state: dict[str, Any],
+    ) -> dict[str, Any]:
         """Execute node locally - delegated to StateGraph."""
         # Local execution is handled by StateGraph directly
         return state
@@ -918,8 +914,8 @@ class DockerDeploymentHandler(DeploymentHandler):
     async def execute_node(
         self,
         node: "WorkflowNode",
-        state: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        state: dict[str, Any],
+    ) -> dict[str, Any]:
         """Execute node in Docker container via exec."""
         if not self.container_id:
             raise RuntimeError("Container not started. Call prepare() first.")
@@ -959,8 +955,8 @@ class DockerDeploymentHandler(DeploymentHandler):
 
             parsed_result = json.loads(output.decode())
             if isinstance(parsed_result, dict) and "state" in parsed_result:
-                return cast(Dict[str, Any], parsed_result["state"])
-            return cast(Dict[str, Any], parsed_result) if isinstance(parsed_result, dict) else state
+                return cast(dict[str, Any], parsed_result["state"])
+            return cast(dict[str, Any], parsed_result) if isinstance(parsed_result, dict) else state
         except json.JSONDecodeError:
             return state
 
@@ -1099,8 +1095,8 @@ class KubernetesDeploymentHandler(DeploymentHandler):
     async def execute_node(
         self,
         node: "WorkflowNode",
-        state: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        state: dict[str, Any],
+    ) -> dict[str, Any]:
         """Execute node in Kubernetes pod via exec."""
         if not self.pod_name:
             raise RuntimeError("Pod not started. Call prepare() first.")
@@ -1146,8 +1142,8 @@ class KubernetesDeploymentHandler(DeploymentHandler):
 
             parsed_result = json.loads(resp)
             if isinstance(parsed_result, dict) and "state" in parsed_result:
-                return cast(Dict[str, Any], parsed_result["state"])
-            return cast(Dict[str, Any], parsed_result) if isinstance(parsed_result, dict) else state
+                return cast(dict[str, Any], parsed_result["state"])
+            return cast(dict[str, Any], parsed_result) if isinstance(parsed_result, dict) else state
         except json.JSONDecodeError:
             logger.warning(f"Could not parse pod exec output: {resp}")
             return state
@@ -1290,8 +1286,8 @@ class ECSDeploymentHandler(DeploymentHandler):
     async def execute_node(
         self,
         node: "WorkflowNode",
-        state: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        state: dict[str, Any],
+    ) -> dict[str, Any]:
         """Execute node in ECS task via ECS Exec."""
         if not self.task_arn:
             raise RuntimeError("Task not started. Call prepare() first.")
@@ -1375,8 +1371,8 @@ class RemoteDeploymentHandler(DeploymentHandler):
     async def execute_node(
         self,
         node: "WorkflowNode",
-        state: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        state: dict[str, Any],
+    ) -> dict[str, Any]:
         """Execute node on remote server."""
         logger.debug(f"Executing node {node.id} remotely")
         # NOTE: Remote execution via HTTP/gRPC requires API server with workflow endpoint

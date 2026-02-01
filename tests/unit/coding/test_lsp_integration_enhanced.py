@@ -25,7 +25,7 @@ This test suite provides comprehensive coverage for:
 - Message parsing
 """
 
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -33,19 +33,11 @@ from tests.fixtures.coding_fixtures import (
     MOCK_LSP_COMPLETIONS,
     MOCK_LSP_DIAGNOSTICS,
     MOCK_LSP_HOVER_RESPONSES,
-    MOCK_LSP_SYMBOLS,
-    create_mock_diagnostic,
-    create_mock_position,
-    create_mock_range,
 )
 from victor.coding.lsp.client import LSPClient
 from victor.coding.lsp.config import LSPServerConfig
 from victor.protocols.lsp_types import (
     CompletionItem,
-    CompletionItemKind,
-    Diagnostic,
-    DiagnosticSeverity,
-    DocumentSymbol,
     Hover,
     Location,
     Position,

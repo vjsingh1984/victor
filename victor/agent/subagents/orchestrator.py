@@ -44,7 +44,8 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Optional
+from collections.abc import AsyncIterator
 
 from victor.agent.subagents.base import (
     SubAgent,
@@ -57,7 +58,6 @@ if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
 
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.protocols.agent import IAgentOrchestrator
     from victor.agent.subagents.protocols import RoleToolProvider
     from victor.providers.base import StreamChunk
 
@@ -65,7 +65,7 @@ logger = logging.getLogger(__name__)
 
 
 # Default tool sets for each role
-ROLE_DEFAULT_TOOLS: Dict[SubAgentRole, List[str]] = {
+ROLE_DEFAULT_TOOLS: dict[SubAgentRole, list[str]] = {
     SubAgentRole.RESEARCHER: [
         "read",
         "ls",
@@ -115,7 +115,7 @@ ROLE_DEFAULT_TOOLS: Dict[SubAgentRole, List[str]] = {
 }
 
 # Default budgets for each role
-ROLE_DEFAULT_BUDGETS: Dict[SubAgentRole, int] = {
+ROLE_DEFAULT_BUDGETS: dict[SubAgentRole, int] = {
     SubAgentRole.RESEARCHER: 15,
     SubAgentRole.PLANNER: 10,
     SubAgentRole.EXECUTOR: 30,
@@ -124,7 +124,7 @@ ROLE_DEFAULT_BUDGETS: Dict[SubAgentRole, int] = {
 }
 
 # Default context limits for each role
-ROLE_DEFAULT_CONTEXT: Dict[SubAgentRole, int] = {
+ROLE_DEFAULT_CONTEXT: dict[SubAgentRole, int] = {
     SubAgentRole.RESEARCHER: 50000,
     SubAgentRole.PLANNER: 30000,
     SubAgentRole.EXECUTOR: 80000,
@@ -150,7 +150,7 @@ class SubAgentTask:
     role: SubAgentRole
     task: str
     tool_budget: Optional[int] = None
-    allowed_tools: Optional[List[str]] = None
+    allowed_tools: Optional[list[str]] = None
     context_limit: Optional[int] = None
 
 
@@ -168,11 +168,11 @@ class FanOutResult:
         errors: List of error messages from failed sub-agents
     """
 
-    results: List[SubAgentResult]
+    results: list[SubAgentResult]
     all_success: bool
     total_tool_calls: int
     total_duration: float
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class SubAgentOrchestrator:
@@ -220,7 +220,7 @@ class SubAgentOrchestrator:
         from victor.agent.subagents.protocols import get_role_tool_provider
 
         self.parent = parent_orchestrator
-        self.active_subagents: Set[SubAgent] = set()
+        self.active_subagents: set[SubAgent] = set()
         self._role_provider = role_provider or get_role_tool_provider()
         self._vertical = vertical
 
@@ -234,7 +234,7 @@ class SubAgentOrchestrator:
         role: SubAgentRole,
         task: str,
         tool_budget: Optional[int] = None,
-        allowed_tools: Optional[List[str]] = None,
+        allowed_tools: Optional[list[str]] = None,
         context_limit: Optional[int] = None,
         can_spawn_subagents: bool = False,
         timeout_seconds: int = 300,
@@ -318,7 +318,7 @@ class SubAgentOrchestrator:
 
     async def fan_out(
         self,
-        tasks: List[SubAgentTask],
+        tasks: list[SubAgentTask],
         max_concurrent: int = 3,
     ) -> FanOutResult:
         """Execute multiple sub-agent tasks in parallel.
@@ -367,8 +367,8 @@ class SubAgentOrchestrator:
         )
 
         # Process results
-        processed_results: List[SubAgentResult] = []
-        errors: List[str] = []
+        processed_results: list[SubAgentResult] = []
+        errors: list[str] = []
         total_tool_calls = 0
 
         for i, result in enumerate(results):
@@ -417,7 +417,7 @@ class SubAgentOrchestrator:
         task: str,
         *,
         tool_budget: Optional[int] = None,
-        allowed_tools: Optional[List[str]] = None,
+        allowed_tools: Optional[list[str]] = None,
         context_limit: Optional[int] = None,
         can_spawn_subagents: bool = False,
         timeout_seconds: int = 300,

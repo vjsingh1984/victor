@@ -36,7 +36,7 @@ Example:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -76,8 +76,8 @@ class IClassificationResult(Protocol):
     needs_execution: bool
     source: str
     recommended_tool_budget: int
-    matched_keywords: List[Any]  # KeywordMatch objects
-    negated_keywords: List[Any]  # KeywordMatch objects
+    matched_keywords: list[Any]  # KeywordMatch objects
+    negated_keywords: list[Any]  # KeywordMatch objects
 
     def get_task_type_value(self) -> str:
         """Get task type as string value.

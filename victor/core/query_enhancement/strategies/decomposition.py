@@ -35,7 +35,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import List, Optional
+from typing import Optional
 
 from victor.integrations.protocols.query_enhancement import (
     EnhancedQuery,
@@ -142,7 +142,7 @@ class DecompositionStrategy(BaseQueryEnhancementStrategy):
         Returns:
             Enhanced query with sub-queries
         """
-        sub_queries: List[str] = []
+        sub_queries: list[str] = []
 
         if llm_response:
             sub_queries = self._parse_sub_queries(llm_response)
@@ -170,7 +170,7 @@ class DecompositionStrategy(BaseQueryEnhancementStrategy):
             metadata={"domain": context.domain, "no_decomposition": True},
         )
 
-    def _parse_sub_queries(self, response: str) -> List[str]:
+    def _parse_sub_queries(self, response: str) -> list[str]:
         """Parse sub-queries from LLM response.
 
         Args:
@@ -213,7 +213,7 @@ class DecompositionStrategy(BaseQueryEnhancementStrategy):
 
         return sub_queries
 
-    def _heuristic_decompose(self, query: str, context: EnhancementContext) -> List[str]:
+    def _heuristic_decompose(self, query: str, context: EnhancementContext) -> list[str]:
         """Heuristic decomposition without LLM.
 
         Uses simple rules to break down queries:
@@ -228,7 +228,7 @@ class DecompositionStrategy(BaseQueryEnhancementStrategy):
         Returns:
             List of sub-queries
         """
-        sub_queries: List[str] = []
+        sub_queries: list[str] = []
         query_lower = query.lower()
 
         # Check if query is complex enough to decompose
@@ -265,7 +265,7 @@ class DecompositionStrategy(BaseQueryEnhancementStrategy):
 
         return sub_queries[:4]  # Max 4 sub-queries
 
-    def _extract_aspects(self, query: str) -> List[str]:
+    def _extract_aspects(self, query: str) -> list[str]:
         """Extract analysis aspects from query.
 
         Args:

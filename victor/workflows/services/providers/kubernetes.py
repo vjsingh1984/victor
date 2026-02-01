@@ -45,14 +45,11 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
-import os
 import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.workflows.services.definition import (
-    HealthCheckConfig,
     ServiceConfig,
     ServiceHandle,
     ServiceHealthError,
@@ -368,7 +365,7 @@ class KubernetesServiceProvider(BaseServiceProvider):
 
             await asyncio.sleep(5)
 
-    async def _get_service_endpoint(self, handle: ServiceHandle, namespace: str) -> Dict[str, Any]:
+    async def _get_service_endpoint(self, handle: ServiceHandle, namespace: str) -> dict[str, Any]:
         """Get service endpoint (host and ports)."""
         loop = asyncio.get_event_loop()
         service_name = handle.service_id
@@ -473,7 +470,7 @@ class KubernetesServiceProvider(BaseServiceProvider):
         except ApiException as e:
             return f"[Error getting logs: {e}]"
 
-    async def _run_command_in_service(self, handle: ServiceHandle, command: str) -> Tuple[int, str]:
+    async def _run_command_in_service(self, handle: ServiceHandle, command: str) -> tuple[int, str]:
         """Execute command in pod."""
         loop = asyncio.get_event_loop()
         namespace = handle.metadata.get("namespace", self._namespace)

@@ -46,7 +46,8 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 from victor.framework.capabilities.base_vertical_capability_provider import (
     BaseVerticalCapabilityProvider,
@@ -55,7 +56,7 @@ from victor.framework.capabilities.base_vertical_capability_provider import (
 from victor.framework.protocols import CapabilityType
 
 if TYPE_CHECKING:
-    from victor.core.capabilities import Capability as CoreCapability
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ class CapabilityRegistry:
         if CapabilityRegistry._instance is not None:
             raise RuntimeError("Use get_instance() to get the CapabilityRegistry singleton")
 
-        self._providers: Dict[str, BaseVerticalCapabilityProvider] = {}
+        self._providers: dict[str, BaseVerticalCapabilityProvider] = {}
         self._provider_lock: threading.Lock = threading.Lock()
         logger.debug("CapabilityRegistry initialized")
 
@@ -187,7 +188,7 @@ class CapabilityRegistry:
         with self._provider_lock:
             return vertical in self._providers
 
-    def list_providers(self) -> List[str]:
+    def list_providers(self) -> list[str]:
         """List all registered vertical names.
 
         Returns:
@@ -267,7 +268,7 @@ class CapabilityRegistry:
 
     def list_capabilities(
         self, vertical: str, capability_type: Optional[CapabilityType] = None
-    ) -> List[str]:
+    ) -> list[str]:
         """List capabilities for a vertical, optionally filtered by type.
 
         Args:
@@ -293,7 +294,7 @@ class CapabilityRegistry:
 
     def list_all_capabilities(
         self, capability_type: Optional[CapabilityType] = None
-    ) -> Dict[str, List[str]]:
+    ) -> dict[str, list[str]]:
         """List capabilities across all verticals.
 
         Args:
@@ -311,7 +312,7 @@ class CapabilityRegistry:
             for vertical, caps in tools.items():
                 print(f"{vertical}: {caps}")
         """
-        result: Dict[str, List[str]] = {}
+        result: dict[str, list[str]] = {}
 
         with self._provider_lock:
             verticals = list(self._providers.keys())
@@ -363,7 +364,7 @@ class CapabilityRegistry:
 
     def get_capability_config(
         self, vertical: str, orchestrator: Any, capability_name: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Get current configuration for a capability.
 
         Args:
@@ -385,7 +386,7 @@ class CapabilityRegistry:
 
         return provider.get_capability_config(orchestrator, capability_name)
 
-    def get_default_config(self, vertical: str, capability_name: str) -> Optional[Dict[str, Any]]:
+    def get_default_config(self, vertical: str, capability_name: str) -> Optional[dict[str, Any]]:
         """Get default configuration for a capability.
 
         Args:
@@ -409,7 +410,7 @@ class CapabilityRegistry:
         except ValueError:
             return None
 
-    def get_all_capability_configs(self, vertical: str) -> Dict[str, Any]:
+    def get_all_capability_configs(self, vertical: str) -> dict[str, Any]:
         """Get all default configurations for a vertical.
 
         Args:
@@ -459,7 +460,7 @@ class CapabilityRegistry:
             )
             return False
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get registry statistics.
 
         Returns:
@@ -476,7 +477,7 @@ class CapabilityRegistry:
 
         total_capabilities = sum(len(p.list_capabilities()) for p in providers)
 
-        capability_counts: Dict[str, int] = {}
+        capability_counts: dict[str, int] = {}
         for provider in providers:
             vertical_name = provider._vertical_name
             capability_counts[vertical_name] = len(provider.list_capabilities())

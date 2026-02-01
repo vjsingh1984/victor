@@ -18,7 +18,6 @@ These tests verify the Persona system that provides consistent
 personality and communication styles for agents.
 """
 
-import pytest
 
 
 # =============================================================================

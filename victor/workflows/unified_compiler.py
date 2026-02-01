@@ -59,19 +59,11 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    Generic,
-    List,
     Optional,
-    Set,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
     cast,
 )
+from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
     from victor.protocols import WorkflowAgentProtocol
@@ -95,11 +87,9 @@ if TYPE_CHECKING:
     from victor.workflows.graph_dsl import WorkflowGraph
     from victor.workflows.node_runners import NodeRunnerRegistry
     from victor.workflows.graph_compiler import (
-        CompilerConfig,
         WorkflowGraphCompiler,
         WorkflowDefinitionCompiler,
     )
-    from victor.workflows.yaml_loader import YAMLWorkflowConfig
 
 from victor.core.errors import (
     WorkflowExecutionError,
@@ -112,7 +102,7 @@ from victor.core.errors import (
 
 logger = logging.getLogger(__name__)
 
-StateType = TypeVar("StateType", bound=Dict[str, Any])
+StateType = TypeVar("StateType", bound=dict[str, Any])
 
 
 # =============================================================================
@@ -222,7 +212,7 @@ class NodeExecutorFactory:
             {"_parallel_results", "_node_results", "_errors", "_checkpoints"}
         )
 
-    def _copy_state_for_parallel(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def _copy_state_for_parallel(self, state: dict[str, Any]) -> dict[str, Any]:
         """Create an isolated copy of state for parallel execution.
 
         Uses selective copying strategy:
@@ -258,7 +248,7 @@ class NodeExecutorFactory:
     def create_executor(
         self,
         node: "WorkflowNode",
-    ) -> Callable[[Dict[str, Any]], Any]:
+    ) -> Callable[[dict[str, Any]], Any]:
         """Create an executor function for a workflow node.
 
         Args:
@@ -294,7 +284,7 @@ class NodeExecutorFactory:
     def create_agent_executor(
         self,
         node: "AgentNode",
-    ) -> Callable[[Dict[str, Any]], Any]:
+    ) -> Callable[[dict[str, Any]], Any]:
         """Create executor for an AgentNode.
 
         Spawns a sub-agent with the specified role and goal to process
@@ -316,7 +306,7 @@ class NodeExecutorFactory:
         retry_policy = node.retry_policy
         timeout_seconds = node.timeout_seconds
 
-        async def execute_agent(state: Dict[str, Any]) -> Dict[str, Any]:
+        async def execute_agent(state: dict[str, Any]) -> dict[str, Any]:
             start_time = time.time()
             state = dict(state)  # Make mutable copy
             node_name = node.name
@@ -377,7 +367,7 @@ class NodeExecutorFactory:
                     sub_orchestrator = SubAgentOrchestrator(cast(AgentOrchestrator, orchestrator))
 
                     # Create the coroutine for execution
-                    async def _run_sub_agent() -> Dict[str, Any]:
+                    async def _run_sub_agent() -> dict[str, Any]:
                         result = await sub_orchestrator.spawn(
                             role=role,
                             task=goal,
@@ -556,13 +546,13 @@ class NodeExecutorFactory:
             strategy = retry_policy_to_strategy(retry_policy)
             retry_executor = RetryExecutor(strategy)
 
-            async def execute_agent_with_retry(state: Dict[str, Any]) -> Dict[str, Any]:
+            async def execute_agent_with_retry(state: dict[str, Any]) -> dict[str, Any]:
                 """Wrapper that applies retry policy to agent execution."""
                 from typing import cast
 
                 result = await retry_executor.execute_async(lambda: execute_agent(state))
                 if result.success:
-                    return cast(Dict[str, Any], result.result)
+                    return cast(dict[str, Any], result.result)
                 else:
                     # Return last state with error info
                     state = dict(state)
@@ -587,7 +577,7 @@ class NodeExecutorFactory:
     def create_compute_executor(
         self,
         node: "ComputeNode",
-    ) -> Callable[[Dict[str, Any]], Any]:
+    ) -> Callable[[dict[str, Any]], Any]:
         """Create executor for a ComputeNode.
 
         Executes tools directly without LLM inference, using registered
@@ -605,7 +595,7 @@ class NodeExecutorFactory:
         emitter = self._emitter
         retry_policy = node.retry_policy
 
-        async def execute_compute(state: Dict[str, Any]) -> Dict[str, Any]:
+        async def execute_compute(state: dict[str, Any]) -> dict[str, Any]:
             start_time = time.time()
             state = dict(state)  # Make mutable copy
             tool_calls_used = 0
@@ -794,13 +784,13 @@ class NodeExecutorFactory:
             strategy = retry_policy_to_strategy(retry_policy)
             retry_executor = RetryExecutor(strategy)
 
-            async def execute_compute_with_retry(state: Dict[str, Any]) -> Dict[str, Any]:
+            async def execute_compute_with_retry(state: dict[str, Any]) -> dict[str, Any]:
                 """Wrapper that applies retry policy to compute execution."""
                 from typing import cast
 
                 result = await retry_executor.execute_async(lambda: execute_compute(state))
                 if result.success:
-                    return cast(Dict[str, Any], result.result)
+                    return cast(dict[str, Any], result.result)
                 else:
                     # Return last state with error info
                     state = dict(state)
@@ -825,7 +815,7 @@ class NodeExecutorFactory:
     def create_condition_router(
         self,
         node: "ConditionNode",
-    ) -> Callable[[Dict[str, Any]], Any]:
+    ) -> Callable[[dict[str, Any]], Any]:
         """Create a router function for a condition node.
 
         The router evaluates the condition and returns the state unchanged.
@@ -837,7 +827,7 @@ class NodeExecutorFactory:
             control and do not spawn nested workflows.
         """
 
-        async def condition_exec(state: Dict[str, Any]) -> Dict[str, Any]:
+        async def condition_exec(state: dict[str, Any]) -> dict[str, Any]:
             state = dict(state)
             if "_node_results" not in state:
                 state["_node_results"] = {}
@@ -853,8 +843,8 @@ class NodeExecutorFactory:
     def create_parallel_executor(
         self,
         node: "ParallelNode",
-        child_nodes: Optional[List["WorkflowNode"]] = None,
-    ) -> Callable[[Dict[str, Any]], Any]:
+        child_nodes: Optional[list["WorkflowNode"]] = None,
+    ) -> Callable[[dict[str, Any]], Any]:
         """Create executor for a ParallelNode.
 
         Executes child nodes in true parallel using asyncio.gather().
@@ -879,7 +869,7 @@ class NodeExecutorFactory:
             for child in child_nodes:
                 child_executors.append((child, factory.create_executor(child)))
 
-        async def execute_parallel(state: Dict[str, Any]) -> Dict[str, Any]:
+        async def execute_parallel(state: dict[str, Any]) -> dict[str, Any]:
             start_time = time.time()
             state = dict(state)
             node_name = node.name
@@ -1016,7 +1006,7 @@ class NodeExecutorFactory:
     def create_transform_executor(
         self,
         node: "TransformNode",
-    ) -> Callable[[Dict[str, Any]], Any]:
+    ) -> Callable[[dict[str, Any]], Any]:
         """Create executor for a TransformNode.
 
         Applies a transformation function to the workflow state.
@@ -1028,7 +1018,7 @@ class NodeExecutorFactory:
         """
         emitter = self._emitter
 
-        async def execute_transform(state: Dict[str, Any]) -> Dict[str, Any]:
+        async def execute_transform(state: dict[str, Any]) -> dict[str, Any]:
             start_time = time.time()
             state = dict(state)
             node_name = node.name
@@ -1093,16 +1083,12 @@ class NodeExecutorFactory:
     def create_team_executor(
         self,
         node: "TeamNodeWorkflow",
-    ) -> Callable[[Dict[str, Any]], Any]:
+    ) -> Callable[[dict[str, Any]], Any]:
         """Create executor for a TeamNode.
 
         Spawns an ad-hoc multi-agent team using victor/teams/ infrastructure
         and merges the result back into the workflow state.
         """
-        from victor.framework.workflows.nodes import TeamNode
-        from victor.framework.state_merging import MergeMode
-        from victor.agent.subagents import SubAgentRole
-        from victor.teams.types import TeamMember, TeamFormation
         from victor.workflows.team_node_runner import TeamNodeRunner
         from victor.workflows.recursion import RecursionContext
 
@@ -1110,7 +1096,7 @@ class NodeExecutorFactory:
         emitter = self._emitter
         tool_registry = self.tool_registry
 
-        async def execute_team(state: Dict[str, Any]) -> Dict[str, Any]:
+        async def execute_team(state: dict[str, Any]) -> dict[str, Any]:
             start_time = time.time()
             state = dict(state)
             node_name = node.name
@@ -1239,10 +1225,10 @@ class NodeExecutorFactory:
     def _create_passthrough_executor(
         self,
         node: "WorkflowNode",
-    ) -> Callable[[Dict[str, Any]], Any]:
+    ) -> Callable[[dict[str, Any]], Any]:
         """Create a passthrough executor for unknown node types."""
 
-        async def passthrough(state: Dict[str, Any]) -> Dict[str, Any]:
+        async def passthrough(state: dict[str, Any]) -> dict[str, Any]:
             state = dict(state)
             if "_node_results" not in state:
                 state["_node_results"] = {}
@@ -1282,7 +1268,7 @@ class CachedCompiledGraph:
         max_recursion_depth: Maximum recursion depth for nested execution (default: 3)
     """
 
-    compiled_graph: "CompiledGraph[Dict[str, Any]]"
+    compiled_graph: "CompiledGraph[dict[str, Any]]"
     workflow_name: str
     source_path: Optional[Path] = None
     compiled_at: float = field(default_factory=time.time)
@@ -1296,13 +1282,13 @@ class CachedCompiledGraph:
 
     async def invoke(
         self,
-        input_state: Dict[str, Any],
+        input_state: dict[str, Any],
         *,
         config: Optional["GraphConfig"] = None,
         thread_id: Optional[str] = None,
         use_cache: bool = True,
         max_recursion_depth: Optional[int] = None,
-    ) -> "GraphExecutionResult[Dict[str, Any]]":
+    ) -> "GraphExecutionResult[dict[str, Any]]":
         """Execute the compiled workflow.
 
         Args:
@@ -1360,11 +1346,11 @@ class CachedCompiledGraph:
 
     async def _execute_with_recursion(
         self,
-        exec_state: Dict[str, Any],
+        exec_state: dict[str, Any],
         config: Optional["GraphConfig"],
         thread_id: Optional[str],
         recursion_ctx: Any,
-    ) -> "GraphExecutionResult[Dict[str, Any]]":
+    ) -> "GraphExecutionResult[dict[str, Any]]":
         """Execute compiled graph with recursion context.
 
         Args:
@@ -1388,11 +1374,11 @@ class CachedCompiledGraph:
 
     async def stream(
         self,
-        input_state: Dict[str, Any],
+        input_state: dict[str, Any],
         *,
         config: Optional["GraphConfig"] = None,
         thread_id: Optional[str] = None,
-    ) -> AsyncIterator[Tuple[str, Dict[str, Any]]]:
+    ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
         """Stream workflow execution yielding state after each node.
 
         Args:
@@ -1412,7 +1398,7 @@ class CachedCompiledGraph:
         ):
             yield node_id, state
 
-    def _prepare_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def _prepare_state(self, state: dict[str, Any]) -> dict[str, Any]:
         """Prepare initial state with workflow metadata."""
         exec_state = dict(state)
         if "_workflow_id" not in exec_state:
@@ -1425,7 +1411,7 @@ class CachedCompiledGraph:
             exec_state["_parallel_results"] = {}
         return exec_state
 
-    def get_graph_schema(self) -> Dict[str, Any]:
+    def get_graph_schema(self) -> dict[str, Any]:
         """Get graph structure as dictionary.
 
         Returns:
@@ -1627,8 +1613,8 @@ class UnifiedWorkflowCompiler:
 
     def _compute_config_hash(
         self,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]],
-        transform_registry: Optional[Dict[str, Callable[..., Any]]],
+        condition_registry: Optional[dict[str, Callable[..., Any]]],
+        transform_registry: Optional[dict[str, Callable[..., Any]]],
     ) -> int:
         """Compute hash for cache key based on registries."""
         condition_names = tuple(sorted(condition_registry.keys())) if condition_registry else ()
@@ -1641,10 +1627,10 @@ class UnifiedWorkflowCompiler:
 
     def compile_yaml(
         self,
-        yaml_path: Union[str, Path],
+        yaml_path: str | Path,
         workflow_name: Optional[str] = None,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
-        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[dict[str, Callable[..., Any]]] = None,
         **kwargs: Any,
     ) -> CachedCompiledGraph:
         """Compile a workflow from a YAML file.
@@ -1760,8 +1746,8 @@ class UnifiedWorkflowCompiler:
         self,
         yaml_content: str,
         workflow_name: str,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
-        transform_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[dict[str, Callable[..., Any]]] = None,
+        transform_registry: Optional[dict[str, Callable[..., Any]]] = None,
         **kwargs: Any,
     ) -> CachedCompiledGraph:
         """Compile a workflow from YAML content string.
@@ -1948,13 +1934,13 @@ class UnifiedWorkflowCompiler:
         logger.info(f"Cleared {total} cache entries")
         return total
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get comprehensive cache statistics.
 
         Returns:
             Dictionary with cache and compilation statistics
         """
-        stats: Dict[str, Any] = {
+        stats: dict[str, Any] = {
             "compilation": dict(self._compile_stats),
             "caching_enabled": self._config.enable_caching,
         }
@@ -1981,7 +1967,7 @@ class UnifiedWorkflowCompiler:
 
         return stats
 
-    def invalidate_yaml(self, yaml_path: Union[str, Path]) -> int:
+    def invalidate_yaml(self, yaml_path: str | Path) -> int:
         """Invalidate cached definitions for a specific YAML file.
 
         Args:
@@ -2071,7 +2057,7 @@ class UnifiedWorkflowCompiler:
 
 
 def compile_workflow(
-    source: Union[Path, str, "WorkflowDefinition"],
+    source: Path | str | "WorkflowDefinition",
     workflow_name: Optional[str] = None,
     enable_caching: bool = True,
     **kwargs: Any,
@@ -2111,11 +2097,11 @@ def compile_workflow(
 
 
 async def compile_and_execute(
-    source: Union[Path, str, "WorkflowDefinition"],
-    initial_state: Optional[Dict[str, Any]] = None,
+    source: Path | str | "WorkflowDefinition",
+    initial_state: Optional[dict[str, Any]] = None,
     workflow_name: Optional[str] = None,
     **kwargs: Any,
-) -> "GraphExecutionResult[Dict[str, Any]]":
+) -> "GraphExecutionResult[dict[str, Any]]":
     """Compile and execute a workflow in one step.
 
     Convenience function for one-off execution.

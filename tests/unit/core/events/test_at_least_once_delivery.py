@@ -24,7 +24,6 @@ Run with: pytest tests/unit/core/events/test_at_least_once_delivery.py -v
 """
 
 import asyncio
-from typing import List
 
 import pytest
 

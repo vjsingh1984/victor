@@ -31,7 +31,7 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     # Type stubs for native extensions (optional)
@@ -120,20 +120,20 @@ class StreamingContentFilter:
     MAX_THINKING_CONTENT: int = 50000
 
     # Thinking token patterns (compiled for efficiency) - class-level constants
-    THINKING_START_PATTERNS: List[re.Pattern[str]] = [
+    THINKING_START_PATTERNS: list[re.Pattern[str]] = [
         re.compile(r"<｜begin▁of▁thinking｜>"),  # DeepSeek
         re.compile(r"<\|begin_of_thinking\|>"),  # ASCII variant
         re.compile(r"<think>"),  # Qwen3
     ]
 
-    THINKING_END_PATTERNS: List[re.Pattern[str]] = [
+    THINKING_END_PATTERNS: list[re.Pattern[str]] = [
         re.compile(r"<｜end▁of▁thinking｜>"),  # DeepSeek
         re.compile(r"<\|end_of_thinking\|>"),  # ASCII variant
         re.compile(r"</think>"),  # Qwen3
     ]
 
     # Individual token patterns to strip (single markers without blocks)
-    INLINE_TOKEN_PATTERNS: List[re.Pattern[str]] = [
+    INLINE_TOKEN_PATTERNS: list[re.Pattern[str]] = [
         re.compile(r"<｜end▁of▁thinking｜>"),
         re.compile(r"<｜begin▁of▁thinking｜>"),
         re.compile(r"<\|end_of_thinking\|>"),
@@ -421,9 +421,9 @@ class CodeSanitizationResult:
 
     code: str  # The sanitized code
     is_valid: bool  # Whether the code is syntactically valid
-    errors: List[str] = field(default_factory=list)  # List of errors/issues found
-    fixes_applied: List[str] = field(default_factory=list)  # List of fixes applied
-    function_names: List[str] = field(default_factory=list)  # Names of functions found
+    errors: list[str] = field(default_factory=list)  # List of errors/issues found
+    fixes_applied: list[str] = field(default_factory=list)  # List of fixes applied
+    function_names: list[str] = field(default_factory=list)  # Names of functions found
 
 
 class ResponseSanitizer:
@@ -437,7 +437,7 @@ class ResponseSanitizer:
     """
 
     # Patterns indicating training data leakage
-    LEAKAGE_PATTERNS: List[str] = [
+    LEAKAGE_PATTERNS: list[str] = [
         r"Do not invent any new or additional parameters.*",
         r"The parameter value should be passed as a string.*",
         r"If you want to call multiple functions.*",
@@ -452,7 +452,7 @@ class ResponseSanitizer:
     ]
 
     # Patterns indicating garbage/malformed output
-    GARBAGE_PATTERNS: List[str] = [
+    GARBAGE_PATTERNS: list[str] = [
         r"FUNCTION_CALL\s*\{",  # Raw function call syntax
         r"</function>\s*</function>",  # Repeated closing tags
         r"<parameter[^>]*>",  # Raw parameter tags
@@ -482,7 +482,7 @@ class ResponseSanitizer:
 
     # Thinking token patterns to strip (DeepSeek, Qwen, and other reasoning models)
     # These tokens leak through in content when running locally via Ollama
-    THINKING_TOKEN_PATTERNS: List[str] = [
+    THINKING_TOKEN_PATTERNS: list[str] = [
         r"<｜end▁of▁thinking｜>",  # DeepSeek end-of-thinking marker
         r"<｜begin▁of▁thinking｜>",  # DeepSeek begin-of-thinking marker
         r"<\|end_of_thinking\|>",  # ASCII variant
@@ -493,7 +493,7 @@ class ResponseSanitizer:
     ]
 
     # Patterns for invalid/hallucinated tool names
-    INVALID_TOOL_PATTERNS: List[str] = [
+    INVALID_TOOL_PATTERNS: list[str] = [
         r"^example_",
         r"^func_",
         r"^function_",
@@ -699,8 +699,8 @@ class ResponseSanitizer:
         Returns:
             CodeSanitizationResult with cleaned code and metadata
         """
-        errors: List[str] = []
-        fixes: List[str] = []
+        errors: list[str] = []
+        fixes: list[str] = []
 
         # Step 1: Extract code from markdown blocks
         original_code = code
@@ -750,7 +750,7 @@ class ResponseSanitizer:
         code = code.replace("```python", "").replace("```", "")
         return code.strip()
 
-    def _remove_code_artifacts(self, code: str) -> Tuple[str, List[str]]:
+    def _remove_code_artifacts(self, code: str) -> tuple[str, list[str]]:
         """Remove common LLM preamble/artifacts from code."""
         fixes = []
         original = code
@@ -781,7 +781,7 @@ class ResponseSanitizer:
 
         return code.strip(), fixes
 
-    def _fix_code_indentation(self, code: str) -> Tuple[str, List[str]]:
+    def _fix_code_indentation(self, code: str) -> tuple[str, list[str]]:
         """Fix common indentation issues in code."""
         fixes = []
         lines = code.split("\n")
@@ -805,7 +805,7 @@ class ResponseSanitizer:
 
         return code.strip(), fixes
 
-    def _remove_incomplete_code(self, code: str) -> Tuple[str, List[str]]:
+    def _remove_incomplete_code(self, code: str) -> tuple[str, list[str]]:
         """Remove trailing incomplete code."""
         fixes = []
         lines = code.split("\n")
@@ -827,7 +827,7 @@ class ResponseSanitizer:
 
         return "\n".join(lines), fixes
 
-    def _ensure_valid_python(self, code: str) -> Tuple[str, List[str]]:
+    def _ensure_valid_python(self, code: str) -> tuple[str, list[str]]:
         """Ensure code is valid Python, trying to extract function if needed."""
         fixes: list[str] = []
 
@@ -916,7 +916,7 @@ class ResponseSanitizer:
             return "\n".join(imports_to_add) + "\n\n" + code
         return code
 
-    def _validate_python_syntax(self, code: str) -> Tuple[bool, List[str]]:
+    def _validate_python_syntax(self, code: str) -> tuple[bool, list[str]]:
         """Validate Python syntax."""
         errors: list[str] = []
         try:
@@ -926,7 +926,7 @@ class ResponseSanitizer:
             errors.append(f"SyntaxError at line {e.lineno}: {e.msg}")
             return False, errors
 
-    def _extract_function_names(self, code: str) -> List[str]:
+    def _extract_function_names(self, code: str) -> list[str]:
         """Extract function names from code."""
         names = []
         try:

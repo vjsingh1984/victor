@@ -16,7 +16,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol, Union, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 import jsonschema  # type: ignore[import-untyped]
 from jsonschema import Draft7Validator, ValidationError as JsonSchemaValidationError
@@ -24,19 +24,14 @@ from pydantic import BaseModel, Field
 
 # Import enums from separate module
 from victor.tools.enums import (
-    AccessMode,
     CostTier,
-    DangerLevel,
-    ExecutionCategory,
-    Priority,
     SchemaLevel,
 )
 
 # Import metadata classes from separate module
-from victor.tools.metadata import ToolMetadata, ToolMetadataRegistry
+from victor.tools.metadata import ToolMetadata
 
 # Import registry classes from separate module (for backward compatibility)
-from victor.tools.registry import Hook, HookError, ToolRegistry
 
 
 # NOTE: Enums (CostTier, Priority, AccessMode, ExecutionCategory, DangerLevel)
@@ -63,8 +58,8 @@ class ToolValidationResult:
     """
 
     valid: bool
-    errors: List[str] = field(default_factory=list)
-    invalid_params: Dict[str, str] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    invalid_params: dict[str, str] = field(default_factory=dict)
 
     def __bool__(self) -> bool:
         """Allow using ToolValidationResult in boolean context."""
@@ -77,7 +72,7 @@ class ToolValidationResult:
 
     @classmethod
     def failure(
-        cls, errors: List[str], invalid_params: Optional[Dict[str, str]] = None
+        cls, errors: list[str], invalid_params: Optional[dict[str, str]] = None
     ) -> "ToolValidationResult":
         """Create a failed validation result."""
         return cls(valid=False, errors=errors, invalid_params=invalid_params or {})
@@ -99,16 +94,16 @@ class ToolResult(BaseModel):
     success: bool = Field(..., description="Whether execution succeeded")
     output: Any = Field(..., description="Tool output data")
     error: Optional[str] = Field(default=None, description="Error message if failed")
-    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+    metadata: Optional[dict[str, Any]] = Field(default=None, description="Additional metadata")
 
     @classmethod
-    def create_success(cls, output: Any, metadata: Optional[Dict[str, Any]] = None) -> "ToolResult":
+    def create_success(cls, output: Any, metadata: Optional[dict[str, Any]] = None) -> "ToolResult":
         """Create a successful tool result."""
         return cls(success=True, output=output, error=None, metadata=metadata)
 
     @classmethod
     def create_failure(
-        cls, error: str, output: Any = None, metadata: Optional[Dict[str, Any]] = None
+        cls, error: str, output: Any = None, metadata: Optional[dict[str, Any]] = None
     ) -> "ToolResult":
         """Create a failed tool result."""
         return cls(success=False, output=output, error=error, metadata=metadata)
@@ -170,7 +165,7 @@ class ToolConfig:
         self.batch_max_files = batch_max_files
 
     @classmethod
-    def from_context(cls, context: Dict[str, Any]) -> Optional["ToolConfig"]:
+    def from_context(cls, context: dict[str, Any]) -> Optional["ToolConfig"]:
         """Extract ToolConfig from context dictionary.
 
         Args:
@@ -221,7 +216,7 @@ class ToolMetadataProvider(Protocol):
         ...
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         """Tool parameters JSON schema."""
         ...
 
@@ -265,7 +260,7 @@ class BaseTool(ABC):
 
     @property
     @abstractmethod
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         """JSON Schema for tool parameters."""
         pass
 
@@ -359,7 +354,7 @@ class BaseTool(ABC):
         return False  # Default: assume side effects
 
     @staticmethod
-    def convert_parameters_to_schema(parameters: List[ToolParameter]) -> Dict[str, Any]:
+    def convert_parameters_to_schema(parameters: list[ToolParameter]) -> dict[str, Any]:
         """Convert list of ToolParameter objects to JSON Schema format.
 
         Args:
@@ -372,7 +367,7 @@ class BaseTool(ABC):
         required = []
 
         for param in parameters:
-            param_schema: Dict[str, Any] = {
+            param_schema: dict[str, Any] = {
                 "type": param.type,
                 "description": param.description,
             }
@@ -398,7 +393,7 @@ class BaseTool(ABC):
 
     @abstractmethod
     async def execute(
-        self, _exec_ctx: Optional[Dict[str, Any]] = None, **kwargs: Any
+        self, _exec_ctx: Optional[dict[str, Any]] = None, **kwargs: Any
     ) -> ToolResult:
         """Execute the tool.
 
@@ -413,7 +408,7 @@ class BaseTool(ABC):
         """
         pass
 
-    def to_json_schema(self) -> Dict[str, Any]:
+    def to_json_schema(self) -> dict[str, Any]:
         """Convert tool to JSON Schema format.
 
         Returns:
@@ -428,7 +423,7 @@ class BaseTool(ABC):
             },
         }
 
-    def to_schema(self, level: Optional["SchemaLevel"] = None) -> Dict[str, Any]:
+    def to_schema(self, level: Optional["SchemaLevel"] = None) -> dict[str, Any]:
         """Generate JSON schema at specified verbosity level.
 
         Args:
@@ -556,8 +551,8 @@ class BaseTool(ABC):
             validator = Draft7Validator(schema)
 
             # Collect all validation errors
-            errors: List[str] = []
-            invalid_params: Dict[str, str] = {}
+            errors: list[str] = []
+            invalid_params: dict[str, str] = {}
 
             for error in validator.iter_errors(kwargs):
                 # Format error message based on error type
@@ -629,8 +624,8 @@ class BaseTool(ABC):
         Returns:
             ToolValidationResult with basic validation
         """
-        errors: List[str] = []
-        invalid_params: Dict[str, str] = {}
+        errors: list[str] = []
+        invalid_params: dict[str, str] = {}
 
         required_params = self.parameters.get("required", [])
         properties = self.parameters.get("properties", {})
@@ -666,7 +661,7 @@ class BaseTool(ABC):
         Returns:
             True if types match
         """
-        type_mapping: Dict[str, Union[type[Any], tuple[type[Any], ...]]] = {
+        type_mapping: dict[str, type[Any] | tuple[type[Any], ...]] = {
             "string": str,
             "number": (int, float),
             "integer": int,

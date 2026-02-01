@@ -9,9 +9,7 @@ verifying backward compatibility and new context-only mode.
 """
 
 import os
-import pytest
-from unittest.mock import Mock, MagicMock, patch
-from typing import Any, Dict
+from unittest.mock import Mock, patch
 
 from victor.core.verticals.context import VerticalContext
 from victor.core.verticals.capability_adapter import (

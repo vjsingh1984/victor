@@ -19,7 +19,7 @@ discovery and invocation, replacing hasattr duck-typing.
 """
 
 import pytest
-from typing import Any, Dict, Optional, Set
+from typing import Any, Optional
 
 from victor.framework.protocols import (
     CapabilityType,
@@ -47,12 +47,12 @@ class MockOrchestrator(CapabilityRegistryMixin):
         self._vertical_context = None
         self._rl_hooks = None
         self._team_specs = None
-        self._enabled_tools: Set[str] = set()
+        self._enabled_tools: set[str] = set()
 
         # Initialize capability registry
         self.__init_capability_registry__()
 
-    def set_enabled_tools(self, tools: Set[str]) -> None:
+    def set_enabled_tools(self, tools: set[str]) -> None:
         """Set enabled tools."""
         self._enabled_tools = tools
 

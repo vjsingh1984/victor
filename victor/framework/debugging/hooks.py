@@ -38,12 +38,11 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.framework.debugging.breakpoints import (
     BreakpointManager,
     BreakpointPosition,
-    WorkflowBreakpoint,
 )
 from victor.framework.debugging.execution import (
     ExecutionController,
@@ -119,7 +118,7 @@ class DebugHook:
         """Enable debug hook."""
         self._enabled = True
 
-    async def before_node(self, node_id: str, state: Dict[str, Any]) -> None:
+    async def before_node(self, node_id: str, state: dict[str, Any]) -> None:
         """Called before node execution.
 
         Checks for BEFORE position breakpoints and pauses if hit.
@@ -158,7 +157,7 @@ class DebugHook:
             self._emit_paused(context)
 
     async def after_node(
-        self, node_id: str, state: Dict[str, Any], error: Optional[Exception] = None
+        self, node_id: str, state: dict[str, Any], error: Optional[Exception] = None
     ) -> None:
         """Called after node execution.
 

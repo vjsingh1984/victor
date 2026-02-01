@@ -31,15 +31,14 @@ Usage:
 """
 
 import asyncio
-import json
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from typing import Any, Optional
+from unittest.mock import MagicMock
 
 import pytest
 
 from victor.config.settings import Settings
-from victor.providers.base import BaseProvider, StreamChunk, Message, ToolDefinition
+from victor.providers.base import StreamChunk
 
 
 class MockHTTPEndPoint:
@@ -51,7 +50,7 @@ class MockHTTPEndPoint:
 
     def __init__(
         self,
-        response_data: Optional[Dict[str, Any]] = None,
+        response_data: Optional[dict[str, Any]] = None,
         status_code: int = 200,
         error_message: Optional[str] = None,
         delay_ms: int = 0,
@@ -69,9 +68,9 @@ class MockHTTPEndPoint:
         self.error_message = error_message
         self.delay_ms = delay_ms
         self.request_count = 0
-        self.requests_made: List[Dict[str, Any]] = []
+        self.requests_made: list[dict[str, Any]] = []
 
-    async def simulate_request(self, **kwargs) -> Tuple[int, Dict[str, Any]]:
+    async def simulate_request(self, **kwargs) -> tuple[int, dict[str, Any]]:
         """Simulate an HTTP request to this endpoint.
 
         Args:
@@ -114,13 +113,13 @@ class MockHTTPServer:
 
     def __init__(self):
         """Initialize mock HTTP server."""
-        self.endpoints: Dict[str, MockHTTPEndPoint] = {}
+        self.endpoints: dict[str, MockHTTPEndPoint] = {}
         self.default_endpoint = MockHTTPEndPoint()
 
     def add_endpoint(
         self,
         path: str,
-        response_data: Optional[Dict[str, Any]] = None,
+        response_data: Optional[dict[str, Any]] = None,
         status_code: int = 200,
         error_message: Optional[str] = None,
     ) -> MockHTTPEndPoint:
@@ -147,7 +146,7 @@ class MockHTTPServer:
         """Get endpoint by path, or default if not found."""
         return self.endpoints.get(path, self.default_endpoint)
 
-    async def request(self, path: str, **kwargs) -> Tuple[int, Dict[str, Any]]:
+    async def request(self, path: str, **kwargs) -> tuple[int, dict[str, Any]]:
         """Simulate a request to an endpoint.
 
         Args:
@@ -559,8 +558,8 @@ class ProviderPerformanceTest(ABC):
 def create_mock_response(
     content: str = "Test response",
     role: str = "assistant",
-    tool_calls: Optional[List[Dict[str, Any]]] = None,
-    usage: Optional[Dict[str, int]] = None,
+    tool_calls: Optional[list[dict[str, Any]]] = None,
+    usage: Optional[dict[str, int]] = None,
 ) -> MagicMock:
     """Create a mock provider response.
 
@@ -591,7 +590,7 @@ def create_mock_response(
 def create_mock_stream_chunks(
     content: str = "Test streaming response",
     chunk_size: int = 5,
-) -> List[StreamChunk]:
+) -> list[StreamChunk]:
     """Create mock streaming chunks.
 
     Args:

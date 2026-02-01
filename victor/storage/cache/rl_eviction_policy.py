@@ -30,7 +30,7 @@ Sprint 3: Cache & Grounding Learners
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ class BoundedQTable:
 
     def __init__(self, max_size: int = 100000):
         self.max_size = max_size
-        self._table: Dict[str, float] = {}
-        self._access_order: List[str] = []
+        self._table: dict[str, float] = {}
+        self._access_order: list[str] = []
 
     def get(self, key: str, default: float = 0.0) -> float:
         if key in self._table:
@@ -69,7 +69,7 @@ class BoundedQTable:
         self._table.clear()
         self._access_order.clear()
 
-    def keys(self) -> List[str]:
+    def keys(self) -> list[str]:
         return list(self._table.keys())
 
 
@@ -104,7 +104,7 @@ class CacheEntryState:
     size_bytes: int = 0
     context_relevance: float = 0.5
 
-    def to_feature_tuple(self) -> Tuple[str, str, str, str, str]:
+    def to_feature_tuple(self) -> tuple[str, str, str, str, str]:
         """Convert to feature tuple for Q-table lookup.
 
         Returns bucketed/discretized features for manageable state space.
@@ -230,10 +230,10 @@ class RLEvictionPolicy:
         self._external_learner = cache_eviction_learner
 
         # Local Q-table if no external learner
-        self._q_table: Dict[Tuple[Any, ...], Dict[EvictionAction, float]] = {}
+        self._q_table: dict[tuple[Any, ...], dict[EvictionAction, float]] = {}
 
         # Track recent decisions for feedback
-        self._recent_decisions: Dict[str, Tuple[CacheEntryState, EvictionAction, float]] = {}
+        self._recent_decisions: dict[str, tuple[CacheEntryState, EvictionAction, float]] = {}
         self._max_tracked_decisions = 1000
 
         # Statistics
@@ -341,7 +341,7 @@ class RLEvictionPolicy:
                 self._update_q_value(state, action, self.REWARD_EVICT_FREED_SPACE)
                 self._evictions += 1
 
-    def _get_q_values(self, state: CacheEntryState) -> Dict[EvictionAction, float]:
+    def _get_q_values(self, state: CacheEntryState) -> dict[EvictionAction, float]:
         """Get Q-values for all actions in given state.
 
         Args:
@@ -379,7 +379,7 @@ class RLEvictionPolicy:
 
         return self._q_table[feature_key]
 
-    def _get_default_q_values(self, state: CacheEntryState) -> Dict[EvictionAction, float]:
+    def _get_default_q_values(self, state: CacheEntryState) -> dict[EvictionAction, float]:
         """Get default Q-values based on heuristics.
 
         Args:
@@ -489,10 +489,10 @@ class RLEvictionPolicy:
 
     def get_entries_to_evict(
         self,
-        entries: List[CacheEntryState],
+        entries: list[CacheEntryState],
         target_count: int,
         cache_utilization: float = 0.9,
-    ) -> List[str]:
+    ) -> list[str]:
         """Get list of entry keys to evict.
 
         Evaluates all entries and returns those recommended for eviction.
@@ -519,7 +519,7 @@ class RLEvictionPolicy:
         # Return top entries to evict
         return [key for key, _, _ in scored_entries[:target_count]]
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export policy metrics.
 
         Returns:

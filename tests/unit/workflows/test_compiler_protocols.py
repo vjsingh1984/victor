@@ -14,9 +14,7 @@
 
 """Tests for Workflow Compiler Protocols (DIP compliance)."""
 
-import pytest
-import typing
-from typing import Any, Dict, List, Optional
+from typing import Any
 from victor.workflows.protocols import (
     IWorkflowCompiler,
     IWorkflowLoader,
@@ -44,7 +42,7 @@ class TestIWorkflowCompilerProtocol:
         class ConcreteCompiler:
             """Concrete implementation of IWorkflowCompiler."""
 
-            def compile(self, workflow_def: Dict[str, Any]) -> CompiledGraph:
+            def compile(self, workflow_def: dict[str, Any]) -> CompiledGraph:
                 """Compile workflow definition into executable graph."""
                 # Mock implementation
                 from victor.framework.graph import CompiledGraph
@@ -84,7 +82,7 @@ class TestIWorkflowLoaderProtocol:
         class ConcreteLoader:
             """Concrete implementation of IWorkflowLoader."""
 
-            def load(self, source: str) -> Dict[str, Any]:
+            def load(self, source: str) -> dict[str, Any]:
                 """Load workflow definition from source."""
                 # Mock implementation
                 return {"name": "test", "nodes": []}
@@ -122,12 +120,12 @@ class TestIWorkflowValidatorProtocol:
             """Result of workflow validation."""
 
             is_valid: bool
-            errors: List[str]
+            errors: list[str]
 
         class ConcreteValidator:
             """Concrete implementation of IWorkflowValidator."""
 
-            def validate(self, workflow_def: Dict[str, Any]) -> ValidationResult:
+            def validate(self, workflow_def: dict[str, Any]) -> ValidationResult:
                 """Validate workflow definition."""
                 # Mock implementation
                 return ValidationResult(is_valid=True, errors=[])
@@ -152,11 +150,11 @@ class TestProtocolComposition:
         from victor.framework.graph import CompiledGraph
 
         class MockLoader:
-            def load(self, source: str) -> Dict[str, Any]:
+            def load(self, source: str) -> dict[str, Any]:
                 return {"name": "loaded_workflow", "nodes": []}
 
         class MockValidator:
-            def validate(self, workflow_def: Dict[str, Any]) -> Any:
+            def validate(self, workflow_def: dict[str, Any]) -> Any:
                 return type("ValidationResult", (), {"is_valid": True, "errors": []})()
 
         class DIPCompiler:
@@ -193,15 +191,15 @@ class TestProtocolComposition:
         from victor.framework.graph import CompiledGraph
 
         class FileLoader:
-            def load(self, source: str) -> Dict[str, Any]:
+            def load(self, source: str) -> dict[str, Any]:
                 return {"name": "file_workflow", "source": "file"}
 
         class StringLoader:
-            def load(self, source: str) -> Dict[str, Any]:
+            def load(self, source: str) -> dict[str, Any]:
                 return {"name": "string_workflow", "source": "string"}
 
         class StrictValidator:
-            def validate(self, workflow_def: Dict[str, Any]) -> Any:
+            def validate(self, workflow_def: dict[str, Any]) -> Any:
                 has_name = "name" in workflow_def
                 return type(
                     "ValidationResult",
@@ -213,7 +211,7 @@ class TestProtocolComposition:
                 )()
 
         class LenientValidator:
-            def validate(self, workflow_def: Dict[str, Any]) -> Any:
+            def validate(self, workflow_def: dict[str, Any]) -> Any:
                 return type("ValidationResult", (), {"is_valid": True, "errors": []})()
 
         class FlexibleCompiler:
@@ -244,7 +242,7 @@ class TestProtocolRuntimeChecking:
         """Test that isinstance works with protocols (runtime_checkable)."""
 
         class ValidCompiler:
-            def compile(self, workflow_def: Dict[str, Any]) -> Any:
+            def compile(self, workflow_def: dict[str, Any]) -> Any:
                 return None
 
         class InvalidCompiler:
@@ -261,7 +259,7 @@ class TestProtocolRuntimeChecking:
         """Test runtime checking for loader protocol."""
 
         class ValidLoader:
-            def load(self, source: str) -> Dict[str, Any]:
+            def load(self, source: str) -> dict[str, Any]:
                 return {}
 
         assert isinstance(ValidLoader(), IWorkflowLoader)
@@ -270,7 +268,7 @@ class TestProtocolRuntimeChecking:
         """Test runtime checking for validator protocol."""
 
         class ValidValidator:
-            def validate(self, workflow_def: Dict[str, Any]) -> Any:
+            def validate(self, workflow_def: dict[str, Any]) -> Any:
                 return type("Result", (), {"is_valid": True, "errors": []})()
 
         assert isinstance(ValidValidator(), IWorkflowValidator)

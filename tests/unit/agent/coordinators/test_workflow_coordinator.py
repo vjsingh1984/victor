@@ -26,8 +26,7 @@ Test Coverage Strategy:
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from typing import List, Dict, Any
+from unittest.mock import Mock, patch
 
 from victor.agent.coordinators.workflow_coordinator import WorkflowCoordinator
 from victor.workflows.definition import WorkflowDefinition, AgentNode

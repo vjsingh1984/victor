@@ -26,8 +26,7 @@ Target: 35+ tests with 70%+ coverage
 from __future__ import annotations
 
 import time
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -39,10 +38,8 @@ from victor.agent.skills.skill_discovery import (
     SkillDiscoveryEngine,
     ToolSignature,
 )
-from victor.core.events import UnifiedEventType
 from victor.protocols.tool_selector import (
     IToolSelector,
-    ToolSelectionContext,
     ToolSelectionResult,
     ToolSelectionStrategy,
 )

@@ -20,7 +20,7 @@ provider name and model.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Optional
 
 from victor.agent.tool_calling.base import BaseToolCallingAdapter
 
@@ -41,10 +41,10 @@ class ToolCallingAdapterRegistry:
         adapter = ToolCallingAdapterRegistry.get_adapter("ollama", model="llama3.1")
     """
 
-    _adapters: Dict[str, Type[BaseToolCallingAdapter]] = {}
+    _adapters: dict[str, type[BaseToolCallingAdapter]] = {}
 
     @classmethod
-    def register(cls, provider_name: str, adapter_class: Type[BaseToolCallingAdapter]) -> None:
+    def register(cls, provider_name: str, adapter_class: type[BaseToolCallingAdapter]) -> None:
         """Register an adapter class for a provider.
 
         Args:
@@ -61,7 +61,7 @@ class ToolCallingAdapterRegistry:
         cls,
         provider_name: str,
         model: str = "",
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[dict[str, Any]] = None,
     ) -> BaseToolCallingAdapter:
         """Get an adapter for a provider.
 
@@ -159,7 +159,7 @@ class ToolCallingAdapterRegistry:
         )
 
     @classmethod
-    def list_providers(cls) -> List[str]:
+    def list_providers(cls) -> list[str]:
         """List registered provider names."""
         # Ensure defaults are loaded
         cls.get_adapter("ollama")  # Triggers default registration

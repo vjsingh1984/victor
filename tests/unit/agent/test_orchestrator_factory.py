@@ -32,10 +32,7 @@ from victor.agent.orchestrator_factory import (
     CoreServices,
     ConversationComponents,
     ToolComponents,
-    StreamingComponents,
-    AnalyticsComponents,
     RecoveryComponents,
-    WorkflowOptimizationComponents,
     CoordinatorComponents,
 )
 

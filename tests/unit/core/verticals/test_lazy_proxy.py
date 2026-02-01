@@ -11,8 +11,8 @@ while providing lazy loading benefits (TDD approach).
 import pytest
 import threading
 import time
-from typing import TYPE_CHECKING, Type, Any, List
-from unittest.mock import Mock, patch, MagicMock
+from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
@@ -24,7 +24,6 @@ from victor.core.verticals.lazy_proxy import (
     LazyProxy,
     LazyProxyType,
     get_lazy_proxy_factory,
-    clear_proxy_cache,
 )
 
 
@@ -41,7 +40,7 @@ class MockVertical(VerticalBase):
     display_name: str = "Mock Vertical"
     description: str = "A mock vertical for testing"
 
-    def get_tools(self) -> List[Any]:
+    def get_tools(self) -> list[Any]:
         return []
 
     def get_system_prompt(self) -> str:
@@ -55,7 +54,7 @@ class AnotherMockVertical(VerticalBase):
     display_name = "Another Vertical"
     description = "Another mock vertical"
 
-    def get_tools(self) -> List[Any]:
+    def get_tools(self) -> list[Any]:
         return []
 
     def get_system_prompt(self) -> str:

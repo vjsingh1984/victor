@@ -62,9 +62,8 @@ Usage:
 
 import os
 import logging
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Dict, Optional, Any, Type
+from dataclasses import dataclass
+from typing import Optional, Any
 
 from victor.core.registries.universal_registry import (
     UniversalRegistry,
@@ -138,7 +137,7 @@ class CacheConfig:
 
 
 # Default configurations for all cache types
-DEFAULT_CACHE_CONFIGS: Dict[str, CacheConfig] = {
+DEFAULT_CACHE_CONFIGS: dict[str, CacheConfig] = {
     # Tool selection caches (high priority)
     "tool_selection": CacheConfig(
         name="tool_selection",
@@ -279,7 +278,7 @@ class CacheConfigManager:
 
     def __init__(
         self,
-        configs: Optional[Dict[str, CacheConfig]] = None,
+        configs: Optional[dict[str, CacheConfig]] = None,
     ) -> None:
         """Initialize cache configuration manager.
 
@@ -377,7 +376,7 @@ class CacheConfigManager:
 
     def configure_registry(
         self,
-        registry_class: Type[UniversalRegistry[Any]],
+        registry_class: type[UniversalRegistry[Any]],
         cache_name: str,
         env_prefix: Optional[str] = None,
     ) -> UniversalRegistry[Any]:
@@ -411,7 +410,7 @@ class CacheConfigManager:
             max_size=max_size,
         )
 
-    def list_configs(self) -> Dict[str, CacheConfig]:
+    def list_configs(self) -> dict[str, CacheConfig]:
         """List all cache configurations.
 
         Returns:
@@ -489,7 +488,7 @@ def get_cache_config(
 
 
 def configure_registry(
-    registry_class: Type[UniversalRegistry[Any]],
+    registry_class: type[UniversalRegistry[Any]],
     cache_name: str,
     env_prefix: Optional[str] = None,
 ) -> UniversalRegistry[Any]:
@@ -532,7 +531,7 @@ def print_cache_configs() -> None:
     print("\n" + "=" * 80 + "\n")
 
 
-def export_cache_configs() -> Dict[str, Any]:
+def export_cache_configs() -> dict[str, Any]:
     """Export all cache configurations as dict.
 
     Returns:

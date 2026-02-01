@@ -54,7 +54,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Optional
 
 from victor.core.security.patterns.types import SafetyPattern
 
@@ -91,7 +91,7 @@ class RiskLevel(Enum):
 
 
 # Destructive operations - high data loss risk
-DESTRUCTIVE_PATTERNS: List[SafetyPattern] = [
+DESTRUCTIVE_PATTERNS: list[SafetyPattern] = [
     SafetyPattern(
         pattern=r"rm\s+-rf\s+/(?!tmp)",
         description="Destructive filesystem deletion",
@@ -132,7 +132,7 @@ DESTRUCTIVE_PATTERNS: List[SafetyPattern] = [
 
 
 # Kubernetes patterns
-KUBERNETES_PATTERNS: List[SafetyPattern] = [
+KUBERNETES_PATTERNS: list[SafetyPattern] = [
     # Destructive operations
     SafetyPattern(
         pattern=r"kubectl\s+delete\s+(?:namespace|ns)\s+(?!test|dev|local|staging)",
@@ -223,7 +223,7 @@ KUBERNETES_PATTERNS: List[SafetyPattern] = [
 
 
 # Docker patterns
-DOCKER_PATTERNS: List[SafetyPattern] = [
+DOCKER_PATTERNS: list[SafetyPattern] = [
     # Destructive operations
     SafetyPattern(
         pattern=r"docker\s+system\s+prune\s+-a",
@@ -303,7 +303,7 @@ DOCKER_PATTERNS: List[SafetyPattern] = [
 
 
 # Terraform patterns
-TERRAFORM_PATTERNS: List[SafetyPattern] = [
+TERRAFORM_PATTERNS: list[SafetyPattern] = [
     SafetyPattern(
         pattern=r"terraform\s+destroy(?!\s+--target)",
         description="Full infrastructure destruction",
@@ -344,7 +344,7 @@ TERRAFORM_PATTERNS: List[SafetyPattern] = [
 
 
 # Cloud provider patterns
-CLOUD_PATTERNS: List[SafetyPattern] = [
+CLOUD_PATTERNS: list[SafetyPattern] = [
     # AWS
     SafetyPattern(
         pattern=r"aws\s+s3\s+rb\s+--force",
@@ -416,11 +416,11 @@ class InfraScanResult:
         security_issues: Security-specific matches
     """
 
-    matches: List[SafetyPattern] = field(default_factory=list)
-    risk_summary: Dict[str, int] = field(default_factory=dict)
+    matches: list[SafetyPattern] = field(default_factory=list)
+    risk_summary: dict[str, int] = field(default_factory=dict)
     has_critical: bool = False
     has_high: bool = False
-    security_issues: List[SafetyPattern] = field(default_factory=list)
+    security_issues: list[SafetyPattern] = field(default_factory=list)
 
     def add_match(self, pattern: SafetyPattern) -> None:
         """Add a matched pattern."""
@@ -467,7 +467,7 @@ class InfrastructureScanner:
         include_docker: bool = True,
         include_terraform: bool = True,
         include_cloud: bool = True,
-        custom_patterns: Optional[List[SafetyPattern]] = None,
+        custom_patterns: Optional[list[SafetyPattern]] = None,
     ):
         """Initialize the scanner.
 
@@ -479,7 +479,7 @@ class InfrastructureScanner:
             include_cloud: Include cloud provider patterns
             custom_patterns: Additional custom patterns
         """
-        self._patterns: List[SafetyPattern] = []
+        self._patterns: list[SafetyPattern] = []
 
         if include_destructive:
             self._patterns.extend(DESTRUCTIVE_PATTERNS)
@@ -530,7 +530,7 @@ class InfrastructureScanner:
                 result.add_match(pattern)
         return result
 
-    def validate_dockerfile(self, content: str) -> List[str]:
+    def validate_dockerfile(self, content: str) -> list[str]:
         """Validate Dockerfile security best practices.
 
         Args:
@@ -578,7 +578,7 @@ class InfrastructureScanner:
 
         return warnings
 
-    def validate_kubernetes_manifest(self, content: str) -> List[str]:
+    def validate_kubernetes_manifest(self, content: str) -> list[str]:
         """Validate Kubernetes manifest security.
 
         Args:
@@ -629,7 +629,7 @@ class InfrastructureScanner:
 
         return warnings
 
-    def get_patterns_by_category(self, category: InfraPatternCategory) -> List[SafetyPattern]:
+    def get_patterns_by_category(self, category: InfraPatternCategory) -> list[SafetyPattern]:
         """Get patterns for a specific category.
 
         Args:
@@ -640,7 +640,7 @@ class InfrastructureScanner:
         """
         return [p for p in self._patterns if p.category == category.value]
 
-    def get_patterns_by_risk(self, risk_level: str) -> List[SafetyPattern]:
+    def get_patterns_by_risk(self, risk_level: str) -> list[SafetyPattern]:
         """Get patterns by risk level.
 
         Args:
@@ -652,7 +652,7 @@ class InfrastructureScanner:
         return [p for p in self._patterns if p.risk_level == risk_level]
 
     @property
-    def all_patterns(self) -> List[SafetyPattern]:
+    def all_patterns(self) -> list[SafetyPattern]:
         """Get all patterns."""
         return self._patterns.copy()
 
@@ -662,7 +662,7 @@ class InfrastructureScanner:
 # =============================================================================
 
 
-def scan_infrastructure_command(command: str) -> List[SafetyPattern]:
+def scan_infrastructure_command(command: str) -> list[SafetyPattern]:
     """Scan an infrastructure command for dangerous patterns.
 
     Convenience function for quick scanning.
@@ -677,7 +677,7 @@ def scan_infrastructure_command(command: str) -> List[SafetyPattern]:
     return scanner.scan_command(command).matches
 
 
-def validate_dockerfile(content: str) -> List[str]:
+def validate_dockerfile(content: str) -> list[str]:
     """Validate Dockerfile security best practices.
 
     Convenience function for quick validation.
@@ -692,7 +692,7 @@ def validate_dockerfile(content: str) -> List[str]:
     return scanner.validate_dockerfile(content)
 
 
-def validate_kubernetes_manifest(content: str) -> List[str]:
+def validate_kubernetes_manifest(content: str) -> list[str]:
     """Validate Kubernetes manifest security.
 
     Convenience function for quick validation.
@@ -707,7 +707,7 @@ def validate_kubernetes_manifest(content: str) -> List[str]:
     return scanner.validate_kubernetes_manifest(content)
 
 
-def get_all_infrastructure_patterns() -> List[SafetyPattern]:
+def get_all_infrastructure_patterns() -> list[SafetyPattern]:
     """Get all infrastructure safety patterns.
 
     Returns:
@@ -722,7 +722,7 @@ def get_all_infrastructure_patterns() -> List[SafetyPattern]:
     )
 
 
-def get_safety_reminders() -> List[str]:
+def get_safety_reminders() -> list[str]:
     """Get safety reminders for infrastructure work.
 
     Returns:

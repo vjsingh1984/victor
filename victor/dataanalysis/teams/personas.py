@@ -51,7 +51,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 # Import framework types for base functionality
 from victor.framework.multi_agent import (
@@ -243,8 +243,8 @@ class DataAnalysisPersonaTraits:
         name: str,
         role: str,
         description: str,
-        strengths: Optional[List[str]] = None,
-        preferred_tools: Optional[List[str]] = None,
+        strengths: Optional[list[str]] = None,
+        preferred_tools: Optional[list[str]] = None,
     ) -> FrameworkPersonaTraits:
         """Convert to framework PersonaTraits.
 
@@ -301,15 +301,15 @@ class DataAnalysisPersona:
 
     name: str
     role: str
-    expertise: List[ExpertiseCategory]
-    secondary_expertise: List[ExpertiseCategory] = field(default_factory=list)
+    expertise: list[ExpertiseCategory]
+    secondary_expertise: list[ExpertiseCategory] = field(default_factory=list)
     traits: DataAnalysisPersonaTraits = field(default_factory=DataAnalysisPersonaTraits)
-    strengths: List[str] = field(default_factory=list)
+    strengths: list[str] = field(default_factory=list)
     approach: str = ""
-    communication_patterns: List[str] = field(default_factory=list)
+    communication_patterns: list[str] = field(default_factory=list)
     working_style: str = ""
 
-    def get_expertise_list(self) -> List[str]:
+    def get_expertise_list(self) -> list[str]:
         """Get combined expertise as string list.
 
         Returns:
@@ -354,7 +354,7 @@ class DataAnalysisPersona:
 
         return " ".join(parts)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert persona to dictionary.
 
         Returns:
@@ -377,7 +377,7 @@ class DataAnalysisPersona:
 # =============================================================================
 
 
-DATA_ANALYSIS_PERSONAS: Dict[str, DataAnalysisPersona] = {
+DATA_ANALYSIS_PERSONAS: dict[str, DataAnalysisPersona] = {
     # Data Engineering personas
     "data_engineer": DataAnalysisPersona(
         name="Data Engineer",
@@ -650,7 +650,7 @@ def get_persona(name: str) -> Optional[DataAnalysisPersona]:
     return DATA_ANALYSIS_PERSONAS.get(name)
 
 
-def get_personas_for_role(role: str) -> List[DataAnalysisPersona]:
+def get_personas_for_role(role: str) -> list[DataAnalysisPersona]:
     """Get all personas for a specific role.
 
     Args:
@@ -662,7 +662,7 @@ def get_personas_for_role(role: str) -> List[DataAnalysisPersona]:
     return [p for p in DATA_ANALYSIS_PERSONAS.values() if p.role == role]
 
 
-def get_persona_by_expertise(expertise: ExpertiseCategory) -> List[DataAnalysisPersona]:
+def get_persona_by_expertise(expertise: ExpertiseCategory) -> list[DataAnalysisPersona]:
     """Get personas that have a specific expertise.
 
     Args:
@@ -727,7 +727,7 @@ def apply_persona_to_spec(
     return spec
 
 
-def list_personas() -> List[str]:
+def list_personas() -> list[str]:
     """List all available persona names.
 
     Returns:

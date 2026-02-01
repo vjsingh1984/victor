@@ -34,7 +34,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -52,7 +52,7 @@ class IConfigProvider(Protocol):
     with higher priority values overriding lower ones.
     """
 
-    async def get_config(self, session_id: str) -> Dict[str, Any]:
+    async def get_config(self, session_id: str) -> dict[str, Any]:
         """Get configuration for a session.
 
         Args:

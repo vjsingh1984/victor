@@ -58,11 +58,11 @@ Recent Refactoring (December 2025 - January 2025):
 import ast
 import asyncio
 import json
-import logging
 import time
 import warnings
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
+from collections.abc import AsyncIterator
 
 # Consolidated imports - all imports organized by category
 # See victor/agent/orchestrator_imports.py for the complete import structure
@@ -70,185 +70,47 @@ from victor.agent.orchestrator_imports import (
     # Third-party
     Console,
     # Coordinators
-    CheckpointCoordinator,
-    ToolAccessConfigCoordinator,
     EvaluationCoordinator,
-    MetricsCoordinator,
-    ResponseCoordinator,
     StateCoordinator,
-    StateScope,
-    WorkflowCoordinator,
-    ConversationCoordinator,
-    SearchCoordinator,
     TeamCoordinator,
     # Agent components
-    ArgumentNormalizer,
     NormalizationStrategy,
-    MessageHistory,
-    ConversationStore,
-    MessageRole,
-    # Mixins
     ModeAwareMixin,
     CapabilityRegistryMixin,
     ComponentAccessorMixin,
     StateDelegationMixin,
     # DI container
-    ensure_bootstrapped,
-    get_service_optional,
-    MetricsServiceProtocol,
-    LoggerServiceProtocol,
-    # Protocols
-    ResponseSanitizerProtocol,
-    ComplexityClassifierProtocol,
-    ActionAuthorizerProtocol,
-    SearchRouterProtocol,
-    ProjectContextProtocol,
-    ArgumentNormalizerProtocol,
-    ConversationStateMachineProtocol,
-    TaskTrackerProtocol,
-    CodeExecutionManagerProtocol,
-    WorkflowRegistryProtocol,
-    UsageAnalyticsProtocol,
-    ToolSequenceTrackerProtocol,
-    ContextCompactorProtocol,
-    RecoveryHandlerProtocol,
-    # Configuration and enums
-    get_provider_limits,
     Settings,
-    ToolCallingMatrix,
-    ConversationStateMachine,
     ConversationStage,
-    ActionIntent,
-    get_task_type_hint,
-    SystemPromptBuilder,
-    SearchRoute,
-    SearchType,
-    TaskComplexity,
-    DEFAULT_BUDGETS,
     StreamMetrics,
-    MetricsCollectorConfig,
-    TrackerTaskType,
-    UnifiedTaskTracker,
-    extract_prompt_requirements,
-    # Decomposed components
-    ConversationConfig,
     ContextMetrics,
-    CompactionStrategy,
-    TruncationStrategy,
-    create_context_compactor,
-    calculate_parallel_read_budget,
-    ContextManager,
-    ContextManagerConfig,
-    create_context_manager,
     ContinuationStrategy,
-    ExtractedToolCall,
-    get_rl_coordinator,
-    AnalyticsConfig,
-    create_sequence_tracker,
     SessionStateManager,
-    create_session_state_manager,
-    # Phase 1 extractions
-    ConfigurationManager,
-    create_configuration_manager,
     MemoryManager,
-    SessionRecoveryManager,
-    create_memory_manager,
-    create_session_recovery_manager,
-    # Recovery
-    RecoveryOutcome,
-    FailureType,
-    RecoveryAction,
     VerticalContext,
-    create_vertical_context,
-    VerticalIntegrationAdapter,
-    create_recovery_integration,
-    OrchestratorRecoveryAction,
-    # Tool output formatting
-    ToolOutputFormatterConfig,
     FormattingContext,
-    create_tool_output_formatter,
-    # Pipeline
-    ToolPipelineConfig,
     ToolCallResult,
-    StreamingControllerConfig,
     StreamingSession,
-    get_task_analyzer,
-    ToolRegistrarConfig,
-    ProviderManagerConfig,
-    ProviderState,
-    # Observability
     ObservabilityIntegration,
-    IntegrationConfig,
-    # Tool execution
-    get_critical_tools,
     ToolCallParseResult,
-    ValidationMode,
     calculate_max_context_chars,
     infer_git_operation,
-    get_tool_status_message,
     OrchestratorFactory,
-    create_parallel_executor,
-    ToolFailureContext,
-    create_response_completer,
-    # Analytics and logging
-    UsageLogger,
-    StreamingMetricsCollector,
-    # Storage and caching
-    ToolCache,
-    # Providers
     BaseProvider,
     CompletionResponse,
-    Message,
     StreamChunk,
-    ToolDefinition,
-    ProviderRegistry,
-    ProviderAuthError,
-    ProviderRateLimitError,
-    ProviderTimeoutError,
     ToolNotFoundError,
     ToolValidationError,
     # Tools
-    CostTier,
-    ToolRegistry,
-    CodeSandbox,
-    get_mcp_tool_definitions,
-    ToolPluginRegistry,
-    SemanticToolSelector,
     ToolNames,
     TOOL_ALIASES,
     get_alias_resolver,
     get_progressive_registry,
     # Workflows and embeddings
-    IntentClassifier,
-    IntentType,
-    WorkflowRegistry,
-    register_builtin_workflows,
-    # Project context
-    ProjectContext,
-    # Streaming submodule
-    CoordinatorConfig,
-    ContinuationHandler,
-    ContinuationResult,
-    IntentClassificationHandler,
-    IntentClassificationResult,
-    IterationCoordinator,
     ProgressMetrics,
-    StreamingChatContext,
     StreamingChatHandler,
-    ToolExecutionHandler,
-    ToolExecutionResult,
-    TrackingState,
-    apply_tracking_state_updates,
-    create_continuation_handler,
-    create_coordinator,
-    create_intent_classification_handler,
-    create_stream_context,
-    create_tool_execution_handler,
-    create_tracking_state,
-    # Adapters
     CoordinatorAdapter,
     IntelligentPipelineAdapter,
-    ResultConverters,
     OrchestratorProtocolAdapter,
     create_orchestrator_protocol_adapter,
     # Logger
@@ -262,7 +124,6 @@ if TYPE_CHECKING:
     from victor.agent.chunk_generator import ChunkGenerator
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
-    from victor.agent.protocols import ToolAccessContext
     from victor.evaluation.protocol import TokenUsage
     from victor.agent.subagents import SubAgentOrchestrator
 
@@ -281,10 +142,8 @@ if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.task_analyzer import TaskAnalyzer
-    from victor.agent.tool_registrar import ToolRegistrar
     from victor.agent.orchestrator_factory import OrchestratorComponents
     from victor.agent.provider_manager import ProviderManager
-    from victor.agent.provider_coordinator import ProviderCoordinator
     from victor.agent.tool_selection import ToolSelector
     from victor.agent.tool_executor import ToolExecutor
     from victor.agent.safety import SafetyChecker
@@ -360,7 +219,7 @@ class _ProgressiveToolsProxy:
     The proxy ensures tools are re-registered if the registry was reset (e.g., during tests).
     """
 
-    def __getitem__(self, key: str) -> List[str]:
+    def __getitem__(self, key: str) -> list[str]:
         _ensure_progressive_tools_registered()
         registry = get_progressive_registry()
         config = registry.get_config(key)
@@ -381,7 +240,7 @@ class _ProgressiveToolsProxy:
             return default
         return list(config.progressive_params.keys())
 
-    def keys(self) -> Set[str]:
+    def keys(self) -> set[str]:
         _ensure_progressive_tools_registered()
         registry = get_progressive_registry()
         return registry.list_progressive_tools()
@@ -404,7 +263,7 @@ class _ProgressiveToolsProxy:
 PROGRESSIVE_TOOLS = _ProgressiveToolsProxy()
 
 # Build set of all known tool names (canonical + aliases) for detection
-_ALL_TOOL_NAMES: Set[str] = set()
+_ALL_TOOL_NAMES: set[str] = set()
 for attr in dir(ToolNames):
     if not attr.startswith("_"):
         val = getattr(ToolNames, attr)
@@ -413,7 +272,7 @@ for attr in dir(ToolNames):
 _ALL_TOOL_NAMES.update(TOOL_ALIASES.keys())
 
 
-def _detect_mentioned_tools(text: str) -> List[str]:
+def _detect_mentioned_tools(text: str) -> list[str]:
     """Detect tool names mentioned in text that model said it would call.
 
     Looks for patterns like:
@@ -430,7 +289,7 @@ def _detect_mentioned_tools(text: str) -> List[str]:
     """
     import re
 
-    mentioned: List[str] = []
+    mentioned: list[str] = []
     text_lower = text.lower()
 
     # Look for tool names followed by common patterns
@@ -506,7 +365,7 @@ class AgentOrchestrator(
         temperature: float = 0.7,
         max_tokens: int = 4096,
         console: Optional[Console] = None,
-        tool_selection: Optional[Dict[str, Any]] = None,
+        tool_selection: Optional[dict[str, Any]] = None,
         thinking: bool = False,
         provider_name: Optional[str] = None,
         profile_name: Optional[str] = None,
@@ -534,7 +393,7 @@ class AgentOrchestrator(
         self._temperature: float
         self._max_tokens: int
         self._console: Optional[Console]
-        self._tool_selection: Optional[Dict[str, Any]]
+        self._tool_selection: Optional[dict[str, Any]]
         self._thinking: bool
         self._provider_name: Optional[str]
         self._profile_name: Optional[str]
@@ -606,7 +465,7 @@ class AgentOrchestrator(
         )
         self._factory.initialize_orchestrator(self)
 
-    def _on_tool_start_callback(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+    def _on_tool_start_callback(self, tool_name: str, arguments: dict[str, Any]) -> None:
         """Callback when tool execution starts."""
         iteration = self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
         self._metrics_collector.on_tool_start(tool_name, arguments, iteration)
@@ -733,7 +592,7 @@ class AgentOrchestrator(
         """Send reward signal to RL model selector for Q-value updates."""
         self._coordinator_adapter.send_rl_reward_signal(session)
 
-    def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
+    def _extract_required_files_from_prompt(self, user_message: str) -> list[str]:
         """Extract file paths mentioned in user prompt for task completion tracking.
 
         DEPRECATED (Phase 3): This method is domain-specific and will be removed.
@@ -741,7 +600,7 @@ class AgentOrchestrator(
         """
         return self._task_analyzer.extract_required_files_from_prompt(user_message)
 
-    def _extract_required_outputs_from_prompt(self, user_message: str) -> List[str]:
+    def _extract_required_outputs_from_prompt(self, user_message: str) -> list[str]:
         """Extract output requirements from user prompt.
 
         DEPRECATED (Phase 3): This method is domain-specific and will be removed.
@@ -908,40 +767,40 @@ class AgentOrchestrator(
             self._session_state.execution_state.tool_calls_used = value
 
     @property
-    def observed_files(self) -> Set[str]:
+    def observed_files(self) -> set[str]:
         """Files observed/read during this session."""
         if self._session_state is None:
             return set()
         return self._session_state.execution_state.observed_files
 
     @observed_files.setter
-    def observed_files(self, value: Set[str]) -> None:
+    def observed_files(self, value: set[str]) -> None:
         """Set observed files (for checkpoint restore)."""
         if self._session_state is not None:
             self._session_state.execution_state.observed_files = set(value) if value else set()
 
     @property
-    def executed_tools(self) -> List[str]:
+    def executed_tools(self) -> list[str]:
         """Executed tool names in order."""
         if self._session_state is None:
             return []
         return self._session_state.execution_state.executed_tools
 
     @executed_tools.setter
-    def executed_tools(self, value: List[str]) -> None:
+    def executed_tools(self, value: list[str]) -> None:
         """Set executed tools (for checkpoint restore)."""
         if self._session_state is not None:
             self._session_state.execution_state.executed_tools = list(value) if value else []
 
     @property
-    def failed_tool_signatures(self) -> Set[Tuple[str, str]]:
+    def failed_tool_signatures(self) -> set[tuple[str, str]]:
         """Failed tool call signatures (tool_name, args_hash)."""
         if self._session_state is None:
             return set()
         return self._session_state.execution_state.failed_tool_signatures
 
     @failed_tool_signatures.setter
-    def failed_tool_signatures(self, value: Set[Tuple[str, str]]) -> None:
+    def failed_tool_signatures(self, value: set[tuple[str, str]]) -> None:
         """Set failed tool signatures (for checkpoint restore)."""
         if self._session_state is not None:
             self._session_state.execution_state.failed_tool_signatures = (
@@ -962,7 +821,7 @@ class AgentOrchestrator(
             self._session_state.session_flags.tool_capability_warned = value
 
     @property
-    def _read_files_session(self) -> Set[str]:
+    def _read_files_session(self) -> set[str]:
         """Files read during this session for task completion detection.
 
         DEPRECATED (Phase 3): This property is coding-specific and will be removed.
@@ -973,7 +832,7 @@ class AgentOrchestrator(
         return self._session_state.execution_state.read_files_session
 
     @property
-    def _required_files(self) -> List[str]:
+    def _required_files(self) -> list[str]:
         """Required files extracted from user prompts.
 
         DEPRECATED (Phase 3): This property is coding-specific and will be removed.
@@ -984,7 +843,7 @@ class AgentOrchestrator(
         return self._session_state.execution_state.required_files
 
     @_required_files.setter
-    def _required_files(self, value: List[str]) -> None:
+    def _required_files(self, value: list[str]) -> None:
         """Set required files list.
 
         DEPRECATED (Phase 3): This property is coding-specific and will be removed.
@@ -994,7 +853,7 @@ class AgentOrchestrator(
             self._session_state.execution_state.required_files = list(value)
 
     @property
-    def _required_outputs(self) -> List[str]:
+    def _required_outputs(self) -> list[str]:
         """Required outputs extracted from user prompts.
 
         DEPRECATED (Phase 3): This property is coding-specific and will be removed.
@@ -1005,7 +864,7 @@ class AgentOrchestrator(
         return self._session_state.execution_state.required_outputs
 
     @_required_outputs.setter
-    def _required_outputs(self, value: List[str]) -> None:
+    def _required_outputs(self, value: list[str]) -> None:
         """Set required outputs list.
 
         DEPRECATED (Phase 3): This property is coding-specific and will be removed.
@@ -1036,14 +895,14 @@ class AgentOrchestrator(
             self._session_state.session_flags.all_files_read_nudge_sent = value
 
     @property
-    def _cumulative_token_usage(self) -> Dict[str, int]:
+    def _cumulative_token_usage(self) -> dict[str, int]:
         """Cumulative token usage for evaluation/benchmarking."""
         if self._session_state is None:
             return {}
         return self._session_state.get_token_usage()
 
     @_cumulative_token_usage.setter
-    def _cumulative_token_usage(self, value: Dict[str, int]) -> None:
+    def _cumulative_token_usage(self, value: dict[str, int]) -> None:
         """Set cumulative token usage (for backward compatibility)."""
         if self._session_state is not None:
             self._session_state.execution_state.token_usage = dict(value)
@@ -1103,7 +962,7 @@ class AgentOrchestrator(
         return self._intelligent_integration
 
     @property
-    def subagent_orchestrator(self) -> Optional["SubAgentOrchestrator"]:  # noqa: F821
+    def subagent_orchestrator(self) -> Optional["SubAgentOrchestrator"]:
         """Sub-agent orchestrator for spawning specialized sub-agents and parallel task delegation."""
         if not self._subagent_orchestration_enabled:
             return None
@@ -1367,7 +1226,7 @@ class AgentOrchestrator(
             )
             logger.info(f"Loaded project context from {self.project_context.context_file}")
 
-    def _apply_vertical_tools(self, tools: Set[str]) -> None:
+    def _apply_vertical_tools(self, tools: set[str]) -> None:
         """Apply enabled tools to vertical context and access controller.
 
         Internal helper called by set_enabled_tools. Separated to avoid
@@ -1442,7 +1301,7 @@ class AgentOrchestrator(
 
     async def _prepare_intelligent_request(
         self, task: str, task_type: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Pre-request hook for intelligent pipeline integration."""
         # Update adapter with current intelligent integration
         adapter = self._intelligent_pipeline_adapter
@@ -1461,7 +1320,7 @@ class AgentOrchestrator(
         query: str,
         tool_calls: int,
         task_type: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Post-response hook for intelligent pipeline integration.
 
         Args:
@@ -1535,13 +1394,13 @@ class AgentOrchestrator(
     # Vertical Extension Support
     # =========================================================================
 
-    def apply_vertical_middleware(self, middleware_list: List[Any]) -> None:
+    def apply_vertical_middleware(self, middleware_list: list[Any]) -> None:
         """Apply middleware from vertical extensions (called by FrameworkShim)."""
         adapter = self._vertical_integration_adapter
         if adapter is not None:
             adapter.apply_middleware(middleware_list)
 
-    def apply_vertical_safety_patterns(self, patterns: List[Any]) -> None:
+    def apply_vertical_safety_patterns(self, patterns: list[Any]) -> None:
         """Apply safety patterns from vertical extensions (called by FrameworkShim)."""
         adapter = self._vertical_integration_adapter
         if adapter is not None:
@@ -1562,7 +1421,7 @@ class AgentOrchestrator(
     # VerticalIntegrationAdapter - not for general use.
     # =========================================================================
 
-    def _set_vertical_middleware_storage(self, middleware: List[Any]) -> None:
+    def _set_vertical_middleware_storage(self, middleware: list[Any]) -> None:
         """Internal: Set vertical middleware storage.
 
         DIP Compliance: Provides controlled setter instead of direct
@@ -1584,7 +1443,7 @@ class AgentOrchestrator(
         """
         self._middleware_chain = chain
 
-    def _set_safety_patterns_storage(self, patterns: List[Any]) -> None:
+    def _set_safety_patterns_storage(self, patterns: list[Any]) -> None:
         """Internal: Set safety patterns storage.
 
         DIP Compliance: Provides controlled setter instead of direct
@@ -1602,7 +1461,7 @@ class AgentOrchestrator(
     # private attribute access with protocol-compliant methods.
     # =========================================================================
 
-    def set_middleware(self, middleware: List[Any]) -> None:
+    def set_middleware(self, middleware: list[Any]) -> None:
         """Store middleware configuration.
 
         Implements VerticalStorageProtocol.set_middleware().
@@ -1614,7 +1473,7 @@ class AgentOrchestrator(
         """
         self._vertical_middleware = middleware
 
-    def get_middleware(self) -> List[Any]:
+    def get_middleware(self) -> list[Any]:
         """Retrieve middleware configuration.
 
         Implements VerticalStorageProtocol.get_middleware().
@@ -1625,7 +1484,7 @@ class AgentOrchestrator(
         """
         return getattr(self, "_vertical_middleware", [])
 
-    def set_safety_patterns(self, patterns: List[Any]) -> None:
+    def set_safety_patterns(self, patterns: list[Any]) -> None:
         """Store safety patterns.
 
         Implements VerticalStorageProtocol.set_safety_patterns().
@@ -1637,7 +1496,7 @@ class AgentOrchestrator(
         """
         self._vertical_safety_patterns = patterns
 
-    def get_safety_patterns(self) -> List[Any]:
+    def get_safety_patterns(self) -> list[Any]:
         """Retrieve safety patterns.
 
         Implements VerticalStorageProtocol.get_safety_patterns().
@@ -1648,7 +1507,7 @@ class AgentOrchestrator(
         """
         return getattr(self, "_vertical_safety_patterns", [])
 
-    def set_team_specs(self, specs: Dict[str, Any]) -> None:
+    def set_team_specs(self, specs: dict[str, Any]) -> None:
         """Store team specifications.
 
         Implements VerticalStorageProtocol.set_team_specs().
@@ -1668,7 +1527,7 @@ class AgentOrchestrator(
 
         self._team_coordinator.set_team_specs(specs)
 
-    def get_team_specs(self) -> Dict[str, Any]:
+    def get_team_specs(self) -> dict[str, Any]:
         """Retrieve team specifications.
 
         Implements VerticalStorageProtocol.get_team_specs().
@@ -1826,7 +1685,7 @@ class AgentOrchestrator(
             self._conversation_embedding_store = None  # type: ignore[assignment]
 
     def _finalize_stream_metrics(
-        self, usage_data: Optional[Dict[str, int]] = None
+        self, usage_data: Optional[dict[str, int]] = None
     ) -> Optional[StreamMetrics]:
         """Finalize stream metrics at end of streaming session.
 
@@ -1850,7 +1709,7 @@ class AgentOrchestrator(
         metrics = self._metrics_coordinator.get_last_stream_metrics()
         return metrics if metrics is not None else None
 
-    def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
+    def get_streaming_metrics_summary(self) -> Optional[dict[str, Any]]:
         """Get comprehensive streaming metrics summary.
 
         Returns:
@@ -1861,7 +1720,7 @@ class AgentOrchestrator(
         summary = self._metrics_coordinator.get_streaming_metrics_summary()
         return summary if summary is not None else None
 
-    def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_streaming_metrics_history(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent streaming metrics history.
 
         Args:
@@ -1875,7 +1734,7 @@ class AgentOrchestrator(
         history = self._metrics_coordinator.get_streaming_metrics_history(limit)
         return history if history is not None else []
 
-    def get_session_cost_summary(self) -> Dict[str, Any]:
+    def get_session_cost_summary(self) -> dict[str, Any]:
         """Get session cost summary."""
         if self._metrics_coordinator is None:
             return {}
@@ -1983,7 +1842,7 @@ class AgentOrchestrator(
         """
         self._metrics_collector.record_tool_selection(method, num_tools)
 
-    def route_search_query(self, query: str) -> Dict[str, Any]:
+    def route_search_query(self, query: str) -> dict[str, Any]:
         """Route a search query to the optimal search tool using SearchRouter.
 
         Analyzes the query to determine whether keyword search (code_search)
@@ -2115,7 +1974,7 @@ class AgentOrchestrator(
             except ValueError as e:
                 logger.warning(f"Invalid outcome data for RL recording: {e}")
 
-    def get_tool_usage_stats(self) -> Dict[str, Any]:
+    def get_tool_usage_stats(self) -> dict[str, Any]:
         """Get comprehensive tool usage statistics.
 
         Returns:
@@ -2141,7 +2000,7 @@ class AgentOrchestrator(
         result = self._metrics_coordinator.get_tool_usage_stats(
             conversation_state_summary=conv_summary
         )
-        return cast(Dict[str, Any], result)
+        return cast(dict[str, Any], result)
 
     def get_token_usage(self) -> "TokenUsage":
         """Get cumulative token usage for evaluation tracking.
@@ -2195,7 +2054,7 @@ class AgentOrchestrator(
             return ConversationStage[stage_name]
         return ConversationStage.INITIAL
 
-    def get_stage_recommended_tools(self) -> Set[str]:
+    def get_stage_recommended_tools(self) -> set[str]:
         """Get tools recommended for the current conversation stage.
 
         Returns:
@@ -2205,7 +2064,7 @@ class AgentOrchestrator(
             return set()
         return self._state_coordinator.get_stage_tools()
 
-    def get_optimization_status(self) -> Dict[str, Any]:
+    def get_optimization_status(self) -> dict[str, Any]:
         """Get comprehensive status of all integrated optimization components.
 
         Creates AnalyticsCoordinator inline for unified status reporting.
@@ -2235,7 +2094,7 @@ class AgentOrchestrator(
             search_router=self.search_router,
         )
 
-    async def flush_analytics(self) -> Dict[str, bool]:
+    async def flush_analytics(self) -> dict[str, bool]:
         """Flush all analytics and cached data to persistent storage.
 
         Call this method before shutdown or when you need to ensure
@@ -2291,7 +2150,7 @@ class AgentOrchestrator(
             logger.warning(f"Failed to stop health monitoring: {e}")
             return False
 
-    async def get_provider_health(self) -> Dict[str, Any]:
+    async def get_provider_health(self) -> dict[str, Any]:
         """Get health status of all registered providers.
 
         Returns:
@@ -2299,7 +2158,7 @@ class AgentOrchestrator(
         """
         return await self._provider_coordinator.get_health()
 
-    async def graceful_shutdown(self) -> Dict[str, bool]:
+    async def graceful_shutdown(self) -> dict[str, bool]:
         """Perform graceful shutdown of all orchestrator components.
 
         Flushes analytics, stops health monitoring, and cleans up resources.
@@ -2400,7 +2259,6 @@ class AgentOrchestrator(
         Example:
             orchestrator.switch_model("qwen2.5-coder:32b")
         """
-        import warnings
 
         # For backward compatibility with sync API, run the async version
         try:
@@ -2419,7 +2277,7 @@ class AgentOrchestrator(
             logger.error(f"Failed to switch model to {model}: {e}")
             return False
 
-    def get_current_provider_info(self) -> Dict[str, Any]:
+    def get_current_provider_info(self) -> dict[str, Any]:
         """Get information about the current provider and model.
 
         Combines ProviderManager's provider info with orchestrator-specific
@@ -2499,7 +2357,7 @@ class AgentOrchestrator(
         )
 
     def _parse_tool_calls_with_adapter(
-        self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None
+        self, content: str, raw_tool_calls: Optional[list[dict[str, Any]]] = None
     ) -> ToolCallParseResult:
         """Parse tool calls using the tool calling adapter.
 
@@ -2613,7 +2471,7 @@ class AgentOrchestrator(
         # Move verbose argument logging to debug level - not user-facing
         logger.debug(f"Tool call: {name} with args: {kwargs}")
 
-    def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
+    def _classify_task_keywords(self, user_message: str) -> dict[str, Any]:
         """Classify task type based on keywords in the user message.
 
 
@@ -2626,8 +2484,8 @@ class AgentOrchestrator(
         return self._task_analyzer.classify_task_keywords(user_message)
 
     def _classify_task_with_context(
-        self, user_message: str, history: Optional[List[Dict[str, Any]]] = None
-    ) -> Dict[str, Any]:
+        self, user_message: str, history: Optional[list[dict[str, Any]]] = None
+    ) -> dict[str, Any]:
         """Classify task with conversation context for improved accuracy.
 
 
@@ -2650,8 +2508,8 @@ class AgentOrchestrator(
         continuation_prompts: int,
         asking_input_prompts: int,
         one_shot_mode: bool,
-        mentioned_tools: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        mentioned_tools: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         """Determine what continuation action to take when model doesn't call tools.
 
         DEPRECATED: This method delegates to ContinuationStrategy.determine_continuation_action().
@@ -2717,7 +2575,7 @@ class AgentOrchestrator(
             task_complexity=task_complexity,
         )
 
-    def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
+    def _format_tool_output(self, tool_name: str, args: dict[str, Any], output: Any) -> str:
         """Format tool output with clear boundaries to prevent model hallucination.
 
 
@@ -2917,7 +2775,7 @@ class AgentOrchestrator(
             yield chunk
 
     async def _execute_tool_with_retry(
-        self, tool_name: str, tool_args: Dict[str, Any], context: Dict[str, Any]
+        self, tool_name: str, tool_args: dict[str, Any], context: dict[str, Any]
     ) -> tuple[Any, bool, Optional[str]]:
         """Execute a tool with retry logic and exponential backoff.
 
@@ -3067,7 +2925,7 @@ class AgentOrchestrator(
         # Should not reach here, but handle it anyway
         return None, False, last_error or "Unknown error"
 
-    async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def _handle_tool_calls(self, tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Handle tool calls from the model.
 
         Args:
@@ -3076,7 +2934,7 @@ class AgentOrchestrator(
         if not tool_calls:
             return []
 
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         for tool_call in tool_calls:
             # Validate tool call structure
@@ -3464,7 +3322,7 @@ class AgentOrchestrator(
         """
         return self._memory_session_id
 
-    def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_sessions(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent conversation sessions for recovery.
 
         Args:
@@ -3527,7 +3385,7 @@ class AgentOrchestrator(
     # Memory Management
     # =====================================================================
 
-    def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_memory_context(self, max_tokens: Optional[int] = None) -> list[dict[str, Any]]:
         """Get token-aware context messages from memory manager.
 
         Uses intelligent pruning to select the most relevant messages
@@ -3561,7 +3419,7 @@ class AgentOrchestrator(
                 return [msg.model_dump() for msg in self.conversation.messages]
             return []
 
-    def get_session_stats(self) -> Dict[str, Any]:
+    def get_session_stats(self) -> dict[str, Any]:
         """Get statistics for the current memory session.
 
         Returns:
@@ -3701,7 +3559,7 @@ class AgentOrchestrator(
         """
         return self._protocol_adapter.get_tool_budget()
 
-    def get_observed_files(self) -> Set[str]:
+    def get_observed_files(self) -> set[str]:
         """Get files observed/read during conversation (protocol method).
 
         Returns:
@@ -3709,7 +3567,7 @@ class AgentOrchestrator(
         """
         return self._protocol_adapter.get_observed_files()
 
-    def get_modified_files(self) -> Set[str]:
+    def get_modified_files(self) -> set[str]:
         """Get files modified during conversation (protocol method).
 
         Returns:
@@ -3776,7 +3634,7 @@ class AgentOrchestrator(
 
     # --- ToolsProtocol ---
 
-    def get_available_tools(self) -> Set[str]:
+    def get_available_tools(self) -> set[str]:
         """Get all registered tool names (protocol method).
 
         Returns:
@@ -3784,7 +3642,7 @@ class AgentOrchestrator(
         """
         return self._protocol_adapter.get_available_tools()
 
-    def get_enabled_tools(self) -> Set[str]:
+    def get_enabled_tools(self) -> set[str]:
         """Get currently enabled tool names (protocol method).
 
         Returns:
@@ -3792,7 +3650,7 @@ class AgentOrchestrator(
         """
         return self._protocol_adapter.get_enabled_tools()
 
-    def set_enabled_tools(self, tools: Set[str], tiered_config: Any = None) -> None:
+    def set_enabled_tools(self, tools: set[str], tiered_config: Any = None) -> None:
         """Set which tools are enabled for this session (protocol method).
 
         Args:
@@ -3858,7 +3716,7 @@ class AgentOrchestrator(
 
     # --- Health Check Methods ---
 
-    def check_tool_selector_health(self) -> Dict[str, Any]:
+    def check_tool_selector_health(self) -> dict[str, Any]:
         """Check if tool selector is properly initialized.
 
         This health check prevents the critical bug where SemanticToolSelector
@@ -4021,7 +3879,6 @@ class AgentOrchestrator(
         # Setup JSONL exporter if enabled
         if getattr(settings, "enable_observability_logging", False):
             from victor.observability.bridge import ObservabilityBridge
-            from victor.core.events import get_observability_bus
 
             try:
                 bridge = ObservabilityBridge.get_instance()

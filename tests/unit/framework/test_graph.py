@@ -19,8 +19,7 @@ including cyclic workflows, checkpointing, and typed state management.
 """
 
 import pytest
-from typing import TypedDict, Optional, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import TypedDict, Optional
 
 from victor.framework.graph import (
     StateGraph,
@@ -28,15 +27,10 @@ from victor.framework.graph import (
     Node,
     Edge,
     EdgeType,
-    FrameworkNodeStatus,
-    GraphExecutionResult,
     GraphConfig,
     WorkflowCheckpoint,
-    CheckpointerProtocol,
     MemoryCheckpointer,
-    RLCheckpointerAdapter,
     END,
-    START,
     create_graph,
 )
 
@@ -44,8 +38,6 @@ from victor.framework.config import (
     ExecutionConfig,
     CheckpointConfig,
     InterruptConfig,
-    PerformanceConfig,
-    ObservabilityConfig,
 )
 
 
@@ -58,7 +50,7 @@ class SimpleState(TypedDict):
     """Simple state for testing."""
 
     value: int
-    history: List[str]
+    history: list[str]
 
 
 class TaskState(TypedDict, total=False):
@@ -720,17 +712,8 @@ class TestFrameworkExports:
         from victor.framework import (
             StateGraph,
             CompiledGraph,
-            Node,
-            Edge,
-            EdgeType,
-            GraphExecutionResult,
-            GraphConfig,
-            WorkflowCheckpoint,
-            MemoryCheckpointer,
-            RLCheckpointerAdapter,
             END,
             START,
-            create_graph,
         )
 
         assert StateGraph is not None

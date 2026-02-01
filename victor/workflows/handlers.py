@@ -46,12 +46,13 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable, Coroutine
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.executor import NodeResult, WorkflowContext
 
     ComputeHandlerType = Callable[
         [ComputeNode, WorkflowContext, ToolRegistry], Coroutine[Any, Any, NodeResult]
@@ -88,9 +89,9 @@ class HandlerError:
     error_type: str
     message: str
     traceback_str: Optional[str] = None
-    context_snapshot: Dict[str, Any] = field(default_factory=dict)
+    context_snapshot: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for logging/storage."""
         return {
             "handler_name": self.handler_name,
@@ -158,7 +159,6 @@ class HandlerErrorBoundary:
         Returns:
             NodeResult with execution outcome or error details
         """
-        from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
 
@@ -346,8 +346,8 @@ class ParallelToolsHandler:
 
         start_time = time.time()
         semaphore = asyncio.Semaphore(self.max_concurrent)
-        outputs: Dict[str, Any] = {}
-        errors: List[str] = []
+        outputs: dict[str, Any] = {}
+        errors: list[str] = []
         tool_calls_used = 0
 
         # Build params from input mapping
@@ -424,7 +424,7 @@ class ParallelToolsHandler:
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build tool parameters from context."""
         params = {}
         for param_name, context_key in node.input_mapping.items():
@@ -471,7 +471,7 @@ class SequentialToolsHandler:
         from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
-        outputs: Dict[str, Any] = {}
+        outputs: dict[str, Any] = {}
         tool_calls_used = 0
         params = self._build_params(node, context)
         last_output = None
@@ -560,7 +560,7 @@ class SequentialToolsHandler:
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build tool parameters from context."""
         params = {}
         for param_name, context_key in node.input_mapping.items():
@@ -611,7 +611,7 @@ class RetryBackoffHandler:
         from victor.workflows.executor import NodeResult, ExecutorNodeStatus
 
         start_time = time.time()
-        outputs: Dict[str, Any] = {}
+        outputs: dict[str, Any] = {}
         tool_calls_used = 0
         params = self._build_params(node, context)
 
@@ -688,7 +688,7 @@ class RetryBackoffHandler:
         self,
         node: "ComputeNode",
         context: "WorkflowContext",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build tool parameters from context."""
         params = {}
         for param_name, context_key in node.input_mapping.items():
@@ -725,7 +725,7 @@ class DataTransformHandler:
     """
 
     # Registry of transform functions
-    _transforms: Dict[str, Callable[[Any], Any]] = field(default_factory=dict)
+    _transforms: dict[str, Callable[[Any], Any]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # Register default transforms
@@ -755,7 +755,7 @@ class DataTransformHandler:
 
         # Get data and operations from inputs
         data = None
-        operations: List[str] = []
+        operations: list[str] = []
 
         for param_name, context_key in node.input_mapping.items():
             value = context.get(context_key)
@@ -934,7 +934,7 @@ class ConditionalBranchHandler:
                 duration_seconds=time.time() - start_time,
             )
 
-    def _evaluate_condition(self, expr: str, context_data: Dict[str, Any]) -> bool:
+    def _evaluate_condition(self, expr: str, context_data: dict[str, Any]) -> bool:
         """Evaluate a simple condition expression.
 
         Supports:
@@ -978,7 +978,7 @@ class ConditionalBranchHandler:
 
 
 # Framework handler instances
-FRAMEWORK_HANDLERS: Dict[str, Any] = {
+FRAMEWORK_HANDLERS: dict[str, Any] = {
     "parallel_tools": ParallelToolsHandler(),
     "sequential_tools": SequentialToolsHandler(),
     "retry_with_backoff": RetryBackoffHandler(),
@@ -1009,7 +1009,7 @@ def get_framework_handler(name: str) -> Optional[Any]:
     return FRAMEWORK_HANDLERS.get(name)
 
 
-def list_framework_handlers() -> List[str]:
+def list_framework_handlers() -> list[str]:
     """List all available framework handler names."""
     return list(FRAMEWORK_HANDLERS.keys())
 

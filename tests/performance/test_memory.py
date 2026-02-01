@@ -35,11 +35,9 @@ Usage:
 from __future__ import annotations
 
 import gc
-import sys
 import time
 import tracemalloc
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

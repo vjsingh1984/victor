@@ -38,17 +38,16 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 from victor.framework.capabilities.base_vertical_capability_provider import (
     BaseVerticalCapabilityProvider,
     CapabilityDefinition,
 )
-from victor.framework.protocols import CapabilityType, OrchestratorCapability
-from victor.framework.capability_loader import CapabilityEntry, capability
+from victor.framework.capability_loader import CapabilityEntry
 
 if TYPE_CHECKING:
-    from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +63,7 @@ def configure_deployment_safety(
     require_approval_for_production: bool = True,
     require_backup_before_deploy: bool = True,
     enable_rollback: bool = True,
-    protected_environments: Optional[List[str]] = None,
+    protected_environments: Optional[list[str]] = None,
 ) -> None:
     """Configure deployment safety rules for the orchestrator.
 
@@ -121,7 +120,7 @@ def configure_container_settings(
     logger.info(f"Configured container settings: runtime={runtime}")
 
 
-def get_container_settings(orchestrator: Any) -> Dict[str, Any]:
+def get_container_settings(orchestrator: Any) -> dict[str, Any]:
     """Get current container configuration.
 
     Args:
@@ -141,7 +140,7 @@ def get_container_settings(orchestrator: Any) -> Dict[str, Any]:
             "max_image_size_mb": 2000,
         },
     )
-    return cast(Dict[str, Any], config)
+    return cast(dict[str, Any], config)
 
 
 def configure_infrastructure_settings(
@@ -263,7 +262,7 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
         """Initialize the DevOps capability provider."""
         super().__init__("devops")
 
-    def _get_capability_definitions(self) -> Dict[str, CapabilityDefinition]:
+    def _get_capability_definitions(self) -> dict[str, CapabilityDefinition]:
         """Define DevOps capability definitions.
 
         Returns:
@@ -350,7 +349,7 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
             ),
         }
 
-    def generate_capabilities_list(self) -> List[CapabilityEntry]:
+    def generate_capabilities_list(self) -> list[CapabilityEntry]:
         """Generate CAPABILITIES list for CapabilityLoader discovery.
 
         Override base class to use definition.name instead of dict key for
@@ -361,7 +360,7 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
         """
         from victor.framework.protocols import OrchestratorCapability
 
-        entries: List[CapabilityEntry] = []
+        entries: list[CapabilityEntry] = []
         definitions = self._get_definitions()
 
         for key, definition in definitions.items():
@@ -417,7 +416,7 @@ class DevOpsCapabilityProvider(BaseVerticalCapabilityProvider):
         """Configure container settings capability."""
         configure_container_settings(orchestrator, **kwargs)
 
-    def get_container_settings(self, orchestrator: Any) -> Dict[str, Any]:
+    def get_container_settings(self, orchestrator: Any) -> dict[str, Any]:
         """Get container settings configuration."""
         return get_container_settings(orchestrator)
 
@@ -478,7 +477,7 @@ def _get_provider() -> DevOpsCapabilityProvider:
 
 
 # Generate CAPABILITIES list from provider
-CAPABILITIES: List[CapabilityEntry] = []
+CAPABILITIES: list[CapabilityEntry] = []
 
 
 def _generate_capabilities_list() -> None:
@@ -497,7 +496,7 @@ _generate_capabilities_list()
 # =============================================================================
 
 
-def get_devops_capabilities() -> List[CapabilityEntry]:
+def get_devops_capabilities() -> list[CapabilityEntry]:
     """Get all DevOps capability entries.
 
     Returns:
@@ -512,13 +511,12 @@ def create_devops_capability_loader() -> Any:
     Returns:
         CapabilityLoader with DevOps capabilities registered
     """
-    from victor.framework.capability_loader import CapabilityLoader
 
     provider = _get_provider()
     return provider.create_capability_loader()
 
 
-def get_capability_configs() -> Dict[str, Any]:
+def get_capability_configs() -> dict[str, Any]:
     """Get DevOps capability configurations for centralized storage.
 
     Returns default DevOps configuration for VerticalContext storage.

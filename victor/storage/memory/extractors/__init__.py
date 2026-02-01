@@ -83,7 +83,7 @@ def create_extractor(
     Returns:
         Configured CompositeExtractor
     """
-    extractors: List[EntityExtractor] = []
+    extractors: list[EntityExtractor] = []
 
     # Add Tree-sitter extractor if available and requested
     if use_tree_sitter and _HAS_TREE_SITTER:

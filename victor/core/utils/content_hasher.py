@@ -72,7 +72,7 @@ Performance Characteristics:
 import hashlib
 import json
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 # Try to import native acceleration
 _NATIVE_NORMALIZE_AVAILABLE = False
@@ -187,7 +187,7 @@ class ContentHasher:
         hash_obj = hashlib.sha256(normalized.encode("utf-8"))
         return hash_obj.hexdigest()[: self.hash_length]
 
-    def hash_dict(self, data: Dict[str, Any]) -> str:
+    def hash_dict(self, data: dict[str, Any]) -> str:
         """Hash dictionary by sorting keys and hashing JSON representation.
 
         This method ensures that dictionary order doesn't affect the hash:
@@ -212,7 +212,7 @@ class ContentHasher:
         serialized = json.dumps(data, sort_keys=True, default=str)
         return self.hash(serialized)
 
-    def hash_list(self, items: List[Any]) -> str:
+    def hash_list(self, items: list[Any]) -> str:
         """Hash list by sorting items and hashing string representation.
 
         Args:

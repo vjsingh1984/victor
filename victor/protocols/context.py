@@ -45,7 +45,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 # Dict-based models for context-related types (instantiable for tests).
@@ -89,7 +89,7 @@ class CompactionResult:
     tokens_saved: int
     messages_removed: int
     strategy_used: str
-    metadata: Dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @runtime_checkable

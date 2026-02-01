@@ -19,10 +19,10 @@ output of agent N becomes input for agent N+1.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
-from victor.teams.types import AgentMessage, MemberResult, MessageType
+from victor.teams.types import AgentMessage, MemberResult
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +42,10 @@ class SequentialFormation(BaseFormationStrategy):
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute agents sequentially with context chaining."""
         results = []
         previous_output = None

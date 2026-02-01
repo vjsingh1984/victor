@@ -22,11 +22,10 @@ This module implements sophisticated multi-agent coordination including:
 - Dynamic swarm composition
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -99,10 +98,10 @@ class ConsensusResult:
 
     achieved: bool
     decision: Any
-    votes: List[AgentVote] = field(default_factory=list)
+    votes: list[AgentVote] = field(default_factory=list)
     agreement_score: float = 0.0
     iterations: int = 0
-    conflicts: List[str] = field(default_factory=list)
+    conflicts: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -179,8 +178,8 @@ class AgentSwarm:
     async def execute_task(
         self,
         task: str,
-        options: Optional[List[Any]] = None,
-        context: Optional[Dict[str, Any]] = None,
+        options: Optional[list[Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ConsensusResult:
         """Execute task with swarm consensus.
 
@@ -206,8 +205,8 @@ class AgentSwarm:
         return consensus
 
     async def _generate_proposals(
-        self, task: str, context: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, task: str, context: Optional[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Generate proposals from agents."""
         if not self.coordinator:
             return {}
@@ -232,8 +231,8 @@ class AgentSwarm:
 
     async def build_consensus(
         self,
-        proposals: Dict[str, Any],
-        options: Optional[List[Any]] = None,
+        proposals: dict[str, Any],
+        options: Optional[list[Any]] = None,
     ) -> ConsensusResult:
         """Build consensus from agent proposals.
 
@@ -280,13 +279,13 @@ class AgentSwarm:
         else:
             return await self._majority_consensus(votes)
 
-    async def _majority_consensus(self, votes: List[AgentVote]) -> ConsensusResult:
+    async def _majority_consensus(self, votes: list[AgentVote]) -> ConsensusResult:
         """Simple majority consensus."""
         if not votes:
             return ConsensusResult(achieved=False, decision=None)
 
         # Count votes
-        vote_counts: Dict[Any, int] = {}
+        vote_counts: dict[Any, int] = {}
         for vote in votes:
             choice = vote.choice
             vote_counts[choice] = vote_counts.get(choice, 0) + 1
@@ -318,7 +317,7 @@ class AgentSwarm:
             iterations=1,
         )
 
-    async def _unanimous_consensus(self, votes: List[AgentVote]) -> ConsensusResult:
+    async def _unanimous_consensus(self, votes: list[AgentVote]) -> ConsensusResult:
         """Unanimous consensus."""
         if not votes:
             return ConsensusResult(achieved=False, decision=None)
@@ -345,13 +344,13 @@ class AgentSwarm:
                 conflicts=["Agents could not reach unanimous agreement"],
             )
 
-    async def _weighted_consensus(self, votes: List[AgentVote]) -> ConsensusResult:
+    async def _weighted_consensus(self, votes: list[AgentVote]) -> ConsensusResult:
         """Weighted consensus based on agent expertise."""
         if not votes:
             return ConsensusResult(achieved=False, decision=None)
 
         # Calculate weighted scores
-        weighted_scores: Dict[Any, float] = {}
+        weighted_scores: dict[Any, float] = {}
         for vote in votes:
             choice = vote.choice
             # Combine weight and confidence
@@ -371,13 +370,13 @@ class AgentSwarm:
             iterations=1,
         )
 
-    async def _supermajority_consensus(self, votes: List[AgentVote]) -> ConsensusResult:
+    async def _supermajority_consensus(self, votes: list[AgentVote]) -> ConsensusResult:
         """Supermajority consensus (2/3)."""
         if not votes:
             return ConsensusResult(achieved=False, decision=None)
 
         # Count votes
-        vote_counts: Dict[Any, int] = {}
+        vote_counts: dict[Any, int] = {}
         for vote in votes:
             choice = vote.choice
             vote_counts[choice] = vote_counts.get(choice, 0) + 1
@@ -409,7 +408,7 @@ class AgentSwarm:
         )
 
     async def _delphi_consensus(
-        self, initial_votes: List[AgentVote], proposals: Dict[str, Any]
+        self, initial_votes: list[AgentVote], proposals: dict[str, Any]
     ) -> ConsensusResult:
         """Delphi method - iterative consensus building."""
         votes = initial_votes
@@ -442,13 +441,13 @@ class AgentSwarm:
             conflicts=["Failed to converge after max iterations"],
         )
 
-    def _check_convergence(self, votes: List[AgentVote]) -> bool:
+    def _check_convergence(self, votes: list[AgentVote]) -> bool:
         """Check if votes have converged."""
         if not votes:
             return False
 
         # Check if agreement threshold is met
-        vote_counts: Dict[Any, int] = {}
+        vote_counts: dict[Any, int] = {}
         for vote in votes:
             choice = vote.choice
             vote_counts[choice] = vote_counts.get(choice, 0) + 1
@@ -458,12 +457,12 @@ class AgentSwarm:
 
         return agreement_ratio >= self.config.agreement_threshold
 
-    def _calculate_agreement(self, votes: List[AgentVote]) -> float:
+    def _calculate_agreement(self, votes: list[AgentVote]) -> float:
         """Calculate agreement score."""
         if not votes:
             return 0.0
 
-        vote_counts: Dict[Any, int] = {}
+        vote_counts: dict[Any, int] = {}
         for vote in votes:
             choice = vote.choice
             vote_counts[choice] = vote_counts.get(choice, 0) + 1
@@ -472,8 +471,8 @@ class AgentSwarm:
         return max_count / len(votes)
 
     async def _refine_votes(
-        self, votes: List[AgentVote], proposals: Dict[str, Any]
-    ) -> List[AgentVote]:
+        self, votes: list[AgentVote], proposals: dict[str, Any]
+    ) -> list[AgentVote]:
         """Refine votes based on group feedback."""
         # In a real implementation, this would:
         # 1. Share reasoning and confidence with all agents
@@ -485,10 +484,10 @@ class AgentSwarm:
 
     async def vote(
         self,
-        options: List[Any],
-        agents: List[str],
+        options: list[Any],
+        agents: list[str],
         strategy: Optional[VotingStrategy] = None,
-    ) -> Tuple[Any, List[AgentVote]]:
+    ) -> tuple[Any, list[AgentVote]]:
         """Conduct vote among agents.
 
         Args:
@@ -511,8 +510,8 @@ class AgentSwarm:
             return await self._plurality_vote(options, agents)
 
     async def _plurality_vote(
-        self, options: List[Any], agents: List[str]
-    ) -> Tuple[Any, List[AgentVote]]:
+        self, options: list[Any], agents: list[str]
+    ) -> tuple[Any, list[AgentVote]]:
         """Plurality voting (most votes wins)."""
         # Simulate votes (in real implementation, query agents)
         votes = [
@@ -525,7 +524,7 @@ class AgentSwarm:
         ]
 
         # Count votes
-        vote_counts: Dict[Any, int] = {}
+        vote_counts: dict[Any, int] = {}
         for vote in votes:
             choice = vote.choice
             vote_counts[choice] = vote_counts.get(choice, 0) + 1
@@ -535,13 +534,13 @@ class AgentSwarm:
         return winner, votes
 
     async def _borda_vote(
-        self, options: List[Any], agents: List[str]
-    ) -> Tuple[Any, List[AgentVote]]:
+        self, options: list[Any], agents: list[str]
+    ) -> tuple[Any, list[AgentVote]]:
         """Borda count voting."""
         # In Borda count, voters rank options
         # Points awarded: n-1 for first, n-2 for second, etc.
 
-        scores: Dict[Any, int] = dict.fromkeys(options, 0)
+        scores: dict[Any, int] = dict.fromkeys(options, 0)
 
         # Simulate ranked votes
         for agent_id in agents:
@@ -561,12 +560,12 @@ class AgentSwarm:
         return winner, votes
 
     async def _approval_vote(
-        self, options: List[Any], agents: List[str]
-    ) -> Tuple[Any, List[AgentVote]]:
+        self, options: list[Any], agents: list[str]
+    ) -> tuple[Any, list[AgentVote]]:
         """Approval voting (approve multiple options)."""
         # In approval voting, agents can approve any number of options
 
-        approvals: Dict[Any, int] = dict.fromkeys(options, 0)
+        approvals: dict[Any, int] = dict.fromkeys(options, 0)
 
         # Simulate approvals
         for agent_id in agents:
@@ -583,7 +582,7 @@ class AgentSwarm:
 
     async def resolve_conflict(
         self,
-        conflict: Dict[str, Any],
+        conflict: dict[str, Any],
         resolution: Optional[ConflictResolution] = None,
     ) -> Any:
         """Resolve conflict between agents.
@@ -618,7 +617,7 @@ class AgentSwarm:
             proposals = conflict.get("proposals", {})
             return list(proposals.values())[0] if proposals else None
 
-    def _merge_proposals(self, proposals: Dict[str, Any]) -> Dict[str, Any]:
+    def _merge_proposals(self, proposals: dict[str, Any]) -> dict[str, Any]:
         """Merge conflicting proposals."""
         merged = {}
 
@@ -628,7 +627,7 @@ class AgentSwarm:
 
         return merged
 
-    def _find_compromise(self, conflict: Dict[str, Any]) -> Any:
+    def _find_compromise(self, conflict: dict[str, Any]) -> Any:
         """Find compromise position."""
         options = conflict.get("options", [])
         if not options:

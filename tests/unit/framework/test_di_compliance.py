@@ -20,9 +20,7 @@ and avoid direct imports that create tight coupling.
 
 import ast
 import inspect
-from pathlib import Path
 
-import pytest
 
 
 class TestDICompliance:

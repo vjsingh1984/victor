@@ -39,7 +39,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.protocols import ICompactionStrategy, CompactionResult, CompactionContext, ContextBudget
 
@@ -66,7 +66,7 @@ class ContextCoordinator:
 
     def __init__(
         self,
-        strategies: Optional[List[ICompactionStrategy]] = None,
+        strategies: Optional[list[ICompactionStrategy]] = None,
         enable_auto_compaction: bool = True,
     ) -> None:
         """Initialize the context coordinator.
@@ -77,7 +77,7 @@ class ContextCoordinator:
         """
         self._strategies = strategies or []
         self._enable_auto_compaction = enable_auto_compaction
-        self._compaction_history: List[Dict[str, Any]] = []
+        self._compaction_history: list[dict[str, Any]] = []
 
     async def compact_context(
         self,
@@ -254,7 +254,7 @@ class ContextCoordinator:
         if strategy in self._strategies:
             self._strategies.remove(strategy)
 
-    def get_compaction_history(self) -> List[Dict[str, Any]]:
+    def get_compaction_history(self) -> list[dict[str, Any]]:
         """Get history of compaction operations.
 
         Returns:

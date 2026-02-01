@@ -24,7 +24,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from string import Template
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -36,8 +36,8 @@ class TemplateContext:
         metadata: Additional metadata
     """
 
-    variables: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    variables: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def with_variable(self, key: str, value: Any) -> "TemplateContext":
         """Add a variable to the context."""
@@ -76,8 +76,8 @@ class PromptTemplate:
     name: str
     template_string: str
     description: str = ""
-    required_variables: List[str] = field(default_factory=list)
-    optional_variables: List[str] = field(default_factory=list)
+    required_variables: list[str] = field(default_factory=list)
+    optional_variables: list[str] = field(default_factory=list)
 
     def render(
         self,
@@ -122,7 +122,7 @@ class PromptTemplate:
             return False, f"Missing required variables: {missing}"
         return True, None
 
-    def extract_variables(self) -> List[str]:
+    def extract_variables(self) -> list[str]:
         """Extract all variable names from the template.
 
         Returns:
@@ -155,7 +155,7 @@ class PromptTemplateRegistry:
             return
         PromptTemplateRegistry._initialized = True
 
-        self._templates: Dict[str, PromptTemplate] = {}
+        self._templates: dict[str, PromptTemplate] = {}
         self._register_defaults()
 
     def _register_defaults(self) -> None:
@@ -314,7 +314,7 @@ class PromptTemplateRegistry:
         """
         return self._templates.get(name)
 
-    def list_templates(self, category: Optional[str] = None) -> List[str]:
+    def list_templates(self, category: Optional[str] = None) -> list[str]:
         """List available template names.
 
         Args:
@@ -415,7 +415,7 @@ def render_template(
     return get_registry().render(template_name, context, **kwargs)
 
 
-def list_templates(category: Optional[str] = None) -> List[str]:
+def list_templates(category: Optional[str] = None) -> list[str]:
     """List available template names.
 
     Args:

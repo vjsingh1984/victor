@@ -21,7 +21,8 @@ Tests are automatically skipped in CI/CD when API keys are not available.
 import os
 import socket
 from pathlib import Path
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import Optional
+from collections.abc import AsyncGenerator
 
 import pytest
 import httpx
@@ -123,7 +124,7 @@ def has_provider_api_key(provider: str) -> bool:
 # - glm-4:9b - Fast and capable (Zhipu AI)
 # - glm-4:34b - Complex task specialist
 
-PROVIDER_MODELS: Dict[str, List[str]] = {
+PROVIDER_MODELS: dict[str, list[str]] = {
     "ollama": [
         # === ULTRA-FAST MODELS (0.5B-3B) ===
         # Use for: Simple queries, error detection, basic file reads

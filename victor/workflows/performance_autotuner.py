@@ -60,14 +60,13 @@ from __future__ import annotations
 
 import logging
 import statistics
-import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 import json
 import copy
 
@@ -119,9 +118,9 @@ class PerformanceInsight:
     baseline_value: float
     impact_magnitude: float  # 0-1
     recommendation: str
-    affected_components: List[str] = field(default_factory=list)
+    affected_components: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "bottleneck": self.bottleneck,
@@ -153,14 +152,14 @@ class OptimizationSuggestion:
     type: OptimizationType
     priority: OptimizationPriority
     description: str
-    current_config: Dict[str, Any]
-    suggested_config: Dict[str, Any]
+    current_config: dict[str, Any]
+    suggested_config: dict[str, Any]
     expected_improvement: float  # 0-100
     confidence: float  # 0-1
     risk_level: float  # 0-1
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "type": self.type.value,
@@ -194,14 +193,14 @@ class OptimizationResult:
     success: bool
     team_id: str
     optimization: OptimizationSuggestion
-    before_metrics: Dict[str, float]
-    after_metrics: Optional[Dict[str, float]]
+    before_metrics: dict[str, float]
+    after_metrics: Optional[dict[str, float]]
     improvement_percentage: Optional[float]
     validation_status: Optional[str]
-    rollback_config: Dict[str, Any]
+    rollback_config: dict[str, Any]
     error: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "success": self.success,
@@ -248,9 +247,9 @@ class PerformanceAnalyzer:
 
     def __init__(
         self,
-        metrics_history: Optional[List[Dict[str, Any]]] = None,
-        baseline_metrics: Optional[Dict[str, float]] = None,
-        benchmark_data: Optional[Dict[str, Dict[str, float]]] = None,
+        metrics_history: Optional[list[dict[str, Any]]] = None,
+        baseline_metrics: Optional[dict[str, float]] = None,
+        benchmark_data: Optional[dict[str, dict[str, float]]] = None,
     ):
         """Initialize performance analyzer.
 
@@ -263,7 +262,7 @@ class PerformanceAnalyzer:
         self.baseline_metrics = baseline_metrics or self._default_baselines()
         self.benchmark_data = benchmark_data or self._default_benchmarks()
 
-    def _default_baselines(self) -> Dict[str, float]:
+    def _default_baselines(self) -> dict[str, float]:
         """Get default baseline metrics.
 
         Returns:
@@ -277,7 +276,7 @@ class PerformanceAnalyzer:
             "throughput_teams_per_minute": 2.0,
         }
 
-    def _default_benchmarks(self) -> Dict[str, Dict[str, float]]:
+    def _default_benchmarks(self) -> dict[str, dict[str, float]]:
         """Get default benchmark data.
 
         Returns:
@@ -314,7 +313,7 @@ class PerformanceAnalyzer:
             else:
                 self.metrics_history.append(data)
 
-    def analyze_team_workflow(self, team_id: Optional[str] = None) -> List[PerformanceInsight]:
+    def analyze_team_workflow(self, team_id: Optional[str] = None) -> list[PerformanceInsight]:
         """Analyze team workflow performance.
 
         Args:
@@ -323,7 +322,7 @@ class PerformanceAnalyzer:
         Returns:
             List of performance insights
         """
-        insights: List[PerformanceInsight] = []
+        insights: list[PerformanceInsight] = []
 
         if not self.metrics_history:
             logger.warning("No metrics history available for analysis")
@@ -352,7 +351,7 @@ class PerformanceAnalyzer:
 
         return insights
 
-    def _analyze_duration(self, metrics: List[Dict[str, Any]]) -> List[PerformanceInsight]:
+    def _analyze_duration(self, metrics: list[dict[str, Any]]) -> list[PerformanceInsight]:
         """Analyze execution duration.
 
         Args:
@@ -361,7 +360,7 @@ class PerformanceAnalyzer:
         Returns:
             List of duration-related insights
         """
-        insights: List[PerformanceInsight] = []
+        insights: list[PerformanceInsight] = []
 
         durations = [m.get("duration_seconds", 0) for m in metrics if m.get("duration_seconds")]
         if not durations:
@@ -409,7 +408,7 @@ class PerformanceAnalyzer:
 
         return insights
 
-    def _analyze_success_rate(self, metrics: List[Dict[str, Any]]) -> List[PerformanceInsight]:
+    def _analyze_success_rate(self, metrics: list[dict[str, Any]]) -> list[PerformanceInsight]:
         """Analyze success rate.
 
         Args:
@@ -443,7 +442,7 @@ class PerformanceAnalyzer:
 
         return insights
 
-    def _analyze_tool_usage(self, metrics: List[Dict[str, Any]]) -> List[PerformanceInsight]:
+    def _analyze_tool_usage(self, metrics: list[dict[str, Any]]) -> list[PerformanceInsight]:
         """Analyze tool usage patterns.
 
         Args:
@@ -452,7 +451,7 @@ class PerformanceAnalyzer:
         Returns:
             List of tool-usage-related insights
         """
-        insights: List[PerformanceInsight] = []
+        insights: list[PerformanceInsight] = []
 
         tool_calls = [m.get("total_tool_calls", 0) for m in metrics if m.get("total_tool_calls")]
         if not tool_calls:
@@ -483,8 +482,8 @@ class PerformanceAnalyzer:
         return insights
 
     def _analyze_formation_performance(
-        self, metrics: List[Dict[str, Any]]
-    ) -> List[PerformanceInsight]:
+        self, metrics: list[dict[str, Any]]
+    ) -> list[PerformanceInsight]:
         """Analyze formation-specific performance.
 
         Args:
@@ -496,7 +495,7 @@ class PerformanceAnalyzer:
         insights = []
 
         # Group by formation
-        formation_metrics: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        formation_metrics: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for m in metrics:
             formation = m.get("formation", "sequential")
             formation_metrics[formation].append(m)
@@ -538,7 +537,7 @@ class PerformanceAnalyzer:
 
         return insights
 
-    def _analyze_team_size(self, metrics: List[Dict[str, Any]]) -> List[PerformanceInsight]:
+    def _analyze_team_size(self, metrics: list[dict[str, Any]]) -> list[PerformanceInsight]:
         """Analyze team size efficiency.
 
         Args:
@@ -550,7 +549,7 @@ class PerformanceAnalyzer:
         insights = []
 
         # Group by member count
-        size_metrics: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
+        size_metrics: dict[int, list[dict[str, Any]]] = defaultdict(list)
         for m in metrics:
             member_count = m.get("member_count", 1)
             size_metrics[member_count].append(m)
@@ -598,8 +597,8 @@ class OptimizationStrategy(ABC):
 
     @abstractmethod
     def suggest(
-        self, insights: List[PerformanceInsight], current_config: Dict[str, Any]
-    ) -> List[OptimizationSuggestion]:
+        self, insights: list[PerformanceInsight], current_config: dict[str, Any]
+    ) -> list[OptimizationSuggestion]:
         """Generate optimization suggestions.
 
         Args:
@@ -612,7 +611,7 @@ class OptimizationStrategy(ABC):
         pass
 
     @abstractmethod
-    def apply(self, config: Dict[str, Any], suggestion: OptimizationSuggestion) -> Dict[str, Any]:
+    def apply(self, config: dict[str, Any], suggestion: OptimizationSuggestion) -> dict[str, Any]:
         """Apply optimization to configuration.
 
         Args:
@@ -629,8 +628,8 @@ class TeamSizingStrategy(OptimizationStrategy):
     """Optimization strategy for team sizing."""
 
     def suggest(
-        self, insights: List[PerformanceInsight], current_config: Dict[str, Any]
-    ) -> List[OptimizationSuggestion]:
+        self, insights: list[PerformanceInsight], current_config: dict[str, Any]
+    ) -> list[OptimizationSuggestion]:
         """Suggest team size optimizations."""
         suggestions = []
 
@@ -655,7 +654,7 @@ class TeamSizingStrategy(OptimizationStrategy):
 
         return suggestions
 
-    def apply(self, config: Dict[str, Any], suggestion: OptimizationSuggestion) -> Dict[str, Any]:
+    def apply(self, config: dict[str, Any], suggestion: OptimizationSuggestion) -> dict[str, Any]:
         """Apply team size optimization."""
         new_config = copy.deepcopy(config)
         new_config.update(suggestion.suggested_config)
@@ -675,8 +674,8 @@ class FormationSelectionStrategy(OptimizationStrategy):
     }
 
     def suggest(
-        self, insights: List[PerformanceInsight], current_config: Dict[str, Any]
-    ) -> List[OptimizationSuggestion]:
+        self, insights: list[PerformanceInsight], current_config: dict[str, Any]
+    ) -> list[OptimizationSuggestion]:
         """Suggest formation optimizations."""
         suggestions = []
 
@@ -715,7 +714,7 @@ class FormationSelectionStrategy(OptimizationStrategy):
 
         return suggestions
 
-    def apply(self, config: Dict[str, Any], suggestion: OptimizationSuggestion) -> Dict[str, Any]:
+    def apply(self, config: dict[str, Any], suggestion: OptimizationSuggestion) -> dict[str, Any]:
         """Apply formation optimization."""
         new_config = copy.deepcopy(config)
         new_config.update(suggestion.suggested_config)
@@ -726,8 +725,8 @@ class ToolBudgetStrategy(OptimizationStrategy):
     """Optimization strategy for tool budget allocation."""
 
     def suggest(
-        self, insights: List[PerformanceInsight], current_config: Dict[str, Any]
-    ) -> List[OptimizationSuggestion]:
+        self, insights: list[PerformanceInsight], current_config: dict[str, Any]
+    ) -> list[OptimizationSuggestion]:
         """Suggest tool budget optimizations."""
         suggestions = []
 
@@ -752,7 +751,7 @@ class ToolBudgetStrategy(OptimizationStrategy):
 
         return suggestions
 
-    def apply(self, config: Dict[str, Any], suggestion: OptimizationSuggestion) -> Dict[str, Any]:
+    def apply(self, config: dict[str, Any], suggestion: OptimizationSuggestion) -> dict[str, Any]:
         """Apply tool budget optimization."""
         new_config = copy.deepcopy(config)
         new_config.update(suggestion.suggested_config)
@@ -763,8 +762,8 @@ class TimeoutTuningStrategy(OptimizationStrategy):
     """Optimization strategy for timeout tuning."""
 
     def suggest(
-        self, insights: List[PerformanceInsight], current_config: Dict[str, Any]
-    ) -> List[OptimizationSuggestion]:
+        self, insights: list[PerformanceInsight], current_config: dict[str, Any]
+    ) -> list[OptimizationSuggestion]:
         """Suggest timeout optimizations."""
         suggestions = []
 
@@ -790,7 +789,7 @@ class TimeoutTuningStrategy(OptimizationStrategy):
 
         return suggestions
 
-    def apply(self, config: Dict[str, Any], suggestion: OptimizationSuggestion) -> Dict[str, Any]:
+    def apply(self, config: dict[str, Any], suggestion: OptimizationSuggestion) -> dict[str, Any]:
         """Apply timeout optimization."""
         new_config = copy.deepcopy(config)
         new_config.update(suggestion.suggested_config)
@@ -839,7 +838,7 @@ class PerformanceAutotuner:
     def __init__(
         self,
         analyzer: Optional[PerformanceAnalyzer] = None,
-        strategies: Optional[List[OptimizationStrategy]] = None,
+        strategies: Optional[list[OptimizationStrategy]] = None,
         ab_test_threshold: float = 5.0,
         enable_auto_rollback: bool = True,
     ):
@@ -855,9 +854,9 @@ class PerformanceAutotuner:
         self.strategies = strategies or self._default_strategies()
         self.ab_test_threshold = ab_test_threshold
         self.enable_auto_rollback = enable_auto_rollback
-        self.optimization_history: Dict[str, List[OptimizationResult]] = defaultdict(list)
+        self.optimization_history: dict[str, list[OptimizationResult]] = defaultdict(list)
 
-    def _default_strategies(self) -> List[OptimizationStrategy]:
+    def _default_strategies(self) -> list[OptimizationStrategy]:
         """Get default optimization strategies."""
         return [
             TeamSizingStrategy(),
@@ -869,8 +868,8 @@ class PerformanceAutotuner:
     def suggest_optimizations(
         self,
         team_id: Optional[str] = None,
-        current_config: Optional[Dict[str, Any]] = None,
-    ) -> List[OptimizationSuggestion]:
+        current_config: Optional[dict[str, Any]] = None,
+    ) -> list[OptimizationSuggestion]:
         """Generate optimization suggestions.
 
         Args:
@@ -916,8 +915,8 @@ class PerformanceAutotuner:
     async def apply_optimizations(
         self,
         team_id: str,
-        optimizations: List[OptimizationSuggestion],
-        workflow_config: Dict[str, Any],
+        optimizations: list[OptimizationSuggestion],
+        workflow_config: dict[str, Any],
         enable_ab_testing: bool = True,
         dry_run: bool = False,
     ) -> OptimizationResult:
@@ -1028,8 +1027,8 @@ class PerformanceAutotuner:
             )
 
     def _apply_optimization_to_config(
-        self, config: Dict[str, Any], suggestion: OptimizationSuggestion
-    ) -> Dict[str, Any]:
+        self, config: dict[str, Any], suggestion: OptimizationSuggestion
+    ) -> dict[str, Any]:
         """Apply optimization to configuration.
 
         Args:
@@ -1057,8 +1056,8 @@ class PerformanceAutotuner:
         self,
         team_id: str,
         optimization: OptimizationSuggestion,
-        new_config: Dict[str, Any],
-        before_metrics: Dict[str, float],
+        new_config: dict[str, Any],
+        before_metrics: dict[str, float],
     ) -> str:
         """Perform A/B testing for optimization.
 
@@ -1093,7 +1092,7 @@ class PerformanceAutotuner:
             logger.error(f"A/B test failed: {simulated_improvement:.1f}% improvement")
             return "failed"
 
-    def _get_current_metrics(self, team_id: str) -> Dict[str, float]:
+    def _get_current_metrics(self, team_id: str) -> dict[str, float]:
         """Get current metrics for team.
 
         Args:
@@ -1148,7 +1147,7 @@ class PerformanceAutotuner:
 
         return True
 
-    def get_optimization_history(self, team_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_optimization_history(self, team_id: Optional[str] = None) -> list[dict[str, Any]]:
         """Get optimization history.
 
         Args:
@@ -1174,7 +1173,7 @@ class PerformanceAutotuner:
 
 def analyze_team_performance(
     team_id: str, metrics_file: Optional[Path] = None
-) -> List[PerformanceInsight]:
+) -> list[PerformanceInsight]:
     """Analyze team performance and return insights.
 
     Args:
@@ -1198,8 +1197,8 @@ def analyze_team_performance(
 
 
 def suggest_team_optimizations(
-    team_id: str, current_config: Dict[str, Any], metrics_file: Optional[Path] = None
-) -> List[OptimizationSuggestion]:
+    team_id: str, current_config: dict[str, Any], metrics_file: Optional[Path] = None
+) -> list[OptimizationSuggestion]:
     """Get optimization suggestions for a team.
 
     Args:

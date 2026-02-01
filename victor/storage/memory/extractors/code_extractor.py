@@ -20,7 +20,7 @@ from code snippets and file references in text.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.storage.memory.entity_types import (
     Entity,
@@ -120,7 +120,7 @@ class CodeEntityExtractor(EntityExtractor):
         return "code_extractor"
 
     @property
-    def supported_types(self) -> Set[EntityType]:
+    def supported_types(self) -> set[EntityType]:
         return {
             EntityType.FILE,
             EntityType.FUNCTION,
@@ -134,7 +134,7 @@ class CodeEntityExtractor(EntityExtractor):
         self,
         content: str,
         source: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ExtractionResult:
         """Extract code entities from content.
 
@@ -146,8 +146,8 @@ class CodeEntityExtractor(EntityExtractor):
         Returns:
             ExtractionResult with code entities
         """
-        entities: List[Entity] = []
-        relations: List[EntityRelation] = []
+        entities: list[Entity] = []
+        relations: list[EntityRelation] = []
 
         # Extract entities by type
         for entity_type_str, patterns in CODE_PATTERNS.items():
@@ -211,7 +211,7 @@ class CodeEntityExtractor(EntityExtractor):
         name: str,
         entity_type: EntityType,
         pattern: str,
-        context: Optional[Dict[str, Any]],
+        context: Optional[dict[str, Any]],
     ) -> float:
         """Calculate extraction confidence for an entity."""
         confidence = 0.7  # Base confidence
@@ -252,11 +252,11 @@ class CodeEntityExtractor(EntityExtractor):
     def _extract_relationships(
         self,
         content: str,
-        entities: List[Entity],
+        entities: list[Entity],
         source: Optional[str],
-    ) -> List[EntityRelation]:
+    ) -> list[EntityRelation]:
         """Extract relationships between entities."""
-        relations: List[EntityRelation] = []
+        relations: list[EntityRelation] = []
         entity_ids = {e.name: e.id for e in entities}
 
         for rel_type, patterns in RELATIONSHIP_PATTERNS.items():
@@ -281,9 +281,9 @@ class CodeEntityExtractor(EntityExtractor):
 
         return relations
 
-    def _deduplicate_entities(self, entities: List[Entity]) -> List[Entity]:
+    def _deduplicate_entities(self, entities: list[Entity]) -> list[Entity]:
         """Remove duplicate entities, keeping highest confidence."""
-        seen: Dict[str, Entity] = {}
+        seen: dict[str, Entity] = {}
 
         for entity in entities:
             if entity.id in seen:
@@ -294,7 +294,7 @@ class CodeEntityExtractor(EntityExtractor):
 
         return list(seen.values())
 
-    def _calculate_overall_confidence(self, entities: List[Entity]) -> float:
+    def _calculate_overall_confidence(self, entities: list[Entity]) -> float:
         """Calculate overall extraction confidence."""
         if not entities:
             return 0.0

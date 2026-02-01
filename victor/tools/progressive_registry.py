@@ -22,7 +22,7 @@ eliminating duplicate singleton boilerplate code.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Set
+from typing import Any, Optional
 
 from victor.core.registry_base import SingletonRegistry
 
@@ -39,9 +39,9 @@ class ProgressiveToolConfig:
     """
 
     tool_name: str
-    progressive_params: Dict[str, Any] = field(default_factory=dict)
-    initial_values: Dict[str, Any] = field(default_factory=dict)
-    max_values: Dict[str, Any] = field(default_factory=dict)
+    progressive_params: dict[str, Any] = field(default_factory=dict)
+    initial_values: dict[str, Any] = field(default_factory=dict)
+    max_values: dict[str, Any] = field(default_factory=dict)
 
 
 class ProgressiveToolsRegistry(SingletonRegistry["ProgressiveToolsRegistry"]):
@@ -68,14 +68,14 @@ class ProgressiveToolsRegistry(SingletonRegistry["ProgressiveToolsRegistry"]):
     def __init__(self) -> None:
         """Initialize the progressive tools registry."""
         super().__init__()
-        self._tools: Dict[str, ProgressiveToolConfig] = {}
+        self._tools: dict[str, ProgressiveToolConfig] = {}
 
     def register(
         self,
         tool_name: str,
-        progressive_params: Dict[str, Any],
-        initial_values: Optional[Dict[str, Any]] = None,
-        max_values: Optional[Dict[str, Any]] = None,
+        progressive_params: dict[str, Any],
+        initial_values: Optional[dict[str, Any]] = None,
+        max_values: Optional[dict[str, Any]] = None,
     ) -> None:
         """Register a tool with progressive parameter configuration.
 
@@ -128,7 +128,7 @@ class ProgressiveToolsRegistry(SingletonRegistry["ProgressiveToolsRegistry"]):
         """
         return self._tools.get(tool_name)
 
-    def list_progressive_tools(self) -> Set[str]:
+    def list_progressive_tools(self) -> set[str]:
         """Get set of all registered progressive tool names.
 
         Returns:

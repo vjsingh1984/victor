@@ -23,10 +23,9 @@ Example:
     # Returns: ["correlation"]
 """
 
-from typing import Dict, List, Set
 
 # Data analysis type keywords
-ANALYSIS_TYPES: Dict[str, List[str]] = {
+ANALYSIS_TYPES: dict[str, list[str]] = {
     "correlation": ["correlation", "correlate", "covariance", "relationship", "r-squared"],
     "regression": ["regression", "linear", "predict", "fit", "coefficients", "ols"],
     "clustering": ["cluster", "kmeans", "k-means", "grouping", "centroid", "dbscan"],
@@ -38,7 +37,7 @@ ANALYSIS_TYPES: Dict[str, List[str]] = {
 }
 
 # DevOps infrastructure type keywords
-INFRA_TYPES: Dict[str, List[str]] = {
+INFRA_TYPES: dict[str, list[str]] = {
     "docker": ["docker", "container", "dockerfile", "compose", "image", "registry"],
     "kubernetes": ["kubernetes", "k8s", "kubectl", "pod", "deployment", "service", "helm"],
     "terraform": ["terraform", "infrastructure as code", "iac", "tfstate", "provider"],
@@ -49,7 +48,7 @@ INFRA_TYPES: Dict[str, List[str]] = {
 }
 
 # Research task type keywords
-RESEARCH_TYPES: Dict[str, List[str]] = {
+RESEARCH_TYPES: dict[str, list[str]] = {
     "literature_review": ["review", "survey", "literature", "state of the art", "related work"],
     "fact_checking": ["fact check", "verify", "accurate", "claim", "source"],
     "summarization": ["summarize", "summary", "overview", "key points", "tldr"],
@@ -73,7 +72,7 @@ class KeywordClassifier:
         # ["urgent", "bug"]
     """
 
-    def __init__(self, keyword_map: Dict[str, List[str]]) -> None:
+    def __init__(self, keyword_map: dict[str, list[str]]) -> None:
         """Initialize with keyword mapping.
 
         Args:
@@ -81,7 +80,7 @@ class KeywordClassifier:
         """
         self.keyword_map = keyword_map
 
-    def classify(self, text: str) -> List[str]:
+    def classify(self, text: str) -> list[str]:
         """Classify text into matching categories.
 
         Args:
@@ -94,7 +93,7 @@ class KeywordClassifier:
             return []
 
         text_lower = text.lower()
-        matches: List[str] = []
+        matches: list[str] = []
 
         for category, keywords in self.keyword_map.items():
             for keyword in keywords:
@@ -104,7 +103,7 @@ class KeywordClassifier:
 
         return matches
 
-    def classify_with_scores(self, text: str) -> Dict[str, int]:
+    def classify_with_scores(self, text: str) -> dict[str, int]:
         """Classify text with match count scores.
 
         Args:
@@ -117,7 +116,7 @@ class KeywordClassifier:
             return {}
 
         text_lower = text.lower()
-        scores: Dict[str, int] = {}
+        scores: dict[str, int] = {}
 
         for category, keywords in self.keyword_map.items():
             count = sum(1 for kw in keywords if kw.lower() in text_lower)
@@ -157,7 +156,7 @@ class KeywordClassifier:
         return any(kw.lower() in text_lower for kw in self.keyword_map[category])
 
 
-def create_combined_classifier(*keyword_dicts: Dict[str, List[str]]) -> KeywordClassifier:
+def create_combined_classifier(*keyword_dicts: dict[str, list[str]]) -> KeywordClassifier:
     """Create a classifier combining multiple keyword dictionaries.
 
     Args:
@@ -169,7 +168,7 @@ def create_combined_classifier(*keyword_dicts: Dict[str, List[str]]) -> KeywordC
     Example:
         classifier = create_combined_classifier(ANALYSIS_TYPES, INFRA_TYPES)
     """
-    combined: Dict[str, List[str]] = {}
+    combined: dict[str, list[str]] = {}
     for kd in keyword_dicts:
         for category, keywords in kd.items():
             if category in combined:

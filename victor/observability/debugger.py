@@ -47,7 +47,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.observability.tracing.execution import ExecutionTracer
 from victor.observability.tracing.tool_calls import ToolCallTracer
@@ -117,7 +117,7 @@ class AgentDebugger:
 
     def get_execution_trace(
         self, agent_id: Optional[str] = None, span_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get execution trace for an agent.
 
         Args:
@@ -141,7 +141,7 @@ class AgentDebugger:
 
     def get_execution_spans(
         self, agent_id: Optional[str] = None, span_type: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get execution spans as list.
 
         Args:
@@ -161,7 +161,7 @@ class AgentDebugger:
 
         return [span.to_dict() for span in spans]
 
-    def get_active_spans(self) -> List[Dict[str, Any]]:
+    def get_active_spans(self) -> list[dict[str, Any]]:
         """Get all currently running spans.
 
         Returns:
@@ -179,7 +179,7 @@ class AgentDebugger:
         tool_name: Optional[str] = None,
         parent_span_id: Optional[str] = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get tool call history.
 
         Args:
@@ -211,7 +211,7 @@ class AgentDebugger:
             for c in calls
         ]
 
-    def get_failed_tool_calls(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_failed_tool_calls(self, limit: int = 100) -> list[dict[str, Any]]:
         """Get failed tool calls.
 
         Args:
@@ -234,7 +234,7 @@ class AgentDebugger:
             for c in calls
         ]
 
-    def get_tool_calls_by_span(self, parent_span_id: str) -> List[Dict[str, Any]]:
+    def get_tool_calls_by_span(self, parent_span_id: str) -> list[dict[str, Any]]:
         """Get all tool calls for a specific execution span.
 
         Args:
@@ -256,7 +256,7 @@ class AgentDebugger:
         scope: Optional[str] = None,
         key: Optional[str] = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get state transition history.
 
         Args:
@@ -285,7 +285,7 @@ class AgentDebugger:
     # Performance Summary Methods
     # ========================================================================
 
-    def get_performance_summary(self) -> Dict[str, Any]:
+    def get_performance_summary(self) -> dict[str, Any]:
         """Get performance summary across all tracers.
 
         Aggregates metrics from execution, tool calls, and state.
@@ -317,7 +317,7 @@ class AgentDebugger:
 
     def get_slow_tool_calls(
         self, threshold_ms: float = 1000.0, limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get slow tool calls above threshold.
 
         Args:
@@ -363,7 +363,7 @@ class AgentDebugger:
 
         logger.info("Cleared all debugging data")
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get a brief summary of all debugging data.
 
         Returns:

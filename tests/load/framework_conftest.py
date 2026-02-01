@@ -16,7 +16,6 @@
 
 import asyncio
 import pytest
-import httpx
 
 
 @pytest.fixture(scope="session")

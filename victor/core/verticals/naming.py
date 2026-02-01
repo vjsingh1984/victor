@@ -20,14 +20,13 @@ accept legacy names while keeping canonical identifiers consistent.
 
 from __future__ import annotations
 
-from typing import Dict
 
 
-_VERTICAL_NAME_ALIASES: Dict[str, str] = {
+_VERTICAL_NAME_ALIASES: dict[str, str] = {
     "dataanalysis": "data_analysis",
 }
 
-_VERTICAL_MODULE_OVERRIDES: Dict[str, str] = {
+_VERTICAL_MODULE_OVERRIDES: dict[str, str] = {
     "data_analysis": "dataanalysis",
 }
 

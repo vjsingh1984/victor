@@ -34,7 +34,8 @@ from __future__ import annotations
 import importlib
 import logging
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Type, Union
+from typing import Optional
+from collections.abc import Callable
 
 from victor.observability.debug.adapter import (
     BaseDebugAdapter,
@@ -69,9 +70,9 @@ class DebugAdapterRegistry:
 
     def __init__(self):
         """Initialize empty registry."""
-        self._adapters: Dict[str, AdapterFactory] = {}
-        self._instances: Dict[str, DebugAdapter] = {}
-        self._language_aliases: Dict[str, str] = {
+        self._adapters: dict[str, AdapterFactory] = {}
+        self._instances: dict[str, DebugAdapter] = {}
+        self._language_aliases: dict[str, str] = {
             # Common aliases
             "py": "python",
             "python3": "python",
@@ -91,8 +92,8 @@ class DebugAdapterRegistry:
     def register(
         self,
         language: str,
-        adapter: Union[Type[DebugAdapter], AdapterFactory],
-        aliases: Optional[List[str]] = None,
+        adapter: type[DebugAdapter] | AdapterFactory,
+        aliases: Optional[list[str]] = None,
     ) -> None:
         """Register a debug adapter for a language.
 
@@ -172,7 +173,7 @@ class DebugAdapterRegistry:
         language = self._resolve_language(language)
         return language in self._adapters
 
-    def list_adapters(self) -> Dict[str, DebugAdapterCapabilities]:
+    def list_adapters(self) -> dict[str, DebugAdapterCapabilities]:
         """List all registered adapters with their capabilities.
 
         Returns:
@@ -188,7 +189,7 @@ class DebugAdapterRegistry:
                 result[language] = DebugAdapterCapabilities()
         return result
 
-    def supported_languages(self) -> List[str]:
+    def supported_languages(self) -> list[str]:
         """Get list of all supported languages.
 
         Returns:
@@ -208,7 +209,7 @@ class DebugAdapterRegistry:
         language = language.lower()
         return self._language_aliases.get(language, language)
 
-    def discover_adapters(self, paths: Optional[List[Path]] = None) -> int:
+    def discover_adapters(self, paths: Optional[list[Path]] = None) -> int:
         """Auto-discover debug adapters.
 
         Searches for adapter modules in standard locations and

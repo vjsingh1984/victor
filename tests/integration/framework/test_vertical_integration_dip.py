@@ -14,9 +14,7 @@
 
 """Integration tests for DIP-compliant vertical integration."""
 
-from unittest.mock import MagicMock, Mock
 
-import pytest
 
 from victor.core.verticals.mutable_context import MutableVerticalContext
 

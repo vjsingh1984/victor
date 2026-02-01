@@ -24,7 +24,8 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 import logging
 import datetime
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.agent.model_switcher import ModelSwitcher, SwitchReason
 from victor.agent.protocols import (
@@ -108,8 +109,8 @@ class ProviderSwitcher(IProviderSwitcher):
 
         self._current_state: Optional[ProviderSwitcherState] = None
         self._model_switcher = ModelSwitcher()
-        self._switch_history: List[Dict[str, Any]] = []
-        self._on_switch_callbacks: List[Callable[[ProviderSwitcherState], None]] = []
+        self._switch_history: list[dict[str, Any]] = []
+        self._on_switch_callbacks: list[Callable[[ProviderSwitcherState], None]] = []
 
     def get_current_provider(self) -> Optional[BaseProvider]:
         """Get current provider instance.
@@ -329,7 +330,7 @@ class ProviderSwitcher(IProviderSwitcher):
                 self._current_state.last_error = str(e)
             return False
 
-    def get_switch_history(self) -> List[Dict[str, Any]]:
+    def get_switch_history(self) -> list[dict[str, Any]]:
         """Get history of provider/model switches.
 
         Returns:

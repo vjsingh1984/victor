@@ -59,7 +59,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +160,7 @@ class GitCheckpointManager:
 
     def _run_git_command(
         self,
-        args: List[str],
+        args: list[str],
         check: bool = True,
         capture_output: bool = True,
     ) -> "subprocess.CompletedProcess[str]":
@@ -335,7 +335,7 @@ class GitCheckpointManager:
         except subprocess.CalledProcessError as e:
             raise CheckpointError(f"Failed to rollback to checkpoint: {e.stderr}") from e
 
-    def list_checkpoints(self) -> List[GitCheckpoint]:
+    def list_checkpoints(self) -> list[GitCheckpoint]:
         """List all available checkpoints.
 
         Returns:

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 def emit_event_sync(
     event_bus: Any,
     topic: str,
-    data: Dict[str, Any],
+    data: dict[str, Any],
     *,
     source: str = "victor",
     correlation_id: Optional[str] = None,

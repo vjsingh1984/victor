@@ -39,7 +39,7 @@ import logging
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
@@ -63,10 +63,10 @@ class FormationPrediction:
 
     formation: "TeamFormation"
     confidence: float
-    probabilities: Dict[str, float]
+    probabilities: dict[str, float]
     reasoning: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "formation": self.formation.value,
@@ -350,7 +350,7 @@ class FormationPredictor:
         self,
         task_features: "TaskFeatures",
         team_features: "TeamFeatures",
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Get probabilities for all formations.
 
         Args:
@@ -365,7 +365,7 @@ class FormationPredictor:
 
     def train(
         self,
-        training_data: List[Dict[str, Any]],
+        training_data: list[dict[str, Any]],
     ) -> None:
         """Train formation prediction model.
 
@@ -466,7 +466,7 @@ class FormationPredictor:
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
 
-    def get_feature_importance(self) -> Dict[str, float]:
+    def get_feature_importance(self) -> dict[str, float]:
         """Get feature importance from trained model.
 
         Returns:

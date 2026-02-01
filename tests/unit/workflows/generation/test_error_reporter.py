@@ -23,7 +23,6 @@ Tests the error reporting and aggregation functionality:
 """
 
 import json
-import pytest
 
 from victor.workflows.generation.types import (
     ErrorSeverity,

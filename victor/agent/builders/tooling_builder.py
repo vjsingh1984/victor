@@ -18,7 +18,7 @@ Part of HIGH-005: Initialization Complexity reduction.
 """
 
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.builders.base import FactoryAwareBuilder
 
@@ -48,10 +48,10 @@ class ToolingBuilder(FactoryAwareBuilder):
         provider: "BaseProvider",
         model: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build tooling components and attach them to orchestrator."""
         factory = self._ensure_factory(provider=provider, model=model)
-        components: Dict[str, Any] = {}
+        components: dict[str, Any] = {}
 
         # Tool registry (via factory)
         orchestrator.tools = factory.create_tool_registry()

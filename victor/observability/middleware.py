@@ -52,7 +52,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Optional
+from collections.abc import Awaitable, Callable
 
 try:
     from starlette.datastructures import Headers
@@ -68,8 +69,6 @@ except ImportError:
 from victor.observability.production_metrics import ProductionMetricsCollector
 from victor.observability.distributed_tracing import (
     DistributedTracer,
-    Span,
-    TraceContext,
 )
 
 logger = logging.getLogger(__name__)
@@ -118,7 +117,7 @@ class RequestMetadata:
     status_code: int = 200
     status: RequestStatus = RequestStatus.SUCCESS
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary.
 
         Returns:
@@ -404,7 +403,7 @@ class ASGIMonitoringMiddleware:
         )
 
     async def __call__(
-        self, scope: Dict[str, Any], receive: Callable[..., Any], send: Callable[..., Any]
+        self, scope: dict[str, Any], receive: Callable[..., Any], send: Callable[..., Any]
     ) -> None:
         """ASGI entry point.
 

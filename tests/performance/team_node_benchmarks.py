@@ -52,11 +52,10 @@ import logging
 import random
 import time
 import tracemalloc
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Optional
 
 import pytest
 
@@ -129,7 +128,7 @@ class MockTeamMember:
         self._message_size = message_size
         self._call_count = 0
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> TeamMemberResult:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> TeamMemberResult:
         """Execute a task with simulated delay and tool calls."""
         start_time = time.perf_counter()
         self._call_count += 1
@@ -188,7 +187,7 @@ class MockTeamCoordinator:
         enable_recursion_tracking: bool = True,
     ):
         self.formation = formation
-        self.members: List[MockTeamMember] = []
+        self.members: list[MockTeamMember] = []
         self.enable_recursion_tracking = enable_recursion_tracking
         self.recursion_depth = 0
         self.max_recursion_depth = 10
@@ -205,8 +204,8 @@ class MockTeamCoordinator:
     async def execute_team(
         self,
         task: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        context: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """Execute team task based on formation."""
         context = context or {}
         start_time = time.perf_counter()
@@ -257,8 +256,8 @@ class MockTeamCoordinator:
     async def _execute_sequential(
         self,
         task: str,
-        context: Dict[str, Any],
-    ) -> List[TeamMemberResult]:
+        context: dict[str, Any],
+    ) -> list[TeamMemberResult]:
         """Execute members sequentially."""
         results = []
         for member in self.members:
@@ -272,8 +271,8 @@ class MockTeamCoordinator:
     async def _execute_parallel(
         self,
         task: str,
-        context: Dict[str, Any],
-    ) -> List[TeamMemberResult]:
+        context: dict[str, Any],
+    ) -> list[TeamMemberResult]:
         """Execute members in parallel."""
         tasks = [member.execute_task(task, context) for member in self.members]
         self.message_count += len(self.members)
@@ -301,8 +300,8 @@ class MockTeamCoordinator:
     async def _execute_pipeline(
         self,
         task: str,
-        context: Dict[str, Any],
-    ) -> List[TeamMemberResult]:
+        context: dict[str, Any],
+    ) -> list[TeamMemberResult]:
         """Execute members in pipeline (output of one feeds into next)."""
         results = []
         current_context = context.copy()
@@ -323,8 +322,8 @@ class MockTeamCoordinator:
     async def _execute_hierarchical(
         self,
         task: str,
-        context: Dict[str, Any],
-    ) -> List[TeamMemberResult]:
+        context: dict[str, Any],
+    ) -> list[TeamMemberResult]:
         """Execute members in hierarchical formation (manager delegates to workers)."""
         if not self.members:
             return []
@@ -365,9 +364,9 @@ class MockTeamCoordinator:
     async def _execute_consensus(
         self,
         task: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         max_rounds: int = 3,
-    ) -> List[TeamMemberResult]:
+    ) -> list[TeamMemberResult]:
         """Execute members until consensus is reached."""
         results = []
         all_agreed = False
@@ -394,8 +393,8 @@ class MockTeamCoordinator:
     async def _execute_dynamic(
         self,
         task: str,
-        context: Dict[str, Any],
-    ) -> List[TeamMemberResult]:
+        context: dict[str, Any],
+    ) -> list[TeamMemberResult]:
         """Execute members with dynamic formation selection."""
         # Simple heuristic: use parallel for >3 members, sequential otherwise
         if len(self.members) > 3:
@@ -406,8 +405,8 @@ class MockTeamCoordinator:
     async def _execute_adaptive(
         self,
         task: str,
-        context: Dict[str, Any],
-    ) -> List[TeamMemberResult]:
+        context: dict[str, Any],
+    ) -> list[TeamMemberResult]:
         """Execute members with adaptive performance tuning."""
         # Start with parallel, fallback to sequential if any member fails
         try:
@@ -423,8 +422,8 @@ class MockTeamCoordinator:
     async def _execute_hybrid(
         self,
         task: str,
-        context: Dict[str, Any],
-    ) -> List[TeamMemberResult]:
+        context: dict[str, Any],
+    ) -> list[TeamMemberResult]:
         """Execute members using hybrid approach (pipeline + parallel stages)."""
         if len(self.members) <= 2:
             return await self._execute_pipeline(task, context)

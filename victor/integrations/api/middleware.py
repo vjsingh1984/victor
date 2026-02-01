@@ -22,15 +22,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import hmac
 import logging
-import os
 import secrets
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from functools import lru_cache, wraps
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
+from functools import lru_cache
+from typing import Any, Optional
+from collections.abc import Awaitable, Callable
 
 from aiohttp import web
 from aiohttp.web import Request, Response
@@ -46,7 +45,7 @@ class RateLimitConfig:
     requests_per_hour: int = 1000
     burst_size: int = 10  # Allow short bursts
     per_endpoint: bool = True  # Rate limit per endpoint
-    whitelist: Set[str] = field(default_factory=set)  # Exempt paths
+    whitelist: set[str] = field(default_factory=set)  # Exempt paths
 
 
 @dataclass
@@ -54,10 +53,10 @@ class AuthConfig:
     """Configuration for API authentication."""
 
     enabled: bool = False  # Disabled by default for local dev
-    api_keys: Dict[str, str] = field(default_factory=dict)  # key -> client_id
+    api_keys: dict[str, str] = field(default_factory=dict)  # key -> client_id
     header_name: str = "X-API-Key"
     query_param: str = "api_key"
-    exempt_paths: Set[str] = field(default_factory=lambda: {"/health", "/status"})
+    exempt_paths: set[str] = field(default_factory=lambda: {"/health", "/status"})
 
 
 class TokenBucket:
@@ -120,13 +119,13 @@ class RateLimiter:
         self.config = config or RateLimitConfig()
 
         # Token buckets per client
-        self._client_buckets: Dict[str, TokenBucket] = {}
+        self._client_buckets: dict[str, TokenBucket] = {}
 
         # Token buckets per endpoint
-        self._endpoint_buckets: Dict[str, TokenBucket] = {}
+        self._endpoint_buckets: dict[str, TokenBucket] = {}
 
         # Request counters for analytics
-        self._request_counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self._request_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         self._lock = asyncio.Lock()
 
     @lru_cache(maxsize=1024)
@@ -157,7 +156,7 @@ class RateLimiter:
 
         return buckets[key]
 
-    async def is_allowed(self, request: Request) -> tuple[bool, Optional[Dict[str, Any]]]:
+    async def is_allowed(self, request: Request) -> tuple[bool, Optional[dict[str, Any]]]:
         """Check if request is allowed by rate limits.
 
         Args:
@@ -198,7 +197,7 @@ class RateLimiter:
 
         return True, None
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get rate limiter statistics."""
         return {
             "active_clients": len(self._client_buckets),
@@ -217,8 +216,8 @@ class APIKeyAuthenticator:
             config: Authentication configuration
         """
         self.config = config or AuthConfig()
-        self._key_hashes: Dict[str, str] = {}  # hash -> client_id
-        self._hash_cache: Dict[str, str] = {}  # key -> hash cache
+        self._key_hashes: dict[str, str] = {}  # hash -> client_id
+        self._hash_cache: dict[str, str] = {}  # key -> hash cache
 
         # Hash API keys for secure comparison
         for key, client_id in self.config.api_keys.items():
@@ -407,7 +406,7 @@ class APIMiddlewareStack:
 
     def __init__(self) -> None:
         """Initialize middleware stack."""
-        self._middlewares: List[Callable[[Request, Callable[..., Any]], Awaitable[Response]]] = []
+        self._middlewares: list[Callable[[Request, Callable[..., Any]], Awaitable[Response]]] = []
 
     def add_cors(
         self,
@@ -448,7 +447,7 @@ class APIMiddlewareStack:
         self,
         requests_per_minute: int = 60,
         burst_size: int = 10,
-        whitelist: Optional[Set[str]] = None,
+        whitelist: Optional[set[str]] = None,
     ) -> "APIMiddlewareStack":
         """Add rate limiting middleware.
 
@@ -470,9 +469,9 @@ class APIMiddlewareStack:
 
     def add_authentication(
         self,
-        api_keys: Optional[Dict[str, str]] = None,
+        api_keys: Optional[dict[str, str]] = None,
         enabled: bool = True,
-        exempt_paths: Optional[Set[str]] = None,
+        exempt_paths: Optional[set[str]] = None,
     ) -> "APIMiddlewareStack":
         """Add authentication middleware.
 
@@ -501,7 +500,7 @@ class APIMiddlewareStack:
         self._middlewares.append(create_request_logging_middleware())
         return self
 
-    def build(self) -> List[Callable[[Request, Callable[..., Any]], Awaitable[Response]]]:
+    def build(self) -> list[Callable[[Request, Callable[..., Any]], Awaitable[Response]]]:
         """Build middleware list for aiohttp Application.
 
         Returns:

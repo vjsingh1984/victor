@@ -24,10 +24,10 @@ Features:
 
 import ast
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 import logging
 
-from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
+from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.common import gather_files_by_pattern
 
@@ -123,7 +123,7 @@ Example:
     return docstring
 
 
-def _extract_api_info(tree: ast.AST, module_name: str) -> Dict[str, Any]:
+def _extract_api_info(tree: ast.AST, module_name: str) -> dict[str, Any]:
     """Extract API information from AST."""
     functions = []
     classes = []
@@ -166,7 +166,7 @@ def _extract_api_info(tree: ast.AST, module_name: str) -> Dict[str, Any]:
     }
 
 
-def _build_markdown_docs(api_info: Dict[str, Any]) -> str:
+def _build_markdown_docs(api_info: dict[str, Any]) -> str:
     """Build Markdown API documentation."""
     lines = []
     lines.append(f"# {api_info['module']} API Documentation")
@@ -386,11 +386,11 @@ For complete API documentation, see [API Docs](docs/api.md).
 )
 async def docs(
     path: str,
-    doc_types: Optional[List[str]] = None,
+    doc_types: Optional[list[str]] = None,
     format: str = "google",
     output: Optional[str] = None,
     recursive: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Unified documentation generation tool.
 
@@ -631,7 +631,7 @@ async def docs_coverage(
     check_quality: bool = False,
     file_pattern: str = "*.py",
     max_files: int = 50,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Analyze documentation coverage and quality.
 

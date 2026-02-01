@@ -28,7 +28,7 @@ Install libclang with: pip install libclang
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional, cast
 
 from ..types import ExtractedSymbol
 from .base import BaseLanguageProcessor
@@ -120,7 +120,7 @@ class CppExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: Optional[str] = None,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract symbols from C/C++ code.
 
         Args:
@@ -152,7 +152,7 @@ class CppExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: str,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract symbols using libclang.
 
         Args:
@@ -169,7 +169,7 @@ class CppExtractor(BaseLanguageProcessor):
         # is_available() ensures self._index is not None, use cast for mypy
         index = cast(Any, self._index)
 
-        symbols: List[ExtractedSymbol] = []
+        symbols: list[ExtractedSymbol] = []
 
         # Parse options
         args = ["-x", "c++" if language == "cpp" else "c"]
@@ -194,7 +194,7 @@ class CppExtractor(BaseLanguageProcessor):
         self,
         cursor: Any,
         file_path: Path,
-        symbols: List[ExtractedSymbol],
+        symbols: list[ExtractedSymbol],
         target_file: str,
         parent: Optional[str] = None,
     ) -> None:
@@ -267,7 +267,7 @@ class CppExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: str = "cpp",
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get diagnostics (errors/warnings) from C/C++ code.
 
         Args:
@@ -284,7 +284,7 @@ class CppExtractor(BaseLanguageProcessor):
         # is_available() ensures self._index is not None, use cast for mypy
         index = cast(Any, self._index)
 
-        diagnostics: List[Dict[str, Any]] = []
+        diagnostics: list[dict[str, Any]] = []
 
         try:
             args = ["-x", "c++" if language == "cpp" else "c"]
@@ -330,6 +330,6 @@ class CppExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: Optional[str] = None,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Process code and return results (BaseLanguageProcessor interface)."""
         return self.extract(code, file_path, language)

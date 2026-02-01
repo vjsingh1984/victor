@@ -22,8 +22,9 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.agent.protocols import BudgetConfig, BudgetStatus, BudgetType, IBudgetTracker
 
@@ -82,7 +83,7 @@ class BudgetTracker(IBudgetTracker):
         self._config = config
         self._multiplier_calculator = multiplier_calculator
         self._on_exhausted = on_exhausted
-        self._budgets: Dict[BudgetType, BudgetState] = {}
+        self._budgets: dict[BudgetType, BudgetState] = {}
         self._initialize_budgets()
 
     def _initialize_budgets(self) -> None:
@@ -226,7 +227,7 @@ class BudgetTracker(IBudgetTracker):
         """
         self._on_exhausted = callback
 
-    def get_prompt_budget_info(self) -> Dict[str, Any]:
+    def get_prompt_budget_info(self) -> dict[str, Any]:
         """Get budget information for system prompts.
 
         Returns:
@@ -262,13 +263,13 @@ class BudgetTracker(IBudgetTracker):
             **multiplier_info,
         }
 
-    def get_diagnostics(self) -> Dict[str, Any]:
+    def get_diagnostics(self) -> dict[str, Any]:
         """Get diagnostic information about all budgets.
 
         Returns:
             Dictionary with detailed budget state
         """
-        diagnostics: Dict[str, Any] = {
+        diagnostics: dict[str, Any] = {
             "budgets": {},
         }
 

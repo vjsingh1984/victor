@@ -49,14 +49,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Tuple
+from typing import TYPE_CHECKING, Any
 
 from victor.framework.workflows.base_handler import BaseHandler
 from victor.framework.handler_registry import handler_decorator
 
 if TYPE_CHECKING:
-    import mlflow
-    from mlflow.tracking import MlflowClient
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
     from victor.workflows.executor import WorkflowContext
@@ -89,7 +87,7 @@ class ContainerOpsHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute container operations."""
         operation = node.input_mapping.get("operation", "build")
         dockerfile = node.input_mapping.get("dockerfile", "Dockerfile")
@@ -150,7 +148,7 @@ class TerraformHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute Terraform operations."""
         operation = node.input_mapping.get("operation", "plan")
         workspace = node.input_mapping.get("workspace")
@@ -246,15 +244,15 @@ class MLOpsHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute MLOps operations."""
         operation = node.input_mapping.get("operation", "register")
         model_name = node.input_mapping.get("model_name", "")
         model_path = node.input_mapping.get("model_path", "")
         metrics_input: Any = node.input_mapping.get("metrics", {})
         params_input: Any = node.input_mapping.get("params", {})
-        metrics: Dict[str, Any] = metrics_input if isinstance(metrics_input, dict) else {}
-        params: Dict[str, Any] = params_input if isinstance(params_input, dict) else {}
+        metrics: dict[str, Any] = metrics_input if isinstance(metrics_input, dict) else {}
+        params: dict[str, Any] = params_input if isinstance(params_input, dict) else {}
         experiment_name = node.input_mapping.get("experiment_name", "default")
         stage = node.input_mapping.get("stage", "Staging")
         version = node.input_mapping.get("version", "")
@@ -283,13 +281,13 @@ class MLOpsHandler(BaseHandler):
         operation: str,
         model_name: str,
         model_path: str,
-        metrics: Dict[str, Any],
-        params: Dict[str, Any],
+        metrics: dict[str, Any],
+        params: dict[str, Any],
         experiment_name: str,
         stage: str,
         version: str,
         port: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run MLOps operation asynchronously."""
         import asyncio
 
@@ -313,13 +311,13 @@ class MLOpsHandler(BaseHandler):
         operation: str,
         model_name: str,
         model_path: str,
-        metrics: Dict[str, Any],
-        params: Dict[str, Any],
+        metrics: dict[str, Any],
+        params: dict[str, Any],
         experiment_name: str,
         stage: str,
         version: str,
         port: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Synchronous MLOps execution."""
         try:
             # Runtime import for mlflow (optional dependency)
@@ -365,9 +363,9 @@ class MLOpsHandler(BaseHandler):
         client: Any,
         model_name: str,
         model_path: str,
-        metrics: Dict[str, Any],
-        params: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        metrics: dict[str, Any],
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
         """Register a model with MLflow."""
         with mlflow.start_run() as run:
             # Log parameters
@@ -396,8 +394,8 @@ class MLOpsHandler(BaseHandler):
             }
 
     def _log_experiment(
-        self, mlflow: Any, experiment_name: str, metrics: Dict[str, Any], params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, mlflow: Any, experiment_name: str, metrics: dict[str, Any], params: dict[str, Any]
+    ) -> dict[str, Any]:
         """Log an experiment run."""
         mlflow.set_experiment(experiment_name)
 
@@ -415,7 +413,7 @@ class MLOpsHandler(BaseHandler):
                 "experiment_id": run.info.experiment_id,
             }
 
-    def _serve_model(self, model_name: str, version: str, port: int) -> Dict[str, Any]:
+    def _serve_model(self, model_name: str, version: str, port: int) -> dict[str, Any]:
         """Start model serving (returns command, doesn't actually start)."""
         model_uri = f"models:/{model_name}/{version or 'latest'}"
         serve_cmd = f"mlflow models serve -m {model_uri} -p {port} --no-conda"
@@ -431,7 +429,7 @@ class MLOpsHandler(BaseHandler):
             "note": "Run the command to start serving. Use tool_registry.execute('shell', command=...) to start.",
         }
 
-    def _compare_models(self, client: Any, model_name: str) -> Dict[str, Any]:
+    def _compare_models(self, client: Any, model_name: str) -> dict[str, Any]:
         """Compare versions of a registered model."""
         try:
             versions = client.search_model_versions(f"name='{model_name}'")
@@ -470,7 +468,7 @@ class MLOpsHandler(BaseHandler):
 
     def _promote_model(
         self, client: Any, model_name: str, version: str, stage: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Promote a model version to a stage."""
         client.transition_model_version_stage(
             name=model_name,
@@ -486,7 +484,7 @@ class MLOpsHandler(BaseHandler):
             "stage": stage,
         }
 
-    def _list_models(self, client: Any) -> Dict[str, Any]:
+    def _list_models(self, client: Any) -> dict[str, Any]:
         """List all registered models."""
         models = client.search_registered_models()
 
@@ -515,7 +513,7 @@ __all__ = [
 ]
 
 # Handler registry for tests and programmatic access
-HANDLERS: Dict[str, type[object]] = {
+HANDLERS: dict[str, type[object]] = {
     "container_ops": ContainerOpsHandler,
     "terraform_apply": TerraformHandler,
     "mlops": MLOpsHandler,

@@ -51,15 +51,16 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
 from threading import RLock
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
 
 # Import canonical types from victor.teams.types
-from victor.teams.types import MessageType, AgentMessage as CanonicalAgentMessage
+from victor.teams.types import MessageType
+import builtins
 
 logger = logging.getLogger(__name__)
 
@@ -103,13 +104,13 @@ class AgentMessage:
     from_agent: str
     content: str = ""
     to_agent: Optional[str] = None
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
     reply_to: Optional[str] = None
     priority: int = 0
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -181,11 +182,11 @@ class TeamMessageBus:
             team_id: Unique identifier for the team
         """
         self.team_id = team_id
-        self._queues: Dict[str, asyncio.Queue[AgentMessage]] = {}
-        self._message_log: List[AgentMessage] = []
-        self._subscribers: Dict[MessageType, List[Callable[[AgentMessage], None]]] = {}
+        self._queues: dict[str, asyncio.Queue[AgentMessage]] = {}
+        self._message_log: list[AgentMessage] = []
+        self._subscribers: dict[MessageType, list[Callable[[AgentMessage], None]]] = {}
         self._lock = RLock()
-        self._registered_agents: Set[str] = set()
+        self._registered_agents: set[str] = set()
 
         logger.debug(f"Created message bus for team: {team_id}")
 
@@ -271,7 +272,7 @@ class TeamMessageBus:
         self,
         agent_id: str,
         timeout: float = 0,
-        message_types: Optional[List[MessageType]] = None,
+        message_types: Optional[list[MessageType]] = None,
     ) -> Optional[AgentMessage]:
         """Receive next message for an agent.
 
@@ -334,7 +335,7 @@ class TeamMessageBus:
         from_agent: Optional[str] = None,
         to_agent: Optional[str] = None,
         limit: int = 100,
-    ) -> List[AgentMessage]:
+    ) -> list[AgentMessage]:
         """Get filtered message history.
 
         Args:
@@ -360,7 +361,7 @@ class TeamMessageBus:
         # Return most recent, limited
         return list(reversed(messages[-limit:]))
 
-    def get_discoveries(self, agent_id: Optional[str] = None) -> List[AgentMessage]:
+    def get_discoveries(self, agent_id: Optional[str] = None) -> list[AgentMessage]:
         """Get all discovery messages, optionally filtered by agent.
 
         Args:
@@ -445,9 +446,9 @@ class TeamSharedMemory:
 
     def __init__(self) -> None:
         """Initialize empty shared memory."""
-        self._data: Dict[str, Any] = {}
-        self._contributors: Dict[str, Set[str]] = {}
-        self._timestamps: Dict[str, float] = {}
+        self._data: dict[str, Any] = {}
+        self._contributors: dict[str, set[str]] = {}
+        self._timestamps: dict[str, float] = {}
         self._lock = RLock()
 
     def set(self, key: str, value: Any, agent_id: str) -> None:
@@ -500,7 +501,7 @@ class TeamSharedMemory:
             self._contributors[key].add(agent_id)
             self._timestamps[key] = time.time()
 
-    def update(self, key: str, updates: Dict[str, Any], agent_id: str) -> None:
+    def update(self, key: str, updates: dict[str, Any], agent_id: str) -> None:
         """Update a dictionary value.
 
         Creates dict if key doesn't exist.
@@ -532,7 +533,7 @@ class TeamSharedMemory:
         """
         return key in self._data
 
-    def keys(self) -> List[str]:
+    def keys(self) -> list[str]:
         """Get all keys in shared memory.
 
         Returns:
@@ -540,7 +541,7 @@ class TeamSharedMemory:
         """
         return list(self._data.keys())
 
-    def get_contributors(self, key: str) -> Set[str]:
+    def get_contributors(self, key: str) -> builtins.set[str]:
         """Get agents that contributed to a key.
 
         Args:
@@ -551,7 +552,7 @@ class TeamSharedMemory:
         """
         return self._contributors.get(key, set()).copy()
 
-    def get_all(self) -> Dict[str, Any]:
+    def get_all(self) -> dict[str, Any]:
         """Get snapshot of all shared data.
 
         Returns:

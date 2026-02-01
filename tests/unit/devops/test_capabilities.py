@@ -16,8 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
-from unittest.mock import MagicMock
+from typing import Any, Optional
 
 import pytest
 
@@ -26,15 +25,15 @@ class MockVerticalContext:
     """Mock vertical context for testing capabilities."""
 
     def __init__(self):
-        self._configs: Dict[str, Any] = {}
+        self._configs: dict[str, Any] = {}
 
-    def set_capability_config(self, name: str, config: Dict[str, Any]) -> None:
+    def set_capability_config(self, name: str, config: dict[str, Any]) -> None:
         """Store capability configuration."""
         self._configs[name] = config
 
     def get_capability_config(
-        self, name: str, default: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, name: str, default: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """Retrieve capability configuration."""
         return self._configs.get(name, default if default is not None else {})
 

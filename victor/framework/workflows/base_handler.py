@@ -27,14 +27,13 @@ import logging
 import time
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
     from victor.workflows.executor import (
         NodeResult,
-        ExecutorNodeStatus,
         WorkflowContext,
     )
 
@@ -180,7 +179,7 @@ class BaseHandler:
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute handler-specific logic.
 
         Subclasses implement this method with their business logic.

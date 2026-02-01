@@ -11,13 +11,9 @@ from __future__ import annotations
 import asyncio
 import statistics
 import time
-from typing import Any, Dict, List
-from unittest.mock import Mock, patch
 
 import pytest
 
-from victor.framework.protocols import MutableChatState
-from victor.config.settings import Settings
 
 
 @pytest.mark.performance
@@ -28,7 +24,6 @@ class TestWorkflowChatPerformance:
     @pytest.mark.asyncio
     async def test_legacy_chat_latency(self, auto_mock_docker_for_orchestrator):
         """Benchmark legacy chat implementation latency."""
-        from victor.agent.orchestrator import AgentOrchestrator
         from victor.config.settings import Settings
 
         # Disable workflow chat to use legacy
@@ -61,7 +56,6 @@ class TestWorkflowChatPerformance:
     @pytest.mark.asyncio
     async def test_workflow_chat_latency(self, auto_mock_docker_for_orchestrator):
         """Benchmark workflow chat implementation latency."""
-        from victor.framework.protocols import MutableChatState
 
         # Mock workflow execution
         latencies = []
@@ -192,7 +186,6 @@ class TestWorkflowChatPerformance:
         """Test for memory leaks during repeated operations."""
         from victor.framework.protocols import MutableChatState
         import gc
-        import sys
 
         states = []
 

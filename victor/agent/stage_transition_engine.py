@@ -47,12 +47,9 @@ import time
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Set,
 )
+from collections.abc import Callable
 
 from victor.core.state import ConversationStage
 from victor.agent.protocols import StageTransitionProtocol
@@ -64,14 +61,14 @@ logger = logging.getLogger(__name__)
 
 
 # Stage ordering for adjacency calculations
-STAGE_ORDER: Dict[ConversationStage, int] = {
+STAGE_ORDER: dict[ConversationStage, int] = {
     stage: idx for idx, stage in enumerate(ConversationStage)
 }
 
 # Transition graph: defines valid FORWARD transitions from each stage
 # Backward transitions require high confidence and are checked separately
 # Format: stage -> set of valid forward target stages
-TRANSITION_GRAPH: Dict[ConversationStage, Set[ConversationStage]] = {
+TRANSITION_GRAPH: dict[ConversationStage, set[ConversationStage]] = {
     ConversationStage.INITIAL: {
         ConversationStage.PLANNING,
         ConversationStage.READING,  # Allow skipping planning for simple tasks
@@ -98,7 +95,7 @@ TRANSITION_GRAPH: Dict[ConversationStage, Set[ConversationStage]] = {
 
 # Tool priority multipliers by stage
 # Format: stage -> {tool_name: multiplier}
-STAGE_TOOL_PRIORITIES: Dict[ConversationStage, Dict[str, float]] = {
+STAGE_TOOL_PRIORITIES: dict[ConversationStage, dict[str, float]] = {
     ConversationStage.INITIAL: {
         "search": 1.2,
         "overview": 1.3,
@@ -178,8 +175,8 @@ class StageTransitionEngine(StageTransitionProtocol):
         )
         self._event_bus = event_bus
         self._last_transition_time: float = 0.0
-        self._callbacks: List[Callable[[ConversationStage, ConversationStage], None]] = []
-        self._transition_history: List[Dict[str, Any]] = []
+        self._callbacks: list[Callable[[ConversationStage, ConversationStage], None]] = []
+        self._transition_history: list[dict[str, Any]] = []
         self._transition_count: int = 0
 
     @property
@@ -193,7 +190,7 @@ class StageTransitionEngine(StageTransitionProtocol):
         return self._cooldown_seconds
 
     @property
-    def transition_history(self) -> List[Dict[str, Any]]:
+    def transition_history(self) -> list[dict[str, Any]]:
         """Get the transition history."""
         return list(self._transition_history)
 
@@ -203,7 +200,7 @@ class StageTransitionEngine(StageTransitionProtocol):
         return self._transition_count
 
     @property
-    def transition_graph(self) -> Dict[ConversationStage, Set[ConversationStage]]:
+    def transition_graph(self) -> dict[ConversationStage, set[ConversationStage]]:
         """Get the transition graph (for testing/inspection)."""
         return TRANSITION_GRAPH
 
@@ -245,7 +242,7 @@ class StageTransitionEngine(StageTransitionProtocol):
         # Forward skip not in graph
         return False
 
-    def get_valid_transitions(self) -> List[ConversationStage]:
+    def get_valid_transitions(self) -> list[ConversationStage]:
         """Get list of valid transition targets from current stage.
 
         Returns:

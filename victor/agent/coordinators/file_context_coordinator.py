@@ -32,7 +32,7 @@ Phase 6 Refactoring: Extracted from AgentOrchestrator
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, List, Optional, Set
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from victor.agent.task_analyzer import TaskAnalyzer
@@ -71,10 +71,10 @@ class FileContextCoordinator:
             task_analyzer: TaskAnalyzer for extracting requirements from prompts
         """
         self._task_analyzer = task_analyzer
-        self._required_files: List[str] = []
-        self._required_outputs: List[str] = []
-        self._observed_files: Set[str] = set()
-        self._read_files_session: Set[str] = set()
+        self._required_files: list[str] = []
+        self._required_outputs: list[str] = []
+        self._observed_files: set[str] = set()
+        self._read_files_session: set[str] = set()
         self._all_files_read_nudge_sent: bool = False
 
     # ========================================================================
@@ -97,7 +97,7 @@ class FileContextCoordinator:
             f"{len(self._required_outputs)} required outputs"
         )
 
-    def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
+    def _extract_required_files_from_prompt(self, user_message: str) -> list[str]:
         """Extract file paths mentioned in user prompt for task completion tracking.
 
         Delegates to TaskAnalyzer.extract_required_files_from_prompt().
@@ -110,7 +110,7 @@ class FileContextCoordinator:
         """
         return self._task_analyzer.extract_required_files_from_prompt(user_message)
 
-    def _extract_required_outputs_from_prompt(self, user_message: str) -> List[str]:
+    def _extract_required_outputs_from_prompt(self, user_message: str) -> list[str]:
         """Extract output requirements from user prompt.
 
         Delegates to TaskAnalyzer.extract_required_outputs_from_prompt().
@@ -135,7 +135,7 @@ class FileContextCoordinator:
         """
         self._observed_files.add(file_path)
 
-    def mark_many_observed(self, file_paths: List[str]) -> None:
+    def mark_many_observed(self, file_paths: list[str]) -> None:
         """Mark multiple files as observed.
 
         Args:
@@ -143,7 +143,7 @@ class FileContextCoordinator:
         """
         self._observed_files.update(file_paths)
 
-    def get_observed_files(self) -> Set[str]:
+    def get_observed_files(self) -> set[str]:
         """Get set of observed files.
 
         Returns:
@@ -151,7 +151,7 @@ class FileContextCoordinator:
         """
         return self._observed_files.copy()
 
-    def set_observed_files(self, files: Set[str]) -> None:
+    def set_observed_files(self, files: set[str]) -> None:
         """Set observed files (for state restoration).
 
         Args:
@@ -163,7 +163,7 @@ class FileContextCoordinator:
     # Required Files
     # ========================================================================
 
-    def get_required_files(self) -> List[str]:
+    def get_required_files(self) -> list[str]:
         """Get list of required files.
 
         Returns:
@@ -171,7 +171,7 @@ class FileContextCoordinator:
         """
         return self._required_files.copy()
 
-    def set_required_files(self, files: List[str]) -> None:
+    def set_required_files(self, files: list[str]) -> None:
         """Set required files (for state restoration).
 
         Args:
@@ -183,7 +183,7 @@ class FileContextCoordinator:
     # Required Outputs
     # ========================================================================
 
-    def get_required_outputs(self) -> List[str]:
+    def get_required_outputs(self) -> list[str]:
         """Get list of required outputs.
 
         Returns:
@@ -191,7 +191,7 @@ class FileContextCoordinator:
         """
         return self._required_outputs.copy()
 
-    def set_required_outputs(self, outputs: List[str]) -> None:
+    def set_required_outputs(self, outputs: list[str]) -> None:
         """Set required outputs (for state restoration).
 
         Args:
@@ -211,7 +211,7 @@ class FileContextCoordinator:
         """
         self._read_files_session.add(file_path)
 
-    def get_read_session(self) -> Set[str]:
+    def get_read_session(self) -> set[str]:
         """Get files read in current session.
 
         Returns:
@@ -219,7 +219,7 @@ class FileContextCoordinator:
         """
         return self._read_files_session.copy()
 
-    def set_read_session(self, files: Set[str]) -> None:
+    def set_read_session(self, files: set[str]) -> None:
         """Set read session files (for state restoration).
 
         Args:
@@ -303,7 +303,7 @@ class FileContextCoordinator:
             return False
         return all(f in self._observed_files for f in self._required_files)
 
-    def get_missing_files(self) -> List[str]:
+    def get_missing_files(self) -> list[str]:
         """Get list of required files not yet observed.
 
         Returns:

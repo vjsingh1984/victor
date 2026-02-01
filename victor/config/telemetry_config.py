@@ -53,7 +53,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +98,8 @@ class TelemetryConfig:
     environment: str = "development"
     batch_timeout: int = 30
     batch_max_size: int = 512
-    exporters: List[TelemetryExporter] = field(default_factory=list)
-    resource_attributes: Dict[str, Any] = field(default_factory=dict)
+    exporters: list[TelemetryExporter] = field(default_factory=list)
+    resource_attributes: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_env(cls) -> "TelemetryConfig":
@@ -192,7 +192,7 @@ class TelemetryConfig:
             resource_attributes=resource_attrs,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary.
 
         Returns:
@@ -214,7 +214,7 @@ class TelemetryConfig:
             "resource_attributes": self.resource_attributes,
         }
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Validate configuration.
 
         Returns:
@@ -256,7 +256,7 @@ def get_telemetry_config() -> TelemetryConfig:
     return object.__getattribute__(get_telemetry_config, "_config")
 
 
-def setup_telemetry(config: Optional[TelemetryConfig] = None) -> Optional[Tuple[Any, Any]]:
+def setup_telemetry(config: Optional[TelemetryConfig] = None) -> Optional[tuple[Any, Any]]:
     """Setup OpenTelemetry based on configuration.
 
     This function initializes OpenTelemetry tracing and metrics

@@ -13,8 +13,7 @@ This module tests:
 """
 
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from typing import Set, Dict, Any, Optional, List
+from unittest.mock import MagicMock
 
 from victor.agent.protocols import IToolSelectionCoordinator, AgentToolSelectionContext
 

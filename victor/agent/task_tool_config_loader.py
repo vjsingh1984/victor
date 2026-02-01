@@ -21,7 +21,7 @@ and conversation stage.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional, cast
 
 import yaml
 
@@ -42,7 +42,7 @@ class TaskToolConfigLoader:
     """
 
     # Fallback config when YAML is not available
-    DEFAULT_CONFIG: Dict[str, Any] = {
+    DEFAULT_CONFIG: dict[str, Any] = {
         "task_types": {
             "edit": {
                 "max_exploration_iterations": 8,  # Increased from 3 - edits often need context
@@ -163,9 +163,9 @@ class TaskToolConfigLoader:
             config_path: Path to the YAML config file. Uses default if not specified.
         """
         self._config_path = Path(config_path) if config_path else DEFAULT_CONFIG_PATH
-        self._config: Optional[Dict[str, Any]] = None
+        self._config: Optional[dict[str, Any]] = None
 
-    def load_config(self) -> Dict[str, Any]:
+    def load_config(self) -> dict[str, Any]:
         """Load configuration from YAML file.
 
         Returns:
@@ -188,7 +188,7 @@ class TaskToolConfigLoader:
 
         return self._config
 
-    def get_stage_tools(self, task_type: str, stage: str) -> List[str]:
+    def get_stage_tools(self, task_type: str, stage: str) -> list[str]:
         """Get tools available for a specific task type and stage.
 
         Args:
@@ -202,7 +202,7 @@ class TaskToolConfigLoader:
         task_config = config.get("task_types", {}).get(task_type, {})
         stage_tools = task_config.get("stage_tools", {})
         result = stage_tools.get(stage, [])
-        return cast(List[str], result) if isinstance(result, list) else []
+        return cast(list[str], result) if isinstance(result, list) else []
 
     def get_force_action_hint(self, task_type: str, hint_type: str) -> str:
         """Get force action hint for a task type.
@@ -220,7 +220,7 @@ class TaskToolConfigLoader:
         result = hints.get(hint_type, "Please proceed with the task.")
         return str(result) if result else "Please proceed with the task."
 
-    def get_task_config(self, task_type: str) -> Dict[str, Any]:
+    def get_task_config(self, task_type: str) -> dict[str, Any]:
         """Get full configuration for a task type.
 
         Args:
@@ -231,7 +231,7 @@ class TaskToolConfigLoader:
         """
         config = self.load_config()
         result = config.get("task_types", {}).get(task_type, {})
-        return cast(Dict[str, Any], result) if isinstance(result, dict) else {}
+        return cast(dict[str, Any], result) if isinstance(result, dict) else {}
 
 
 __all__ = [

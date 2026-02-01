@@ -14,13 +14,11 @@
 
 """Tests for Enhanced RL Coordinator."""
 
-import math
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-import yaml
 
 from victor.framework.rl.rl_coordinator_enhanced import (
     EnhancedRLCoordinator,

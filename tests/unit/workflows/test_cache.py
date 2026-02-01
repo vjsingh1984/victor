@@ -15,11 +15,8 @@
 """Tests for victor.workflows.cache module."""
 
 import tempfile
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-from dataclasses import asdict
+from unittest.mock import MagicMock
 
-import pytest
 
 from victor.workflows.cache import (
     DependencyGraph,

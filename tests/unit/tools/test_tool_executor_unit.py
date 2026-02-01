@@ -478,9 +478,9 @@ class TestToolExecutorCacheableTools:
     @staticmethod
     def _ensure_tools_loaded():
         """Force import of tool modules to populate the registry."""
-        import victor.tools.filesystem  # noqa: F401
-        import victor.tools.code_search_tool  # noqa: F401
-        import victor.tools.file_editor_tool  # noqa: F401
+        import victor.tools.filesystem
+        import victor.tools.code_search_tool
+        import victor.tools.file_editor_tool
         import victor.tools.bash  # noqa: F401
 
     def test_default_cacheable_tools(self):

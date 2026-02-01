@@ -40,15 +40,15 @@ import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from victor.teams.types import TeamConfig, TeamFormation
+    from victor.teams.types import TeamConfig
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +84,9 @@ class ExecutionEvent:
     timestamp: datetime
     event_type: str
     member_id: Optional[str] = None
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -121,10 +121,10 @@ class ExecutionRecord:
     start_time: datetime
     end_time: Optional[datetime] = None
     success: bool = False
-    result: Dict[str, Any] = field(default_factory=dict)
-    events: List[ExecutionEvent] = field(default_factory=list)
-    member_results: Dict[str, Any] = field(default_factory=dict)
-    metrics: Dict[str, float] = field(default_factory=dict)
+    result: dict[str, Any] = field(default_factory=dict)
+    events: list[ExecutionEvent] = field(default_factory=list)
+    member_results: dict[str, Any] = field(default_factory=dict)
+    metrics: dict[str, float] = field(default_factory=dict)
 
     @property
     def duration(self) -> float:
@@ -133,7 +133,7 @@ class ExecutionRecord:
             return (self.end_time - self.start_time).total_seconds()
         return 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "execution_id": self.execution_id,
@@ -165,11 +165,11 @@ class BottleneckInfo:
 
     bottleneck_type: str
     severity: float
-    affected_members: List[str]
+    affected_members: list[str]
     description: str
-    suggested_fixes: List[str] = field(default_factory=list)
+    suggested_fixes: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "bottleneck_type": self.bottleneck_type,
@@ -195,12 +195,12 @@ class ComparisonResult:
 
     team1_id: str
     team2_id: str
-    metric_comparisons: Dict[str, Dict[str, float]]
+    metric_comparisons: dict[str, dict[str, float]]
     overall_winner: Optional[str]
     confidence: float
-    insights: List[str]
+    insights: list[str]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "team1_id": self.team1_id,
@@ -248,10 +248,10 @@ class TeamAnalytics:
         self.storage_path = storage_path
 
         # Data storage
-        self._executions: Dict[str, ExecutionRecord] = {}
-        self._team_executions: Dict[str, List[str]] = defaultdict(list)
-        self._member_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: defaultdict(list))
-        self._formation_stats: Dict[str, List[float]] = defaultdict(list)
+        self._executions: dict[str, ExecutionRecord] = {}
+        self._team_executions: dict[str, list[str]] = defaultdict(list)
+        self._member_stats: dict[str, dict[str, Any]] = defaultdict(lambda: defaultdict(list))
+        self._formation_stats: dict[str, list[float]] = defaultdict(list)
 
         # Load existing data
         if storage_path and storage_path.exists():
@@ -261,9 +261,9 @@ class TeamAnalytics:
         self,
         team_config: "TeamConfig",
         task: str,
-        result: Dict[str, Any],
+        result: dict[str, Any],
         team_id: str = "default",
-        events: Optional[List[ExecutionEvent]] = None,
+        events: Optional[list[ExecutionEvent]] = None,
     ) -> str:
         """Track a team execution.
 
@@ -319,7 +319,7 @@ class TeamAnalytics:
 
         return execution_id
 
-    def _compute_metrics(self, record: ExecutionRecord) -> Dict[str, float]:
+    def _compute_metrics(self, record: ExecutionRecord) -> dict[str, float]:
         """Compute metrics from execution record.
 
         Args:
@@ -352,7 +352,7 @@ class TeamAnalytics:
 
         return metrics
 
-    def get_team_stats(self, team_id: str) -> Dict[str, Any]:
+    def get_team_stats(self, team_id: str) -> dict[str, Any]:
         """Get statistics for a team.
 
         Args:
@@ -421,7 +421,7 @@ class TeamAnalytics:
             "member_performance": member_performance,
         }
 
-    def detect_bottlenecks(self, team_id: str) -> List[BottleneckInfo]:
+    def detect_bottlenecks(self, team_id: str) -> list[BottleneckInfo]:
         """Detect performance bottlenecks for a team.
 
         Args:
@@ -576,7 +576,7 @@ class TeamAnalytics:
             insights=insights,
         )
 
-    def get_formation_effectiveness(self) -> Dict[str, Dict[str, float]]:
+    def get_formation_effectiveness(self) -> dict[str, dict[str, float]]:
         """Get effectiveness metrics for each formation.
 
         Returns:
@@ -596,7 +596,7 @@ class TeamAnalytics:
 
         return formation_metrics
 
-    def get_member_ranking(self, team_id: Optional[str] = None) -> List[Tuple[str, float]]:
+    def get_member_ranking(self, team_id: Optional[str] = None) -> list[tuple[str, float]]:
         """Rank members by performance.
 
         Args:
@@ -605,7 +605,7 @@ class TeamAnalytics:
         Returns:
             List of (member_id, score) tuples sorted by score
         """
-        member_scores: Dict[str, Dict[str, list[Any]]] = {}
+        member_scores: dict[str, dict[str, list[Any]]] = {}
 
         if team_id:
             execution_ids = self._team_executions.get(team_id, [])
@@ -705,7 +705,7 @@ class TeamAnalytics:
 
         logger.info(f"Exported report for {team_id} to {output_path}")
 
-    def _generate_recommendations(self, bottlenecks: List[BottleneckInfo]) -> List[str]:
+    def _generate_recommendations(self, bottlenecks: list[BottleneckInfo]) -> list[str]:
         """Generate recommendations from bottlenecks.
 
         Args:

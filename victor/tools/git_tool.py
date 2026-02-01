@@ -22,15 +22,15 @@ This tool provides:
 """
 
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from victor.config.timeouts import ProcessTimeouts
-from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority, ToolConfig
+from victor.tools.base import AccessMode, DangerLevel, Priority, ToolConfig
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async
 
 
-def _get_provider_and_model(context: Optional[Dict[str, Any]] = None) -> Tuple[Any, Optional[str]]:
+def _get_provider_and_model(context: Optional[dict[str, Any]] = None) -> tuple[Any, Optional[str]]:
     """Get provider and model from ToolConfig in execution context.
 
     Args:
@@ -49,8 +49,8 @@ def _get_provider_and_model(context: Optional[Dict[str, Any]] = None) -> Tuple[A
 
 
 async def _run_git_async(
-    *args: str, env_overrides: Optional[Dict[str, str]] = None
-) -> Tuple[bool, str, str]:
+    *args: str, env_overrides: Optional[dict[str, str]] = None
+) -> tuple[bool, str, str]:
     """Run git command asynchronously with optional environment variable overrides.
 
     Args:
@@ -135,16 +135,16 @@ async def _run_git_async(
 )
 async def git(
     operation: str,
-    files: Optional[List[str]] = None,
+    files: Optional[list[str]] = None,
     message: Optional[str] = None,
     branch: Optional[str] = None,
     staged: bool = False,
     limit: int = 10,
-    options: Optional[Dict[str, Any]] = None,
+    options: Optional[dict[str, Any]] = None,
     author_name: Optional[str] = None,
     author_email: Optional[str] = None,
-    context: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    context: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Unified git operations: status, diff, stage, commit, log, branch.
 
     Operations: status, diff (staged=True for staged), stage (files or all),
@@ -227,7 +227,7 @@ async def git(
             }
 
         # Build environment overrides for custom authorship
-        env_overrides: Dict[str, str] = {}
+        env_overrides: dict[str, str] = {}
         if author_name:
             env_overrides["GIT_AUTHOR_NAME"] = author_name
             env_overrides["GIT_COMMITTER_NAME"] = author_name
@@ -301,7 +301,7 @@ async def git(
     use_cases=["generating commit messages", "creating conventional commits"],
     examples=["suggest a commit message", "generate commit message for staged changes"],
 )
-async def commit_msg(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def commit_msg(context: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Generate an AI-powered commit message from staged changes.
 
     Analyzes the staged diff and generates a conventional commit message
@@ -403,8 +403,8 @@ async def pr(
     pr_title: Optional[str] = None,
     pr_description: Optional[str] = None,
     base_branch: str = "main",
-    context: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    context: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Create a GitHub pull request with auto-generated or custom content.
 
     Creates a pull request using GitHub CLI (gh). Automatically pushes the
@@ -559,7 +559,7 @@ DESCRIPTION:
     use_cases=["analyzing merge conflicts", "resolving git conflicts", "conflict resolution help"],
     examples=["analyze conflicts", "show merge conflicts", "help resolve conflicts"],
 )
-async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def conflicts(context: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Analyze merge conflicts and provide resolution guidance.
 
     Detects files with merge conflicts (marked as UU in git status) and provides

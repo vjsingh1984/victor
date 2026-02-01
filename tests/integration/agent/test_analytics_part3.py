@@ -32,10 +32,8 @@ Follows TDD Red phase - tests will fail initially.
 
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

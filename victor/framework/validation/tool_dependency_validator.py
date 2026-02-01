@@ -48,7 +48,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 import yaml
 
@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 
 
 # JSON Schema for tool_dependencies.yaml
-TOOL_DEPENDENCY_SCHEMA: Dict[str, Any] = {
+TOOL_DEPENDENCY_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "Tool Dependency Configuration",
     "description": "Schema for vertical tool dependency YAML files",
@@ -172,7 +172,7 @@ TOOL_DEPENDENCY_SCHEMA: Dict[str, Any] = {
 }
 
 
-def get_json_schema() -> Dict[str, Any]:
+def get_json_schema() -> dict[str, Any]:
     """Get the JSON Schema for tool_dependencies.yaml files.
 
     Returns:
@@ -199,11 +199,11 @@ class ValidationResult:
     """
 
     is_valid: bool
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     file_path: Optional[Path] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
 
         Returns:
@@ -217,7 +217,7 @@ class ValidationResult:
         }
 
 
-def validate_tool_dependency_yaml(data: Dict[str, Any]) -> List[str]:
+def validate_tool_dependency_yaml(data: dict[str, Any]) -> list[str]:
     """Validate tool dependency YAML data.
 
     This function provides basic validation without requiring jsonschema.
@@ -229,7 +229,7 @@ def validate_tool_dependency_yaml(data: Dict[str, Any]) -> List[str]:
     Returns:
         List of validation error messages (empty if valid)
     """
-    errors: List[str] = []
+    errors: list[str] = []
 
     # Required field: vertical
     if "vertical" not in data:
@@ -308,7 +308,7 @@ def validate_tool_dependency_yaml(data: Dict[str, Any]) -> List[str]:
     return errors
 
 
-def _detect_circular_dependencies(data: Dict[str, Any]) -> List[str]:
+def _detect_circular_dependencies(data: dict[str, Any]) -> list[str]:
     """Detect circular dependencies in tool dependency graph.
 
     Args:
@@ -317,14 +317,14 @@ def _detect_circular_dependencies(data: Dict[str, Any]) -> List[str]:
     Returns:
         List of warning messages for circular dependencies
     """
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     deps = data.get("dependencies", [])
     if not deps:
         return warnings
 
     # Build dependency graph
-    graph: Dict[str, Set[str]] = {}
+    graph: dict[str, set[str]] = {}
     for dep in deps:
         if not isinstance(dep, dict):
             continue
@@ -334,7 +334,7 @@ def _detect_circular_dependencies(data: Dict[str, Any]) -> List[str]:
             graph[tool] = set(depends_on)
 
     # Detect cycles using DFS
-    def has_cycle(node: str, visited: Set[str], path: Set[str]) -> bool:
+    def has_cycle(node: str, visited: set[str], path: set[str]) -> bool:
         visited.add(node)
         path.add(node)
 
@@ -349,7 +349,7 @@ def _detect_circular_dependencies(data: Dict[str, Any]) -> List[str]:
         path.remove(node)
         return False
 
-    visited: Set[str] = set()
+    visited: set[str] = set()
     for node in graph:
         if node not in visited:
             has_cycle(node, visited, set())
@@ -395,8 +395,8 @@ class ToolDependencyValidator:
         Returns:
             ValidationResult with validation status
         """
-        errors: List[str] = []
-        warnings: List[str] = []
+        errors: list[str] = []
+        warnings: list[str] = []
 
         # Check file exists
         if not path.exists():
@@ -455,7 +455,7 @@ class ToolDependencyValidator:
 
     def validate_all_verticals(
         self, base_path: Optional[Path] = None
-    ) -> Dict[str, ValidationResult]:
+    ) -> dict[str, ValidationResult]:
         """Validate tool_dependencies.yaml across all verticals.
 
         Args:
@@ -471,7 +471,7 @@ class ToolDependencyValidator:
                 # Try relative to this file
                 base_path = Path(__file__).parent.parent.parent.parent
 
-        results: Dict[str, ValidationResult] = {}
+        results: dict[str, ValidationResult] = {}
 
         for vertical in self.VERTICALS:
             vertical_path = base_path / vertical / "tool_dependencies.yaml"

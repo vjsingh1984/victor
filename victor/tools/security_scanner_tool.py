@@ -25,7 +25,7 @@ import re
 import subprocess
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 import logging
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -53,7 +53,7 @@ CONFIG_CHECKS = {
 }
 
 
-def _scan_file_for_secrets(file_path: Path) -> List[Dict[str, Any]]:
+def _scan_file_for_secrets(file_path: Path) -> list[dict[str, Any]]:
     """Scan a file for potential secrets."""
     findings = []
 
@@ -78,7 +78,7 @@ def _scan_file_for_secrets(file_path: Path) -> List[Dict[str, Any]]:
     return findings
 
 
-def _scan_file_for_config_issues(file_path: Path) -> List[Dict[str, Any]]:
+def _scan_file_for_config_issues(file_path: Path) -> list[dict[str, Any]]:
     """Scan a file for configuration security issues."""
     findings = []
 
@@ -119,13 +119,13 @@ def _scan_file_for_config_issues(file_path: Path) -> List[Dict[str, Any]]:
 )
 async def scan(
     path: str,
-    scan_types: Optional[List[str]] = None,
+    scan_types: Optional[list[str]] = None,
     file_pattern: str = "*.py",
     severity_threshold: str = "low",
     requirements_file: str = "requirements.txt",
     dependency_scan: bool = False,
     iac_scan: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Comprehensive security scanning for code analysis.
 
@@ -178,12 +178,12 @@ async def scan(
         return {"success": False, "error": f"Path not found: {path}"}
 
     results = {}
-    all_findings: List[Dict[str, Any]] = []
+    all_findings: list[dict[str, Any]] = []
 
     # Secrets scan
     if "secrets" in scan_types:
         if path_obj.is_file():
-            secrets_findings: List[Dict[str, Any]] = _scan_file_for_secrets(path_obj)
+            secrets_findings: list[dict[str, Any]] = _scan_file_for_secrets(path_obj)
             results["secrets"] = {
                 "files_scanned": 1,
                 "findings": secrets_findings,
@@ -193,7 +193,7 @@ async def scan(
         else:
             # Use gather_files_by_pattern to exclude venv, node_modules, etc.
             files = gather_files_by_pattern(path_obj, file_pattern)
-            secrets_findings_batch: List[Dict[str, Any]] = []
+            secrets_findings_batch: list[dict[str, Any]] = []
             for file in files:
                 secrets_findings_batch.extend(_scan_file_for_secrets(file))
             results["secrets"] = {
@@ -206,7 +206,7 @@ async def scan(
     # Configuration scan
     if "config" in scan_types:
         if path_obj.is_file():
-            config_findings: List[Dict[str, Any]] = _scan_file_for_config_issues(path_obj)
+            config_findings: list[dict[str, Any]] = _scan_file_for_config_issues(path_obj)
             results["config"] = {
                 "files_scanned": 1,
                 "findings": config_findings,
@@ -216,7 +216,7 @@ async def scan(
         else:
             # Use gather_files_by_pattern to exclude venv, node_modules, etc.
             files = gather_files_by_pattern(path_obj, file_pattern)
-            config_findings_batch: List[Dict[str, Any]] = []
+            config_findings_batch: list[dict[str, Any]] = []
             for file in files:
                 config_findings_batch.extend(_scan_file_for_config_issues(file))
             results["config"] = {
@@ -288,7 +288,7 @@ async def scan(
                 check=True,
             )
             bandit = json.loads(proc.stdout)
-            iac_findings: List[Dict[str, Any]] = []
+            iac_findings: list[dict[str, Any]] = []
             for res in bandit.get("results", []):
                 iac_findings.append(
                     {

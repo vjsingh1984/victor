@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for SandboxProviderRegistry and sandbox providers."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import pytest
 
@@ -310,7 +310,7 @@ class TestCustomSandboxProvider:
             async def execute(
                 self,
                 code: str,
-                context: Dict[str, Any],
+                context: dict[str, Any],
                 config: IsolationConfig,
                 timeout: Optional[float] = None,
             ) -> SandboxResult:
@@ -346,7 +346,7 @@ class TestCustomSandboxProvider:
             async def execute(
                 self,
                 code: str,
-                context: Dict[str, Any],
+                context: dict[str, Any],
                 config: IsolationConfig,
                 timeout: Optional[float] = None,
             ) -> SandboxResult:

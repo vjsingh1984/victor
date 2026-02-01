@@ -54,7 +54,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 # =============================================================================
@@ -211,12 +211,12 @@ class TaskHint:
     category: TaskCategory
     hint: str
     tool_budget: int = 10
-    priority_tools: List[str] = field(default_factory=list)
-    workflow_steps: Optional[List[str]] = None
-    rules: Optional[List[str]] = None
-    anti_patterns: Optional[List[str]] = None
+    priority_tools: list[str] = field(default_factory=list)
+    workflow_steps: Optional[list[str]] = None
+    rules: Optional[list[str]] = None
+    anti_patterns: Optional[list[str]] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary.
 
         Returns:
@@ -266,10 +266,10 @@ class TaskHintBuilder:
         self._category: TaskCategory = TaskCategory.GENERAL
         self._hint: str = ""
         self._tool_budget: int = 10
-        self._priority_tools: List[str] = []
-        self._workflow_steps: Optional[List[str]] = None
-        self._rules: Optional[List[str]] = None
-        self._anti_patterns: Optional[List[str]] = None
+        self._priority_tools: list[str] = []
+        self._workflow_steps: Optional[list[str]] = None
+        self._rules: Optional[list[str]] = None
+        self._anti_patterns: Optional[list[str]] = None
 
     def for_task_type(self, task_type: str) -> "TaskHintBuilder":
         """Set the task type.
@@ -319,7 +319,7 @@ class TaskHintBuilder:
         self._tool_budget = budget
         return self
 
-    def with_priority_tools(self, tools: List[str]) -> "TaskHintBuilder":
+    def with_priority_tools(self, tools: list[str]) -> "TaskHintBuilder":
         """Set priority tools.
 
         Args:
@@ -331,7 +331,7 @@ class TaskHintBuilder:
         self._priority_tools = tools
         return self
 
-    def with_workflow(self, steps: List[str]) -> "TaskHintBuilder":
+    def with_workflow(self, steps: list[str]) -> "TaskHintBuilder":
         """Set workflow steps.
 
         Args:
@@ -343,7 +343,7 @@ class TaskHintBuilder:
         self._workflow_steps = steps
         return self
 
-    def with_rules(self, rules: List[str]) -> "TaskHintBuilder":
+    def with_rules(self, rules: list[str]) -> "TaskHintBuilder":
         """Set rules to follow.
 
         Args:
@@ -355,7 +355,7 @@ class TaskHintBuilder:
         self._rules = rules
         return self
 
-    def with_anti_patterns(self, patterns: List[str]) -> "TaskHintBuilder":
+    def with_anti_patterns(self, patterns: list[str]) -> "TaskHintBuilder":
         """Set anti-patterns to avoid.
 
         Args:
@@ -422,9 +422,9 @@ class SystemPromptBuilder:
     def __init__(self) -> None:
         """Initialize a new SystemPromptBuilder."""
         self._identity: str = ""
-        self._capabilities: List[str] = []
-        self._guidelines: List[str] = []
-        self._best_practices: List[str] = []
+        self._capabilities: list[str] = []
+        self._guidelines: list[str] = []
+        self._best_practices: list[str] = []
         self._tool_usage: str = ""
 
     def with_identity(self, identity: str) -> "SystemPromptBuilder":
@@ -439,7 +439,7 @@ class SystemPromptBuilder:
         self._identity = identity
         return self
 
-    def with_capabilities(self, capabilities: List[str]) -> "SystemPromptBuilder":
+    def with_capabilities(self, capabilities: list[str]) -> "SystemPromptBuilder":
         """Set capabilities.
 
         Args:
@@ -451,7 +451,7 @@ class SystemPromptBuilder:
         self._capabilities = capabilities
         return self
 
-    def with_guidelines(self, guidelines: List[str]) -> "SystemPromptBuilder":
+    def with_guidelines(self, guidelines: list[str]) -> "SystemPromptBuilder":
         """Set guidelines.
 
         Args:
@@ -463,7 +463,7 @@ class SystemPromptBuilder:
         self._guidelines = guidelines
         return self
 
-    def with_best_practices(self, practices: List[str]) -> "SystemPromptBuilder":
+    def with_best_practices(self, practices: list[str]) -> "SystemPromptBuilder":
         """Set best practices.
 
         Args:
@@ -493,7 +493,7 @@ class SystemPromptBuilder:
         Returns:
             Formatted system prompt section
         """
-        parts: List[str] = []
+        parts: list[str] = []
 
         # Identity
         if self._identity:
@@ -548,7 +548,7 @@ class ChecklistBuilder:
 
     def __init__(self) -> None:
         """Initialize a new ChecklistBuilder."""
-        self._items: List[str] = []
+        self._items: list[str] = []
         self._title: str = "Checklist"
 
     def with_title(self, title: str) -> "ChecklistBuilder":
@@ -575,7 +575,7 @@ class ChecklistBuilder:
         self._items.append(item)
         return self
 
-    def add_items(self, items: List[str]) -> "ChecklistBuilder":
+    def add_items(self, items: list[str]) -> "ChecklistBuilder":
         """Add multiple checklist items.
 
         Args:
@@ -623,7 +623,7 @@ class SafetyRulesBuilder:
 
     def __init__(self) -> None:
         """Initialize a new SafetyRulesBuilder."""
-        self._rules: List[str] = []
+        self._rules: list[str] = []
 
     def add_rule(self, rule: str) -> "SafetyRulesBuilder":
         """Add a safety rule.
@@ -637,7 +637,7 @@ class SafetyRulesBuilder:
         self._rules.append(rule)
         return self
 
-    def add_rules(self, rules: List[str]) -> "SafetyRulesBuilder":
+    def add_rules(self, rules: list[str]) -> "SafetyRulesBuilder":
         """Add multiple safety rules.
 
         Args:
@@ -675,7 +675,7 @@ class WorkflowTemplate(ABC):
     """
 
     @abstractmethod
-    def get_steps(self) -> List[str]:
+    def get_steps(self) -> list[str]:
         """Get workflow steps.
 
         Returns:
@@ -699,7 +699,7 @@ class BugFixWorkflow(WorkflowTemplate):
     Provides structured workflow for fixing bugs efficiently.
     """
 
-    def get_steps(self) -> List[str]:
+    def get_steps(self) -> list[str]:
         """Get bug fix workflow steps.
 
         Returns:
@@ -720,7 +720,7 @@ class CodeCreationWorkflow(WorkflowTemplate):
     Provides structured workflow for creating new code.
     """
 
-    def get_steps(self) -> List[str]:
+    def get_steps(self) -> list[str]:
         """Get code creation workflow steps.
 
         Returns:
@@ -739,7 +739,7 @@ class AnalysisWorkflow(WorkflowTemplate):
     Provides structured workflow for analyzing code or data.
     """
 
-    def get_steps(self) -> List[str]:
+    def get_steps(self) -> list[str]:
         """Get analysis workflow steps.
 
         Returns:

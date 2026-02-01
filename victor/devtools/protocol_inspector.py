@@ -32,13 +32,12 @@ from __future__ import annotations
 
 import argparse
 import ast
-import inspect
 import logging
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Optional
 
 
 # Configure logging
@@ -56,7 +55,7 @@ class ProtocolInfo:
     name: str
     module: str
     file_path: str
-    methods: List[str]
+    methods: list[str]
     docstring: Optional[str]
     line_number: int
 
@@ -76,7 +75,7 @@ class ImplementationInfo:
     module: str
     file_path: str
     line_number: int
-    implements_protocols: List[str]
+    implements_protocols: list[str]
 
 
 class ProtocolInspector:
@@ -95,9 +94,9 @@ class ProtocolInspector:
 
         self.victor_root = Path(victor_root)
         self.protocols_dir = self.victor_root / "victor" / "protocols"
-        self.protocols: Dict[str, ProtocolInfo] = {}
-        self.implementations: Dict[str, List[ImplementationInfo]] = defaultdict(list)
-        self.usage_map: Dict[str, List[str]] = defaultdict(list)
+        self.protocols: dict[str, ProtocolInfo] = {}
+        self.implementations: dict[str, list[ImplementationInfo]] = defaultdict(list)
+        self.usage_map: dict[str, list[str]] = defaultdict(list)
 
     def scan_protocols(self) -> None:
         """Scan all protocol definitions in victor/protocols."""
@@ -183,7 +182,7 @@ class ProtocolInspector:
                     return True
         return False
 
-    def _extract_protocol_methods(self, class_node: ast.ClassDef) -> List[str]:
+    def _extract_protocol_methods(self, class_node: ast.ClassDef) -> list[str]:
         """Extract method signatures from a protocol class."""
         methods = []
 
@@ -276,7 +275,7 @@ class ProtocolInspector:
 
     def _check_protocol_implementation(
         self, class_node: ast.ClassDef, protocol_name: Optional[str] = None
-    ) -> List[str]:
+    ) -> list[str]:
         """Check if a class implements any protocols."""
         implemented = []
 
@@ -361,7 +360,7 @@ class ProtocolInspector:
             return annotation.attr == protocol_name
         return False
 
-    def _get_usage_context(self, lines: List[str], line_no: int, file_path: Path) -> str:
+    def _get_usage_context(self, lines: list[str], line_no: int, file_path: Path) -> str:
         """Get context string for usage."""
         # Get the line (0-indexed)
         line = lines[line_no - 1] if line_no <= len(lines) else ""

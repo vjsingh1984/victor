@@ -21,7 +21,7 @@ optimal collaboration patterns for specific tasks.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from victor.framework.patterns.types import (
     CollaborationPattern,
@@ -56,8 +56,8 @@ class PatternRecommender:
 
     def __init__(
         self,
-        patterns: Optional[List[CollaborationPattern]] = None,
-        complexity_weights: Optional[Dict[str, float]] = None,
+        patterns: Optional[list[CollaborationPattern]] = None,
+        complexity_weights: Optional[dict[str, float]] = None,
     ):
         """Initialize pattern recommender.
 
@@ -99,7 +99,7 @@ class PatternRecommender:
         self,
         task_context: TaskContext,
         top_k: int = 5,
-    ) -> List[PatternRecommendation]:
+    ) -> list[PatternRecommendation]:
         """Recommend patterns for task context.
 
         Args:
@@ -121,9 +121,9 @@ class PatternRecommender:
 
     async def rank_patterns(
         self,
-        patterns: List[CollaborationPattern],
+        patterns: list[CollaborationPattern],
         task_context: TaskContext,
-    ) -> List[PatternRecommendation]:
+    ) -> list[PatternRecommendation]:
         """Rank patterns by suitability for task.
 
         Args:
@@ -401,7 +401,7 @@ class PatternRecommender:
         self,
         pattern: CollaborationPattern,
         context: TaskContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """Identify expected benefits of using pattern.
 
         Args:
@@ -434,7 +434,7 @@ class PatternRecommender:
         self,
         pattern: CollaborationPattern,
         context: TaskContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """Identify potential risks of using pattern.
 
         Args:
@@ -490,7 +490,7 @@ class PatternValidator:
     async def validate(
         self,
         pattern: CollaborationPattern,
-        test_cases: Optional[List[TaskContext]] = None,
+        test_cases: Optional[list[TaskContext]] = None,
     ) -> PatternValidationResult:
         """Validate pattern structure and correctness.
 

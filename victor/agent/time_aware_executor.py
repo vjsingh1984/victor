@@ -30,14 +30,12 @@ from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Literal,
     Optional,
     Protocol,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -70,7 +68,7 @@ class ExecutionCheckpoint:
     remaining: float
     description: str
     phase: TimePhase
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -79,8 +77,8 @@ class ExecutionBudget:
 
     total_seconds: float
     start_time: float
-    checkpoints: List[ExecutionCheckpoint] = field(default_factory=list)
-    phase_transitions: List[tuple[float, TimePhase, TimePhase]] = field(default_factory=list)
+    checkpoints: list[ExecutionCheckpoint] = field(default_factory=list)
+    phase_transitions: list[tuple[float, TimePhase, TimePhase]] = field(default_factory=list)
     _last_phase: TimePhase = field(default=TimePhase.NORMAL)
 
     @property
@@ -146,7 +144,7 @@ class ExecutionBudget:
         logger.debug(f"ExecutionCheckpoint: {description} (elapsed: {self.elapsed:.1f}s)")
         return cp
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get budget summary."""
         return {
             "total_seconds": self.total_seconds,
@@ -355,7 +353,7 @@ class TimeAwareExecutor:
             return self._budget.checkpoint(description, **metadata)
         return None
 
-    def get_budget_summary(self) -> Optional[Dict[str, Any]]:
+    def get_budget_summary(self) -> Optional[dict[str, Any]]:
         """Get budget summary.
 
         Returns:
@@ -363,7 +361,7 @@ class TimeAwareExecutor:
         """
         return self._budget.get_summary() if self._budget else None
 
-    def get_checkpoints(self) -> List[ExecutionCheckpoint]:
+    def get_checkpoints(self) -> list[ExecutionCheckpoint]:
         """Get all recorded checkpoints.
 
         Returns:

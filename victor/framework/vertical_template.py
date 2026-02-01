@@ -48,8 +48,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.core.vertical_types import StageDefinition
 
@@ -83,11 +82,11 @@ class VerticalMetadata:
     author: Optional[str] = None
     license: str = "Apache-2.0"
     category: str = "general"
-    tags: List[str] = field(default_factory=list)
-    provider_hints: Dict[str, Any] = field(default_factory=dict)
-    evaluation_criteria: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+    provider_hints: dict[str, Any] = field(default_factory=dict)
+    evaluation_criteria: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for YAML serialization."""
         return {
             "name": self.name,
@@ -102,7 +101,7 @@ class VerticalMetadata:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "VerticalMetadata":
+    def from_dict(cls, data: dict[str, Any]) -> "VerticalMetadata":
         """Create from dictionary (YAML deserialization)."""
         return cls(
             name=data["name"],
@@ -138,9 +137,9 @@ class MiddlewareSpec:
     class_name: str
     module: str
     enabled: bool = True
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -151,7 +150,7 @@ class MiddlewareSpec:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MiddlewareSpec":
+    def from_dict(cls, data: dict[str, Any]) -> "MiddlewareSpec":
         """Create from dictionary."""
         return cls(
             name=data["name"],
@@ -180,7 +179,7 @@ class SafetyPatternSpec:
     severity: str = "medium"
     category: str = "general"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -191,7 +190,7 @@ class SafetyPatternSpec:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SafetyPatternSpec":
+    def from_dict(cls, data: dict[str, Any]) -> "SafetyPatternSpec":
         """Create from dictionary."""
         return cls(
             name=data["name"],
@@ -216,9 +215,9 @@ class PromptHintSpec:
     task_type: str
     hint: str
     tool_budget: int = 10
-    priority_tools: List[str] = field(default_factory=list)
+    priority_tools: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "task_type": self.task_type,
@@ -228,7 +227,7 @@ class PromptHintSpec:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PromptHintSpec":
+    def from_dict(cls, data: dict[str, Any]) -> "PromptHintSpec":
         """Create from dictionary."""
         return cls(
             task_type=data["task_type"],
@@ -251,14 +250,14 @@ class ExtensionSpecs:
         composed_chains: Dict of LCEL chain definitions
     """
 
-    middleware: List[MiddlewareSpec] = field(default_factory=list)
-    safety_patterns: List[SafetyPatternSpec] = field(default_factory=list)
-    prompt_hints: List[PromptHintSpec] = field(default_factory=list)
-    handlers: Dict[str, Any] = field(default_factory=dict)
-    personas: Dict[str, Any] = field(default_factory=dict)
-    composed_chains: Dict[str, Any] = field(default_factory=dict)
+    middleware: list[MiddlewareSpec] = field(default_factory=list)
+    safety_patterns: list[SafetyPatternSpec] = field(default_factory=list)
+    prompt_hints: list[PromptHintSpec] = field(default_factory=list)
+    handlers: dict[str, Any] = field(default_factory=dict)
+    personas: dict[str, Any] = field(default_factory=dict)
+    composed_chains: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "middleware": [m.to_dict() for m in self.middleware],
@@ -270,7 +269,7 @@ class ExtensionSpecs:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ExtensionSpecs":
+    def from_dict(cls, data: dict[str, Any]) -> "ExtensionSpecs":
         """Create from dictionary."""
         return cls(
             middleware=[MiddlewareSpec.from_dict(m) for m in data.get("middleware", [])],
@@ -305,7 +304,7 @@ class WorkflowSpec:
     yaml_path: Optional[str] = None
     handler_module: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -315,7 +314,7 @@ class WorkflowSpec:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowSpec":
+    def from_dict(cls, data: dict[str, Any]) -> "WorkflowSpec":
         """Create from dictionary."""
         return cls(
             name=data["name"],
@@ -342,10 +341,10 @@ class TeamRoleSpec:
     display_name: str
     description: str
     persona: str
-    tool_categories: List[str] = field(default_factory=list)
-    capabilities: List[str] = field(default_factory=list)
+    tool_categories: list[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -357,7 +356,7 @@ class TeamRoleSpec:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TeamRoleSpec":
+    def from_dict(cls, data: dict[str, Any]) -> "TeamRoleSpec":
         """Create from dictionary."""
         return cls(
             name=data["name"],
@@ -389,9 +388,9 @@ class TeamSpec:
     formation: str = "parallel"
     communication_style: str = "structured"
     max_iterations: int = 5
-    roles: List[TeamRoleSpec] = field(default_factory=list)
+    roles: list[TeamRoleSpec] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -404,7 +403,7 @@ class TeamSpec:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TeamSpec":
+    def from_dict(cls, data: dict[str, Any]) -> "TeamSpec":
         """Create from dictionary."""
         return cls(
             name=data["name"],
@@ -440,9 +439,9 @@ class CapabilitySpec:
     description: str
     enabled: bool = True
     handler: Optional[str] = None
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -454,7 +453,7 @@ class CapabilitySpec:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CapabilitySpec":
+    def from_dict(cls, data: dict[str, Any]) -> "CapabilitySpec":
         """Create from dictionary."""
         return cls(
             name=data["name"],
@@ -502,18 +501,18 @@ class VerticalTemplate:
     """
 
     metadata: VerticalMetadata
-    tools: List[str]
+    tools: list[str]
     system_prompt: str
-    stages: Dict[str, StageDefinition]
+    stages: dict[str, StageDefinition]
     extensions: ExtensionSpecs = field(default_factory=ExtensionSpecs)
-    workflows: List[WorkflowSpec] = field(default_factory=list)
-    teams: List[TeamSpec] = field(default_factory=list)
-    capabilities: List[CapabilitySpec] = field(default_factory=list)
-    custom_config: Dict[str, Any] = field(default_factory=dict)
-    file_templates: Dict[str, str] = field(default_factory=dict)
+    workflows: list[WorkflowSpec] = field(default_factory=list)
+    teams: list[TeamSpec] = field(default_factory=list)
+    capabilities: list[CapabilitySpec] = field(default_factory=list)
+    custom_config: dict[str, Any] = field(default_factory=dict)
+    file_templates: dict[str, str] = field(default_factory=dict)
     parent_template: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert template to dictionary for YAML serialization.
 
         Returns:
@@ -548,7 +547,7 @@ class VerticalTemplate:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "VerticalTemplate":
+    def from_dict(cls, data: dict[str, Any]) -> "VerticalTemplate":
         """Create template from dictionary (YAML deserialization).
 
         Args:
@@ -585,7 +584,7 @@ class VerticalTemplate:
             parent_template=data.get("parent_template"),
         )
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Validate template completeness.
 
         Returns:
@@ -697,7 +696,6 @@ class VerticalTemplate:
             custom_template = VerticalTemplate(...)
             merged = custom_template.merge_with_parent(base_template)
         """
-        from dataclasses import replace
 
         # Merge metadata (child overrides parent)
         merged_metadata_dict = parent.metadata.to_dict()

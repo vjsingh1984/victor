@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import AsyncIterator
 
 import pytest
 
@@ -33,12 +34,12 @@ class DummyStreamProvider(BaseProvider):
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         self.stream_calls += 1
@@ -66,13 +67,13 @@ class DummyTool(BaseTool):
 
     name = "dummy_tool"
     description = "A dummy tool"
-    parameters: Dict[str, Any] = {"type": "object", "properties": {}}
+    parameters: dict[str, Any] = {"type": "object", "properties": {}}
 
     def __init__(self) -> None:
         super().__init__()
-        self.calls: list[Dict[str, Any]] = []
+        self.calls: list[dict[str, Any]] = []
 
-    async def execute(self, _exec_ctx: Dict[str, Any] = None, **kwargs: Any):
+    async def execute(self, _exec_ctx: dict[str, Any] = None, **kwargs: Any):
         self.calls.append(kwargs)
         return SimpleNamespace(success=True, output="ok", error=None)
 

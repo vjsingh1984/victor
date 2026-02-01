@@ -19,7 +19,7 @@ secrets masking, and audit logging across all verticals.
 """
 
 import pytest
-from typing import Any, Dict, Set
+from typing import Any
 
 from victor.framework.capabilities.privacy import (
     # Configuration functions
@@ -47,9 +47,9 @@ class MockOrchestrator:
     """Mock orchestrator for testing privacy configuration."""
 
     def __init__(self):
-        self.privacy_config: Dict[str, Any] = {}
-        self.secrets_masking_config: Dict[str, Any] = {}
-        self.audit_logging_config: Dict[str, Any] = {}
+        self.privacy_config: dict[str, Any] = {}
+        self.secrets_masking_config: dict[str, Any] = {}
+        self.audit_logging_config: dict[str, Any] = {}
 
 
 class MinimalOrchestrator:

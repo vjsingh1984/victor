@@ -21,7 +21,7 @@ for adaptive agent behavior in Victor AI.
 from __future__ import annotations
 
 import logging
-from victor.agent.personas import PersonaManager, Persona, Feedback
+from victor.agent.personas import PersonaManager, Feedback
 from victor.agent.personas.types import PersonalityType, CommunicationStyle
 
 logger = logging.getLogger(__name__)

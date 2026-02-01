@@ -31,26 +31,20 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import functools
 import logging
 import queue
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Coroutine,
-    Dict,
     Generic,
-    List,
     Optional,
     ParamSpec,
     TypeVar,
-    cast,
 )
+from collections.abc import Awaitable, Callable, Coroutine
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +70,7 @@ class ConcurrencyStats:
     throughput: float = 0.0
     avg_latency_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "active_tasks": self.active_tasks,
@@ -286,7 +280,7 @@ class ConcurrencyOptimizer:
         """Initialize concurrency optimizer."""
         self._thread_pool: Optional[ThreadPoolExecutor] = None
         self._process_pool: Optional[ProcessPoolExecutor] = None
-        self._semaphores: Dict[str, AdaptiveSemaphore] = {}
+        self._semaphores: dict[str, AdaptiveSemaphore] = {}
 
     @classmethod
     def configure_default_thread_pools(
@@ -367,9 +361,9 @@ class ConcurrencyOptimizer:
 
     async def execute_in_parallel(
         self,
-        tasks: List[Callable[..., Awaitable[T]]],
+        tasks: list[Callable[..., Awaitable[T]]],
         max_concurrency: Optional[int] = None,
-    ) -> List[T]:
+    ) -> list[T]:
         """Execute async tasks in parallel with concurrency control.
 
         Reduces latency by 15-25% through optimal concurrency.
@@ -486,10 +480,10 @@ class ConcurrencyOptimizer:
     async def execute_batch(
         self,
         func: Callable[[Any], Awaitable[T]],
-        items: List[Any],
+        items: list[Any],
         batch_size: int = 10,
         delay: float = 0.0,
-    ) -> List[T]:
+    ) -> list[T]:
         """Execute function on items in batches.
 
         Useful for rate-limited APIs or bulk operations.
@@ -563,9 +557,9 @@ class ConcurrencyOptimizer:
 
 
 async def gather_with_concurrency(
-    tasks: List[Coroutine[Any, Any, T]],
+    tasks: list[Coroutine[Any, Any, T]],
     max_concurrency: int,
-) -> List[T]:
+) -> list[T]:
     """Gather coroutines with concurrency limit.
 
     Utility function for executing tasks with concurrency control.

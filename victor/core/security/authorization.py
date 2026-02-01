@@ -43,13 +43,13 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum, auto
+from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Union, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 import yaml
 
 if TYPE_CHECKING:
-    from victor.agent.action_authorizer import ActionIntent
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class Permission:
 
     resource: str
     action: str
-    constraints: Dict[str, Any] = field(default_factory=dict)
+    constraints: dict[str, Any] = field(default_factory=dict)
 
     def __hash__(self) -> int:
         """Make Permission hashable by using resource, action, and frozen constraints."""
@@ -124,7 +124,7 @@ class Permission:
             and self.constraints == other.constraints
         )
 
-    def matches(self, resource: str, action: str, context: Optional[Dict[str, Any]] = None) -> bool:
+    def matches(self, resource: str, action: str, context: Optional[dict[str, Any]] = None) -> bool:
         """Check if this permission matches a request.
 
         Args:
@@ -144,7 +144,7 @@ class Permission:
 
         return True
 
-    def _evaluate_constraints(self, context: Dict[str, Any]) -> bool:
+    def _evaluate_constraints(self, context: dict[str, Any]) -> bool:
         """Evaluate permission constraints against context.
 
         Args:
@@ -165,7 +165,7 @@ class Permission:
 
         return True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "resource": self.resource,
@@ -186,8 +186,8 @@ class Role:
     """
 
     name: str
-    permissions: Set[Permission] = field(default_factory=set)
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    permissions: set[Permission] = field(default_factory=set)
+    attributes: dict[str, Any] = field(default_factory=dict)
     description: str = ""
 
     def add_permission(self, permission: Permission) -> None:
@@ -222,7 +222,7 @@ class Role:
         """
         return any(p.resource == resource and p.action == action for p in self.permissions)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -247,9 +247,9 @@ class User:
 
     id: str
     username: str
-    roles: Set[str] = field(default_factory=set)
-    attributes: Dict[str, Any] = field(default_factory=dict)
-    permissions: Set[Permission] = field(default_factory=set)
+    roles: set[str] = field(default_factory=set)
+    attributes: dict[str, Any] = field(default_factory=dict)
+    permissions: set[Permission] = field(default_factory=set)
     enabled: bool = True
 
     def add_role(self, role_name: str) -> None:
@@ -291,7 +291,7 @@ class User:
         """
         return self.attributes.get(key, default)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "id": self.id,
@@ -322,8 +322,8 @@ class Policy:
     effect: PolicyEffect
     resource: str
     action: str
-    subjects: List[str] = field(default_factory=list)
-    conditions: Dict[str, Any] = field(default_factory=dict)
+    subjects: list[str] = field(default_factory=list)
+    conditions: dict[str, Any] = field(default_factory=dict)
     priority: int = 0
     description: str = ""
 
@@ -332,7 +332,7 @@ class Policy:
         resource: str,
         action: str,
         subject: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> bool:
         """Check if this policy matches a request.
 
@@ -361,7 +361,7 @@ class Policy:
 
         return True
 
-    def _check_subject_attributes(self, subject: str, context: Optional[Dict[str, Any]]) -> bool:
+    def _check_subject_attributes(self, subject: str, context: Optional[dict[str, Any]]) -> bool:
         """Check if subject matches via attribute conditions.
 
         Args:
@@ -383,7 +383,7 @@ class Policy:
 
         return True
 
-    def _evaluate_conditions(self, context: Dict[str, Any]) -> bool:
+    def _evaluate_conditions(self, context: dict[str, Any]) -> bool:
         """Evaluate policy conditions against context.
 
         Args:
@@ -413,7 +413,7 @@ class Policy:
         return True
 
     def _evaluate_operator_condition(
-        self, key: str, condition: Dict[str, Any], context: Dict[str, Any]
+        self, key: str, condition: dict[str, Any], context: dict[str, Any]
     ) -> bool:
         """Evaluate operator-based condition.
 
@@ -448,7 +448,7 @@ class Policy:
 
         return True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -475,10 +475,10 @@ class AuthorizationDecision:
 
     allowed: bool
     reason: str
-    matched_policies: List[Policy] = field(default_factory=list)
+    matched_policies: list[Policy] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "allowed": self.allowed,
@@ -587,11 +587,11 @@ class EnhancedAuthorizer:
         self._lock = threading.RLock()
 
         # Initialize with default roles
-        self._roles: Dict[str, Role] = dict(self.DEFAULT_ROLES)
+        self._roles: dict[str, Role] = dict(self.DEFAULT_ROLES)
 
         # Users and policies
-        self._users: Dict[str, User] = {}
-        self._policies: List[Policy] = []
+        self._users: dict[str, User] = {}
+        self._policies: list[Policy] = []
 
         logger.info(
             f"EnhancedAuthorizer initialized (enabled={enabled}, default_deny={default_deny})"
@@ -621,8 +621,8 @@ class EnhancedAuthorizer:
     def create_role(
         self,
         name: str,
-        permissions: List[Permission],
-        attributes: Optional[Dict[str, Any]] = None,
+        permissions: list[Permission],
+        attributes: Optional[dict[str, Any]] = None,
         description: str = "",
     ) -> Role:
         """Create a new role.
@@ -659,7 +659,7 @@ class EnhancedAuthorizer:
         with self._lock:
             return self._roles.get(name)
 
-    def list_roles(self) -> List[Role]:
+    def list_roles(self) -> list[Role]:
         """List all roles.
 
         Returns:
@@ -692,8 +692,8 @@ class EnhancedAuthorizer:
         self,
         user_id: str,
         username: str,
-        roles: Optional[List[str]] = None,
-        attributes: Optional[Dict[str, Any]] = None,
+        roles: Optional[list[str]] = None,
+        attributes: Optional[dict[str, Any]] = None,
     ) -> User:
         """Create a new user.
 
@@ -744,7 +744,7 @@ class EnhancedAuthorizer:
                     return user
             return None
 
-    def list_users(self) -> List[User]:
+    def list_users(self) -> list[User]:
         """List all users.
 
         Returns:
@@ -869,8 +869,8 @@ class EnhancedAuthorizer:
         effect: PolicyEffect,
         resource: str,
         action: str,
-        subjects: Optional[List[str]] = None,
-        conditions: Optional[Dict[str, Any]] = None,
+        subjects: Optional[list[str]] = None,
+        conditions: Optional[dict[str, Any]] = None,
         priority: int = 0,
         description: str = "",
     ) -> Policy:
@@ -921,7 +921,7 @@ class EnhancedAuthorizer:
                     return policy
             return None
 
-    def list_policies(self) -> List[Policy]:
+    def list_policies(self) -> list[Policy]:
         """List all policies.
 
         Returns:
@@ -956,7 +956,7 @@ class EnhancedAuthorizer:
         user: User,
         resource: str,
         action: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> AuthorizationDecision:
         """Check if a user has permission to perform an action on a resource.
 
@@ -1054,7 +1054,7 @@ class EnhancedAuthorizer:
         user_id: str,
         resource: str,
         action: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> AuthorizationDecision:
         """Check permission by user ID.
 
@@ -1080,7 +1080,7 @@ class EnhancedAuthorizer:
     # Configuration
     # -------------------------------------------------------------------------
 
-    def load_from_dict(self, config: Dict[str, Any]) -> None:
+    def load_from_dict(self, config: dict[str, Any]) -> None:
         """Load authorization configuration from dictionary.
 
         Args:
@@ -1187,7 +1187,7 @@ class EnhancedAuthorizer:
     # Statistics and Monitoring
     # -------------------------------------------------------------------------
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get authorization statistics.
 
         Returns:

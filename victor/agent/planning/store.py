@@ -41,13 +41,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from victor.agent.planning.base import ExecutionPlan, PlanStep, StepStatus, StepType
+from victor.agent.planning.base import ExecutionPlan
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +127,7 @@ class PlanStore:
         logger.warning(f"Plan not found: {plan_id_or_filename}")
         return None
 
-    def list_plans(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def list_plans(self, limit: int = 20) -> list[dict[str, Any]]:
         """List available plans.
 
         Args:

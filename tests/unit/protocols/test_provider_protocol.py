@@ -17,7 +17,6 @@
 Tests the ProviderProtocol interface and conformance.
 """
 
-import pytest
 
 from victor.protocols.provider import ProviderProtocol
 

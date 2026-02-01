@@ -43,9 +43,8 @@ import asyncio
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
-from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from victor.core.health import (
@@ -211,7 +210,7 @@ class CoordinatorHealthService:
         """
         self._metrics = metrics_collector
         self._checker = health_checker or create_default_health_checker()
-        self._coordinator_checks: Dict[str, CoordinatorHealthCheck] = {}
+        self._coordinator_checks: dict[str, CoordinatorHealthCheck] = {}
         self._start_time = time.time()
 
     def add_coordinator_check(
@@ -293,7 +292,7 @@ class CoordinatorHealthService:
         """
         return True
 
-    def get_coordinator_names(self) -> List[str]:
+    def get_coordinator_names(self) -> list[str]:
         """Get list of monitored coordinator names.
 
         Returns:
@@ -392,7 +391,7 @@ def setup_health_endpoints(
 
 
 async def create_coordinator_health_service(
-    coordinators: Optional[List[str]] = None,
+    coordinators: Optional[list[str]] = None,
     error_rate_threshold: float = 0.05,
     latency_threshold_ms: float = 5000.0,
 ) -> CoordinatorHealthService:

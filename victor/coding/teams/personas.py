@@ -50,7 +50,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 # Import framework types for base functionality
 from victor.framework.multi_agent import (
@@ -218,8 +218,8 @@ class CodingPersonaTraits:
         name: str,
         role: str,
         description: str,
-        strengths: Optional[List[str]] = None,
-        preferred_tools: Optional[List[str]] = None,
+        strengths: Optional[list[str]] = None,
+        preferred_tools: Optional[list[str]] = None,
     ) -> FrameworkPersonaTraits:
         """Convert to framework PersonaTraits.
 
@@ -276,15 +276,15 @@ class CodingPersona:
 
     name: str
     role: str
-    expertise: List[ExpertiseCategory]
-    secondary_expertise: List[ExpertiseCategory] = field(default_factory=list)
+    expertise: list[ExpertiseCategory]
+    secondary_expertise: list[ExpertiseCategory] = field(default_factory=list)
     traits: CodingPersonaTraits = field(default_factory=CodingPersonaTraits)
-    strengths: List[str] = field(default_factory=list)
+    strengths: list[str] = field(default_factory=list)
     approach: str = ""
-    communication_patterns: List[str] = field(default_factory=list)
+    communication_patterns: list[str] = field(default_factory=list)
     working_style: str = ""
 
-    def get_expertise_list(self) -> List[str]:
+    def get_expertise_list(self) -> list[str]:
         """Get combined expertise as string list.
 
         Returns:
@@ -329,7 +329,7 @@ class CodingPersona:
 
         return " ".join(parts)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert persona to dictionary.
 
         Returns:
@@ -352,7 +352,7 @@ class CodingPersona:
 # =============================================================================
 
 
-CODING_PERSONAS: Dict[str, CodingPersona] = {
+CODING_PERSONAS: dict[str, CodingPersona] = {
     # Research-focused personas
     "code_archaeologist": CodingPersona(
         name="Code Archaeologist",
@@ -646,7 +646,7 @@ def get_persona(name: str) -> Optional[CodingPersona]:
     return CODING_PERSONAS.get(name)
 
 
-def get_personas_for_role(role: str) -> List[CodingPersona]:
+def get_personas_for_role(role: str) -> list[CodingPersona]:
     """Get all personas for a specific role.
 
     Args:
@@ -658,7 +658,7 @@ def get_personas_for_role(role: str) -> List[CodingPersona]:
     return [p for p in CODING_PERSONAS.values() if p.role == role]
 
 
-def get_persona_by_expertise(expertise: ExpertiseCategory) -> List[CodingPersona]:
+def get_persona_by_expertise(expertise: ExpertiseCategory) -> list[CodingPersona]:
     """Get personas that have a specific expertise.
 
     Args:
@@ -723,7 +723,7 @@ def apply_persona_to_spec(
     return spec
 
 
-def list_personas() -> List[str]:
+def list_personas() -> list[str]:
     """List all available persona names.
 
     Returns:

@@ -52,16 +52,10 @@ from enum import Enum
 from heapq import heappop, heappush
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Set,
-    Tuple,
-    Union,
     cast,
 )
+from collections.abc import Awaitable
 
 try:
     import psutil  # type: ignore[import-untyped]
@@ -74,7 +68,6 @@ except ImportError:
 from victor.framework.parallel.executor import (
     ParallelExecutor,
     ProgressCallback,
-    ProgressEvent,
     TaskInput,
 )
 from victor.framework.parallel.protocols import ParallelExecutionResult
@@ -82,9 +75,7 @@ from victor.framework.parallel.strategies import (
     ErrorStrategy,
     JoinStrategy,
     ParallelConfig,
-    ResourceLimit,
 )
-from victor.observability.metrics import MetricsRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -209,8 +200,8 @@ class ParallelizationStrategy:
         recommended_workers: Optimal number of workers for this workload
     """
 
-    task_groups: List[List[int]]  # List of groups of task indices
-    worker_assignments: Dict[int, List[int]]  # worker_id -> task_indices
+    task_groups: list[list[int]]  # List of groups of task indices
+    worker_assignments: dict[int, list[int]]  # worker_id -> task_indices
     estimated_duration: float
     parallelism_level: int
     recommended_workers: int
@@ -279,8 +270,8 @@ class SystemResourceInfo:
     memory_percent: float = 0.0
     available_memory_mb: float = 0.0
     load_average: float = 0.0
-    network_io: Dict[str, float] = field(default_factory=dict)
-    disk_io: Dict[str, float] = field(default_factory=dict)
+    network_io: dict[str, float] = field(default_factory=dict)
+    disk_io: dict[str, float] = field(default_factory=dict)
 
     @classmethod
     def collect(cls) -> "SystemResourceInfo":
@@ -400,12 +391,12 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         self.enable_priority_queue = enable_priority_queue
 
         self._metrics = PerformanceMetrics()
-        self._task_durations: List[float] = []
+        self._task_durations: list[float] = []
 
     async def execute(
         self,
-        tasks: List[TaskInput[Any]],
-        context: Optional[Dict[str, Any]] = None,
+        tasks: list[TaskInput[Any]],
+        context: Optional[dict[str, Any]] = None,
     ) -> ParallelExecutionResult:
         """Execute tasks with adaptive optimization.
 
@@ -460,7 +451,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         self._metrics = PerformanceMetrics()
         self._task_durations.clear()
 
-    def _should_parallelize(self, tasks: List["TaskInput[Any]"]) -> bool:
+    def _should_parallelize(self, tasks: list["TaskInput[Any]"]) -> bool:
         """Decide whether to execute tasks in parallel.
 
         Args:
@@ -490,8 +481,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_parallel_optimized(
         self,
-        tasks: List[TaskInput[Any]],
-        context: Dict[str, Any],
+        tasks: list[TaskInput[Any]],
+        context: dict[str, Any],
         start_time: float,
     ) -> ParallelExecutionResult:
         """Execute tasks with parallel optimizations.
@@ -521,8 +512,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_sequential_optimized(
         self,
-        tasks: List[TaskInput[Any]],
-        context: Dict[str, Any],
+        tasks: list[TaskInput[Any]],
+        context: dict[str, Any],
         start_time: float,
     ) -> ParallelExecutionResult:
         """Execute tasks sequentially.
@@ -537,8 +528,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         """
         sequential_start = time.time()
 
-        results: List[Any] = []
-        errors: List[Exception] = []
+        results: list[Any] = []
+        errors: list[Exception] = []
         success_count = 0
         failure_count = 0
 
@@ -578,8 +569,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_with_load_balancing(
         self,
-        tasks: List[TaskInput[Any]],
-        context: Dict[str, Any],
+        tasks: list[TaskInput[Any]],
+        context: dict[str, Any],
     ) -> ParallelExecutionResult:
         """Execute tasks with load balancing across workers.
 
@@ -607,8 +598,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_with_priority_queue(
         self,
-        tasks: List[TaskInput[Any]],
-        context: Dict[str, Any],
+        tasks: list[TaskInput[Any]],
+        context: dict[str, Any],
     ) -> ParallelExecutionResult:
         """Execute tasks using a priority queue.
 
@@ -622,7 +613,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
             ParallelExecutionResult
         """
         # Create priority queue
-        priority_queue: List[TaskWithPriority] = []
+        priority_queue: list[TaskWithPriority] = []
         task_id = 0
 
         for task in tasks:
@@ -650,8 +641,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
             task_id += 1
 
         # Execute tasks in priority order
-        results: List[Any] = []
-        errors: List[Exception] = []
+        results: list[Any] = []
+        errors: list[Exception] = []
 
         while priority_queue:
             task_with_priority = heappop(priority_queue)
@@ -670,8 +661,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_with_work_stealing(
         self,
-        tasks: List[TaskInput[Any]],
-        context: Dict[str, Any],
+        tasks: list[TaskInput[Any]],
+        context: dict[str, Any],
     ) -> ParallelExecutionResult:
         """Execute tasks with work stealing.
 
@@ -685,7 +676,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         Returns:
             ParallelExecutionResult
         """
-        task_queue: asyncio.Queue[Tuple[int, TaskInput[Any]]] = asyncio.Queue()
+        task_queue: asyncio.Queue[tuple[int, TaskInput[Any]]] = asyncio.Queue()
         result_queue: asyncio.Queue[Any] = asyncio.Queue()
 
         # Add tasks to queue
@@ -706,8 +697,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
             worker.cancel()
 
         # Collect results
-        results: List[Any] = [None] * len(tasks)
-        errors: List[Exception] = []
+        results: list[Any] = [None] * len(tasks)
+        errors: list[Exception] = []
 
         while not result_queue.empty():
             task_id, result = await result_queue.get()
@@ -720,9 +711,9 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _worker(
         self,
-        task_queue: asyncio.Queue[Tuple[int, TaskInput[Any]]],
+        task_queue: asyncio.Queue[tuple[int, TaskInput[Any]]],
         result_queue: asyncio.Queue[Any],
-        context: Dict[str, Any],
+        context: dict[str, Any],
         worker_id: int,
     ) -> None:
         """Worker that processes tasks from queue with work stealing.
@@ -779,9 +770,9 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def _create_batches(
         self,
-        tasks: List["TaskInput[Any]"],
+        tasks: list["TaskInput[Any]"],
         batch_size: int,
-    ) -> List[List["TaskInput[Any]"]]:
+    ) -> list[list["TaskInput[Any]"]]:
         """Divide tasks into batches.
 
         Args:
@@ -798,9 +789,9 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def _execute_batches(
         self,
-        batches: List[List["TaskInput[Any]"]],
-        context: Dict[str, Any],
-    ) -> List[ParallelExecutionResult]:
+        batches: list[list["TaskInput[Any]"]],
+        context: dict[str, Any],
+    ) -> list[ParallelExecutionResult]:
         """Execute batches in parallel.
 
         Args:
@@ -817,11 +808,11 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
         # Execute batches in parallel
         batch_results_with_exceptions = await asyncio.gather(*batch_tasks, return_exceptions=True)
-        return cast(List[ParallelExecutionResult], batch_results_with_exceptions)
+        return cast(list[ParallelExecutionResult], batch_results_with_exceptions)
 
     def _aggregate_batch_results(
         self,
-        batch_results: List[Any],
+        batch_results: list[Any],
         total_tasks: int,
     ) -> ParallelExecutionResult:
         """Aggregate results from multiple batches.
@@ -833,8 +824,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         Returns:
             Aggregated ParallelExecutionResult
         """
-        all_results: List[Any] = []
-        all_errors: List[Exception] = []
+        all_results: list[Any] = []
+        all_errors: list[Exception] = []
         success_count = 0
         failure_count = 0
 
@@ -869,8 +860,8 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def _create_result_from_lists(
         self,
-        results: List[Any],
-        errors: List[Exception],
+        results: list[Any],
+        errors: list[Exception],
     ) -> ParallelExecutionResult:
         """Create ParallelExecutionResult from results and errors lists.
 
@@ -914,7 +905,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def _calculate_metrics(
         self,
-        tasks: List[TaskInput[Any]],
+        tasks: list[TaskInput[Any]],
         result: ParallelExecutionResult,
         start_time: float,
     ) -> None:
@@ -958,7 +949,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def optimize_parallelism(
         self,
-        tasks: List[TaskInput[Any]],
+        tasks: list[TaskInput[Any]],
     ) -> ParallelizationStrategy:
         """Optimize parallelization strategy based on task characteristics.
 
@@ -1022,9 +1013,9 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def balance_load(
         self,
-        workers: List[WorkerInfo],
-        tasks: List[TaskInput[Any]],
-    ) -> Dict[int, List[int]]:
+        workers: list[WorkerInfo],
+        tasks: list[TaskInput[Any]],
+    ) -> dict[int, list[int]]:
         """Balance task load across workers based on current state.
 
         Implements work stealing and load balancing to ensure even distribution
@@ -1045,7 +1036,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
         # Distribute tasks using greedy load balancing
         task_indices = list(range(len(tasks)))
-        assignments: Dict[int, List[int]] = {w.worker_id: [] for w in workers}
+        assignments: dict[int, list[int]] = {w.worker_id: [] for w in workers}
 
         for i, task_idx in enumerate(task_indices):
             # Assign to worker with lowest load
@@ -1060,7 +1051,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
     def detect_bottlenecks(
         self,
         execution: ParallelExecutionResult,
-    ) -> List[Bottleneck]:
+    ) -> list[Bottleneck]:
         """Detect performance bottlenecks from execution results.
 
         Analyzes execution metrics to identify:
@@ -1075,7 +1066,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         Returns:
             List of detected bottlenecks
         """
-        bottlenecks: List[Bottleneck] = []
+        bottlenecks: list[Bottleneck] = []
 
         # Check for speedup degradation
         if self._metrics.speedup_factor < 1.2 and self._metrics.worker_count > 1:
@@ -1213,9 +1204,9 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     async def profile_execution(
         self,
-        tasks: List[TaskInput[Any]],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        tasks: list[TaskInput[Any]],
+        context: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """Profile parallel execution with detailed performance analysis.
 
         Executes tasks and collects detailed profiling information including:
@@ -1318,9 +1309,9 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def _create_task_groups(
         self,
-        tasks: List[TaskInput[Any]],
+        tasks: list[TaskInput[Any]],
         num_workers: int,
-    ) -> List[List[int]]:
+    ) -> list[list[int]]:
         """Create groups of tasks that can execute in parallel.
 
         Args:
@@ -1338,7 +1329,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
         # Simple round-robin grouping
         # In production, would analyze task dependencies
-        groups: List[List[int]] = [[] for _ in range(workers)]
+        groups: list[list[int]] = [[] for _ in range(workers)]
         for i in range(task_count):
             groups[i % workers].append(i)
 
@@ -1346,9 +1337,9 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def _assign_tasks_to_workers(
         self,
-        task_groups: List[List[int]],
+        task_groups: list[list[int]],
         num_workers: int,
-    ) -> Dict[int, List[int]]:
+    ) -> dict[int, list[int]]:
         """Assign task groups to specific workers.
 
         Args:
@@ -1358,7 +1349,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         Returns:
             Mapping of worker_id to assigned task indices
         """
-        assignments: Dict[int, List[int]] = {}
+        assignments: dict[int, list[int]] = {}
         for worker_id in range(num_workers):
             if worker_id < len(task_groups):
                 assignments[worker_id] = task_groups[worker_id]
@@ -1396,9 +1387,9 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def _rebalance_with_work_stealing(
         self,
-        workers: List[WorkerInfo],
-        assignments: Dict[int, List[int]],
-    ) -> Dict[int, List[int]]:
+        workers: list[WorkerInfo],
+        assignments: dict[int, list[int]],
+    ) -> dict[int, list[int]]:
         """Rebalance tasks using work stealing algorithm.
 
         Args:
@@ -1437,9 +1428,9 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
     def _generate_optimization_recommendations(
         self,
-        bottlenecks: List[Bottleneck],
+        bottlenecks: list[Bottleneck],
         result: ParallelExecutionResult,
-    ) -> List[str]:
+    ) -> list[str]:
         """Generate optimization recommendations based on analysis.
 
         Args:
@@ -1449,7 +1440,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
         Returns:
             List of recommendation strings
         """
-        recommendations: List[str] = []
+        recommendations: list[str] = []
 
         # Add bottleneck recommendations
         for bottleneck in bottlenecks[:3]:  # Top 3 bottlenecks
@@ -1478,12 +1469,12 @@ class AdaptiveParallelExecutor(ParallelExecutor):
 
 
 def create_adaptive_executor(
-    strategy: Union[OptimizationStrategy, str] = OptimizationStrategy.AUTO,
+    strategy: OptimizationStrategy | str = OptimizationStrategy.AUTO,
     max_workers: Optional[int] = None,
     enable_work_stealing: bool = False,
     enable_priority_queue: bool = False,
-    join_strategy: Union[JoinStrategy, str] = JoinStrategy.ALL,
-    error_strategy: Union[ErrorStrategy, str] = ErrorStrategy.FAIL_FAST,
+    join_strategy: JoinStrategy | str = JoinStrategy.ALL,
+    error_strategy: ErrorStrategy | str = ErrorStrategy.FAIL_FAST,
 ) -> AdaptiveParallelExecutor:
     """Factory function to create an adaptive parallel executor.
 
@@ -1529,9 +1520,9 @@ def create_adaptive_executor(
 
 
 async def execute_parallel_optimized(
-    tasks: List["TaskInput[Any]"],
-    context: Optional[Dict[str, Any]] = None,
-    strategy: Union[OptimizationStrategy, str] = OptimizationStrategy.AUTO,
+    tasks: list["TaskInput[Any]"],
+    context: Optional[dict[str, Any]] = None,
+    strategy: OptimizationStrategy | str = OptimizationStrategy.AUTO,
     max_workers: Optional[int] = None,
 ) -> ParallelExecutionResult:
     """Convenience function for optimized parallel execution.

@@ -49,7 +49,7 @@ Example usage:
 
 import os
 from pathlib import Path
-from typing import List, Dict, Optional, Union
+from typing import Optional
 
 # Import Rust extension (will be available after compilation)
 try:
@@ -88,12 +88,12 @@ class FileOpsError(Exception):
 
 
 def walk_directory(
-    root: Union[str, Path],
-    patterns: Optional[List[str]] = None,
+    root: str | Path,
+    patterns: Optional[list[str]] = None,
     max_depth: int = 100,
     follow_symlinks: bool = False,
-    ignore_patterns: Optional[List[str]] = None,
-) -> List[FileInfo]:
+    ignore_patterns: Optional[list[str]] = None,
+) -> list[FileInfo]:
     """
     Walk directory tree in parallel with pattern matching.
 
@@ -161,7 +161,7 @@ def walk_directory(
         raise FileOpsError(f"Error walking directory: {e}") from e
 
 
-def get_file_metadata(paths: List[Union[str, Path]]) -> List[FileMetadata]:
+def get_file_metadata(paths: list[str | Path]) -> list[FileMetadata]:
     """
     Collect metadata for multiple files in parallel.
 
@@ -197,7 +197,7 @@ def get_file_metadata(paths: List[Union[str, Path]]) -> List[FileMetadata]:
         raise FileOpsError(f"Error collecting metadata: {e}") from e
 
 
-def filter_files_by_extension(files: List[FileInfo], extensions: List[str]) -> List[FileInfo]:
+def filter_files_by_extension(files: list[FileInfo], extensions: list[str]) -> list[FileInfo]:
     """
     Filter files by extension using efficient set-based lookup.
 
@@ -232,8 +232,8 @@ def filter_files_by_extension(files: List[FileInfo], extensions: List[str]) -> L
 
 
 def filter_files_by_size(
-    files: List[FileInfo], min_size: int = 0, max_size: int = 0
-) -> List[FileInfo]:
+    files: list[FileInfo], min_size: int = 0, max_size: int = 0
+) -> list[FileInfo]:
     """
     Filter files by size range.
 
@@ -265,8 +265,8 @@ def filter_files_by_size(
 
 
 def get_directory_statistics(
-    root: Union[str, Path], max_depth: int = 100
-) -> Dict[str, Union[int, List[tuple]]]:
+    root: str | Path, max_depth: int = 100
+) -> dict[str, int | list[tuple]]:
     """
     Get directory statistics including total size and largest files.
 
@@ -302,7 +302,7 @@ def get_directory_statistics(
         raise FileOpsError(f"Error getting directory stats: {e}") from e
 
 
-def group_files_by_directory(files: List[FileInfo]) -> Dict[str, List[FileInfo]]:
+def group_files_by_directory(files: list[FileInfo]) -> dict[str, list[FileInfo]]:
     """
     Group files by their parent directory.
 
@@ -330,8 +330,8 @@ def group_files_by_directory(files: List[FileInfo]) -> Dict[str, List[FileInfo]]
 
 
 def filter_files_by_modified_time(
-    files: List[FileInfo], since: int, until: int = 0
-) -> List[FileInfo]:
+    files: list[FileInfo], since: int, until: int = 0
+) -> list[FileInfo]:
     """
     Filter files by modification time.
 
@@ -361,11 +361,11 @@ def filter_files_by_modified_time(
 
 
 def find_code_files(
-    root: Union[str, Path],
-    extensions: Optional[List[str]] = None,
-    ignore_dirs: Optional[List[str]] = None,
+    root: str | Path,
+    extensions: Optional[list[str]] = None,
+    ignore_dirs: Optional[list[str]] = None,
     max_depth: int = 100,
-) -> List[FileInfo]:
+) -> list[FileInfo]:
     """
     Convenience function to find code files in a directory.
 

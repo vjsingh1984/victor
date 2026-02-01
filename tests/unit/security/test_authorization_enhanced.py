@@ -10,17 +10,12 @@ Tests cover:
 """
 
 import pytest
-from pathlib import Path
 from victor.core.security.authorization import (
     EnhancedAuthorizer,
     User,
     Role,
     Permission,
-    Policy,
     PolicyEffect,
-    ResourceType,
-    ActionType,
-    AuthorizationDecision,
 )
 
 

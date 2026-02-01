@@ -50,7 +50,8 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.coordination.formations.base import TeamContext, BaseFormationStrategy
@@ -70,7 +71,6 @@ def get_formation(formation_name: str) -> "BaseFormationStrategy":
         HierarchicalFormation,
         PipelineFormation,
         ConsensusFormation,
-        BaseFormationStrategy,
     )
     from victor.teams.types import TeamFormation
 
@@ -123,9 +123,9 @@ class SwitchingCriteria:
     target_formation: "TeamFormation"
     trigger_type: TriggerType = TriggerType.CONDITION
     condition: Optional[str] = None
-    callback: Optional[Callable[[Dict[str, Any]], bool]] = None
+    callback: Optional[Callable[[dict[str, Any]], bool]] = None
     threshold_key: Optional[str] = None
-    threshold_value: Optional[Union[int, float]] = None
+    threshold_value: Optional[int | float] = None
     comparison: str = ">="
     trigger_once: bool = True
     priority: int = 0
@@ -135,7 +135,7 @@ class SwitchingCriteria:
     _triggered: bool = field(default=False, init=False, repr=False)
     _last_triggered: float = field(default=0.0, init=False, repr=False)
 
-    def should_trigger(self, context: Dict[str, Any]) -> bool:
+    def should_trigger(self, context: dict[str, Any]) -> bool:
         """Check if criteria should trigger formation switch.
 
         Args:
@@ -247,7 +247,7 @@ class SwitchingFormation:
     def __init__(
         self,
         initial_formation: "TeamFormation",
-        switching_criteria: List[SwitchingCriteria],
+        switching_criteria: list[SwitchingCriteria],
         max_switches: int = 10,
         track_switches: bool = True,
     ):
@@ -259,7 +259,6 @@ class SwitchingFormation:
             max_switches: Maximum number of formation switches
             track_switches: Whether to track switch history
         """
-        from victor.teams.types import TeamFormation
 
         self.initial_formation = initial_formation
         self.switching_criteria = sorted(switching_criteria, key=lambda c: c.priority, reverse=True)
@@ -269,14 +268,14 @@ class SwitchingFormation:
         # State
         self.current_formation = initial_formation
         self.switch_count = 0
-        self.switch_history: List[Dict[str, Any]] = []
+        self.switch_history: list[dict[str, Any]] = []
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: "TeamContext",
         task: "AgentMessage",
-    ) -> List["MemberResult"]:
+    ) -> list["MemberResult"]:
         """Execute with dynamic formation switching.
 
         Args:
@@ -367,7 +366,7 @@ class SwitchingFormation:
         return results
 
     def _check_switch_criteria(
-        self, context: Dict[str, Any]
+        self, context: dict[str, Any]
     ) -> tuple[bool, Optional["TeamFormation"], Optional[SwitchingCriteria]]:
         """Check if any switching criteria is met.
 
@@ -383,7 +382,7 @@ class SwitchingFormation:
 
         return False, None, None
 
-    def get_switch_history(self) -> List[Dict[str, Any]]:
+    def get_switch_history(self) -> list[dict[str, Any]]:
         """Get history of formation switches.
 
         Returns:
@@ -424,10 +423,10 @@ class NegotiationProposal:
     content: str
     confidence: float = 0.5
     rationale: str = ""
-    alternatives: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    alternatives: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "member_id": self.member_id,
@@ -454,12 +453,12 @@ class NegotiationResult:
     """
 
     round_number: int
-    proposals: List[NegotiationProposal]
+    proposals: list[NegotiationProposal]
     consensus_reached: bool
     selected_proposal: Optional[NegotiationProposal] = None
-    confidence_scores: Dict[str, float] = field(default_factory=dict)
+    confidence_scores: dict[str, float] = field(default_factory=dict)
     discussion_summary: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class NegotiationFormation:
@@ -503,14 +502,14 @@ class NegotiationFormation:
         self.timeout_per_round = timeout_per_round
 
         # State
-        self.negotiation_history: List[NegotiationResult] = []
+        self.negotiation_history: list[NegotiationResult] = []
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: "TeamContext",
         task: "AgentMessage",
-    ) -> List["MemberResult"]:
+    ) -> list["MemberResult"]:
         """Execute with negotiation phase.
 
         Args:
@@ -530,7 +529,7 @@ class NegotiationFormation:
 
     async def _negotiate(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: "TeamContext",
         task: "AgentMessage",
     ) -> NegotiationResult:
@@ -579,11 +578,11 @@ class NegotiationFormation:
 
     async def _gather_proposals(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: "TeamContext",
         task: "AgentMessage",
         round_number: int,
-    ) -> List[NegotiationProposal]:
+    ) -> list[NegotiationProposal]:
         """Gather proposals from all agents.
 
         Args:
@@ -689,7 +688,7 @@ Format your response as a JSON object:
         )
 
     def _evaluate_proposals(
-        self, proposals: List[NegotiationProposal]
+        self, proposals: list[NegotiationProposal]
     ) -> tuple[bool, Optional[NegotiationProposal]]:
         """Evaluate proposals and check for consensus.
 
@@ -715,7 +714,7 @@ Format your response as a JSON object:
         return False, None
 
     async def _share_proposals(
-        self, agents: List[Any], proposals: List[NegotiationProposal]
+        self, agents: list[Any], proposals: list[NegotiationProposal]
     ) -> None:
         """Share proposals with all agents for next round.
 
@@ -737,7 +736,7 @@ Format your response as a JSON object:
             except Exception as e:
                 logger.warning(f"Failed to share proposals with {agent.id}: {e}")
 
-    def _summarize_proposals(self, proposals: List[NegotiationProposal]) -> str:
+    def _summarize_proposals(self, proposals: list[NegotiationProposal]) -> str:
         """Create summary of proposals.
 
         Args:
@@ -754,7 +753,7 @@ Format your response as a JSON object:
             )
         return "\n".join(lines)
 
-    def _summarize_negotiation(self, proposals: List[NegotiationProposal]) -> str:
+    def _summarize_negotiation(self, proposals: list[NegotiationProposal]) -> str:
         """Create summary of entire negotiation.
 
         Args:
@@ -789,11 +788,11 @@ Format your response as a JSON object:
 
     async def _execute_with_formation(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: "TeamContext",
         task: "AgentMessage",
         formation: "TeamFormation",
-    ) -> List["MemberResult"]:
+    ) -> list["MemberResult"]:
         """Execute with determined formation.
 
         Args:
@@ -812,7 +811,7 @@ Format your response as a JSON object:
         strategy = get_formation(formation.value)  # type: ignore[misc]
         return await strategy.execute(agents, context, task)
 
-    def get_negotiation_history(self) -> List[NegotiationResult]:
+    def get_negotiation_history(self) -> list[NegotiationResult]:
         """Get history of negotiation rounds.
 
         Returns:
@@ -850,11 +849,11 @@ class Vote:
 
     member_id: str
     choice: str
-    ranking: Optional[List[str]] = None
+    ranking: Optional[list[str]] = None
     confidence: float = 1.0
     rationale: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "member_id": self.member_id,
@@ -878,12 +877,12 @@ class VotingResult:
         metadata: Additional metadata
     """
 
-    votes: List[Vote]
+    votes: list[Vote]
     winner: Optional[str]
-    vote_distribution: Dict[str, int]
+    vote_distribution: dict[str, int]
     consensus_level: float
     method: VotingMethod
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class VotingFormation:
@@ -923,14 +922,14 @@ class VotingFormation:
         self.fallback_formation = fallback_formation or TeamFormation.SEQUENTIAL
 
         # State
-        self.voting_history: List[VotingResult] = []
+        self.voting_history: list[VotingResult] = []
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: "TeamContext",
         task: "AgentMessage",
-    ) -> List["MemberResult"]:
+    ) -> list["MemberResult"]:
         """Execute with voting on key decisions.
 
         Args:
@@ -949,7 +948,7 @@ class VotingFormation:
 
     async def _vote_on_approach(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: "TeamContext",
         task: "AgentMessage",
     ) -> VotingResult:
@@ -990,7 +989,7 @@ class VotingFormation:
         self.voting_history.append(result)
         return result
 
-    def _get_choices(self, task: "AgentMessage") -> List[str]:
+    def _get_choices(self, task: "AgentMessage") -> list[str]:
         """Get available choices for voting.
 
         Args:
@@ -1005,7 +1004,7 @@ class VotingFormation:
     async def _request_vote(
         self,
         agent: Any,
-        choices: List[str],
+        choices: list[str],
         context: "TeamContext",
         task: "AgentMessage",
     ) -> Optional[Vote]:
@@ -1037,7 +1036,7 @@ class VotingFormation:
             logger.warning(f"Failed to get vote from {agent.id}: {e}")
             return None
 
-    def _create_voting_prompt(self, task: "AgentMessage", choices: List[str]) -> str:
+    def _create_voting_prompt(self, task: "AgentMessage", choices: list[str]) -> str:
         """Create voting prompt.
 
         Args:
@@ -1062,7 +1061,7 @@ Confidence: [0.0-1.0]
 Rationale: [your reasoning]
 """
 
-    def _parse_vote(self, member_id: str, response: str, choices: List[str]) -> Optional[Vote]:
+    def _parse_vote(self, member_id: str, response: str, choices: list[str]) -> Optional[Vote]:
         """Parse vote from agent response.
 
         Args:
@@ -1121,8 +1120,8 @@ Rationale: [your reasoning]
         return None
 
     def _tally_votes(
-        self, votes: List[Vote], choices: List[str]
-    ) -> tuple[Optional[str], Dict[str, int], float]:
+        self, votes: list[Vote], choices: list[str]
+    ) -> tuple[Optional[str], dict[str, int], float]:
         """Tally votes and determine winner.
 
         Args:
@@ -1195,12 +1194,12 @@ Rationale: [your reasoning]
             consensus = total_votes / len(votes) if votes else 0.0
 
         # Cast distribution to expected type for return
-        distribution_typed: Dict[str, int] = {
+        distribution_typed: dict[str, int] = {
             k: int(v) if v is not None else 0 for k, v in distribution.items()
         }
         return winner, distribution_typed, consensus
 
-    def _apply_tiebreaker(self, distribution: Dict[str, int]) -> Optional[str]:
+    def _apply_tiebreaker(self, distribution: dict[str, int]) -> Optional[str]:
         """Apply tiebreaker rule.
 
         Args:
@@ -1230,11 +1229,11 @@ Rationale: [your reasoning]
 
     async def _execute_with_vote_result(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: "TeamContext",
         task: "AgentMessage",
         vote_result: VotingResult,
-    ) -> List["MemberResult"]:
+    ) -> list["MemberResult"]:
         """Execute with chosen approach.
 
         Args:
@@ -1275,7 +1274,7 @@ Rationale: [your reasoning]
         except ValueError:
             return self.fallback_formation
 
-    def get_voting_history(self) -> List[VotingResult]:
+    def get_voting_history(self) -> list[VotingResult]:
         """Get history of voting rounds.
 
         Returns:

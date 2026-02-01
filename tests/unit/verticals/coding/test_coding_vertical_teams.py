@@ -14,7 +14,6 @@
 
 """Tests for coding vertical teams integration."""
 
-import pytest
 
 from victor.framework.teams import TeamFormation
 from victor.framework.team_schema import TeamSpec

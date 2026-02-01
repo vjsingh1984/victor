@@ -47,7 +47,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from victor.framework.enrichment import (
     ContextEnrichment,
@@ -59,7 +59,7 @@ from victor.framework.enrichment import (
 if TYPE_CHECKING:
     from victor.rag.document_store import DocumentStore
     from victor.rag.entity_resolver import EntityInfo, EntityResolver
-    from victor.rag.query_enhancer import QueryEnhancer, EnhancementTechnique
+    from victor.rag.query_enhancer import QueryEnhancer
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class RAGEnrichmentConfig:
 
     use_entity_resolution: bool = True
     use_llm_enhancement: bool = True  # Enabled by default for RAG vertical
-    enhancement_techniques: Optional[List[str]] = (
+    enhancement_techniques: Optional[list[str]] = (
         None  # ["rewrite", "decomposition", "entity_expand"]
     )
     include_metadata: bool = True
@@ -174,7 +174,7 @@ class RAGEnrichmentStrategy:
         self,
         prompt: str,
         context: EnrichmentContext,
-    ) -> List[ContextEnrichment]:
+    ) -> list[ContextEnrichment]:
         """Get context enrichments for a RAG prompt.
 
         Args:
@@ -184,7 +184,7 @@ class RAGEnrichmentStrategy:
         Returns:
             List of enrichments to apply
         """
-        enrichments: List[ContextEnrichment] = []
+        enrichments: list[ContextEnrichment] = []
 
         # Ensure initialized
         await self.initialize()
@@ -237,7 +237,7 @@ class RAGEnrichmentStrategy:
 
         return enrichments
 
-    def _format_entity_hints(self, entities: List["EntityInfo"]) -> str:
+    def _format_entity_hints(self, entities: list["EntityInfo"]) -> str:
         """Format entity information as enrichment hints.
 
         Args:
@@ -261,7 +261,7 @@ class RAGEnrichmentStrategy:
         self,
         query: str,
         use_llm: Optional[bool] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze query with full async support.
 
         This is the main entry point for query analysis. It:
@@ -279,7 +279,7 @@ class RAGEnrichmentStrategy:
         await self.initialize()
 
         # Resolve entities
-        entities: List["EntityInfo"] = []
+        entities: list["EntityInfo"] = []
         if self._entity_resolver:
             entities = await self._entity_resolver.resolve_entities(query)
 
@@ -319,7 +319,7 @@ class RAGEnrichmentStrategy:
 
         return analysis
 
-    def analyze_query(self, query: str) -> Dict[str, Any]:
+    def analyze_query(self, query: str) -> dict[str, Any]:
         """Synchronous query analysis (for backward compatibility).
 
         Uses fallback logic without async entity resolution.
@@ -333,7 +333,7 @@ class RAGEnrichmentStrategy:
         """
         return self._fallback_analyze(query)
 
-    def _fallback_analyze(self, query: str) -> Dict[str, Any]:
+    def _fallback_analyze(self, query: str) -> dict[str, Any]:
         """Fallback query analysis without entity resolver.
 
         Args:
@@ -366,7 +366,7 @@ class RAGEnrichmentStrategy:
             "expansion_terms": [],
         }
 
-    def _format_source_metadata(self, sources: List[str]) -> str:
+    def _format_source_metadata(self, sources: list[str]) -> str:
         """Format document source metadata for enrichment.
 
         Args:
@@ -386,7 +386,7 @@ class RAGEnrichmentStrategy:
 
         return "\n".join(lines)
 
-    def _format_conversation_history(self, tool_history: List[Dict[str, Any]]) -> str:
+    def _format_conversation_history(self, tool_history: list[dict[str, Any]]) -> str:
         """Format relevant conversation history.
 
         Args:
@@ -416,8 +416,8 @@ class RAGEnrichmentStrategy:
         self,
         question: str,
         context: str,
-        sources: List[str],
-        enrichments: Optional[List[ContextEnrichment]] = None,
+        sources: list[str],
+        enrichments: Optional[list[ContextEnrichment]] = None,
     ) -> str:
         """Enrich the synthesis prompt with additional context.
 

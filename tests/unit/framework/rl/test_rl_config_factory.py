@@ -24,7 +24,6 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import pytest
 import yaml
 
 from victor.framework.rl import LearnerType

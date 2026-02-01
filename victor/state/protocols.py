@@ -39,7 +39,7 @@ Usage:
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 class StateScope(str, Enum):
@@ -128,7 +128,7 @@ class IStateManager(Protocol):
         """
         ...
 
-    async def keys(self, pattern: str = "*") -> List[str]:
+    async def keys(self, pattern: str = "*") -> list[str]:
         """Get all keys matching pattern.
 
         Args:
@@ -139,7 +139,7 @@ class IStateManager(Protocol):
         """
         ...
 
-    async def get_all(self) -> Dict[str, Any]:
+    async def get_all(self) -> dict[str, Any]:
         """Get all state as dictionary.
 
         Returns:
@@ -147,7 +147,7 @@ class IStateManager(Protocol):
         """
         ...
 
-    async def update(self, updates: Dict[str, Any]) -> None:
+    async def update(self, updates: dict[str, Any]) -> None:
         """Update multiple keys at once.
 
         Args:
@@ -159,7 +159,7 @@ class IStateManager(Protocol):
         """Clear all state."""
         ...
 
-    async def snapshot(self) -> Dict[str, Any]:
+    async def snapshot(self) -> dict[str, Any]:
         """Create immutable snapshot for checkpointing.
 
         Returns:
@@ -167,7 +167,7 @@ class IStateManager(Protocol):
         """
         ...
 
-    async def restore(self, snapshot: Dict[str, Any]) -> None:
+    async def restore(self, snapshot: dict[str, Any]) -> None:
         """Restore from snapshot.
 
         Args:
@@ -211,7 +211,7 @@ class IStateObserver(Protocol):
         key: str,
         old_value: Any,
         new_value: Any,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Called when state changes.
 

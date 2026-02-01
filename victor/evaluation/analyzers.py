@@ -22,7 +22,8 @@ between harness.py and code_quality.py.
 """
 
 import logging
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 

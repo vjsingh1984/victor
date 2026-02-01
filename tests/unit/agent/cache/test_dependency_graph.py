@@ -17,7 +17,6 @@
 Tests the dependency graph for cascading cache invalidation.
 """
 
-import pytest
 
 from victor.agent.cache.dependency_graph import ToolDependencyGraph
 

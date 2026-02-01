@@ -27,12 +27,11 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
 from victor.agent.cache.indexed_lru_cache import IndexedLRUCache
-from victor.agent.cache.dependency_extractor import DependencyExtractor
 
 
 @dataclass
@@ -40,7 +39,7 @@ class MockToolCallResult:
     """Mock ToolCallResult for testing."""
 
     tool_name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     success: bool = True
     result: Any = None
     cached: bool = False

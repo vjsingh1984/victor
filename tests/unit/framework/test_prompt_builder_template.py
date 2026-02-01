@@ -22,9 +22,6 @@ These tests verify:
 4. Integration with existing PromptBuilder
 """
 
-import pytest
-from typing import List, Optional
-from unittest.mock import Mock, MagicMock
 
 
 class TestPromptBuilderTemplateExists:

@@ -33,7 +33,8 @@ from __future__ import annotations
 
 import logging
 from functools import cached_property
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +135,7 @@ class LazyToolRunnable:
 
         return self.tool
 
-    def run(self, inputs: Dict[str, Any]) -> Any:
+    def run(self, inputs: dict[str, Any]) -> Any:
         """Execute the tool synchronously with the given inputs.
 
         This method creates the tool if not yet initialized (or if
@@ -152,7 +153,7 @@ class LazyToolRunnable:
         tool_instance = self.get_tool_instance()
         return tool_instance.run(inputs)
 
-    async def arun(self, inputs: Dict[str, Any]) -> Any:
+    async def arun(self, inputs: dict[str, Any]) -> Any:
         """Execute the tool asynchronously with the given inputs.
 
         This method creates the tool if not yet initialized (or if
@@ -228,7 +229,7 @@ class ToolCompositionBuilder:
 
     def __init__(self) -> None:
         """Initialize an empty tool composition builder."""
-        self._tools: Dict[str, Any] = {}
+        self._tools: dict[str, Any] = {}
 
     def add(
         self,
@@ -329,7 +330,7 @@ class ToolCompositionBuilder:
         """
         return name in self._tools
 
-    def build(self) -> Dict[str, Any]:
+    def build(self) -> dict[str, Any]:
         """Build and return the tool composition.
 
         Returns:

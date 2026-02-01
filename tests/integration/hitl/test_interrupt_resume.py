@@ -23,12 +23,10 @@ These tests verify:
 
 import asyncio
 import pytest
-from typing import Dict, Any, List
+from typing import Any
 
 from victor.framework.hitl import (
     HITLController,
-    HITLCheckpoint,
-    ApprovalStatus,
 )
 
 
@@ -220,13 +218,13 @@ class TestMultipleInterruptPointsInWorkflow:
             workflow_log.append("step_1_complete")
             return {"step_1_result": "analyzed codebase"}
 
-        async def step_2(input_data: Dict[str, Any]):
+        async def step_2(input_data: dict[str, Any]):
             workflow_log.append("step_2_start")
             await asyncio.sleep(0.01)
             workflow_log.append("step_2_complete")
             return {**input_data, "step_2_result": "identified issues"}
 
-        async def step_3(input_data: Dict[str, Any]):
+        async def step_3(input_data: dict[str, Any]):
             workflow_log.append("step_3_start")
             await asyncio.sleep(0.01)
             workflow_log.append("step_3_complete")
@@ -431,7 +429,7 @@ class TestPauseResumeCallbacks:
         """on_pause callback should receive checkpoint ID and context."""
         pause_events = []
 
-        def on_pause(checkpoint_id: str, context: Dict[str, Any]):
+        def on_pause(checkpoint_id: str, context: dict[str, Any]):
             pause_events.append(
                 {
                     "checkpoint_id": checkpoint_id,

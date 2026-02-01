@@ -43,7 +43,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from victor.core.search_types import SearchHit
 
@@ -78,8 +78,8 @@ class ISemanticSearch(Protocol):
         self,
         query: str,
         max_results: int = 10,
-        filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[SearchHit]:
+        filter_metadata: Optional[dict[str, Any]] = None,
+    ) -> list[SearchHit]:
         """Execute semantic search on indexed content.
 
         Args:
@@ -115,7 +115,7 @@ class IIndexable(Protocol):
         self,
         file_path: str,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Index a document for semantic search.
 

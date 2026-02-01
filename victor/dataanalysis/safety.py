@@ -1,6 +1,6 @@
 """Data Analysis Safety Extension - Privacy and data protection patterns."""
 
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from victor.core.verticals.protocols import SafetyExtensionProtocol
 from victor.core.security.patterns.types import SafetyPattern
@@ -22,7 +22,7 @@ LOW = "LOW"
 
 # Data analysis-specific safety patterns as tuples
 # Note: PII detection patterns are now in victor.security.safety.pii
-_DATA_ANALYSIS_SAFETY_TUPLES: List[Tuple[str, str, str]] = [
+_DATA_ANALYSIS_SAFETY_TUPLES: list[tuple[str, str, str]] = [
     # High-risk patterns - PII exposure (kept for SafetyPattern interface)
     (r"(?i)(social[_\s-]?security|ssn)[^\w]", "Social Security Number exposure", HIGH),
     (r"(?i)(credit[_\s-]?card|card[_\s-]?number)", "Credit card data exposure", HIGH),
@@ -46,7 +46,7 @@ _DATA_ANALYSIS_SAFETY_TUPLES: List[Tuple[str, str, str]] = [
 class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
     """Safety extension for data analysis tasks."""
 
-    def get_bash_patterns(self) -> List[SafetyPattern]:
+    def get_bash_patterns(self) -> list[SafetyPattern]:
         """Return data analysis-specific bash patterns.
 
         Returns:
@@ -62,7 +62,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
             for p, d, r in _DATA_ANALYSIS_SAFETY_TUPLES
         ]
 
-    def get_danger_patterns(self) -> List[Tuple[str, str, str]]:
+    def get_danger_patterns(self) -> list[tuple[str, str, str]]:
         """Return data analysis-specific danger patterns (legacy format).
 
         Returns:
@@ -70,7 +70,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
         """
         return _DATA_ANALYSIS_SAFETY_TUPLES
 
-    def get_blocked_operations(self) -> List[str]:
+    def get_blocked_operations(self) -> list[str]:
         """Return operations that should be blocked in data analysis."""
         return [
             "export_pii_unencrypted",
@@ -79,7 +79,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
             "access_production_database_directly",
         ]
 
-    def get_pii_patterns(self) -> Dict[str, str]:
+    def get_pii_patterns(self) -> dict[str, str]:
         """Return patterns for detecting PII columns.
 
         Uses patterns from victor.core.security.patterns.pii for comprehensive detection.
@@ -92,7 +92,7 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
         # Return simplified dict format for backward compatibility
         return {pii_type.value: pattern for pii_type, pattern in CORE_PII_PATTERNS.items()}
 
-    def detect_pii_columns(self, columns: List[str]) -> List[Tuple[str, str]]:
+    def detect_pii_columns(self, columns: list[str]) -> list[tuple[str, str]]:
         """Detect potential PII columns in a dataframe.
 
         Uses victor.security.safety.pii.detect_pii_columns for detection.
@@ -125,14 +125,14 @@ class DataAnalysisSafetyExtension(SafetyExtensionProtocol):
         except ValueError:
             return "Consider removing or hashing"
 
-    def get_safety_reminders(self) -> List[str]:
+    def get_safety_reminders(self) -> list[str]:
         """Return safety reminders for data analysis.
 
         Uses victor.security.safety.pii.get_safety_reminders.
         """
         return core_get_safety_reminders()
 
-    def scan_for_pii(self, content: str) -> List[Dict[str, Any]]:
+    def scan_for_pii(self, content: str) -> list[dict[str, Any]]:
         """Scan content for PII using the core PIIScanner.
 
         Args:
@@ -189,7 +189,7 @@ Example:
         print(f"Blocked: {reason}")
 """
 
-from victor.framework.config import SafetyEnforcer, SafetyRule, SafetyLevel
+from victor.framework.config import SafetyEnforcer
 
 
 def create_dataanalysis_pii_safety_rules(

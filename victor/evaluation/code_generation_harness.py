@@ -30,7 +30,8 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Awaitable, Optional
+from typing import Any, Optional
+from collections.abc import Callable, Awaitable
 
 from victor.evaluation.protocol import (
     BenchmarkTask,

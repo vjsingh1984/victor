@@ -19,7 +19,7 @@ merge conflict detection and resolution.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from victor.processing.merge import (
     FileResolution,
@@ -141,7 +141,7 @@ class MergeConflictTool(BaseTool):
         )
 
     async def execute(
-        self, _exec_ctx: Optional[Dict[str, Any]] = None, **kwargs: Any
+        self, _exec_ctx: Optional[dict[str, Any]] = None, **kwargs: Any
     ) -> ToolResult:
         """Execute merge conflict action."""
         action = kwargs.get("action", "detect")

@@ -69,49 +69,33 @@ from __future__ import annotations
 
 import asyncio
 import copy
-import hashlib
-import json
 import logging
 import threading
 import time
 import uuid
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Dict,
     Generic,
-    Iterator,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
     runtime_checkable,
 )
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 
 logger = logging.getLogger(__name__)
 
 # Import focused configs for ISP compliance
 from victor.framework.config import (
     GraphConfig as GraphConfig,
-    ExecutionConfig,
-    CheckpointConfig,
-    InterruptConfig,
-    PerformanceConfig,
-    ObservabilityConfig,
 )
+import builtins
 
 # Type variables for generic state
 StateType_contra = TypeVar("StateType_contra", contravariant=True)
-StateType = TypeVar("StateType", bound=Dict[str, Any])
+StateType = TypeVar("StateType", bound=dict[str, Any])
 T = TypeVar("T")
 
 # Sentinel for end of graph
@@ -356,7 +340,7 @@ class CopyOnWriteState(Generic[StateType]):
         with self._lock:
             return self._copy.get(key, default)  # type: ignore
 
-    def keys(self) -> List[Any]:
+    def keys(self) -> list[Any]:
         """Get keys (thread-safe snapshot).
 
         Returns:
@@ -369,7 +353,7 @@ class CopyOnWriteState(Generic[StateType]):
             assert self._copy is not None
             return list(self._copy.keys())
 
-    def values(self) -> List[Any]:
+    def values(self) -> list[Any]:
         """Get values (thread-safe snapshot).
 
         Returns:
@@ -382,7 +366,7 @@ class CopyOnWriteState(Generic[StateType]):
             assert self._copy is not None
             return list(self._copy.values())
 
-    def items(self) -> List[Tuple[Any, Any]]:
+    def items(self) -> list[tuple[Any, Any]]:
         """Get items (thread-safe snapshot).
 
         Returns:
@@ -395,7 +379,7 @@ class CopyOnWriteState(Generic[StateType]):
             assert self._copy is not None
             return list(self._copy.items())
 
-    def update(self, other: Dict[str, Any]) -> None:
+    def update(self, other: dict[str, Any]) -> None:
         """Update state, triggering copy (thread-safe).
 
         Args:
@@ -439,7 +423,7 @@ class CopyOnWriteState(Generic[StateType]):
         with self._lock:
             return self._ensure_copy().pop(key, *args)
 
-    def copy(self) -> Dict[str, Any]:
+    def copy(self) -> dict[str, Any]:
         """Create a shallow copy of the current state (thread-safe).
 
         Returns:
@@ -478,7 +462,7 @@ class CopyOnWriteState(Generic[StateType]):
         """
         return self._modified
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to regular dictionary (thread-safe deep copy).
 
         Returns:
@@ -547,7 +531,7 @@ class NodeFunctionProtocol(Protocol[StateType]):
     Can be sync or async.
     """
 
-    def __call__(self, state: StateType) -> Union[StateType, Awaitable[StateType]]: ...
+    def __call__(self, state: StateType) -> StateType | Awaitable[StateType]: ...
 
 
 @runtime_checkable
@@ -574,10 +558,10 @@ class Edge:
     """
 
     source: str
-    target: Union[str, Dict[str, str], List[str]]
+    target: str | dict[str, str] | list[str]
     edge_type: EdgeType = EdgeType.NORMAL
     condition: Optional[Callable[[Any], str]] = None
-    merge_func: Optional[Callable[[List[Any]], Any]] = None
+    merge_func: Optional[Callable[[list[Any]], Any]] = None
     join_node: Optional[str] = None
 
     def get_target(self, state: Any) -> Optional[str]:
@@ -604,7 +588,7 @@ class Edge:
             return self.target.get(branch)
         return None
 
-    def get_parallel_targets(self) -> List[str]:
+    def get_parallel_targets(self) -> list[str]:
         """Get all parallel targets for a parallel edge.
 
         Returns:
@@ -632,8 +616,8 @@ class Node:
     """
 
     id: str
-    func: Callable[[Any], Union[Any, Awaitable[Any]]]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    func: Callable[[Any], Any | Awaitable[Any]]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     async def execute(self, state: Any) -> Any:
         """Execute node function.
@@ -672,11 +656,11 @@ class WorkflowCheckpoint:
     checkpoint_id: str
     thread_id: str
     node_id: str
-    state: Dict[str, Any]
+    state: dict[str, Any]
     timestamp: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize checkpoint to dictionary."""
         return {
             "checkpoint_id": self.checkpoint_id,
@@ -688,7 +672,7 @@ class WorkflowCheckpoint:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowCheckpoint":
+    def from_dict(cls, data: dict[str, Any]) -> "WorkflowCheckpoint":
         """Deserialize checkpoint from dictionary."""
         return cls(
             checkpoint_id=data["checkpoint_id"],
@@ -711,7 +695,7 @@ class CheckpointerProtocol(Protocol):
         """Load latest checkpoint for thread."""
         ...
 
-    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
+    async def list(self, thread_id: str) -> builtins.list[WorkflowCheckpoint]:
         """List all checkpoints for thread."""
         ...
 
@@ -723,7 +707,7 @@ class MemoryCheckpointer:
     """
 
     def __init__(self) -> None:
-        self._checkpoints: Dict[str, List[WorkflowCheckpoint]] = {}
+        self._checkpoints: dict[str, list[WorkflowCheckpoint]] = {}
 
     async def save(self, checkpoint: WorkflowCheckpoint) -> None:
         """Save checkpoint to memory."""
@@ -736,7 +720,7 @@ class MemoryCheckpointer:
         checkpoints = self._checkpoints.get(thread_id, [])
         return checkpoints[-1] if checkpoints else None
 
-    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
+    async def list(self, thread_id: str) -> builtins.list[WorkflowCheckpoint]:
         """List all checkpoints."""
         return self._checkpoints.get(thread_id, [])
 
@@ -796,7 +780,7 @@ class RLCheckpointerAdapter:
             metadata=policy_cp.metadata,
         )
 
-    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
+    async def list(self, thread_id: str) -> builtins.list[WorkflowCheckpoint]:
         """List all checkpoints for thread."""
         store = self._get_store()
         policy_cps = store.list_checkpoints(f"{self.learner_name}_{thread_id}")
@@ -892,10 +876,10 @@ class BatchingCheckpointer:
         self._config = config or BatchingCheckpointerConfig()
 
         # Pending checkpoints per thread: thread_id -> list of checkpoints
-        self._pending: Dict[str, List[WorkflowCheckpoint]] = {}
+        self._pending: dict[str, list[WorkflowCheckpoint]] = {}
 
         # Track latest checkpoint per thread for fast reads
-        self._latest: Dict[str, WorkflowCheckpoint] = {}
+        self._latest: dict[str, WorkflowCheckpoint] = {}
 
         # Async lock for thread safety
         self._lock = asyncio.Lock()
@@ -973,7 +957,7 @@ class BatchingCheckpointer:
             # Fall back to backend
             return await self._backend.load(thread_id)
 
-    async def list(self, thread_id: str) -> List[WorkflowCheckpoint]:
+    async def list(self, thread_id: str) -> builtins.list[WorkflowCheckpoint]:
         """List all checkpoints for thread.
 
         Combines pending (in-memory) and persisted checkpoints,
@@ -1101,7 +1085,7 @@ class BatchingCheckpointer:
         """Get the underlying backend checkpointer."""
         return self._backend
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get batching statistics.
 
         Returns:
@@ -1155,7 +1139,7 @@ class GraphExecutionResult(Generic[StateType]):
     error: Optional[str] = None
     iterations: int = 0
     duration: float = 0.0
-    node_history: List[str] = field(default_factory=list)
+    node_history: list[str] = field(default_factory=list)
 
 
 # =============================================================================
@@ -1179,7 +1163,7 @@ class IterationController:
         self.max_iterations = max_iterations
         self.recursion_limit = recursion_limit
         self.iterations = 0
-        self.visited_count: Dict[str, int] = {}
+        self.visited_count: dict[str, int] = {}
 
     def should_continue(self, current_node: str) -> tuple[bool, Optional[str]]:
         """Check if execution should continue.
@@ -1262,7 +1246,7 @@ class TimeoutManager:
 class InterruptHandler:
     """Handles graph interrupts for human-in-the-loop workflows (SRP)."""
 
-    def __init__(self, interrupt_before: List[str], interrupt_after: List[str]):
+    def __init__(self, interrupt_before: list[str], interrupt_after: list[str]):
         """Initialize interrupt handler.
 
         Args:
@@ -1301,7 +1285,7 @@ class NodeExecutor:
     Handles node lookup, execution with timeout, and copy-on-write state management.
     """
 
-    def __init__(self, nodes: Dict[str, Node], use_copy_on_write: bool):
+    def __init__(self, nodes: dict[str, Node], use_copy_on_write: bool):
         """Initialize node executor.
 
         Args:
@@ -1385,7 +1369,7 @@ class ParallelBranchResult:
     success: bool
     state: Any
     error: Optional[str] = None
-    node_history: List[str] = field(default_factory=list)
+    node_history: list[str] = field(default_factory=list)
 
 
 class ParallelBranchExecutor:
@@ -1402,8 +1386,8 @@ class ParallelBranchExecutor:
 
     def __init__(
         self,
-        nodes: Dict[str, Node],
-        edges: Dict[str, List[Edge]],
+        nodes: dict[str, Node],
+        edges: dict[str, list[Edge]],
         use_copy_on_write: bool,
     ):
         """Initialize parallel branch executor.
@@ -1419,13 +1403,13 @@ class ParallelBranchExecutor:
 
     async def execute_parallel_branches(
         self,
-        branch_targets: List[str],
+        branch_targets: list[str],
         state: Any,
         join_node: Optional[str],
-        merge_func: Optional[Callable[[List[Any]], Any]],
+        merge_func: Optional[Callable[[list[Any]], Any]],
         timeout_manager: TimeoutManager,
         max_iterations: int = 100,
-    ) -> tuple[bool, Optional[str], Any, List[str]]:
+    ) -> tuple[bool, Optional[str], Any, list[str]]:
         """Execute multiple branches in parallel.
 
         Each branch runs independently with its own copy of state.
@@ -1458,7 +1442,7 @@ class ParallelBranchExecutor:
         ]
 
         # Execute all branches concurrently
-        results: List[ParallelBranchResult] = await asyncio.gather(*tasks)
+        results: list[ParallelBranchResult] = await asyncio.gather(*tasks)
 
         # Check for failures
         failed_branches = [r for r in results if not r.success]
@@ -1478,7 +1462,7 @@ class ParallelBranchExecutor:
             merged_state = self._default_merge(branch_states)
 
         # Combine node histories
-        combined_history: List[str] = []
+        combined_history: list[str] = []
         for result in results:
             combined_history.extend(result.node_history)
 
@@ -1505,7 +1489,7 @@ class ParallelBranchExecutor:
             ParallelBranchResult with execution outcome
         """
         current_node = start_node
-        node_history: List[str] = []
+        node_history: list[str] = []
         iterations = 0
 
         node_executor = NodeExecutor(
@@ -1591,7 +1575,7 @@ class ParallelBranchExecutor:
 
         return END
 
-    def _default_merge(self, states: List[Any]) -> Any:
+    def _default_merge(self, states: list[Any]) -> Any:
         """Default state merge strategy: deep merge dictionaries.
 
         Later states override earlier ones for conflicting keys.
@@ -1620,7 +1604,7 @@ class ParallelBranchExecutor:
 
         return result
 
-    def _deep_merge_dicts(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    def _deep_merge_dicts(self, base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
         """Recursively merge two dictionaries.
 
         Args:
@@ -1839,7 +1823,7 @@ class GraphEventEmitter:
             logger.debug(f"Failed to emit graph_error event: {e}")
 
     async def emit_parallel_start(
-        self, source_node: str, branch_count: int, branch_targets: List[str]
+        self, source_node: str, branch_count: int, branch_targets: list[str]
     ) -> None:
         """Emit parallel execution start event."""
         if not self.emit_events:
@@ -1897,10 +1881,10 @@ class CompiledGraph(Generic[StateType]):
 
     def __init__(
         self,
-        nodes: Dict[str, Node],
-        edges: Dict[str, List[Edge]],
+        nodes: dict[str, Node],
+        edges: dict[str, list[Edge]],
         entry_point: str,
-        state_schema: Optional[Type[StateType]] = None,
+        state_schema: Optional[type[StateType]] = None,
         config: Optional[GraphConfig] = None,
     ):
         """Initialize compiled graph.
@@ -1966,7 +1950,7 @@ class CompiledGraph(Generic[StateType]):
         self,
         event_type: str,
         graph_id: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         emit_events: bool,
     ) -> None:
         """Emit an event to the EventBus for observability.
@@ -2066,7 +2050,7 @@ class CompiledGraph(Generic[StateType]):
             thread_id=thread_id,
         )
 
-        node_history: List[str] = []
+        node_history: list[str] = []
 
         try:
             while current_node != END:
@@ -2376,7 +2360,7 @@ class CompiledGraph(Generic[StateType]):
         *,
         config: Optional[GraphConfig] = None,
         thread_id: Optional[str] = None,
-    ) -> AsyncIterator[Tuple[str, StateType]]:
+    ) -> AsyncIterator[tuple[str, StateType]]:
         """Stream execution yielding state after each node.
 
         Args:
@@ -2393,7 +2377,7 @@ class CompiledGraph(Generic[StateType]):
         state = copy.deepcopy(input_state)
         current_node = self._entry_point
         iterations = 0
-        visited_count: Dict[str, int] = {}
+        visited_count: dict[str, int] = {}
 
         while current_node != END:
             iterations += 1
@@ -2413,7 +2397,7 @@ class CompiledGraph(Generic[StateType]):
 
             current_node = self._get_next_node(current_node, state)
 
-    def get_graph_schema(self) -> Dict[str, Any]:
+    def get_graph_schema(self) -> dict[str, Any]:
         """Get graph structure as dictionary.
 
         Returns:
@@ -2459,8 +2443,8 @@ class StateGraph(Generic[StateType]):
 
     def __init__(
         self,
-        state_schema: Optional[Type[StateType]] = None,
-        config_schema: Optional[Type[Any]] = None,
+        state_schema: Optional[type[StateType]] = None,
+        config_schema: Optional[type[Any]] = None,
     ):
         """Initialize StateGraph.
 
@@ -2470,14 +2454,14 @@ class StateGraph(Generic[StateType]):
         """
         self._state_schema = state_schema
         self._config_schema = config_schema
-        self._nodes: Dict[str, Node] = {}
-        self._edges: Dict[str, List[Edge]] = {}
+        self._nodes: dict[str, Node] = {}
+        self._edges: dict[str, list[Edge]] = {}
         self._entry_point: Optional[str] = None
 
     def add_node(
         self,
         node_id: str,
-        func: Callable[[StateType], Union[StateType, Awaitable[StateType]]],
+        func: Callable[[StateType], StateType | Awaitable[StateType]],
         **metadata: Any,
     ) -> "StateGraph[StateType]":
         """Add a node to the graph.
@@ -2526,7 +2510,7 @@ class StateGraph(Generic[StateType]):
         self,
         source: str,
         condition: Callable[[StateType], str],
-        branches: Dict[str, str],
+        branches: dict[str, str],
     ) -> "StateGraph[StateType]":
         """Add a conditional edge with multiple branches.
 
@@ -2554,9 +2538,9 @@ class StateGraph(Generic[StateType]):
     def add_parallel_edges(
         self,
         source: str,
-        targets: List[str],
+        targets: list[str],
         join_node: Optional[str] = None,
-        merge_func: Optional[Callable[[List[StateType]], StateType]] = None,
+        merge_func: Optional[Callable[[list[StateType]], StateType]] = None,
     ) -> "StateGraph[StateType]":
         """Add parallel edges that fork execution into concurrent branches.
 
@@ -2669,7 +2653,7 @@ class StateGraph(Generic[StateType]):
             config=config,
         )
 
-    def _validate(self) -> List[str]:
+    def _validate(self) -> list[str]:
         """Validate graph structure.
 
         Returns:
@@ -2709,7 +2693,7 @@ class StateGraph(Generic[StateType]):
 
         return errors
 
-    def _find_reachable(self) -> Set[str]:
+    def _find_reachable(self) -> set[str]:
         """Find all reachable nodes from entry point."""
         if not self._entry_point:
             return set()
@@ -2741,10 +2725,10 @@ class StateGraph(Generic[StateType]):
     @classmethod
     def from_schema(
         cls,
-        schema: Union[Dict[str, Any], str],
-        state_schema: Optional[Type[StateType]] = None,
-        node_registry: Optional[Dict[str, Callable[..., Any]]] = None,
-        condition_registry: Optional[Dict[str, Callable[..., Any]]] = None,
+        schema: dict[str, Any] | str,
+        state_schema: Optional[type[StateType]] = None,
+        node_registry: Optional[dict[str, Callable[..., Any]]] = None,
+        condition_registry: Optional[dict[str, Callable[..., Any]]] = None,
     ) -> "StateGraph[StateType]":
         """Create StateGraph from schema dictionary or YAML string.
 
@@ -2902,7 +2886,7 @@ class StateGraph(Generic[StateType]):
                 # Agent node - placeholder for workflow execution
                 # The actual agent execution is handled by the workflow executor
                 def create_agent_placeholder(
-                    node_config: Dict[str, Any],
+                    node_config: dict[str, Any],
                 ) -> Callable[[StateType], StateType]:
                     def agent_placeholder(state: StateType) -> StateType:
                         # Store node config in state for executor to use
@@ -2920,7 +2904,7 @@ class StateGraph(Generic[StateType]):
                 # Compute node - placeholder for handler execution
                 # The actual compute execution is handled by the workflow executor
                 def create_compute_placeholder(
-                    node_config: Dict[str, Any],
+                    node_config: dict[str, Any],
                 ) -> Callable[[StateType], StateType]:
                     def compute_placeholder(state: StateType) -> StateType:
                         # Store node config in state for executor to use
@@ -2993,7 +2977,7 @@ class StateGraph(Generic[StateType]):
 
 # Convenience factory functions
 def create_graph(
-    state_schema: Optional[Type[StateType]] = None,
+    state_schema: Optional[type[StateType]] = None,
 ) -> StateGraph[StateType]:
     """Create a new StateGraph.
 

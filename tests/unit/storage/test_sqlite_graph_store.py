@@ -61,7 +61,6 @@ async def test_sqlite_graph_store_weight_type_conversion(tmp_path):
 
     See: https://github.com/anthropics/victor/issues/XXX
     """
-    import sqlite3
 
     db_path = tmp_path / "graph.db"
     store = SqliteGraphStore(db_path)

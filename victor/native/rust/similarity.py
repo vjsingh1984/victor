@@ -26,7 +26,7 @@ Performance characteristics:
 
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import Optional
 
 try:
     import victor_native  # type: ignore[import-not-found]
@@ -59,7 +59,7 @@ class RustSimilarityComputer(InstrumentedAccelerator):
     def get_version(self) -> Optional[str]:
         return self._version
 
-    def cosine(self, a: List[float], b: List[float]) -> float:
+    def cosine(self, a: list[float], b: list[float]) -> float:
         """Compute cosine similarity between two vectors.
 
         Delegates to Rust SIMD-optimized implementation.
@@ -80,7 +80,7 @@ class RustSimilarityComputer(InstrumentedAccelerator):
             b_f32 = [float(x) for x in b]
             return victor_native.cosine_similarity(a_f32, b_f32)
 
-    def batch_cosine(self, query: List[float], corpus: List[List[float]]) -> List[float]:
+    def batch_cosine(self, query: list[float], corpus: list[list[float]]) -> list[float]:
         """Compute cosine similarity of query against corpus.
 
         Delegates to Rust parallel + SIMD implementation.
@@ -102,10 +102,10 @@ class RustSimilarityComputer(InstrumentedAccelerator):
 
     def similarity_matrix(
         self,
-        queries: List[List[float]],
-        corpus: List[List[float]],
+        queries: list[list[float]],
+        corpus: list[list[float]],
         normalize: bool = True,
-    ) -> List[List[float]]:
+    ) -> list[list[float]]:
         """Compute pairwise similarity matrix.
 
         Uses Rust batch_cosine for each query row.
@@ -143,8 +143,8 @@ class RustSimilarityComputer(InstrumentedAccelerator):
                 return result
 
     def top_k(
-        self, query: List[float], corpus: List[List[float]], k: int
-    ) -> List[Tuple[int, float]]:
+        self, query: list[float], corpus: list[list[float]], k: int
+    ) -> list[tuple[int, float]]:
         """Find top-k most similar vectors.
 
         Delegates to Rust implementation with partial sort optimization.

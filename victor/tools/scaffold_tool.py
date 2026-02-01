@@ -24,7 +24,7 @@ Features:
 
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 import logging
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -394,8 +394,8 @@ async def scaffold(
     path: Optional[str] = None,
     content: str = "",
     force: bool = False,
-    variables: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    variables: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """
     Unified project scaffolding tool.
 

@@ -22,8 +22,6 @@ from unittest.mock import MagicMock, patch
 from victor.tools.code_executor_tool import (
     CodeSandbox,
     sandbox,
-    _execute_code,
-    _upload_files,
 )
 
 

@@ -14,7 +14,6 @@
 
 """Tests for thinking pattern detection."""
 
-import pytest
 
 from victor.agent.thinking_detector import (
     ThinkingPatternDetector,

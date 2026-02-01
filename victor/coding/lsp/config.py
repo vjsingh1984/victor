@@ -18,7 +18,7 @@ Defines configurations for common language servers that can be used with Victor.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -27,18 +27,18 @@ class LSPServerConfig:
 
     name: str  # Human-readable name
     language_id: str  # LSP language identifier
-    file_extensions: List[str]  # File extensions this server handles
-    command: List[str]  # Command to start the server
-    args: List[str] = field(default_factory=list)  # Additional arguments
-    initialization_options: Dict[str, Any] = field(default_factory=dict)
-    settings: Dict[str, Any] = field(default_factory=dict)
-    root_patterns: List[str] = field(default_factory=list)  # Files indicating project root
+    file_extensions: list[str]  # File extensions this server handles
+    command: list[str]  # Command to start the server
+    args: list[str] = field(default_factory=list)  # Additional arguments
+    initialization_options: dict[str, Any] = field(default_factory=dict)
+    settings: dict[str, Any] = field(default_factory=dict)
+    root_patterns: list[str] = field(default_factory=list)  # Files indicating project root
     install_command: Optional[str] = None  # How to install the server
     install_check: Optional[str] = None  # Command to check if installed
 
 
 # Pre-configured language servers
-LANGUAGE_SERVERS: Dict[str, LSPServerConfig] = {
+LANGUAGE_SERVERS: dict[str, LSPServerConfig] = {
     "python": LSPServerConfig(
         name="Pyright",
         language_id="python",

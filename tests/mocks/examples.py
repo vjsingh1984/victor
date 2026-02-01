@@ -18,9 +18,7 @@ This file demonstrates common patterns for using the mock providers
 in your tests.
 """
 
-import pytest
 from victor.core.errors import ProviderRateLimitError, ProviderTimeoutError
-from victor.providers.base import Message
 
 # Import mocks directly for standalone execution
 try:

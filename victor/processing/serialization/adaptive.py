@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.processing.serialization.strategy import (
     SerializationFormat,
@@ -115,7 +115,7 @@ class SerializationMetrics:
     # Format selection
     format_selected: str = ""
     selection_reason: str = ""
-    candidates_considered: List[str] = field(default_factory=list)
+    candidates_considered: list[str] = field(default_factory=list)
 
 
 class AdaptiveSerializer:
@@ -162,8 +162,8 @@ class AdaptiveSerializer:
         self._serialization_count: int = 0
         self._total_tokens_saved: int = 0
         self._total_original_tokens: int = 0
-        self._tool_stats: Dict[str, Dict[str, Any]] = {}
-        self._format_stats: Dict[str, Dict[str, Any]] = {}
+        self._tool_stats: dict[str, dict[str, Any]] = {}
+        self._format_stats: dict[str, dict[str, Any]] = {}
 
     def serialize(
         self,
@@ -307,7 +307,7 @@ class AdaptiveSerializer:
         """
         return self._metrics
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get serialization statistics.
 
         Returns:
@@ -480,7 +480,7 @@ class AdaptiveSerializer:
             Selected SerializationFormat
         """
         # Collect encoder suitability scores
-        encoder_scores: Dict[SerializationFormat, float] = {}
+        encoder_scores: dict[SerializationFormat, float] = {}
         for fmt in config.allowed_formats:
             encoder = self._format_registry.get_encoder(fmt)
             if encoder and encoder.can_encode(data, characteristics):

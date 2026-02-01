@@ -34,7 +34,7 @@ import json
 import logging
 import threading
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class SerializationAccelerator:
         self._rust_available = RUST_AVAILABLE
         self._cache_size = cache_size
         self._cache_ttl = cache_ttl
-        self._config_cache: Dict[str, Any] = {}
+        self._config_cache: dict[str, Any] = {}
         self._cache_lock = threading.Lock()
 
         if self._rust_available:
@@ -98,7 +98,7 @@ class SerializationAccelerator:
         """Check if Rust implementation is available."""
         return self._rust_available
 
-    def parse_json(self, json_str: str) -> Dict[str, Any]:
+    def parse_json(self, json_str: str) -> dict[str, Any]:
         """Parse JSON string.
 
         Args:
@@ -126,7 +126,7 @@ class SerializationAccelerator:
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON: {e}")
 
-    def serialize_json(self, data: Dict[str, Any], pretty: bool = False) -> str:
+    def serialize_json(self, data: dict[str, Any], pretty: bool = False) -> str:
         """Serialize data to JSON string.
 
         Args:
@@ -148,7 +148,7 @@ class SerializationAccelerator:
             return json.dumps(data, indent=2)
         return json.dumps(data)
 
-    def parse_yaml(self, yaml_str: str) -> Dict[str, Any]:
+    def parse_yaml(self, yaml_str: str) -> dict[str, Any]:
         """Parse YAML string.
 
         Args:
@@ -178,7 +178,7 @@ class SerializationAccelerator:
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML: {e}")
 
-    def serialize_yaml(self, data: Dict[str, Any]) -> str:
+    def serialize_yaml(self, data: dict[str, Any]) -> str:
         """Serialize data to YAML string.
 
         Args:
@@ -207,7 +207,7 @@ class SerializationAccelerator:
         path: str,
         format: Optional[str] = None,
         use_cache: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Load configuration file with automatic format detection.
 
         Args:
@@ -304,7 +304,7 @@ class SerializationAccelerator:
             self._config_cache.clear()
         logger.debug("Config file cache cleared")
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

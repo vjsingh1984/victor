@@ -20,9 +20,8 @@ the coordinator-based orchestrator architecture.
 
 import asyncio
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, Mock
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -502,7 +501,7 @@ def performance_monitor():
 
     class PerformanceMonitor:
         def __init__(self):
-            self.metrics: Dict[str, List[float]] = {}
+            self.metrics: dict[str, list[float]] = {}
 
         def track(self, operation: str):
             """Decorator to track operation timing."""
@@ -554,7 +553,7 @@ def integration_test_helpers():
         @staticmethod
         def assert_coordinator_interactions(
             orchestrator,
-            expected_coordinators: List[str],
+            expected_coordinators: list[str],
         ):
             """Assert that orchestrator has expected coordinators."""
             for coord_name in expected_coordinators:
@@ -577,15 +576,15 @@ def integration_test_helpers():
             raise TimeoutError(f"Condition not met within {timeout}s")
 
         @staticmethod
-        def create_mock_message(role: str, content: str) -> Dict[str, Any]:
+        def create_mock_message(role: str, content: str) -> dict[str, Any]:
             """Create a mock message for testing."""
             return {"role": role, "content": content}
 
         @staticmethod
         def create_mock_tool_call(
             tool_name: str,
-            arguments: Dict[str, Any],
-        ) -> Dict[str, Any]:
+            arguments: dict[str, Any],
+        ) -> dict[str, Any]:
             """Create a mock tool call for testing."""
             return {
                 "id": f"call_{tool_name}_123",

@@ -44,8 +44,9 @@ Example:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from dataclasses import dataclass
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable
 
 from victor.framework.capabilities.base import BaseCapabilityProvider, CapabilityMetadata
 
@@ -128,7 +129,7 @@ class ConfigurationCapabilityProvider(BaseCapabilityProvider[ConfigurationCapabi
             vertical_name: Name of the vertical (for namespacing)
         """
         self._vertical_name = vertical_name
-        self._configurations: Dict[str, ConfigurationCapability] = {}
+        self._configurations: dict[str, ConfigurationCapability] = {}
 
     def register_configuration(
         self,
@@ -193,7 +194,7 @@ class ConfigurationCapabilityProvider(BaseCapabilityProvider[ConfigurationCapabi
         config = self._configurations.get(name)
         return config.value if config else None
 
-    def get_capabilities(self) -> Dict[str, ConfigurationCapability]:
+    def get_capabilities(self) -> dict[str, ConfigurationCapability]:
         """Return all registered configurations.
 
         Returns:
@@ -201,7 +202,7 @@ class ConfigurationCapabilityProvider(BaseCapabilityProvider[ConfigurationCapabi
         """
         return self._configurations
 
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+    def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
         """Return metadata for all configurations.
 
         Returns:

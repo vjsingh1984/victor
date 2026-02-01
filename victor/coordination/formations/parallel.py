@@ -20,7 +20,7 @@ All agents receive the same task and work independently.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 
 from victor.coordination.formations.base import BaseFormationStrategy, TeamContext
 from victor.teams.types import AgentMessage, MemberResult
@@ -42,10 +42,10 @@ class ParallelFormation(BaseFormationStrategy):
 
     async def execute(
         self,
-        agents: List[Any],
+        agents: list[Any],
         context: TeamContext,
         task: AgentMessage,
-    ) -> List[MemberResult]:
+    ) -> list[MemberResult]:
         """Execute all agents in parallel."""
         # Create independent tasks for each agent
         tasks = [self._execute_agent(agent, task, context, i) for i, agent in enumerate(agents)]
@@ -54,7 +54,7 @@ class ParallelFormation(BaseFormationStrategy):
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Process results, handling any exceptions
-        processed_results: List[MemberResult] = []
+        processed_results: list[MemberResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 logger.error(f"ParallelFormation: agent {agents[i].id} failed: {result}")

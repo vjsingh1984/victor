@@ -47,8 +47,6 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
 import pickle
 import threading
@@ -57,7 +55,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -346,7 +344,7 @@ class CacheLevel:
         with self._lock:
             return len(self._cache)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache level statistics."""
         with self._lock:
             total_requests = self._hits + self._misses
@@ -506,7 +504,7 @@ class MultiLevelCache:
         self._l2 = CacheLevel(l2_config, level=2)
 
         # Namespace isolation
-        self._namespaces: Dict[str, Set[str]] = {}
+        self._namespaces: dict[str, set[str]] = {}
         self._namespace_lock = threading.Lock()
 
         logger.info(
@@ -652,7 +650,7 @@ class MultiLevelCache:
         with self._namespace_lock:
             self._namespaces.clear()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get comprehensive cache statistics.
 
         Returns:

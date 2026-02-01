@@ -21,7 +21,6 @@ from concurrent.futures import ThreadPoolExecutor
 from victor.optimization.runtime.lazy_loader import (
     ComponentDescriptor,
     LazyComponentLoader,
-    LoadingStats,
     lazy_load,
     set_global_loader,
 )

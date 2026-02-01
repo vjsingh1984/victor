@@ -145,15 +145,11 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Type,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.core.verticals import VerticalContext
@@ -178,10 +174,8 @@ from victor.framework.protocols import CapabilityRegistryProtocol
 
 # Import ISP compliance protocols (Phase 1 SOLID Remediation)
 from victor.protocols import (
-    CapabilityContainerProtocol,
     WorkflowProviderProtocol,
     TieredConfigProviderProtocol,
-    ExtensionProviderProtocol,
 )
 
 
@@ -371,7 +365,7 @@ class StepHandlerProtocol(Protocol):
     def apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
         strict_mode: bool = False,
@@ -442,7 +436,7 @@ class BaseStepHandler(ABC):
     def apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
         strict_mode: bool = False,
@@ -465,7 +459,7 @@ class BaseStepHandler(ABC):
 
         start_time = time.perf_counter()
         status = "success"
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[dict[str, Any]] = None
 
         try:
             self._do_apply(orchestrator, vertical, context, result)
@@ -490,7 +484,7 @@ class BaseStepHandler(ABC):
             duration_ms=round(duration_ms, 2),
         )
 
-    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[dict[str, Any]]:
         """Get step-specific details for status tracking.
 
         Override in subclasses to provide meaningful details about
@@ -508,7 +502,7 @@ class BaseStepHandler(ABC):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -554,7 +548,7 @@ class ToolStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -578,7 +572,7 @@ class ToolStepHandler(BaseStepHandler):
                 "tools stored in context only"
             )
 
-    def _canonicalize_tool_names(self, tools: Set[str]) -> Set[str]:
+    def _canonicalize_tool_names(self, tools: set[str]) -> set[str]:
         """Canonicalize tool names to ensure consistency.
 
         Converts legacy tool names (e.g., 'read_file', 'edit_files') to
@@ -598,7 +592,7 @@ class ToolStepHandler(BaseStepHandler):
             logger.debug("Tool name canonicalization not available")
             return tools
 
-    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[dict[str, Any]]:
         """Return tool-specific details."""
         if result.tools_applied:
             return {"tools_count": len(result.tools_applied)}
@@ -636,7 +630,7 @@ class PromptStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -666,7 +660,7 @@ class PromptStepHandler(BaseStepHandler):
     def apply_contributors(
         self,
         orchestrator: Any,
-        contributors: List[Any],
+        contributors: list[Any],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -682,7 +676,7 @@ class PromptStepHandler(BaseStepHandler):
             result: Result to update
         """
         # Merge and normalize task hints from all contributors using adapter
-        merged_hints: Dict[str, TaskTypeHint] = {}
+        merged_hints: dict[str, TaskTypeHint] = {}
         for contributor in sorted(contributors, key=lambda c: c.get_priority()):
             raw_hints = contributor.get_task_type_hints()
             # Use PromptContributorAdapter to normalize hints to TaskTypeHint
@@ -719,7 +713,7 @@ class PromptStepHandler(BaseStepHandler):
                     if prompt_builder and hasattr(prompt_builder, "add_prompt_section"):
                         prompt_builder.add_prompt_section(section)
 
-    def _normalize_hints(self, hints: Dict[str, Any]) -> Dict[str, TaskTypeHint]:
+    def _normalize_hints(self, hints: dict[str, Any]) -> dict[str, TaskTypeHint]:
         """Normalize hints to TaskTypeHint using PromptContributorAdapter.
 
         Supports multiple hint formats:
@@ -769,7 +763,7 @@ class SafetyStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -781,7 +775,7 @@ class SafetyStepHandler(BaseStepHandler):
     def apply_safety_extensions(
         self,
         orchestrator: Any,
-        safety_extensions: List[Any],
+        safety_extensions: list[Any],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -793,7 +787,7 @@ class SafetyStepHandler(BaseStepHandler):
             context: Vertical context
             result: Result to update
         """
-        all_patterns: List[Any] = []
+        all_patterns: list[Any] = []
         for ext in safety_extensions:
             all_patterns.extend(ext.get_bash_patterns())
             all_patterns.extend(ext.get_file_patterns())
@@ -846,7 +840,7 @@ class ConfigStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -959,7 +953,7 @@ class CapabilityConfigStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -973,7 +967,7 @@ class CapabilityConfigStepHandler(BaseStepHandler):
         result.add_info(f"Applied {len(configs)} capability configs")
         logger.debug(f"Applied capability configs: {list(configs.keys())}")
 
-    def _get_capability_configs(self, vertical: Type["VerticalBase"]) -> Dict[str, Any]:
+    def _get_capability_configs(self, vertical: type["VerticalBase"]) -> dict[str, Any]:
         """Get capability configs from vertical.
 
         Args:
@@ -1023,7 +1017,7 @@ class MiddlewareStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1035,7 +1029,7 @@ class MiddlewareStepHandler(BaseStepHandler):
     def apply_middleware(
         self,
         orchestrator: Any,
-        middleware_list: List[Any],
+        middleware_list: list[Any],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1121,7 +1115,7 @@ class FrameworkStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1142,7 +1136,7 @@ class FrameworkStepHandler(BaseStepHandler):
     def apply_workflows(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1246,7 +1240,7 @@ class FrameworkStepHandler(BaseStepHandler):
     def apply_rl_config(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1308,7 +1302,7 @@ class FrameworkStepHandler(BaseStepHandler):
     def apply_team_specs(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1368,7 +1362,7 @@ class FrameworkStepHandler(BaseStepHandler):
 
         logger.debug(f"Applied {team_count} team specifications from vertical")
 
-    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[dict[str, Any]]:
         """Return framework integration details."""
         details = {}
         if result.workflows_count > 0:
@@ -1382,7 +1376,7 @@ class FrameworkStepHandler(BaseStepHandler):
     def apply_chains(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1437,7 +1431,7 @@ class FrameworkStepHandler(BaseStepHandler):
     def apply_personas(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1506,7 +1500,7 @@ class FrameworkStepHandler(BaseStepHandler):
     def apply_capability_provider(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1582,7 +1576,7 @@ class FrameworkStepHandler(BaseStepHandler):
     def apply_tool_graphs(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1632,7 +1626,7 @@ class FrameworkStepHandler(BaseStepHandler):
     def apply_handlers(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1725,7 +1719,7 @@ class TieredConfigStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1826,7 +1820,7 @@ class ContextStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -1881,7 +1875,7 @@ class ExtensionHandlerRegistry:
     """
 
     def __init__(self) -> None:
-        self._handlers: Dict[str, ExtensionHandler] = {}
+        self._handlers: dict[str, ExtensionHandler] = {}
 
     def register(self, handler: ExtensionHandler, replace: bool = False) -> None:
         """Register an extension handler.
@@ -1910,7 +1904,7 @@ class ExtensionHandlerRegistry:
             return True
         return False
 
-    def get_ordered_handlers(self) -> List[ExtensionHandler]:
+    def get_ordered_handlers(self) -> list[ExtensionHandler]:
         """Get handlers in priority order."""
         return sorted(self._handlers.values(), key=lambda h: h.priority)
 
@@ -2002,7 +1996,7 @@ class ExtensionsStepHandler(BaseStepHandler):
 
         def handle_middleware(
             orchestrator: Any,
-            middleware: List[Any],
+            middleware: list[Any],
             extensions: Any,
             context: "VerticalContext",
             result: "IntegrationResult",
@@ -2044,7 +2038,7 @@ class ExtensionsStepHandler(BaseStepHandler):
 
         def handle_safety(
             orchestrator: Any,
-            safety_extensions: List[Any],
+            safety_extensions: list[Any],
             extensions: Any,
             context: "VerticalContext",
             result: "IntegrationResult",
@@ -2055,7 +2049,7 @@ class ExtensionsStepHandler(BaseStepHandler):
 
         def handle_prompts(
             orchestrator: Any,
-            contributors: List[Any],
+            contributors: list[Any],
             extensions: Any,
             context: "VerticalContext",
             result: "IntegrationResult",
@@ -2168,7 +2162,7 @@ class ExtensionsStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -2184,7 +2178,7 @@ class ExtensionsStepHandler(BaseStepHandler):
         else:
             logger.debug("No extensions available for vertical")  # type: ignore[unreachable]
 
-    def _get_step_details(self, result: "IntegrationResult") -> Optional[Dict[str, Any]]:
+    def _get_step_details(self, result: "IntegrationResult") -> Optional[dict[str, Any]]:
         """Return extension application details."""
         details = {}
         if result.middleware_count > 0:
@@ -2303,7 +2297,7 @@ class StepHandlerRegistry:
         handlers: List of registered step handlers
     """
 
-    handlers: List[StepHandlerProtocol]
+    handlers: list[StepHandlerProtocol]
 
     @classmethod
     def default(cls) -> "StepHandlerRegistry":
@@ -2363,7 +2357,7 @@ class StepHandlerRegistry:
                 return handler
         return None
 
-    def get_ordered_handlers(self) -> List[StepHandlerProtocol]:
+    def get_ordered_handlers(self) -> list[StepHandlerProtocol]:
         """Get handlers in execution order.
 
         Returns:

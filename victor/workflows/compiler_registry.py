@@ -44,7 +44,7 @@ Example (Third-party package):
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Type
+from typing import Any
 
 from victor.core.registry_base import ItemRegistry
 
@@ -64,7 +64,7 @@ class WorkflowCompilerRegistry(ItemRegistry["WorkflowCompilerRegistry"]):
         compiler = registry.get_compiler("security", enable_caching=True)
     """
 
-    def register_compiler(self, name: str, compiler_class: Type[Any]) -> None:
+    def register_compiler(self, name: str, compiler_class: type[Any]) -> None:
         """Register a third-party workflow compiler plugin.
 
         Args:
@@ -133,7 +133,7 @@ class WorkflowCompilerRegistry(ItemRegistry["WorkflowCompilerRegistry"]):
         """
         return self.contains(name)
 
-    def list_compilers(self) -> List[str]:
+    def list_compilers(self) -> list[str]:
         """List all registered compiler plugin names.
 
         Returns:
@@ -147,7 +147,7 @@ class WorkflowCompilerRegistry(ItemRegistry["WorkflowCompilerRegistry"]):
 # =============================================================================
 
 
-def register_compiler(name: str, compiler_class: Type[Any]) -> None:
+def register_compiler(name: str, compiler_class: type[Any]) -> None:
     """Register a third-party workflow compiler plugin.
 
     Args:
@@ -214,7 +214,7 @@ def is_registered(name: str) -> bool:
     return WorkflowCompilerRegistry.get_instance().is_compiler_registered(name)
 
 
-def list_compilers() -> List[str]:
+def list_compilers() -> list[str]:
     """List all registered compiler plugin names.
 
     Returns:

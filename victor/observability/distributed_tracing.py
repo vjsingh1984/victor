@@ -57,19 +57,16 @@ from __future__ import annotations
 import contextvars
 import functools
 import logging
-import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import (
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     TYPE_CHECKING,
 )
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     # Import opentelemetry types if available
@@ -78,7 +75,7 @@ if TYPE_CHECKING:
             Status as Status,
             StatusCode as StatusCode,
             Span as Span,
-        )  # noqa: F401
+        )
     except ImportError:
         # Create stub types when opentelemetry is not available
         class Status:  # type: ignore[no-redef]
@@ -126,7 +123,7 @@ class TraceContext:
     trace_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     span_id: str = field(default_factory=lambda: uuid.uuid4().hex[:16])
     parent_span_id: Optional[str] = None
-    baggage: Dict[str, str] = field(default_factory=dict)
+    baggage: dict[str, str] = field(default_factory=dict)
 
     def child_span(self, span_id: Optional[str] = None) -> "TraceContext":
         """Create child trace context.
@@ -144,7 +141,7 @@ class TraceContext:
             baggage=dict(self.baggage),
         )
 
-    def inject(self, carrier: Dict[str, str]) -> None:
+    def inject(self, carrier: dict[str, str]) -> None:
         """Inject trace context into carrier.
 
         Args:
@@ -159,7 +156,7 @@ class TraceContext:
             carrier[f"baggage_{key}"] = value
 
     @classmethod
-    def extract(cls, carrier: Dict[str, str]) -> Optional["TraceContext"]:
+    def extract(cls, carrier: dict[str, str]) -> Optional["TraceContext"]:
         """Extract trace context from carrier.
 
         Args:
@@ -214,12 +211,12 @@ class SpanData:
     start_time: datetime
     end_time: datetime
     duration_ms: float
-    attributes: Dict[str, Any] = field(default_factory=dict)
-    events: List[Dict[str, Any]] = field(default_factory=list)
+    attributes: dict[str, Any] = field(default_factory=dict)
+    events: list[dict[str, Any]] = field(default_factory=list)
     status: str = "ok"
     kind: SpanKind = SpanKind.INTERNAL
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary.
 
         Returns:
@@ -302,7 +299,7 @@ class DistributedTracer:
                 logger.debug(f"OpenTelemetry not available: {e}")
 
         # Span storage for export
-        self._spans: Dict[str, SpanData] = {}
+        self._spans: dict[str, SpanData] = {}
         self._root_context: Optional[TraceContext] = None
 
     @property
@@ -319,7 +316,7 @@ class DistributedTracer:
         name: str,
         parent: Optional["Span"] = None,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: Optional[dict[str, Any]] = None,
     ) -> "Span | NoOpSpan":
         """Start a new span.
 
@@ -376,7 +373,7 @@ class DistributedTracer:
         """
         return self.current_context
 
-    def inject_context(self, carrier: Dict[str, str]) -> None:
+    def inject_context(self, carrier: dict[str, str]) -> None:
         """Inject trace context into carrier for propagation.
 
         Args:
@@ -391,7 +388,7 @@ class DistributedTracer:
         if ctx:
             ctx.inject(carrier)
 
-    def extract_context(self, carrier: Dict[str, str]) -> Optional[TraceContext]:
+    def extract_context(self, carrier: dict[str, str]) -> Optional[TraceContext]:
         """Extract trace context from carrier.
 
         Args:
@@ -430,7 +427,7 @@ class DistributedTracer:
         """
         return [span for span in self._spans.values() if span.trace_id == trace_id]
 
-    def export_trace(self, trace_id: str) -> Dict[str, Any]:
+    def export_trace(self, trace_id: str) -> dict[str, Any]:
         """Export trace as JSON.
 
         Args:
@@ -489,7 +486,7 @@ class Span:  # type: ignore[no-redef]
         name: str,
         context: TraceContext,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize span.
 
@@ -504,8 +501,8 @@ class Span:  # type: ignore[no-redef]
         self.name = name
         self.context = context
         self.kind = kind
-        self.attributes: Dict[str, Any] = attributes or {}
-        self.events: List[Dict[str, Any]] = []
+        self.attributes: dict[str, Any] = attributes or {}
+        self.events: list[dict[str, Any]] = []
         self.start_time = datetime.now(timezone.utc)
         self.end_time: Optional[datetime] = None
         self.status: str = "ok"
@@ -539,7 +536,7 @@ class Span:  # type: ignore[no-redef]
     def add_event(
         self,
         name: str,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: Optional[dict[str, Any]] = None,
         timestamp: Optional[datetime] = None,
     ) -> None:
         """Add event to span.
@@ -650,7 +647,7 @@ class NoOpSpan:
     def add_event(
         self,
         name: str,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: Optional[dict[str, Any]] = None,
         timestamp: Optional[datetime] = None,
     ) -> None:
         """No-op."""

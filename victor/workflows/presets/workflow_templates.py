@@ -19,7 +19,8 @@ Each workflow is optimized for its specific use case.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from victor.workflows.definition import WorkflowBuilder, WorkflowDefinition
 
@@ -42,7 +43,7 @@ class WorkflowPreset:
     description: str
     category: str
     builder_factory: Callable[[], WorkflowDefinition]
-    example_context: Dict[str, Any] = field(default_factory=dict)
+    example_context: dict[str, Any] = field(default_factory=dict)
     estimated_duration_minutes: int = 10
     complexity: str = "medium"
 
@@ -55,7 +56,7 @@ class WorkflowPreset:
 def _build_code_review_workflow() -> WorkflowDefinition:
     """Build code review workflow with researcher → reviewer → triage."""
 
-    def decide_next_node(context: Dict[str, Any]) -> str:
+    def decide_next_node(context: dict[str, Any]) -> str:
         """Decide next step based on review findings."""
         issues_found = context.get("issues_found", False)
         critical_issues = context.get("critical_issues", False)
@@ -132,7 +133,7 @@ CODE_REVIEW_WORKFLOW = WorkflowPreset(
 def _build_refactoring_workflow() -> WorkflowDefinition:
     """Build refactoring workflow with analysis → planning → execution → verification."""
 
-    def decide_refactoring_approach(context: Dict[str, Any]) -> str:
+    def decide_refactoring_approach(context: dict[str, Any]) -> str:
         """Decide refactoring approach based on analysis."""
         complexity = context.get("complexity", "medium")
         if complexity == "high":
@@ -255,7 +256,7 @@ RESEARCH_WORKFLOW = WorkflowPreset(
 def _build_bug_investigation_workflow() -> WorkflowDefinition:
     """Build bug investigation workflow with reproduction → analysis → fix."""
 
-    def decide_fix_approach(context: Dict[str, Any]) -> str:
+    def decide_fix_approach(context: dict[str, Any]) -> str:
         """Decide fix approach based on bug analysis."""
         bug_type = context.get("bug_type", "unknown")
         if bug_type == "critical":
@@ -432,7 +433,7 @@ SECURITY_AUDIT_WORKFLOW = WorkflowPreset(
 # WORKFLOW REGISTRY
 # =============================================================================()
 
-_WORKFLOW_PRESETS: Dict[str, WorkflowPreset] = {
+_WORKFLOW_PRESETS: dict[str, WorkflowPreset] = {
     "code_review": CODE_REVIEW_WORKFLOW,
     "refactoring": REFACTORING_WORKFLOW,
     "research": RESEARCH_WORKFLOW,
@@ -462,7 +463,7 @@ def get_workflow_preset(name: str) -> Optional[WorkflowPreset]:
     return None
 
 
-def list_workflow_presets() -> List[str]:
+def list_workflow_presets() -> list[str]:
     """List all available workflow preset names.
 
     Returns:
@@ -477,7 +478,7 @@ def list_workflow_presets() -> List[str]:
     return list(_WORKFLOW_PRESETS.keys())
 
 
-def list_workflow_presets_by_category() -> Dict[str, List[str]]:
+def list_workflow_presets_by_category() -> dict[str, list[str]]:
     """List workflow presets grouped by category.
 
     Returns:
@@ -488,7 +489,7 @@ def list_workflow_presets_by_category() -> Dict[str, List[str]]:
         for category, presets in by_category.items():
             print(f"{category}: {', '.join(presets)}")
     """
-    by_category: Dict[str, List[str]] = {}
+    by_category: dict[str, list[str]] = {}
     for name, preset in _WORKFLOW_PRESETS.items():
         if preset.category not in by_category:
             by_category[preset.category] = []

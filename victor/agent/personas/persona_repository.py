@@ -32,14 +32,12 @@ import logging
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import yaml
 
 from victor.agent.personas.types import (
-    AdaptedPersona,
     CommunicationStyle,
-    Feedback,
     PersonalityType,
     Persona,
     PersonaConstraints,
@@ -99,8 +97,8 @@ class PersonaRepository:
         Args:
             storage_path: Optional path for file-based storage
         """
-        self._personas: Dict[str, Persona] = {}
-        self._versions: Dict[str, List[PersonaVersion]] = {}
+        self._personas: dict[str, Persona] = {}
+        self._versions: dict[str, list[PersonaVersion]] = {}
         self._lock = threading.RLock()
         self._storage_path = storage_path
 
@@ -179,7 +177,7 @@ class PersonaRepository:
         with self._lock:
             return self._personas.get(persona_id)
 
-    def list_all(self) -> List[Persona]:
+    def list_all(self) -> list[Persona]:
         """List all personas in the repository.
 
         Returns:
@@ -223,7 +221,7 @@ class PersonaRepository:
         with self._lock:
             return persona_id in self._personas
 
-    def get_version_history(self, persona_id: str) -> List[PersonaVersion]:
+    def get_version_history(self, persona_id: str) -> list[PersonaVersion]:
         """Get version history for a persona.
 
         Args:
@@ -377,7 +375,7 @@ class PersonaRepository:
         logger.debug(f"Imported {count} personas from {input_path}")
         return count
 
-    def validate(self, persona: Persona) -> List[str]:
+    def validate(self, persona: Persona) -> list[str]:
         """Validate a persona and return any issues.
 
         Args:
@@ -441,7 +439,7 @@ class PersonaRepository:
 
         return False
 
-    def _import_from_dict(self, data: Dict[str, Any]) -> Persona:
+    def _import_from_dict(self, data: dict[str, Any]) -> Persona:
         """Import a persona from dictionary.
 
         Args:

@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any
 
 from victor.framework.workflows.base_handler import BaseHandler
 from victor.framework.handler_registry import handler_decorator
@@ -71,7 +71,7 @@ class CodeValidationHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute code validation checks."""
         files: Any = node.input_mapping.get("files", [])
         checks = node.input_mapping.get("checks", ["lint"])
@@ -94,8 +94,8 @@ class CodeValidationHandler(BaseHandler):
         return output, tool_calls
 
     async def _run_check(
-        self, check: str, files: List[str], tool_registry: "ToolRegistry"
-    ) -> Dict[str, Any]:
+        self, check: str, files: list[str], tool_registry: "ToolRegistry"
+    ) -> dict[str, Any]:
         """Run a specific check type."""
         try:
             file_args = " ".join(files) if files else "."
@@ -144,7 +144,7 @@ class TestRunnerHandler(BaseHandler):
         node: "ComputeNode",
         context: "WorkflowContext",
         tool_registry: "ToolRegistry",
-    ) -> Tuple[Any, int]:
+    ) -> tuple[Any, int]:
         """Execute test runner."""
         test_path = node.input_mapping.get("test_path", "tests/")
         framework = node.input_mapping.get("framework", "pytest")

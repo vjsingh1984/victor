@@ -14,7 +14,6 @@
 
 """Tests for database optimization module."""
 
-import asyncio
 import pytest
 
 from victor.optimization.runtime.database import (
@@ -268,7 +267,6 @@ class TestCachedQueryDecorator:
     @pytest.mark.asyncio
     async def test_decorator_ttl_expiration(self):
         """Test decorator respects TTL."""
-        import time
 
         @cached_query(cache_ttl=0)  # Immediate expiration
         async def get_value() -> int:

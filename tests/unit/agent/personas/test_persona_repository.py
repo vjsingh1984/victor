@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 import yaml
@@ -33,7 +32,6 @@ from victor.agent.personas.persona_repository import (
 )
 from victor.agent.personas.types import (
     CommunicationStyle,
-    Feedback,
     PersonalityType,
     Persona,
     PersonaConstraints,

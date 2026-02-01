@@ -18,7 +18,7 @@ Provides a multi-step workflow for investigating and fixing bugs
 with systematic debugging and verification.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from victor.workflows.definition import (
     WorkflowBuilder,
@@ -27,7 +27,7 @@ from victor.workflows.definition import (
 )
 
 
-def _check_verification_result(ctx: Dict[str, Any]) -> str:
+def _check_verification_result(ctx: dict[str, Any]) -> str:
     """Check if tests pass after fix.
 
     Args:

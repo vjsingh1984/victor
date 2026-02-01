@@ -19,7 +19,6 @@ including caching, parallel processing, and error handling.
 """
 
 import pytest
-from typing import List
 
 from victor.native.accelerators import AstProcessorAccelerator, get_ast_processor
 

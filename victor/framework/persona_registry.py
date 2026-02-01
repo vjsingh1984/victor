@@ -57,7 +57,8 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Optional, TypeVar
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -84,11 +85,11 @@ class PersonaSpec:
 
     name: str
     role: str
-    expertise: List[str] = field(default_factory=list)
+    expertise: list[str] = field(default_factory=list)
     communication_style: str = ""
-    behavioral_traits: List[str] = field(default_factory=list)
+    behavioral_traits: list[str] = field(default_factory=list)
     vertical: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
     @property
     def full_name(self) -> str:
@@ -97,7 +98,7 @@ class PersonaSpec:
             return f"{self.vertical}:{self.name}"
         return self.name
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert persona spec to dictionary for serialization.
 
         Returns:
@@ -161,8 +162,8 @@ class PersonaRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._personas: Dict[str, PersonaSpec] = {}
-        self._factories: Dict[str, Callable[[], PersonaSpec]] = {}
+        self._personas: dict[str, PersonaSpec] = {}
+        self._factories: dict[str, Callable[[], PersonaSpec]] = {}
         self._lock = threading.RLock()
 
     @classmethod
@@ -348,7 +349,7 @@ class PersonaRegistry:
                     return self._personas[key]
             return self._personas.get(name)
 
-    def list_personas(self, vertical: Optional[str] = None) -> List[str]:
+    def list_personas(self, vertical: Optional[str] = None) -> list[str]:
         """List all registered persona names.
 
         Args:
@@ -363,7 +364,7 @@ class PersonaRegistry:
                 return [k for k in self._personas.keys() if k.startswith(prefix)]
             return list(self._personas.keys())
 
-    def list_specs(self, vertical: Optional[str] = None) -> List[PersonaSpec]:
+    def list_specs(self, vertical: Optional[str] = None) -> list[PersonaSpec]:
         """List all persona specs.
 
         Args:
@@ -378,7 +379,7 @@ class PersonaRegistry:
                 return [p for k, p in self._personas.items() if k.startswith(prefix)]
             return list(self._personas.values())
 
-    def find_by_vertical(self, vertical: str) -> List[PersonaSpec]:
+    def find_by_vertical(self, vertical: str) -> list[PersonaSpec]:
         """Get all personas for a specific vertical.
 
         Args:
@@ -391,7 +392,7 @@ class PersonaRegistry:
         with self._lock:
             return [v for k, v in self._personas.items() if k.startswith(prefix)]
 
-    def find_by_expertise(self, expertise: str) -> List[PersonaSpec]:
+    def find_by_expertise(self, expertise: str) -> list[PersonaSpec]:
         """Find personas with specific expertise.
 
         Args:
@@ -403,7 +404,7 @@ class PersonaRegistry:
         with self._lock:
             return [p for p in self._personas.values() if expertise in p.expertise]
 
-    def find_by_role(self, role: str) -> List[PersonaSpec]:
+    def find_by_role(self, role: str) -> list[PersonaSpec]:
         """Find personas with a specific role.
 
         Args:
@@ -416,7 +417,7 @@ class PersonaRegistry:
         with self._lock:
             return [p for p in self._personas.values() if role_lower in p.role.lower()]
 
-    def find_by_tag(self, tag: str) -> List[PersonaSpec]:
+    def find_by_tag(self, tag: str) -> list[PersonaSpec]:
         """Find personas with a specific tag.
 
         Args:
@@ -428,7 +429,7 @@ class PersonaRegistry:
         with self._lock:
             return [p for p in self._personas.values() if tag in p.tags]
 
-    def find_by_tags(self, tags: List[str], match_all: bool = False) -> List[PersonaSpec]:
+    def find_by_tags(self, tags: list[str], match_all: bool = False) -> list[PersonaSpec]:
         """Find personas matching multiple tags.
 
         Args:
@@ -458,7 +459,7 @@ class PersonaRegistry:
             self._factories.clear()
             logger.debug("Cleared persona registry")
 
-    def list_factories(self, vertical: Optional[str] = None) -> List[str]:
+    def list_factories(self, vertical: Optional[str] = None) -> list[str]:
         """List all registered factory names.
 
         Args:
@@ -473,7 +474,7 @@ class PersonaRegistry:
                 return [k for k in self._factories.keys() if k.startswith(prefix)]
             return list(self._factories.keys())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize the registry to a dictionary.
 
         Returns:
@@ -485,7 +486,7 @@ class PersonaRegistry:
     def register_from_vertical(
         self,
         vertical_name: str,
-        personas: Dict[str, PersonaSpec],
+        personas: dict[str, PersonaSpec],
         replace: bool = True,
     ) -> int:
         """Register multiple personas from a vertical.

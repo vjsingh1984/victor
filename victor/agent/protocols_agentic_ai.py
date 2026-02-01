@@ -34,7 +34,7 @@ Design Pattern: Protocol-Based Design
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 from enum import Enum
 
 
@@ -82,7 +82,7 @@ class HierarchicalPlannerProtocol(Protocol):
     async def decompose_task(
         self,
         goal: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         max_depth: int = 5,
     ) -> Any:
         """Decompose a complex task into hierarchical subtasks.
@@ -101,7 +101,7 @@ class HierarchicalPlannerProtocol(Protocol):
         self,
         graph: Any,
         max_tasks: int = 5,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Suggest next executable tasks based on dependencies.
 
         Args:
@@ -116,8 +116,8 @@ class HierarchicalPlannerProtocol(Protocol):
     async def update_plan(
         self,
         graph: Any,
-        completed_tasks: List[str],
-        failed_tasks: Optional[List[str]] = None,
+        completed_tasks: list[str],
+        failed_tasks: Optional[list[str]] = None,
     ) -> Any:
         """Update plan after task execution.
 
@@ -174,11 +174,11 @@ class EpisodicMemoryProtocol(Protocol):
 
     async def store_episode(
         self,
-        inputs: Dict[str, Any],
-        actions: List[Any],
-        outcomes: Dict[str, Any],
+        inputs: dict[str, Any],
+        actions: list[Any],
+        outcomes: dict[str, Any],
         rewards: Optional[float] = None,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Store an episode in episodic memory.
 
@@ -199,7 +199,7 @@ class EpisodicMemoryProtocol(Protocol):
         query: str,
         k: int = 5,
         threshold: float = 0.3,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Recall episodes relevant to query.
 
         Args:
@@ -215,7 +215,7 @@ class EpisodicMemoryProtocol(Protocol):
     async def recall_recent(
         self,
         n: int = 10,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Recall recent episodes.
 
         Args:
@@ -231,7 +231,7 @@ class EpisodicMemoryProtocol(Protocol):
         outcome_key: str,
         outcome_value: Any,
         n: int = 10,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Recall episodes by outcome pattern.
 
         Args:
@@ -244,7 +244,7 @@ class EpisodicMemoryProtocol(Protocol):
         """
         ...
 
-    def get_memory_statistics(self) -> Dict[str, Any]:
+    def get_memory_statistics(self) -> dict[str, Any]:
         """Get memory statistics.
 
         Returns:
@@ -279,7 +279,7 @@ class SemanticMemoryProtocol(Protocol):
     async def store_knowledge(
         self,
         fact: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         confidence: float = 1.0,
     ) -> str:
         """Store a fact in semantic memory.
@@ -299,7 +299,7 @@ class SemanticMemoryProtocol(Protocol):
         query: str,
         k: int = 5,
         threshold: float = 0.25,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Query facts by similarity.
 
         Args:
@@ -372,7 +372,7 @@ class SkillDiscoveryProtocol(Protocol):
         self,
         context: str,
         max_tools: int = 20,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Discover tools relevant to context.
 
         Args:
@@ -387,7 +387,7 @@ class SkillDiscoveryProtocol(Protocol):
     async def compose_skill(
         self,
         skill_name: str,
-        tools: List[Any],
+        tools: list[Any],
         description: str,
     ) -> Any:
         """Compose multiple tools into a skill.
@@ -449,7 +449,7 @@ class SkillChainerProtocol(Protocol):
     async def plan_chain(
         self,
         goal: str,
-        skills: List[Any],
+        skills: list[Any],
         max_length: int = 10,
     ) -> Any:
         """Plan a skill chain for a goal.
@@ -467,7 +467,7 @@ class SkillChainerProtocol(Protocol):
     async def execute_chain(
         self,
         chain: Any,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> Any:
         """Execute a skill chain.
 
@@ -534,7 +534,7 @@ class ProficiencyTrackerProtocol(Protocol):
         success: bool,
         duration: float,
         cost: float,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Record task/tool outcome for learning.
 
@@ -567,7 +567,7 @@ class ProficiencyTrackerProtocol(Protocol):
     def get_suggestions(
         self,
         n: int = 5,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Get improvement suggestions.
 
         Args:
@@ -578,7 +578,7 @@ class ProficiencyTrackerProtocol(Protocol):
         """
         ...
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get proficiency metrics.
 
         Returns:
@@ -616,8 +616,8 @@ class RLCoordinatorProtocol(Protocol):
 
     async def select_action(
         self,
-        state: Dict[str, Any],
-        actions: List[Any],
+        state: dict[str, Any],
+        actions: list[Any],
         explore: bool = False,
     ) -> Any:
         """Select action using current policy.
@@ -634,10 +634,10 @@ class RLCoordinatorProtocol(Protocol):
 
     async def update_policy(
         self,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         action: Any,
         reward: float,
-        next_state: Dict[str, Any],
+        next_state: dict[str, Any],
         done: bool = False,
     ) -> None:
         """Update policy based on reward.
@@ -651,7 +651,7 @@ class RLCoordinatorProtocol(Protocol):
         """
         ...
 
-    def get_policy(self) -> Dict[str, Any]:
+    def get_policy(self) -> dict[str, Any]:
         """Get current policy state.
 
         Returns:

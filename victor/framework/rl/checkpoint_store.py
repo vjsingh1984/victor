@@ -37,7 +37,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +60,11 @@ class PolicyCheckpoint:
     checkpoint_id: str
     learner_name: str
     version: str
-    state: Dict[str, Any]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    state: dict[str, Any]
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     parent_id: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
     @property
     def state_hash(self) -> str:
@@ -72,7 +72,7 @@ class PolicyCheckpoint:
         state_json = json.dumps(self.state, sort_keys=True)
         return hashlib.sha256(state_json.encode()).hexdigest()[:16]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         return {
             "checkpoint_id": self.checkpoint_id,
@@ -87,7 +87,7 @@ class PolicyCheckpoint:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PolicyCheckpoint":
+    def from_dict(cls, data: dict[str, Any]) -> "PolicyCheckpoint":
         """Create from dictionary."""
         return cls(
             checkpoint_id=data["checkpoint_id"],
@@ -116,10 +116,10 @@ class CheckpointDiff:
 
     from_version: str
     to_version: str
-    added_keys: List[str] = field(default_factory=list)
-    removed_keys: List[str] = field(default_factory=list)
-    changed_keys: List[str] = field(default_factory=list)
-    unchanged_keys: List[str] = field(default_factory=list)
+    added_keys: list[str] = field(default_factory=list)
+    removed_keys: list[str] = field(default_factory=list)
+    changed_keys: list[str] = field(default_factory=list)
+    unchanged_keys: list[str] = field(default_factory=list)
 
     @property
     def has_changes(self) -> bool:
@@ -189,7 +189,7 @@ class CheckpointStore:
         self.db = db_connection
 
         # In-memory cache for fast access
-        self._cache: Dict[str, Dict[str, PolicyCheckpoint]] = {}
+        self._cache: dict[str, dict[str, PolicyCheckpoint]] = {}
 
         # Auto-increment for checkpoint IDs
         self._next_id = 1
@@ -303,10 +303,10 @@ class CheckpointStore:
         self,
         learner_name: str,
         version: str,
-        state: Dict[str, Any],
-        metadata: Optional[Dict[str, Any]] = None,
+        state: dict[str, Any],
+        metadata: Optional[dict[str, Any]] = None,
         parent_id: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
     ) -> PolicyCheckpoint:
         """Create a new checkpoint.
 
@@ -468,7 +468,7 @@ class CheckpointStore:
         self,
         learner_name: Optional[str] = None,
         tag: Optional[str] = None,
-    ) -> List[PolicyCheckpoint]:
+    ) -> list[PolicyCheckpoint]:
         """List checkpoints with optional filtering.
 
         Args:
@@ -546,7 +546,7 @@ class CheckpointStore:
             unchanged_keys=unchanged,
         )
 
-    def _flatten_keys(self, d: Dict[str, Any], prefix: str = "") -> List[str]:
+    def _flatten_keys(self, d: dict[str, Any], prefix: str = "") -> list[str]:
         """Flatten nested dictionary keys."""
         keys = []
         for k, v in d.items():
@@ -557,7 +557,7 @@ class CheckpointStore:
                 keys.append(key)
         return keys
 
-    def _get_nested_value(self, d: Dict[str, Any], key: str) -> Any:
+    def _get_nested_value(self, d: dict[str, Any], key: str) -> Any:
         """Get value from nested dictionary using dot notation."""
         parts = key.split(".")
         current = d
@@ -589,7 +589,7 @@ class CheckpointStore:
 
         return True
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export checkpoint store metrics.
 
         Returns:

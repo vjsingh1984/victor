@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -37,7 +37,7 @@ class MockComputeNode:
     def __init__(
         self,
         node_id: str = "test_node",
-        input_mapping: Dict[str, Any] = None,
+        input_mapping: dict[str, Any] = None,
         output_key: str = None,
     ):
         self.id = node_id
@@ -48,7 +48,7 @@ class MockComputeNode:
 class MockWorkflowContext:
     """Mock workflow context for testing."""
 
-    def __init__(self, data: Dict[str, Any] = None):
+    def __init__(self, data: dict[str, Any] = None):
         self._data = data or {}
 
     def get(self, key: str, default: Any = None) -> Any:

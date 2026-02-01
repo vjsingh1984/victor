@@ -46,7 +46,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ HASH_DIGEST_SIZE = 8  # 64 bits
 
 def generate_cache_key(
     query: str,
-    context: Optional[Dict[str, Any]] = None,
+    context: Optional[dict[str, Any]] = None,
     tools_hash: Optional[int] = None,
 ) -> str:
     """Generate optimized cache key for tool selection.
@@ -188,7 +188,7 @@ class CacheKeyBuilder:
         self._hash.update(str(value).encode())
         return self
 
-    def add_string_list(self, values: List[str]) -> "CacheKeyBuilder":
+    def add_string_list(self, values: list[str]) -> "CacheKeyBuilder":
         """Add list of strings to key.
 
         Args:
@@ -204,7 +204,7 @@ class CacheKeyBuilder:
             self._hash.update(value.encode())
         return self
 
-    def add_dict(self, value: Dict[str, Any]) -> "CacheKeyBuilder":
+    def add_dict(self, value: dict[str, Any]) -> "CacheKeyBuilder":
         """Add dict to key.
 
         Args:
@@ -254,7 +254,7 @@ class CacheKeyBuilder:
         return self
 
 
-def hash_tools_list(tool_names: List[str]) -> int:
+def hash_tools_list(tool_names: list[str]) -> int:
     """Generate hash from list of tool names.
 
     Used for detecting when available tools change (invalidates cache).
@@ -273,7 +273,7 @@ def hash_tools_list(tool_names: List[str]) -> int:
     return int(h.hexdigest(), 16)
 
 
-def hash_context(context: Dict[str, Any]) -> str:
+def hash_context(context: dict[str, Any]) -> str:
     """Generate hash from context dict.
 
     Args:
@@ -296,7 +296,7 @@ class CacheKeyBenchmark:
     """Benchmark cache key generation performance."""
 
     @staticmethod
-    def benchmark_hash_algorithms(iterations: int = 10000) -> Dict[str, float]:
+    def benchmark_hash_algorithms(iterations: int = 10000) -> dict[str, float]:
         """Benchmark different hash algorithms.
 
         Args:

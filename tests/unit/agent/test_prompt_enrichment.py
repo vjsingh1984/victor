@@ -25,7 +25,6 @@ Tests the core PromptEnrichmentService and related components:
 
 import asyncio
 import pytest
-from typing import List
 
 from victor.framework.enrichment import (
     PromptEnrichmentService,
@@ -49,7 +48,7 @@ class MockEnrichmentStrategy:
 
     def __init__(
         self,
-        enrichments: List[ContextEnrichment] | None = None,
+        enrichments: list[ContextEnrichment] | None = None,
         delay_ms: float = 0,
         should_fail: bool = False,
     ):
@@ -61,7 +60,7 @@ class MockEnrichmentStrategy:
         self,
         prompt: str,
         context: EnrichmentContext,
-    ) -> List[ContextEnrichment]:
+    ) -> list[ContextEnrichment]:
         if self._delay_ms > 0:
             await asyncio.sleep(self._delay_ms / 1000.0)
         if self._should_fail:

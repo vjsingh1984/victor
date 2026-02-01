@@ -51,7 +51,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -87,8 +87,8 @@ class BrowserConfig:
     element_timeout: int = 5000
 
     # Safety settings
-    allowed_domains: List[str] = field(default_factory=list)  # Empty = all allowed
-    blocked_domains: List[str] = field(
+    allowed_domains: list[str] = field(default_factory=list)  # Empty = all allowed
+    blocked_domains: list[str] = field(
         default_factory=lambda: [
             "*.gov",  # Government sites
             "*.mil",  # Military sites
@@ -118,9 +118,9 @@ class BrowserState:
     is_loading: bool = False
     action_count: int = 0
     page_count: int = 0
-    console_logs: List[Dict[str, Any]] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
-    screenshots: List[str] = field(default_factory=list)
+    console_logs: list[dict[str, Any]] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    screenshots: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -811,7 +811,7 @@ class BrowserTool:
         """
         return self._state
 
-    def get_console_logs(self, log_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_console_logs(self, log_type: Optional[str] = None) -> list[dict[str, Any]]:
         """Get captured console logs.
 
         Args:
@@ -824,7 +824,7 @@ class BrowserTool:
             return [log for log in self._state.console_logs if log["type"] == log_type]
         return self._state.console_logs
 
-    def get_errors(self) -> List[str]:
+    def get_errors(self) -> list[str]:
         """Get captured page errors.
 
         Returns:
@@ -860,7 +860,7 @@ class BrowserTool:
 # Convenience functions for tool integration
 
 
-async def browser_navigate(url: str, **kwargs) -> Dict[str, Any]:
+async def browser_navigate(url: str, **kwargs) -> dict[str, Any]:
     """Navigate to URL and return page info.
 
     Args:
@@ -884,7 +884,7 @@ async def browser_navigate(url: str, **kwargs) -> Dict[str, Any]:
         return {"success": False, "error": result.error}
 
 
-async def browser_screenshot(url: str, full_page: bool = False) -> Dict[str, Any]:
+async def browser_screenshot(url: str, full_page: bool = False) -> dict[str, Any]:
     """Navigate to URL and take screenshot.
 
     Args:

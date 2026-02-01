@@ -5,7 +5,7 @@ Supports light, dark, high-contrast, and custom themes.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass
@@ -75,7 +75,7 @@ $border-muted: {self.border_muted};
 $border-strong: {self.border_strong};
 """
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         """Convert theme to dictionary."""
         return {
             "primary": self.primary,
@@ -235,7 +235,7 @@ NORD_THEME = Theme(
 )
 
 # Theme registry
-THEMES: Dict[str, Theme] = {
+THEMES: dict[str, Theme] = {
     "default": DEFAULT_THEME,
     "dark": DARK_THEME,
     "light": LIGHT_THEME,

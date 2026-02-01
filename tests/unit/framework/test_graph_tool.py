@@ -30,13 +30,11 @@ Tests cover all modes:
 import pytest
 from dataclasses import dataclass
 from typing import Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from victor.tools.graph_tool import (
     GraphAnalyzer,
     graph,
-    GraphMode,
-    ALL_EDGE_TYPES,
 )
 
 

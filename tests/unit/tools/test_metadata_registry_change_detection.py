@@ -19,9 +19,8 @@ reindexing when tools haven't changed, improving startup performance.
 """
 
 import pytest
-from unittest.mock import Mock
 
-from victor.tools.metadata_registry import ToolMetadataRegistry, get_global_registry
+from victor.tools.metadata_registry import ToolMetadataRegistry
 from victor.tools.base import BaseTool
 
 

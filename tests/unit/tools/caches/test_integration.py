@@ -29,7 +29,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from victor.agent.protocols import ToolSelectionContext
 from victor.providers.base import ToolDefinition
 from victor.tools.caches import (
-    ToolSelectionCache,
     get_tool_selection_cache,
     invalidate_tool_selection_cache,
 )

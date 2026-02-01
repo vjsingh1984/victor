@@ -26,7 +26,7 @@ Design Principles:
 
 from __future__ import annotations
 
-from typing import Any, List, Protocol, Set, Tuple, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -43,7 +43,7 @@ class StateProtocol(Protocol):
     """
 
     @property
-    def messages(self) -> List[Any]:
+    def messages(self) -> list[Any]:
         """Get conversation messages.
 
         Returns:
@@ -69,7 +69,7 @@ class StateProtocol(Protocol):
         ...
 
     @property
-    def executed_tools(self) -> List[str]:
+    def executed_tools(self) -> list[str]:
         """Get list of executed tool names in order.
 
         Returns:
@@ -82,7 +82,7 @@ class StateProtocol(Protocol):
         ...
 
     @property
-    def failed_tool_signatures(self) -> Set[Tuple[str, str]]:
+    def failed_tool_signatures(self) -> set[tuple[str, str]]:
         """Get set of failed tool call signatures.
 
         Returns:
@@ -96,7 +96,7 @@ class StateProtocol(Protocol):
         ...
 
     @property
-    def observed_files(self) -> Set[str]:
+    def observed_files(self) -> set[str]:
         """Get set of files observed during session.
 
         Returns:

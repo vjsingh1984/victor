@@ -24,22 +24,19 @@ duplication and maintain consistency across verticals.
 
 from __future__ import annotations
 
-from typing import Dict
 
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
 from victor.core.vertical_types import StandardTaskHints
 from victor.framework.prompts import (
     GroundingRulesBuilder,
     SystemPromptBuilder,
-    TaskCategory,
-    TaskHint,
     TOOL_USAGE_CODING_TEMPLATE,
 )
 
 
 # Task-type-specific prompt hints for coding tasks
 # These guide the model's approach based on detected task type
-CODING_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
+CODING_TASK_TYPE_HINTS: dict[str, TaskTypeHint] = {
     "code_generation": TaskTypeHint(
         task_type="code_generation",
         hint="[GENERATE] Write code directly. No exploration needed. Complete implementation.",
@@ -228,7 +225,7 @@ class CodingPromptContributor(PromptContributorProtocol):
         """
         self._use_extended_grounding = use_extended_grounding
 
-    def get_task_type_hints(self) -> Dict[str, TaskTypeHint]:
+    def get_task_type_hints(self) -> dict[str, TaskTypeHint]:
         """Get coding-specific task type hints.
 
         Returns:

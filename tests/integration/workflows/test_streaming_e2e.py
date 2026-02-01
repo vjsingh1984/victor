@@ -24,16 +24,12 @@ These tests verify the complete streaming workflow API, including:
 - Backward compatibility with execute() method
 """
 
-import asyncio
 import pytest
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock
+from typing import Any, Optional
+from unittest.mock import MagicMock
 
 from victor.workflows.definition import (
     WorkflowBuilder,
-    WorkflowDefinition,
-    TransformNode,
 )
 from victor.workflows.streaming_executor import (
     StreamingWorkflowExecutor,
@@ -42,7 +38,6 @@ from victor.workflows.streaming_executor import (
 )
 from victor.workflows.executor import (
     WorkflowResult,
-    ExecutorNodeStatus,
 )
 
 
@@ -67,17 +62,17 @@ def mock_orchestrator() -> Any:
 def three_node_workflow() -> Any:
     """Create a workflow with exactly 3 transform nodes for testing."""
 
-    def step_a(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def step_a(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["steps"] = ctx.get("steps", []) + ["a"]
         ctx["counter"] = ctx.get("counter", 0) + 1
         return ctx
 
-    def step_b(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def step_b(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["steps"] = ctx.get("steps", []) + ["b"]
         ctx["counter"] = ctx.get("counter", 0) + 10
         return ctx
 
-    def step_c(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def step_c(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["steps"] = ctx.get("steps", []) + ["c"]
         ctx["counter"] = ctx.get("counter", 0) + 100
         return ctx
@@ -95,14 +90,14 @@ def three_node_workflow() -> Any:
 def failing_workflow() -> Any:
     """Create a workflow that will fail at a specific node."""
 
-    def success_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def success_step(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["success_ran"] = True
         return ctx
 
-    def failing_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def failing_step(ctx: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Intentional test failure")
 
-    def after_failure(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def after_failure(ctx: dict[str, Any]) -> dict[str, Any]:
         ctx["after_failure_ran"] = True
         return ctx
 
@@ -119,21 +114,21 @@ def failing_workflow() -> Any:
 def long_running_workflow() -> Any:
     """Create a workflow with nodes that take time to execute."""
 
-    def slow_step_a(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def slow_step_a(ctx: dict[str, Any]) -> dict[str, Any]:
         import time
 
         time.sleep(0.1)
         ctx["a_completed"] = True
         return ctx
 
-    def slow_step_b(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def slow_step_b(ctx: dict[str, Any]) -> dict[str, Any]:
         import time
 
         time.sleep(0.1)
         ctx["b_completed"] = True
         return ctx
 
-    def slow_step_c(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    def slow_step_c(ctx: dict[str, Any]) -> dict[str, Any]:
         import time
 
         time.sleep(0.1)
@@ -167,7 +162,7 @@ class TestStreamingWorkflowE2E:
         """
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
-        events: List[WorkflowStreamChunk] = []
+        events: list[WorkflowStreamChunk] = []
         async for chunk in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             events.append(chunk)
 
@@ -202,7 +197,7 @@ class TestStreamingWorkflowE2E:
         """
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
-        progress_values: List[float] = []
+        progress_values: list[float] = []
         async for chunk in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             progress_values.append(chunk.progress)
 
@@ -234,7 +229,7 @@ class TestStreamingWorkflowE2E:
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
         # Track node execution order
-        execution_order: List[str] = []
+        execution_order: list[str] = []
 
         async for chunk in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
@@ -250,7 +245,7 @@ class TestStreamingWorkflowE2E:
         """
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
-        events: List[WorkflowStreamChunk] = []
+        events: list[WorkflowStreamChunk] = []
         async for chunk in executor.astream(failing_workflow):
             events.append(chunk)
 
@@ -295,7 +290,7 @@ class TestStreamingWorkflowE2E:
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
         # Collect events via subscription
-        subscribed_events: List[WorkflowStreamChunk] = []
+        subscribed_events: list[WorkflowStreamChunk] = []
 
         def on_node_complete(chunk: WorkflowStreamChunk) -> None:
             subscribed_events.append(chunk)
@@ -355,7 +350,7 @@ class TestStreamingWorkflowE2E:
         """
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
-        events: List[WorkflowStreamChunk] = []
+        events: list[WorkflowStreamChunk] = []
         workflow_id: Optional[str] = None
         cancelled = False
 
@@ -420,7 +415,7 @@ class TestStreamingWorkflowE2E:
         assert executor.get_active_workflows() == []
 
         # Track workflow IDs during execution
-        workflow_ids_during: List[str] = []
+        workflow_ids_during: list[str] = []
         captured_workflow_id: Optional[str] = None
 
         # Execute workflow completely and check active state during execution
@@ -448,7 +443,7 @@ class TestStreamingWorkflowE2E:
         assert executor.get_workflow_progress("unknown") is None
 
         # During execution, should return current progress
-        progress_values: List[float] = []
+        progress_values: list[float] = []
         workflow_id: Optional[str] = None
 
         async for chunk in executor.astream(long_running_workflow):
@@ -488,7 +483,7 @@ class TestStreamingWorkflowE2E:
         """Test that node metadata is included in node event chunks."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
-        node_events: List[WorkflowStreamChunk] = []
+        node_events: list[WorkflowStreamChunk] = []
         async for chunk in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             if chunk.event_type in [
                 WorkflowEventType.NODE_START,
@@ -523,7 +518,7 @@ class TestStreamingWorkflowEdgeCases:
     async def test_empty_workflow_context(self, mock_orchestrator) -> None:
         """Test streaming with empty initial context."""
 
-        def identity_transform(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def identity_transform(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["touched"] = True
             return ctx
 
@@ -546,7 +541,7 @@ class TestStreamingWorkflowEdgeCases:
     async def test_single_node_workflow(self, mock_orchestrator) -> None:
         """Test streaming a workflow with only one node."""
 
-        def single_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def single_step(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["result"] = "done"
             return ctx
 
@@ -556,7 +551,7 @@ class TestStreamingWorkflowEdgeCases:
 
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
-        events: List[WorkflowStreamChunk] = []
+        events: list[WorkflowStreamChunk] = []
         async for chunk in executor.astream(workflow):
             events.append(chunk)
 
@@ -575,8 +570,8 @@ class TestStreamingWorkflowEdgeCases:
         """Test multiple simultaneous subscriptions."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
-        starts_received: List[WorkflowStreamChunk] = []
-        completes_received: List[WorkflowStreamChunk] = []
+        starts_received: list[WorkflowStreamChunk] = []
+        completes_received: list[WorkflowStreamChunk] = []
 
         def on_start(chunk: WorkflowStreamChunk) -> None:
             starts_received.append(chunk)
@@ -601,7 +596,7 @@ class TestStreamingWorkflowEdgeCases:
     async def test_workflow_with_custom_timeout(self, mock_orchestrator) -> None:
         """Test streaming with custom timeout parameter."""
 
-        def quick_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def quick_step(ctx: dict[str, Any]) -> dict[str, Any]:
             ctx["quick"] = True
             return ctx
 

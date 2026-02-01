@@ -73,7 +73,8 @@ import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -223,9 +224,9 @@ class MigrationStep:
     old_value: Optional[Any] = None
     new_value: Optional[Any] = None
     description: str = ""
-    custom_handler: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
+    custom_handler: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None
 
-    def apply(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def apply(self, state: dict[str, Any]) -> dict[str, Any]:
         """Apply this migration to workflow state.
 
         Used for migrating in-progress workflow state when
@@ -273,7 +274,7 @@ class WorkflowMigration:
 
     from_version: WorkflowVersion
     to_version: WorkflowVersion
-    steps: List[MigrationStep] = field(default_factory=list)
+    steps: list[MigrationStep] = field(default_factory=list)
     description: str = ""
     breaking: bool = False
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -283,7 +284,7 @@ class WorkflowMigration:
         """Generate unique ID for this migration."""
         return f"{self.from_version}->{self.to_version}"
 
-    def apply(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def apply(self, state: dict[str, Any]) -> dict[str, Any]:
         """Apply all migration steps to state.
 
         Args:
@@ -297,7 +298,7 @@ class WorkflowMigration:
             result = step.apply(result)
         return result
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Validate the migration.
 
         Returns:
@@ -407,8 +408,8 @@ class WorkflowVersionRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._versions: Dict[str, Dict[str, VersionedWorkflow]] = {}
-        self._migrations: Dict[str, Dict[str, WorkflowMigration]] = {}
+        self._versions: dict[str, dict[str, VersionedWorkflow]] = {}
+        self._migrations: dict[str, dict[str, WorkflowMigration]] = {}
         self._lock = threading.RLock()
 
     def register(self, workflow: VersionedWorkflow) -> None:
@@ -493,7 +494,7 @@ class WorkflowVersionRegistry:
             )
             return sorted_versions[0]
 
-    def get_all_versions(self, name: str) -> List[VersionedWorkflow]:
+    def get_all_versions(self, name: str) -> list[VersionedWorkflow]:
         """Get all versions of a workflow.
 
         Args:
@@ -512,7 +513,7 @@ class WorkflowVersionRegistry:
                 reverse=True,
             )
 
-    def list_workflows(self) -> List[str]:
+    def list_workflows(self) -> list[str]:
         """List all registered workflow names.
 
         Returns:
@@ -545,7 +546,7 @@ class WorkflowVersionRegistry:
         name: str,
         from_version: WorkflowVersion,
         to_version: WorkflowVersion,
-    ) -> List[WorkflowMigration]:
+    ) -> list[WorkflowMigration]:
         """Find migration path between versions.
 
         Args:
@@ -590,10 +591,10 @@ class WorkflowVersionRegistry:
     def migrate_state(
         self,
         name: str,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         from_version: str,
         to_version: str,
-    ) -> Tuple[Dict[str, Any], List[str]]:
+    ) -> tuple[dict[str, Any], list[str]]:
         """Migrate workflow state between versions.
 
         Args:
@@ -673,7 +674,7 @@ def reset_version_registry() -> None:
         _registry_instance = None
 
 
-def parse_version_from_yaml(data: Dict[str, Any]) -> Optional[WorkflowVersion]:
+def parse_version_from_yaml(data: dict[str, Any]) -> Optional[WorkflowVersion]:
     """Parse version from YAML workflow data.
 
     Args:
@@ -694,8 +695,8 @@ def parse_version_from_yaml(data: Dict[str, Any]) -> Optional[WorkflowVersion]:
 
 
 def parse_migrations_from_yaml(
-    data: Dict[str, Any],
-) -> List[WorkflowMigration]:
+    data: dict[str, Any],
+) -> list[WorkflowMigration]:
     """Parse migrations from YAML workflow data.
 
     Args:

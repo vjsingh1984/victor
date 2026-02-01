@@ -21,7 +21,7 @@ optimized workflow variants based on optimization opportunities.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 from dataclasses import dataclass, field
 from copy import deepcopy
 
@@ -32,7 +32,6 @@ from victor.optimization.workflow.models import (
 )
 from victor.optimization.workflow.strategies import (
     WorkflowChange,
-    create_strategy,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,15 +55,15 @@ class WorkflowVariant:
 
     variant_id: str
     base_workflow_id: str
-    changes: List[WorkflowChange]
+    changes: list[WorkflowChange]
     expected_improvement: float
     risk_level: str
     estimated_cost_reduction: float = 0.0
     estimated_duration_reduction: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    config: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "variant_id": self.variant_id,
@@ -131,7 +130,7 @@ class WorkflowVariantGenerator:
 
     async def generate_variant(
         self,
-        workflow_config: Dict[str, Any],
+        workflow_config: dict[str, Any],
         opportunity: OptimizationOpportunity,
         profile: WorkflowProfile,
     ) -> Optional[WorkflowVariant]:
@@ -215,10 +214,10 @@ class WorkflowVariantGenerator:
 
     async def _apply_pruning(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         opportunity: OptimizationOpportunity,
         profile: WorkflowProfile,
-    ) -> tuple[bool, List[WorkflowChange]]:
+    ) -> tuple[bool, list[WorkflowChange]]:
         """Apply pruning strategy to remove nodes.
 
         Args:
@@ -269,10 +268,10 @@ class WorkflowVariantGenerator:
 
     async def _apply_parallelization(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         opportunity: OptimizationOpportunity,
         profile: WorkflowProfile,
-    ) -> tuple[bool, List[WorkflowChange]]:
+    ) -> tuple[bool, list[WorkflowChange]]:
         """Apply parallelization strategy to group nodes.
 
         Args:
@@ -361,10 +360,10 @@ class WorkflowVariantGenerator:
 
     async def _apply_tool_selection(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         opportunity: OptimizationOpportunity,
         profile: WorkflowProfile,
-    ) -> tuple[bool, List[WorkflowChange]]:
+    ) -> tuple[bool, list[WorkflowChange]]:
         """Apply tool selection strategy to swap tools.
 
         Args:
@@ -375,7 +374,7 @@ class WorkflowVariantGenerator:
         Returns:
             Tuple of (success, changes)
         """
-        changes: List[WorkflowChange] = []
+        changes: list[WorkflowChange] = []
 
         # Parse tool mapping (e.g., "tool_a -> tool_b")
         if " -> " not in opportunity.target:
@@ -477,8 +476,8 @@ class WorkflowVariantGenerator:
 
     def _find_reachable_nodes(
         self,
-        config: Dict[str, Any],
-    ) -> Set[str]:
+        config: dict[str, Any],
+    ) -> set[str]:
         """Find all nodes reachable from start nodes.
 
         Args:
@@ -514,7 +513,7 @@ class WorkflowVariantGenerator:
 
     def _detect_cycles(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
     ) -> bool:
         """Detect if workflow contains cycles.
 
@@ -528,7 +527,7 @@ class WorkflowVariantGenerator:
             return False
 
         # Build adjacency list
-        adj: Dict[str, List[str]] = {node_id: [] for node_id in config["nodes"].keys()}
+        adj: dict[str, list[str]] = {node_id: [] for node_id in config["nodes"].keys()}
 
         for edge in config["edges"]:
             source = edge.get("source")

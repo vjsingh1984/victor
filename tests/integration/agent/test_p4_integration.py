@@ -9,10 +9,8 @@ This module tests the integration of:
 These tests verify that all components work together correctly.
 """
 
-import asyncio
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import Mock, AsyncMock
 
 from victor.config.settings import Settings
 from victor.framework.search import HybridSearchEngine, create_hybrid_search_engine

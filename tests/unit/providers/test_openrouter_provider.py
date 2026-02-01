@@ -24,9 +24,8 @@ Tests cover:
 - Special headers (HTTP-Referer, X-Title)
 """
 
-import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 import httpx
 
 from victor.providers.openrouter_provider import OpenRouterProvider, OPENROUTER_MODELS

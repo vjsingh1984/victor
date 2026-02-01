@@ -30,7 +30,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from functools import wraps
-from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar, cast
+from typing import Any, Optional, TypeVar, cast
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,7 @@ class VictorError(Exception):
         message: str,
         category: ErrorCategory = ErrorCategory.UNKNOWN,
         severity: ErrorSeverity = ErrorSeverity.ERROR,
-        details: Optional[Dict[str, Any]] = None,
+        details: Optional[dict[str, Any]] = None,
         recovery_hint: Optional[str] = None,
         correlation_id: Optional[str] = None,
         cause: Optional[Exception] = None,
@@ -145,7 +146,7 @@ class VictorError(Exception):
             # (e.g., during early initialization or testing)
             pass
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "error": self.message,
@@ -276,7 +277,7 @@ class ProviderNotFoundError(ProviderError):
         self,
         message: Optional[str] = None,
         provider: Optional[str] = None,
-        available_providers: Optional[List[str]] = None,
+        available_providers: Optional[list[str]] = None,
         status_code: Optional[int] = None,
         raw_error: Optional[Any] = None,
         **kwargs: Any,
@@ -360,7 +361,7 @@ class ProviderInvalidResponseError(ProviderError):
         self,
         message: str,
         provider: Optional[str] = None,
-        response_data: Optional[Dict[str, Any]] = None,
+        response_data: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ):
         super().__init__(
@@ -428,7 +429,7 @@ class ToolExecutionError(ToolError):
         self,
         message: str,
         tool_name: Optional[str] = None,
-        arguments: Optional[Dict[str, Any]] = None,
+        arguments: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ):
         # Add recovery hint if not provided
@@ -460,7 +461,7 @@ class ToolValidationError(ToolError):
         self,
         message: str,
         tool_name: Optional[str] = None,
-        invalid_args: Optional[List[str]] = None,
+        invalid_args: Optional[list[str]] = None,
         **kwargs: Any,
     ):
         super().__init__(
@@ -510,7 +511,7 @@ class ConfigurationError(VictorError):
         self,
         message: str,
         config_key: Optional[str] = None,
-        invalid_fields: Optional[List[str]] = None,
+        invalid_fields: Optional[list[str]] = None,
         **kwargs: Any,
     ):
         # Add recovery hint if not provided
@@ -565,10 +566,10 @@ class ConfigurationValidationError(ConfigurationError):
         self,
         message: str,
         config_key: Optional[str] = None,
-        invalid_fields: Optional[List[str]] = None,
-        field_errors: Optional[Dict[str, str]] = None,
-        line_numbers: Optional[Dict[str, int]] = None,
-        validation_errors: Optional[List[str]] = None,
+        invalid_fields: Optional[list[str]] = None,
+        field_errors: Optional[dict[str, str]] = None,
+        line_numbers: Optional[dict[str, int]] = None,
+        validation_errors: Optional[list[str]] = None,
         **kwargs: Any,
     ):
         # Build detailed error message if not provided
@@ -637,7 +638,7 @@ class ConfigurationValidationError(ConfigurationError):
         """
         return self.line_numbers.get(field_name)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary with full validation details."""
         result = super().to_dict()
         result["field_errors"] = self.field_errors
@@ -671,7 +672,7 @@ class CapabilityRegistryRequiredError(ConfigurationError):
         message: Optional[str] = None,
         component: Optional[str] = None,
         capability_name: Optional[str] = None,
-        required_methods: Optional[List[str]] = None,
+        required_methods: Optional[list[str]] = None,
         **kwargs: Any,
     ):
         # Build message if not provided
@@ -907,8 +908,8 @@ class SearchError(VictorError):
         self,
         message: str,
         search_type: Optional[str] = None,
-        failed_backends: Optional[List[str]] = None,
-        failure_details: Optional[Dict[str, str]] = None,
+        failed_backends: Optional[list[str]] = None,
+        failure_details: Optional[dict[str, str]] = None,
         query: Optional[str] = None,
         **kwargs: Any,
     ):
@@ -982,7 +983,7 @@ class WorkflowExecutionError(VictorError):
         node_id: Optional[str] = None,
         node_type: Optional[str] = None,
         checkpoint_id: Optional[str] = None,
-        execution_context: Optional[Dict[str, Any]] = None,
+        execution_context: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ):
         # Generate recovery hint if not provided
@@ -1060,7 +1061,7 @@ class RecursionDepthError(WorkflowExecutionError):
         message: str,
         current_depth: int,
         max_depth: int,
-        execution_stack: List[str],
+        execution_stack: list[str],
         **kwargs: Any,
     ):
         # Generate stack trace for error message
@@ -1125,12 +1126,12 @@ class ErrorInfo:
     severity: ErrorSeverity
     correlation_id: str
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     recovery_hint: Optional[str] = None
     traceback: Optional[str] = None
     original_exception: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "message": self.message,
@@ -1177,13 +1178,13 @@ class ErrorHandler:
     ):
         self.logger = logging.getLogger(logger_name)
         self.include_traceback = include_traceback
-        self._error_history: List[ErrorInfo] = []
+        self._error_history: list[ErrorInfo] = []
         self._max_history = 100
 
     def handle(
         self,
         exception: Exception,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         log_level: Optional[int] = None,
     ) -> ErrorInfo:
         """Handle an exception and return structured error info.
@@ -1209,7 +1210,7 @@ class ErrorHandler:
     def _create_error_info(
         self,
         exception: Exception,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> ErrorInfo:
         """Create ErrorInfo from an exception."""
         # Handle VictorError specially
@@ -1299,7 +1300,7 @@ class ErrorHandler:
         if len(self._error_history) > self._max_history:
             self._error_history = self._error_history[-self._max_history :]
 
-    def get_recent_errors(self, count: int = 10) -> List[ErrorInfo]:
+    def get_recent_errors(self, count: int = 10) -> list[ErrorInfo]:
         """Get recent errors from history."""
         return self._error_history[-count:]
 
@@ -1422,7 +1423,7 @@ def get_error_handler() -> ErrorHandler:
 
 def handle_exception(
     exception: Exception,
-    context: Optional[Dict[str, Any]] = None,
+    context: Optional[dict[str, Any]] = None,
 ) -> ErrorInfo:
     """Handle an exception using the global handler.
 

@@ -35,11 +35,10 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Optional
 
 from victor.config.defaults import ToolDefaults
 from victor.protocols.tool_selector import (
-    IConfigurableToolSelector,
     ToolSelectionContext,
     ToolSelectionResult,
     ToolSelectionStrategy,
@@ -71,8 +70,8 @@ class BaseToolSelector(ABC):
         self,
         tool_registry: "ToolRegistry",
         *,
-        enabled_tools: Optional[Set[str]] = None,
-        disabled_tools: Optional[Set[str]] = None,
+        enabled_tools: Optional[set[str]] = None,
+        disabled_tools: Optional[set[str]] = None,
         model_name: str = "",
         provider_name: str = "",
     ) -> None:
@@ -150,7 +149,7 @@ class BaseToolSelector(ABC):
             )
 
         # Score all available tools
-        scores: Dict[str, float] = {}
+        scores: dict[str, float] = {}
         for tool_name in available_tools:
             try:
                 score = self._score_tool(tool_name, task, context)
@@ -208,8 +207,8 @@ class BaseToolSelector(ABC):
     def configure(
         self,
         *,
-        enabled_tools: Optional[Set[str]] = None,
-        disabled_tools: Optional[Set[str]] = None,
+        enabled_tools: Optional[set[str]] = None,
+        disabled_tools: Optional[set[str]] = None,
         cost_tier_filter: Optional[str] = None,
     ) -> None:
         """Configure selector options.
@@ -234,7 +233,7 @@ class BaseToolSelector(ABC):
         self._enabled_tools = None
         self._disabled_tools = set()
 
-    def get_available_tools(self) -> List[str]:
+    def get_available_tools(self) -> list[str]:
         """Get list of all available tool names.
 
         Returns:
@@ -245,7 +244,7 @@ class BaseToolSelector(ABC):
     def _get_available_tools(
         self,
         context: Optional[ToolSelectionContext] = None,
-    ) -> Set[str]:
+    ) -> set[str]:
         """Get set of available tools after filtering.
 
         Args:

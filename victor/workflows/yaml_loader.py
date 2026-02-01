@@ -111,11 +111,11 @@ import logging
 import operator
 import os
 import re
-import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TYPE_CHECKING, Union
+from typing import Any, Literal, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 import yaml
 
@@ -303,10 +303,10 @@ class LLMConfig:
     model_hint: Optional[str] = None
     max_tokens: Optional[int] = None
     top_p: Optional[float] = None
-    stop_sequences: Optional[List[str]] = None
+    stop_sequences: Optional[list[str]] = None
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {}
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {}
         if self.temperature is not None:
             result["temperature"] = self.temperature
         if self.model_hint is not None:
@@ -320,7 +320,7 @@ class LLMConfig:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "LLMConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "LLMConfig":
         return cls(
             temperature=data.get("temperature"),
             model_hint=data.get("model_hint"),
@@ -354,7 +354,7 @@ class TemporalContextConfig:
     period_type: Literal["days", "weeks", "months", "quarters", "years"] = "quarters"
     include_end_date: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "as_of_date": self.as_of_date,
             "lookback_periods": self.lookback_periods,
@@ -363,7 +363,7 @@ class TemporalContextConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TemporalContextConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "TemporalContextConfig":
         return cls(
             as_of_date=data.get("as_of_date"),
             lookback_periods=data.get("lookback_periods", 1),
@@ -416,20 +416,20 @@ class ServiceConfigYAML:
     preset: Optional[str] = None
     image: Optional[str] = None
     command: Optional[str] = None
-    ports: List[Union[int, str]] = field(default_factory=list)
-    environment: Dict[str, str] = field(default_factory=dict)
-    volumes: List[str] = field(default_factory=list)
-    health_check: Optional[Dict[str, Any]] = None
-    depends_on: List[str] = field(default_factory=list)
-    lifecycle: Optional[Dict[str, Any]] = None
-    exports: Dict[str, str] = field(default_factory=dict)
+    ports: list[int | str] = field(default_factory=list)
+    environment: dict[str, str] = field(default_factory=dict)
+    volumes: list[str] = field(default_factory=list)
+    health_check: Optional[dict[str, Any]] = None
+    depends_on: list[str] = field(default_factory=list)
+    lifecycle: Optional[dict[str, Any]] = None
+    exports: dict[str, str] = field(default_factory=dict)
     # AWS-specific
-    aws_config: Optional[Dict[str, Any]] = None
+    aws_config: Optional[dict[str, Any]] = None
     # Kubernetes-specific
-    k8s_config: Optional[Dict[str, Any]] = None
+    k8s_config: Optional[dict[str, Any]] = None
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "name": self.name,
             "provider": self.provider,
         }
@@ -460,7 +460,7 @@ class ServiceConfigYAML:
         return result
 
     @classmethod
-    def from_dict(cls, name: str, data: Dict[str, Any]) -> "ServiceConfigYAML":
+    def from_dict(cls, name: str, data: dict[str, Any]) -> "ServiceConfigYAML":
         return cls(
             name=name,
             provider=data.get("provider", "docker"),
@@ -607,7 +607,7 @@ class BatchConfigYAML:
     timeout_per_item: Optional[float] = None
     fail_fast: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "batch_size": self.batch_size,
             "max_concurrent": self.max_concurrent,
@@ -620,7 +620,7 @@ class BatchConfigYAML:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BatchConfigYAML":
+    def from_dict(cls, data: dict[str, Any]) -> "BatchConfigYAML":
         return cls(
             batch_size=data.get("batch_size", 5),
             max_concurrent=data.get("max_concurrent", 3),
@@ -674,8 +674,8 @@ class YAMLWorkflowError(Exception):
 def _resolve_ref(
     ref: str,
     base_dir: Optional[Path],
-    ref_cache: Dict[str, Dict[str, Any]],
-) -> Dict[str, Any]:
+    ref_cache: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
     """Resolve an external $ref reference to a node definition.
 
     Supports two formats:
@@ -722,23 +722,23 @@ def _resolve_ref(
     # Extract specific node or return first node
     if node_id:
         # Look for node in "nodes" list
-        nodes: List[Dict[str, Any]] = file_data.get("nodes", [])
+        nodes: list[dict[str, Any]] = file_data.get("nodes", [])
         for node in nodes:
             if node.get("id") == node_id:
                 return node
         raise YAMLWorkflowError(f"Node '{node_id}' not found in {full_path}")
     else:
         # Return first node from file
-        all_nodes: List[Dict[str, Any]] = file_data.get("nodes", [])
+        all_nodes: list[dict[str, Any]] = file_data.get("nodes", [])
         if not all_nodes:
             raise YAMLWorkflowError(f"No nodes found in {full_path}")
         return all_nodes[0]
 
 
 def _expand_refs(
-    node_list: List[Dict[str, Any]],
+    node_list: list[dict[str, Any]],
     base_dir: Optional[Path],
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Expand $ref references in node list.
 
     Args:
@@ -748,7 +748,7 @@ def _expand_refs(
     Returns:
         List with all $ref nodes replaced with actual definitions
     """
-    ref_cache: Dict[str, Dict[str, Any]] = {}
+    ref_cache: dict[str, dict[str, Any]] = {}
     expanded = []
 
     for node_data in node_list:
@@ -771,7 +771,7 @@ def _expand_refs(
     return expanded
 
 
-def _deep_merge_dicts(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
+def _deep_merge_dicts(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
     """Deep merge overrides into base dict.
 
     Args:
@@ -803,8 +803,8 @@ def _deep_merge_dicts(base: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[s
 
 
 def _resolve_stage_templates(
-    node_list: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    node_list: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Resolve stage template references in node list.
 
     This function processes nodes that contain a 'stage' field, which references
@@ -914,9 +914,9 @@ class YAMLWorkflowConfig:
     # Base directory for relative imports
     base_dir: Optional[Path] = None
     # Custom condition functions
-    condition_registry: Optional[Dict[str, Callable[[Dict[str, Any]], str]]] = None
+    condition_registry: Optional[dict[str, Callable[[dict[str, Any]], str]]] = None
     # Custom transform functions
-    transform_registry: Optional[Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]]] = None
+    transform_registry: Optional[dict[str, Callable[[dict[str, Any]], dict[str, Any]]]] = None
 
     def __post_init__(self) -> None:
         if self.condition_registry is None:
@@ -925,7 +925,7 @@ class YAMLWorkflowConfig:
             self.transform_registry = {}
 
 
-def _create_simple_condition(expr: str) -> Callable[[Dict[str, Any]], str]:
+def _create_simple_condition(expr: str) -> Callable[[dict[str, Any]], str]:
     """Create a condition function from a simple expression.
 
     Supported expressions:
@@ -961,7 +961,7 @@ def _create_simple_condition(expr: str) -> Callable[[Dict[str, Any]], str]:
             # Parse value
             value = _parse_value(value_str)
 
-            def condition(ctx: Dict[str, Any], k: str = key, v: Any = value, o: Any = op) -> str:
+            def condition(ctx: dict[str, Any], k: str = key, v: Any = value, o: Any = op) -> str:
                 ctx_value = ctx.get(k)
                 try:
                     return "true" if o(ctx_value, v) else "false"
@@ -977,7 +977,7 @@ def _create_simple_condition(expr: str) -> Callable[[Dict[str, Any]], str]:
         values_str = in_match.group(2)
         values = [_parse_value(v.strip()) for v in values_str.split(",")]
 
-        def in_condition(ctx: Dict[str, Any], k: str = key, vs: Any = values) -> str:
+        def in_condition(ctx: dict[str, Any], k: str = key, vs: Any = values) -> str:
             return "true" if ctx.get(k) in vs else "false"
 
         return in_condition
@@ -985,7 +985,7 @@ def _create_simple_condition(expr: str) -> Callable[[Dict[str, Any]], str]:
     # Simple truthy check
     if re.match(r"^\w+$", expr):
 
-        def truthy_condition(ctx: Dict[str, Any], k: str = expr) -> str:
+        def truthy_condition(ctx: dict[str, Any], k: str = expr) -> str:
             return "true" if ctx.get(k) else "false"
 
         return truthy_condition
@@ -1024,7 +1024,7 @@ def _parse_value(value_str: str) -> Any:
     return value_str
 
 
-def _create_transform(expr: str) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
+def _create_transform(expr: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
     """Create a transform function from a simple expression.
 
     Supported expressions:
@@ -1048,8 +1048,8 @@ def _create_transform(expr: str) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
             ref_key = value_str[4:]
 
             def ref_transform(
-                ctx: Dict[str, Any], k: str = key, rk: str = ref_key
-            ) -> Dict[str, Any]:
+                ctx: dict[str, Any], k: str = key, rk: str = ref_key
+            ) -> dict[str, Any]:
                 result = ctx.copy()
                 result[k] = ctx.get(rk)
                 return result
@@ -1059,7 +1059,7 @@ def _create_transform(expr: str) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
         # Literal value
         value = _parse_value(value_str)
 
-        def literal_transform(ctx: Dict[str, Any], k: str = key, v: Any = value) -> Dict[str, Any]:
+        def literal_transform(ctx: dict[str, Any], k: str = key, v: Any = value) -> dict[str, Any]:
             result = ctx.copy()
             result[k] = v
             return result
@@ -1070,7 +1070,7 @@ def _create_transform(expr: str) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
     return lambda ctx: ctx
 
 
-def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
+def _parse_agent_node(node_data: dict[str, Any]) -> AgentNode:
     """Parse an agent node from YAML data.
 
     Supports llm_config for per-node LLM settings:
@@ -1112,7 +1112,7 @@ def _parse_agent_node(node_data: Dict[str, Any]) -> AgentNode:
 
 
 def _parse_condition_node(
-    node_data: Dict[str, Any],
+    node_data: dict[str, Any],
     config: YAMLWorkflowConfig,
 ) -> ConditionNode:
     """Parse a condition node from YAML data."""
@@ -1135,7 +1135,7 @@ def _parse_condition_node(
     )
 
 
-def _parse_parallel_node(node_data: Dict[str, Any]) -> ParallelNode:
+def _parse_parallel_node(node_data: dict[str, Any]) -> ParallelNode:
     """Parse a parallel node from YAML data."""
     node_id = node_data["id"]
     return ParallelNode(
@@ -1148,7 +1148,7 @@ def _parse_parallel_node(node_data: Dict[str, Any]) -> ParallelNode:
 
 
 def _parse_transform_node(
-    node_data: Dict[str, Any],
+    node_data: dict[str, Any],
     config: YAMLWorkflowConfig,
 ) -> TransformNode:
     """Parse a transform node from YAML data."""
@@ -1170,7 +1170,7 @@ def _parse_transform_node(
     )
 
 
-def _parse_hitl_node(node_data: Dict[str, Any]) -> WorkflowNode:
+def _parse_hitl_node(node_data: dict[str, Any]) -> WorkflowNode:
     """Parse a HITL node from YAML data."""
     from victor.workflows.hitl import HITLFallback, HITLNode, HITLNodeType
 
@@ -1195,7 +1195,7 @@ def _parse_hitl_node(node_data: Dict[str, Any]) -> WorkflowNode:
     )
 
 
-def _parse_team_node(node_data: Dict[str, Any]) -> TeamNodeWorkflow:
+def _parse_team_node(node_data: dict[str, Any]) -> TeamNodeWorkflow:
     """Parse team node from YAML data.
 
     Team nodes spawn multi-agent teams with configurable formations.
@@ -1361,7 +1361,7 @@ def _parse_constraints(constraints_data: Any, timeout: float = 60.0) -> TaskCons
     )
 
 
-def _parse_compute_node(node_data: Dict[str, Any]) -> ComputeNode:
+def _parse_compute_node(node_data: dict[str, Any]) -> ComputeNode:
     """Parse a compute node from YAML data.
 
     Compute nodes execute tools with configurable constraints.
@@ -1445,7 +1445,7 @@ def _parse_compute_node(node_data: Dict[str, Any]) -> ComputeNode:
 
 
 def _parse_node(
-    node_data: Dict[str, Any],
+    node_data: dict[str, Any],
     config: YAMLWorkflowConfig,
 ) -> WorkflowNode:
     """Parse a workflow node from YAML data.
@@ -1492,7 +1492,7 @@ def _parse_node(
 
 
 def load_workflow_from_dict(
-    data: Dict[str, Any],
+    data: dict[str, Any],
     name: str,
     config: Optional[YAMLWorkflowConfig] = None,
 ) -> WorkflowDefinition:
@@ -1522,7 +1522,7 @@ def load_workflow_from_dict(
     node_list = _resolve_stage_templates(node_list)
 
     # Parse nodes
-    nodes: Dict[str, WorkflowNode] = {}
+    nodes: dict[str, WorkflowNode] = {}
     for node_data in node_list:
         if "id" not in node_data:
             raise YAMLWorkflowError("Node missing required 'id' field")
@@ -1667,7 +1667,7 @@ def load_workflow_from_yaml(
     yaml_content: str,
     workflow_name: Optional[str] = None,
     config: Optional[YAMLWorkflowConfig] = None,
-) -> Union[WorkflowDefinition, Dict[str, WorkflowDefinition]]:
+) -> WorkflowDefinition | dict[str, WorkflowDefinition]:
     """Load workflow(s) from YAML content.
 
     Args:
@@ -1708,10 +1708,10 @@ def load_workflow_from_yaml(
 
 
 def load_workflow_from_file(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     workflow_name: Optional[str] = None,
     config: Optional[YAMLWorkflowConfig] = None,
-) -> Union[WorkflowDefinition, Dict[str, WorkflowDefinition]]:
+) -> WorkflowDefinition | dict[str, WorkflowDefinition]:
     """Load workflow(s) from a YAML file.
 
     Args:
@@ -1738,12 +1738,12 @@ def load_workflow_from_file(
 
 
 def load_and_validate(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     workflow_name: Optional[str] = None,
     config: Optional[YAMLWorkflowConfig] = None,
     tool_registry: Optional[Any] = None,
     strict: bool = True,
-) -> Tuple[Union[WorkflowDefinition, Dict[str, WorkflowDefinition]], "ToolValidationResult"]:
+) -> tuple[WorkflowDefinition | dict[str, WorkflowDefinition], "ToolValidationResult"]:
     """Load workflow(s) from a YAML file and validate tool dependencies.
 
     This function combines workflow loading with tool dependency validation,
@@ -1783,7 +1783,6 @@ def load_and_validate(
     from victor.workflows.validation import (
         ToolDependencyValidator,
         ToolValidationResult,
-        validate_workflow_tools,
     )
 
     # Load the workflow(s)
@@ -1834,10 +1833,10 @@ def load_and_validate(
 
 
 def load_workflows_from_directory(
-    directory: Union[str, Path],
+    directory: str | Path,
     pattern: str = "*.yaml",
     config: Optional[YAMLWorkflowConfig] = None,
-) -> Dict[str, WorkflowDefinition]:
+) -> dict[str, WorkflowDefinition]:
     """Load all workflows from YAML files in a directory.
 
     Args:
@@ -1879,8 +1878,8 @@ class YAMLWorkflowProvider:
 
     def __init__(
         self,
-        workflows: Dict[str, WorkflowDefinition],
-        auto_workflows: Optional[List[tuple[str, str]]] = None,
+        workflows: dict[str, WorkflowDefinition],
+        auto_workflows: Optional[list[tuple[str, str]]] = None,
     ):
         """Initialize provider with pre-loaded workflows.
 
@@ -1894,7 +1893,7 @@ class YAMLWorkflowProvider:
     @classmethod
     def from_file(
         cls,
-        file_path: Union[str, Path],
+        file_path: str | Path,
         config: Optional[YAMLWorkflowConfig] = None,
     ) -> "YAMLWorkflowProvider":
         """Create provider from a YAML file.
@@ -1914,7 +1913,7 @@ class YAMLWorkflowProvider:
     @classmethod
     def from_directory(
         cls,
-        directory: Union[str, Path],
+        directory: str | Path,
         pattern: str = "*.yaml",
         config: Optional[YAMLWorkflowConfig] = None,
     ) -> "YAMLWorkflowProvider":
@@ -1931,7 +1930,7 @@ class YAMLWorkflowProvider:
         workflows = load_workflows_from_directory(directory, pattern, config)
         return cls(workflows)
 
-    def get_workflows(self) -> Dict[str, type]:
+    def get_workflows(self) -> dict[str, type]:
         """Get all available workflow factories."""
         return {name: type(wf) for name, wf in self._workflows.items()}
 
@@ -1939,11 +1938,11 @@ class YAMLWorkflowProvider:
         """Get a specific workflow by name."""
         return self._workflows.get(name)
 
-    def get_auto_workflows(self) -> List[tuple[str, str]]:
+    def get_auto_workflows(self) -> list[tuple[str, str]]:
         """Get auto-selection workflow mappings."""
         return self._auto_workflows.copy()
 
-    def list_workflows(self) -> List[str]:
+    def list_workflows(self) -> list[str]:
         """List all available workflow names."""
         return list(self._workflows.keys())
 
@@ -1982,7 +1981,7 @@ class YAMLWorkflowLoader:
         self._enable_cache = enable_cache
         self._cache_ttl = cache_ttl
         self._config = config or YAMLWorkflowConfig()
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
 
     def load(self, source: str, workflow_name: Optional[str] = None) -> Any:
         """Load workflow definition from file path or YAML string.
@@ -2058,7 +2057,7 @@ class WorkflowArgument:
     required: bool = False
     default: Any = None
     help: str = ""
-    choices: Optional[List[Any]] = None
+    choices: Optional[list[Any]] = None
     env_var: Optional[str] = None
 
     def parse_value(self, value: Any) -> Any:
@@ -2071,9 +2070,8 @@ class WorkflowArgument:
                 return self.default
 
         # Type conversion
-        from typing import Callable
 
-        type_map: Dict[str, Callable[[Any], Any]] = {
+        type_map: dict[str, Callable[[Any], Any]] = {
             "str": str,
             "int": int,
             "float": float,
@@ -2095,7 +2093,7 @@ class WorkflowArgument:
         return converted
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowArgument":
+    def from_dict(cls, data: dict[str, Any]) -> "WorkflowArgument":
         return cls(
             name=data["name"],
             type=data.get("type", "str"),
@@ -2109,9 +2107,9 @@ class WorkflowArgument:
 
 def parse_workflow_args(
     workflow_def: WorkflowDefinition,
-    cli_args: Optional[Dict[str, Any]] = None,
+    cli_args: Optional[dict[str, Any]] = None,
     env_prefix: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Parse CLI-style arguments into workflow initial context.
 
     Args:
@@ -2135,7 +2133,7 @@ def parse_workflow_args(
         result = await executor.execute(workflow, initial_context=context)
     """
     cli_args = cli_args or {}
-    context: Dict[str, Any] = {}
+    context: dict[str, Any] = {}
 
     # Get argument definitions from workflow metadata
     args_defs = workflow_def.metadata.get("arguments", [])

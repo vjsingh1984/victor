@@ -49,18 +49,15 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Dict,
-    List,
     Optional,
 )
+from collections.abc import AsyncIterator
 
 if TYPE_CHECKING:
     from victor.protocols import WorkflowAgentProtocol
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import WorkflowDefinition
     from victor.workflows.yaml_to_graph_compiler import (
-        CompilerConfig,
         YAMLToStateGraphCompiler,
     )
     from victor.framework.graph import CheckpointerProtocol
@@ -85,7 +82,7 @@ class ExecutorConfig:
     enable_checkpointing: bool = True
     max_iterations: int = 25
     timeout: Optional[float] = None
-    interrupt_nodes: List[str] = field(default_factory=list)
+    interrupt_nodes: list[str] = field(default_factory=list)
     default_profile: Optional[str] = None  # Default profile for nodes without explicit profile
     max_recursion_depth: int = 3
 
@@ -107,10 +104,10 @@ class ExecutorResult:
     """
 
     success: bool
-    state: Dict[str, Any]
+    state: dict[str, Any]
     error: Optional[str] = None
     duration_seconds: float = 0.0
-    nodes_executed: List[str] = field(default_factory=list)
+    nodes_executed: list[str] = field(default_factory=list)
     iterations: int = 0
     checkpoints_saved: int = 0
     interrupted: bool = False
@@ -120,7 +117,7 @@ class ExecutorResult:
         """Get value from final state."""
         return self.state.get(key, default)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize result to dictionary."""
         return {
             "success": self.success,
@@ -170,7 +167,7 @@ class StateGraphExecutor:
     def __init__(
         self,
         orchestrator: Optional["WorkflowAgentProtocol"] = None,
-        orchestrators: Optional[Dict[str, "WorkflowAgentProtocol"]] = None,
+        orchestrators: Optional[dict[str, "WorkflowAgentProtocol"]] = None,
         tool_registry: Optional["ToolRegistry"] = None,
         config: Optional[ExecutorConfig] = None,
     ):
@@ -240,7 +237,7 @@ class StateGraphExecutor:
     async def execute(
         self,
         workflow: "WorkflowDefinition",
-        initial_context: Optional[Dict[str, Any]] = None,
+        initial_context: Optional[dict[str, Any]] = None,
         *,
         thread_id: Optional[str] = None,
         checkpointer: Optional["CheckpointerProtocol"] = None,
@@ -343,11 +340,11 @@ class StateGraphExecutor:
     async def stream(
         self,
         workflow: "WorkflowDefinition",
-        initial_context: Optional[Dict[str, Any]] = None,
+        initial_context: Optional[dict[str, Any]] = None,
         *,
         thread_id: Optional[str] = None,
         recursion_context: Optional[RecursionContext] = None,
-    ) -> AsyncIterator[tuple[str, Dict[str, Any]]]:
+    ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
         """Stream workflow execution, yielding after each node.
 
         Args:
@@ -434,7 +431,7 @@ def get_executor(
 
 async def execute_workflow(
     workflow: "WorkflowDefinition",
-    initial_context: Optional[Dict[str, Any]] = None,
+    initial_context: Optional[dict[str, Any]] = None,
     *,
     orchestrator: Optional["WorkflowAgentProtocol"] = None,
     thread_id: Optional[str] = None,

@@ -30,7 +30,7 @@ import logging
 import math
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -115,9 +115,9 @@ class ModeTransitionLearner(BaseLearner):
         self.epsilon = epsilon
 
         # In-memory caches for fast access
-        self._q_values: Dict[str, Dict[str, float]] = {}  # state_key -> {action_key -> Q-value}
-        self._visit_counts: Dict[str, Dict[str, int]] = {}  # state_key -> {action_key -> count}
-        self._task_stats: Dict[str, Dict[str, Any]] = {}  # task_type -> stats
+        self._q_values: dict[str, dict[str, float]] = {}  # state_key -> {action_key -> Q-value}
+        self._visit_counts: dict[str, dict[str, int]] = {}  # state_key -> {action_key -> count}
+        self._task_stats: dict[str, dict[str, Any]] = {}  # task_type -> stats
         self._total_transitions: int = 0
 
         # Load state from database
@@ -361,7 +361,7 @@ class ModeTransitionLearner(BaseLearner):
         """Update task-type statistics."""
         task_type = outcome.task_type or "default"
         tool_budget_used = outcome.metadata.get("tool_budget_used", 0)
-        _tool_budget_total = outcome.metadata.get("tool_budget_total", 10)  # noqa: F841
+        _tool_budget_total = outcome.metadata.get("tool_budget_total", 10)
 
         if task_type not in self._task_stats:
             self._task_stats[task_type] = {
@@ -453,7 +453,7 @@ class ModeTransitionLearner(BaseLearner):
         if random.random() < self.epsilon:
             # Exploration: random action
             action = random.choice(list(actions.keys()))
-            _q_value = actions[action]  # noqa: F841
+            _q_value = actions[action]
             return RLRecommendation(
                 value=action,
                 confidence=0.3,
@@ -489,7 +489,7 @@ class ModeTransitionLearner(BaseLearner):
         task_type: str,
         tool_ratio: str,
         quality_bucket: str,
-    ) -> Tuple[str, float, float]:
+    ) -> tuple[str, float, float]:
         """Get best action for given state components.
 
         Convenience method that builds the state key and returns the best action.
@@ -525,7 +525,7 @@ class ModeTransitionLearner(BaseLearner):
             return int(budget) if isinstance(budget, (int, float)) else 10
 
         # Default budgets by task type
-        defaults: Dict[str, int] = {
+        defaults: dict[str, int] = {
             "code_generation": 8,
             "create_simple": 5,
             "create": 10,
@@ -543,7 +543,7 @@ class ModeTransitionLearner(BaseLearner):
         """Get Q-value for a state-action pair."""
         return self._q_values.get(state_key, {}).get(action_key, self.DEFAULT_Q_VALUE)
 
-    def _get_all_actions(self, state_key: str) -> Dict[str, float]:
+    def _get_all_actions(self, state_key: str) -> dict[str, float]:
         """Get all Q-values for a state."""
         return self._q_values.get(state_key, {})
 
@@ -596,7 +596,7 @@ class ModeTransitionLearner(BaseLearner):
 
         return max(-1.0, min(1.0, reward))
 
-    def get_task_stats(self, task_type: str) -> Dict[str, Any]:
+    def get_task_stats(self, task_type: str) -> dict[str, Any]:
         """Get statistics for a task type.
 
         Args:
@@ -619,7 +619,7 @@ class ModeTransitionLearner(BaseLearner):
             "sample_count": 0,
         }
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export learner metrics for monitoring.
 
         Returns:

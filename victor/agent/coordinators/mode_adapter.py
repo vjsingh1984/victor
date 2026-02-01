@@ -29,7 +29,8 @@ Design Pattern: Adapter
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from victor.agent.mode_controller import AgentMode, AgentModeController, OperationalModeConfig
@@ -161,7 +162,7 @@ class ModeControllerAdapter:
         """
         return self._controller.get_system_prompt_addition()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current mode status information.
 
         Returns:
@@ -169,7 +170,7 @@ class ModeControllerAdapter:
         """
         return self._controller.get_status()
 
-    def get_mode_list(self) -> List[Dict[str, str]]:
+    def get_mode_list(self) -> list[dict[str, str]]:
         """Get list of available modes.
 
         Returns:

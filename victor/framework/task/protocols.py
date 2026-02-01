@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 class TaskComplexity(Enum):
@@ -55,7 +55,7 @@ class TaskClassification:
     complexity: TaskComplexity
     tool_budget: int
     confidence: float
-    matched_patterns: List[str]
+    matched_patterns: list[str]
 
     def should_force_completion_after(self, tool_calls: int) -> bool:
         """Check if task should complete based on tool call count."""

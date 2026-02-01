@@ -36,7 +36,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 # =============================================================================
@@ -95,7 +95,7 @@ class ModeConfigProviderProtocol(Protocol):
     """
 
     @abstractmethod
-    def get_mode_configs(self) -> Dict[str, ModeConfig]:
+    def get_mode_configs(self) -> dict[str, ModeConfig]:
         """Get mode configurations for this vertical.
 
         Returns:

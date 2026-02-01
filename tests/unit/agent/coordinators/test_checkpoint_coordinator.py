@@ -31,8 +31,8 @@ Migration Pattern from orchestrator tests:
 """
 
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
-from typing import Dict, Any
+from unittest.mock import AsyncMock, Mock
+from typing import Any
 
 from victor.agent.coordinators.checkpoint_coordinator import CheckpointCoordinator
 
@@ -54,7 +54,7 @@ class TestCheckpointCoordinator:
         return manager
 
     @pytest.fixture
-    def sample_state(self) -> Dict[str, Any]:
+    def sample_state(self) -> dict[str, Any]:
         """Create sample conversation state for testing."""
         return {
             "stage": "EXECUTING",
@@ -69,7 +69,7 @@ class TestCheckpointCoordinator:
         }
 
     @pytest.fixture
-    def get_state_fn(self, sample_state: Dict[str, Any]) -> Mock:
+    def get_state_fn(self, sample_state: dict[str, Any]) -> Mock:
         """Create mock get_state function."""
         return Mock(return_value=sample_state)
 
@@ -283,7 +283,7 @@ class TestCheckpointCoordinator:
         self,
         coordinator: CheckpointCoordinator,
         mock_checkpoint_manager: Mock,
-        sample_state: Dict[str, Any],
+        sample_state: dict[str, Any],
         apply_state_fn: Mock,
     ):
         """Test successful checkpoint restoration."""
@@ -524,7 +524,7 @@ class TestCheckpointCoordinator:
         self,
         coordinator: CheckpointCoordinator,
         mock_checkpoint_manager: Mock,
-        sample_state: Dict[str, Any],
+        sample_state: dict[str, Any],
         apply_state_fn: Mock,
     ):
         """Test complete workflow: save checkpoint, then restore it."""
@@ -595,7 +595,7 @@ class TestCheckpointCoordinatorEdgeCases:
         return manager
 
     @pytest.fixture
-    def sample_state(self) -> Dict[str, Any]:
+    def sample_state(self) -> dict[str, Any]:
         """Create sample conversation state for testing."""
         return {
             "stage": "EXECUTING",
@@ -765,7 +765,7 @@ class TestCheckpointCoordinatorEdgeCases:
         self,
         coordinator: CheckpointCoordinator,
         mock_checkpoint_manager: Mock,
-        sample_state: Dict[str, Any],
+        sample_state: dict[str, Any],
     ):
         """Test restoring with special characters in checkpoint ID."""
         # Setup
@@ -857,7 +857,7 @@ class TestCheckpointCoordinatorEdgeCases:
         self,
         coordinator: CheckpointCoordinator,
         mock_checkpoint_manager: Mock,
-        sample_state: Dict[str, Any],
+        sample_state: dict[str, Any],
         apply_state_fn: Mock,
     ):
         """Test a complete save-restore-save cycle."""

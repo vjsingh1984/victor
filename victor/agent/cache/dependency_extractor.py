@@ -42,7 +42,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Set
+from typing import Any
 
 from victor.protocols import IDependencyExtractor
 
@@ -103,8 +103,8 @@ class DependencyExtractor(IDependencyExtractor):
     def extract_file_dependencies(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
-    ) -> Set[str]:
+        arguments: dict[str, Any],
+    ) -> set[str]:
         """Extract file paths from tool arguments.
 
         Analyzes tool arguments and identifies file paths that should
@@ -136,7 +136,7 @@ class DependencyExtractor(IDependencyExtractor):
             >>> deps
             {'/src/auth.py', '/src/login.py'}
         """
-        dependencies: Set[str] = set()
+        dependencies: set[str] = set()
 
         # Check all known file/directory argument patterns
         for pattern in self._all_patterns:
@@ -156,7 +156,7 @@ class DependencyExtractor(IDependencyExtractor):
 
         return dependencies
 
-    def _extract_paths_from_value(self, value: Any) -> Set[str]:
+    def _extract_paths_from_value(self, value: Any) -> set[str]:
         """Extract paths from a value.
 
         Handles strings, lists, and other iterable types.
@@ -167,7 +167,7 @@ class DependencyExtractor(IDependencyExtractor):
         Returns:
             Set of extracted path strings
         """
-        paths: Set[str] = set()
+        paths: set[str] = set()
 
         if isinstance(value, str):
             # Single path string
@@ -182,7 +182,7 @@ class DependencyExtractor(IDependencyExtractor):
 
         return paths
 
-    def _filter_valid_paths(self, paths: Set[str]) -> Set[str]:
+    def _filter_valid_paths(self, paths: set[str]) -> set[str]:
         """Filter and validate paths.
 
         Removes empty strings and obvious non-paths.
@@ -193,7 +193,7 @@ class DependencyExtractor(IDependencyExtractor):
         Returns:
             Set of valid path strings
         """
-        valid: Set[str] = set()
+        valid: set[str] = set()
 
         for path in paths:
             # Skip empty strings

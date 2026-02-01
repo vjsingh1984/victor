@@ -46,23 +46,18 @@ Usage:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 from victor.agent.conversation_state import (
     ConversationStage,
-    ConversationState,
-    STAGE_ORDER,
 )
 
 if TYPE_CHECKING:
@@ -115,7 +110,7 @@ class IStateCoordinator(Protocol):
 
     def get_current_stage(self) -> ConversationStage: ...
     def transition_to(self, stage: ConversationStage, reason: str = "") -> bool: ...
-    def get_message_history(self) -> List[Any]: ...
+    def get_message_history(self) -> list[Any]: ...
 
 
 class StateCoordinator:
@@ -171,7 +166,7 @@ class StateCoordinator:
         self._on_stage_change = on_stage_change
 
         # Transition history
-        self._transition_history: List[StageTransition] = []
+        self._transition_history: list[StageTransition] = []
 
         # Track last known stage for change detection
         self._last_stage: Optional[ConversationStage] = None
@@ -281,7 +276,7 @@ class StateCoordinator:
             logger.warning(f"Failed to transition to {stage.value}: {e}")
             return False
 
-    def get_message_history(self) -> List["Message"]:
+    def get_message_history(self) -> list["Message"]:
         """Get the full message history.
 
         Returns:
@@ -293,7 +288,7 @@ class StateCoordinator:
         self,
         limit: int = 10,
         include_system: bool = False,
-    ) -> List["Message"]:
+    ) -> list["Message"]:
         """Get recent messages from history.
 
         Args:
@@ -333,7 +328,7 @@ class StateCoordinator:
     def get_transition_history(
         self,
         limit: Optional[int] = None,
-    ) -> List[StageTransition]:
+    ) -> list[StageTransition]:
         """Get stage transition history.
 
         Args:
@@ -361,7 +356,7 @@ class StateCoordinator:
                 count += 1
         return count
 
-    def get_stage_sequence(self) -> List[ConversationStage]:
+    def get_stage_sequence(self) -> list[ConversationStage]:
         """Get the sequence of stages visited.
 
         Returns:
@@ -409,7 +404,7 @@ class StateCoordinator:
             ConversationStage.COMPLETION,
         }
 
-    def get_state_snapshot(self) -> Dict[str, Any]:
+    def get_state_snapshot(self) -> dict[str, Any]:
         """Get a snapshot of current state for persistence.
 
         Returns:
@@ -430,7 +425,7 @@ class StateCoordinator:
             ],
         }
 
-    def restore_state(self, snapshot: Dict[str, Any]) -> bool:
+    def restore_state(self, snapshot: dict[str, Any]) -> bool:
         """Restore state from a snapshot.
 
         Args:

@@ -67,7 +67,7 @@ class TransformNodeExecutor:
         import dataclasses
         import time
         from dataclasses import dataclass, field
-        from typing import Any, Dict, Optional
+        from typing import Optional
 
         @dataclass
         class GraphNodeResult:
@@ -75,15 +75,15 @@ class TransformNodeExecutor:
 
             node_id: str
             status: str
-            result: Optional[Dict[str, Any]] = None
+            result: Optional[dict[str, Any]] = None
             error: Optional[str] = None
-            metadata: Dict[str, Any] = field(default_factory=dict)
+            metadata: dict[str, Any] = field(default_factory=dict)
 
         logger.info(f"Executing transform node: {node.id}")
         start_time = time.time()
 
         # Make mutable copy of state
-        state_dict: Dict[str, Any] = dict(state)
+        state_dict: dict[str, Any] = dict(state)
 
         try:
             # Step 1: Execute transform function

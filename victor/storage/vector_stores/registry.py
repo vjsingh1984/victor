@@ -17,7 +17,7 @@
 import hashlib
 import logging
 import threading
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
 
 from victor.storage.vector_stores.base import BaseEmbeddingProvider, EmbeddingConfig
 
@@ -50,14 +50,14 @@ class EmbeddingRegistry:
         EmbeddingRegistry.reset()
     """
 
-    _providers: Dict[str, Type[BaseEmbeddingProvider]] = {}
+    _providers: dict[str, type[BaseEmbeddingProvider]] = {}
 
     # Singleton cache: {config_key: provider_instance}
-    _provider_cache: Dict[str, BaseEmbeddingProvider] = {}
+    _provider_cache: dict[str, BaseEmbeddingProvider] = {}
     _cache_lock = threading.Lock()
 
     @classmethod
-    def register(cls, name: str, provider_class: Type[BaseEmbeddingProvider]) -> None:
+    def register(cls, name: str, provider_class: type[BaseEmbeddingProvider]) -> None:
         """Register an embedding provider.
 
         Args:
@@ -71,7 +71,7 @@ class EmbeddingRegistry:
         print(f"Registered embedding provider: {name}")
 
     @classmethod
-    def get(cls, name: str) -> Type[BaseEmbeddingProvider]:
+    def get(cls, name: str) -> type[BaseEmbeddingProvider]:
         """Get a provider class by name.
 
         Args:
@@ -184,7 +184,7 @@ class EmbeddingRegistry:
             return provider
 
     @classmethod
-    def list_providers(cls) -> List[str]:
+    def list_providers(cls) -> list[str]:
         """List all registered provider names.
 
         Returns:
@@ -219,14 +219,14 @@ class EmbeddingRegistry:
             logger.info("[EmbeddingRegistry] Provider cache cleared")
 
     @classmethod
-    def get_cache_stats(cls) -> Dict[str, Any]:
+    def get_cache_stats(cls) -> dict[str, Any]:
         """Get statistics about the provider cache.
 
         Returns:
             Dictionary with cache size and provider breakdown
         """
         with cls._cache_lock:
-            provider_types: Dict[str, int] = {}
+            provider_types: dict[str, int] = {}
             for provider in cls._provider_cache.values():
                 provider_type = provider.__class__.__name__
                 provider_types[provider_type] = provider_types.get(provider_type, 0) + 1

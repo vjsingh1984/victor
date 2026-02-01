@@ -17,8 +17,7 @@
 Rule sections provide ordered lists of behavioral rules or guidelines.
 """
 
-from dataclasses import dataclass, field
-from typing import List
+from dataclasses import dataclass
 
 
 @dataclass
@@ -41,7 +40,7 @@ class RuleSection:
         # "- Always read files first\n- Verify changes"
     """
 
-    rules: List[str]
+    rules: list[str]
     priority: int = 20
 
     def render(self) -> str:

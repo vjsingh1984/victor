@@ -52,14 +52,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import (
     Any,
-    AsyncIterator,
-    Dict,
-    Generator,
-    List,
     Optional,
     Protocol,
     runtime_checkable,
 )
+from collections.abc import AsyncIterator
 
 from victor.providers.base import (
     BaseProvider,
@@ -83,12 +80,12 @@ class StreamingProvider(Protocol):
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion response."""
@@ -105,12 +102,12 @@ class StreamChatProvider(Protocol):
 
     async def stream_chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion response (alternate naming)."""
@@ -257,7 +254,7 @@ class OpenAIAdapter(BaseSDKAdapter):
                     is_final=finish_reason is not None,
                 )
 
-    def _normalize_tool_calls(self, tool_calls: Any) -> Optional[List[Dict[str, Any]]]:
+    def _normalize_tool_calls(self, tool_calls: Any) -> Optional[list[dict[str, Any]]]:
         """Normalize OpenAI tool calls format."""
         if not tool_calls:
             return None
@@ -413,7 +410,7 @@ class OllamaAdapter(BaseSDKAdapter):
                     is_final=done,
                 )
 
-    def _normalize_tool_calls(self, tool_calls: Any) -> Optional[List[Dict[str, Any]]]:
+    def _normalize_tool_calls(self, tool_calls: Any) -> Optional[list[dict[str, Any]]]:
         """Normalize Ollama tool calls."""
         if not tool_calls:
             return None
@@ -457,7 +454,7 @@ class LMStudioAdapter(BaseSDKAdapter):
                 async for adapted in adapter.adapt_stream(self._create_async_iterable([chunk])):
                     yield adapted
 
-    def _create_async_iterable(self, items: List[Any]) -> AsyncIterator[Any]:  # type: ignore[misc]
+    def _create_async_iterable(self, items: list[Any]) -> AsyncIterator[Any]:  # type: ignore[misc]
         """Convert a list to an async iterator."""
         for item in items:
             yield item
@@ -497,7 +494,7 @@ class VLLMAdapter(BaseSDKAdapter):
                 async for adapted in adapter.adapt_stream(self._create_async_iterable([chunk])):
                     yield adapted
 
-    def _create_async_iterable(self, items: List[Any]) -> AsyncIterator[Any]:  # type: ignore[misc]
+    def _create_async_iterable(self, items: list[Any]) -> AsyncIterator[Any]:  # type: ignore[misc]
         """Convert a list to an async iterator."""
         for item in items:
             yield item
@@ -511,7 +508,7 @@ class VLLMAdapter(BaseSDKAdapter):
 class SDKAdapterRegistry:
     """Registry for SDK-specific stream adapters."""
 
-    _adapters: Dict[SDKType, BaseSDKAdapter] = {
+    _adapters: dict[SDKType, BaseSDKAdapter] = {
         SDKType.OPENAI: OpenAIAdapter(),
         SDKType.ANTHROPIC: AnthropicAdapter(),
         SDKType.GOOGLE: GoogleAdapter(),
@@ -520,7 +517,7 @@ class SDKAdapterRegistry:
         SDKType.VLLM: VLLMAdapter(),
     }
 
-    def _create_async_iterable(self, items: List[Any]) -> AsyncIterator[Any]:  # type: ignore[misc]
+    def _create_async_iterable(self, items: list[Any]) -> AsyncIterator[Any]:  # type: ignore[misc]
         """Convert a list to an async iterator."""
         for item in items:
             yield item
@@ -639,12 +636,12 @@ class UnifiedStreamAdapter:
 
     async def stream(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion with unified interface.
@@ -706,12 +703,12 @@ class UnifiedStreamAdapter:
     # Aliases for compatibility with different naming conventions
     async def stream_chat(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion (alias for stream()).
@@ -730,12 +727,12 @@ class UnifiedStreamAdapter:
 
     async def stream_completion(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream completion (alias for stream()).
@@ -754,12 +751,12 @@ class UnifiedStreamAdapter:
 
     async def collect_to_response(
         self,
-        messages: List[Message],
+        messages: list[Message],
         *,
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[ToolDefinition]] = None,
+        tools: Optional[list[ToolDefinition]] = None,
         **kwargs: Any,
     ) -> CompletionResponse:
         """Stream and collect into a single CompletionResponse.
@@ -777,8 +774,8 @@ class UnifiedStreamAdapter:
         Returns:
             Complete CompletionResponse
         """
-        content_parts: List[str] = []
-        tool_calls: List[Dict[str, Any]] = []
+        content_parts: list[str] = []
+        tool_calls: list[dict[str, Any]] = []
         stop_reason: Optional[str] = None
 
         async for chunk in self.stream(

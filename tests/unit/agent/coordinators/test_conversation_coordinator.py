@@ -42,8 +42,7 @@ def test_conversation_coordinator_add_message(coordinator, mock_conversation):
 """
 
 import pytest
-from unittest.mock import MagicMock, Mock, patch
-from typing import List, Any
+from unittest.mock import Mock
 
 from victor.agent.coordinators.conversation_coordinator import ConversationCoordinator
 

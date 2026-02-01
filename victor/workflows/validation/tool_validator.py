@@ -46,7 +46,7 @@ Example:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol, Set
+from typing import Any, Optional, Protocol
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class ToolRegistryProtocol(Protocol):
         """
         ...
 
-    def list_tools(self, only_enabled: bool = True) -> List[Any]:
+    def list_tools(self, only_enabled: bool = True) -> list[Any]:
         """List all available tools.
 
         Args:
@@ -118,10 +118,10 @@ class ToolValidationResult:
     """
 
     valid: bool = True
-    errors: List[ToolValidationError] = field(default_factory=list)
-    warnings: List[ToolValidationError] = field(default_factory=list)
-    validated_tools: Set[str] = field(default_factory=set)
-    missing_tools: Set[str] = field(default_factory=set)
+    errors: list[ToolValidationError] = field(default_factory=list)
+    warnings: list[ToolValidationError] = field(default_factory=list)
+    validated_tools: set[str] = field(default_factory=set)
+    missing_tools: set[str] = field(default_factory=set)
 
     def add_error(self, error: ToolValidationError) -> None:
         """Add validation error."""
@@ -141,7 +141,7 @@ class ToolValidationResult:
             f"{len(self.missing_tools)} missing tools"
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "valid": self.valid,
@@ -199,7 +199,7 @@ class ToolDependencyValidator:
         """
         self.tool_registry = tool_registry
         self.strict = strict
-        self._available_tools: Optional[Set[str]] = None
+        self._available_tools: Optional[set[str]] = None
 
     def set_registry(self, registry: ToolRegistryProtocol) -> None:
         """Set or update tool registry.
@@ -211,7 +211,7 @@ class ToolDependencyValidator:
         self._available_tools = None  # Reset cache
 
     @property
-    def available_tools(self) -> Set[str]:
+    def available_tools(self) -> set[str]:
         """Get set of available tool names (cached)."""
         if self._available_tools is None:
             if self.tool_registry:
@@ -255,7 +255,7 @@ class ToolDependencyValidator:
             node: Node object to validate
             result: Result object to add errors to
         """
-        tools_to_check: Set[str] = set()
+        tools_to_check: set[str] = set()
 
         # Extract tools based on node attributes
         # AgentNode has allowed_tools
@@ -319,7 +319,7 @@ class ToolDependencyValidator:
 
     def validate_tools_exist(
         self,
-        tool_names: List[str],
+        tool_names: list[str],
         context: str = "",
     ) -> ToolValidationResult:
         """Validate a list of tool names exist (without workflow context).

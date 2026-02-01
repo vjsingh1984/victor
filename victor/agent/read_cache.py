@@ -27,7 +27,8 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from time import time
-from typing import Any, Callable, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class ReadCacheStats:
         total = self.hits + self.misses
         return self.hits / total if total > 0 else 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert stats to dictionary."""
         return {
             "hits": self.hits,
@@ -94,7 +95,7 @@ class IReadCache(Protocol):
         """Invalidate cache for a modified file."""
         ...
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Return cache statistics."""
         ...
 
@@ -139,7 +140,7 @@ class ReadResultCache:
             redundant_threshold: Read count threshold for redundant warning
             redundant_window: Time window for redundant detection
         """
-        self._cache: Dict[str, CachedRead] = {}
+        self._cache: dict[str, CachedRead] = {}
         self._lock = threading.RLock()
         self._ttl = ttl_seconds
         self._max_entries = max_entries
@@ -293,7 +294,7 @@ class ReadResultCache:
 
             return is_redundant
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Return cache statistics.
 
         Returns:

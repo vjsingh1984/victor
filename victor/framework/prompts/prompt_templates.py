@@ -47,7 +47,6 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Dict, List
 
 
 # =============================================================================
@@ -455,8 +454,8 @@ class TemplateBuilder:
 
     def __init__(self) -> None:
         """Initialize a new TemplateBuilder."""
-        self._sections: List[tuple[str, str]] = []
-        self._variables: Dict[str, str] = {}
+        self._sections: list[tuple[str, str]] = []
+        self._variables: dict[str, str] = {}
 
     def add_identity(self, template: str) -> "TemplateBuilder":
         """Add identity section.
@@ -562,7 +561,7 @@ class TemplateBuilder:
         Returns:
             Composed prompt with variables substituted
         """
-        parts: List[str] = []
+        parts: list[str] = []
 
         for name, content in self._sections:
             # Substitute variables

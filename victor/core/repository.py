@@ -52,7 +52,6 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import logging
 import sqlite3
@@ -63,20 +62,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
-    Dict,
     Generic,
-    Iterator,
-    List,
     Optional,
     Protocol,
-    Set,
-    Type,
     TypeVar,
-    Union,
     cast,
     runtime_checkable,
 )
+import builtins
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +102,7 @@ class Entity:
         """Hash by id for use in sets/dicts."""
         return hash(self.id)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize entity to dictionary."""
         result = {}
         for key, value in self.__dict__.items():
@@ -120,7 +113,7 @@ class Entity:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Entity":
+    def from_dict(cls, data: dict[str, Any]) -> "Entity":
         """Deserialize entity from dictionary."""
         # Convert datetime strings back to datetime objects
         if "created_at" in data and isinstance(data["created_at"], str):
@@ -159,7 +152,7 @@ class Specification(Protocol[T_contra]):
         """Check if entity satisfies this specification."""
         ...
 
-    def to_query(self) -> Dict[str, Any]:
+    def to_query(self) -> dict[str, Any]:
         """Convert specification to query dict for storage backends."""
         ...
 
@@ -172,7 +165,7 @@ class BaseSpecification(Generic[T]):
         """Check if entity satisfies this specification."""
         raise NotImplementedError
 
-    def to_query(self) -> Dict[str, Any]:
+    def to_query(self) -> dict[str, Any]:
         """Convert to query dictionary."""
         return {}
 
@@ -199,7 +192,7 @@ class AndSpecification(BaseSpecification[T]):
     def is_satisfied_by(self, entity: T) -> bool:
         return self.left.is_satisfied_by(entity) and self.right.is_satisfied_by(entity)
 
-    def to_query(self) -> Dict[str, Any]:
+    def to_query(self) -> dict[str, Any]:
         return {"$and": [self.left.to_query(), self.right.to_query()]}
 
 
@@ -213,7 +206,7 @@ class OrSpecification(BaseSpecification[T]):
     def is_satisfied_by(self, entity: T) -> bool:
         return self.left.is_satisfied_by(entity) or self.right.is_satisfied_by(entity)
 
-    def to_query(self) -> Dict[str, Any]:
+    def to_query(self) -> dict[str, Any]:
         return {"$or": [self.left.to_query(), self.right.to_query()]}
 
 
@@ -226,7 +219,7 @@ class NotSpecification(BaseSpecification[T]):
     def is_satisfied_by(self, entity: T) -> bool:
         return not self.spec.is_satisfied_by(entity)
 
-    def to_query(self) -> Dict[str, Any]:
+    def to_query(self) -> dict[str, Any]:
         return {"$not": self.spec.to_query()}
 
 
@@ -263,7 +256,7 @@ class AttributeSpecification(BaseSpecification[T]):
         assert isinstance(result, bool)
         return result
 
-    def to_query(self) -> Dict[str, Any]:
+    def to_query(self) -> dict[str, Any]:
         op_map = {
             "eq": "$eq",
             "ne": "$ne",
@@ -344,7 +337,7 @@ class Repository(ABC, Generic[T]):
         specification: Optional[BaseSpecification[T]] = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[T]:
+    ) -> builtins.list[T]:
         """List entities matching specification.
 
         Args:
@@ -401,7 +394,7 @@ class Repository(ABC, Generic[T]):
             raise EntityNotFoundError(id)
         return entity
 
-    async def add_many(self, entities: List[T]) -> None:
+    async def add_many(self, entities: builtins.list[T]) -> None:
         """Add multiple entities.
 
         Args:
@@ -410,7 +403,7 @@ class Repository(ABC, Generic[T]):
         for entity in entities:
             await self.add(entity)
 
-    async def delete_many(self, ids: List[str]) -> None:
+    async def delete_many(self, ids: builtins.list[str]) -> None:
         """Delete multiple entities.
 
         Args:
@@ -471,14 +464,14 @@ class InMemoryRepository(Repository[T], Generic[T]):
     Supports optimistic concurrency control.
     """
 
-    def __init__(self, entity_class: Optional[Type[T]] = None) -> None:
+    def __init__(self, entity_class: Optional[type[T]] = None) -> None:
         """Initialize in-memory repository.
 
         Args:
             entity_class: Optional entity class for type hints
         """
-        self._store: Dict[str, T] = {}
-        self._entity_class: Optional[Type[T]] = entity_class
+        self._store: dict[str, T] = {}
+        self._entity_class: Optional[type[T]] = entity_class
         self._lock = asyncio.Lock()
 
     async def add(self, entity: T) -> None:
@@ -522,7 +515,7 @@ class InMemoryRepository(Repository[T], Generic[T]):
         specification: Optional[BaseSpecification[T]] = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[T]:
+    ) -> builtins.list[T]:
         """List entities matching specification."""
         entities = list(self._store.values())
 
@@ -563,9 +556,9 @@ class SQLiteRepository(Repository[T], Generic[T]):
 
     def __init__(
         self,
-        db_path: Union[str, Path],
+        db_path: str | Path,
         table_name: str,
-        entity_class: Type[T],
+        entity_class: type[T],
         create_table: bool = True,
     ) -> None:
         """Initialize SQLite repository.
@@ -578,7 +571,7 @@ class SQLiteRepository(Repository[T], Generic[T]):
         """
         self._db_path = str(db_path)
         self._table_name = table_name
-        self._entity_class: Type[T] = entity_class
+        self._entity_class: type[T] = entity_class
         self._lock = asyncio.Lock()
 
         if create_table:
@@ -701,7 +694,7 @@ class SQLiteRepository(Repository[T], Generic[T]):
         specification: Optional[BaseSpecification[T]] = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[T]:
+    ) -> builtins.list[T]:
         """List entities matching specification."""
         async with self._lock:
             with sqlite3.connect(self._db_path) as conn:
@@ -773,7 +766,7 @@ class CachedRepository(Repository[T], Generic[T]):
             max_cache_size: Maximum entities to cache
         """
         self._repository = repository
-        self._cache: Dict[str, tuple[T, float]] = {}
+        self._cache: dict[str, tuple[T, float]] = {}
         self._cache_ttl = cache_ttl
         self._max_cache_size = max_cache_size
         self._lock = asyncio.Lock()
@@ -835,7 +828,7 @@ class CachedRepository(Repository[T], Generic[T]):
         specification: Optional[BaseSpecification[T]] = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[T]:
+    ) -> builtins.list[T]:
         """List entities (bypasses cache)."""
         entities = await self._repository.list(specification, limit, offset)
         for entity in entities:
@@ -897,7 +890,7 @@ class ReadOnlyRepository(Generic[T]):
         specification: Optional[BaseSpecification[T]] = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[T]:
+    ) -> builtins.list[T]:
         """List entities matching specification."""
         return await self._repository.list(specification, limit, offset)
 
@@ -919,7 +912,7 @@ class ReadOnlyRepository(Generic[T]):
 
 
 def create_repository(
-    entity_class: Type[T],
+    entity_class: type[T],
     backend: str = "memory",
     **kwargs: Any,
 ) -> Repository[T]:

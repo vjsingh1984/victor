@@ -40,7 +40,6 @@ Usage:
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, Set
 
 
 class ToolDependencyGraph:
@@ -63,16 +62,16 @@ class ToolDependencyGraph:
     def __init__(self) -> None:
         """Initialize the dependency graph."""
         # tool -> set of tools it depends on
-        self._tool_dependencies: Dict[str, Set[str]] = defaultdict(set)
+        self._tool_dependencies: dict[str, set[str]] = defaultdict(set)
 
         # tool -> set of files it depends on
-        self._file_dependencies: Dict[str, Set[str]] = defaultdict(set)
+        self._file_dependencies: dict[str, set[str]] = defaultdict(set)
 
         # file -> set of tools that depend on it (reverse index)
-        self._file_dependents: Dict[str, Set[str]] = defaultdict(set)
+        self._file_dependents: dict[str, set[str]] = defaultdict(set)
 
         # tool -> set of tools that depend on it (reverse index)
-        self._tool_dependents: Dict[str, Set[str]] = defaultdict(set)
+        self._tool_dependents: dict[str, set[str]] = defaultdict(set)
 
     def add_tool_dependency(self, tool: str, depends_on: str) -> None:
         """Add a tool-to-tool dependency.
@@ -106,7 +105,7 @@ class ToolDependencyGraph:
         self._file_dependencies[tool].add(file_path)
         self._file_dependents[file_path].add(tool)
 
-    def get_dependents(self, tool: str) -> Set[str]:
+    def get_dependents(self, tool: str) -> set[str]:
         """Get all tools that depend on the given tool.
 
         This is used for cascading invalidation. When a tool is
@@ -127,7 +126,7 @@ class ToolDependencyGraph:
         """
         return self._tool_dependents.get(tool, set()).copy()
 
-    def get_file_dependents(self, file_path: str) -> Set[str]:
+    def get_file_dependents(self, file_path: str) -> set[str]:
         """Get all tools that depend on the given file.
 
         This is used for file-based cache invalidation. When a file
@@ -151,9 +150,9 @@ class ToolDependencyGraph:
     def get_transitive_dependents(
         self,
         tool: str,
-        visited: Set[str] | None = None,
-        result: Set[str] | None = None,
-    ) -> Set[str]:
+        visited: set[str] | None = None,
+        result: set[str] | None = None,
+    ) -> set[str]:
         """Get all transitive dependents of a tool.
 
         This includes not only direct dependents, but also tools
@@ -193,7 +192,7 @@ class ToolDependencyGraph:
 
         return result
 
-    def get_dependencies(self, tool: str) -> Set[str]:
+    def get_dependencies(self, tool: str) -> set[str]:
         """Get all tools that the given tool depends on.
 
         Args:
@@ -211,7 +210,7 @@ class ToolDependencyGraph:
         """
         return self._tool_dependencies.get(tool, set()).copy()
 
-    def get_file_dependencies(self, tool: str) -> Set[str]:
+    def get_file_dependencies(self, tool: str) -> set[str]:
         """Get all files that the given tool depends on.
 
         Args:
@@ -272,7 +271,7 @@ class ToolDependencyGraph:
         self._file_dependents.clear()
         self._tool_dependents.clear()
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Get statistics about the dependency graph.
 
         Returns:

@@ -29,7 +29,7 @@ Example YAML usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def retrieval_quality(ctx: Dict[str, Any]) -> str:
+def retrieval_quality(ctx: dict[str, Any]) -> str:
     """Assess retrieval quality based on relevance scores.
 
     Args:
@@ -75,7 +75,7 @@ def retrieval_quality(ctx: Dict[str, Any]) -> str:
     return "insufficient"
 
 
-def document_quality(ctx: Dict[str, Any]) -> str:
+def document_quality(ctx: dict[str, Any]) -> str:
     """Assess document quality for ingestion.
 
     Args:
@@ -110,7 +110,7 @@ def document_quality(ctx: Dict[str, Any]) -> str:
     return "low"
 
 
-def chunking_strategy(ctx: Dict[str, Any]) -> str:
+def chunking_strategy(ctx: dict[str, Any]) -> str:
     """Determine optimal chunking strategy based on document type.
 
     Args:
@@ -141,7 +141,7 @@ def chunking_strategy(ctx: Dict[str, Any]) -> str:
     return "fixed"
 
 
-def should_reindex(ctx: Dict[str, Any]) -> str:
+def should_reindex(ctx: dict[str, Any]) -> str:
     """Determine if document should be reindexed.
 
     Args:
@@ -170,7 +170,7 @@ def should_reindex(ctx: Dict[str, Any]) -> str:
     return "skip"
 
 
-def query_complexity(ctx: Dict[str, Any]) -> str:
+def query_complexity(ctx: dict[str, Any]) -> str:
     """Assess query complexity for routing.
 
     Args:
@@ -201,7 +201,7 @@ def query_complexity(ctx: Dict[str, Any]) -> str:
     return "simple"
 
 
-def answer_confidence(ctx: Dict[str, Any]) -> str:
+def answer_confidence(ctx: dict[str, Any]) -> str:
     """Assess confidence in generated answer.
 
     Args:
@@ -239,7 +239,7 @@ def answer_confidence(ctx: Dict[str, Any]) -> str:
     return "uncertain"
 
 
-def embedding_batch_size(ctx: Dict[str, Any]) -> str:
+def embedding_batch_size(ctx: dict[str, Any]) -> str:
     """Determine optimal embedding batch size.
 
     Args:
@@ -274,7 +274,7 @@ def embedding_batch_size(ctx: Dict[str, Any]) -> str:
 # =============================================================================
 
 
-def merge_retrieved_chunks(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def merge_retrieved_chunks(ctx: dict[str, Any]) -> dict[str, Any]:
     """Merge and deduplicate retrieved chunks from multiple sources.
 
     Args:
@@ -321,7 +321,7 @@ def merge_retrieved_chunks(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def format_context_window(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def format_context_window(ctx: dict[str, Any]) -> dict[str, Any]:
     """Format retrieved chunks into context window for LLM.
 
     Args:
@@ -367,7 +367,7 @@ def format_context_window(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def aggregate_ingestion_stats(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def aggregate_ingestion_stats(ctx: dict[str, Any]) -> dict[str, Any]:
     """Aggregate statistics from parallel ingestion operations.
 
     Args:

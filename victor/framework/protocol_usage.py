@@ -135,7 +135,7 @@ orchestrator implementation details.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 # Import all protocols for easy access
 # Import SubAgentContext from victor.agent.subagents (subagent protocols)
@@ -159,7 +159,7 @@ __all__ = [
 ]
 
 
-def get_protocol_recommendation(use_case: str) -> Dict[str, Any]:
+def get_protocol_recommendation(use_case: str) -> dict[str, Any]:
     """Get recommended protocol for a given use case.
 
     Args:

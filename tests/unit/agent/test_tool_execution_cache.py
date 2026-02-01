@@ -16,13 +16,11 @@
 
 Tests the hot path optimization cache for tool execution decisions.
 """
-import pytest
 from unittest.mock import Mock
 
 from victor.agent.tool_execution_cache import (
     ToolExecutionDecisionCache,
     ToolValidationResult,
-    ToolNormalizationResult,
 )
 
 

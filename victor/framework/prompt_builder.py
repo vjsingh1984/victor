@@ -61,8 +61,8 @@ from __future__ import annotations
 
 import logging
 import sys
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Optional
 
 # Python 3.11+ has typing.Self, 3.10 needs typing_extensions
 if sys.version_info >= (3, 11):
@@ -187,10 +187,10 @@ class PromptBuilder:
 
     def __init__(self) -> None:
         """Initialize a new PromptBuilder."""
-        self._sections: Dict[str, PromptSection] = {}
-        self._tool_hints: Dict[str, ToolHint] = {}
-        self._safety_rules: List[str] = []
-        self._context: List[str] = []
+        self._sections: dict[str, PromptSection] = {}
+        self._tool_hints: dict[str, ToolHint] = {}
+        self._safety_rules: list[str] = []
+        self._context: list[str] = []
         self._grounding_mode: str = "minimal"
         self._custom_grounding: Optional[str] = None
 
@@ -224,7 +224,7 @@ class PromptBuilder:
         )
         return self
 
-    def add_tool_hints(self, hints: Dict[str, str]) -> Self:
+    def add_tool_hints(self, hints: dict[str, str]) -> Self:
         """Add tool usage hints.
 
         Tool hints provide guidance on how to use specific tools effectively.
@@ -263,7 +263,7 @@ class PromptBuilder:
         )
         return self
 
-    def add_safety_rules(self, rules: List[str]) -> Self:
+    def add_safety_rules(self, rules: list[str]) -> Self:
         """Add safety rules.
 
         Safety rules are constraints the model should follow to ensure
@@ -448,7 +448,7 @@ class PromptBuilder:
         )
         return self
 
-    def add_rules(self, rules: List[str], priority: int = 20) -> Self:
+    def add_rules(self, rules: list[str], priority: int = 20) -> Self:
         """Add rule section with behavioral guidelines.
 
         Rules are rendered as a bulleted list in the final prompt.
@@ -477,7 +477,7 @@ class PromptBuilder:
         )
         return self
 
-    def add_checklist(self, checklist: List[str], priority: int = 30) -> Self:
+    def add_checklist(self, checklist: list[str], priority: int = 30) -> Self:
         """Add checklist section for verification.
 
         Checklist items are rendered as Markdown checkboxes.
@@ -708,7 +708,7 @@ class PromptBuilder:
         Returns:
             The complete system prompt string
         """
-        parts: List[str] = []
+        parts: list[str] = []
 
         # Add sections sorted by priority
         sorted_sections = sorted(

@@ -43,7 +43,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, TypeVar, cast
+from typing import Any, Optional, TypeVar, cast
+from collections.abc import AsyncIterator, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -98,16 +99,16 @@ class StreamMetrics:
 
     # Tool call metrics
     tool_calls_count: int = 0
-    tool_call_times: List[float] = field(default_factory=list)
+    tool_call_times: list[float] = field(default_factory=list)
 
     # Chunk timing (in seconds)
-    chunk_intervals: List[float] = field(default_factory=list)
+    chunk_intervals: list[float] = field(default_factory=list)
 
     # Error tracking
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
     # Additional metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def ttft_ms(self) -> Optional[float]:
@@ -176,7 +177,7 @@ class StreamMetrics:
         """Check if any errors occurred."""
         return len(self.errors) > 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Export metrics as dictionary."""
         return {
             "request_id": self.request_id,
@@ -209,14 +210,14 @@ class MetricsSummary:
     """Aggregated metrics summary."""
 
     count: int = 0
-    ttft_ms: Dict[str, Optional[float]] = field(default_factory=dict)
-    tokens_per_second: Dict[str, Optional[float]] = field(default_factory=dict)
-    duration_ms: Dict[str, Optional[float]] = field(default_factory=dict)
+    ttft_ms: dict[str, Optional[float]] = field(default_factory=dict)
+    tokens_per_second: dict[str, Optional[float]] = field(default_factory=dict)
+    duration_ms: dict[str, Optional[float]] = field(default_factory=dict)
     error_rate: float = 0.0
     total_tokens: int = 0
     total_tool_calls: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Export summary as dictionary."""
         return {
             "count": self.count,
@@ -268,8 +269,8 @@ class StreamingMetricsCollector:
         self.max_history = max_history
         self.export_path = export_path
 
-        self._metrics_history: List[StreamMetrics] = []
-        self._callbacks: List[Callable[[StreamMetrics], None]] = []
+        self._metrics_history: list[StreamMetrics] = []
+        self._callbacks: list[Callable[[StreamMetrics], None]] = []
         self._lock = asyncio.Lock()
 
         logger.debug(f"StreamingMetricsCollector initialized. Max history: {max_history}")
@@ -279,7 +280,7 @@ class StreamingMetricsCollector:
         request_id: Optional[str] = None,
         model: str = "unknown",
         provider: str = "unknown",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> StreamMetrics:
         """Create a new metrics instance for a stream.
 
@@ -431,7 +432,7 @@ class StreamingMetricsCollector:
         self,
         count: int = 10,
         provider: Optional[str] = None,
-    ) -> List[StreamMetrics]:
+    ) -> list[StreamMetrics]:
         """Get recent metrics.
 
         Args:
@@ -670,7 +671,7 @@ class StreamingMetricsCollector:
             logger.warning(f"Failed to export metrics: {e}")
 
     @staticmethod
-    def _percentile(values: List[float], p: float) -> Optional[float]:
+    def _percentile(values: list[float], p: float) -> Optional[float]:
         """Calculate percentile.
 
         Args:
@@ -788,7 +789,7 @@ class MetricsStreamWrapper:
             return chunk.get("content") or chunk.get("delta", {}).get("content")
         return None
 
-    def _extract_tool_calls(self, chunk: Any) -> Optional[List[Any]]:
+    def _extract_tool_calls(self, chunk: Any) -> Optional[list[Any]]:
         """Extract tool calls from chunk."""
         if hasattr(chunk, "tool_calls") and chunk.tool_calls:
             return chunk.tool_calls

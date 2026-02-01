@@ -23,17 +23,17 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Optional
 from urllib.parse import urlparse
 
 from victor.framework.ingestion.models import DocumentType, SourceContent
-from victor.framework.ingestion.chunker import detect_document_type, EXTENSION_TO_DOCTYPE
+from victor.framework.ingestion.chunker import detect_document_type
 
 logger = logging.getLogger(__name__)
 
 
 # Binary file extensions to skip
-BINARY_EXTENSIONS: Set[str] = {
+BINARY_EXTENSIONS: set[str] = {
     ".png",
     ".jpg",
     ".jpeg",
@@ -125,7 +125,7 @@ class FileHandler:
 
     def __init__(
         self,
-        encodings: Optional[List[str]] = None,
+        encodings: Optional[list[str]] = None,
         skip_binary: bool = True,
     ):
         """Initialize file handler.
@@ -374,8 +374,8 @@ class DirectoryHandler:
 
     def __init__(
         self,
-        patterns: Optional[List[str]] = None,
-        exclude_patterns: Optional[List[str]] = None,
+        patterns: Optional[list[str]] = None,
+        exclude_patterns: Optional[list[str]] = None,
         recursive: bool = True,
     ):
         """Initialize directory handler.
@@ -412,7 +412,7 @@ class DirectoryHandler:
         path = Path(source)
         return path.exists() and path.is_dir()
 
-    async def discover(self, source: str) -> List[str]:
+    async def discover(self, source: str) -> list[str]:
         """Discover files in a directory.
 
         Args:
@@ -450,7 +450,7 @@ class DirectoryHandler:
 
         return sorted(files)
 
-    async def extract_all(self, source: str) -> List[SourceContent]:
+    async def extract_all(self, source: str) -> list[SourceContent]:
         """Extract content from all files in a directory.
 
         Args:

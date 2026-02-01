@@ -40,7 +40,7 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 from victor.tools.base import ToolRegistry
 
@@ -59,9 +59,9 @@ class PluginLoaderConfig:
     """
 
     enabled: bool = True
-    plugin_dirs: List[str] = field(default_factory=list)
-    disabled_plugins: Set[str] = field(default_factory=set)
-    plugin_packages: List[str] = field(default_factory=list)
+    plugin_dirs: list[str] = field(default_factory=list)
+    disabled_plugins: set[str] = field(default_factory=set)
+    plugin_packages: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -76,7 +76,7 @@ class PluginLoadResult:
 
     plugins_loaded: int = 0
     tools_registered: int = 0
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -162,7 +162,7 @@ class PluginLoader:
             from pathlib import Path
 
             # Use centralized path for plugins directory
-            plugin_dirs: List[Path] = [get_project_paths().global_plugins_dir]
+            plugin_dirs: list[Path] = [get_project_paths().global_plugins_dir]
             plugin_dirs.extend(Path(p) for p in self._config.plugin_dirs)
 
             plugin_config = getattr(self._settings, "plugin_config", {})
@@ -206,7 +206,7 @@ class PluginLoader:
         self._loaded = True
         return result
 
-    def get_plugin_info(self) -> List[PluginInfo]:
+    def get_plugin_info(self) -> list[PluginInfo]:
         """Get information about loaded plugins.
 
         Returns:
@@ -224,7 +224,7 @@ class PluginLoader:
             for p in self._plugin_manager.loaded_plugins.values()
         ]
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get summary information about plugins.
 
         Returns:

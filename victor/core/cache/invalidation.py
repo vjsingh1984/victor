@@ -57,13 +57,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
-import time
 from collections import defaultdict
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple, cast
+from typing import Any, Optional, cast
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +109,7 @@ class TaggedEntry:
 
     key: str
     namespace: str
-    tags: Set[str]
+    tags: set[str]
     timestamp: float
     ttl: Optional[int]
 
@@ -133,14 +131,14 @@ class CacheTagManager:
         self.max_entries = max_entries
 
         # tag -> set of (key, namespace) tuples
-        self._tag_index: Dict[str, Set[tuple[str, str]]] = defaultdict(set)
+        self._tag_index: dict[str, set[tuple[str, str]]] = defaultdict(set)
 
         # (key, namespace) -> set of tags
-        self._entry_tags: Dict[tuple[str, str], Set[str]] = {}
+        self._entry_tags: dict[tuple[str, str], set[str]] = {}
 
         self._lock = threading.RLock()
 
-    def tag(self, key: str, namespace: str, tags: List[str]) -> None:
+    def tag(self, key: str, namespace: str, tags: list[str]) -> None:
         """Add tags to a cache entry.
 
         Args:
@@ -160,7 +158,7 @@ class CacheTagManager:
                 self._entry_tags[key_tuple].add(tag)
                 self._tag_index[tag].add(key_tuple)
 
-    def untag(self, key: str, namespace: str, tags: Optional[List[str]] = None) -> None:
+    def untag(self, key: str, namespace: str, tags: Optional[list[str]] = None) -> None:
         """Remove tags from a cache entry.
 
         Args:
@@ -190,7 +188,7 @@ class CacheTagManager:
                     if not self._tag_index[tag]:
                         del self._tag_index[tag]
 
-    def get_tagged_keys(self, tag: str) -> Set[tuple[str, str]]:
+    def get_tagged_keys(self, tag: str) -> set[tuple[str, str]]:
         """Get all keys with a specific tag.
 
         Args:
@@ -224,7 +222,7 @@ class CacheTagManager:
             # Remove entry
             del self._entry_tags[key_tuple]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get tag manager statistics.
 
         Returns:
@@ -264,10 +262,10 @@ class InvalidationDependencyGraph:
     def __init__(self) -> None:
         """Initialize dependency graph."""
         # resource -> set of dependent (key, namespace) tuples
-        self._dependencies: Dict[str, Set[Tuple[str, str]]] = defaultdict(set)
+        self._dependencies: dict[str, set[tuple[str, str]]] = defaultdict(set)
 
         # (key, namespace) -> set of resources it depends on
-        self._dependents: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
+        self._dependents: dict[tuple[str, str], set[str]] = defaultdict(set)
 
         self._lock = threading.RLock()
 
@@ -307,7 +305,7 @@ class InvalidationDependencyGraph:
             if not self._dependents[key_tuple]:
                 del self._dependents[key_tuple]
 
-    def get_dependents(self, resource: str) -> Set[tuple[str, str]]:
+    def get_dependents(self, resource: str) -> set[tuple[str, str]]:
         """Get all cache entries that depend on a resource.
 
         Args:
@@ -341,7 +339,7 @@ class InvalidationDependencyGraph:
             # Remove entry
             del self._dependents[key_tuple]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get dependency graph statistics.
 
         Returns:
@@ -439,7 +437,7 @@ class CacheInvalidator:
             self._dependency_graph = InvalidationDependencyGraph()
 
         # Invalidation event handlers
-        self._event_handlers: Dict[str, List[Callable[..., Awaitable[None]]]] = {}
+        self._event_handlers: dict[str, list[Callable[..., Awaitable[None]]]] = {}
 
         # Background cleanup task
         self._cleanup_task: Optional[asyncio.Task[None]] = None
@@ -532,7 +530,7 @@ class CacheInvalidator:
 
         logger.info("Invalidated all cache entries")
 
-    def tag(self, key: str, namespace: str, tags: List[str]) -> None:
+    def tag(self, key: str, namespace: str, tags: list[str]) -> None:
         """Add tags to a cache entry.
 
         Args:
@@ -685,13 +683,13 @@ class CacheInvalidator:
         self._stop_event.clear()
         logger.info("Stopped cleanup task")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get invalidation statistics.
 
         Returns:
             Dictionary with statistics
         """
-        stats: Dict[str, Any] = {
+        stats: dict[str, Any] = {
             "strategy": self.config.strategy.value,
             "invalidations": self._invalidations,
             "tag_invalidations": self._tag_invalidations,

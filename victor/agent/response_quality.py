@@ -47,7 +47,8 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ class DimensionScore:
     score: float
     weight: float = 1.0
     feedback: str = ""
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -103,10 +104,10 @@ class QualityResult:
     """
 
     overall_score: float
-    dimension_scores: List[DimensionScore]
+    dimension_scores: list[DimensionScore]
     passes_threshold: bool
-    improvement_suggestions: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    improvement_suggestions: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def get_dimension_score(self, dimension: ResponseQualityDimension) -> Optional[float]:
         """Get score for a specific dimension."""
@@ -115,7 +116,7 @@ class QualityResult:
                 return ds.score
         return None
 
-    def get_weakest_dimensions(self, n: int = 3) -> List[DimensionScore]:
+    def get_weakest_dimensions(self, n: int = 3) -> list[DimensionScore]:
         """Get the n weakest scoring dimensions."""
         sorted_dims = sorted(self.dimension_scores, key=lambda x: x.score)
         return sorted_dims[:n]
@@ -134,7 +135,7 @@ class ScorerConfig:
     """
 
     min_threshold: float = 0.6
-    dimension_weights: Dict[ResponseQualityDimension, float] = field(default_factory=dict)
+    dimension_weights: dict[ResponseQualityDimension, float] = field(default_factory=dict)
     enable_code_quality: bool = True
     enable_grounding: bool = True
     strict_mode: bool = False
@@ -199,7 +200,7 @@ class ResponseQualityScorer:
         self.weights = {**self.DEFAULT_WEIGHTS, **self.config.dimension_weights}
 
         # Quality observers
-        self._observers: List[Callable[[QualityResult], None]] = []
+        self._observers: list[Callable[[QualityResult], None]] = []
 
     def add_observer(self, observer: Callable[[QualityResult], None]) -> None:
         """Add an observer for quality events."""
@@ -260,7 +261,7 @@ class ResponseQualityScorer:
         self,
         query: str,
         response: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> QualityResult:
         """Score a response's quality.
 
@@ -273,7 +274,7 @@ class ResponseQualityScorer:
             QualityResult with scores and suggestions
         """
         context = context or {}
-        dimension_scores: List[DimensionScore] = []
+        dimension_scores: list[DimensionScore] = []
 
         # Score each dimension
         dimension_scores.append(await self._score_relevance(query, response))
@@ -385,7 +386,7 @@ class ResponseQualityScorer:
         )
 
     async def _score_completeness(
-        self, query: str, response: str, context: Dict[str, Any]
+        self, query: str, response: str, context: dict[str, Any]
     ) -> DimensionScore:
         """Score how complete the response is."""
         score = 0.5  # Base score
@@ -448,7 +449,7 @@ class ResponseQualityScorer:
             evidence=evidence,
         )
 
-    async def _score_accuracy(self, response: str, context: Dict[str, Any]) -> DimensionScore:
+    async def _score_accuracy(self, response: str, context: dict[str, Any]) -> DimensionScore:
         """Score factual accuracy of the response."""
         score = 0.7  # Default score when no verification possible
         evidence = []
@@ -737,7 +738,7 @@ class ResponseQualityScorer:
         """Check if response contains code."""
         return bool(re.search(r"```\w*\n", response))
 
-    def _generate_suggestions(self, dimension_scores: List[DimensionScore]) -> List[str]:
+    def _generate_suggestions(self, dimension_scores: list[DimensionScore]) -> list[str]:
         """Generate improvement suggestions based on scores."""
         suggestions = []
 
@@ -772,7 +773,7 @@ class QualityGate:
         self,
         scorer: ResponseQualityScorer,
         min_score: float = 0.6,
-        required_dimensions: Optional[List[ResponseQualityDimension]] = None,
+        required_dimensions: Optional[list[ResponseQualityDimension]] = None,
     ):
         """Initialize quality gate.
 
@@ -789,7 +790,7 @@ class QualityGate:
         self,
         query: str,
         response: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> tuple[bool, QualityResult]:
         """Check if response passes quality gate.
 

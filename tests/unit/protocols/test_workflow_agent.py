@@ -14,7 +14,6 @@
 
 """Tests for WorkflowAgentProtocol."""
 
-import pytest
 from victor.protocols import WorkflowAgentProtocol
 
 

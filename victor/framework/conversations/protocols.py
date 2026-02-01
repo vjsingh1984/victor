@@ -25,7 +25,7 @@ Protocol Separation:
 - ConversationRoutingProtocol: Dynamic routing between agents
 """
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from victor.framework.protocols import OrchestratorProtocol
 
@@ -42,7 +42,7 @@ class ConversationParticipant:
         self,
         agent_id: str,
         role: str,
-        capabilities: List[str],
+        capabilities: list[str],
         persona: Optional[str] = None,
     ) -> None:
         """Initialize conversation participant.
@@ -67,7 +67,7 @@ class ConversationContext:
         conversation_id: str,
         topic: str,
         protocol: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize conversation context.
 
@@ -96,11 +96,11 @@ class ConversationalMessage:
         sender: str,
         content: str,
         message_type: str = "conversation",
-        recipients: Optional[List[str]] = None,
+        recipients: Optional[list[str]] = None,
         conversation_id: str = "",
         turn_number: int = 0,
         reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize conversational message.
 
@@ -124,7 +124,7 @@ class ConversationalMessage:
         self.metadata = metadata or {}
         self.id = f"{conversation_id}_t{turn_number}_{sender}"
 
-    def to_agent_message(self) -> Dict[str, Any]:
+    def to_agent_message(self) -> dict[str, Any]:
         """Convert to canonical AgentMessage format.
 
         Returns:
@@ -148,7 +148,7 @@ class ConversationalTurn:
         turn_number: int,
         speaker: str,
         message: ConversationalMessage,
-        responses: List[ConversationalMessage],
+        responses: list[ConversationalMessage],
     ) -> None:
         """Initialize conversational turn.
 
@@ -187,7 +187,7 @@ class ConversationProtocol(Protocol):
 
     async def initialize(
         self,
-        participants: List[ConversationParticipant],
+        participants: list[ConversationParticipant],
         context: ConversationContext,
     ) -> None:
         """Initialize conversation with participants.
@@ -330,7 +330,7 @@ class ConversationResultProtocol(Protocol):
     async def get_result(
         self,
         context: ConversationContext,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Extract result from conversation context.
 
         Args:
@@ -343,7 +343,7 @@ class ConversationResultProtocol(Protocol):
 
     async def format_result(
         self,
-        result: Dict[str, Any],
+        result: dict[str, Any],
         format: str = "summary",
     ) -> str:
         """Format result for presentation.
@@ -397,7 +397,7 @@ class ConversationHistoryProtocol(Protocol):
     async def get_history(
         self,
         context: ConversationContext,
-    ) -> List[ConversationalTurn]:
+    ) -> list[ConversationalTurn]:
         """Get full conversation history.
 
         Args:
@@ -412,7 +412,7 @@ class ConversationHistoryProtocol(Protocol):
         self,
         context: ConversationContext,
         n: int,
-    ) -> List[ConversationalTurn]:
+    ) -> list[ConversationalTurn]:
         """Get last N turns from conversation.
 
         Args:
@@ -461,9 +461,9 @@ class ConversationRoutingProtocol(Protocol):
     async def route_message(
         self,
         message: ConversationalMessage,
-        participants: List[ConversationParticipant],
+        participants: list[ConversationParticipant],
         context: ConversationContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """Route message to appropriate recipients.
 
         Args:
@@ -479,9 +479,9 @@ class ConversationRoutingProtocol(Protocol):
     async def get_recipients(
         self,
         speaker: str,
-        participants: List[ConversationParticipant],
+        participants: list[ConversationParticipant],
         context: ConversationContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """Get recipients for speaker's message.
 
         Args:
@@ -538,13 +538,13 @@ class BaseConversationProtocol:
         """
         self.max_turns = max_turns
         self.require_all_participants = require_all_participants
-        self._participants: List[ConversationParticipant] = []
-        self._turn_order: List[str] = []
+        self._participants: list[ConversationParticipant] = []
+        self._turn_order: list[str] = []
         self._current_index = 0
 
     async def initialize(
         self,
-        participants: List[ConversationParticipant],
+        participants: list[ConversationParticipant],
         context: ConversationContext,
     ) -> None:
         """Initialize conversation with participants."""
@@ -659,7 +659,7 @@ class DebateProtocol(BaseConversationProtocol):
 
     async def initialize(
         self,
-        participants: List[ConversationParticipant],
+        participants: list[ConversationParticipant],
         context: ConversationContext,
     ) -> None:
         """Initialize debate with FOR and AGAINST sides."""
@@ -733,12 +733,12 @@ class ConsensusProtocol(BaseConversationProtocol):
         self.threshold = threshold
         self.max_voting_rounds = max_voting_rounds
         self._voting_round = 0
-        self._votes: Dict[str, bool] = {}
+        self._votes: dict[str, bool] = {}
         self._in_voting_phase = False
 
     async def initialize(
         self,
-        participants: List[ConversationParticipant],
+        participants: list[ConversationParticipant],
         context: ConversationContext,
     ) -> None:
         """Initialize consensus protocol."""

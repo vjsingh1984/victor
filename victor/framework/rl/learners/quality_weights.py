@@ -36,7 +36,7 @@ import json
 import logging
 import math
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
@@ -122,16 +122,16 @@ class QualityWeightLearner(BaseLearner):
 
         # Learned weights per task type
         # task_type -> {dimension: weight}
-        self._weights: Dict[str, Dict[str, float]] = {}
+        self._weights: dict[str, dict[str, float]] = {}
 
         # Momentum velocities for gradient descent
-        self._velocities: Dict[str, Dict[str, float]] = {}
+        self._velocities: dict[str, dict[str, float]] = {}
 
         # Sample counts per task type
-        self._sample_counts: Dict[str, int] = {}
+        self._sample_counts: dict[str, int] = {}
 
         # Recent outcomes for gradient computation
-        self._recent_outcomes: Dict[str, List[Dict[str, float]]] = {}
+        self._recent_outcomes: dict[str, list[dict[str, float]]] = {}
 
         # Load state from database
         self._load_state()
@@ -263,7 +263,7 @@ class QualityWeightLearner(BaseLearner):
     def _update_weights(
         self,
         task_type: str,
-        dimension_scores: Dict[str, float],
+        dimension_scores: dict[str, float],
         success: float,
     ) -> None:
         """Update weights using gradient descent with momentum.
@@ -328,7 +328,7 @@ class QualityWeightLearner(BaseLearner):
     def _save_to_db(
         self,
         task_type: str,
-        dimension_scores: Dict[str, float],
+        dimension_scores: dict[str, float],
         success: float,
     ) -> None:
         """Save weights and history to database."""
@@ -410,7 +410,7 @@ class QualityWeightLearner(BaseLearner):
             is_baseline=is_baseline,
         )
 
-    def get_weights(self, task_type: str) -> Dict[str, float]:
+    def get_weights(self, task_type: str) -> dict[str, float]:
         """Get weights for a task type.
 
         Args:
@@ -423,7 +423,7 @@ class QualityWeightLearner(BaseLearner):
             return dict(self._weights[task_type])
         return dict(self.DEFAULT_WEIGHTS)
 
-    def get_weight_adjustments(self, task_type: str) -> Dict[str, float]:
+    def get_weight_adjustments(self, task_type: str) -> dict[str, float]:
         """Get weight adjustments relative to defaults.
 
         Args:
@@ -480,7 +480,7 @@ class QualityWeightLearner(BaseLearner):
         reward: float = 1.0 - 2.0 * error
         return reward
 
-    def get_correlation_analysis(self, task_type: str) -> Dict[str, float]:
+    def get_correlation_analysis(self, task_type: str) -> dict[str, float]:
         """Analyze correlation between dimensions and success.
 
         Uses recent outcomes to compute Pearson correlation.
@@ -494,7 +494,7 @@ class QualityWeightLearner(BaseLearner):
         if task_type not in self._recent_outcomes:
             return dict.fromkeys(QualityDimension.ALL, 0.0)
 
-        outcomes: List[Dict[str, Any]] = self._recent_outcomes[task_type]
+        outcomes: list[dict[str, Any]] = self._recent_outcomes[task_type]
         if len(outcomes) < 5:
             return dict.fromkeys(QualityDimension.ALL, 0.0)
 
@@ -502,8 +502,8 @@ class QualityWeightLearner(BaseLearner):
 
         for dim in QualityDimension.ALL:
             # Extract dimension scores and success values
-            dim_scores: List[float] = []
-            successes: List[float] = []
+            dim_scores: list[float] = []
+            successes: list[float] = []
 
             for o in outcomes:
                 dim_scores_dict = o.get("dimension_scores", {})
@@ -539,7 +539,7 @@ class QualityWeightLearner(BaseLearner):
 
         return correlations
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export learner metrics for monitoring.
 
         Returns:

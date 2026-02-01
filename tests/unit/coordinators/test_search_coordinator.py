@@ -18,7 +18,6 @@ Tests the search query routing coordinator extracted from
 the monolithic orchestrator as part of Track 4 Phase 1 refactoring.
 """
 
-import pytest
 from unittest.mock import Mock
 
 from victor.agent.search_router import SearchType, SearchRoute

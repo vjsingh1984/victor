@@ -21,7 +21,6 @@ Tests are automatically skipped for providers that are not available.
 import asyncio
 import time
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 import pytest
 

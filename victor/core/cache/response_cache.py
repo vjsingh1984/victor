@@ -38,11 +38,10 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, Set, cast
+from typing import Any, Optional, cast
 from pathlib import Path
 from collections import OrderedDict
 
-from pydantic import BaseModel
 
 from victor.providers.base import Message, CompletionResponse
 
@@ -71,12 +70,12 @@ class CacheEntry:
 
     key: str
     response: CompletionResponse
-    embedding: Optional[List[float]] = None
+    embedding: Optional[list[float]] = None
     timestamp: float = field(default_factory=time.time)
     access_count: int = 0
     last_access: float = field(default_factory=time.time)
     ttl: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def is_expired(self) -> bool:
         """Check if this entry has expired.
@@ -275,7 +274,7 @@ class ResponseCache:
                         return None
         return self._embedding_service
 
-    def _generate_key(self, messages: List[Message]) -> str:
+    def _generate_key(self, messages: list[Message]) -> str:
         """Generate cache key from messages.
 
         Args:
@@ -291,7 +290,7 @@ class ResponseCache:
         )
         return hashlib.sha256(content.encode()).hexdigest()
 
-    async def _compute_embedding(self, text: str) -> Optional[List[float]]:
+    async def _compute_embedding(self, text: str) -> Optional[list[float]]:
         """Compute embedding for text.
 
         Args:
@@ -311,12 +310,12 @@ class ResponseCache:
             # Compute embedding (run in thread pool to avoid blocking)
             loop = asyncio.get_event_loop()
             embedding = await loop.run_in_executor(None, service.get_embedding, text)
-            return cast(Optional[List[float]], embedding)
+            return cast(Optional[list[float]], embedding)
         except Exception as e:
             logger.warning(f"Failed to compute embedding: {e}")
             return None
 
-    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
         """Calculate cosine similarity between two vectors.
 
         Args:
@@ -371,10 +370,10 @@ class ResponseCache:
 
     async def put(
         self,
-        messages: List[Message],
+        messages: list[Message],
         response: CompletionResponse,
         ttl: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> str:
         """Store a response in the cache.
 
@@ -421,7 +420,7 @@ class ResponseCache:
 
         return key
 
-    async def get(self, messages: List[Message]) -> Optional[CompletionResponse]:
+    async def get(self, messages: list[Message]) -> Optional[CompletionResponse]:
         """Get cached response by exact match.
 
         Args:
@@ -454,7 +453,7 @@ class ResponseCache:
 
     async def get_similar(
         self,
-        messages: List[Message],
+        messages: list[Message],
         threshold: Optional[float] = None,
     ) -> Optional[CompletionResponse]:
         """Get cached response by semantic similarity.
@@ -535,7 +534,7 @@ class ResponseCache:
         with self._lock:
             return len(self._cache)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

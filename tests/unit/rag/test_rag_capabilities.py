@@ -16,8 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
-from unittest.mock import MagicMock
+from typing import Any
 
 import pytest
 
@@ -26,9 +25,9 @@ class MockVerticalContext:
     """Mock vertical context for testing."""
 
     def __init__(self):
-        self._configs: Dict[str, Any] = {}
+        self._configs: dict[str, Any] = {}
 
-    def set_capability_config(self, name: str, config: Dict[str, Any]) -> None:
+    def set_capability_config(self, name: str, config: dict[str, Any]) -> None:
         """Set capability configuration."""
         self._configs[name] = config
 
@@ -41,7 +40,7 @@ class MockOrchestrator:
     """Mock orchestrator for testing RAG capabilities."""
 
     def __init__(self):
-        self.rag_config: Dict[str, Any] = {}
+        self.rag_config: dict[str, Any] = {}
         self.vertical_context = MockVerticalContext()
 
 

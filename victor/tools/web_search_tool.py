@@ -24,7 +24,7 @@ This tool provides:
 
 import re
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import httpx
 from bs4 import BeautifulSoup  # type: ignore[import-untyped]
@@ -37,7 +37,7 @@ _USER_AGENT = "Mozilla/5.0 (compatible; Victor/1.0; +https://github.com/vijaykum
 _DEFAULT_MAX_CONTENT_LENGTH = 5000
 
 
-def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _get_web_config(context: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Get web tool configuration from ToolConfig in execution context.
 
     Args:
@@ -64,7 +64,7 @@ def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     }
 
 
-def _parse_ddg_results(html: str, max_results: int) -> List[Dict[str, str]]:
+def _parse_ddg_results(html: str, max_results: int) -> list[dict[str, str]]:
     """Parse DuckDuckGo HTML results.
 
     Args:
@@ -101,7 +101,7 @@ def _parse_ddg_results(html: str, max_results: int) -> List[Dict[str, str]]:
     return results
 
 
-def _format_results(query: str, results: List[Dict[str, str]]) -> str:
+def _format_results(query: str, results: list[dict[str, str]]) -> str:
     """Format search results as text.
 
     Args:
@@ -201,8 +201,8 @@ async def web_search(
     fetch_top: Optional[int] = None,
     fetch_pool: Optional[int] = None,
     max_content_length: int = 5000,
-    context: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    context: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Search the web using DuckDuckGo. Optionally summarize with AI.
 
     Purpose:
@@ -304,7 +304,7 @@ async def web_search(
     keywords=["fetch", "url", "webpage", "download", "http", "content", "web fetch"],
     aliases=["fetch"],  # Backward compatibility alias
 )
-async def web_fetch(url: str) -> Dict[str, Any]:
+async def web_fetch(url: str) -> dict[str, Any]:
     """Fetch and extract main text content from a URL.
 
     Args:
@@ -347,8 +347,8 @@ async def _summarize_search(
     fetch_top: Optional[int] = None,
     fetch_pool: Optional[int] = None,
     max_content_length: int = 5000,
-    context: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    context: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Internal implementation for web search with AI summarization."""
     # Get config from context
     config = _get_web_config(context)
@@ -424,7 +424,7 @@ async def _summarize_search(
             results_text = _format_results(query, results)
 
         # Fetch top content for deeper summary (best-effort)
-        fetched_contents: List[Dict[str, Any]] = []
+        fetched_contents: list[dict[str, Any]] = []
         for result in results[:fetch_pool]:
             if len(fetched_contents) >= fetch_top:
                 break

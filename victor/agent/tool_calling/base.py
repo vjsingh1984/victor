@@ -25,7 +25,8 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
+from collections.abc import Callable
 
 
 from victor.providers.base import ToolDefinition
@@ -156,11 +157,11 @@ class ToolCall:
     """
 
     name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     id: Optional[str] = None  # Tool call ID (for multi-turn)
     raw: Optional[Any] = None  # Raw provider-specific data
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary format."""
         result = {"name": self.name, "arguments": self.arguments}
         if self.id:
@@ -168,7 +169,7 @@ class ToolCall:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ToolCall":
+    def from_dict(cls, data: dict[str, Any]) -> "ToolCall":
         """Create from dictionary."""
         return cls(
             name=data.get("name", ""),
@@ -185,11 +186,11 @@ class ToolCallParseResult:
     Contains both the parsed tool calls and metadata about the parsing process.
     """
 
-    tool_calls: List[ToolCall] = field(default_factory=list)
+    tool_calls: list[ToolCall] = field(default_factory=list)
     remaining_content: str = ""  # Content after removing tool calls
     parse_method: str = "none"  # How the tool calls were parsed
     confidence: float = 1.0  # Confidence in the parsing (0-1)
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 class FallbackParsingMixin:
@@ -215,7 +216,7 @@ class FallbackParsingMixin:
                 return self.parse_from_content(content)
     """
 
-    def parse_json_arguments(self, args: Any) -> Tuple[Dict[str, Any], Optional[str]]:
+    def parse_json_arguments(self, args: Any) -> tuple[dict[str, Any], Optional[str]]:
         """Parse arguments that may be string or dict.
 
         Args:
@@ -240,7 +241,7 @@ class FallbackParsingMixin:
 
     def parse_native_tool_calls(
         self,
-        raw_tool_calls: List[Dict[str, Any]],
+        raw_tool_calls: list[dict[str, Any]],
         validate_name_fn: Optional[Callable[[str], bool]] = None,
     ) -> ToolCallParseResult:
         """Parse native tool calls from provider response.
@@ -260,8 +261,8 @@ class FallbackParsingMixin:
         if not raw_tool_calls:
             return ToolCallParseResult()
 
-        tool_calls: List[ToolCall] = []
-        warnings: List[str] = []
+        tool_calls: list[ToolCall] = []
+        warnings: list[str] = []
 
         for tc in raw_tool_calls:
             # Handle OpenAI/Ollama format: {function: {name, arguments}}
@@ -341,8 +342,8 @@ class FallbackParsingMixin:
         # Also try the raw content (might be pure JSON without fences)
         json_candidates.append(content)
 
-        tool_calls: List[ToolCall] = []
-        warnings: List[str] = []
+        tool_calls: list[ToolCall] = []
+        warnings: list[str] = []
         remaining_content = content
 
         for json_str in json_candidates:
@@ -427,7 +428,7 @@ class FallbackParsingMixin:
 
         return ToolCallParseResult(remaining_content=content)
 
-    def _extract_multiple_json_objects(self, content: str) -> List[str]:
+    def _extract_multiple_json_objects(self, content: str) -> list[str]:
         """Extract multiple JSON objects from content.
 
         Handles cases where models output multiple JSON objects back-to-back
@@ -514,8 +515,8 @@ class FallbackParsingMixin:
             ),
         ]
 
-        matches: List[Tuple[str, str]] = []
-        matched_patterns: List[str] = []
+        matches: list[tuple[str, str]] = []
+        matched_patterns: list[str] = []
 
         for pattern, _pattern_name in patterns:
             found = re.findall(pattern, content, re.DOTALL | re.IGNORECASE)
@@ -541,8 +542,8 @@ class FallbackParsingMixin:
         if not matches:
             return ToolCallParseResult(remaining_content=content)
 
-        tool_calls: List[ToolCall] = []
-        warnings: List[str] = []
+        tool_calls: list[ToolCall] = []
+        warnings: list[str] = []
 
         for name, args_str in matches:
             name = name.strip()
@@ -612,7 +613,7 @@ class FallbackParsingMixin:
                 return ToolCallParseResult(remaining_content=content)
 
             # Convert ExtractedToolCall to ToolCall
-            tool_calls: List[ToolCall] = []
+            tool_calls: list[ToolCall] = []
             for extracted in result.tool_calls:
                 # Validate name if validator provided
                 if validate_name_fn and not validate_name_fn(extracted.name):
@@ -695,7 +696,7 @@ class BaseToolCallingAdapter(ABC):
     uses the unified interface.
     """
 
-    def __init__(self, model: str = "", config: Optional[Dict[str, Any]] = None):
+    def __init__(self, model: str = "", config: Optional[dict[str, Any]] = None):
         """Initialize adapter.
 
         Args:
@@ -722,7 +723,7 @@ class BaseToolCallingAdapter(ABC):
         pass
 
     @abstractmethod
-    def convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
+    def convert_tools(self, tools: list[ToolDefinition]) -> list[dict[str, Any]]:
         """Convert standard tool definitions to provider format.
 
         Args:
@@ -737,7 +738,7 @@ class BaseToolCallingAdapter(ABC):
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> ToolCallParseResult:
         """Parse tool calls from response.
 
@@ -784,7 +785,7 @@ class BaseToolCallingAdapter(ABC):
     # LLMs often hallucinate alternate names for common parameters.
     # Key: (tool_name, alias_name), Value: canonical_name
     # Use None as tool_name for global aliases that apply to all tools.
-    ARGUMENT_ALIASES: Dict[Tuple[Optional[str], str], str] = {
+    ARGUMENT_ALIASES: dict[tuple[Optional[str], str], str] = {
         # Shell tool: LLMs often use 'command' instead of 'cmd'
         ("shell", "command"): "cmd",
         ("execute_bash", "command"): "cmd",
@@ -814,7 +815,7 @@ class BaseToolCallingAdapter(ABC):
     # These are sensible defaults that preserve expected tool behavior.
     # Key: tool_name, Value: dict of parameter defaults
     # NOTE: Includes both canonical short names and legacy names for backward compat
-    TOOL_ARGUMENT_DEFAULTS: Dict[str, Dict[str, Any]] = {
+    TOOL_ARGUMENT_DEFAULTS: dict[str, dict[str, Any]] = {
         # Canonical short names
         "ls": {"path": "."},
         "read": {"path": ""},  # Empty string will fail gracefully
@@ -832,7 +833,7 @@ class BaseToolCallingAdapter(ABC):
     # Tool-specific valid arguments that should NOT be filtered even if they appear
     # in HALLUCINATED_ARGUMENTS. Some tools legitimately support pagination params.
     # Key: tool_name (canonical or legacy), Value: set of valid argument names
-    TOOL_VALID_ARGUMENTS: Dict[str, Set[str]] = {
+    TOOL_VALID_ARGUMENTS: dict[str, set[str]] = {
         # read/read_file support offset/limit for pagination of large files
         "read": {"offset", "limit", "line_start", "line_end"},
         "read_file": {"offset", "limit", "line_start", "line_end"},
@@ -847,7 +848,7 @@ class BaseToolCallingAdapter(ABC):
     # These are filtered out silently to prevent tool execution failures.
     # Models like gpt-oss:20b and smaller models frequently hallucinate these.
     # NOTE: Check TOOL_VALID_ARGUMENTS first - some tools legitimately use these.
-    HALLUCINATED_ARGUMENTS: Set[str] = {
+    HALLUCINATED_ARGUMENTS: set[str] = {
         # Common pagination/limit params (but some tools DO support these - see above)
         "max_results",
         "limit",
@@ -880,7 +881,7 @@ class BaseToolCallingAdapter(ABC):
         "async",
     }
 
-    def normalize_arguments(self, arguments: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
+    def normalize_arguments(self, arguments: dict[str, Any], tool_name: str) -> dict[str, Any]:
         """Normalize tool arguments with sensible defaults and filter hallucinations.
 
         This method:
@@ -910,8 +911,8 @@ class BaseToolCallingAdapter(ABC):
         logger = logging.getLogger(__name__)
 
         # Step 1: Apply argument aliases (e.g., 'command' -> 'cmd' for shell)
-        aliased: Dict[str, Any] = {}
-        aliased_keys: List[str] = []
+        aliased: dict[str, Any] = {}
+        aliased_keys: list[str] = []
         for key, value in arguments.items():
             # Check for tool-specific alias
             alias_key = (tool_name, key)

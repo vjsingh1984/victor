@@ -61,7 +61,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Protocol, cast, runtime_checkable
+from typing import Any, Optional, Protocol, cast, runtime_checkable
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -83,11 +84,11 @@ class ComponentHealth:
     status: HealthStatus
     message: Optional[str] = None
     latency_ms: Optional[float] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     last_check: Optional[datetime] = None
     consecutive_failures: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -105,12 +106,12 @@ class HealthReport:
     """Aggregated health report for the system."""
 
     status: HealthStatus
-    components: Dict[str, ComponentHealth]
+    components: dict[str, ComponentHealth]
     timestamp: datetime
     version: str = "0.5.0"
     uptime_seconds: Optional[float] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "status": self.status.value,
@@ -131,7 +132,7 @@ class HealthReport:
         return self.status == HealthStatus.DEGRADED
 
     @property
-    def unhealthy_components(self) -> List[str]:
+    def unhealthy_components(self) -> list[str]:
         """Get list of unhealthy component names."""
         return [
             name for name, comp in self.components.items() if comp.status == HealthStatus.UNHEALTHY
@@ -306,7 +307,7 @@ class ProviderHealthCheck(BaseHealthCheck):
 
     async def _do_check(self) -> ComponentHealth:
         """Check provider health."""
-        details: Dict[str, Any] = {}
+        details: dict[str, Any] = {}
 
         # Check if provider has health check method
         if hasattr(self._provider, "health_check"):
@@ -376,7 +377,7 @@ class ToolHealthCheck(BaseHealthCheck):
 
     async def _do_check(self) -> ComponentHealth:
         """Check tool health."""
-        details: Dict[str, Any] = {}
+        details: dict[str, Any] = {}
 
         # Check required attributes
         has_name = hasattr(self._tool, "name")
@@ -569,13 +570,13 @@ class HealthChecker:
             cache_ttl: How long to cache health results.
             version: Application version for reports.
         """
-        self._checks: Dict[str, BaseHealthCheck] = {}
+        self._checks: dict[str, BaseHealthCheck] = {}
         self._cache_ttl = cache_ttl
         self._version = version
         self._start_time = time.time()
         self._cached_report: Optional[HealthReport] = None
         self._cache_time: Optional[float] = None
-        self._on_status_change: List[Callable[[HealthStatus, HealthStatus], None]] = []
+        self._on_status_change: list[Callable[[HealthStatus, HealthStatus], None]] = []
 
     def add_check(self, check: BaseHealthCheck) -> "HealthChecker":
         """Add a health check.
@@ -629,7 +630,7 @@ class HealthChecker:
                 return self._cached_report
 
         # Run all checks concurrently
-        component_healths: Dict[str, ComponentHealth] = {}
+        component_healths: dict[str, ComponentHealth] = {}
 
         if self._checks:
             tasks = [check.check() for check in self._checks.values()]
@@ -675,7 +676,7 @@ class HealthChecker:
 
     def _aggregate_status(
         self,
-        components: Dict[str, ComponentHealth],
+        components: dict[str, ComponentHealth],
     ) -> HealthStatus:
         """Aggregate component statuses into overall status.
 
@@ -740,7 +741,7 @@ class HealthChecker:
         # For liveness, we just check that we can execute
         return True
 
-    def get_check_names(self) -> List[str]:
+    def get_check_names(self) -> list[str]:
         """Get list of registered check names.
 
         Returns:

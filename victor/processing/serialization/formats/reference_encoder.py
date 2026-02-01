@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from victor.processing.serialization.formats.base import FormatEncoder, EncodingResult
 from victor.processing.serialization.strategy import (
@@ -166,8 +166,8 @@ class ReferenceEncoder(FormatEncoder):
 
     def _build_reference_table(
         self,
-        common_values: Dict[str, int],
-    ) -> Tuple[Dict[str, str], Dict[str, str]]:
+        common_values: dict[str, int],
+    ) -> tuple[dict[str, str], dict[str, str]]:
         """Build reference table from common values.
 
         Args:
@@ -176,8 +176,8 @@ class ReferenceEncoder(FormatEncoder):
         Returns:
             Tuple of (ref_key -> value, value -> ref_key)
         """
-        ref_table: Dict[str, str] = {}
-        reverse_table: Dict[str, str] = {}
+        ref_table: dict[str, str] = {}
+        reverse_table: dict[str, str] = {}
 
         # Filter values worth referencing
         candidates = [
@@ -221,7 +221,7 @@ class ReferenceEncoder(FormatEncoder):
     def _replace_with_refs(
         self,
         data: Any,
-        reverse_table: Dict[str, str],
+        reverse_table: dict[str, str],
     ) -> Any:
         """Recursively replace values with references.
 

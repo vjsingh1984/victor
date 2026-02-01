@@ -30,16 +30,12 @@ import os
 
 os.environ["VICTOR_SKIP_ENV_FILE"] = "1"
 
-import asyncio
 import pytest
 import time
-from typing import List
-import sys
 
 # Import directly from modules to avoid framework import issues
 from victor.tools.semantic_selector import SemanticToolSelector
 from victor.tools.registry import ToolRegistry
-from victor.providers.base import ToolDefinition
 
 
 # Common queries for cache hit rate testing (from production logs)

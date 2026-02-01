@@ -49,11 +49,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 # These imports are intentionally after pytestmark to avoid loading if Ollama unavailable
-from victor.agent.orchestrator import AgentOrchestrator  # noqa: E402
-from victor.config.settings import Settings  # noqa: E402
-from victor.providers.ollama_provider import OllamaProvider  # noqa: E402
-from victor.tools.filesystem import read, write  # noqa: E402
-from victor.tools.bash import shell  # noqa: E402
+from victor.agent.orchestrator import AgentOrchestrator
+from victor.config.settings import Settings
+from victor.providers.ollama_provider import OllamaProvider
+from victor.tools.filesystem import read, write
+from victor.tools.bash import shell
 
 
 @pytest.fixture
@@ -166,7 +166,7 @@ async def agent_with_tools(ollama_coding_provider):
 
     # Tools are already registered by orchestrator via imports
     # read, write from filesystem and shell from bash are available
-    _ = read, write, shell  # noqa: F841 - Tools imported and available
+    _ = read, write, shell
 
     yield agent
 
@@ -476,7 +476,7 @@ if __name__ == "__main__":
     )
 
     # Tools are already registered by orchestrator via imports
-    _ = read, write, shell  # noqa: F841 - Tools imported and available
+    _ = read, write, shell
 
     print("\n" + "=" * 70)
     print("TESTING AGENT ENHANCEMENT")

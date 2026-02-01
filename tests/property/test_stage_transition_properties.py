@@ -23,9 +23,7 @@ Uses Hypothesis to test invariants across many iterations:
 4. State consistency after transitions
 """
 
-import pytest
 from hypothesis import given, strategies as st, settings, Phase, assume
-from typing import List, Callable
 
 from victor.core.state import ConversationStage
 from victor.agent.stage_transition_engine import (
@@ -168,7 +166,7 @@ class TestCallbackProperties:
     def test_callback_invoked_on_successful_transitions(
         self,
         initial_stage: ConversationStage,
-        target_stages: List[ConversationStage],
+        target_stages: list[ConversationStage],
     ):
         """Callbacks should be invoked on every successful transition."""
         callback_count = [0]
@@ -210,7 +208,7 @@ class TestHistoryProperties:
     def test_history_only_records_successful_transitions(
         self,
         initial_stage: ConversationStage,
-        transitions: List[tuple],
+        transitions: list[tuple],
     ):
         """Transition history should only record successful transitions."""
         engine = StageTransitionEngine(initial_stage=initial_stage, cooldown_seconds=0)
@@ -238,7 +236,7 @@ class TestResetProperties:
     def test_reset_restores_initial_state(
         self,
         initial_stage: ConversationStage,
-        transitions: List[ConversationStage],
+        transitions: list[ConversationStage],
     ):
         """Reset should restore engine to INITIAL stage with empty history."""
         engine = StageTransitionEngine(initial_stage=initial_stage, cooldown_seconds=0)

@@ -15,19 +15,19 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Optional
 
 import yaml
 
 logger = logging.getLogger(__name__)
 
 # Module-level cache to avoid re-loading the same file multiple times
-_tool_capable_patterns_cache: Optional[Dict[str, List[str]]] = None
+_tool_capable_patterns_cache: Optional[dict[str, list[str]]] = None
 
 
 def _load_tool_capable_patterns_from_yaml(
     user_profiles_path: Optional[Path] = None,
-) -> Dict[str, List[str]]:
+) -> dict[str, list[str]]:
     """Load tool-capable model patterns from model_capabilities.yaml.
 
     PRIMARY SOURCE: victor/config/model_capabilities.yaml
@@ -42,7 +42,7 @@ def _load_tool_capable_patterns_from_yaml(
     if user_profiles_path is None and _tool_capable_patterns_cache is not None:
         return _tool_capable_patterns_cache
 
-    result: Dict[str, List[str]] = {}
+    result: dict[str, list[str]] = {}
 
     # First, load from the main model_capabilities.yaml (bundled with victor)
     config_dir = Path(__file__).parent
@@ -84,14 +84,14 @@ def _load_tool_capable_patterns_from_yaml(
     return result
 
 
-def _minimal_builtin_defaults() -> Dict[str, List[str]]:
+def _minimal_builtin_defaults() -> dict[str, list[str]]:
     """Minimal built-in defaults for when profiles.yaml is missing.
 
     These are just enough to get started. Users should copy
     examples/profiles.yaml.example to get the full list.
     """
     # Cloud providers support all models
-    defaults: Dict[str, List[str]] = {
+    defaults: dict[str, list[str]] = {
         "anthropic": ["*"],
         "openai": ["*"],
         "google": ["*"],
@@ -118,7 +118,7 @@ def _minimal_builtin_defaults() -> Dict[str, List[str]]:
     return defaults
 
 
-def _extract_tool_capable_patterns(data: Dict[str, Any], result: Dict[str, Any]) -> None:
+def _extract_tool_capable_patterns(data: dict[str, Any], result: dict[str, Any]) -> None:
     """Extract tool-capable patterns from capability data into result dict."""
     # Providers with native_tool_calls: true at provider_defaults level
     provider_defaults = data.get("provider_defaults", {})
@@ -142,9 +142,9 @@ def _extract_tool_capable_patterns(data: Dict[str, Any], result: Dict[str, Any])
                     result.setdefault(provider_l, []).append(pattern)
 
 
-def _flatten_yaml_manifest(data: Dict[str, Any]) -> Dict[str, List[str]]:
+def _flatten_yaml_manifest(data: dict[str, Any]) -> dict[str, list[str]]:
     """Flatten the tiered YAML manifest into provider -> model list."""
-    result: Dict[str, List[str]] = {}
+    result: dict[str, list[str]] = {}
 
     def _add(provider: str, name: Optional[str]) -> None:
         if not name:
@@ -169,7 +169,7 @@ def _flatten_yaml_manifest(data: Dict[str, Any]) -> Dict[str, List[str]]:
     # Deduplicate while preserving order
     for provider, models in result.items():
         seen = set()
-        deduped: List[str] = []
+        deduped: list[str] = []
         for model in models:
             if model not in seen:
                 seen.add(model)
@@ -189,9 +189,9 @@ class ToolCallingMatrix:
 
     def __init__(
         self,
-        manifest: Optional[Dict[str, List[str]]] = None,
-        manifest_path: Optional[Path] = None,  # noqa: ARG002 - kept for API compat
-        always_allow_providers: Optional[List[str]] = None,
+        manifest: Optional[dict[str, list[str]]] = None,
+        manifest_path: Optional[Path] = None,
+        always_allow_providers: Optional[list[str]] = None,
     ) -> None:
         # Load tool-capable patterns from model_capabilities.yaml
         base = _load_tool_capable_patterns_from_yaml()
@@ -205,7 +205,7 @@ class ToolCallingMatrix:
                         base[provider.lower()].append(model)
 
         # Normalize to lowercase for matching
-        self.manifest: Dict[str, List[str]] = {
+        self.manifest: dict[str, list[str]] = {
             provider.lower(): [m.lower() for m in models] for provider, models in base.items()
         }
         self.always_allow = {p.lower() for p in (always_allow_providers or [])}
@@ -239,7 +239,7 @@ class ToolCallingMatrix:
 
         return any(self._matches(model_l, pattern) for pattern in patterns)
 
-    def get_supported_models(self, provider: str) -> List[str]:
+    def get_supported_models(self, provider: str) -> list[str]:
         """Return the list of known tool-capable models for a provider."""
         return self.manifest.get(provider.lower(), [])
 

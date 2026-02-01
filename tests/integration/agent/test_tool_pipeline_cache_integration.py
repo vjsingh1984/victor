@@ -17,7 +17,6 @@
 Tests the integration of ToolExecutionDecisionCache with ToolPipeline
 to ensure hot path optimization works correctly.
 """
-import asyncio
 import pytest
 from unittest.mock import Mock
 

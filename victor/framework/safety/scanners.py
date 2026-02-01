@@ -34,7 +34,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import List, Protocol
+from typing import Protocol
 
 from victor.framework.safety.types import (
     SafetyPattern,
@@ -52,7 +52,7 @@ class ScannerProtocol(Protocol):
     Compatible with existing ISafetyScanner protocol.
     """
 
-    def scan(self, content: str) -> List[SafetyViolation]:
+    def scan(self, content: str) -> list[SafetyViolation]:
         """Scan content for safety violations.
 
         Args:
@@ -70,7 +70,7 @@ class BaseScanner:
     Provides common functionality for pattern-based scanning.
     """
 
-    def __init__(self, patterns: List[SafetyPattern] | None = None):
+    def __init__(self, patterns: list[SafetyPattern] | None = None):
         """Initialize scanner with patterns.
 
         Args:
@@ -78,7 +78,7 @@ class BaseScanner:
         """
         self._patterns = patterns or self._get_default_patterns()
 
-    def _get_default_patterns(self) -> List[SafetyPattern]:
+    def _get_default_patterns(self) -> list[SafetyPattern]:
         """Get default patterns for this scanner.
 
         Override in subclasses to provide built-in patterns.
@@ -88,7 +88,7 @@ class BaseScanner:
         """
         return []
 
-    def scan(self, content: str) -> List[SafetyViolation]:
+    def scan(self, content: str) -> list[SafetyViolation]:
         """Scan content for safety violations.
 
         Args:
@@ -97,7 +97,7 @@ class BaseScanner:
         Returns:
             List of SafetyViolation instances
         """
-        violations: List[SafetyViolation] = []
+        violations: list[SafetyViolation] = []
 
         for pattern in self._patterns:
             if pattern.matches(content):
@@ -127,7 +127,7 @@ class SecretScanner(BaseScanner):
     - Passwords in code
     """
 
-    def _get_default_patterns(self) -> List[SafetyPattern]:
+    def _get_default_patterns(self) -> list[SafetyPattern]:
         """Get default secret detection patterns."""
         return [
             SafetyPattern(
@@ -213,7 +213,7 @@ class CommandScanner(BaseScanner):
     - Sudo abuse
     """
 
-    def _get_default_patterns(self) -> List[SafetyPattern]:
+    def _get_default_patterns(self) -> list[SafetyPattern]:
         """Get default dangerous command patterns."""
         return [
             SafetyPattern(
@@ -306,7 +306,7 @@ class FilePathScanner(BaseScanner):
     - Environment files
     """
 
-    def _get_default_patterns(self) -> List[SafetyPattern]:
+    def _get_default_patterns(self) -> list[SafetyPattern]:
         """Get default sensitive file path patterns."""
         return [
             SafetyPattern(

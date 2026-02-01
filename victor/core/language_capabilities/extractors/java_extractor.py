@@ -25,7 +25,7 @@ Install javalang with: pip install javalang
 
 import logging
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from ..types import ExtractedSymbol
 from .base import BaseLanguageProcessor
@@ -74,7 +74,7 @@ class JavaExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: Optional[str] = None,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract symbols from Java code.
 
         Args:
@@ -100,7 +100,7 @@ class JavaExtractor(BaseLanguageProcessor):
         self,
         code: str,
         file_path: Path,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Extract symbols using javalang.
 
         Args:
@@ -113,7 +113,7 @@ class JavaExtractor(BaseLanguageProcessor):
         if not JAVALANG_AVAILABLE:
             return []
 
-        symbols: List[ExtractedSymbol] = []
+        symbols: list[ExtractedSymbol] = []
 
         try:
             # Parse Java code
@@ -160,7 +160,7 @@ class JavaExtractor(BaseLanguageProcessor):
         self,
         node: Any,
         file_path: Path,
-        symbols: List[ExtractedSymbol],
+        symbols: list[ExtractedSymbol],
         parent: Optional[str] = None,
     ) -> None:
         """Extract symbols from a type declaration."""
@@ -219,7 +219,7 @@ class JavaExtractor(BaseLanguageProcessor):
         self,
         member: Any,
         file_path: Path,
-        symbols: List[ExtractedSymbol],
+        symbols: list[ExtractedSymbol],
         parent: str,
     ) -> None:
         """Extract a class/interface member."""
@@ -310,6 +310,6 @@ class JavaExtractor(BaseLanguageProcessor):
         code: str,
         file_path: Path,
         language: Optional[str] = None,
-    ) -> List[ExtractedSymbol]:
+    ) -> list[ExtractedSymbol]:
         """Process code and return results (BaseLanguageProcessor interface)."""
         return self.extract(code, file_path, language)

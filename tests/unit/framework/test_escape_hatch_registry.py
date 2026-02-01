@@ -15,8 +15,7 @@
 """Unit tests for EscapeHatchRegistry."""
 
 import pytest
-from typing import Any, Dict
-from unittest.mock import MagicMock, patch
+from typing import Any
 
 from victor.framework.escape_hatch_registry import (
     ConditionFunction,
@@ -29,14 +28,14 @@ from victor.framework.escape_hatch_registry import (
 
 
 # Sample functions for testing
-def sample_condition(ctx: Dict[str, Any]) -> str:
+def sample_condition(ctx: dict[str, Any]) -> str:
     """Sample condition function."""
     if ctx.get("value", 0) > 10:
         return "high"
     return "low"
 
 
-def sample_transform(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def sample_transform(ctx: dict[str, Any]) -> dict[str, Any]:
     """Sample transform function."""
     return {"result": ctx.get("a", 0) + ctx.get("b", 0)}
 
@@ -482,7 +481,7 @@ class TestConditionDecorator:
         """Test @condition decorator registers the function."""
 
         @condition("my_test_cond")
-        def my_condition(ctx: Dict[str, Any]) -> str:
+        def my_condition(ctx: dict[str, Any]) -> str:
             return "test"
 
         registry = get_escape_hatch_registry()
@@ -492,7 +491,7 @@ class TestConditionDecorator:
         """Test @condition decorator with vertical."""
 
         @condition("my_test_cond", vertical="coding")
-        def my_condition(ctx: Dict[str, Any]) -> str:
+        def my_condition(ctx: dict[str, Any]) -> str:
             return "test"
 
         registry = get_escape_hatch_registry()
@@ -503,7 +502,7 @@ class TestConditionDecorator:
         """Test @condition decorator returns the original function."""
 
         @condition("my_test_cond")
-        def my_condition(ctx: Dict[str, Any]) -> str:
+        def my_condition(ctx: dict[str, Any]) -> str:
             return "result"
 
         # Function should still be callable directly
@@ -524,7 +523,7 @@ class TestTransformDecorator:
         """Test @transform decorator registers the function."""
 
         @transform("my_test_trans")
-        def my_transform(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def my_transform(ctx: dict[str, Any]) -> dict[str, Any]:
             return {"result": "test"}
 
         registry = get_escape_hatch_registry()
@@ -534,7 +533,7 @@ class TestTransformDecorator:
         """Test @transform decorator with vertical."""
 
         @transform("my_test_trans", vertical="research")
-        def my_transform(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def my_transform(ctx: dict[str, Any]) -> dict[str, Any]:
             return {"result": "test"}
 
         registry = get_escape_hatch_registry()
@@ -545,7 +544,7 @@ class TestTransformDecorator:
         """Test @transform decorator returns the original function."""
 
         @transform("my_test_trans")
-        def my_transform(ctx: Dict[str, Any]) -> Dict[str, Any]:
+        def my_transform(ctx: dict[str, Any]) -> dict[str, Any]:
             return {"value": 42}
 
         # Function should still be callable directly

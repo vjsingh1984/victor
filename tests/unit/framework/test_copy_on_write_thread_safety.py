@@ -7,7 +7,7 @@ import asyncio
 import concurrent.futures
 import threading
 import time
-from typing import Dict, Any
+from typing import Any
 
 import pytest
 
@@ -45,7 +45,7 @@ class TestCopyOnWriteStateThreadSafety:
 
     def test_concurrent_writes(self):
         """Test concurrent writes to state."""
-        source: Dict[str, Any] = {"initial": "value"}
+        source: dict[str, Any] = {"initial": "value"}
         cow = CopyOnWriteState(source)
         errors = []
 
@@ -153,7 +153,7 @@ class TestCopyOnWriteStateThreadSafety:
 
     def test_concurrent_update(self):
         """Test concurrent update operations."""
-        source: Dict[str, Any] = {}
+        source: dict[str, Any] = {}
         cow = CopyOnWriteState(source)
         errors = []
 
@@ -215,7 +215,7 @@ class TestCopyOnWriteStateThreadSafety:
 
     def test_concurrent_setdefault(self):
         """Test concurrent setdefault operations."""
-        source: Dict[str, Any] = {}
+        source: dict[str, Any] = {}
         cow = CopyOnWriteState(source)
         results = []
         errors = []

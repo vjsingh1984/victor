@@ -25,7 +25,7 @@ tools dynamically based on decorator metadata.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Dict, Optional, Set
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from victor.tools.base import ToolRegistry
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 # Fallback critical tools for cases where registry is unavailable.
 # Critical tools are detected via priority=Priority.CRITICAL in @tool decorator.
-FALLBACK_CRITICAL_TOOLS: Set[str] = {
+FALLBACK_CRITICAL_TOOLS: set[str] = {
     "read",  # read_file → read
     "write",  # write_file → write
     "ls",  # list_directory → ls
@@ -52,7 +52,7 @@ FALLBACK_CRITICAL_TOOLS: Set[str] = {
 # NOTE: This is a FALLBACK when registry.detect_categories_from_text() is unavailable.
 # The registry-based approach dynamically builds categories from @tool(keywords=[...])
 # decorators and is preferred. This static list is only used when registry is None.
-FALLBACK_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
+FALLBACK_CATEGORY_KEYWORDS: dict[str, set[str]] = {
     "security": {"security", "vulnerability", "scan", "audit", "cve", "exploit", "owasp"},
     "metrics": {"metrics", "complexity", "coverage", "analyze", "statistics", "cyclomatic"},
     "testing": {"test", "unittest", "pytest", "spec", "coverage", "mock"},
@@ -67,7 +67,7 @@ FALLBACK_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
 # ============================================================================
 
 
-def get_critical_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
+def get_critical_tools(registry: Optional["ToolRegistry"] = None) -> set[str]:
     """Dynamically discover critical tools from registry using priority-based detection.
 
     Critical tools are those with priority=Priority.CRITICAL in their @tool decorator.
@@ -83,7 +83,7 @@ def get_critical_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
     if registry is None:
         return FALLBACK_CRITICAL_TOOLS.copy()
 
-    critical_tools: Set[str] = set()
+    critical_tools: set[str] = set()
     for tool in registry.list_tools(only_enabled=True):
         # Use is_critical property which checks priority=Priority.CRITICAL
         if hasattr(tool, "is_critical") and tool.is_critical:
@@ -102,7 +102,7 @@ def get_critical_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
 
 def get_tools_by_category(
     registry: Optional["ToolRegistry"] = None, category: str = ""
-) -> Set[str]:
+) -> set[str]:
     """Dynamically discover tools in a specific category from registry.
 
     Tools declare their category via @tool(category="...") decorator.
@@ -117,7 +117,7 @@ def get_tools_by_category(
     if registry is None or not category:
         return set()
 
-    tools_in_category: Set[str] = set()
+    tools_in_category: set[str] = set()
     for tool in registry.list_tools(only_enabled=True):
         if hasattr(tool, "category") and tool.category == category:
             tools_in_category.add(tool.name)
@@ -125,7 +125,7 @@ def get_tools_by_category(
     return tools_in_category
 
 
-def get_web_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
+def get_web_tools(registry: Optional["ToolRegistry"] = None) -> set[str]:
     """Get web-related tools from registry.
 
     Web tools are those with category='web'. Tools must declare their category
@@ -145,7 +145,7 @@ def get_web_tools(registry: Optional["ToolRegistry"] = None) -> Set[str]:
     return get_tools_by_category(registry, category="web")
 
 
-def get_all_categories(registry: Optional["ToolRegistry"] = None) -> Set[str]:
+def get_all_categories(registry: Optional["ToolRegistry"] = None) -> set[str]:
     """Get all unique categories from tools in registry.
 
     Args:
@@ -157,7 +157,7 @@ def get_all_categories(registry: Optional["ToolRegistry"] = None) -> Set[str]:
     if registry is None:
         return set()
 
-    categories: Set[str] = set()
+    categories: set[str] = set()
     for tool in registry.list_tools(only_enabled=True):
         if hasattr(tool, "category") and tool.category:
             categories.add(tool.category)
@@ -167,7 +167,7 @@ def get_all_categories(registry: Optional["ToolRegistry"] = None) -> Set[str]:
 
 def get_category_to_tools_map(
     registry: Optional["ToolRegistry"] = None,
-) -> Dict[str, Set[str]]:
+) -> dict[str, set[str]]:
     """Build a mapping from categories to tool names.
 
     Dynamically discovers categories from tool metadata. Tools must declare
@@ -190,7 +190,7 @@ def get_category_to_tools_map(
         )
         return {}
 
-    category_map: Dict[str, Set[str]] = {}
+    category_map: dict[str, set[str]] = {}
     for tool in registry.list_tools(only_enabled=True):
         if hasattr(tool, "category") and tool.category:
             category = tool.category
@@ -207,7 +207,7 @@ def get_category_to_tools_map(
     return category_map
 
 
-def detect_categories_from_message(message: str) -> Set[str]:
+def detect_categories_from_message(message: str) -> set[str]:
     """Detect relevant tool categories from keywords in a message.
 
     Uses registry-based detection with decorator-driven keywords when available,
@@ -242,7 +242,7 @@ def detect_categories_from_message(message: str) -> Set[str]:
 
     # Fallback to static keywords
     message_lower = message.lower()
-    detected: Set[str] = set()
+    detected: set[str] = set()
 
     for category, keywords in FALLBACK_CATEGORY_KEYWORDS.items():
         if any(kw in message_lower for kw in keywords):
@@ -255,8 +255,8 @@ def detect_categories_from_message(message: str) -> Set[str]:
 
 
 def get_tools_for_categories(
-    categories: Set[str], registry: Optional["ToolRegistry"] = None
-) -> Set[str]:
+    categories: set[str], registry: Optional["ToolRegistry"] = None
+) -> set[str]:
     """Get tool names for a set of categories.
 
     Aggregates tools from multiple categories into a single set.
@@ -269,7 +269,7 @@ def get_tools_for_categories(
     Returns:
         Set of tool names belonging to any of the specified categories
     """
-    tools: Set[str] = set()
+    tools: set[str] = set()
 
     # Try registry-based lookup first
     if registry is not None:
@@ -297,7 +297,7 @@ def get_tools_for_categories(
     return tools
 
 
-def get_tools_from_message(message: str) -> Set[str]:
+def get_tools_from_message(message: str) -> set[str]:
     """Get tool names from message using metadata registry keyword matching.
 
     Uses the global ToolMetadataRegistry to match keywords defined in @tool decorators.
@@ -327,11 +327,11 @@ def get_tools_from_message(message: str) -> Set[str]:
 
 def select_tools_by_keywords(
     message: str,
-    all_tool_names: Set[str],
+    all_tool_names: set[str],
     registry: Optional["ToolRegistry"] = None,
     is_small: bool = False,
     max_tools_for_small: int = 10,
-) -> Set[str]:
+) -> set[str]:
     """Select tools using keyword matching via ToolMetadataRegistry.
 
     Uses keywords defined in @tool decorators for tool selection.

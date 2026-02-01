@@ -24,10 +24,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ class HealthMetrics:
         if self.successful_requests > 0:
             self.avg_latency_ms = self.total_latency_ms / self.successful_requests
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get current statistics.
 
         Returns:
@@ -329,7 +329,7 @@ class HealthMonitor:
         self._status = status
         logger.info(f"Provider {self.provider_id} status: {old_status.value} -> {status.value}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get comprehensive health statistics.
 
         Returns:
@@ -367,7 +367,7 @@ class ProviderHealthRegistry:
 
     def __init__(self) -> None:
         """Initialize health registry."""
-        self._monitors: Dict[str, HealthMonitor] = {}
+        self._monitors: dict[str, HealthMonitor] = {}
         self._lock = asyncio.Lock()
 
     async def register(
@@ -417,7 +417,7 @@ class ProviderHealthRegistry:
         """
         return self._monitors.get(provider_id)
 
-    def get_all_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics for all monitored providers.
 
         Returns:
@@ -425,7 +425,7 @@ class ProviderHealthRegistry:
         """
         return {pid: monitor.get_stats() for pid, monitor in self._monitors.items()}
 
-    def get_healthy_providers(self) -> List[str]:
+    def get_healthy_providers(self) -> list[str]:
         """Get list of healthy provider IDs.
 
         Returns:

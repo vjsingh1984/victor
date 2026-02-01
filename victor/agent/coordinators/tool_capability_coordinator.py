@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -60,7 +60,7 @@ class CapabilityCheckResult:
     provider: str
     model: str
     capability: str
-    alternative_models: List[str] = field(default_factory=list)
+    alternative_models: list[str] = field(default_factory=list)
     reason: Optional[str] = None
 
 
@@ -80,7 +80,7 @@ class ModelCapabilityInfo:
     model: str
     tool_calling_supported: bool
     parallel_calls_supported: bool
-    other_capabilities: Set[str] = field(default_factory=set)
+    other_capabilities: set[str] = field(default_factory=set)
 
 
 class ToolCapabilityCoordinator:
@@ -125,7 +125,7 @@ class ToolCapabilityCoordinator:
         self._tool_capabilities = tool_capabilities
         self._console = console
         self._warn_once = warn_once
-        self._warned_cache: Dict[tuple[str, str], bool] = {}
+        self._warned_cache: dict[tuple[str, str], bool] = {}
 
     def check_tool_calling_capability(
         self,
@@ -212,7 +212,7 @@ class ToolCapabilityCoordinator:
                 f"Running without tools.[/]"
             )
 
-    def get_supported_models(self, provider_name: str) -> List[str]:
+    def get_supported_models(self, provider_name: str) -> list[str]:
         """Get list of models that support tool calling for a provider.
 
         Args:
@@ -255,7 +255,7 @@ class ToolCapabilityCoordinator:
                 )
 
             # Get other capabilities (if available)
-            other_capabilities: Set[str] = set()
+            other_capabilities: set[str] = set()
             if hasattr(self._tool_capabilities, "get_capabilities"):
                 other_capabilities = self._tool_capabilities.get_capabilities(provider_name, model)
 
@@ -313,7 +313,7 @@ class ToolCapabilityCoordinator:
         self,
         provider_name: str,
         capability: str = "tool_calling",
-    ) -> List[str]:
+    ) -> list[str]:
         """Get models that support a specific capability.
 
         Args:

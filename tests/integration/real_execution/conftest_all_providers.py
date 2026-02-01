@@ -37,7 +37,7 @@ Supported Providers (21 total):
 import os
 import socket
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, Optional
 
 import pytest
 import pytest_asyncio
@@ -74,7 +74,7 @@ from victor.providers.huggingface_provider import HuggingFaceProvider
 
 
 # Complete provider configuration with cheapest/fastest models
-PROVIDER_CONFIG: Dict[str, Dict[str, Any]] = {
+PROVIDER_CONFIG: dict[str, dict[str, Any]] = {
     # === Local Providers (No API Key Required) ===
     "ollama": {
         "class": OllamaProvider,
@@ -716,7 +716,6 @@ def pytest_runtest_makereport(item, call):
     2. The timeout is clearly reported
     3. The test suite doesn't abort on slow providers
     """
-    from _pytest.outcomes import Failed
 
     if call.excinfo is not None:
         # Check for timeout exception (pytest-timeout uses different exception types)

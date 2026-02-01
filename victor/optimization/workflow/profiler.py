@@ -21,8 +21,7 @@ executions to detect performance bottlenecks and optimization opportunities.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
-from datetime import datetime
+from typing import Any, Optional
 from collections import defaultdict
 
 import numpy as np
@@ -160,7 +159,7 @@ class WorkflowProfiler:
         workflow_id: str,
         tracker: ExperimentTracker,
         min_executions: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Fetch historical executions from experiment tracker.
 
         Args:
@@ -205,8 +204,8 @@ class WorkflowProfiler:
 
     def _calculate_node_statistics(
         self,
-        executions: List[Dict[str, Any]],
-    ) -> Dict[str, NodeStatistics]:
+        executions: list[dict[str, Any]],
+    ) -> dict[str, NodeStatistics]:
         """Calculate statistics for each node across executions.
 
         Args:
@@ -215,7 +214,7 @@ class WorkflowProfiler:
         Returns:
             Dictionary mapping node IDs to statistics
         """
-        node_data: Dict[str, Dict[str, Any]] = defaultdict(
+        node_data: dict[str, dict[str, Any]] = defaultdict(
             lambda: {
                 "durations": [],
                 "input_tokens": [],
@@ -286,8 +285,8 @@ class WorkflowProfiler:
 
     def _detect_bottlenecks(
         self,
-        node_stats: Dict[str, NodeStatistics],
-    ) -> List[Bottleneck]:
+        node_stats: dict[str, NodeStatistics],
+    ) -> list[Bottleneck]:
         """Detect performance bottlenecks from node statistics.
 
         Args:
@@ -296,7 +295,7 @@ class WorkflowProfiler:
         Returns:
             List of detected bottlenecks
         """
-        bottlenecks: List[Bottleneck] = []
+        bottlenecks: list[Bottleneck] = []
 
         if not node_stats:
             return bottlenecks
@@ -392,9 +391,9 @@ class WorkflowProfiler:
 
     def _generate_opportunities(
         self,
-        bottlenecks: List[Bottleneck],
-        node_stats: Dict[str, NodeStatistics],
-    ) -> List[OptimizationOpportunity]:
+        bottlenecks: list[Bottleneck],
+        node_stats: dict[str, NodeStatistics],
+    ) -> list[OptimizationOpportunity]:
         """Generate optimization opportunities from bottlenecks.
 
         Args:

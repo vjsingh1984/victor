@@ -58,7 +58,7 @@ import logging
 import sys
 import threading
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Type, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 import yaml
 
@@ -78,7 +78,7 @@ else:
     from importlib.metadata import entry_points
 
 
-def validate_capability_yaml(data: Dict[str, Any]) -> List[str]:
+def validate_capability_yaml(data: dict[str, Any]) -> list[str]:
     """Validate YAML capability data against schema.
 
     Args:
@@ -87,7 +87,7 @@ def validate_capability_yaml(data: Dict[str, Any]) -> List[str]:
     Returns:
         List of validation error messages (empty if valid)
     """
-    errors: List[str] = []
+    errors: list[str] = []
 
     if "capabilities" not in data:
         # Empty file is valid (no capabilities defined)
@@ -159,8 +159,8 @@ class CapabilityRegistry:
 
         Note: Use get_instance() instead of direct instantiation.
         """
-        self._definitions: Dict[str, CapabilityDefinition] = {}
-        self._handlers: Dict[str, CapabilityHandler] = {}
+        self._definitions: dict[str, CapabilityDefinition] = {}
+        self._handlers: dict[str, CapabilityHandler] = {}
         self._op_lock = threading.RLock()
 
     @classmethod
@@ -254,7 +254,7 @@ class CapabilityRegistry:
         with self._op_lock:
             return self._handlers.get(name)
 
-    def list_all(self) -> List[str]:
+    def list_all(self) -> list[str]:
         """List all registered capability names.
 
         Returns:
@@ -263,7 +263,7 @@ class CapabilityRegistry:
         with self._op_lock:
             return list(self._definitions.keys())
 
-    def list_by_type(self, capability_type: CapabilityType) -> List[str]:
+    def list_by_type(self, capability_type: CapabilityType) -> list[str]:
         """List capabilities by type.
 
         Args:
@@ -279,7 +279,7 @@ class CapabilityRegistry:
                 if definition.capability_type == capability_type
             ]
 
-    def list_by_tag(self, tag: str) -> List[str]:
+    def list_by_tag(self, tag: str) -> list[str]:
         """List capabilities by tag.
 
         Args:
@@ -437,14 +437,14 @@ class CapabilityRegistry:
 
         return count
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get registry statistics.
 
         Returns:
             Dictionary with registry stats
         """
         with self._op_lock:
-            type_counts: Dict[str, int] = {}
+            type_counts: dict[str, int] = {}
             for definition in self._definitions.values():
                 type_name = definition.capability_type.value
                 type_counts[type_name] = type_counts.get(type_name, 0) + 1

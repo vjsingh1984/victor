@@ -16,12 +16,8 @@
 
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
 
 from victor.providers.provider_pool import (
-    PoolStrategy,
-    PoolStrategy as ProviderPoolStrategy,  # Avoid name conflict
-    PoolStrategy as PS,  # Use shorter alias
     ProviderPool,
     ProviderPoolConfig,
     create_provider_pool,

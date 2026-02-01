@@ -23,7 +23,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 from victor.coding.languages.base import (
     LanguageCapabilities,
@@ -70,7 +70,7 @@ class LanguageManager:
         """
         return self._registry.detect_language(path)
 
-    def detect_project_languages(self, project_root: Path) -> Dict[str, int]:
+    def detect_project_languages(self, project_root: Path) -> dict[str, int]:
         """Detect languages used in a project.
 
         Args:
@@ -79,7 +79,7 @@ class LanguageManager:
         Returns:
             Dict mapping language -> file count
         """
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
 
         for path in project_root.rglob("*"):
             if path.is_file():
@@ -124,7 +124,7 @@ class LanguageManager:
         path: Optional[str] = None,
         coverage: bool = False,
         parallel: bool = False,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Run tests for a project.
 
         Args:
@@ -166,7 +166,7 @@ class LanguageManager:
         # Run tests
         return await self._run_command(cmd, project_root)
 
-    async def discover_tests(self, project_root: Path, language: Optional[str] = None) -> List[str]:
+    async def discover_tests(self, project_root: Path, language: Optional[str] = None) -> list[str]:
         """Discover tests in a project.
 
         Args:
@@ -202,8 +202,8 @@ class LanguageManager:
         project_root: Path,
         language: Optional[str] = None,
         check_only: bool = False,
-        paths: Optional[List[str]] = None,
-    ) -> Tuple[bool, str]:
+        paths: Optional[list[str]] = None,
+    ) -> tuple[bool, str]:
         """Format code in a project.
 
         Args:
@@ -245,8 +245,8 @@ class LanguageManager:
         project_root: Path,
         language: Optional[str] = None,
         fix: bool = False,
-        paths: Optional[List[str]] = None,
-    ) -> Tuple[bool, str]:
+        paths: Optional[list[str]] = None,
+    ) -> tuple[bool, str]:
         """Lint code in a project.
 
         Args:
@@ -288,7 +288,7 @@ class LanguageManager:
         project_root: Path,
         language: Optional[str] = None,
         release: bool = False,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """Build a project.
 
         Args:
@@ -325,8 +325,8 @@ class LanguageManager:
         self,
         project_root: Path,
         language: Optional[str] = None,
-        args: Optional[List[str]] = None,
-    ) -> Tuple[bool, str]:
+        args: Optional[list[str]] = None,
+    ) -> tuple[bool, str]:
         """Run a project.
 
         Args:
@@ -359,11 +359,11 @@ class LanguageManager:
 
     # Utilities
 
-    def list_languages(self) -> List[str]:
+    def list_languages(self) -> list[str]:
         """List all supported languages."""
         return self._registry.list_languages()
 
-    async def _run_command(self, cmd: List[str], cwd: Path, timeout: int = 300) -> Tuple[bool, str]:
+    async def _run_command(self, cmd: list[str], cwd: Path, timeout: int = 300) -> tuple[bool, str]:
         """Run a command and return result.
 
         Args:

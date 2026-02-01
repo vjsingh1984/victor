@@ -25,10 +25,8 @@ Run with: pytest tests/unit/workflows/test_template_registry.py -v
 """
 
 import tempfile
-from pathlib import Path
 
 import pytest
-import yaml
 
 from victor.workflows.template_registry import (
     WorkflowTemplateRegistry,

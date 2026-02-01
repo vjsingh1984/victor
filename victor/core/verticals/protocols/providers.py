@@ -88,7 +88,7 @@ Example Implementation:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 
 # =============================================================================
@@ -113,7 +113,7 @@ class MiddlewareProvider(Protocol):
     """
 
     @classmethod
-    def get_middleware(cls) -> List[Any]:
+    def get_middleware(cls) -> list[Any]:
         """Get middleware implementations for this vertical.
 
         Returns:
@@ -188,7 +188,7 @@ class WorkflowProvider(Protocol):
         ...
 
     @classmethod
-    def get_workflows(cls) -> Dict[str, Any]:
+    def get_workflows(cls) -> dict[str, Any]:
         """Get workflow definitions for this vertical.
 
         Returns:
@@ -232,7 +232,7 @@ class TeamProvider(Protocol):
         ...
 
     @classmethod
-    def get_team_specs(cls) -> Dict[str, Any]:
+    def get_team_specs(cls) -> dict[str, Any]:
         """Get team specifications for this vertical.
 
         Returns:
@@ -276,7 +276,7 @@ class RLProvider(Protocol):
         ...
 
     @classmethod
-    def get_rl_hooks(cls) -> List[Any]:
+    def get_rl_hooks(cls) -> list[Any]:
         """Get RL hooks for outcome recording.
 
         Returns:
@@ -344,7 +344,7 @@ class ToolProvider(Protocol):
     """
 
     @classmethod
-    def get_tools(cls) -> List[str]:
+    def get_tools(cls) -> list[str]:
         """Get the list of tool names for this vertical.
 
         Returns:
@@ -383,7 +383,7 @@ class HandlerProvider(Protocol):
     """
 
     @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
+    def get_handlers(cls) -> dict[str, Any]:
         """Get compute handlers for workflow execution.
 
         Returns:
@@ -460,7 +460,7 @@ class ModeConfigProvider(Protocol):
         ...
 
     @classmethod
-    def get_mode_config(cls) -> Dict[str, Any]:
+    def get_mode_config(cls) -> dict[str, Any]:
         """Get mode configurations for this vertical.
 
         Returns:
@@ -506,7 +506,7 @@ class PromptContributorProvider(Protocol):
         ...
 
     @classmethod
-    def get_task_type_hints(cls) -> Dict[str, Any]:
+    def get_task_type_hints(cls) -> dict[str, Any]:
         """Get task-type-specific prompt hints.
 
         Returns:

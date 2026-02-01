@@ -29,7 +29,7 @@ Example YAML usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-def tests_passing(ctx: Dict[str, Any]) -> str:
+def tests_passing(ctx: dict[str, Any]) -> str:
     """Check if tests are passing.
 
     Args:
@@ -72,7 +72,7 @@ def tests_passing(ctx: Dict[str, Any]) -> str:
     return "no_tests"
 
 
-def code_quality_check(ctx: Dict[str, Any]) -> str:
+def code_quality_check(ctx: dict[str, Any]) -> str:
     """Assess code quality based on linting and static analysis.
 
     Args:
@@ -103,7 +103,7 @@ def code_quality_check(ctx: Dict[str, Any]) -> str:
     return "needs_improvement"
 
 
-def should_retry_implementation(ctx: Dict[str, Any]) -> str:
+def should_retry_implementation(ctx: dict[str, Any]) -> str:
     """Determine if implementation should be retried.
 
     Args:
@@ -135,7 +135,7 @@ def should_retry_implementation(ctx: Dict[str, Any]) -> str:
     return "give_up"
 
 
-def review_verdict(ctx: Dict[str, Any]) -> str:
+def review_verdict(ctx: dict[str, Any]) -> str:
     """Determine code review verdict.
 
     Args:
@@ -166,7 +166,7 @@ def review_verdict(ctx: Dict[str, Any]) -> str:
     return "changes_requested"
 
 
-def complexity_assessment(ctx: Dict[str, Any]) -> str:
+def complexity_assessment(ctx: dict[str, Any]) -> str:
     """Assess task complexity for planning.
 
     Args:
@@ -196,7 +196,7 @@ def complexity_assessment(ctx: Dict[str, Any]) -> str:
     return "major"
 
 
-def complexity_check(ctx: Dict[str, Any]) -> str:
+def complexity_check(ctx: dict[str, Any]) -> str:
     """Assess task complexity from task analysis for team routing.
 
     Used by team_node workflows to route tasks to appropriate team sizes.
@@ -266,7 +266,7 @@ def complexity_check(ctx: Dict[str, Any]) -> str:
     return "simple"
 
 
-def tdd_cycle_status(ctx: Dict[str, Any]) -> str:
+def tdd_cycle_status(ctx: dict[str, Any]) -> str:
     """Determine TDD cycle status.
 
     Args:
@@ -294,7 +294,7 @@ def tdd_cycle_status(ctx: Dict[str, Any]) -> str:
     return "green"
 
 
-def bugfix_priority(ctx: Dict[str, Any]) -> str:
+def bugfix_priority(ctx: dict[str, Any]) -> str:
     """Determine bugfix priority level.
 
     Args:
@@ -325,7 +325,7 @@ def bugfix_priority(ctx: Dict[str, Any]) -> str:
     return "p3"
 
 
-def should_continue_fixing(ctx: Dict[str, Any]) -> str:
+def should_continue_fixing(ctx: dict[str, Any]) -> str:
     """Determine if agent should continue attempting fixes.
 
     Multi-factor decision based on iteration count, error patterns, and progress.
@@ -376,7 +376,7 @@ def should_continue_fixing(ctx: Dict[str, Any]) -> str:
 # =============================================================================
 
 
-def merge_code_analysis(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def merge_code_analysis(ctx: dict[str, Any]) -> dict[str, Any]:
     """Merge results from parallel code analysis operations.
 
     Args:
@@ -403,7 +403,7 @@ def merge_code_analysis(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def format_implementation_plan(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def format_implementation_plan(ctx: dict[str, Any]) -> dict[str, Any]:
     """Format implementation plan from analysis.
 
     Args:
@@ -443,7 +443,7 @@ def format_implementation_plan(ctx: Dict[str, Any]) -> Dict[str, Any]:
 # =============================================================================
 
 
-def chat_task_complexity(ctx: Dict[str, Any]) -> str:
+def chat_task_complexity(ctx: dict[str, Any]) -> str:
     """Determine task complexity for chat workflow routing.
 
     Args:
@@ -505,7 +505,7 @@ def chat_task_complexity(ctx: Dict[str, Any]) -> str:
         return "moderate"
 
 
-def has_pending_tool_calls(ctx: Dict[str, Any]) -> str:
+def has_pending_tool_calls(ctx: dict[str, Any]) -> str:
     """Check if there are pending tool calls to execute.
 
     Args:
@@ -524,7 +524,7 @@ def has_pending_tool_calls(ctx: Dict[str, Any]) -> str:
     return "no_tools"
 
 
-def can_continue_iteration(ctx: Dict[str, Any]) -> str:
+def can_continue_iteration(ctx: dict[str, Any]) -> str:
     """Check if workflow can continue with another iteration.
 
     Args:
@@ -543,7 +543,7 @@ def can_continue_iteration(ctx: Dict[str, Any]) -> str:
     return "max_reached"
 
 
-def update_conversation_with_tool_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def update_conversation_with_tool_results(ctx: dict[str, Any]) -> dict[str, Any]:
     """Update conversation with tool results from execution.
 
     Args:
@@ -586,7 +586,7 @@ def update_conversation_with_tool_results(ctx: Dict[str, Any]) -> Dict[str, Any]
     }
 
 
-def format_coding_response(ctx: Dict[str, Any]) -> Dict[str, Any]:
+def format_coding_response(ctx: dict[str, Any]) -> dict[str, Any]:
     """Format final coding response for user.
 
     Args:

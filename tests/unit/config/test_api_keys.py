@@ -18,7 +18,6 @@ Tests the APIKeysProxy class and ensures backward compatibility
 for code accessing victor.config.api_keys.api_keys.
 """
 
-import pytest
 
 from victor.config.api_keys import api_keys, APIKeysProxy, APIKeyManager
 

@@ -27,12 +27,12 @@ import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from victor.providers.health_monitor import HealthMonitor, HealthStatus
+    from victor.providers.health_monitor import HealthMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ class ProviderInstance:
         if self.active_connections > 0:
             self.active_connections -= 1
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get instance statistics.
 
         Returns:
@@ -137,7 +137,7 @@ class LoadBalancer(ABC):
     @abstractmethod
     async def select_provider(
         self,
-        instances: List[ProviderInstance],
+        instances: list[ProviderInstance],
     ) -> Optional[ProviderInstance]:
         """Select the best provider instance for a request.
 
@@ -151,8 +151,8 @@ class LoadBalancer(ABC):
 
     def _filter_healthy_instances(
         self,
-        instances: List[ProviderInstance],
-    ) -> List[ProviderInstance]:
+        instances: list[ProviderInstance],
+    ) -> list[ProviderInstance]:
         """Filter to only healthy instances that can accept traffic.
 
         Args:
@@ -165,7 +165,7 @@ class LoadBalancer(ABC):
 
     async def select_with_fallback(
         self,
-        instances: List[ProviderInstance],
+        instances: list[ProviderInstance],
         max_attempts: int = 3,
     ) -> Optional[ProviderInstance]:
         """Select provider with automatic fallback on failure.
@@ -209,7 +209,7 @@ class RoundRobinLoadBalancer(LoadBalancer):
 
     async def select_provider(
         self,
-        instances: List[ProviderInstance],
+        instances: list[ProviderInstance],
     ) -> Optional[ProviderInstance]:
         """Select next provider in round-robin fashion.
 
@@ -247,7 +247,7 @@ class LeastConnectionsLoadBalancer(LoadBalancer):
 
     async def select_provider(
         self,
-        instances: List[ProviderInstance],
+        instances: list[ProviderInstance],
     ) -> Optional[ProviderInstance]:
         """Select provider with fewest active connections.
 
@@ -308,7 +308,7 @@ class AdaptiveLoadBalancer(LoadBalancer):
 
     async def select_provider(
         self,
-        instances: List[ProviderInstance],
+        instances: list[ProviderInstance],
     ) -> Optional[ProviderInstance]:
         """Select provider based on adaptive scoring.
 
@@ -429,7 +429,7 @@ class RandomLoadBalancer(LoadBalancer):
 
     async def select_provider(
         self,
-        instances: List[ProviderInstance],
+        instances: list[ProviderInstance],
     ) -> Optional[ProviderInstance]:
         """Select a random healthy provider.
 

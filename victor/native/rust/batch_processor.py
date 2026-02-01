@@ -60,7 +60,8 @@ Usage Example:
     ```
 """
 
-from typing import Callable, List, Optional, Any, Dict
+from typing import Optional, Any
+from collections.abc import Callable
 from dataclasses import dataclass
 
 try:
@@ -100,7 +101,7 @@ class BatchTask:
     priority: float = 0.0
     timeout_ms: Optional[int] = None
     retry_count: int = 0
-    dependencies: Optional[List[str]] = None
+    dependencies: Optional[list[str]] = None
 
     def __post_init__(self) -> None:
         if self.dependencies is None:
@@ -212,7 +213,7 @@ class BatchProcessSummary:
         throughput_per_second: Tasks processed per second
     """
 
-    results: List[BatchResult]
+    results: list[BatchResult]
     total_duration_ms: float
     successful_count: int
     failed_count: int
@@ -291,7 +292,7 @@ class BatchProcessor:
 
     def process_batch(
         self,
-        tasks: List[BatchTask],
+        tasks: list[BatchTask],
         python_executor: Callable[[dict], Any],
     ) -> BatchProcessSummary:
         """
@@ -345,7 +346,7 @@ class BatchProcessor:
 
     def process_batch_streaming(
         self,
-        tasks: List[BatchTask],
+        tasks: list[BatchTask],
         python_executor: Callable[[dict], Any],
         callback: Callable[[BatchResult], None],
     ) -> BatchProcessSummary:
@@ -373,7 +374,7 @@ class BatchProcessor:
                 callback(result)
             return summary
 
-    def resolve_execution_order(self, tasks: List[BatchTask]) -> List[List[str]]:
+    def resolve_execution_order(self, tasks: list[BatchTask]) -> list[list[str]]:
         """
         Resolve task execution order using topological sort.
 
@@ -389,7 +390,7 @@ class BatchProcessor:
         else:
             return self._resolve_execution_order(tasks)
 
-    def validate_dependencies(self, tasks: List[BatchTask]) -> bool:
+    def validate_dependencies(self, tasks: list[BatchTask]) -> bool:
         """
         Validate task dependencies for circular references.
 
@@ -406,7 +407,7 @@ class BatchProcessor:
             self._validate_dependencies(tasks)
             return True
 
-    def assign_tasks(self, tasks: List[BatchTask], workers: int) -> List[List[BatchTask]]:
+    def assign_tasks(self, tasks: list[BatchTask], workers: int) -> list[list[BatchTask]]:
         """
         Assign tasks to workers using load balancing strategy.
 
@@ -468,7 +469,7 @@ class BatchProcessor:
         else:
             raise NotImplementedError("Load balancing requires Rust implementation")
 
-    def _validate_dependencies(self, tasks: List[BatchTask]) -> None:
+    def _validate_dependencies(self, tasks: list[BatchTask]) -> None:
         """Validate dependencies (Python fallback)."""
         # Build dependency graph
         graph = {task.task_id: set(task.dependencies or []) for task in tasks}
@@ -493,11 +494,11 @@ class BatchProcessor:
                 if visit(task_id, set(), set()):
                     raise ValueError("Circular dependency detected in tasks")
 
-    def _resolve_execution_order(self, tasks: List[BatchTask]) -> List[List[str]]:
+    def _resolve_execution_order(self, tasks: list[BatchTask]) -> list[list[str]]:
         """Resolve execution order using topological sort (Python fallback)."""
         # Build graph
         in_degree = {task.task_id: 0 for task in tasks}
-        adjacency: Dict[str, List[str]] = {task.task_id: [] for task in tasks}
+        adjacency: dict[str, list[str]] = {task.task_id: [] for task in tasks}
 
         for task in tasks:
             for dep in task.dependencies or []:
@@ -524,10 +525,9 @@ class BatchProcessor:
         return layers
 
     def _execute_layer(
-        self, tasks: List[BatchTask], executor: Callable[[dict], Any]
-    ) -> List[BatchResult]:
+        self, tasks: list[BatchTask], executor: Callable[[dict], Any]
+    ) -> list[BatchResult]:
         """Execute a layer of tasks (Python fallback)."""
-        import time
 
         results = []
         for task in tasks:
@@ -611,7 +611,7 @@ class BatchProcessor:
 
 
 # Utility functions
-def create_task_batches_py(tasks: List[BatchTask], batch_size: int) -> List[List[BatchTask]]:
+def create_task_batches_py(tasks: list[BatchTask], batch_size: int) -> list[list[BatchTask]]:
     """
     Split tasks into batches of specified size.
 
@@ -633,7 +633,7 @@ def create_task_batches_py(tasks: List[BatchTask], batch_size: int) -> List[List
         return batches
 
 
-def merge_batch_summaries_py(summaries: List[BatchProcessSummary]) -> BatchProcessSummary:
+def merge_batch_summaries_py(summaries: list[BatchProcessSummary]) -> BatchProcessSummary:
     """
     Merge multiple batch summaries into one.
 

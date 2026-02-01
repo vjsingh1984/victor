@@ -9,7 +9,7 @@ Tests cover:
 """
 
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch, call
+from unittest.mock import MagicMock, AsyncMock, patch
 from rich.console import Console
 
 from victor.ui.rendering import (

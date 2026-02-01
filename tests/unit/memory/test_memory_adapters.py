@@ -24,10 +24,10 @@ Tests cover:
 
 import pytest
 from datetime import datetime, timezone
-from typing import List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Optional
+from unittest.mock import MagicMock
 
-from victor.storage.memory.unified import MemoryQuery, MemoryResult, MemoryType
+from victor.storage.memory.unified import MemoryQuery, MemoryType
 from victor.storage.memory.adapters import (
     EntityMemoryAdapter,
     ConversationMemoryAdapter,
@@ -103,9 +103,9 @@ class MockEntityMemory:
     async def search(
         self,
         query: str,
-        entity_types: Optional[List] = None,
+        entity_types: Optional[list] = None,
         limit: int = 10,
-    ) -> List[MockEntity]:
+    ) -> list[MockEntity]:
         results = []
         for entity in self._entities.values():
             if query.lower() in entity.name.lower():
@@ -122,10 +122,10 @@ class MockEntityMemory:
     async def get_related(
         self,
         entity_id: str,
-        relation_types: Optional[List] = None,
+        relation_types: Optional[list] = None,
         direction: str = "both",
         limit: int = 20,
-    ) -> List[tuple]:
+    ) -> list[tuple]:
         results = []
         for rel in self._relations.values():
             if rel.source_id == entity_id or rel.target_id == entity_id:
@@ -182,7 +182,7 @@ class MockConversationStore:
         query: str,
         limit: int = 10,
         min_similarity: float = 0.3,
-    ) -> List[tuple]:
+    ) -> list[tuple]:
         if session_id not in self._messages:
             return []
 
@@ -197,7 +197,7 @@ class MockConversationStore:
         self,
         session_id: str,
         count: int = 10,
-    ) -> List[MockConversationMessage]:
+    ) -> list[MockConversationMessage]:
         if session_id not in self._messages:
             return []
         return self._messages[session_id][:count]
@@ -205,9 +205,9 @@ class MockConversationStore:
     def get_historical_tool_results(
         self,
         session_id: str,
-        tool_names: Optional[List[str]] = None,
+        tool_names: Optional[list[str]] = None,
         limit: int = 20,
-    ) -> List[MockConversationMessage]:
+    ) -> list[MockConversationMessage]:
         if session_id not in self._messages:
             return []
 

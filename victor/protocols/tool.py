@@ -22,7 +22,7 @@ Phase 3 Architectural Improvement: Breaking circular dependencies via protocols.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable

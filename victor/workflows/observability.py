@@ -55,25 +55,17 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
-    Union,
     runtime_checkable,
 )
+from collections.abc import AsyncIterator, Callable
 
 from victor.workflows.streaming import (
     WorkflowEventType,
     WorkflowStreamChunk,
-    WorkflowStreamContext,
 )
 
 logger = logging.getLogger(__name__)
@@ -113,7 +105,7 @@ class StreamingObserver(Protocol):
         """
         ...
 
-    def get_filter(self) -> Optional[Set[WorkflowEventType]]:
+    def get_filter(self) -> Optional[set[WorkflowEventType]]:
         """Get the set of event types this observer cares about.
 
         Returns:
@@ -142,13 +134,13 @@ class FunctionObserver:
     """
 
     callback: Callable[[WorkflowStreamChunk], None]
-    event_filter: Optional[Set[WorkflowEventType]] = None
+    event_filter: Optional[set[WorkflowEventType]] = None
 
     def on_event(self, chunk: WorkflowStreamChunk) -> None:
         """Call the wrapped function."""
         self.callback(chunk)
 
-    def get_filter(self) -> Optional[Set[WorkflowEventType]]:
+    def get_filter(self) -> Optional[set[WorkflowEventType]]:
         """Return the configured filter."""
         return self.event_filter
 
@@ -177,7 +169,7 @@ class AsyncStreamingObserver(Protocol):
         """Handle a streaming event asynchronously."""
         ...
 
-    def get_filter(self) -> Optional[Set[WorkflowEventType]]:
+    def get_filter(self) -> Optional[set[WorkflowEventType]]:
         """Get the set of event types this observer cares about."""
         ...
 
@@ -221,14 +213,14 @@ class ObservabilityEmitter:
     workflow_name: str = ""
     total_nodes: int = 0
     completed_nodes: int = 0
-    _observers: List[StreamingObserver] = field(default_factory=list)
-    _async_observers: List[AsyncStreamingObserver] = field(default_factory=list)
+    _observers: list[StreamingObserver] = field(default_factory=list)
+    _async_observers: list[AsyncStreamingObserver] = field(default_factory=list)
     _start_time: float = field(default_factory=time.time)
 
     def add_observer(
         self,
         observer: Callable[[WorkflowStreamChunk], None] | StreamingObserver,
-        event_filter: Optional[Set[WorkflowEventType]] = None,
+        event_filter: Optional[set[WorkflowEventType]] = None,
     ) -> Callable[[], None]:
         """Add an observer for workflow events.
 
@@ -251,7 +243,7 @@ class ObservabilityEmitter:
             # Wrap function in FunctionObserver
             wrapped = FunctionObserver(callback=observer, event_filter=event_filter)
             self._observers.append(wrapped)
-            actual_observer: Union[StreamingObserver, FunctionObserver] = wrapped
+            actual_observer: StreamingObserver | FunctionObserver = wrapped
         else:
             self._observers.append(observer)
             actual_observer = observer
@@ -328,7 +320,7 @@ class ObservabilityEmitter:
                 except Exception as e:
                     logger.warning(f"Async observer error: {e}")
 
-    def emit_workflow_start(self, metadata: Optional[Dict[str, Any]] = None) -> WorkflowStreamChunk:
+    def emit_workflow_start(self, metadata: Optional[dict[str, Any]] = None) -> WorkflowStreamChunk:
         """Emit a WORKFLOW_START event.
 
         Args:
@@ -353,7 +345,7 @@ class ObservabilityEmitter:
     def emit_workflow_complete(
         self,
         success: bool = True,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> WorkflowStreamChunk:
         """Emit a WORKFLOW_COMPLETE event.
 
@@ -382,7 +374,7 @@ class ObservabilityEmitter:
     def emit_workflow_error(
         self,
         error: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> WorkflowStreamChunk:
         """Emit a WORKFLOW_ERROR event.
 
@@ -412,7 +404,7 @@ class ObservabilityEmitter:
         self,
         node_id: str,
         node_name: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> WorkflowStreamChunk:
         """Emit a NODE_START event.
 
@@ -441,7 +433,7 @@ class ObservabilityEmitter:
         node_name: Optional[str] = None,
         duration: float = 0.0,
         output: Any = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> WorkflowStreamChunk:
         """Emit a NODE_COMPLETE event.
 
@@ -477,7 +469,7 @@ class ObservabilityEmitter:
         error: str,
         node_name: Optional[str] = None,
         duration: float = 0.0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> WorkflowStreamChunk:
         """Emit a NODE_ERROR event.
 
@@ -536,7 +528,7 @@ class ObservabilityEmitter:
     def emit_tool_call(
         self,
         node_id: str,
-        tool_calls: List[Dict[str, Any]],
+        tool_calls: list[dict[str, Any]],
         node_name: Optional[str] = None,
     ) -> WorkflowStreamChunk:
         """Emit an AGENT_TOOL_CALL event.

@@ -33,8 +33,7 @@ The persona system enables adaptive agent behavior by modifying:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 from victor.agent.personas.persona_repository import PersonaRepository
 from victor.agent.personas.types import (
@@ -49,7 +48,6 @@ from victor.agent.personas.types import (
     PromptTemplates,
 )
 from victor.core.events import IEventBackend, MessagingEvent
-from victor.core.mode_config import ModeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +92,7 @@ class PersonaManager:
 
         self.repository = repository
         self._event_bus = event_bus
-        self._adaptation_cache: Dict[Tuple[str, str], AdaptedPersona] = {}
+        self._adaptation_cache: dict[tuple[str, str], AdaptedPersona] = {}
 
     def load_persona(self, persona_id: str) -> Persona:
         """Load a persona by ID.
@@ -119,7 +117,7 @@ class PersonaManager:
 
         return persona
 
-    def adapt_persona(self, persona: Persona, context: Dict[str, Any]) -> AdaptedPersona:
+    def adapt_persona(self, persona: Persona, context: dict[str, Any]) -> AdaptedPersona:
         """Adapt a persona based on context.
 
         Context may include:
@@ -172,7 +170,7 @@ class PersonaManager:
         return adapted
 
     def create_custom_persona(
-        self, name: str, traits: Dict[str, Any], persona_id: Optional[str] = None
+        self, name: str, traits: dict[str, Any], persona_id: Optional[str] = None
     ) -> Persona:
         """Create a custom persona from traits.
 
@@ -237,7 +235,7 @@ class PersonaManager:
 
     def get_suitable_personas(
         self, task: str, min_score: float = 0.3
-    ) -> List[Tuple[Persona, float]]:
+    ) -> list[tuple[Persona, float]]:
         """Get personas suitable for a given task, ranked by match score.
 
         Args:
@@ -298,7 +296,7 @@ class PersonaManager:
         return None
 
     def merge_personas(
-        self, personas: List[Persona], merged_name: str, merged_id: Optional[str] = None
+        self, personas: list[Persona], merged_name: str, merged_id: Optional[str] = None
     ) -> Persona:
         """Merge multiple personas into a hybrid persona.
 
@@ -448,7 +446,7 @@ class PersonaManager:
             },
         )
 
-    def evolve_persona(self, persona: Persona, feedback_list: List[Feedback]) -> Persona:
+    def evolve_persona(self, persona: Persona, feedback_list: list[Feedback]) -> Persona:
         """Evolve a persona based on aggregated feedback from episodic memory.
 
         This method creates an evolved version of a persona by applying
@@ -550,7 +548,7 @@ class PersonaManager:
 
         return evolved
 
-    def export_persona(self, persona_id: str) -> Dict[str, Any]:
+    def export_persona(self, persona_id: str) -> dict[str, Any]:
         """Export a persona for sharing.
 
         Args:
@@ -568,7 +566,7 @@ class PersonaManager:
 
         return persona.to_dict()
 
-    def import_persona(self, definition: Dict[str, Any]) -> Persona:
+    def import_persona(self, definition: dict[str, Any]) -> Persona:
         """Import a persona from definition.
 
         Args:
@@ -613,8 +611,8 @@ class PersonaManager:
         return persona
 
     def _determine_adjustments(
-        self, persona: Persona, context: Dict[str, Any]
-    ) -> List[ContextAdjustment]:
+        self, persona: Persona, context: dict[str, Any]
+    ) -> list[ContextAdjustment]:
         """Determine context-specific adjustments.
 
         Args:
@@ -675,8 +673,8 @@ class PersonaManager:
         return adjustments
 
     def _calculate_dynamic_traits(
-        self, persona: Persona, context: Dict[str, Any]
-    ) -> List[DynamicTrait]:
+        self, persona: Persona, context: dict[str, Any]
+    ) -> list[DynamicTrait]:
         """Calculate dynamic traits based on context.
 
         Args:
@@ -727,7 +725,7 @@ class PersonaManager:
         return traits
 
     def _explain_adaptations(
-        self, persona: Persona, context: Dict[str, Any], adjustments: List[ContextAdjustment]
+        self, persona: Persona, context: dict[str, Any], adjustments: list[ContextAdjustment]
     ) -> str:
         """Generate explanation for adaptations.
 
@@ -758,7 +756,7 @@ class PersonaManager:
 
         return "; ".join(reasons) if reasons else "Standard persona application"
 
-    def _extract_expertise_from_task(self, task: str) -> Set[str]:
+    def _extract_expertise_from_task(self, task: str) -> set[str]:
         """Extract expertise requirements from task description.
 
         Args:
@@ -821,7 +819,7 @@ class PersonaManager:
         return False
 
     def _parse_constraints(
-        self, constraints_data: Optional[Dict[str, Any]]
+        self, constraints_data: Optional[dict[str, Any]]
     ) -> Optional[PersonaConstraints]:
         """Parse constraints from dictionary.
 
@@ -843,7 +841,7 @@ class PersonaManager:
         )
 
     def _parse_prompt_templates(
-        self, templates_data: Optional[Dict[str, Any]]
+        self, templates_data: Optional[dict[str, Any]]
     ) -> Optional[PromptTemplates]:
         """Parse prompt templates from dictionary.
 
@@ -888,7 +886,7 @@ class PersonaManager:
                 if overlap:
                     raise ValueError(f"Tools cannot be both preferred and forbidden: {overlap}")
 
-    def _apply_improvements(self, persona: Persona, improvements: Dict[str, Any]) -> None:
+    def _apply_improvements(self, persona: Persona, improvements: dict[str, Any]) -> None:
         """Apply suggested improvements to persona.
 
         Args:
@@ -933,7 +931,7 @@ class PersonaManager:
         for key in keys_to_remove:
             del self._adaptation_cache[key]
 
-    def _validate_merge_compatibility(self, personas: List[Persona]) -> None:
+    def _validate_merge_compatibility(self, personas: list[Persona]) -> None:
         """Validate that personas can be merged without conflicts.
 
         Args:
@@ -964,7 +962,7 @@ class PersonaManager:
             )
 
     def _merge_constraints(
-        self, constraints_list: List[Optional[PersonaConstraints]]
+        self, constraints_list: list[Optional[PersonaConstraints]]
     ) -> PersonaConstraints:
         """Merge multiple constraint sets.
 
@@ -1024,7 +1022,7 @@ class PersonaManager:
         )
 
     def _merge_prompt_templates(
-        self, templates_list: List[Optional[PromptTemplates]]
+        self, templates_list: list[Optional[PromptTemplates]]
     ) -> Optional[PromptTemplates]:
         """Merge multiple prompt template sets.
 
@@ -1056,7 +1054,7 @@ class PersonaManager:
             farewell=base.farewell,
         )
 
-    def _publish_event(self, event_type: str, data: Dict[str, Any]) -> None:
+    def _publish_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Publish persona event to event bus.
 
         Args:

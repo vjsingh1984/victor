@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 
 class ChunkType(str, Enum):
@@ -73,10 +73,10 @@ class OrchestratorStreamChunk:
     content: str = ""
     tool_name: Optional[str] = None
     tool_id: Optional[str] = None
-    tool_arguments: Optional[Dict[str, Any]] = None
+    tool_arguments: Optional[dict[str, Any]] = None
     tool_result: Optional[str] = None
     error: Optional[str] = None
     old_stage: Optional[str] = None
     new_stage: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     is_final: bool = False

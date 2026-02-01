@@ -16,9 +16,9 @@
 
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
-from victor.core.chunking.base import Chunk, ChunkingConfig, ChunkingStrategy
+from victor.core.chunking.base import Chunk, ChunkingStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,10 @@ class JSONChunkingStrategy(ChunkingStrategy):
         return "json"
 
     @property
-    def supported_types(self) -> List[str]:
+    def supported_types(self) -> list[str]:
         return ["json", "jsonl"]
 
-    def chunk(self, content: str) -> List[Chunk]:
+    def chunk(self, content: str) -> list[Chunk]:
         """Chunk JSON content preserving structure.
 
         Args:
@@ -74,7 +74,7 @@ class JSONChunkingStrategy(ChunkingStrategy):
                 )
             ]
 
-    def _chunk_object(self, data: dict[str, Any]) -> List[Chunk]:
+    def _chunk_object(self, data: dict[str, Any]) -> list[Chunk]:
         """Chunk a JSON object by top-level keys.
 
         Args:
@@ -125,7 +125,7 @@ class JSONChunkingStrategy(ChunkingStrategy):
         logger.debug(f"JSON object chunking produced {len(chunks)} chunks")
         return chunks
 
-    def _chunk_array(self, data: list[Any]) -> List[Chunk]:
+    def _chunk_array(self, data: list[Any]) -> list[Chunk]:
         """Chunk a JSON array by batching items.
 
         Args:
@@ -137,8 +137,8 @@ class JSONChunkingStrategy(ChunkingStrategy):
         from victor.core.chunking.strategies.text import TextChunkingStrategy
 
         text_strategy = TextChunkingStrategy(self.config)
-        chunks: List[Chunk] = []
-        current_batch: List[Dict[str, Any]] = []
+        chunks: list[Chunk] = []
+        current_batch: list[dict[str, Any]] = []
         current_size = 0
         pos = 0
 

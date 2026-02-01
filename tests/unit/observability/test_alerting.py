@@ -20,7 +20,6 @@ from victor.observability.alerting import (
     AlertManager,
     Alert,
     AlertRule,
-    AlertRuleBuilder,
     AlertSeverity,
     AlertStatus,
     WebhookNotifier,

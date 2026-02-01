@@ -38,7 +38,7 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 # Import LearnerType from enum directly to avoid circular import
 from victor.framework.rl import LearnerType
@@ -46,7 +46,7 @@ from victor.framework.rl import LearnerType
 
 # Default patience map - shared across all verticals
 # These are reasonable defaults for continuation learning
-DEFAULT_PATIENCE_MAP: Dict[str, int] = {
+DEFAULT_PATIENCE_MAP: dict[str, int] = {
     "anthropic": 4,
     "openai": 4,
     "google": 4,
@@ -60,7 +60,7 @@ DEFAULT_PATIENCE_MAP: Dict[str, int] = {
 }
 
 # Default active learners - shared across all verticals
-DEFAULT_ACTIVE_LEARNERS: List[LearnerType] = [
+DEFAULT_ACTIVE_LEARNERS: list[LearnerType] = [
     LearnerType.TOOL_SELECTOR,
     LearnerType.CONTINUATION_PATIENCE,
     LearnerType.GROUNDING_THRESHOLD,
@@ -89,23 +89,23 @@ class BaseRLConfig:
     """
 
     # Learners to activate - shared defaults
-    active_learners: List[LearnerType] = field(
+    active_learners: list[LearnerType] = field(
         default_factory=lambda: list(DEFAULT_ACTIVE_LEARNERS)
     )
 
     # Task type to tool mappings - must be provided by subclass
-    task_type_mappings: Dict[str, List[str]] = field(default_factory=dict)
+    task_type_mappings: dict[str, list[str]] = field(default_factory=dict)
 
     # Quality thresholds by task type - must be provided by subclass
-    quality_thresholds: Dict[str, float] = field(default_factory=dict)
+    quality_thresholds: dict[str, float] = field(default_factory=dict)
 
     # Continuation patience by provider - shared defaults
-    default_patience: Dict[str, int] = field(default_factory=lambda: dict(DEFAULT_PATIENCE_MAP))
+    default_patience: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_PATIENCE_MAP))
 
     # Exploration bonus for tool selection (can be overridden)
     exploration_bonus: float = 0.15
 
-    def get_tools_for_task(self, task_type: str) -> List[str]:
+    def get_tools_for_task(self, task_type: str) -> list[str]:
         """Get recommended tools for a task type.
 
         Args:
@@ -149,7 +149,7 @@ class BaseRLConfig:
         """
         return learner in self.active_learners
 
-    def get_rl_config(self) -> Dict[str, Any]:
+    def get_rl_config(self) -> dict[str, Any]:
         """Return RL configuration as dictionary (protocol compliance).
 
         Implements RLConfigProviderProtocol.get_rl_config() to enable

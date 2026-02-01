@@ -20,7 +20,8 @@ to inject experiment configuration.
 
 import time
 import uuid
-from typing import Any, AsyncGenerator, Callable, Dict, Optional
+from typing import Any, Optional
+from collections.abc import AsyncGenerator, Callable
 
 from victor.experiments.ab_testing.experiment import ABTestManager
 from victor.experiments.ab_testing.models import ExperimentConfig
@@ -66,7 +67,7 @@ class WorkflowInterceptor:
         workflow_func: Callable[..., Any],
         experiment_id: str,
         user_id: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         *args: Any,
         **kwargs: Any,
     ) -> Any:
@@ -157,8 +158,8 @@ class WorkflowInterceptor:
         self,
         experiment: ExperimentConfig,
         variant_id: str,
-        kwargs: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        kwargs: dict[str, Any],
+    ) -> dict[str, Any]:
         """Apply variant configuration to execution parameters.
 
         Args:
@@ -186,7 +187,7 @@ class WorkflowInterceptor:
         variant_id: str,
         user_id: str,
         execution_id: str,
-        context: Optional[Dict[str, Any]],
+        context: Optional[dict[str, Any]],
         result: Any,
         start_time: float,
         success: bool,
@@ -284,7 +285,7 @@ class ExperimentCompiledGraphWrapper:
 
     async def invoke(
         self,
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         user_id: str = "unknown",
         **kwargs: Any,
     ) -> Any:
@@ -358,10 +359,10 @@ class ExperimentCompiledGraphWrapper:
 
     async def stream(
         self,
-        initial_state: Dict[str, Any],
+        initial_state: dict[str, Any],
         user_id: str = "unknown",
         **kwargs: Any,
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    ) -> AsyncGenerator[dict[str, Any], None]:
         """Stream graph execution with experiment configuration.
 
         Args:
@@ -440,7 +441,7 @@ class ExperimentCompiledGraphWrapper:
         variant_id: str,
         user_id: str,
         execution_id: str,
-        context: Optional[Dict[str, Any]],
+        context: Optional[dict[str, Any]],
         result: Any,
         start_time: float,
         success: bool,

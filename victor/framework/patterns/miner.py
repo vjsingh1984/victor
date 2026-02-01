@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional, cast
 
 from victor.framework.patterns.types import (
     CollaborationPattern,
@@ -64,8 +64,8 @@ class PatternMiner:
 
     async def mine_from_traces(
         self,
-        traces: List[WorkflowExecutionTrace],
-    ) -> List[CollaborationPattern]:
+        traces: list[WorkflowExecutionTrace],
+    ) -> list[CollaborationPattern]:
         """Extract patterns from execution traces.
 
         Args:
@@ -99,7 +99,7 @@ class PatternMiner:
     async def analyze_execution_order(
         self,
         trace: WorkflowExecutionTrace,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze execution order patterns.
 
         Args:
@@ -127,8 +127,8 @@ class PatternMiner:
 
     async def detect_formations(
         self,
-        traces: List[WorkflowExecutionTrace],
-    ) -> Dict[PatternCategory, int]:
+        traces: list[WorkflowExecutionTrace],
+    ) -> dict[PatternCategory, int]:
         """Detect pattern categories from traces.
 
         Args:
@@ -137,7 +137,7 @@ class PatternMiner:
         Returns:
             Dictionary mapping category to frequency
         """
-        category_counts: Dict[PatternCategory, int] = defaultdict(int)
+        category_counts: dict[PatternCategory, int] = defaultdict(int)
 
         for trace in traces:
             category = self._detect_category(trace)
@@ -147,8 +147,8 @@ class PatternMiner:
 
     def _group_by_structure(
         self,
-        traces: List[WorkflowExecutionTrace],
-    ) -> Dict[str, List[WorkflowExecutionTrace]]:
+        traces: list[WorkflowExecutionTrace],
+    ) -> dict[str, list[WorkflowExecutionTrace]]:
         """Group traces by similar execution structure.
 
         Args:
@@ -157,7 +157,7 @@ class PatternMiner:
         Returns:
             Dictionary mapping structure key to traces
         """
-        groups: Dict[str, List[WorkflowExecutionTrace]] = defaultdict(list)
+        groups: dict[str, list[WorkflowExecutionTrace]] = defaultdict(list)
 
         for trace in traces:
             # Create structure key from execution order
@@ -183,7 +183,7 @@ class PatternMiner:
 
         return f"{'-'.join(nodes)}|{order_pattern}"
 
-    def _get_order_pattern(self, execution_order: List[str]) -> str:
+    def _get_order_pattern(self, execution_order: list[str]) -> str:
         """Extract execution order pattern.
 
         Args:
@@ -216,7 +216,7 @@ class PatternMiner:
     def _create_pattern_from_group(
         self,
         structure_key: str,
-        traces: List[WorkflowExecutionTrace],
+        traces: list[WorkflowExecutionTrace],
     ) -> Optional[CollaborationPattern]:
         """Create a pattern from a group of similar traces.
 
@@ -293,7 +293,7 @@ class PatternMiner:
         # Default to sequential
         return PatternCategory.SEQUENTIAL
 
-    def _detect_parallel_groups(self, trace: WorkflowExecutionTrace) -> List[List[str]]:
+    def _detect_parallel_groups(self, trace: WorkflowExecutionTrace) -> list[list[str]]:
         """Detect groups of parallel nodes.
 
         Args:
@@ -344,7 +344,7 @@ class PatternMiner:
 
         return has_manager and has_worker
 
-    def _extract_participants(self, traces: List[WorkflowExecutionTrace]) -> List[Dict[str, Any]]:
+    def _extract_participants(self, traces: list[WorkflowExecutionTrace]) -> list[dict[str, Any]]:
         """Extract participant specs from traces.
 
         Args:
@@ -354,7 +354,7 @@ class PatternMiner:
             List of participant specifications
         """
         # Collect all unique nodes across traces
-        all_nodes: Dict[str, int] = defaultdict(int)
+        all_nodes: dict[str, int] = defaultdict(int)
         for trace in traces:
             for node in trace.nodes_executed:
                 all_nodes[node] += 1
@@ -383,7 +383,7 @@ class PatternMiner:
     def _generate_pattern_name(
         self,
         category: PatternCategory,
-        participants: List[Dict[str, Any]],
+        participants: list[dict[str, Any]],
     ) -> str:
         """Generate a descriptive pattern name.
 
@@ -395,7 +395,7 @@ class PatternMiner:
             Pattern name
         """
         # Count roles
-        role_counts: Dict[str, int] = defaultdict(int)
+        role_counts: dict[str, int] = defaultdict(int)
         for p in participants:
             role_counts[p["role"]] += 1
 

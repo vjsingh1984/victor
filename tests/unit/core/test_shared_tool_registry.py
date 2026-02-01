@@ -20,8 +20,8 @@ way to share tool instances across multiple concurrent orchestrator sessions.
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict
-from unittest.mock import MagicMock, patch
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -340,10 +340,10 @@ class MockBaseTool(BaseTool):
         return "A mock tool for testing"
 
     @property
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         return {"type": "object", "properties": {}}
 
-    async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
+    async def execute(self, _exec_ctx: dict[str, Any], **kwargs: Any) -> ToolResult:
         return ToolResult(success=True, output="mock result")
 
 

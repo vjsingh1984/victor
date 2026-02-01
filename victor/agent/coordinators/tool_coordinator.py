@@ -55,16 +55,11 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
     runtime_checkable,
 )
+from collections.abc import Callable
 
 from victor.agent.argument_normalizer import NormalizationStrategy
 
@@ -74,11 +69,9 @@ if TYPE_CHECKING:
     from victor.agent.budget_manager import BudgetManager
     from victor.agent.tool_executor import ToolExecutionResult
     from victor.storage.cache.tool_cache import ToolCache
-    from victor.tools.base import BaseTool
     from victor.tools.registry import ToolRegistry
     from victor.agent.argument_normalizer import ArgumentNormalizer
     from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallParseResult
-    from victor.tools.tool_names import ToolNames
 
     # Type alias for convenience
     ToolCallingAdapter = BaseToolCallingAdapter
@@ -89,7 +82,6 @@ from victor.agent.coordinators.base_config import BaseCoordinatorConfig
 from victor.agent.coordinators.tool_budget_coordinator import (
     ToolBudgetCoordinator,
     ToolBudgetConfig,
-    BudgetStatus,
 )
 from victor.agent.coordinators.tool_access_coordinator import (
     ToolAccessCoordinator,
@@ -99,7 +91,6 @@ from victor.agent.coordinators.tool_access_coordinator import (
 from victor.agent.coordinators.tool_alias_resolver import (
     ToolAliasResolver,
     ToolAliasConfig,
-    ResolutionResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -126,11 +117,11 @@ class TaskContext:
     complexity: str = "medium"
     goals: Optional[Any] = None
     stage: Optional[str] = None
-    observed_files: Set[str] = field(default_factory=set)
-    executed_tools: Set[str] = field(default_factory=set)
+    observed_files: set[str] = field(default_factory=set)
+    executed_tools: set[str] = field(default_factory=set)
     conversation_depth: int = 0
-    conversation_history: Optional[List[Dict[str, Any]]] = None
-    additional_context: Dict[str, Any] = field(default_factory=dict)
+    conversation_history: Optional[list[dict[str, Any]]] = None
+    additional_context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -174,7 +165,7 @@ class ToolCoordinatorConfig(BaseCoordinatorConfig):
 class IToolCoordinator(Protocol):
     """Protocol for tool coordination operations."""
 
-    async def select_tools(self, context: TaskContext) -> List[Any]: ...
+    async def select_tools(self, context: TaskContext) -> list[Any]: ...
 
     def get_remaining_budget(self) -> int: ...
 
@@ -182,17 +173,17 @@ class IToolCoordinator(Protocol):
 
     def is_tool_enabled(self, tool_name: str) -> bool: ...
 
-    def get_enabled_tools(self) -> Set[str]: ...
+    def get_enabled_tools(self) -> set[str]: ...
 
-    def set_enabled_tools(self, tools: Set[str]) -> None: ...
+    def set_enabled_tools(self, tools: set[str]) -> None: ...
 
     async def execute_tool_calls(
-        self, tool_calls: List[Dict[str, Any]], context: Optional[TaskContext] = None
+        self, tool_calls: list[dict[str, Any]], context: Optional[TaskContext] = None
     ) -> Any: ...
 
     def resolve_tool_alias(self, tool_name: str) -> str: ...
 
-    def get_tool_usage_stats(self) -> Dict[str, Any]: ...
+    def get_tool_usage_stats(self) -> dict[str, Any]: ...
 
 
 class ToolCoordinator:
@@ -299,10 +290,10 @@ class ToolCoordinator:
         )
 
         # Legacy state (for backward compatibility)
-        self._selection_history: List[Tuple[str, int]] = []
+        self._selection_history: list[tuple[str, int]] = []
         self._execution_count: int = 0
-        self._executed_tools: List[str] = []
-        self._failed_tool_signatures: Set[Tuple[str, str]] = set()
+        self._executed_tools: list[str] = []
+        self._failed_tool_signatures: set[tuple[str, str]] = set()
 
         # Tool access dependencies (injected after init)
         self._mode_controller: Optional[Any] = None
@@ -387,7 +378,7 @@ class ToolCoordinator:
         self,
         context: TaskContext,
         max_tools: Optional[int] = None,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Select appropriate tools for the current context.
 
         Uses the configured ToolSelector to determine which tools are
@@ -412,7 +403,7 @@ class ToolCoordinator:
             # - Old: (user_message, use_semantic, conversation_history, conversation_depth, planned_tools)
             # - New: (context: ToolSelectionContext, max_tools: int = 10)
             # Support both patterns
-            selector_kwargs: Dict[str, Any] = {
+            selector_kwargs: dict[str, Any] = {
                 "user_message": context.message,
                 "conversation_history": context.conversation_history,
                 "conversation_depth": context.conversation_depth,
@@ -440,13 +431,13 @@ class ToolCoordinator:
             logger.warning(f"Tool selection failed: {e}, returning empty list")
             return []
 
-    def get_selection_stats(self) -> Dict[str, Any]:
+    def get_selection_stats(self) -> dict[str, Any]:
         """Get tool selection statistics.
 
         Returns:
             Dict with selection method distribution and counts
         """
-        method_counts: Dict[str, int] = {}
+        method_counts: dict[str, int] = {}
         total_selected = 0
 
         for method, count in self._selection_history:
@@ -466,7 +457,7 @@ class ToolCoordinator:
     # Tool Access Control (delegates to ToolAccessCoordinator)
     # =====================================================================
 
-    def get_enabled_tools(self) -> Set[str]:
+    def get_enabled_tools(self) -> set[str]:
         """Get currently enabled tool names.
 
         Returns:
@@ -481,7 +472,7 @@ class ToolCoordinator:
 
         return self._access_coordinator.get_enabled_tools(context)
 
-    def set_enabled_tools(self, tools: Set[str]) -> None:
+    def set_enabled_tools(self, tools: set[str]) -> None:
         """Set which tools are enabled for this session.
 
         Args:
@@ -512,7 +503,7 @@ class ToolCoordinator:
 
         return self._access_coordinator.is_tool_enabled(tool_name, context)
 
-    def get_available_tools(self) -> Set[str]:
+    def get_available_tools(self) -> set[str]:
         """Get all registered tool names.
 
         Returns:
@@ -527,7 +518,7 @@ class ToolCoordinator:
             ToolAccessContext with session tools and current mode
         """
         # Get disallowed tools from mode controller
-        disallowed: Set[str] = set()
+        disallowed: set[str] = set()
         mode_name = None
 
         if self._mode_controller:
@@ -565,7 +556,7 @@ class ToolCoordinator:
 
     async def execute_tool_calls(
         self,
-        tool_calls: List[Dict[str, Any]],
+        tool_calls: list[dict[str, Any]],
         context: Optional[TaskContext] = None,
     ) -> "PipelineExecutionResult":
         """Execute tool calls through the pipeline.
@@ -618,9 +609,9 @@ class ToolCoordinator:
     async def execute_tool_with_retry(
         self,
         tool_name: str,
-        tool_args: Dict[str, Any],
-        context: Dict[str, Any],
-    ) -> Tuple[Optional[Any], bool, Optional[str]]:
+        tool_args: dict[str, Any],
+        context: dict[str, Any],
+    ) -> tuple[Optional[Any], bool, Optional[str]]:
         """Execute a tool with retry logic and exponential backoff.
 
         Args:
@@ -747,11 +738,11 @@ class ToolCoordinator:
 
     async def handle_tool_calls(
         self,
-        tool_calls: List[Dict[str, Any]],
-        execution_context: Optional[Dict[str, Any]] = None,
+        tool_calls: list[dict[str, Any]],
+        execution_context: Optional[dict[str, Any]] = None,
         message_adder: Optional[Any] = None,
         formatter: Optional[Any] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Handle tool calls from the model with full orchestration.
 
         This method orchestrates the complete tool execution flow:
@@ -777,7 +768,7 @@ class ToolCoordinator:
             return []
 
         execution_context = execution_context or {}
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         for tool_call in tool_calls:
             # Validate structure
@@ -952,7 +943,7 @@ class ToolCoordinator:
     def parse_tool_calls(
         self,
         content: str,
-        raw_tool_calls: Optional[List[Dict[str, Any]]] = None,
+        raw_tool_calls: Optional[list[dict[str, Any]]] = None,
     ) -> "ToolCallParseResult":
         """Parse tool calls using the tool calling adapter.
 
@@ -999,9 +990,9 @@ class ToolCoordinator:
 
     def normalize_tool_arguments(
         self,
-        tool_args: Dict[str, Any],
+        tool_args: dict[str, Any],
         tool_name: str,
-    ) -> Tuple[Dict[str, Any], "NormalizationStrategy"]:
+    ) -> tuple[dict[str, Any], "NormalizationStrategy"]:
         """Normalize tool arguments to handle malformed JSON.
 
         Args:
@@ -1020,7 +1011,7 @@ class ToolCoordinator:
     # Statistics and Tracking
     # =====================================================================
 
-    def get_execution_stats(self) -> Dict[str, Any]:
+    def get_execution_stats(self) -> dict[str, Any]:
         """Get tool execution statistics.
 
         Returns:
@@ -1038,7 +1029,7 @@ class ToolCoordinator:
             "failed_signatures_count": len(self._failed_tool_signatures),
         }
 
-    def get_tool_usage_stats(self) -> Dict[str, Any]:
+    def get_tool_usage_stats(self) -> dict[str, Any]:
         """Get comprehensive tool usage statistics.
 
         Returns:

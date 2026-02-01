@@ -95,11 +95,8 @@ from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
     runtime_checkable,
 )
 
@@ -139,22 +136,22 @@ class VerticalContextProtocol(Protocol):
         ...
 
     @property
-    def middleware(self) -> List["MiddlewareProtocol"]:
+    def middleware(self) -> list["MiddlewareProtocol"]:
         """Get middleware list."""
         ...
 
     @property
-    def safety_patterns(self) -> List["SafetyPattern"]:
+    def safety_patterns(self) -> list["SafetyPattern"]:
         """Get safety patterns."""
         ...
 
     @property
-    def task_hints(self) -> Dict[str, "TaskTypeHint"]:
+    def task_hints(self) -> dict[str, "TaskTypeHint"]:
         """Get task type hints."""
         ...
 
     @property
-    def mode_configs(self) -> Dict[str, "ModeConfig"]:
+    def mode_configs(self) -> dict[str, "ModeConfig"]:
         """Get mode configurations."""
         ...
 
@@ -175,25 +172,25 @@ class MutableVerticalContextProtocol(VerticalContextProtocol, Protocol):
         """Apply a vertical to this context."""
         ...
 
-    def apply_stages(self, stages: Dict[str, Any]) -> None:
+    def apply_stages(self, stages: dict[str, Any]) -> None:
         """Apply stage configuration."""
         ...
 
-    def apply_middleware(self, middleware: List["MiddlewareProtocol"]) -> None:
+    def apply_middleware(self, middleware: list["MiddlewareProtocol"]) -> None:
         """Apply middleware list."""
         ...
 
-    def apply_safety_patterns(self, patterns: List["SafetyPattern"]) -> None:
+    def apply_safety_patterns(self, patterns: list["SafetyPattern"]) -> None:
         """Apply safety patterns."""
         ...
 
-    def apply_task_hints(self, hints: Dict[str, "TaskTypeHint"]) -> None:
+    def apply_task_hints(self, hints: dict[str, "TaskTypeHint"]) -> None:
         """Apply task type hints."""
         ...
 
     def apply_mode_configs(
         self,
-        configs: Dict[str, "ModeConfig"],
+        configs: dict[str, "ModeConfig"],
         default_mode: str = "default",
         default_budget: int = 10,
     ) -> None:
@@ -202,8 +199,8 @@ class MutableVerticalContextProtocol(VerticalContextProtocol, Protocol):
 
     def apply_tool_dependencies(
         self,
-        dependencies: List["ToolDependency"],
-        sequences: List[List[str]],
+        dependencies: list["ToolDependency"],
+        sequences: list[list[str]],
     ) -> None:
         """Apply tool dependencies."""
         ...
@@ -220,7 +217,7 @@ class MutableVerticalContextProtocol(VerticalContextProtocol, Protocol):
         """Retrieve a capability configuration."""
         ...
 
-    def apply_capability_configs(self, configs: Dict[str, Any]) -> None:
+    def apply_capability_configs(self, configs: dict[str, Any]) -> None:
         """Apply multiple capability configurations at once."""
         ...
 
@@ -272,36 +269,36 @@ class VerticalContext:
     config: Optional["VerticalConfig"] = None
 
     # Stage configuration
-    stages: Dict[str, Any] = field(default_factory=dict)
+    stages: dict[str, Any] = field(default_factory=dict)
 
     # Middleware chain
-    middleware: List[Any] = field(default_factory=list)
+    middleware: list[Any] = field(default_factory=list)
 
     # Safety extensions
-    safety_patterns: List[Any] = field(default_factory=list)
+    safety_patterns: list[Any] = field(default_factory=list)
 
     # Prompt contributions
-    task_hints: Dict[str, Any] = field(default_factory=dict)
+    task_hints: dict[str, Any] = field(default_factory=dict)
     system_prompt: Optional[str] = None
-    prompt_sections: List[str] = field(default_factory=list)
+    prompt_sections: list[str] = field(default_factory=list)
 
     # Mode configuration
-    mode_configs: Dict[str, Any] = field(default_factory=dict)
+    mode_configs: dict[str, Any] = field(default_factory=dict)
     default_mode: str = "default"
     default_budget: int = 10
 
     # Tool dependencies
-    tool_dependencies: List[Any] = field(default_factory=list)
-    tool_sequences: List[List[str]] = field(default_factory=list)
+    tool_dependencies: list[Any] = field(default_factory=list)
+    tool_sequences: list[list[str]] = field(default_factory=list)
 
     # Tool filter
-    enabled_tools: Set[str] = field(default_factory=set)
+    enabled_tools: set[str] = field(default_factory=set)
 
     # New framework integrations (workflows, RL, teams)
-    workflows: Dict[str, Any] = field(default_factory=dict)
+    workflows: dict[str, Any] = field(default_factory=dict)
     rl_config: Optional[Any] = None
     rl_hooks: Optional[Any] = None
-    team_specs: Dict[str, Any] = field(default_factory=dict)
+    team_specs: dict[str, Any] = field(default_factory=dict)
 
     # Tiered tool configuration (Phase 1: Gap fix)
     tiered_config: Optional["TieredToolConfig"] = None
@@ -316,7 +313,7 @@ class VerticalContext:
     # Replaces direct orchestrator attribute assignment patterns like:
     # orchestrator.rag_config = {...}
     # orchestrator.source_verification_config = {...}
-    capability_configs: Dict[str, Any] = field(default_factory=dict)
+    capability_configs: dict[str, Any] = field(default_factory=dict)
 
     # ==========================================================================
     # Property Accessors
@@ -410,7 +407,7 @@ class VerticalContext:
         self.name = name
         self.config = config
 
-    def apply_stages(self, stages: Dict[str, Any]) -> None:
+    def apply_stages(self, stages: dict[str, Any]) -> None:
         """Apply stage configuration.
 
         Args:
@@ -418,7 +415,7 @@ class VerticalContext:
         """
         self.stages = stages
 
-    def apply_middleware(self, middleware: List[Any]) -> None:
+    def apply_middleware(self, middleware: list[Any]) -> None:
         """Apply middleware list.
 
         Args:
@@ -426,7 +423,7 @@ class VerticalContext:
         """
         self.middleware = middleware
 
-    def apply_safety_patterns(self, patterns: List[Any]) -> None:
+    def apply_safety_patterns(self, patterns: list[Any]) -> None:
         """Apply safety patterns.
 
         Args:
@@ -434,7 +431,7 @@ class VerticalContext:
         """
         self.safety_patterns = patterns
 
-    def apply_task_hints(self, hints: Dict[str, Any]) -> None:
+    def apply_task_hints(self, hints: dict[str, Any]) -> None:
         """Apply task type hints.
 
         Args:
@@ -444,7 +441,7 @@ class VerticalContext:
 
     def apply_mode_configs(
         self,
-        configs: Dict[str, Any],
+        configs: dict[str, Any],
         default_mode: str = "default",
         default_budget: int = 10,
     ) -> None:
@@ -461,8 +458,8 @@ class VerticalContext:
 
     def apply_tool_dependencies(
         self,
-        dependencies: List[Any],
-        sequences: Optional[List[List[str]]] = None,
+        dependencies: list[Any],
+        sequences: Optional[list[list[str]]] = None,
     ) -> None:
         """Apply tool dependencies.
 
@@ -481,7 +478,7 @@ class VerticalContext:
         """
         self.system_prompt = prompt
 
-    def apply_enabled_tools(self, tools: Set[str]) -> None:
+    def apply_enabled_tools(self, tools: set[str]) -> None:
         """Apply enabled tools filter.
 
         Args:
@@ -497,7 +494,7 @@ class VerticalContext:
         """
         self.prompt_sections.append(section)
 
-    def apply_workflows(self, workflows: Dict[str, Any]) -> None:
+    def apply_workflows(self, workflows: dict[str, Any]) -> None:
         """Apply workflow definitions.
 
         Args:
@@ -521,7 +518,7 @@ class VerticalContext:
         """
         self.rl_hooks = hooks
 
-    def apply_team_specs(self, specs: Dict[str, Any]) -> None:
+    def apply_team_specs(self, specs: dict[str, Any]) -> None:
         """Apply team specifications.
 
         Args:
@@ -587,7 +584,7 @@ class VerticalContext:
         """
         return self.capability_configs.get(name, default)
 
-    def apply_capability_configs(self, configs: Dict[str, Any]) -> None:
+    def apply_capability_configs(self, configs: dict[str, Any]) -> None:
         """Apply multiple capability configurations at once.
 
         Args:
@@ -637,7 +634,7 @@ class VerticalContext:
 
         return self.default_budget
 
-    def get_stage_tools(self, stage: str) -> Set[str]:
+    def get_stage_tools(self, stage: str) -> set[str]:
         """Get tools available for a stage.
 
         Args:
@@ -684,7 +681,7 @@ class VerticalContext:
         """
         return self.team_specs.get(name)
 
-    def list_workflows(self) -> List[str]:
+    def list_workflows(self) -> list[str]:
         """List available workflow names.
 
         Returns:
@@ -692,7 +689,7 @@ class VerticalContext:
         """
         return list(self.workflows.keys())
 
-    def list_team_specs(self) -> List[str]:
+    def list_team_specs(self) -> list[str]:
         """List available team spec names.
 
         Returns:
@@ -716,7 +713,7 @@ class VerticalContext:
     # Serialization
     # ==========================================================================
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization.
 
         Returns:

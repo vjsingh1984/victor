@@ -52,11 +52,7 @@ import logging
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Dict,
-    List,
     Optional,
-    Type,
 )
 
 from victor.framework.step_handlers import BaseStepHandler
@@ -174,7 +170,7 @@ class WorkflowStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -254,7 +250,7 @@ class RLConfigStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -338,7 +334,7 @@ class TeamSpecStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -412,7 +408,7 @@ class ChainStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -479,7 +475,7 @@ class PersonaStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -549,7 +545,7 @@ class CapabilityProviderStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -632,7 +628,7 @@ class ToolGraphStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -696,7 +692,7 @@ class HandlerRegistrationStepHandler(BaseStepHandler):
     def _do_apply(
         self,
         orchestrator: Any,
-        vertical: Type["VerticalBase"],
+        vertical: type["VerticalBase"],
         context: "VerticalContext",
         result: "IntegrationResult",
     ) -> None:
@@ -749,7 +745,7 @@ class HandlerRegistrationStepHandler(BaseStepHandler):
 # =============================================================================
 
 
-def get_decomposed_handlers() -> List[BaseStepHandler]:
+def get_decomposed_handlers() -> list[BaseStepHandler]:
     """Get all decomposed handlers in order.
 
     Returns:
@@ -775,7 +771,7 @@ def create_decomposed_handlers(
     chain_registry: Optional[Any] = None,
     persona_registry: Optional[Any] = None,
     handler_registry: Optional[Any] = None,
-) -> List[BaseStepHandler]:
+) -> list[BaseStepHandler]:
     """Create decomposed handlers with injected registries.
 
     Args:

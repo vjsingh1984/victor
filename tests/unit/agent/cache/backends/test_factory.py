@@ -24,7 +24,6 @@ import pytest
 from victor.agent.cache.backends.factory import CacheBackendFactory
 from victor.agent.cache.backends.memory import MemoryCacheBackend
 from victor.protocols import ICacheBackend
-from victor.agent.cache.backends.redis import RedisCacheBackend
 from victor.agent.cache.backends.sqlite import SQLiteCacheBackend
 
 

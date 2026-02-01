@@ -49,7 +49,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +103,7 @@ class CacheInfo:
     description: str
     path: Path
     pattern: str
-    files: List[CacheFileInfo] = field(default_factory=list)
+    files: list[CacheFileInfo] = field(default_factory=list)
 
     @property
     def file_count(self) -> int:
@@ -149,7 +150,7 @@ class CacheInfo:
 class CacheStatus:
     """Overall cache status."""
 
-    caches: List[CacheInfo]
+    caches: list[CacheInfo]
 
     @property
     def total_files(self) -> int:
@@ -182,7 +183,7 @@ class ClearResult:
 
     cleared_files: int = 0
     cleared_size: int = 0
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
     @property
     def success(self) -> bool:
@@ -229,7 +230,7 @@ class EmbeddingCacheManager:
         self._project_embeddings = paths.project_victor_dir / "embeddings"
 
         # Cache category definitions
-        self._categories: Dict[CacheType, Dict[str, Any]] = {
+        self._categories: dict[CacheType, dict[str, Any]] = {
             CacheType.TOOL: {
                 "name": "Tool Embeddings",
                 "desc": "Semantic tool selection (project-isolated)",
@@ -256,9 +257,9 @@ class EmbeddingCacheManager:
             },
         }
 
-    def _scan_cache_files(self, path: Path, pattern: str) -> List[CacheFileInfo]:
+    def _scan_cache_files(self, path: Path, pattern: str) -> list[CacheFileInfo]:
         """Scan directory for cache files matching pattern."""
-        files: List[CacheFileInfo] = []
+        files: list[CacheFileInfo] = []
         if not path.exists():
             return files
 
@@ -321,7 +322,7 @@ class EmbeddingCacheManager:
 
     def clear(
         self,
-        cache_types: Optional[List[CacheType]] = None,
+        cache_types: Optional[list[CacheType]] = None,
         progress_callback: Optional[Callable[[str], None]] = None,
     ) -> ClearResult:
         """Clear specified caches.

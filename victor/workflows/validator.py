@@ -23,10 +23,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.workflows.linter import WorkflowLinter, LinterResult, lint_file, lint_dict
-from victor.workflows.validation_rules import DEFAULT_RULES, Severity, ValidationRule
+from victor.workflows.validation_rules import Severity, ValidationRule
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class WorkflowValidator:
         result = validator.validate_file("workflow.yaml")
     """
 
-    def __init__(self, strict_mode: bool = False, rules: Optional[List[ValidationRule]] = None):
+    def __init__(self, strict_mode: bool = False, rules: Optional[list[ValidationRule]] = None):
         """Initialize the validator.
 
         Args:
@@ -88,7 +88,7 @@ class WorkflowValidator:
                 if rule.severity in {Severity.INFO, Severity.SUGGESTION}:
                     rule.enabled = True
 
-    def validate(self, workflow_def: Dict[str, Any]) -> bool:
+    def validate(self, workflow_def: dict[str, Any]) -> bool:
         """Validate a workflow definition (legacy API).
 
         Args:
@@ -119,7 +119,7 @@ class WorkflowValidator:
         """
         return self.linter.lint_file(file_path)
 
-    def validate_dict(self, workflow: Dict[str, Any]) -> LinterResult:
+    def validate_dict(self, workflow: dict[str, Any]) -> LinterResult:
         """Validate a workflow dictionary.
 
         Args:
@@ -186,7 +186,7 @@ class WorkflowValidator:
         """
         self.linter.set_rule_severity(rule_id, severity)
 
-    def get_rules(self) -> List[ValidationRule]:
+    def get_rules(self) -> list[ValidationRule]:
         """Get list of all validation rules.
 
         Returns:
@@ -194,7 +194,7 @@ class WorkflowValidator:
         """
         return self.linter.get_rules()
 
-    def get_enabled_rules(self) -> List[ValidationRule]:
+    def get_enabled_rules(self) -> list[ValidationRule]:
         """Get list of enabled validation rules.
 
         Returns:

@@ -56,16 +56,11 @@ import logging
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
     TYPE_CHECKING,
 )
+from collections.abc import AsyncIterator, Callable
 
 from victor.agent.streaming.context import StreamingChatContext
 from victor.providers.base import StreamChunk
@@ -74,7 +69,6 @@ if TYPE_CHECKING:
     # Use protocol for type hint to avoid circular dependency (DIP compliance)
 
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.protocols.agent import IAgentOrchestrator
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -93,26 +87,26 @@ class RecoveryCoordinatorProtocol(Protocol):
     ) -> Optional[StreamChunk]: ...
 
     def truncate_tool_calls(
-        self, recovery_ctx: Any, tool_calls: List[Dict[str, Any]], remaining: int
-    ) -> Tuple[List[Dict[str, Any]], Any]: ...
+        self, recovery_ctx: Any, tool_calls: list[dict[str, Any]], remaining: int
+    ) -> tuple[list[dict[str, Any]], Any]: ...
 
     def filter_blocked_tool_calls(
-        self, recovery_ctx: Any, tool_calls: List[Dict[str, Any]]
-    ) -> Tuple[List[Dict[str, Any]], List[StreamChunk], int]: ...
+        self, recovery_ctx: Any, tool_calls: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], list[StreamChunk], int]: ...
 
     def check_blocked_threshold(
         self, recovery_ctx: Any, all_blocked: bool
-    ) -> Optional[Tuple[StreamChunk, bool]]: ...
+    ) -> Optional[tuple[StreamChunk, bool]]: ...
 
 
 class ChunkGeneratorProtocol(Protocol):
     """Protocol for chunk generation."""
 
     def generate_tool_start_chunk(
-        self, tool_name: str, tool_args: Dict[str, Any], status_msg: str
+        self, tool_name: str, tool_args: dict[str, Any], status_msg: str
     ) -> StreamChunk: ...
 
-    def generate_tool_result_chunks(self, result: Dict[str, Any]) -> List[StreamChunk]: ...
+    def generate_tool_result_chunks(self, result: dict[str, Any]) -> list[StreamChunk]: ...
 
     def generate_thinking_status_chunk(self) -> StreamChunk: ...
 
@@ -128,7 +122,7 @@ class ReminderManagerProtocol(Protocol):
 
     def update_state(
         self,
-        observed_files: Set[str],
+        observed_files: set[str],
         executed_tool: Optional[str],
         tool_calls: int,
     ) -> None: ...
@@ -140,7 +134,7 @@ class UnifiedTrackerProtocol(Protocol):
     """Protocol for unified task tracking."""
 
     @property
-    def unique_resources(self) -> Set[str]: ...
+    def unique_resources(self) -> set[str]: ...
 
 
 # =============================================================================
@@ -160,9 +154,9 @@ class ToolExecutionResult:
         last_tool_name: Name of the last executed tool (for reminder tracking).
     """
 
-    chunks: List[StreamChunk] = field(default_factory=list)
+    chunks: list[StreamChunk] = field(default_factory=list)
     should_return: bool = False
-    tool_results: List[Dict[str, Any]] = field(default_factory=list)
+    tool_results: list[dict[str, Any]] = field(default_factory=list)
     tool_calls_executed: int = 0
     last_tool_name: Optional[str] = None
 
@@ -170,7 +164,7 @@ class ToolExecutionResult:
         """Add a chunk to yield."""
         self.chunks.append(chunk)
 
-    def add_chunks(self, chunks: List[StreamChunk]) -> None:
+    def add_chunks(self, chunks: list[StreamChunk]) -> None:
         """Add multiple chunks to yield."""
         self.chunks.extend(chunks)
 
@@ -219,9 +213,9 @@ class ToolExecutionHandler:
         ],
         handle_budget_exhausted: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
         handle_force_final_response: Callable[[StreamingChatContext], AsyncIterator[StreamChunk]],
-        handle_tool_calls: Callable[[List[Dict[str, Any]]], Any],
-        get_tool_status_message: Callable[[str, Dict[str, Any]], str],
-        observed_files: Optional[Set[str]] = None,
+        handle_tool_calls: Callable[[list[dict[str, Any]]], Any],
+        get_tool_status_message: Callable[[str, dict[str, Any]], str],
+        observed_files: Optional[set[str]] = None,
     ):
         """Initialize the tool execution handler.
 
@@ -256,14 +250,14 @@ class ToolExecutionHandler:
         self._get_tool_status_message = get_tool_status_message
         self._observed_files = observed_files or set()
 
-    def update_observed_files(self, files: Set[str]) -> None:
+    def update_observed_files(self, files: set[str]) -> None:
         """Update the set of observed files."""
         self._observed_files = files
 
     async def execute_tools(
         self,
         stream_ctx: StreamingChatContext,
-        tool_calls: Optional[List[Dict[str, Any]]],
+        tool_calls: Optional[list[dict[str, Any]]],
         user_message: str,
         full_content: str,
         tool_calls_used: int,
@@ -367,9 +361,9 @@ class ToolExecutionHandler:
     async def _filter_and_truncate_tools(
         self,
         stream_ctx: StreamingChatContext,
-        tool_calls: Optional[List[Dict[str, Any]]],
+        tool_calls: Optional[list[dict[str, Any]]],
         result: ToolExecutionResult,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Filter and truncate tool calls based on budget and blocking rules."""
         if not tool_calls:
             return []
@@ -404,7 +398,7 @@ class ToolExecutionHandler:
     async def _execute_tool_calls(
         self,
         stream_ctx: StreamingChatContext,
-        tool_calls: List[Dict[str, Any]],
+        tool_calls: list[dict[str, Any]],
         result: ToolExecutionResult,
     ) -> None:
         """Execute tool calls and generate result chunks."""

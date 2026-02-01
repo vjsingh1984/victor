@@ -21,8 +21,6 @@ without modifying existing code.
 Part of SOLID-based refactoring to eliminate OCP violations.
 """
 
-from abc import ABC, abstractmethod
-from typing import Set
 
 from victor.agent.protocols import IProviderClassificationStrategy
 
@@ -36,7 +34,7 @@ class DefaultProviderClassificationStrategy(IProviderClassificationStrategy):
 
     def __init__(self) -> None:
         """Initialize with default provider sets."""
-        self._cloud_providers: Set[str] = {
+        self._cloud_providers: set[str] = {
             "anthropic",
             "openai",
             "google",
@@ -45,7 +43,7 @@ class DefaultProviderClassificationStrategy(IProviderClassificationStrategy):
             "moonshot",
             "groq",
         }
-        self._local_providers: Set[str] = {
+        self._local_providers: set[str] = {
             "ollama",
             "lmstudio",
             "vllm",
@@ -98,8 +96,8 @@ class ConfigurableProviderClassificationStrategy(IProviderClassificationStrategy
 
     def __init__(
         self,
-        cloud_providers: Set[str] | None = None,
-        local_providers: Set[str] | None = None,
+        cloud_providers: set[str] | None = None,
+        local_providers: set[str] | None = None,
     ) -> None:
         """Initialize with optional provider sets.
 
@@ -107,8 +105,8 @@ class ConfigurableProviderClassificationStrategy(IProviderClassificationStrategy
             cloud_providers: Set of cloud provider names
             local_providers: Set of local provider names
         """
-        self._cloud_providers: Set[str] = cloud_providers or set()
-        self._local_providers: Set[str] = local_providers or set()
+        self._cloud_providers: set[str] = cloud_providers or set()
+        self._local_providers: set[str] = local_providers or set()
 
     def add_cloud_provider(self, provider_name: str) -> None:
         """Add a cloud provider (OCP compliance).

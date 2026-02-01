@@ -66,11 +66,9 @@ Example:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import logging
 import sqlite3
-import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -78,16 +76,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
-    Dict,
     Generic,
-    Iterator,
-    List,
     Optional,
-    Type,
     TypeVar,
-    Union,
 )
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +91,7 @@ logger = logging.getLogger(__name__)
 
 
 # Event type registry for deserialization (module-level to avoid dataclass issues)
-_EVENT_REGISTRY: Dict[str, Type["DomainEvent"]] = {}
+_EVENT_REGISTRY: dict[str, type["DomainEvent"]] = {}
 
 
 @dataclass
@@ -118,7 +111,7 @@ class DomainEvent:
     version: int = 1
     correlation_id: Optional[str] = None
     causation_id: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Auto-register event subclasses."""
@@ -126,7 +119,7 @@ class DomainEvent:
         _EVENT_REGISTRY[cls.__name__] = cls
 
     @classmethod
-    def register(cls, event_class: Type["DomainEvent"]) -> Type["DomainEvent"]:
+    def register(cls, event_class: type["DomainEvent"]) -> type["DomainEvent"]:
         """Explicitly register an event type.
 
         Normally event types are auto-registered, but this can be used
@@ -142,7 +135,7 @@ class DomainEvent:
         return event_class
 
     @classmethod
-    def get_registered_types(cls) -> Dict[str, Type["DomainEvent"]]:
+    def get_registered_types(cls) -> dict[str, type["DomainEvent"]]:
         """Get all registered event types."""
         return dict(_EVENT_REGISTRY)
 
@@ -151,7 +144,7 @@ class DomainEvent:
         """Get event type name."""
         return self.__class__.__name__
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize event to dictionary."""
         return {
             "event_id": self.event_id,
@@ -164,7 +157,7 @@ class DomainEvent:
             "data": self._get_data(),
         }
 
-    def _get_data(self) -> Dict[str, Any]:
+    def _get_data(self) -> dict[str, Any]:
         """Get event-specific data."""
         result = {}
         for key, value in self.__dict__.items():
@@ -180,7 +173,7 @@ class DomainEvent:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DomainEvent":
+    def from_dict(cls, data: dict[str, Any]) -> "DomainEvent":
         """Deserialize event from dictionary.
 
         Uses the event type registry to instantiate the correct event class.
@@ -218,7 +211,7 @@ class EventEnvelope:
     event: DomainEvent
     stored_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize envelope to dictionary."""
         return {
             "stream_id": self.stream_id,
@@ -265,7 +258,7 @@ class Aggregate(ABC):
         """
         self._aggregate_id = aggregate_id
         self._version = 0
-        self._uncommitted_events: List[DomainEvent] = []
+        self._uncommitted_events: list[DomainEvent] = []
 
     @property
     def aggregate_id(self) -> str:
@@ -278,7 +271,7 @@ class Aggregate(ABC):
         return self._version
 
     @property
-    def uncommitted_events(self) -> List[DomainEvent]:
+    def uncommitted_events(self) -> list[DomainEvent]:
         """Get events that haven't been persisted."""
         return self._uncommitted_events.copy()
 
@@ -309,7 +302,7 @@ class Aggregate(ABC):
 
         handler(event)
 
-    def load_from_history(self, events: List[DomainEvent]) -> None:
+    def load_from_history(self, events: list[DomainEvent]) -> None:
         """Rebuild aggregate state from event history.
 
         Args:
@@ -323,7 +316,7 @@ class Aggregate(ABC):
         """Clear uncommitted events after save."""
         self._uncommitted_events.clear()
 
-    def get_snapshot(self) -> Dict[str, Any]:
+    def get_snapshot(self) -> dict[str, Any]:
         """Get snapshot of current state.
 
         Returns:
@@ -335,7 +328,7 @@ class Aggregate(ABC):
             "state": self._get_state(),
         }
 
-    def _get_state(self) -> Dict[str, Any]:
+    def _get_state(self) -> dict[str, Any]:
         """Get internal state for snapshot.
 
         Returns:
@@ -347,7 +340,7 @@ class Aggregate(ABC):
                 state[key] = value
         return state
 
-    def load_from_snapshot(self, snapshot: Dict[str, Any]) -> None:
+    def load_from_snapshot(self, snapshot: dict[str, Any]) -> None:
         """Load aggregate from snapshot.
 
         Args:
@@ -375,7 +368,7 @@ class EventStore(ABC):
     async def append(
         self,
         stream_id: str,
-        events: List[DomainEvent],
+        events: list[DomainEvent],
         expected_version: Optional[int] = None,
     ) -> int:
         """Append events to a stream.
@@ -399,7 +392,7 @@ class EventStore(ABC):
         stream_id: str,
         from_version: int = 0,
         to_version: Optional[int] = None,
-    ) -> List[EventEnvelope]:
+    ) -> list[EventEnvelope]:
         """Read events from a stream.
 
         Args:
@@ -417,7 +410,7 @@ class EventStore(ABC):
         self,
         from_position: int = 0,
         limit: int = 100,
-    ) -> List[EventEnvelope]:
+    ) -> list[EventEnvelope]:
         """Read all events across streams.
 
         Args:
@@ -461,7 +454,7 @@ class EventStore(ABC):
 
     async def load(
         self,
-        aggregate_type: Type[T],
+        aggregate_type: type[T],
         aggregate_id: str,
     ) -> Optional[T]:
         """Load aggregate from event history.
@@ -521,14 +514,14 @@ class InMemoryEventStore(EventStore):
 
     def __init__(self) -> None:
         """Initialize in-memory store."""
-        self._streams: Dict[str, List[EventEnvelope]] = {}
-        self._all_events: List[EventEnvelope] = []
+        self._streams: dict[str, list[EventEnvelope]] = {}
+        self._all_events: list[EventEnvelope] = []
         self._lock = asyncio.Lock()
 
     async def append(
         self,
         stream_id: str,
-        events: List[DomainEvent],
+        events: list[DomainEvent],
         expected_version: Optional[int] = None,
     ) -> int:
         """Append events to stream."""
@@ -558,7 +551,7 @@ class InMemoryEventStore(EventStore):
         stream_id: str,
         from_version: int = 0,
         to_version: Optional[int] = None,
-    ) -> List[EventEnvelope]:
+    ) -> list[EventEnvelope]:
         """Read events from stream."""
         async with self._lock:
             if stream_id not in self._streams:
@@ -581,7 +574,7 @@ class InMemoryEventStore(EventStore):
         self,
         from_position: int = 0,
         limit: int = 100,
-    ) -> List[EventEnvelope]:
+    ) -> list[EventEnvelope]:
         """Read all events."""
         async with self._lock:
             return self._all_events[from_position : from_position + limit]
@@ -608,7 +601,7 @@ class SQLiteEventStore(EventStore):
     Provides durable event storage with atomic operations.
     """
 
-    def __init__(self, db_path: Union[str, Path]) -> None:
+    def __init__(self, db_path: str | Path) -> None:
         """Initialize SQLite store.
 
         Args:
@@ -658,7 +651,7 @@ class SQLiteEventStore(EventStore):
     async def append(
         self,
         stream_id: str,
-        events: List[DomainEvent],
+        events: list[DomainEvent],
         expected_version: Optional[int] = None,
     ) -> int:
         """Append events to stream."""
@@ -706,7 +699,7 @@ class SQLiteEventStore(EventStore):
         stream_id: str,
         from_version: int = 0,
         to_version: Optional[int] = None,
-    ) -> List[EventEnvelope]:
+    ) -> list[EventEnvelope]:
         """Read events from stream."""
         async with self._lock:
             with sqlite3.connect(self._db_path) as conn:
@@ -752,7 +745,7 @@ class SQLiteEventStore(EventStore):
         self,
         from_position: int = 0,
         limit: int = 100,
-    ) -> List[EventEnvelope]:
+    ) -> list[EventEnvelope]:
         """Read all events."""
         async with self._lock:
             with sqlite3.connect(self._db_path) as conn:
@@ -800,7 +793,7 @@ class SQLiteEventStore(EventStore):
         self,
         stream_id: str,
         version: int,
-        snapshot: Dict[str, Any],
+        snapshot: dict[str, Any],
     ) -> None:
         """Save aggregate snapshot.
 
@@ -829,7 +822,7 @@ class SQLiteEventStore(EventStore):
     async def load_snapshot(
         self,
         stream_id: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Load aggregate snapshot.
 
         Args:
@@ -873,8 +866,8 @@ class EventDispatcher:
 
     def __init__(self) -> None:
         """Initialize dispatcher."""
-        self._handlers: Dict[str, List[AsyncEventHandler]] = {}
-        self._all_handlers: List[AsyncEventHandler] = []
+        self._handlers: dict[str, list[AsyncEventHandler]] = {}
+        self._all_handlers: list[AsyncEventHandler] = []
 
     def subscribe(
         self,
@@ -941,7 +934,7 @@ class Projection(ABC):
         pass
 
     @abstractmethod
-    async def rebuild(self, events: List[DomainEvent]) -> None:
+    async def rebuild(self, events: list[DomainEvent]) -> None:
         """Rebuild projection from event history.
 
         Args:
@@ -964,7 +957,7 @@ class EventSourcedRepository(Generic[T]):
     def __init__(
         self,
         event_store: EventStore,
-        aggregate_type: Type[T],
+        aggregate_type: type[T],
         snapshot_interval: int = 100,
     ) -> None:
         """Initialize repository.
@@ -1062,7 +1055,7 @@ class ToolCalledEvent(DomainEvent):
 
     task_id: str = ""
     tool_name: str = ""
-    arguments: Dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

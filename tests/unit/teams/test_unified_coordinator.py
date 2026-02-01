@@ -14,20 +14,18 @@
 
 """Tests for UnifiedTeamCoordinator."""
 
-from typing import Any, Dict, Optional
-from unittest.mock import AsyncMock, MagicMock
+from typing import Any, Optional
+from unittest.mock import MagicMock
 
 import pytest
 
 from victor.teams import (
     AgentMessage,
-    ITeamCoordinator,
     MessageType,
     TeamFormation,
     UnifiedTeamCoordinator,
     create_coordinator,
 )
-from victor.teams.protocols import ITeamMember
 
 
 class MockTeamMember:
@@ -47,7 +45,7 @@ class MockTeamMember:
     def role(self) -> Any:
         return self._role
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> str:
         return self._output
 
     async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
@@ -58,7 +56,7 @@ class MockTeamMember:
 class FailingMember(MockTeamMember):
     """Mock member that always fails."""
 
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
+    async def execute_task(self, task: str, context: dict[str, Any]) -> str:
         raise RuntimeError("Task failed")
 
 

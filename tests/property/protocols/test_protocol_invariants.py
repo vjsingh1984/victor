@@ -9,15 +9,12 @@ ensuring robust protocol behavior with diverse inputs.
 """
 
 from hypothesis import given, strategies as st, settings, Phase
-import pytest
-from typing import Any, Optional, Dict, Set, List, Callable
+from typing import Any, Optional
+from collections.abc import Callable
 from victor.protocols import (
     CapabilityContainerProtocol,
     WorkflowProviderProtocol,
-    TieredConfigProviderProtocol,
-    ExtensionProviderProtocol,
 )
-from victor.framework.graph import StateGraph
 
 
 class TestCapabilityContainerProtocolInvariants:
@@ -38,12 +35,12 @@ class TestCapabilityContainerProtocolInvariants:
     )
     @settings(max_examples=100, phases=[Phase.generate])
     def test_has_capability_reflects_get_capability(
-        self, capability_name: str, capabilities: Dict[str, int]
+        self, capability_name: str, capabilities: dict[str, int]
     ):
         """has_capability(name) should return True iff get_capability(name) is not None."""
 
         class TestContainer:
-            def __init__(self, caps: Dict[str, int]):
+            def __init__(self, caps: dict[str, int]):
                 self._capabilities = caps
 
             def has_capability(self, capability_name: str) -> bool:
@@ -73,11 +70,11 @@ class TestCapabilityContainerProtocolInvariants:
         )
     )
     @settings(max_examples=100, phases=[Phase.generate])
-    def test_capability_retrieval_is_consistent(self, capabilities: Dict[str, int]):
+    def test_capability_retrieval_is_consistent(self, capabilities: dict[str, int]):
         """get_capability should return consistent values for the same capability."""
 
         class TestContainer:
-            def __init__(self, caps: Dict[str, int]):
+            def __init__(self, caps: dict[str, int]):
                 self._capabilities = caps
 
             def has_capability(self, capability_name: str) -> bool:
@@ -116,12 +113,12 @@ class TestCapabilityContainerProtocolInvariants:
     )
     @settings(max_examples=100, phases=[Phase.generate])
     def test_nonexistent_capabilities_return_none(
-        self, capabilities: Dict[str, int], queries: List[str]
+        self, capabilities: dict[str, int], queries: list[str]
     ):
         """get_capability should return None for nonexistent capabilities."""
 
         class TestContainer:
-            def __init__(self, caps: Dict[str, int]):
+            def __init__(self, caps: dict[str, int]):
                 self._capabilities = caps
 
             def has_capability(self, capability_name: str) -> bool:
@@ -154,7 +151,7 @@ class TestWorkflowProviderProtocolInvariants:
         )
     )
     @settings(max_examples=100, phases=[Phase.generate])
-    def test_workflow_provider_returns_all_workflows(self, workflow_names: List[str]):
+    def test_workflow_provider_returns_all_workflows(self, workflow_names: list[str]):
         """get_workflows should return all registered workflows."""
 
         class MockStateGraph:
@@ -163,10 +160,10 @@ class TestWorkflowProviderProtocolInvariants:
             pass
 
         class TestWorkflowProvider:
-            def __init__(self, names: List[str]):
+            def __init__(self, names: list[str]):
                 self._workflows = {name: MockStateGraph() for name in names}
 
-            def get_workflows(self) -> Dict[str, MockStateGraph]:
+            def get_workflows(self) -> dict[str, MockStateGraph]:
                 return self._workflows.copy()
 
             def get_workflow_provider(self) -> Optional["TestWorkflowProvider"]:
@@ -192,14 +189,14 @@ class TestWorkflowProviderProtocolInvariants:
         )
     )
     @settings(max_examples=100, phases=[Phase.generate])
-    def test_workflow_provider_self_reference(self, workflow_names: List[str]):
+    def test_workflow_provider_self_reference(self, workflow_names: list[str]):
         """get_workflow_provider should return self when available."""
 
         class TestWorkflowProvider:
-            def __init__(self, names: List[str]):
+            def __init__(self, names: list[str]):
                 self._workflows = dict.fromkeys(names)
 
-            def get_workflows(self) -> Dict[str, Any]:
+            def get_workflows(self) -> dict[str, Any]:
                 return self._workflows.copy()
 
             def get_workflow_provider(self) -> Optional["TestWorkflowProvider"]:
@@ -225,14 +222,14 @@ class TestTieredConfigProviderProtocolInvariants:
         )
     )
     @settings(max_examples=100, phases=[Phase.generate])
-    def test_tiered_config_sets_are_disjoint(self, tool_pool: Set[str]):
+    def test_tiered_config_sets_are_disjoint(self, tool_pool: set[str]):
         """Tool sets in tiered config should be disjoint when constructed from disjoint partitions."""
 
         # Split tool_pool into 3 disjoint partitions
         tool_list = list(tool_pool)
 
         class TestTieredConfig:
-            def __init__(self, tools: List[str]):
+            def __init__(self, tools: list[str]):
                 # Partition into 3 disjoint sets
                 n = len(tools)
                 self._mandatory = set(tools[: n // 3])
@@ -240,15 +237,15 @@ class TestTieredConfigProviderProtocolInvariants:
                 self._optional = set(tools[2 * n // 3 :])
 
             @property
-            def mandatory(self) -> Set[str]:
+            def mandatory(self) -> set[str]:
                 return self._mandatory.copy()
 
             @property
-            def core(self) -> Set[str]:
+            def core(self) -> set[str]:
                 return self._core.copy()
 
             @property
-            def optional(self) -> Set[str]:
+            def optional(self) -> set[str]:
                 return self._optional.copy()
 
         config = TestTieredConfig(tool_list)
@@ -276,14 +273,14 @@ class TestTieredConfigProviderProtocolInvariants:
     )
     @settings(max_examples=100, phases=[Phase.generate])
     def test_tiered_config_hierarchy(
-        self, tool_names: List[str], mandatory_ratio: float, core_ratio: float
+        self, tool_names: list[str], mandatory_ratio: float, core_ratio: float
     ):
         """Tiered config should maintain hierarchical constraints."""
 
         import math
 
         class TestTieredConfig:
-            def __init__(self, tools: List[str], m_ratio: float, c_ratio: float):
+            def __init__(self, tools: list[str], m_ratio: float, c_ratio: float):
                 n_mandatory = math.floor(len(tools) * m_ratio)
                 n_core = math.floor(len(tools) * c_ratio)
 
@@ -292,15 +289,15 @@ class TestTieredConfigProviderProtocolInvariants:
                 self._optional = set(tools[n_mandatory + n_core :])
 
             @property
-            def mandatory(self) -> Set[str]:
+            def mandatory(self) -> set[str]:
                 return self._mandatory.copy()
 
             @property
-            def core(self) -> Set[str]:
+            def core(self) -> set[str]:
                 return self._core.copy()
 
             @property
-            def optional(self) -> Set[str]:
+            def optional(self) -> set[str]:
                 return self._optional.copy()
 
         config = TestTieredConfig(tool_names, mandatory_ratio, core_ratio)
@@ -324,14 +321,14 @@ class TestExtensionProviderProtocolInvariants:
         )
     )
     @settings(max_examples=100, phases=[Phase.generate])
-    def test_extension_registration_preserves_extensions(self, extensions: List[Callable[[], Any]]):
+    def test_extension_registration_preserves_extensions(self, extensions: list[Callable[[], Any]]):
         """Registering extensions should preserve them in get_extensions."""
 
         class TestExtensionProvider:
             def __init__(self):
-                self._extensions: List[Callable[..., Any]] = []
+                self._extensions: list[Callable[..., Any]] = []
 
-            def get_extensions(self) -> List[Callable[..., Any]]:
+            def get_extensions(self) -> list[Callable[..., Any]]:
                 return self._extensions.copy()
 
             def register_extension(self, extension: Callable[..., Any]) -> None:
@@ -367,15 +364,15 @@ class TestExtensionProviderProtocolInvariants:
     )
     @settings(max_examples=100, phases=[Phase.generate])
     def test_extension_registration_is_additive(
-        self, initial_extensions: List[Callable[[], None]], new_extensions: List[Callable[[], None]]
+        self, initial_extensions: list[Callable[[], None]], new_extensions: list[Callable[[], None]]
     ):
         """Adding extensions should be additive and idempotent."""
 
         class TestExtensionProvider:
             def __init__(self):
-                self._extensions: List[Callable[..., Any]] = []
+                self._extensions: list[Callable[..., Any]] = []
 
-            def get_extensions(self) -> List[Callable[..., Any]]:
+            def get_extensions(self) -> list[Callable[..., Any]]:
                 return self._extensions.copy()
 
             def register_extension(self, extension: Callable[..., Any]) -> None:
@@ -429,7 +426,7 @@ class TestProtocolCompositionInvariants:
     )
     @settings(max_examples=100, phases=[Phase.generate])
     def test_object_can_implement_multiple_protocols(
-        self, capability_names: List[str], workflow_names: List[str]
+        self, capability_names: list[str], workflow_names: list[str]
     ):
         """An object can implement multiple protocols simultaneously."""
 
@@ -439,7 +436,7 @@ class TestProtocolCompositionInvariants:
         class MultiProtocolObject:
             """Implements both CapabilityContainerProtocol and WorkflowProviderProtocol."""
 
-            def __init__(self, caps: List[str], workflows: List[str]):
+            def __init__(self, caps: list[str], workflows: list[str]):
                 self._capabilities = {name: {} for name in caps}
                 self._workflows = {name: MockStateGraph() for name in workflows}
 
@@ -447,11 +444,11 @@ class TestProtocolCompositionInvariants:
             def has_capability(self, capability_name: str) -> bool:
                 return capability_name in self._capabilities
 
-            def get_capability(self, name: str) -> Optional[Dict[str, Any]]:
+            def get_capability(self, name: str) -> Optional[dict[str, Any]]:
                 return self._capabilities.get(name)
 
             # WorkflowProviderProtocol methods
-            def get_workflows(self) -> Dict[str, MockStateGraph]:
+            def get_workflows(self) -> dict[str, MockStateGraph]:
                 return self._workflows.copy()
 
             def get_workflow_provider(self) -> Optional["MultiProtocolObject"]:

@@ -41,7 +41,8 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterator, Optional, Protocol, TypeVar
+from typing import Any, Optional, TypeVar
+from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,7 @@ class CacheNamespace:
         self.max_entries = max_entries
         self.default_ttl = default_ttl
 
-        self._data: Dict[str, GenericCacheEntry] = {}
+        self._data: dict[str, GenericCacheEntry] = {}
         self._stats = CacheStats()
         self._lock = threading.RLock()
 
@@ -350,7 +351,7 @@ class ToolCacheManager:
             default_max_entries: Default max entries per namespace
             default_ttl: Default TTL in seconds (None for no expiry)
         """
-        self._namespaces: Dict[str, CacheNamespace] = {}
+        self._namespaces: dict[str, CacheNamespace] = {}
         self._default_max_entries = default_max_entries
         self._default_ttl = default_ttl
         self._lock = threading.RLock()
@@ -439,7 +440,7 @@ class ToolCacheManager:
                 total += ns.clear()
             return total
 
-    def get_stats(self) -> Dict[str, CacheStats]:
+    def get_stats(self) -> dict[str, CacheStats]:
         """Get statistics for all namespaces.
 
         Returns:

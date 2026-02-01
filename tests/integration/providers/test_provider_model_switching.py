@@ -25,7 +25,6 @@ Coverage:
 - Tool adapter reinitialization
 """
 
-import os
 
 import pytest
 from victor.agent.orchestrator import AgentOrchestrator
@@ -276,7 +275,6 @@ class TestProviderSwitchingIntegration:
     def test_switch_provider_with_custom_settings(self, orchestrator, second_provider_name):
         """Test switching provider with custom provider settings."""
         # Note: Settings are passed through provider_kwargs
-        from victor.config.settings import Settings
 
         custom_settings = {"timeout": 60}
 

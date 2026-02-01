@@ -22,8 +22,7 @@ Tests that CapabilityHelper:
 """
 
 import warnings
-from typing import Any, Dict, Optional, Set
-from unittest.mock import MagicMock
+from typing import Any, Optional
 
 import pytest
 
@@ -34,12 +33,12 @@ class MockOrchestrator(CapabilityRegistryProtocol):
     """Mock orchestrator implementing CapabilityRegistryProtocol."""
 
     def __init__(self):
-        self._capabilities: Dict[str, bool] = {
+        self._capabilities: dict[str, bool] = {
             "enabled_tools": True,
             "prompt_builder": True,
         }
-        self._invoked: Dict[str, Any] = {}
-        self._versions: Dict[str, str] = {
+        self._invoked: dict[str, Any] = {}
+        self._versions: dict[str, str] = {
             "enabled_tools": "1.0",
             "prompt_builder": "2.0",
         }
@@ -58,14 +57,14 @@ class MockOrchestrator(CapabilityRegistryProtocol):
         self._invoked[name] = (args, kwargs)
         return True
 
-    def get_capabilities(self) -> Dict[str, Any]:
+    def get_capabilities(self) -> dict[str, Any]:
         return dict(self._capabilities)
 
 
 class NonProtocolObject:
     """Object that doesn't implement CapabilityRegistryProtocol."""
 
-    def set_enabled_tools(self, tools: Set[str]) -> None:
+    def set_enabled_tools(self, tools: set[str]) -> None:
         self.enabled_tools = tools
 
 

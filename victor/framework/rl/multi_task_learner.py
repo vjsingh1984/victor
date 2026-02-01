@@ -47,7 +47,7 @@ import logging
 import math
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.framework.rl.shared_encoder import (
@@ -72,9 +72,9 @@ class VerticalHead:
     """
 
     vertical: str
-    q_values: Dict[str, float] = field(default_factory=dict)
-    sample_counts: Dict[str, int] = field(default_factory=dict)
-    success_rates: Dict[str, float] = field(default_factory=dict)
+    q_values: dict[str, float] = field(default_factory=dict)
+    sample_counts: dict[str, int] = field(default_factory=dict)
+    success_rates: dict[str, float] = field(default_factory=dict)
 
     def get_q_value(self, context_key: str, default: float = 0.5) -> float:
         """Get Q-value for a context."""
@@ -165,11 +165,11 @@ class MultiTaskLearner(BaseLearner):
         self._encoder = get_shared_encoder(db_connection)
 
         # Vertical-specific heads
-        self._heads: Dict[str, VerticalHead] = {}
+        self._heads: dict[str, VerticalHead] = {}
 
         # Global Q-values (shared across verticals)
-        self._global_q_values: Dict[str, float] = {}
-        self._global_sample_counts: Dict[str, int] = {}
+        self._global_q_values: dict[str, float] = {}
+        self._global_sample_counts: dict[str, int] = {}
 
         # Load state
         self._load_state()
@@ -485,7 +485,7 @@ class MultiTaskLearner(BaseLearner):
         model: str,
         task_type: str,
         target_vertical: str,
-    ) -> Tuple[Optional[float], int]:
+    ) -> tuple[Optional[float], int]:
         """Get transferred Q-value from similar contexts.
 
         Args:
@@ -608,7 +608,7 @@ class MultiTaskLearner(BaseLearner):
 
         self.db.commit()
 
-    def get_vertical_stats(self, vertical: str) -> Dict[str, Any]:
+    def get_vertical_stats(self, vertical: str) -> dict[str, Any]:
         """Get statistics for a specific vertical.
 
         Args:
@@ -643,7 +643,7 @@ class MultiTaskLearner(BaseLearner):
             ),
         }
 
-    def get_transfer_stats(self) -> Dict[str, Any]:
+    def get_transfer_stats(self) -> dict[str, Any]:
         """Get transfer learning statistics.
 
         Returns:
@@ -665,7 +665,7 @@ class MultiTaskLearner(BaseLearner):
             "encoder_stats": self._encoder.export_metrics(),
         }
 
-    def export_metrics(self) -> Dict[str, Any]:
+    def export_metrics(self) -> dict[str, Any]:
         """Export learner metrics.
 
         Returns:

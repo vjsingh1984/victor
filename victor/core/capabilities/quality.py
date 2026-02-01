@@ -49,7 +49,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from victor.core.capabilities.types import CapabilityDefinition, CapabilityType
 
@@ -108,13 +108,13 @@ class QualityResult:
     metric_name: str = ""
     enforcement: Optional[Enforcement] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
 
         Returns:
             Dictionary with result details
         """
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "passed": self.passed,
             "value": self.value,
             "threshold": self.threshold,

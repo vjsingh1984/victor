@@ -26,25 +26,16 @@ Key Metrics:
 Goal: Coordinator overhead < 10%
 """
 
-import asyncio
 import gc
 import os
 import time
 import tracemalloc
-from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
-from victor.agent.coordinators import (
-    ConfigCoordinator,
-    PromptCoordinator,
-    ContextCoordinator,
-    AnalyticsCoordinator,
-    ChatCoordinator,
-)
 from victor.tools.decorators import tool
 
 
@@ -81,7 +72,7 @@ def mock_provider():
 
     # Mock chat method
     async def mock_chat(messages, **kwargs):
-        from victor.providers.base import CompletionResponse, Message
+        from victor.providers.base import CompletionResponse
 
         return CompletionResponse(  # type: ignore[call-arg]
             content="Test response",
@@ -158,7 +149,7 @@ def sample_tools():
         return True
 
     @tool
-    def search_files(query: str) -> List[str]:
+    def search_files(query: str) -> list[str]:
         """Search for files."""
         return [f"result1_{query}", f"result2_{query}"]
 

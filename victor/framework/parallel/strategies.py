@@ -44,27 +44,13 @@ Example:
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
-    Callable,
-    Coroutine,
-    Dict,
-    Generic,
-    List,
     Optional,
-    Protocol,
-    TypeVar,
-    runtime_checkable,
 )
 
-from victor.framework.parallel.protocols import (
-    JoinStrategyProtocol,
-    ErrorStrategyProtocol,
-    ResultAggregatorProtocol,
-)
 
 
 __all__ = [
@@ -183,7 +169,7 @@ class ResourceLimit:
         if self.cpu_limit is not None and not (0.0 <= self.cpu_limit <= 1.0):
             raise ValueError("cpu_limit must be between 0.0 and 1.0")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "max_concurrent": self.max_concurrent,
@@ -193,7 +179,7 @@ class ResourceLimit:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ResourceLimit":
+    def from_dict(cls, data: dict[str, Any]) -> "ResourceLimit":
         """Deserialize from dictionary."""
         return cls(
             max_concurrent=data.get("max_concurrent"),
@@ -227,7 +213,7 @@ class ParallelConfig:
         if self.join_strategy == JoinStrategy.N_OF_M and self.n_of_m is None:
             raise ValueError("n_of_m must be specified for N_OF_M join strategy")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "join_strategy": self.join_strategy.value,
@@ -237,7 +223,7 @@ class ParallelConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ParallelConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "ParallelConfig":
         """Deserialize from dictionary."""
         resource_limit_data = data.get("resource_limit", {})
         return cls(
@@ -263,9 +249,9 @@ class AllJoinStrategy:
 
     async def evaluate(
         self,
-        results: List[Any],
-        errors: List[Exception],
-    ) -> tuple[bool, Any, List[Exception]]:
+        results: list[Any],
+        errors: list[Exception],
+    ) -> tuple[bool, Any, list[Exception]]:
         """Evaluate results requiring all tasks to succeed.
 
         Args:
@@ -295,9 +281,9 @@ class AnyJoinStrategy:
 
     async def evaluate(
         self,
-        results: List[Any],
-        errors: List[Exception],
-    ) -> tuple[bool, Any, List[Exception]]:
+        results: list[Any],
+        errors: list[Exception],
+    ) -> tuple[bool, Any, list[Exception]]:
         """Evaluate results requiring at least one successful task.
 
         Args:
@@ -330,9 +316,9 @@ class FirstJoinStrategy:
 
     async def evaluate(
         self,
-        results: List[Any],
-        errors: List[Exception],
-    ) -> tuple[bool, Any, List[Exception]]:
+        results: list[Any],
+        errors: list[Exception],
+    ) -> tuple[bool, Any, list[Exception]]:
         """Evaluate results returning first successful result.
 
         Args:
@@ -373,9 +359,9 @@ class NOfMJoinStrategy:
 
     async def evaluate(
         self,
-        results: List[Any],
-        errors: List[Exception],
-    ) -> tuple[bool, Any, List[Exception]]:
+        results: list[Any],
+        errors: list[Exception],
+    ) -> tuple[bool, Any, list[Exception]]:
         """Evaluate results requiring N of M tasks to succeed.
 
         Args:
@@ -409,9 +395,9 @@ class MajorityJoinStrategy:
 
     async def evaluate(
         self,
-        results: List[Any],
-        errors: List[Exception],
-    ) -> tuple[bool, Any, List[Exception]]:
+        results: list[Any],
+        errors: list[Exception],
+    ) -> tuple[bool, Any, list[Exception]]:
         """Evaluate results requiring majority of tasks to succeed.
 
         Args:
@@ -515,7 +501,7 @@ class CollectErrorsErrorStrategy:
     for comprehensive reporting. Execution fails only if no tasks succeed.
     """
 
-    collected_errors: List[Exception] = field(default_factory=list)
+    collected_errors: list[Exception] = field(default_factory=list)
 
     async def handle_error(
         self,
@@ -540,7 +526,7 @@ class CollectErrorsErrorStrategy:
         """Return False to continue all tasks."""
         return False
 
-    def get_errors(self) -> List[Exception]:
+    def get_errors(self) -> list[Exception]:
         """Get all collected errors."""
         return self.collected_errors.copy()
 
@@ -554,7 +540,7 @@ class CollectErrorsErrorStrategy:
 # =============================================================================
 
 
-_JOIN_STRATEGY_IMPLS: Dict[JoinStrategy, type] = {
+_JOIN_STRATEGY_IMPLS: dict[JoinStrategy, type] = {
     JoinStrategy.ALL: AllJoinStrategy,
     JoinStrategy.ANY: AnyJoinStrategy,
     JoinStrategy.FIRST: FirstJoinStrategy,
@@ -562,7 +548,7 @@ _JOIN_STRATEGY_IMPLS: Dict[JoinStrategy, type] = {
     JoinStrategy.MAJORITY: MajorityJoinStrategy,
 }
 
-_ERROR_STRATEGY_IMPLS: Dict[ErrorStrategy, type] = {
+_ERROR_STRATEGY_IMPLS: dict[ErrorStrategy, type] = {
     ErrorStrategy.FAIL_FAST: FailFastErrorStrategy,
     ErrorStrategy.CONTINUE_ALL: ContinueAllErrorStrategy,
     ErrorStrategy.COLLECT_ERRORS: CollectErrorsErrorStrategy,

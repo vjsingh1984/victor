@@ -25,7 +25,7 @@ import json
 import logging
 from dataclasses import dataclass, asdict
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Union, cast
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class SerializedState:
         serializer_version: Version of serializer for compatibility
     """
 
-    data: Union[bytes, Dict[str, Any]]
+    data: bytes | dict[str, Any]
     compressed: bool
     checksum: str
     serializer_version: int = 1
@@ -76,7 +76,7 @@ class StateSerializer:
         self.compress = compress
         self.compression_threshold = compression_threshold
 
-    def serialize(self, state: Dict[str, Any]) -> SerializedState:
+    def serialize(self, state: dict[str, Any]) -> SerializedState:
         """Serialize conversation state.
 
         Args:
@@ -114,7 +114,7 @@ class StateSerializer:
             serializer_version=self.VERSION,
         )
 
-    def deserialize(self, serialized: SerializedState) -> Dict[str, Any]:
+    def deserialize(self, serialized: SerializedState) -> dict[str, Any]:
         """Deserialize conversation state.
 
         Args:
@@ -168,7 +168,7 @@ class StateSerializer:
 
         # Restore Python types
         result = self._from_json_safe(json_safe)
-        return cast(Dict[str, Any], result)
+        return cast(dict[str, Any], result)
 
     def _to_json_safe(self, obj: Any) -> Any:
         """Convert Python objects to JSON-safe format.
@@ -252,9 +252,9 @@ class StateSerializer:
 
 
 def serialize_conversation_state(
-    state: Dict[str, Any],
+    state: dict[str, Any],
     compress: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Convenience function to serialize conversation state.
 
     Args:
@@ -291,7 +291,7 @@ def serialize_conversation_state(
         }
 
 
-def deserialize_conversation_state(stored: Dict[str, Any]) -> Dict[str, Any]:
+def deserialize_conversation_state(stored: dict[str, Any]) -> dict[str, Any]:
     """Convenience function to deserialize conversation state.
 
     Args:

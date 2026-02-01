@@ -42,7 +42,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Generic, List, Optional, TypeVar
+from typing import Generic, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -71,8 +71,8 @@ class CapabilityMetadata:
     name: str
     description: str
     version: str = "1.0"
-    dependencies: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
 
 class BaseCapabilityProvider(ABC, Generic[T]):
@@ -116,7 +116,7 @@ class BaseCapabilityProvider(ABC, Generic[T]):
     """
 
     @abstractmethod
-    def get_capabilities(self) -> Dict[str, T]:
+    def get_capabilities(self) -> dict[str, T]:
         """Return all registered capabilities.
 
         Returns:
@@ -125,7 +125,7 @@ class BaseCapabilityProvider(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
+    def get_capability_metadata(self) -> dict[str, CapabilityMetadata]:
         """Return metadata for all registered capabilities.
 
         Returns:
@@ -144,7 +144,7 @@ class BaseCapabilityProvider(ABC, Generic[T]):
         """
         return self.get_capabilities().get(name)
 
-    def list_capabilities(self) -> List[str]:
+    def list_capabilities(self) -> list[str]:
         """List all available capability names.
 
         Returns:

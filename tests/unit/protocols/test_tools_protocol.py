@@ -17,8 +17,7 @@
 Tests the ToolProtocol interface and conformance.
 """
 
-import pytest
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from victor.protocols.tools import ToolProtocol
 
@@ -43,7 +42,7 @@ class MockToolImplementation:
         return self._tool_registry
 
     @property
-    def allowed_tools(self) -> Optional[List[str]]:
+    def allowed_tools(self) -> Optional[list[str]]:
         """Get list of allowed tool names, if restricted."""
         return self._allowed_tools
 

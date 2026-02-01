@@ -24,7 +24,7 @@ These tests verify that:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -243,7 +243,6 @@ class TestCachedCompiledGraph:
     @pytest.mark.asyncio
     async def test_cached_compiled_graph_stream_delegates(self) -> None:
         """Test that stream() delegates to underlying compiled_graph."""
-        from unittest.mock import AsyncMock
 
         from victor.workflows.unified_compiler import CachedCompiledGraph
 

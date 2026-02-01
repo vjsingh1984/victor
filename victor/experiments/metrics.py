@@ -22,8 +22,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.experiments.storage import IStorageBackend
 
@@ -117,7 +116,7 @@ class MetricsAggregator:
         )
 
     def aggregate_metrics_across_runs(
-        self, run_ids: List[str], metric_name: str, aggregation: str = "mean"
+        self, run_ids: list[str], metric_name: str, aggregation: str = "mean"
     ) -> Optional[float]:
         """Aggregate a metric across multiple runs.
 
@@ -161,7 +160,7 @@ class MetricsAggregator:
 
         return None
 
-    def get_all_metrics_summary(self, run_id: str) -> Dict[str, MetricStatistics]:
+    def get_all_metrics_summary(self, run_id: str) -> dict[str, MetricStatistics]:
         """Get statistics for all metrics in a run.
 
         Args:
@@ -173,7 +172,7 @@ class MetricsAggregator:
         all_metrics = self._storage.get_metrics(run_id)
 
         # Group by metric name
-        metrics_by_name: Dict[str, List[Any]] = {}
+        metrics_by_name: dict[str, list[Any]] = {}
         for metric in all_metrics:
             if metric.key not in metrics_by_name:
                 metrics_by_name[metric.key] = []
@@ -196,8 +195,8 @@ class MetricsAggregator:
         return summary
 
     def compare_runs(
-        self, run_ids: List[str], metric_names: Optional[List[str]] = None
-    ) -> Dict[str, Dict[str, float]]:
+        self, run_ids: list[str], metric_names: Optional[list[str]] = None
+    ) -> dict[str, dict[str, float]]:
         """Compare metrics across multiple runs.
 
         Args:
@@ -230,7 +229,7 @@ class MetricsAggregator:
 
 def get_metrics_history(
     run_id: str, metric_name: str, storage: IStorageBackend
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Get the history of a metric as a list of dictionaries.
 
     Convenience function for easy access to metric history.
@@ -256,7 +255,7 @@ def get_metrics_history(
 
 
 def get_best_run(
-    run_ids: List[str],
+    run_ids: list[str],
     metric_name: str,
     storage: IStorageBackend,
     maximize: bool = True,

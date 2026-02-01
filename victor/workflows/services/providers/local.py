@@ -39,12 +39,10 @@ import logging
 import os
 import signal
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Optional
 
 from victor.workflows.services.definition import (
-    HealthCheckConfig,
     ServiceConfig,
     ServiceHandle,
     ServiceStartError,
@@ -69,7 +67,7 @@ class LocalProcessProvider(BaseServiceProvider):
     def __init__(
         self,
         working_dir: Optional[Path] = None,
-        env: Optional[Dict[str, str]] = None,
+        env: Optional[dict[str, str]] = None,
     ):
         """Initialize local process provider.
 
@@ -79,7 +77,7 @@ class LocalProcessProvider(BaseServiceProvider):
         """
         self._working_dir = working_dir or Path.cwd()
         self._env = env or {}
-        self._processes: Dict[str, asyncio.subprocess.Process] = {}
+        self._processes: dict[str, asyncio.subprocess.Process] = {}
 
     async def _do_start(self, config: ServiceConfig) -> ServiceHandle:
         """Start a local process."""
@@ -190,7 +188,7 @@ class LocalProcessProvider(BaseServiceProvider):
         self,
         handle: ServiceHandle,
         command: str,
-    ) -> Tuple[int, str]:
+    ) -> tuple[int, str]:
         """Run a command (for local process, just run in same env)."""
         try:
             process = await asyncio.create_subprocess_shell(

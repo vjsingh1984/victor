@@ -20,12 +20,11 @@ This module implements various strategies for allocating users to experiment var
 import hashlib
 import random
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from victor.experiments.ab_testing.models import (
     AllocationStrategy,
     ExperimentConfig,
-    ExperimentVariant,
 )
 
 
@@ -40,7 +39,7 @@ class TrafficAllocator(ABC):
         self,
         user_id: str,
         experiment: ExperimentConfig,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Allocate a user to a variant.
 
@@ -60,7 +59,7 @@ class TrafficAllocator(ABC):
     async def get_allocation_stats(
         self,
         experiment_id: str,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Get allocation statistics for an experiment.
 
         Args:
@@ -99,7 +98,7 @@ class RandomAllocator(TrafficAllocator):
         self,
         user_id: str,
         experiment: ExperimentConfig,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Allocate user to variant using weighted random selection.
 
@@ -151,13 +150,13 @@ class StickyAllocator(TrafficAllocator):
     def __init__(self) -> None:
         """Initialize sticky allocator."""
         # Cache for allocations to avoid recomputation
-        self._allocation_cache: Dict[str, Dict[str, str]] = {}
+        self._allocation_cache: dict[str, dict[str, str]] = {}
 
     async def allocate_variant(
         self,
         user_id: str,
         experiment: ExperimentConfig,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Allocate user to variant using consistent hashing.
 
@@ -209,7 +208,7 @@ class StickyAllocator(TrafficAllocator):
     async def get_allocation_stats(
         self,
         experiment_id: str,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Get allocation statistics for an experiment.
 
         Args:
@@ -222,7 +221,7 @@ class StickyAllocator(TrafficAllocator):
             return {}
 
         # Count allocations per variant
-        stats: Dict[str, int] = {}
+        stats: dict[str, int] = {}
         for variant_id in self._allocation_cache[experiment_id].values():
             stats[variant_id] = stats.get(variant_id, 0) + 1
 
@@ -246,13 +245,13 @@ class RoundRobinAllocator(TrafficAllocator):
     def __init__(self) -> None:
         """Initialize round-robin allocator."""
         # Counter for each experiment
-        self._counters: Dict[str, int] = {}
+        self._counters: dict[str, int] = {}
 
     async def allocate_variant(
         self,
         user_id: str,
         experiment: ExperimentConfig,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Allocate user to variant using round-robin.
 
@@ -292,7 +291,7 @@ class RoundRobinAllocator(TrafficAllocator):
     async def get_allocation_stats(
         self,
         experiment_id: str,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Get allocation statistics for an experiment.
 
         Args:

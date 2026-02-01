@@ -47,10 +47,9 @@ import psutil  # type: ignore[import-untyped]
 import threading
 import time
 import traceback
-from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Optional
+from collections.abc import Callable
 from functools import wraps
 from contextlib import contextmanager
 
@@ -77,7 +76,7 @@ class MetricConfig:
 
     name: str
     description: str
-    labels: List[str] = field(default_factory=list)
+    labels: list[str] = field(default_factory=list)
     metric_type: str = "counter"  # counter, gauge, histogram
 
 
@@ -134,8 +133,8 @@ class ProductionMetricsCollector:
         self._init_security_metrics()
 
         # Track current state
-        self._active_users: Dict[str, float] = {}
-        self._session_start_times: Dict[str, float] = {}
+        self._active_users: dict[str, float] = {}
+        self._session_start_times: dict[str, float] = {}
         self._memory_baseline: Optional[float] = None
 
         logger.info("ProductionMetricsCollector initialized")

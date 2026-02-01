@@ -33,10 +33,9 @@ Design Patterns:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from victor.agent.orchestrator_integration import OrchestratorIntegration
     from victor.coding.tracker.unified import UnifiedTracker  # type: ignore[import-not-found]
     from victor.agent.coordinators.validation_coordinator import (
         ValidationCoordinator,
@@ -116,7 +115,7 @@ class IntelligentPipelineAdapter:
         task_type: str,
         conversation_state: Optional["ConversationState"] = None,
         unified_tracker: Optional["UnifiedTracker"] = None,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Prepare intelligent request with task analysis.
 
         This method:
@@ -161,7 +160,7 @@ class IntelligentPipelineAdapter:
         query: str,
         tool_calls: int,
         task_type: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Validate intelligent response with quality scoring.
 
         This method:

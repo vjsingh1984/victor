@@ -25,7 +25,6 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 import tempfile
-import os
 
 
 # =============================================================================
@@ -133,7 +132,6 @@ class TestToolAccessController:
     def test_controller_creation(self):
         """Test controller can be created."""
         from victor.agent.tool_access_controller import (
-            ToolAccessController,
             create_tool_access_controller,
         )
 
@@ -169,7 +167,6 @@ class TestToolAccessController:
     def test_filter_tools(self):
         """Test filtering a list of tools."""
         from victor.agent.tool_access_controller import create_tool_access_controller
-        from victor.agent.protocols import ToolAccessContext
 
         controller = create_tool_access_controller()
         tools = [
@@ -184,7 +181,6 @@ class TestToolAccessController:
     def test_safety_layer_sandbox_mode(self):
         """Test safety layer blocks dangerous tools in sandbox mode."""
         from victor.agent.tool_access_controller import (
-            SafetyLayer,
             create_tool_access_controller,
         )
 
@@ -208,7 +204,6 @@ class TestToolAccessController:
     def test_layer_precedence(self):
         """Test layers are checked in correct order."""
         from victor.agent.tool_access_controller import ToolAccessController
-        from victor.agent.protocols import AccessPrecedence
 
         controller = ToolAccessController()
 
@@ -292,8 +287,7 @@ class TestBudgetManager:
 
     def test_auto_detect_write_tools(self):
         """Test auto-detection of write tools."""
-        from victor.agent.budget_manager import create_budget_manager, is_write_tool
-        from victor.agent.protocols import BudgetType, BudgetConfig
+        from victor.agent.budget_manager import is_write_tool
 
         # Test write tool detection
         assert is_write_tool("write_file") is True

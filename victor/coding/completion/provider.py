@@ -20,7 +20,8 @@ the Strategy pattern for extensibility.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import AsyncIterator, Optional, Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
+from collections.abc import AsyncIterator
 
 from victor.coding.completion.protocol import (
     CompletionCapabilities,

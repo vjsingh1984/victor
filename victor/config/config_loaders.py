@@ -22,9 +22,8 @@ import fnmatch
 import logging
 import time
 from dataclasses import dataclass, field
-from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Optional, cast
 
 import yaml
 
@@ -42,8 +41,8 @@ USER_CONFIG_FILE = USER_CONFIG_DIR / "config.yaml"
 
 # Cache settings
 _cache_ttl = 300  # 5 minutes
-_cache_timestamps: Dict[str, float] = {}
-_cache_data: Dict[str, Any] = {}
+_cache_timestamps: dict[str, float] = {}
+_cache_data: dict[str, Any] = {}
 
 
 @dataclass
@@ -67,10 +66,10 @@ class ProviderLimits:
 class StageConfig:
     """Configuration for a conversation stage."""
 
-    keywords: List[str] = field(default_factory=list)
+    keywords: list[str] = field(default_factory=list)
     weight: float = 1.0
     min_score: int = 2
-    tool_preferences: List[str] = field(default_factory=list)
+    tool_preferences: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -107,7 +106,7 @@ class LoggingConfig:
     console_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     file_format: str = "%(asctime)s - %(session)s - %(name)s - %(levelname)s - %(message)s"
     event_logging: bool = True
-    module_levels: Dict[str, str] = field(default_factory=dict)
+    module_levels: dict[str, str] = field(default_factory=dict)
 
     @property
     def expanded_file_path(self) -> Path:
@@ -123,7 +122,7 @@ class LoggingConfig:
         return getattr(logging, self.file_level.upper(), logging.INFO)
 
 
-def _load_yaml_cached(file_path: Path, cache_key: str) -> Optional[Dict[str, Any]]:
+def _load_yaml_cached(file_path: Path, cache_key: str) -> Optional[dict[str, Any]]:
     """Load YAML file with caching.
 
     Args:
@@ -139,7 +138,7 @@ def _load_yaml_cached(file_path: Path, cache_key: str) -> Optional[Dict[str, Any
     if cache_key in _cache_data:
         cached_time = _cache_timestamps.get(cache_key, 0)
         if now - cached_time < _cache_ttl:
-            return cast(Optional[Dict[str, Any]], _cache_data[cache_key])
+            return cast(Optional[dict[str, Any]], _cache_data[cache_key])
 
     if not file_path.exists():
         logger.debug(f"Config file not found: {file_path}")
@@ -151,7 +150,7 @@ def _load_yaml_cached(file_path: Path, cache_key: str) -> Optional[Dict[str, Any
 
         _cache_data[cache_key] = data
         _cache_timestamps[cache_key] = now
-        return cast(Optional[Dict[str, Any]], data)
+        return cast(Optional[dict[str, Any]], data)
 
     except Exception as e:
         logger.warning(f"Failed to load {file_path}: {e}")
@@ -209,7 +208,7 @@ def get_provider_limits(provider: str, model: Optional[str] = None) -> ProviderL
     return limits
 
 
-def get_all_provider_limits() -> Dict[str, ProviderLimits]:
+def get_all_provider_limits() -> dict[str, ProviderLimits]:
     """Get limits for all configured providers.
 
     Returns:
@@ -236,7 +235,7 @@ def get_all_provider_limits() -> Dict[str, ProviderLimits]:
     return result
 
 
-def get_stage_keywords() -> Dict[str, StageConfig]:
+def get_stage_keywords() -> dict[str, StageConfig]:
     """Get stage keywords configuration.
 
     Returns:
@@ -263,7 +262,7 @@ def get_stage_keywords() -> Dict[str, StageConfig]:
     return result
 
 
-def get_stage_tool_preferences(stage: str) -> List[str]:
+def get_stage_tool_preferences(stage: str) -> list[str]:
     """Get preferred tools for a conversation stage.
 
     Args:
@@ -280,10 +279,10 @@ def get_stage_tool_preferences(stage: str) -> List[str]:
     tool_prefs = data.get("tool_preferences", {})
     result = tool_prefs.get(stage, [])
     assert isinstance(result, list)
-    return cast(List[str], result)
+    return cast(list[str], result)
 
 
-def _get_default_stage_keywords() -> Dict[str, StageConfig]:
+def _get_default_stage_keywords() -> dict[str, StageConfig]:
     """Get default stage keywords (fallback if YAML missing)."""
     return {
         "INITIAL": StageConfig(
@@ -320,9 +319,9 @@ def _get_default_stage_keywords() -> Dict[str, StageConfig]:
 
 
 def _merge_logging_configs(
-    base: Dict[str, Any],
-    override: Dict[str, Any],
-) -> Dict[str, Any]:
+    base: dict[str, Any],
+    override: dict[str, Any],
+) -> dict[str, Any]:
     """Deep merge logging configs (override takes precedence)."""
     result = base.copy()
     for key, value in override.items():
@@ -383,7 +382,7 @@ def get_logging_config(
         LoggingConfig with all overrides applied
     """
     # Start with hardcoded defaults
-    config_dict: Dict[str, Any] = {
+    config_dict: dict[str, Any] = {
         "console_level": "WARNING",
         "file_level": "INFO",
         "file_enabled": True,

@@ -28,7 +28,8 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 from victor.agent.stream_handler import StreamMetrics
 from victor.tools.enums import CostTier
@@ -52,7 +53,7 @@ class ToolSelectionStats:
     total_tools_selected: int = 0
     total_tools_executed: int = 0
 
-    def to_dict(self) -> Dict[str, int]:
+    def to_dict(self) -> dict[str, int]:
         """Convert to dictionary for JSON serialization."""
         return {
             "semantic_selections": self.semantic_selections,
@@ -94,7 +95,7 @@ class ClassificationStats:
     total_confidence: float = 0.0
     classification_count: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         avg_confidence = (
             self.total_confidence / self.classification_count
@@ -132,14 +133,14 @@ class CostTracking:
     """Tracks cost by tier for tool executions."""
 
     total_cost_weight: float = 0.0
-    cost_by_tier: Dict[str, float] = field(
+    cost_by_tier: dict[str, float] = field(
         default_factory=lambda: {"free": 0.0, "low": 0.0, "medium": 0.0, "high": 0.0}
     )
-    calls_by_tier: Dict[str, int] = field(
+    calls_by_tier: dict[str, int] = field(
         default_factory=lambda: {"free": 0, "low": 0, "medium": 0, "high": 0}
     )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "total_cost_weight": self.total_cost_weight,
@@ -202,7 +203,7 @@ class MetricsCollector:
         self._classification_stats = ClassificationStats()
 
         # Tool usage stats (per-tool breakdown)
-        self._tool_usage_stats: Dict[str, Dict[str, Any]] = {}
+        self._tool_usage_stats: dict[str, dict[str, Any]] = {}
 
         # Cost tracking
         self._cost_tracking = CostTracking()
@@ -227,7 +228,7 @@ class MetricsCollector:
                 self._current_stream_metrics.first_token_time = time.time()
 
     def finalize_stream_metrics(
-        self, usage_data: Optional[Dict[str, int]] = None
+        self, usage_data: Optional[dict[str, int]] = None
     ) -> Optional[StreamMetrics]:
         """Finalize stream metrics at end of streaming session.
 
@@ -260,7 +261,7 @@ class MetricsCollector:
         metrics = self._current_stream_metrics
 
         # Log stream metrics including cost if available
-        log_data: Dict[str, Any] = {
+        log_data: dict[str, Any] = {
             "ttft": metrics.time_to_first_token,
             "total_duration": metrics.total_duration,
             "tokens_per_second": metrics.tokens_per_second,
@@ -322,7 +323,7 @@ class MetricsCollector:
         """
         return self._current_stream_metrics
 
-    def get_streaming_metrics_summary(self) -> Optional[Dict[str, Any]]:
+    def get_streaming_metrics_summary(self) -> Optional[dict[str, Any]]:
         """Get comprehensive streaming metrics summary.
 
         Returns:
@@ -336,7 +337,7 @@ class MetricsCollector:
             return vars(summary)
         return summary  # type: ignore[return-value]
 
-    def get_streaming_metrics_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_streaming_metrics_history(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent streaming metrics history.
 
         Args:
@@ -449,7 +450,7 @@ class MetricsCollector:
             f"confidence={confidence:.2f}, negated={negated_count}"
         )
 
-    def get_classification_stats(self) -> Dict[str, Any]:
+    def get_classification_stats(self) -> dict[str, Any]:
         """Get comprehensive classification statistics.
 
         Returns:
@@ -516,8 +517,8 @@ class MetricsCollector:
         )
 
     def get_tool_usage_stats(
-        self, conversation_state_summary: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, conversation_state_summary: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """Get comprehensive tool usage statistics.
 
         Args:
@@ -530,7 +531,7 @@ class MetricsCollector:
             - Cost tracking (by tier and total)
             - Overall metrics
         """
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "selection_stats": self._selection_stats.to_dict(),
             "classification_stats": self._classification_stats.to_dict(),
             "tool_stats": self._tool_usage_stats.copy(),
@@ -564,7 +565,7 @@ class MetricsCollector:
     # Component Callbacks
     # =========================================================================
 
-    def on_tool_start(self, tool_name: str, arguments: Dict[str, Any], iteration: int = 0) -> None:
+    def on_tool_start(self, tool_name: str, arguments: dict[str, Any], iteration: int = 0) -> None:
         """Callback when tool execution starts (from ToolPipeline).
 
         Args:

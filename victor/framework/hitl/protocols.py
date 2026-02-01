@@ -21,20 +21,16 @@ extensibility and type safety for the HITL framework.
 from __future__ import annotations
 
 import time
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    List,
     Optional,
     Protocol,
     TypeVar,
     runtime_checkable,
 )
+from collections.abc import Awaitable, Callable
 
 
 class FallbackBehavior(str, Enum):
@@ -121,7 +117,7 @@ class HITLResponseProtocol(Protocol):
         """Unix timestamp of when response was created."""
         ...
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize response to dictionary."""
         ...
 
@@ -188,7 +184,7 @@ class HITLGateProtocol(Protocol):
         """Whether a response is required."""
         ...
 
-    def with_context(self, context: Dict[str, Any]) -> "HITLGateProtocol":
+    def with_context(self, context: dict[str, Any]) -> "HITLGateProtocol":
         """Create a new gate with additional context."""
         ...
 
@@ -202,7 +198,7 @@ class HITLGateProtocol(Protocol):
 
     async def execute(
         self,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         handler: Optional[Callable[..., Awaitable[HITLResponseProtocol]]] = None,
     ) -> HITLResponseProtocol:
         """Execute the gate and wait for response.
@@ -240,7 +236,7 @@ class BaseHITLResponse:
     reason: Optional[str] = None
     responder: Optional[str] = None
     created_at: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def is_approved(self) -> bool:
@@ -266,7 +262,7 @@ class BaseHITLResponse:
         assert isinstance(value, (bool, int))
         return bool(value)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         return {
             "gate_id": self.gate_id,
@@ -302,7 +298,7 @@ class BaseHITLGate:
     timeout_seconds: float = 300.0
     fallback_strategy: FallbackStrategy = field(default_factory=FallbackStrategy.abort)
     required: bool = True
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     validator: Optional[InputValidationProtocol] = None
 
     @property
@@ -315,7 +311,7 @@ class BaseHITLGate:
         """Whether a response is required."""
         return self.required
 
-    def with_context(self, context: Dict[str, Any]) -> "BaseHITLGate":
+    def with_context(self, context: dict[str, Any]) -> "BaseHITLGate":
         """Create a new gate with additional context."""
         new_context = {**self.context, **context}
         return self.__class__(**{**self.__dict__, "context": new_context})
@@ -328,7 +324,7 @@ class BaseHITLGate:
         """Create a new gate with custom fallback."""
         return self.__class__(**{**self.__dict__, "fallback_strategy": strategy})
 
-    def _render_prompt(self, additional_context: Optional[Dict[str, Any]] = None) -> str:
+    def _render_prompt(self, additional_context: Optional[dict[str, Any]] = None) -> str:
         """Render prompt with context variables."""
         from string import Template
 

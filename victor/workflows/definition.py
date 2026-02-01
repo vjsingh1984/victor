@@ -64,10 +64,10 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
+from collections.abc import Callable
 
 if TYPE_CHECKING:
-    from victor.agent.subagents import SubAgentRole
     from victor.workflows.protocols import RetryPolicy
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,7 @@ class WorkflowNode(ABC):
 
     id: str
     name: str
-    next_nodes: List[str] = field(default_factory=list)
+    next_nodes: list[str] = field(default_factory=list)
     retry_policy: Optional["RetryPolicy"] = None
     circuit_breaker_enabled: bool = False
 
@@ -117,9 +117,9 @@ class WorkflowNode(ABC):
         """The type of this node."""
         pass
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize node to dictionary."""
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "id": self.id,
             "name": self.name,
             "type": self.node_type.value,
@@ -158,10 +158,10 @@ class AgentNode(WorkflowNode):
     role: str = "executor"
     goal: str = ""
     tool_budget: int = 15
-    allowed_tools: Optional[List[str]] = None
-    input_mapping: Dict[str, str] = field(default_factory=dict)
+    allowed_tools: Optional[list[str]] = None
+    input_mapping: dict[str, str] = field(default_factory=dict)
     output_key: Optional[str] = None
-    llm_config: Optional[Dict[str, Any]] = None
+    llm_config: Optional[dict[str, Any]] = None
     timeout_seconds: Optional[float] = None
     profile: Optional[str] = None
     disable_embeddings: bool = False
@@ -170,7 +170,7 @@ class AgentNode(WorkflowNode):
     def node_type(self) -> WorkflowNodeType:
         return WorkflowNodeType.AGENT
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = super().to_dict()
         d.update(
             {
@@ -198,14 +198,14 @@ class ConditionNode(WorkflowNode):
         branches: Mapping from branch names to node IDs
     """
 
-    condition: Callable[[Dict[str, Any]], str] = field(default=lambda ctx: "default")
-    branches: Dict[str, str] = field(default_factory=dict)
+    condition: Callable[[dict[str, Any]], str] = field(default=lambda ctx: "default")
+    branches: dict[str, str] = field(default_factory=dict)
 
     @property
     def node_type(self) -> WorkflowNodeType:
         return WorkflowNodeType.CONDITION
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = super().to_dict()
         d.update(
             {
@@ -215,7 +215,7 @@ class ConditionNode(WorkflowNode):
         )
         return d
 
-    def evaluate(self, context: Dict[str, Any]) -> Optional[str]:
+    def evaluate(self, context: dict[str, Any]) -> Optional[str]:
         """Evaluate condition and return next node ID."""
         branch = self.condition(context)
         return self.branches.get(branch)
@@ -230,14 +230,14 @@ class ParallelNode(WorkflowNode):
         join_strategy: How to combine results (all, any, merge)
     """
 
-    parallel_nodes: List[str] = field(default_factory=list)
+    parallel_nodes: list[str] = field(default_factory=list)
     join_strategy: str = "all"  # all, any, merge
 
     @property
     def node_type(self) -> WorkflowNodeType:
         return WorkflowNodeType.PARALLEL
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = super().to_dict()
         d.update(
             {
@@ -256,7 +256,7 @@ class TransformNode(WorkflowNode):
         transform: Function that transforms context
     """
 
-    transform: Callable[[Dict[str, Any]], Dict[str, Any]] = field(default=lambda ctx: ctx)
+    transform: Callable[[dict[str, Any]], dict[str, Any]] = field(default=lambda ctx: ctx)
 
     @property
     def node_type(self) -> WorkflowNodeType:
@@ -286,13 +286,13 @@ class TeamNodeWorkflow(WorkflowNode):
 
     goal: str = ""
     team_formation: str = "sequential"
-    members: List[Dict[str, Any]] = field(default_factory=list)
+    members: list[dict[str, Any]] = field(default_factory=list)
     timeout_seconds: Optional[float] = None
     merge_strategy: str = "dict"
     merge_mode: str = "team_wins"
     output_key: str = "team_result"
     continue_on_error: bool = True
-    shared_context: Dict[str, Any] = field(default_factory=dict)
+    shared_context: dict[str, Any] = field(default_factory=dict)
     max_iterations: int = 50
     total_tool_budget: int = 100
 
@@ -300,7 +300,7 @@ class TeamNodeWorkflow(WorkflowNode):
     def node_type(self) -> WorkflowNodeType:
         return WorkflowNodeType.TEAM
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize node to dictionary."""
         d = super().to_dict()
         d.update(
@@ -344,7 +344,7 @@ class ConstraintsProtocol(ABC):
         pass
 
     @abstractmethod
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize constraints to dictionary."""
         pass
 
@@ -399,8 +399,8 @@ class TaskConstraints(ConstraintsProtocol):
     max_cost_tier: str = "FREE"  # FREE, LOW, MEDIUM, HIGH
     _max_tool_calls: int = 100
     _timeout: float = 300.0
-    allowed_tools: Optional[List[str]] = None
-    blocked_tools: Optional[List[str]] = None
+    allowed_tools: Optional[list[str]] = None
+    blocked_tools: Optional[list[str]] = None
 
     @property
     def timeout(self) -> float:
@@ -429,7 +429,7 @@ class TaskConstraints(ConstraintsProtocol):
 
         return True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "llm_allowed": self.llm_allowed,
             "network_allowed": self.network_allowed,
@@ -526,8 +526,8 @@ class ComputeNode(WorkflowNode):
             llm_allowed: false
     """
 
-    tools: List[str] = field(default_factory=list)
-    input_mapping: Dict[str, str] = field(default_factory=dict)
+    tools: list[str] = field(default_factory=list)
+    input_mapping: dict[str, str] = field(default_factory=dict)
     output_key: Optional[str] = None
     constraints: TaskConstraints = field(default_factory=TaskConstraints)
     handler: Optional[str] = None  # Custom handler name for extensibility
@@ -545,7 +545,7 @@ class ComputeNode(WorkflowNode):
         """Convenience property for timeout from constraints."""
         return self.constraints.timeout
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = super().to_dict()
         d.update(
             {
@@ -582,9 +582,9 @@ class WorkflowDefinition:
 
     name: str
     description: str = ""
-    nodes: Dict[str, WorkflowNode] = field(default_factory=dict)
+    nodes: dict[str, WorkflowNode] = field(default_factory=dict)
     start_node: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     max_execution_timeout_seconds: Optional[float] = None
     default_node_timeout_seconds: Optional[float] = None
     max_iterations: int = 25
@@ -600,14 +600,14 @@ class WorkflowDefinition:
         """Get node by ID."""
         return self.nodes.get(node_id)
 
-    def get_next_nodes(self, node_id: str) -> List[WorkflowNode]:
+    def get_next_nodes(self, node_id: str) -> list[WorkflowNode]:
         """Get nodes that follow the given node."""
         node = self.nodes.get(node_id)
         if not node:
             return []
         return [self.nodes[nid] for nid in node.next_nodes if nid in self.nodes]
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         """Validate workflow and return list of errors."""
         errors = []
 
@@ -652,7 +652,7 @@ class WorkflowDefinition:
 
         return errors
 
-    def _find_reachable_nodes(self) -> Set[str]:
+    def _find_reachable_nodes(self) -> set[str]:
         """Find all nodes reachable from start."""
         if not self.start_node:
             return set()
@@ -680,7 +680,7 @@ class WorkflowDefinition:
 
         return reachable
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize workflow to dictionary."""
         return {
             "name": self.name,
@@ -769,10 +769,10 @@ class WorkflowBuilder:
         """
         self.name = name
         self.description = description
-        self._nodes: Dict[str, WorkflowNode] = {}
+        self._nodes: dict[str, WorkflowNode] = {}
         self._first_node: Optional[str] = None
         self._last_node: Optional[str] = None
-        self._metadata: Dict[str, Any] = {}
+        self._metadata: dict[str, Any] = {}
 
     def add_agent(
         self,
@@ -782,10 +782,10 @@ class WorkflowBuilder:
         *,
         name: Optional[str] = None,
         tool_budget: int = 15,
-        allowed_tools: Optional[List[str]] = None,
-        input_mapping: Optional[Dict[str, str]] = None,
+        allowed_tools: Optional[list[str]] = None,
+        input_mapping: Optional[dict[str, str]] = None,
         output_key: Optional[str] = None,
-        next_nodes: Optional[List[str]] = None,
+        next_nodes: Optional[list[str]] = None,
     ) -> "WorkflowBuilder":
         """Add an agent node.
 
@@ -819,8 +819,8 @@ class WorkflowBuilder:
     def add_condition(
         self,
         node_id: str,
-        condition: Callable[[Dict[str, Any]], str],
-        branches: Dict[str, str],
+        condition: Callable[[dict[str, Any]], str],
+        branches: dict[str, str],
         *,
         name: Optional[str] = None,
     ) -> "WorkflowBuilder":
@@ -846,11 +846,11 @@ class WorkflowBuilder:
     def add_parallel(
         self,
         node_id: str,
-        parallel_nodes: List[str],
+        parallel_nodes: list[str],
         *,
         name: Optional[str] = None,
         join_strategy: str = "all",
-        next_nodes: Optional[List[str]] = None,
+        next_nodes: Optional[list[str]] = None,
     ) -> "WorkflowBuilder":
         """Add a parallel execution node.
 
@@ -876,10 +876,10 @@ class WorkflowBuilder:
     def add_transform(
         self,
         node_id: str,
-        transform: Callable[[Dict[str, Any]], Dict[str, Any]],
+        transform: Callable[[dict[str, Any]], dict[str, Any]],
         *,
         name: Optional[str] = None,
-        next_nodes: Optional[List[str]] = None,
+        next_nodes: Optional[list[str]] = None,
     ) -> "WorkflowBuilder":
         """Add a transform node.
 
@@ -903,10 +903,10 @@ class WorkflowBuilder:
     def add_compute(
         self,
         node_id: str,
-        tools: Optional[List[str]] = None,
+        tools: Optional[list[str]] = None,
         *,
         name: Optional[str] = None,
-        input_mapping: Optional[Dict[str, str]] = None,
+        input_mapping: Optional[dict[str, str]] = None,
         output_key: Optional[str] = None,
         handler: Optional[str] = None,
         constraints: Optional[TaskConstraints] = None,
@@ -916,7 +916,7 @@ class WorkflowBuilder:
         timeout: float = 60.0,
         fail_fast: bool = True,
         parallel: bool = False,
-        next_nodes: Optional[List[str]] = None,
+        next_nodes: Optional[list[str]] = None,
     ) -> "WorkflowBuilder":
         """Add a compute node for constrained task execution.
 
@@ -991,10 +991,10 @@ class WorkflowBuilder:
         prompt: str,
         *,
         name: Optional[str] = None,
-        context_keys: Optional[List[str]] = None,
+        context_keys: Optional[list[str]] = None,
         timeout: float = 300.0,
         fallback: str = "abort",
-        next_nodes: Optional[List[str]] = None,
+        next_nodes: Optional[list[str]] = None,
     ) -> "WorkflowBuilder":
         """Add a human approval gate.
 
@@ -1040,14 +1040,14 @@ class WorkflowBuilder:
         self,
         node_id: str,
         prompt: str,
-        choices: List[str],
+        choices: list[str],
         *,
         name: Optional[str] = None,
-        context_keys: Optional[List[str]] = None,
+        context_keys: Optional[list[str]] = None,
         default_value: Optional[str] = None,
         timeout: float = 300.0,
         fallback: str = "continue",
-        next_nodes: Optional[List[str]] = None,
+        next_nodes: Optional[list[str]] = None,
     ) -> "WorkflowBuilder":
         """Add a human choice selection node.
 
@@ -1091,10 +1091,10 @@ class WorkflowBuilder:
         prompt: str,
         *,
         name: Optional[str] = None,
-        context_keys: Optional[List[str]] = None,
+        context_keys: Optional[list[str]] = None,
         timeout: float = 600.0,
         fallback: str = "abort",
-        next_nodes: Optional[List[str]] = None,
+        next_nodes: Optional[list[str]] = None,
     ) -> "WorkflowBuilder":
         """Add a human review/modification node.
 
@@ -1136,7 +1136,7 @@ class WorkflowBuilder:
         name: Optional[str] = None,
         timeout: float = 60.0,
         fallback: str = "continue",
-        next_nodes: Optional[List[str]] = None,
+        next_nodes: Optional[list[str]] = None,
     ) -> "WorkflowBuilder":
         """Add a simple confirmation gate.
 
@@ -1246,7 +1246,7 @@ class WorkflowBuilder:
 
 
 # Registry for decorator-registered workflows
-_workflow_registry: Dict[str, Callable[[], WorkflowDefinition]] = {}
+_workflow_registry: dict[str, Callable[[], WorkflowDefinition]] = {}
 
 
 def workflow(
@@ -1291,7 +1291,7 @@ def workflow(
     return decorator
 
 
-def get_registered_workflows() -> Dict[str, Callable[[], WorkflowDefinition]]:
+def get_registered_workflows() -> dict[str, Callable[[], WorkflowDefinition]]:
     """Get all registered workflow factories."""
     return _workflow_registry.copy()
 
