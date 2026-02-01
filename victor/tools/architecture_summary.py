@@ -1,5 +1,5 @@
 from typing import Any, Optional
-from victor.tools.enums import DangerLevel, Priority
+from victor.tools.enums import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.graph_tool import graph
 

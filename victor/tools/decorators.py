@@ -202,7 +202,7 @@ def tool(
     priority_hints: Optional[list[str]] = None,
     # Selection/approval metadata parameters
     priority: Priority = Priority.MEDIUM,
-    access_mode: AccessMode = AccessModeREADONLY,
+    access_mode: AccessMode = AccessMode.READONLY,
     danger_level: DangerLevel = DangerLevel.SAFE,
     # Stage affinity for conversation state machine
     stages: Optional[list[str]] = None,

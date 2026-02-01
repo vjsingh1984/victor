@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 from typing import Optional, Any
 
-from victor.tools.enums import DangerLevel, Priority
+from victor.tools.enums import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async, CommandErrorType
 

@@ -33,7 +33,7 @@ Features:
 import sqlite3
 from typing import TYPE_CHECKING, Any, Optional
 
-from victor.tools.enums import DangerLevel, Priority
+from victor.tools.enums import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 if TYPE_CHECKING:

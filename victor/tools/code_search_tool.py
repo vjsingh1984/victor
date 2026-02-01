@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
-from victor.tools.enums import DangerLevel, Priority
+from victor.tools.enums import AccessMode, DangerLevel, Priority
 from victor.tools.common import EXCLUDE_DIRS, DEFAULT_CODE_EXTENSIONS, latest_mtime
 from victor.tools.decorators import tool
 

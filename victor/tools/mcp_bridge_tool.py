@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 from victor.integrations.mcp.client import MCPClient
-from victor.tools.enums import DangerLevel, Priority
+from victor.tools.enums import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 # Constants

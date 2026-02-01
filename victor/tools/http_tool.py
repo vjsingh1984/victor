@@ -28,7 +28,7 @@ from typing import Any, Optional
 
 import httpx
 
-from victor.tools.enums import CostTier, DangerLevel, Priority
+from victor.tools.enums import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 

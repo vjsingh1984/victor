@@ -30,7 +30,7 @@ import httpx
 from bs4 import BeautifulSoup  # type: ignore[import-untyped]
 
 from victor.tools.base import ToolConfig
-from victor.tools.enums import CostTier, DangerLevel, Priority
+from victor.tools.enums import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 # Constants

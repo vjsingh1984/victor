@@ -34,7 +34,7 @@ from typing import Any, Literal, Optional
 
 from victor.coding.codebase.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
 from victor.coding.codebase.graph.registry import create_graph_store
-from victor.tools.enums import DangerLevel, Priority
+from victor.tools.enums import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 logger = logging.getLogger(__name__)

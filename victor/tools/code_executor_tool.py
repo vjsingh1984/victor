@@ -74,7 +74,7 @@ def _get_docker_components() -> tuple[Any, Any, type]:
 
 
 from victor.core.errors import FileError, ConfigurationError
-from victor.tools.enums import DangerLevel, Priority
+from victor.tools.enums import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 
 # Container label for identifying Victor sandbox containers

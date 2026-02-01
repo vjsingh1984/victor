@@ -159,7 +159,7 @@ def normalize_edit_operations(ops: list[dict[str, Any]]) -> list[dict[str, Any]]
 
 
 from victor.coding.editing import FileEditor
-from victor.tools.enums import DangerLevel, Priority
+from victor.tools.enums import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.filesystem import enforce_sandbox_path
 

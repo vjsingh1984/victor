@@ -20,7 +20,7 @@ import shlex
 from typing import Any, Optional
 
 from victor.config.timeouts import ProcessTimeouts
-from victor.tools.enums import DangerLevel, ExecutionCategory, Priority
+from victor.tools.enums import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
 
 
