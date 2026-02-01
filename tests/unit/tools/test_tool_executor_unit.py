@@ -1223,7 +1223,7 @@ class TestToolExecutorHooks:
 
     def test_run_before_hooks_critical_failure(self, registry_with_hooks):
         """Test that critical hook failures raise HookError."""
-        from victor.tools.base import Hook, HookError
+        from victor.tools.registry import Hook, HookError
 
         registry, _ = registry_with_hooks
 
@@ -1273,7 +1273,7 @@ class TestToolExecutorHooks:
 
     def test_run_after_hooks_critical_failure(self, registry_with_hooks):
         """Test that critical after hook failures raise HookError."""
-        from victor.tools.base import Hook, HookError
+        from victor.tools.registry import Hook, HookError
 
         registry, _ = registry_with_hooks
 

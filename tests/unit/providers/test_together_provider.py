@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from victor.core.errors import ProviderTimeoutError
+from victor.core.errors import ProviderError, ProviderTimeoutError
 from victor.providers.base import Message
 
 

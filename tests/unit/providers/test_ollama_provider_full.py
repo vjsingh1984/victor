@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 from victor.providers.ollama_provider import OllamaProvider
 from victor.providers.base import Message, ToolDefinition
+from victor.core.errors import ProviderError, ProviderTimeoutError
 
 
 # Helper for async generator

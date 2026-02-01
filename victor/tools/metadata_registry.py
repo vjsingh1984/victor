@@ -1608,6 +1608,16 @@ def _get_instance_impl() -> ToolMetadataRegistry:
 ToolMetadataRegistry.get_instance = classmethod(lambda cls: _get_instance_impl())  # type: ignore[attr-defined]
 
 
+def _reset_instance_impl() -> None:
+    """Reset the global registry instance (for testing)."""
+    global _global_registry
+    _global_registry = None
+
+
+# Add reset_instance as a class method for testing purposes
+ToolMetadataRegistry.reset_instance = classmethod(lambda cls: _reset_instance_impl())  # type: ignore[attr-defined]
+
+
 def register_tool_metadata(tool: BaseTool) -> None:
     """Register a tool in the global registry.
 
