@@ -14,16 +14,18 @@
 
 """LLM Provider abstraction layer."""
 
-from victor.providers.base import (
-    BaseProvider,
-    Message,
-    CompletionResponse,
-    StreamChunk,
+from victor.core.errors import (
     ProviderError,
     ProviderNotFoundError,
     ProviderAuthError,
     ProviderRateLimitError,
     ProviderTimeoutError,
+)
+from victor.providers.base import (
+    BaseProvider,
+    Message,
+    CompletionResponse,
+    StreamChunk,
     # ISP Protocol classes
     StreamingProvider,
     ToolCallingProvider,

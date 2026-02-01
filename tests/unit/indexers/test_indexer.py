@@ -17,15 +17,15 @@
 import tempfile
 from pathlib import Path
 
-from victor.coding.codebase.indexer import Symbol, FileMetadata, CodebaseIndex
+from victor.coding.codebase.indexer import IndexedSymbol, FileMetadata, CodebaseIndex
 
 
-class TestSymbol:
+class TestIndexedSymbol:
     """Tests for Symbol model."""
 
     def test_symbol_creation(self):
         """Test creating a Symbol."""
-        symbol = Symbol(
+        symbol = IndexedSymbol(
             name="my_function",
             type="function",
             file_path="/test/file.py",
@@ -38,7 +38,7 @@ class TestSymbol:
 
     def test_symbol_with_optional_fields(self):
         """Test Symbol with optional fields."""
-        symbol = Symbol(
+        symbol = IndexedSymbol(
             name="MyClass",
             type="class",
             file_path="/test/file.py",
@@ -51,7 +51,7 @@ class TestSymbol:
 
     def test_symbol_references(self):
         """Test Symbol references."""
-        symbol = Symbol(
+        symbol = IndexedSymbol(
             name="helper",
             type="function",
             file_path="/test/utils.py",
@@ -79,7 +79,7 @@ class TestFileMetadata:
 
     def test_file_metadata_with_symbols(self):
         """Test FileMetadata with symbols."""
-        symbol = Symbol(name="func", type="function", file_path="/test.py", line_number=1)
+        symbol = IndexedSymbol(name="func", type="function", file_path="/test.py", line_number=1)
         metadata = FileMetadata(
             path="/test.py",
             language="python",

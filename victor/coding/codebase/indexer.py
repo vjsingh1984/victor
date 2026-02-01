@@ -935,16 +935,13 @@ class IndexedSymbol(BaseModel):
     composition: list[tuple[str, str]] = Field(default_factory=list)  # (owner, member) for has-a
 
 
-# Backward compatibility alias
-Symbol = IndexedSymbol
-
 
 class FileMetadata(BaseModel):
     """Metadata about a source file."""
 
     path: str
     language: str
-    symbols: list[Symbol] = Field(default_factory=list)
+    symbols: list[IndexedSymbol] = Field(default_factory=list)
     imports: list[str] = Field(default_factory=list)
     dependencies: list[str] = Field(default_factory=list)  # Files this file depends on
     call_edges: list[tuple[str, str]] = Field(default_factory=list)  # (caller, callee) pairs
@@ -1184,7 +1181,7 @@ class CodebaseIndex:
                 prefix = "async " if enriched.is_async else ""
                 signature = f"{prefix}def {enriched.name}({params}){ret}"
 
-        return Symbol(
+        return IndexedSymbol(
             name=enriched.name,
             type=enriched.symbol_type,
             file_path=relative_path,
@@ -1419,7 +1416,7 @@ class CodebaseIndex:
         """
         # Convert symbol dicts to Symbol objects
         symbols = [
-            Symbol(
+            IndexedSymbol(
                 name=s["name"],
                 type=s["type"],
                 file_path=s["file_path"],
@@ -1833,12 +1830,12 @@ class CodebaseIndex:
     # Lines 866-1197 removed on 2025-12-11 during plugin architecture refactoring.
     # ========================================================================
 
-    def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> list[Symbol]:
+    def _extract_symbols_with_tree_sitter(self, file_path: Path, language: str) -> list[IndexedSymbol]:
         """Extract lightweight symbol declarations for non-Python languages via tree-sitter."""
         query_defs = SYMBOL_QUERIES.get(language)
         if not query_defs:
             return []
-        symbols: list[Symbol] = []
+        symbols: list[IndexedSymbol] = []
         parser = None
         try:
             from victor.coding.codebase.tree_sitter_manager import get_parser
@@ -1873,7 +1870,7 @@ class CodebaseIndex:
                                 if not text:
                                     continue
                                 symbols.append(
-                                    Symbol(
+                                    IndexedSymbol(
                                         name=text,
                                         type=sym_type,
                                         file_path=str(file_path.relative_to(self.root)),
@@ -1915,7 +1912,7 @@ class CodebaseIndex:
             for match in re.finditer(pattern, text):
                 name = match.group(1)
                 symbols.append(
-                    Symbol(
+                    IndexedSymbol(
                         name=name,
                         type=sym_type,
                         file_path=str(file_path.relative_to(self.root)),
@@ -1925,7 +1922,7 @@ class CodebaseIndex:
         return symbols
 
     def _extract_inheritance(
-        self, file_path: Path, language: str, symbols: list[Symbol]
+        self, file_path: Path, language: str, symbols: list[IndexedSymbol]
     ) -> list[tuple[str, str]]:
         """Extract child->base inheritance edges."""
         edges: list[tuple[str, str]] = []
@@ -2026,7 +2023,7 @@ class CodebaseIndex:
         return edges
 
     def _extract_implements(
-        self, file_path: Path, language: str, symbols: list[Symbol]
+        self, file_path: Path, language: str, symbols: list[IndexedSymbol]
     ) -> list[tuple[str, str]]:
         """Extract child->interface implements edges for typed languages."""
         edges: list[tuple[str, str]] = []
@@ -2077,7 +2074,7 @@ class CodebaseIndex:
         return edges
 
     def _extract_composition(
-        self, file_path: Path, language: str, symbols: list[Symbol]
+        self, file_path: Path, language: str, symbols: list[IndexedSymbol]
     ) -> list[tuple[str, str]]:
         """Extract has-a/composition edges (owner -> member type)."""
         edges: list[tuple[str, str]] = []
@@ -2277,7 +2274,7 @@ class CodebaseIndex:
         # Use unified extractor for tier-aware symbol extraction
         # This provides enhanced type info for Tier 1/2 languages
         tier_config = get_tier(language)
-        symbols: list[Symbol] = []
+        symbols: list[IndexedSymbol] = []
 
         if tier_config.tier in (LanguageTier.TIER_1, LanguageTier.TIER_2):
             # Try unified extractor first (provides enriched symbols)
@@ -2950,7 +2947,7 @@ class SymbolVisitor(ast.NodeVisitor):
                 bases.append(base.attr)
             elif isinstance(base, ast.Subscript) and isinstance(base.value, ast.Name):
                 bases.append(base.value.id)
-        symbol = Symbol(
+        symbol = IndexedSymbol(
             name=node.name,
             type="class",
             file_path=self.metadata.path,
@@ -2976,7 +2973,7 @@ class SymbolVisitor(ast.NodeVisitor):
         args = [arg.arg for arg in node.args.args]
         signature = f"{node.name}({', '.join(args)})"
 
-        symbol = Symbol(
+        symbol = IndexedSymbol(
             name=name,
             type="function",
             file_path=self.metadata.path,
