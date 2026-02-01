@@ -1153,7 +1153,9 @@ class GroundingVerifier:
         matches = self.SYMBOL_PATTERN.findall(response)
         return list(set(matches))
 
-    async def verify_file_paths(self, paths: list[str], result: GroundingVerificationResult) -> None:
+    async def verify_file_paths(
+        self, paths: list[str], result: GroundingVerificationResult
+    ) -> None:
         """Verify file path references exist.
 
         Args:
