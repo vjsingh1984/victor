@@ -74,7 +74,11 @@ from typing import (
 if TYPE_CHECKING:
     # Import opentelemetry types if available
     try:
-        from opentelemetry.trace import Status as Status, StatusCode as StatusCode, Span as Span  # noqa: F401
+        from opentelemetry.trace import (
+            Status as Status,
+            StatusCode as StatusCode,
+            Span as Span,
+        )  # noqa: F401
     except ImportError:
         # Create stub types when opentelemetry is not available
         class Status:  # type: ignore[no-redef]
@@ -85,6 +89,7 @@ if TYPE_CHECKING:
 
         class Span:  # type: ignore[no-redef]
             """Stub Span class for type checking when opentelemetry is not installed."""
+
 
 logger = logging.getLogger(__name__)
 

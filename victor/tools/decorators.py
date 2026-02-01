@@ -745,7 +745,9 @@ def _create_tool_class(
                 cost_tier=self._cost_tier,
             )
 
-        async def execute(self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any) -> ToolResult:
+        async def execute(
+            self, _exec_ctx: Dict[str, Any] | None = None, **kwargs: Any
+        ) -> ToolResult:
             try:
                 # Check if the target function wants the framework execution context
                 # Note: We use _exec_ctx to avoid collision with tool parameters named 'context'

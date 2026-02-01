@@ -39,10 +39,6 @@ class ReviewSeverity(Enum):
     HINT = "hint"  # Nice to have
 
 
-# Backward compatibility alias
-Severity = ReviewSeverity
-
-
 class ReviewCategory(Enum):
     """Categories of code review findings."""
 

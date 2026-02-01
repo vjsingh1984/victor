@@ -1840,8 +1840,8 @@ async def graph(
             if runtime_weighted and not edge_types:
                 weighted_edges = ["CALLS", "INHERITS", "IMPLEMENTS", "COMPOSED_OF", "IMPORTS"]
             module_results = []
-            module_to_nodes_b, outgoing_modules_b, incoming_modules_b = analyzer._build_module_graph(
-                effective_granularity_c, weighted_edges
+            module_to_nodes_b, outgoing_modules_b, incoming_modules_b = (
+                analyzer._build_module_graph(effective_granularity_c, weighted_edges)
             )
             node_to_module_2_b: Dict[str, str] = {}
             for mod, nodes in module_to_nodes_b.items():

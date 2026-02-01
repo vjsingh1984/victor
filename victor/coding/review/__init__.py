@@ -65,8 +65,8 @@ from victor.coding.review.protocol import (
     ReviewResult,
     ReviewRule,
     ReviewRuleSet,
+    ReviewSeverity,
     SecurityIssue,
-    Severity,
     SourceLocation,
 )
 from victor.coding.review.analyzers import (
@@ -101,8 +101,8 @@ __all__ = [
     "ReviewResult",
     "ReviewRule",
     "ReviewRuleSet",
+    "ReviewSeverity",
     "SecurityIssue",
-    "Severity",
     "SourceLocation",
     # Analyzers
     "BaseAnalyzer",

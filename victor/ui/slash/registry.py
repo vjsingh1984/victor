@@ -188,7 +188,7 @@ class CommandRegistry:
         count = 0
         try:
             package = importlib.import_module(package_path)
-            package_file = getattr(package, '__file__', None)
+            package_file = getattr(package, "__file__", None)
             package_dir = Path(package_file).parent if package_file else Path(package_path).parent
 
             for _, module_name, _ in pkgutil.iter_modules([str(package_dir)]):

@@ -136,6 +136,7 @@ DO NOT re-read the full file without parameters - you will get the same truncate
 DO NOT assume content is missing - use offset/search to access additional sections.
 """.strip()
 
+
 # Task-type-specific prompt hints are maintained in vertical prompt contributors:
 # - victor/coding/prompts.py (CodingPromptContributor)
 # - victor/devops/prompts.py (DevOpsPromptContributor)

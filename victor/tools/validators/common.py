@@ -354,9 +354,7 @@ class ToolBudgetValidator:
 
         # Type check (runtime validation for defensive programming)
         if not isinstance(budget, int):  # type: ignore[unreachable,unused-ignore]
-            result.add_error(
-                f"Budget must be an integer, got {type(budget).__name__}: {budget!r}"
-            )
+            result.add_error(f"Budget must be an integer, got {type(budget).__name__}: {budget!r}")
             return result
 
         # Range check

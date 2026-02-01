@@ -168,6 +168,7 @@ class LifecycleEventEmitter(ILifecycleEventEmitter):
             bus = self._get_bus()
             if bus:
                 from victor.core.events.emit_helper import emit_event_sync
+
                 emit_event_sync(
                     bus,
                     topic=final_topic,

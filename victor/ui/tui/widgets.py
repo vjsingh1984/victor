@@ -186,7 +186,7 @@ class StatusBar(Static):
         self.provider = provider
         self.model = model
         provider_label = self.query_one(".provider-info")
-        if hasattr(provider_label, 'update'):
+        if hasattr(provider_label, "update"):
             provider_label.update(
                 Text.assemble(
                     ("Victor ", "bold #7cb7ff"),

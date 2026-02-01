@@ -260,5 +260,3 @@ class TestExecutionResult:
 
         assert result.final_state is result.final_state
         assert result.metrics is result.metrics
-
-

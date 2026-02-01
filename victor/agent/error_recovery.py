@@ -52,7 +52,6 @@ class ErrorRecoveryAction(Enum):
     ABORT = "abort"
 
 
-
 @dataclass
 class RecoveryResult:
     """Result of attempting to recover from an error."""

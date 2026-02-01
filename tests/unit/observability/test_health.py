@@ -479,6 +479,7 @@ class TestMemoryHealthCheck:
         """Test healthy memory usage."""
         # Mock psutil to return low memory usage
         import unittest.mock
+
         mock_process = unittest.mock.MagicMock()
         mock_memory_info = unittest.mock.MagicMock()
         mock_memory_info.rss = 500 * 1024 * 1024  # 500 MB
@@ -499,6 +500,7 @@ class TestMemoryHealthCheck:
         """Test memory details are included."""
         # Mock psutil to return moderate memory usage
         import unittest.mock
+
         mock_process = unittest.mock.MagicMock()
         mock_memory_info = unittest.mock.MagicMock()
         mock_memory_info.rss = 1500 * 1024 * 1024  # 1500 MB

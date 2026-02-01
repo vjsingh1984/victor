@@ -127,7 +127,6 @@ class TrackerStopReason(Enum):
     MANUAL_STOP = "manual_stop"
 
 
-
 # Tools that indicate research activity
 RESEARCH_TOOLS = frozenset({"web_search", "web_fetch", "tavily_search", "search_web", "fetch_url"})
 

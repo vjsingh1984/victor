@@ -799,7 +799,9 @@ async def edit(
             # Include validation info if there were warnings/errors
             if validation_errors:
                 commit_result["validation_errors"] = validation_errors
-                commit_result["message"] += f" Note: {len(validation_errors)} syntax issues detected."
+                commit_result[
+                    "message"
+                ] += f" Note: {len(validation_errors)} syntax issues detected."
             if validation_warnings:
                 commit_result["validation_warnings"] = validation_warnings
             return commit_result

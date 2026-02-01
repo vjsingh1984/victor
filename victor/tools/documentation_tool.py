@@ -810,7 +810,9 @@ async def docs_coverage(
     if len(missing) > MAX_MISSING_ITEMS:
         missing_truncated.append(f"... and {len(missing) - MAX_MISSING_ITEMS} more items")
 
-    quality_truncated: list[str] | None = quality_issues[:MAX_QUALITY_ISSUES] if check_quality else None
+    quality_truncated: list[str] | None = (
+        quality_issues[:MAX_QUALITY_ISSUES] if check_quality else None
+    )
     if check_quality and quality_truncated is not None and len(quality_issues) > MAX_QUALITY_ISSUES:
         quality_truncated.append(f"... and {len(quality_issues) - MAX_QUALITY_ISSUES} more issues")
 

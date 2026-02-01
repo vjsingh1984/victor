@@ -52,7 +52,7 @@ async def workflow(
 
     try:
         # BaseWorkflow-style execution
-        if hasattr(workflow, "run") and callable(getattr(workflow, "run")):
+        if hasattr(workflow, "run") and callable(workflow.run):
             result = await workflow.run(context, **workflow_args)
             return result
 
