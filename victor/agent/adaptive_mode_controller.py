@@ -101,7 +101,6 @@ class AdaptiveAgentMode(Enum):
 
 
 # Backward compatibility alias
-AgentMode = AdaptiveAgentMode
 
 
 class TransitionTrigger(Enum):
@@ -120,7 +119,7 @@ class TransitionTrigger(Enum):
 class ModeState:
     """Current state for mode decision making."""
 
-    mode: AgentMode
+    mode: AdaptiveAgentMode
     task_type: str
     tool_calls_made: int
     tool_budget: int
@@ -168,7 +167,7 @@ class ModeState:
 class ModeAction:
     """Action to take in the current state."""
 
-    target_mode: AgentMode
+    target_mode: AdaptiveAgentMode
     adjust_tool_budget: int = 0  # +/- adjustment
     should_continue: bool = True
     reason: str = ""
@@ -186,8 +185,8 @@ class ModeAction:
 class TransitionEvent:
     """Record of a mode transition."""
 
-    from_mode: AgentMode
-    to_mode: AgentMode
+    from_mode: AdaptiveAgentMode
+    to_mode: AdaptiveAgentMode
     trigger: TransitionTrigger
     state_before: ModeState
     action_taken: ModeAction
@@ -373,8 +372,8 @@ class QLearningStore:
     def record_transition(
         self,
         profile_name: str,
-        from_mode: AgentMode,
-        to_mode: AgentMode,
+        from_mode: AdaptiveAgentMode,
+        to_mode: AdaptiveAgentMode,
         trigger: TransitionTrigger,
         state_key: str,
         action_key: str,
@@ -580,11 +579,23 @@ class AdaptiveModeController:
 
     # Valid mode transitions
     VALID_TRANSITIONS = {
-        AgentMode.EXPLORE: [AgentMode.PLAN, AgentMode.BUILD, AgentMode.COMPLETE],
-        AgentMode.PLAN: [AgentMode.BUILD, AgentMode.EXPLORE, AgentMode.COMPLETE],
-        AgentMode.BUILD: [AgentMode.REVIEW, AgentMode.EXPLORE, AgentMode.COMPLETE],
-        AgentMode.REVIEW: [AgentMode.BUILD, AgentMode.COMPLETE],
-        AgentMode.COMPLETE: [],
+        AdaptiveAgentMode.EXPLORE: [
+            AdaptiveAgentMode.PLAN,
+            AdaptiveAgentMode.BUILD,
+            AdaptiveAgentMode.COMPLETE,
+        ],
+        AdaptiveAgentMode.PLAN: [
+            AdaptiveAgentMode.BUILD,
+            AdaptiveAgentMode.EXPLORE,
+            AdaptiveAgentMode.COMPLETE,
+        ],
+        AdaptiveAgentMode.BUILD: [
+            AdaptiveAgentMode.REVIEW,
+            AdaptiveAgentMode.EXPLORE,
+            AdaptiveAgentMode.COMPLETE,
+        ],
+        AdaptiveAgentMode.REVIEW: [AdaptiveAgentMode.BUILD, AdaptiveAgentMode.COMPLETE],
+        AdaptiveAgentMode.COMPLETE: [],
     }
 
     # Default tool budgets by task type
@@ -663,7 +674,7 @@ class AdaptiveModeController:
 
         # Session tracking
         self._session_start = datetime.now()
-        self._mode_history: list[tuple[AgentMode, datetime]] = []
+        self._mode_history: list[tuple[AdaptiveAgentMode, datetime]] = []
         self._total_reward = 0.0
 
         # Consecutive no-tool iterations tracking for loop detection
@@ -780,9 +791,9 @@ class AdaptiveModeController:
         # Ensure current_mode is a string (could be int from ConversationStage.value)
         try:
             mode_str = str(current_mode).lower() if current_mode else "explore"
-            mode_enum = AgentMode(mode_str)
+            mode_enum = AdaptiveAgentMode(mode_str)
         except ValueError:
-            mode_enum = AgentMode.EXPLORE
+            mode_enum = AdaptiveAgentMode.EXPLORE
 
         state = ModeState(
             mode=mode_enum,
@@ -861,7 +872,7 @@ class AdaptiveModeController:
                 ModeAction(
                     target_mode=target_mode,
                     adjust_tool_budget=0,
-                    should_continue=target_mode != AgentMode.COMPLETE,
+                    should_continue=target_mode != AdaptiveAgentMode.COMPLETE,
                     confidence=0.5,
                 )
             )
@@ -870,7 +881,7 @@ class AdaptiveModeController:
         if state.quality_score > 0.8 and state.tool_calls_made > 2:
             actions.append(
                 ModeAction(
-                    target_mode=AgentMode.COMPLETE,
+                    target_mode=AdaptiveAgentMode.COMPLETE,
                     should_continue=False,
                     reason="High quality achieved",
                     confidence=0.8,
@@ -880,7 +891,7 @@ class AdaptiveModeController:
         if state.tool_calls_made >= state.tool_budget:
             actions.append(
                 ModeAction(
-                    target_mode=AgentMode.COMPLETE,
+                    target_mode=AdaptiveAgentMode.COMPLETE,
                     should_continue=False,
                     reason="Tool budget exhausted",
                     confidence=0.9,
@@ -925,7 +936,7 @@ class AdaptiveModeController:
         bonus = 0.0
 
         # Bonus for completing when quality is high
-        if action.target_mode == AgentMode.COMPLETE:
+        if action.target_mode == AdaptiveAgentMode.COMPLETE:
             if self._current_state and self._current_state.quality_score > 0.8:
                 bonus += 0.3
 
@@ -943,7 +954,7 @@ class AdaptiveModeController:
 
     def _infer_trigger(self, state: ModeState, action: ModeAction) -> TransitionTrigger:
         """Infer the trigger for a transition."""
-        if action.target_mode == AgentMode.COMPLETE:
+        if action.target_mode == AdaptiveAgentMode.COMPLETE:
             if state.quality_score > 0.8:
                 return TransitionTrigger.QUALITY_THRESHOLD
             if state.tool_calls_made >= state.tool_budget:
@@ -1260,7 +1271,7 @@ class AdaptiveModeController:
             q_values = self._q_store.get_all_actions(state_key)
 
             # If completing has highest Q-value, suggest stopping
-            complete_key = f"{AgentMode.COMPLETE.value}:+0"
+            complete_key = f"{AdaptiveAgentMode.COMPLETE.value}:+0"
             if complete_key in q_values:
                 if all(q_values[complete_key] >= v for v in q_values.values()):
                     return False, "Learned pattern suggests completion"

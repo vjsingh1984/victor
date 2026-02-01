@@ -46,7 +46,7 @@ class ModeCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.adaptive_mode_controller import AgentMode
+        from victor.agent.adaptive_mode_controller import AdaptiveAgentMode
 
         # Use ModeAwareMixin's public mode_controller property (lazy-loads)
         mode_controller = getattr(ctx.agent, "mode_controller", None) if ctx.agent else None
@@ -56,7 +56,7 @@ class ModeCommand(BaseSlashCommand):
             current_mode = (
                 mode_controller.current_mode
                 if mode_controller
-                else AgentMode.BUILD  # Default fallback
+                else AdaptiveAgentMode.BUILD  # Default fallback
             )
 
             ctx.console.print(
@@ -82,7 +82,7 @@ class ModeCommand(BaseSlashCommand):
             return
 
         try:
-            new_mode = AgentMode(mode_name)
+            new_mode = AdaptiveAgentMode(mode_name)
 
             if mode_controller:
                 mode_controller.switch_mode(new_mode)
@@ -193,13 +193,13 @@ class PlanCommand(BaseSlashCommand):
                 self._show_plan(ctx)
                 return
 
-        from victor.agent.adaptive_mode_controller import AgentMode
+        from victor.agent.adaptive_mode_controller import AdaptiveAgentMode
 
         # Switch to plan mode using public interface
         # Uses ModeAwareMixin's mode_controller property (lazy-loads)
         mc = getattr(ctx.agent, "mode_controller", None)
         if mc:
-            mc.switch_mode(AgentMode.PLAN)
+            mc.switch_mode(AdaptiveAgentMode.PLAN)
         else:
             ctx.console.print("[yellow]Mode controller not available[/]")
             return

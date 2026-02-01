@@ -229,7 +229,7 @@ from dataclasses import dataclass, field
 class AgentToolSelectionContext:
     """Agent-level context for tool selection decisions.
 
-    Renamed from ToolSelectionContext to be semantically distinct:
+    Renamed from AgentToolSelectionContext to be semantically distinct:
     - AgentToolSelectionContext (here): Basic agent-level context
     - VerticalToolSelectionContext (victor.core.verticals.protocols.tool_provider): Vertical-specific
     - CrossVerticalToolSelectionContext (victor.tools.selection.protocol): Extended cross-vertical
@@ -267,7 +267,6 @@ class AgentToolSelectionContext:
 
 
 # Backward compatibility alias
-ToolSelectionContext = AgentToolSelectionContext
 
 
 @dataclass
@@ -2755,7 +2754,7 @@ __all__ = [
     "IAgentFactory",
     "IAgent",
     # Tool selection data classes
-    "ToolSelectionContext",
+    "AgentToolSelectionContext",
     "ToolSelectorFeatures",
     # Provider protocols
     "ProviderManagerProtocol",

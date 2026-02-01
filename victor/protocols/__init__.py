@@ -116,8 +116,8 @@ from victor.protocols.team import (
     IMessageBusProvider,
     ISharedMemoryProvider,
     IEnhancedTeamCoordinator,
-    TeamCoordinatorProtocol,
-    TeamMemberProtocol,
+    ITeamCoordinator,
+    ITeamMember,
 )
 
 # Search Protocols
@@ -397,8 +397,8 @@ __all__ = [
     "IMessageBusProvider",
     "ISharedMemoryProvider",
     "IEnhancedTeamCoordinator",
-    "TeamCoordinatorProtocol",
-    "TeamMemberProtocol",
+    "ITeamCoordinator",
+    "ITeamMember",
     # Search Protocols
     "ISemanticSearch",
     "IIndexable",

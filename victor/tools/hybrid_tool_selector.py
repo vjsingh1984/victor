@@ -38,7 +38,7 @@ from victor.tools.selection_filters import blend_tool_results, deduplicate_tools
 from victor.config.tool_selection_defaults import HybridSelectorDefaults
 
 if TYPE_CHECKING:
-    from victor.agent.protocols import ToolSelectionContext, ToolSelectorFeatures
+    from victor.agent.protocols import AgentToolSelectionContext, ToolSelectorFeatures
     from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
     from victor.protocols.tool_selector import IToolSelector
 
@@ -172,7 +172,7 @@ class HybridToolSelector:
     async def select_tools(
         self,
         prompt: str,
-        context: "ToolSelectionContext",
+        context: "AgentToolSelectionContext",
     ) -> list[ToolDefinition]:
         """Select tools by blending semantic and keyword strategies with RL boost.
 
@@ -666,7 +666,7 @@ class HybridToolSelector:
     def _try_get_from_cache(
         self,
         prompt: str,
-        context: "ToolSelectionContext",
+        context: "AgentToolSelectionContext",
     ) -> Optional[list[ToolDefinition]]:
         """Try to get cached selection result.
 
@@ -723,7 +723,7 @@ class HybridToolSelector:
     def _store_in_cache(
         self,
         prompt: str,
-        context: "ToolSelectionContext",
+        context: "AgentToolSelectionContext",
         tools: list[ToolDefinition],
     ) -> None:
         """Store selection result in cache.

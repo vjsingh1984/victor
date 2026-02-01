@@ -309,5 +309,3 @@ class IEnhancedTeamCoordinator(
 
 
 # Type aliases for backward compatibility with framework
-TeamCoordinatorProtocol = ITeamCoordinator
-TeamMemberProtocol = ITeamMember

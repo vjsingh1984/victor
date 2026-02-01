@@ -20,7 +20,7 @@ Covers HIGH-002: Unified Tool Selection Architecture - Release 2, Phase 3.
 import pytest
 from unittest.mock import MagicMock, patch
 
-from victor.agent.protocols import ToolSelectionContext
+from victor.agent.protocols import AgentToolSelectionContext
 from victor.providers.base import ToolDefinition
 from victor.tools.base import BaseTool, ToolResult
 from victor.tools.registry import ToolRegistry
@@ -108,7 +108,7 @@ class TestKeywordToolSelector:
             enabled_tools={"read_file", "code_search"},
         )
 
-        context = ToolSelectionContext(task_type="analysis")
+        context = AgentToolSelectionContext(task_type="analysis")
         result = await selector.select_tools("find a function", context)
 
         result_names = {t.name for t in result}
@@ -120,7 +120,7 @@ class TestKeywordToolSelector:
         """Test that planned_tools are included in selection."""
         selector = KeywordToolSelector(tools=tool_registry)
 
-        context = ToolSelectionContext(
+        context = AgentToolSelectionContext(
             task_type="action",
             planned_tools=["read_file", "write_file"],
         )
@@ -143,7 +143,7 @@ class TestKeywordToolSelector:
 
         selector = KeywordToolSelector(tools=tool_registry)
 
-        context = ToolSelectionContext(task_type="analysis")
+        context = AgentToolSelectionContext(task_type="analysis")
         result = await selector.select_tools("search for code in git", context)
 
         result_names = {t.name for t in result}
@@ -174,7 +174,7 @@ class TestKeywordToolSelector:
             model="small-model",
         )
 
-        context = ToolSelectionContext(task_type="action")
+        context = AgentToolSelectionContext(task_type="action")
         result = await selector.select_tools("do all the things", context)
 
         # Should be capped at 10 for small models

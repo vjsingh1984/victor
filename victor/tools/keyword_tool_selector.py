@@ -35,7 +35,7 @@ from victor.tools.selection_filters import is_small_model
 
 if TYPE_CHECKING:
     from victor.agent.conversation_state import ConversationStage, ConversationStateMachine
-    from victor.agent.protocols import ToolSelectionContext, ToolSelectorFeatures
+    from victor.agent.protocols import AgentToolSelectionContext, ToolSelectorFeatures
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ class KeywordToolSelector:
     async def select_tools(
         self,
         prompt: str,
-        context: "ToolSelectionContext",
+        context: "AgentToolSelectionContext",
     ) -> list[ToolDefinition]:
         """Select tools using keyword-based category matching.
 
@@ -363,7 +363,7 @@ class KeywordToolSelector:
     def _try_get_cached_selection(
         self,
         prompt: str,
-        context: "ToolSelectionContext",
+        context: "AgentToolSelectionContext",
     ) -> Optional[list[ToolDefinition]]:
         """Try to get cached tool selection result.
 
@@ -422,7 +422,7 @@ class KeywordToolSelector:
         self,
         prompt: str,
         tools: list[ToolDefinition],
-        context: "ToolSelectionContext",
+        context: "AgentToolSelectionContext",
     ) -> None:
         """Store tool selection result in cache.
 

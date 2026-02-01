@@ -24,7 +24,7 @@ from unittest.mock import MagicMock, patch
 
 from victor.agent.adaptive_mode_controller import (
     AdaptiveModeController,
-    AgentMode,
+    AdaptiveAgentMode,
     ModeAction,
     ModeState,
     QLearningStore,
@@ -76,26 +76,26 @@ def controller_with_provider(tmp_project_path: Path) -> AdaptiveModeController:
 
 
 # =============================================================================
-# Test AgentMode Enum
+# Test AdaptiveAgentMode Enum
 # =============================================================================
 
 
 class TestAgentMode:
-    """Tests for AgentMode enum."""
+    """Tests for AdaptiveAgentMode enum."""
 
     def test_agent_mode_values(self):
-        """Test AgentMode has expected values."""
-        assert AgentMode.EXPLORE.value == "explore"
-        assert AgentMode.PLAN.value == "plan"
-        assert AgentMode.BUILD.value == "build"
-        assert AgentMode.REVIEW.value == "review"
-        assert AgentMode.COMPLETE.value == "complete"
+        """Test AdaptiveAgentMode has expected values."""
+        assert AdaptiveAgentMode.EXPLORE.value == "explore"
+        assert AdaptiveAgentMode.PLAN.value == "plan"
+        assert AdaptiveAgentMode.BUILD.value == "build"
+        assert AdaptiveAgentMode.REVIEW.value == "review"
+        assert AdaptiveAgentMode.COMPLETE.value == "complete"
 
     def test_agent_mode_from_string(self):
-        """Test AgentMode can be created from string."""
-        assert AgentMode("explore") == AgentMode.EXPLORE
-        assert AgentMode("plan") == AgentMode.PLAN
-        assert AgentMode("build") == AgentMode.BUILD
+        """Test AdaptiveAgentMode can be created from string."""
+        assert AdaptiveAgentMode("explore") == AdaptiveAgentMode.EXPLORE
+        assert AdaptiveAgentMode("plan") == AdaptiveAgentMode.PLAN
+        assert AdaptiveAgentMode("build") == AdaptiveAgentMode.BUILD
 
 
 class TestTransitionTrigger:
@@ -121,7 +121,7 @@ class TestModeState:
     def test_mode_state_creation(self):
         """Test ModeState can be created with valid parameters."""
         state = ModeState(
-            mode=AgentMode.EXPLORE,
+            mode=AdaptiveAgentMode.EXPLORE,
             task_type="analysis",
             tool_calls_made=5,
             tool_budget=10,
@@ -133,7 +133,7 @@ class TestModeState:
             recent_tool_success_rate=0.9,
         )
 
-        assert state.mode == AgentMode.EXPLORE
+        assert state.mode == AdaptiveAgentMode.EXPLORE
         assert state.task_type == "analysis"
         assert state.tool_calls_made == 5
         assert state.quality_score == 0.75
@@ -141,7 +141,7 @@ class TestModeState:
     def test_mode_state_to_state_key(self):
         """Test ModeState generates correct state key."""
         state = ModeState(
-            mode=AgentMode.EXPLORE,
+            mode=AdaptiveAgentMode.EXPLORE,
             task_type="analysis",
             tool_calls_made=2,
             tool_budget=10,
@@ -162,7 +162,7 @@ class TestModeState:
     def test_discretize_ratio_buckets(self):
         """Test ratio discretization produces correct buckets."""
         state = ModeState(
-            mode=AgentMode.BUILD,
+            mode=AdaptiveAgentMode.BUILD,
             task_type="edit",
             tool_calls_made=1,
             tool_budget=10,
@@ -183,7 +183,7 @@ class TestModeState:
     def test_discretize_quality_buckets(self):
         """Test quality score discretization produces correct buckets."""
         state = ModeState(
-            mode=AgentMode.BUILD,
+            mode=AdaptiveAgentMode.BUILD,
             task_type="edit",
             tool_calls_made=1,
             tool_budget=10,
@@ -211,9 +211,9 @@ class TestModeAction:
 
     def test_mode_action_creation(self):
         """Test ModeAction can be created with defaults."""
-        action = ModeAction(target_mode=AgentMode.BUILD)
+        action = ModeAction(target_mode=AdaptiveAgentMode.BUILD)
 
-        assert action.target_mode == AgentMode.BUILD
+        assert action.target_mode == AdaptiveAgentMode.BUILD
         assert action.adjust_tool_budget == 0
         assert action.should_continue is True
         assert action.confidence == 0.5
@@ -221,7 +221,7 @@ class TestModeAction:
     def test_mode_action_with_budget_adjustment(self):
         """Test ModeAction with budget adjustment."""
         action = ModeAction(
-            target_mode=AgentMode.PLAN,
+            target_mode=AdaptiveAgentMode.PLAN,
             adjust_tool_budget=5,
             should_continue=True,
             reason="Testing budget increase",
@@ -235,7 +235,7 @@ class TestModeAction:
     def test_mode_action_repr(self):
         """Test ModeAction string representation."""
         action = ModeAction(
-            target_mode=AgentMode.BUILD,
+            target_mode=AdaptiveAgentMode.BUILD,
             adjust_tool_budget=3,
             confidence=0.75,
         )
@@ -313,8 +313,8 @@ class TestQLearningStore:
         """Test recording transition history."""
         q_store.record_transition(
             profile_name="test_profile",
-            from_mode=AgentMode.EXPLORE,
-            to_mode=AgentMode.PLAN,
+            from_mode=AdaptiveAgentMode.EXPLORE,
+            to_mode=AdaptiveAgentMode.PLAN,
             trigger=TransitionTrigger.PATTERN_DETECTED,
             state_key="test_state",
             action_key="test_action",
@@ -537,34 +537,34 @@ class TestValidTransitions:
 
     def test_explore_transitions(self, controller: AdaptiveModeController):
         """Test valid transitions from EXPLORE mode."""
-        valid = controller.VALID_TRANSITIONS[AgentMode.EXPLORE]
-        assert AgentMode.PLAN in valid
-        assert AgentMode.BUILD in valid
-        assert AgentMode.COMPLETE in valid
+        valid = controller.VALID_TRANSITIONS[AdaptiveAgentMode.EXPLORE]
+        assert AdaptiveAgentMode.PLAN in valid
+        assert AdaptiveAgentMode.BUILD in valid
+        assert AdaptiveAgentMode.COMPLETE in valid
 
     def test_plan_transitions(self, controller: AdaptiveModeController):
         """Test valid transitions from PLAN mode."""
-        valid = controller.VALID_TRANSITIONS[AgentMode.PLAN]
-        assert AgentMode.BUILD in valid
-        assert AgentMode.EXPLORE in valid
-        assert AgentMode.COMPLETE in valid
+        valid = controller.VALID_TRANSITIONS[AdaptiveAgentMode.PLAN]
+        assert AdaptiveAgentMode.BUILD in valid
+        assert AdaptiveAgentMode.EXPLORE in valid
+        assert AdaptiveAgentMode.COMPLETE in valid
 
     def test_build_transitions(self, controller: AdaptiveModeController):
         """Test valid transitions from BUILD mode."""
-        valid = controller.VALID_TRANSITIONS[AgentMode.BUILD]
-        assert AgentMode.REVIEW in valid
-        assert AgentMode.EXPLORE in valid
-        assert AgentMode.COMPLETE in valid
+        valid = controller.VALID_TRANSITIONS[AdaptiveAgentMode.BUILD]
+        assert AdaptiveAgentMode.REVIEW in valid
+        assert AdaptiveAgentMode.EXPLORE in valid
+        assert AdaptiveAgentMode.COMPLETE in valid
 
     def test_review_transitions(self, controller: AdaptiveModeController):
         """Test valid transitions from REVIEW mode."""
-        valid = controller.VALID_TRANSITIONS[AgentMode.REVIEW]
-        assert AgentMode.BUILD in valid
-        assert AgentMode.COMPLETE in valid
+        valid = controller.VALID_TRANSITIONS[AdaptiveAgentMode.REVIEW]
+        assert AdaptiveAgentMode.BUILD in valid
+        assert AdaptiveAgentMode.COMPLETE in valid
 
     def test_complete_no_transitions(self, controller: AdaptiveModeController):
         """Test COMPLETE mode has no valid transitions."""
-        valid = controller.VALID_TRANSITIONS[AgentMode.COMPLETE]
+        valid = controller.VALID_TRANSITIONS[AdaptiveAgentMode.COMPLETE]
         assert len(valid) == 0
 
 
@@ -581,7 +581,7 @@ class TestGetRecommendedAction:
         )
 
         assert isinstance(action, ModeAction)
-        assert action.target_mode in AgentMode
+        assert action.target_mode in AdaptiveAgentMode
         assert isinstance(action.should_continue, bool)
 
     def test_get_recommended_action_invalid_mode(self, controller: AdaptiveModeController):
@@ -607,7 +607,7 @@ class TestGetRecommendedAction:
         )
 
         assert controller._current_state is not None
-        assert controller._current_state.mode == AgentMode.EXPLORE
+        assert controller._current_state.mode == AdaptiveAgentMode.EXPLORE
         assert controller._current_state.task_type == "analysis"
 
     def test_get_recommended_action_high_quality_completion(
@@ -983,7 +983,7 @@ class TestTransitionEvent:
     def test_transition_event_creation(self):
         """Test creating TransitionEvent."""
         state = ModeState(
-            mode=AgentMode.EXPLORE,
+            mode=AdaptiveAgentMode.EXPLORE,
             task_type="analysis",
             tool_calls_made=5,
             tool_budget=10,
@@ -995,18 +995,18 @@ class TestTransitionEvent:
             recent_tool_success_rate=0.9,
         )
 
-        action = ModeAction(target_mode=AgentMode.PLAN)
+        action = ModeAction(target_mode=AdaptiveAgentMode.PLAN)
 
         event = TransitionEvent(
-            from_mode=AgentMode.EXPLORE,
-            to_mode=AgentMode.PLAN,
+            from_mode=AdaptiveAgentMode.EXPLORE,
+            to_mode=AdaptiveAgentMode.PLAN,
             trigger=TransitionTrigger.PATTERN_DETECTED,
             state_before=state,
             action_taken=action,
         )
 
-        assert event.from_mode == AgentMode.EXPLORE
-        assert event.to_mode == AgentMode.PLAN
+        assert event.from_mode == AdaptiveAgentMode.EXPLORE
+        assert event.to_mode == AdaptiveAgentMode.PLAN
         assert event.trigger == TransitionTrigger.PATTERN_DETECTED
         assert event.outcome_success is None  # Not yet filled
 
@@ -1033,7 +1033,7 @@ class TestInferTrigger:
     def test_infer_trigger_quality_threshold(self, controller: AdaptiveModeController):
         """Test inferring quality threshold trigger."""
         state = ModeState(
-            mode=AgentMode.BUILD,
+            mode=AdaptiveAgentMode.BUILD,
             task_type="edit",
             tool_calls_made=5,
             tool_budget=10,
@@ -1045,7 +1045,7 @@ class TestInferTrigger:
             recent_tool_success_rate=0.9,
         )
 
-        action = ModeAction(target_mode=AgentMode.COMPLETE)
+        action = ModeAction(target_mode=AdaptiveAgentMode.COMPLETE)
 
         trigger = controller._infer_trigger(state, action)
         assert trigger == TransitionTrigger.QUALITY_THRESHOLD
@@ -1053,7 +1053,7 @@ class TestInferTrigger:
     def test_infer_trigger_budget_low(self, controller: AdaptiveModeController):
         """Test inferring budget low trigger."""
         state = ModeState(
-            mode=AgentMode.BUILD,
+            mode=AdaptiveAgentMode.BUILD,
             task_type="edit",
             tool_calls_made=10,  # Budget exhausted
             tool_budget=10,
@@ -1065,7 +1065,7 @@ class TestInferTrigger:
             recent_tool_success_rate=0.9,
         )
 
-        action = ModeAction(target_mode=AgentMode.COMPLETE)
+        action = ModeAction(target_mode=AdaptiveAgentMode.COMPLETE)
 
         trigger = controller._infer_trigger(state, action)
         assert trigger == TransitionTrigger.BUDGET_LOW
@@ -1073,7 +1073,7 @@ class TestInferTrigger:
     def test_infer_trigger_error_recovery(self, controller: AdaptiveModeController):
         """Test inferring error recovery trigger."""
         state = ModeState(
-            mode=AgentMode.BUILD,
+            mode=AdaptiveAgentMode.BUILD,
             task_type="edit",
             tool_calls_made=5,
             tool_budget=10,
@@ -1085,7 +1085,7 @@ class TestInferTrigger:
             recent_tool_success_rate=0.3,  # Low success rate
         )
 
-        action = ModeAction(target_mode=AgentMode.EXPLORE)
+        action = ModeAction(target_mode=AdaptiveAgentMode.EXPLORE)
 
         trigger = controller._infer_trigger(state, action)
         assert trigger == TransitionTrigger.ERROR_RECOVERY
@@ -1123,7 +1123,7 @@ class TestHeuristicBonus:
             quality_score=0.9,
         )
 
-        action = ModeAction(target_mode=AgentMode.COMPLETE)
+        action = ModeAction(target_mode=AdaptiveAgentMode.COMPLETE)
         bonus = controller._get_heuristic_bonus(action)
 
         assert bonus > 0  # Should have bonus for completing with high quality
@@ -1138,7 +1138,7 @@ class TestHeuristicBonus:
             quality_score=0.5,
         )
 
-        action = ModeAction(target_mode=AgentMode.PLAN)
+        action = ModeAction(target_mode=AdaptiveAgentMode.PLAN)
         bonus = controller._get_heuristic_bonus(action)
 
         assert bonus < 0  # Should have penalty for switching too early

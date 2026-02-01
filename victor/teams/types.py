@@ -918,5 +918,4 @@ class TeamMemberAdapter:
 
 
 # Type aliases for backward compatibility
-TeamFormationType = TeamFormation
 MessageTypeEnum = MessageType
