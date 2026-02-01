@@ -65,10 +65,6 @@ class IaCSeverity(str, Enum):
     INFO = "info"  # Informational finding
 
 
-# Backward compatibility alias
-Severity = IaCSeverity
-
-
 class Category(str, Enum):
     """Issue categories for classification."""
 
@@ -236,10 +232,6 @@ class IaCScanResult:
                 "total": len(self.findings),
             },
         }
-
-
-# Backward compatibility alias
-ScanResult = IaCScanResult
 
 
 @dataclass

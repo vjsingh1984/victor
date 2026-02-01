@@ -1096,7 +1096,7 @@ class CodebaseIndex:
 
         # Indexed data
         self.files: dict[str, FileMetadata] = {}
-        self.symbols: dict[str, Symbol] = {}  # symbol_name -> Symbol
+        self.symbols: dict[str, IndexedSymbol] = {}  # symbol_name -> IndexedSymbol
         self.symbol_index: dict[str, list[str]] = {}  # file -> symbol names
 
         # Staleness tracking
@@ -1157,7 +1157,7 @@ class CodebaseIndex:
         self._pending_compose_edges = []
         self._symbol_resolver = SymbolResolver()
 
-    def _enriched_to_symbol(self, enriched: EnrichedSymbol, relative_path: str) -> Symbol:
+    def _enriched_to_symbol(self, enriched: EnrichedSymbol, relative_path: str) -> IndexedSymbol:
         """Convert an EnrichedSymbol to the legacy Symbol format.
 
         This maintains backward compatibility while enabling tier-aware extraction.
@@ -1674,7 +1674,7 @@ class CodebaseIndex:
             except Exception as e:
                 logger.debug(f"Failed to remove graph nodes for {rel_path}: {e}")
 
-    def _get_symbol_embedding_text(self, symbol: Symbol) -> str:
+    def _get_symbol_embedding_text(self, symbol: IndexedSymbol) -> str:
         """Generate text representation of a symbol for embedding.
 
         Args:
@@ -2672,7 +2672,7 @@ class CodebaseIndex:
         results.sort(key=lambda x: x[0], reverse=True)
         return [metadata for _, metadata in results[:max_files]]
 
-    def find_symbol(self, symbol_name: str) -> Optional[Symbol]:
+    def find_symbol(self, symbol_name: str) -> Optional[IndexedSymbol]:
         """Find a symbol by name.
 
         Args:
@@ -2903,11 +2903,11 @@ class CodebaseIndex:
             for result in all_results
         ]
 
-    def _build_symbol_context(self, symbol: Symbol) -> str:
+    def _build_symbol_context(self, symbol: IndexedSymbol) -> str:
         """Build context string for a symbol (for embedding).
 
         Args:
-            symbol: Symbol to build context for
+            symbol: IndexedSymbol to build context for
 
         Returns:
             Context string combining symbol information

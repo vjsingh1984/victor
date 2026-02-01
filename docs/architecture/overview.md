@@ -28,6 +28,8 @@ graph TB
     Coordinators --> Events[EventBus<br/>5 Backends]
 ```
 
+For a detailed view of the two-layer architecture, see [Coordinator Layers Diagram](../diagrams/architecture/coordinator-layers.mmd).
+
 ## Two-Layer Coordinator Design
 
 ### Application Layer (`victor/agent/coordinators/`)

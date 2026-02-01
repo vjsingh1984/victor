@@ -2,6 +2,8 @@
 
 This is the canonical contributor hub for Victor. Use it instead of older, duplicated guides.
 
+**New contributor?** Follow our [Contributor Workflow](../diagrams/user-journeys/contributor-workflow.mmd) for a step-by-step guide from setup to merged PR.
+
 ## Quick Start
 
 ```bash

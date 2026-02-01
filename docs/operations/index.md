@@ -2,6 +2,8 @@
 
 Concise guidance for running Victor in production.
 
+**Deployment Overview:** See [Deployment Patterns Diagram](../diagrams/operations/deployment.mmd) for visual guide to local, cloud, and hybrid deployment options.
+
 ## Quick Links
 
 | Topic | Doc | When to use |

@@ -2,6 +2,8 @@
 
 Welcome to Victor! Get up and running in minutes.
 
+**New to Victor?** Follow our [Beginner Onboarding Journey](../diagrams/user-journeys/beginner-onboarding.mmd) for a step-by-step guide (30 minutes).
+
 ## What is Victor?
 
 **Victor** is a provider-agnostic AI coding assistant supporting multiple LLM providers through a unified interface.
