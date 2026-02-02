@@ -6,7 +6,7 @@ with 5 core concepts:
 1. **Agent** - Single entry point for creating agents
 2. **Task** - What the agent should accomplish (TaskResult)
 3. **Tools** - Available capabilities (ToolSet with presets)
-4. **State** - Observable conversation state (Stage enum)
+4. **State** - Observable conversation state (ConversationStage enum)
 5. **Event** - Stream of observations (EventType enum)
 
 Quick Start:
@@ -99,7 +99,12 @@ from victor.framework.events import (
     tool_error_event,
     tool_result_event,
 )
-from victor.framework.state import Stage, State, StateHooks, StateObserver
+from victor.framework.state import (
+    ConversationStage,
+    State,
+    StateHooks,
+    StateObserver,
+)
 from victor.framework.task import FrameworkTaskType, Task, TaskResult
 from victor.framework.checkpoint import CheckpointBackend
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
@@ -479,7 +484,7 @@ __all__ = (
         "ToolCategory",
         "ToolsInput",
         # State
-        "Stage",
+        "ConversationStage",
         "StateHooks",
         "StateObserver",
         # Checkpoint

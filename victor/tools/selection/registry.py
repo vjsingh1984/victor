@@ -20,7 +20,7 @@ selection algorithms across verticals.
 Example:
     from victor.tools.selection import (
         ToolSelectionStrategyRegistry,
-        ToolSelectionContext,
+        CrossVerticalToolSelectionContext,
         get_strategy,
         get_best_strategy,
     )
@@ -44,7 +44,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 from victor.tools.selection.protocol import (
-    ToolSelectionContext,
+    CrossVerticalToolSelectionContext,
     ToolSelectionStrategy,
 )
 
@@ -201,7 +201,7 @@ class ToolSelectionStrategyRegistry:
 
     def get_best_strategy(
         self,
-        context: ToolSelectionContext,
+        context: CrossVerticalToolSelectionContext,
         *,
         prefer_fast: bool = False,
         require_embeddings: bool = False,
@@ -342,7 +342,7 @@ def get_strategy(name: str) -> Optional[ToolSelectionStrategy]:
 
 
 def get_best_strategy(
-    context: ToolSelectionContext,
+    context: CrossVerticalToolSelectionContext,
     *,
     prefer_fast: bool = False,
     require_embeddings: bool = False,

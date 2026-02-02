@@ -20,7 +20,7 @@ from typing import Optional, Any
 from victor.tools.selection import (
     BaseToolSelectionStrategy,
     PerformanceProfile,
-    ToolSelectionContext,
+    CrossVerticalToolSelectionContext,
     ToolSelectionStrategy,
     ToolSelectionStrategyRegistry,
     ToolSelectorFeatures,
@@ -71,11 +71,11 @@ class TestPerformanceProfile:
 
 
 class TestToolSelectionContext:
-    """Tests for ToolSelectionContext dataclass."""
+    """Tests for CrossVerticalToolSelectionContext dataclass."""
 
     def test_minimal_context(self):
         """Test context with only required fields."""
-        context = ToolSelectionContext(prompt="Find Python files")
+        context = CrossVerticalToolSelectionContext(prompt="Find Python files")
         assert context.prompt == "Find Python files"
         assert context.conversation_history == []
         assert context.current_stage is None
@@ -83,7 +83,7 @@ class TestToolSelectionContext:
 
     def test_full_context(self):
         """Test context with all fields."""
-        context = ToolSelectionContext(
+        context = CrossVerticalToolSelectionContext(
             prompt="Refactor the auth module",
             conversation_history=[{"role": "user", "content": "help"}],
             current_stage="PLANNING",
@@ -117,7 +117,7 @@ class TestToolSelectionContext:
             "recent_tools": ["shell"],
             "turn_number": 5,
         }
-        context = ToolSelectionContext.from_agent_context(
+        context = CrossVerticalToolSelectionContext.from_agent_context(
             prompt="Deploy to production",
             agent_context=agent_ctx,
         )
@@ -128,7 +128,7 @@ class TestToolSelectionContext:
 
     def test_from_empty_agent_context(self):
         """Test creating context from empty agent dict."""
-        context = ToolSelectionContext.from_agent_context(
+        context = CrossVerticalToolSelectionContext.from_agent_context(
             prompt="Hello",
             agent_context={},
         )
@@ -186,7 +186,7 @@ class MockToolSelector(BaseToolSelectionStrategy):
 
     async def select_tools(
         self,
-        context: ToolSelectionContext,
+        context: CrossVerticalToolSelectionContext,
         max_tools: int = 10,
     ) -> list[str]:
         return self._tools[:max_tools]
@@ -225,7 +225,7 @@ class TestBaseToolSelectionStrategy:
     async def test_select_tools(self):
         """Test tool selection."""
         selector = MockToolSelector(tools=["read", "write", "grep"])
-        context = ToolSelectionContext(prompt="test")
+        context = CrossVerticalToolSelectionContext(prompt="test")
         tools = await selector.select_tools(context, max_tools=2)
         assert len(tools) == 2
         assert tools == ["read", "write"]
@@ -233,7 +233,7 @@ class TestBaseToolSelectionStrategy:
     def test_default_supports_context(self):
         """Test default supports_context returns True."""
         selector = MockToolSelector()
-        context = ToolSelectionContext(prompt="test")
+        context = CrossVerticalToolSelectionContext(prompt="test")
         assert selector.supports_context(context) is True
 
     def test_default_features(self):
@@ -353,7 +353,7 @@ class TestToolSelectionStrategyRegistry:
         registry.register("hybrid", hybrid)
         registry.register("keyword", keyword)
 
-        context = ToolSelectionContext(prompt="test")
+        context = CrossVerticalToolSelectionContext(prompt="test")
         best = registry.get_best_strategy(context)
         assert best is hybrid  # Hybrid preferred by default
 
@@ -364,7 +364,7 @@ class TestToolSelectionStrategyRegistry:
         registry.register("hybrid", hybrid)
         registry.register("keyword", keyword)
 
-        context = ToolSelectionContext(prompt="test")
+        context = CrossVerticalToolSelectionContext(prompt="test")
         best = registry.get_best_strategy(context, prefer_fast=True)
         assert best is keyword
 
@@ -412,7 +412,7 @@ class TestConvenienceFunctions:
         """Test get_best_strategy convenience function."""
         selector = MockToolSelector(name="hybrid")
         register_strategy("hybrid", selector)
-        context = ToolSelectionContext(prompt="test")
+        context = CrossVerticalToolSelectionContext(prompt="test")
         assert get_best_strategy(context) is selector
 
     def test_list_strategies(self):
@@ -450,7 +450,7 @@ class TestProtocolCompliance:
 
             async def select_tools(
                 self,
-                context: ToolSelectionContext,
+                context: CrossVerticalToolSelectionContext,
                 max_tools: int = 10,
             ) -> list[str]:
                 return []

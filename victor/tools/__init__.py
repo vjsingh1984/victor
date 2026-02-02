@@ -94,7 +94,7 @@ from victor.tools.context import (
 from victor.tools.selection import (
     BaseToolSelectionStrategy,
     PerformanceProfile,
-    ToolSelectionContext,
+    CrossVerticalToolSelectionContext,
     ToolSelectionStrategy,
     ToolSelectionStrategyRegistry,
     ToolSelectorFeatures,
@@ -174,7 +174,7 @@ __all__ = [
     "ToolSelectionStrategy",
     "BaseToolSelectionStrategy",
     "PerformanceProfile",
-    "ToolSelectionContext",
+    "CrossVerticalToolSelectionContext",
     "ToolSelectorFeatures",
     "ToolSelectionStrategyRegistry",
     "get_strategy_registry",

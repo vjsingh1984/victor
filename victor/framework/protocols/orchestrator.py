@@ -12,7 +12,7 @@ from typing import (
 from collections.abc import AsyncIterator, Callable
 
 if TYPE_CHECKING:
-    from victor.framework.state import Stage
+    from victor.framework.state import ConversationStage
     from victor.framework.protocols.streaming import OrchestratorStreamChunk
 
 
@@ -26,7 +26,7 @@ class OrchestratorProtocol(Protocol):
     Design Pattern: Composite Protocol
     ================================
     This protocol combines 6 sub-protocols for type-safe orchestrator access:
-    - ConversationStateProtocol: Stage, tool usage, file tracking
+    - ConversationStateProtocol: ConversationStage, tool usage, file tracking
     - ProviderProtocol: Provider/model management
     - ToolsProtocol: Tool access and management
     - SystemPromptProtocol: Prompt customization
@@ -45,7 +45,7 @@ class OrchestratorProtocol(Protocol):
         async def run_agent(orch: OrchestratorProtocol, prompt: str):
             # Type-safe access to all orchestrator features
             print(f"Provider: {orch.current_provider}")
-            print(f"Stage: {orch.get_stage()}")
+            print(f"ConversationStage: {orch.get_stage()}")
 
             async for chunk in orch.stream_chat(prompt):
                 if chunk.chunk_type == ChunkType.CONTENT:
@@ -53,7 +53,7 @@ class OrchestratorProtocol(Protocol):
     """
 
     # --- ConversationStateProtocol ---
-    def get_stage(self) -> "Stage":
+    def get_stage(self) -> "ConversationStage":
         """Get current conversation stage."""
         ...
 

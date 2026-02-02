@@ -16,7 +16,7 @@ from typing import (
 from collections.abc import Callable
 
 if TYPE_CHECKING:
-    from victor.framework.state import Stage
+    from victor.framework.state import ConversationStage
 
 
 @runtime_checkable
@@ -27,11 +27,11 @@ class ConversationStateProtocol(Protocol):
     stage, tool usage, and file tracking.
     """
 
-    def get_stage(self) -> "Stage":
+    def get_stage(self) -> "ConversationStage":
         """Get current conversation stage.
 
         Returns:
-            Current Stage enum value
+            Current ConversationStage enum value
 
         Raises:
             RuntimeError: If conversation state is not initialized

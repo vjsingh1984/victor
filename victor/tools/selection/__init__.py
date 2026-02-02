@@ -25,11 +25,11 @@ Available Strategies:
 Quick Start:
     from victor.tools.selection import (
         get_best_strategy,
-        ToolSelectionContext,
+        CrossVerticalToolSelectionContext,
     )
 
     # Create context
-    context = ToolSelectionContext(
+    context = CrossVerticalToolSelectionContext(
         prompt="Find all Python files that import numpy",
         task_type="analysis",
         vertical="coding",
@@ -69,7 +69,7 @@ Custom Strategy:
 from victor.tools.selection.protocol import (
     BaseToolSelectionStrategy,
     PerformanceProfile,
-    ToolSelectionContext,
+    CrossVerticalToolSelectionContext,
     ToolSelectionStrategy,
     ToolSelectorFeatures,
 )
@@ -87,7 +87,7 @@ __all__ = [
     "ToolSelectionStrategy",
     "BaseToolSelectionStrategy",
     "PerformanceProfile",
-    "ToolSelectionContext",
+    "CrossVerticalToolSelectionContext",
     "ToolSelectorFeatures",
     # Registry
     "ToolSelectionStrategyRegistry",

@@ -8,14 +8,14 @@ Phase 7.2 Refactoring:
 - Falls back gracefully for backward compatibility
 - Eliminates most hasattr/getattr duck-typing
 
-Stage Unification (Post-Phase 9):
-- Stage is now an alias to ConversationStage from victor.core.state
+ConversationStage Unification (Post-Phase 9):
+- ConversationStage is now an alias to ConversationStage from victor.core.state
 - ConversationStage is the canonical source for conversation stages
 - This eliminates duplicate enum definitions and enforces layer boundaries
 
 Example:
     # Observe current state
-    print(f"Stage: {agent.state.stage}")
+    print(f"ConversationStage: {agent.state.stage}")
     print(f"Tools used: {agent.state.tool_calls_used}")
 
     # React to state changes
@@ -36,9 +36,8 @@ if TYPE_CHECKING:
     from victor.framework.protocols import OrchestratorProtocol
 
 
-# Stage is an alias to ConversationStage for framework API compatibility
+# ConversationStage is an alias to ConversationStage for framework API compatibility
 # This maintains backward compatibility while eliminating duplicate enums
-Stage = ConversationStage
 """Conversation stage in the agent's workflow.
 
 This is an alias to `victor.core.state.ConversationStage`.
@@ -146,7 +145,7 @@ class State:
 
     Example:
         state = agent.state
-        print(f"Stage: {state.stage}")
+        print(f"ConversationStage: {state.stage}")
         print(f"Progress: {state.tool_calls_used}/{state.tool_budget}")
         print(f"Files touched: {state.files_observed | state.files_modified}")
     """
@@ -160,24 +159,24 @@ class State:
         self._orchestrator = orchestrator
 
     @property
-    def stage(self) -> Stage:
+    def stage(self) -> ConversationStage:
         """Get current conversation stage.
 
         Uses protocol method get_stage() when available.
-        Since Stage is now an alias to ConversationStage,
+        Since ConversationStage is now an alias to ConversationStage,
         we can return the internal stage directly.
 
         Returns:
-            Current Stage enum value
+            Current ConversationStage enum value
         """
         # Prefer protocol method
         if _has_protocol_method(self._orchestrator, "get_stage"):
             try:
-                # Stage is now same type as ConversationStage, return directly
+                # ConversationStage is now same type as ConversationStage, return directly
                 return self._orchestrator.get_stage()
             except AttributeError:
                 pass
-        return Stage.INITIAL
+        return ConversationStage.INITIAL
 
     @property
     def tool_calls_used(self) -> int:
