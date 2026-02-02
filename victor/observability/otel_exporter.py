@@ -78,7 +78,7 @@ except ImportError:
 # Check for OTLP exporter
 _OTLP_AVAILABLE = False
 try:
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # type: ignore[import-not-found]
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
     _OTLP_AVAILABLE = True
 except ImportError:

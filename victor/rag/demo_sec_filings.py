@@ -366,7 +366,7 @@ class SECFilingFetcher:
     def _extract_text_from_html(self, html: str) -> str:
         """Extract readable text from HTML filing."""
         try:
-            from bs4 import BeautifulSoup  # type: ignore[import-untyped]
+            from bs4 import BeautifulSoup
 
             soup = BeautifulSoup(html, "html.parser")
 

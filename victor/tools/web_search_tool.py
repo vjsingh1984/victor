@@ -27,7 +27,7 @@ import logging
 from typing import Any, Optional
 
 import httpx
-from bs4 import BeautifulSoup  # type: ignore[import-untyped]
+from bs4 import BeautifulSoup
 
 from victor.tools.base import ToolConfig
 from victor.tools.enums import AccessMode, CostTier, DangerLevel, Priority

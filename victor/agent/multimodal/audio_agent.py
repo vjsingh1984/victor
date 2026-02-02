@@ -1568,4 +1568,3 @@ Provide a JSON response with:
 SpeechSegment = SpeakerSegment
 
 # Transcription was renamed to TranscriptionResult
-Transcription = TranscriptionResult

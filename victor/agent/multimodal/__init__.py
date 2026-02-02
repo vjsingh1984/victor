@@ -41,7 +41,6 @@ from victor.agent.multimodal.audio_agent import (
     AudioQualityMetrics,
     SpeakerSegment,
     SpeechSegment,  # Legacy alias
-    Transcription,  # Legacy alias
     TranscriptionResult,
 )
 from victor.agent.multimodal.vision_agent import (
@@ -82,7 +81,6 @@ __all__ = [
     "AudioAgent",
     "AudioFormat",
     "TranscriptionResult",
-    "Transcription",  # Legacy alias
     "AudioAnalysis",
     "AudioQualityMetrics",
     "SpeakerSegment",
