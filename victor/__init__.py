@@ -82,7 +82,8 @@ def __getattr__(name: str) -> Any:
 
 # Framework API (simplified - new golden path)
 # Import only what's actually exported from victor.framework
-from victor.framework import (
+# type: ignore[attr-defined] - mypy can't verify lazy-loaded exports via __getattr__
+from victor.framework import (  # type: ignore[attr-defined]
     Agent,
     AgentConfig,
     AgentError,

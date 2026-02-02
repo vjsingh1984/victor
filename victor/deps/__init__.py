@@ -62,7 +62,7 @@ from victor.deps.protocol import (
     VersionConstraint,
 )
 from victor.deps.parsers import (
-    BaseDependencyParser,
+    BasePackageDependencyParser,
     CargoTomlParser,
     GoModParser,
     PackageJsonParser,
@@ -96,7 +96,7 @@ __all__ = [
     "Version",
     "VersionConstraint",
     # Parsers
-    "BaseDependencyParser",
+    "BasePackageDependencyParser",
     "CargoTomlParser",
     "GoModParser",
     "PackageJsonParser",

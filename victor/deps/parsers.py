@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Dependency file parsers for various package managers.
+"""PackageDependency file parsers for various package managers.
 
 Supports requirements.txt, pyproject.toml, package.json, Cargo.toml, go.mod.
 """
@@ -36,8 +36,6 @@ from victor.deps.protocol import (
     PackageManager,
 )
 
-# Legacy alias for backward compatibility
-Dependency = PackageDependency
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +43,7 @@ logger = logging.getLogger(__name__)
 class BasePackageDependencyParser(ABC):
     """Abstract base for package dependency parsers.
 
-    Renamed from BaseDependencyParser to be semantically distinct:
+    Renamed from BasePackageDependencyParser to be semantically distinct:
     - BasePackageDependencyParser (here): Package management with PackageManager
     - BaseSecurityDependencyParser (victor.security.scanner): Security scanning with ecosystem
 
@@ -65,7 +63,7 @@ class BasePackageDependencyParser(ABC):
         pass
 
     @abstractmethod
-    def parse(self, path: Path) -> tuple[list[Dependency], list[Dependency]]:
+    def parse(self, path: Path) -> tuple[list[PackageDependency], list[PackageDependency]]:
         """Parse a dependency file.
 
         Args:
@@ -83,11 +81,9 @@ class BasePackageDependencyParser(ABC):
         return any(fnmatch(path.name, pattern) for pattern in self.file_patterns)
 
 
-# Backward compatibility alias
-BaseDependencyParser = BasePackageDependencyParser
 
 
-class RequirementsTxtParser(BaseDependencyParser):
+class RequirementsTxtParser(BasePackageDependencyParser):
     """Parser for requirements.txt files."""
 
     @property
@@ -108,7 +104,7 @@ class RequirementsTxtParser(BaseDependencyParser):
         r"(?:#(?P<comment>.*))?$"
     )
 
-    def parse(self, path: Path) -> tuple[list[Dependency], list[Dependency]]:
+    def parse(self, path: Path) -> tuple[list[PackageDependency], list[PackageDependency]]:
         """Parse requirements.txt file."""
         dependencies = []
 
@@ -142,7 +138,7 @@ class RequirementsTxtParser(BaseDependencyParser):
                     extras = [e.strip() for e in match.group("extras").split(",")]
 
                 dependencies.append(
-                    Dependency(
+                    PackageDependency(
                         name=name,
                         version_spec=version_spec,
                         dependency_type=dep_type,
@@ -156,7 +152,7 @@ class RequirementsTxtParser(BaseDependencyParser):
         return dependencies, []
 
 
-class PyprojectParser(BaseDependencyParser):
+class PyprojectParser(BasePackageDependencyParser):
     """Parser for pyproject.toml files."""
 
     @property
@@ -167,7 +163,7 @@ class PyprojectParser(BaseDependencyParser):
     def file_patterns(self) -> list[str]:
         return ["pyproject.toml"]
 
-    def parse(self, path: Path) -> tuple[list[Dependency], list[Dependency]]:
+    def parse(self, path: Path) -> tuple[list[PackageDependency], list[PackageDependency]]:
         """Parse pyproject.toml file."""
         try:
             import tomllib
@@ -241,7 +237,7 @@ class PyprojectParser(BaseDependencyParser):
 
         return runtime_deps, dev_deps
 
-    def _parse_pep508(self, dep_str: str, source: str) -> Optional[Dependency]:
+    def _parse_pep508(self, dep_str: str, source: str) -> Optional[PackageDependency]:
         """Parse a PEP 508 dependency string."""
         # Simple pattern for PEP 508
         pattern = r"^([a-zA-Z0-9][-a-zA-Z0-9._]*)(?:\[([^\]]+)\])?\s*(.*)$"
@@ -254,7 +250,7 @@ class PyprojectParser(BaseDependencyParser):
         extras = match.group(2).split(",") if match.group(2) else []
         version_spec = match.group(3).strip()
 
-        return Dependency(
+        return PackageDependency(
             name=name,
             version_spec=version_spec,
             source=source,
@@ -267,10 +263,10 @@ class PyprojectParser(BaseDependencyParser):
         spec: Any,
         source: str,
         dep_type: DependencyType = DependencyType.RUNTIME,
-    ) -> Optional[Dependency]:
+    ) -> Optional[PackageDependency]:
         """Parse a Poetry dependency specification."""
         if isinstance(spec, str):
-            return Dependency(
+            return PackageDependency(
                 name=name,
                 version_spec=spec,
                 dependency_type=dep_type,
@@ -281,7 +277,7 @@ class PyprojectParser(BaseDependencyParser):
             extras = spec.get("extras", [])
             optional = spec.get("optional", False)
 
-            return Dependency(
+            return PackageDependency(
                 name=name,
                 version_spec=version,
                 dependency_type=DependencyType.OPTIONAL if optional else dep_type,
@@ -292,7 +288,7 @@ class PyprojectParser(BaseDependencyParser):
         return None
 
 
-class PackageJsonParser(BaseDependencyParser):
+class PackageJsonParser(BasePackageDependencyParser):
     """Parser for package.json files."""
 
     @property
@@ -303,7 +299,7 @@ class PackageJsonParser(BaseDependencyParser):
     def file_patterns(self) -> list[str]:
         return ["package.json"]
 
-    def parse(self, path: Path) -> tuple[list[Dependency], list[Dependency]]:
+    def parse(self, path: Path) -> tuple[list[PackageDependency], list[PackageDependency]]:
         """Parse package.json file."""
         try:
             content = path.read_text()
@@ -318,7 +314,7 @@ class PackageJsonParser(BaseDependencyParser):
         # Main dependencies
         for name, version in data.get("dependencies", {}).items():
             runtime_deps.append(
-                Dependency(
+                PackageDependency(
                     name=name,
                     version_spec=version,
                     dependency_type=DependencyType.RUNTIME,
@@ -329,7 +325,7 @@ class PackageJsonParser(BaseDependencyParser):
         # Dev dependencies
         for name, version in data.get("devDependencies", {}).items():
             dev_deps.append(
-                Dependency(
+                PackageDependency(
                     name=name,
                     version_spec=version,
                     dependency_type=DependencyType.DEV,
@@ -340,7 +336,7 @@ class PackageJsonParser(BaseDependencyParser):
         # Peer dependencies
         for name, version in data.get("peerDependencies", {}).items():
             runtime_deps.append(
-                Dependency(
+                PackageDependency(
                     name=name,
                     version_spec=version,
                     dependency_type=DependencyType.PEER,
@@ -351,7 +347,7 @@ class PackageJsonParser(BaseDependencyParser):
         # Optional dependencies
         for name, version in data.get("optionalDependencies", {}).items():
             runtime_deps.append(
-                Dependency(
+                PackageDependency(
                     name=name,
                     version_spec=version,
                     dependency_type=DependencyType.OPTIONAL,
@@ -362,7 +358,7 @@ class PackageJsonParser(BaseDependencyParser):
         return runtime_deps, dev_deps
 
 
-class CargoTomlParser(BaseDependencyParser):
+class CargoTomlParser(BasePackageDependencyParser):
     """Parser for Cargo.toml files."""
 
     @property
@@ -373,7 +369,7 @@ class CargoTomlParser(BaseDependencyParser):
     def file_patterns(self) -> list[str]:
         return ["Cargo.toml"]
 
-    def parse(self, path: Path) -> tuple[list[Dependency], list[Dependency]]:
+    def parse(self, path: Path) -> tuple[list[PackageDependency], list[PackageDependency]]:
         """Parse Cargo.toml file."""
         try:
             import tomllib
@@ -420,10 +416,10 @@ class CargoTomlParser(BaseDependencyParser):
         spec: Any,
         source: str,
         dep_type: DependencyType = DependencyType.RUNTIME,
-    ) -> Optional[Dependency]:
+    ) -> Optional[PackageDependency]:
         """Parse a Cargo dependency specification."""
         if isinstance(spec, str):
-            return Dependency(
+            return PackageDependency(
                 name=name,
                 version_spec=spec,
                 dependency_type=dep_type,
@@ -433,7 +429,7 @@ class CargoTomlParser(BaseDependencyParser):
             version = spec.get("version", "")
             features = spec.get("features", [])
 
-            return Dependency(
+            return PackageDependency(
                 name=name,
                 version_spec=version,
                 dependency_type=dep_type,
@@ -444,7 +440,7 @@ class CargoTomlParser(BaseDependencyParser):
         return None
 
 
-class GoModParser(BaseDependencyParser):
+class GoModParser(BasePackageDependencyParser):
     """Parser for go.mod files."""
 
     @property
@@ -457,7 +453,7 @@ class GoModParser(BaseDependencyParser):
 
     REQUIRE_PATTERN = re.compile(r"^\s*([^\s]+)\s+v([^\s]+)\s*(?://.*)?$")
 
-    def parse(self, path: Path) -> tuple[list[Dependency], list[Dependency]]:
+    def parse(self, path: Path) -> tuple[list[PackageDependency], list[PackageDependency]]:
         """Parse go.mod file."""
         try:
             content = path.read_text()
@@ -488,7 +484,7 @@ class GoModParser(BaseDependencyParser):
                 match = self.REQUIRE_PATTERN.match(req_line)
                 if match:
                     dependencies.append(
-                        Dependency(
+                        PackageDependency(
                             name=match.group(1),
                             version_spec=f"v{match.group(2)}",
                             dependency_type=DependencyType.RUNTIME,
@@ -500,7 +496,7 @@ class GoModParser(BaseDependencyParser):
 
 
 # Parser registry
-PARSERS: list[type[BaseDependencyParser]] = [
+PARSERS: list[type[BasePackageDependencyParser]] = [
     RequirementsTxtParser,
     PyprojectParser,
     PackageJsonParser,
@@ -509,7 +505,7 @@ PARSERS: list[type[BaseDependencyParser]] = [
 ]
 
 
-def get_parser(path: Path) -> Optional[BaseDependencyParser]:
+def get_parser(path: Path) -> Optional[BasePackageDependencyParser]:
     """Get a parser for the given file.
 
     Args:

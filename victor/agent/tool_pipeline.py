@@ -70,13 +70,15 @@ from victor.config.tool_selection_defaults import (
 )
 
 # Import signature accelerator for 10-20x faster signature generation and deduplication
+from typing import Callable, Any
+
 try:
     from victor.native.accelerators import get_signature_accelerator
 
     _SIGNATURE_ACCELERATOR_AVAILABLE = True
 except ImportError:
     _SIGNATURE_ACCELERATOR_AVAILABLE = False
-    get_signature_accelerator = None
+    get_signature_accelerator: Callable[..., str] | None = None
 
 # Legacy import for backward compatibility
 try:
@@ -85,7 +87,7 @@ try:
     _NATIVE_SIGNATURE_AVAILABLE = True
 except ImportError:
     _NATIVE_SIGNATURE_AVAILABLE = False
-    native_compute_signature = None
+    native_compute_signature: Callable[..., str] | None = None
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
@@ -1220,7 +1222,7 @@ class ToolPipeline:
 
         return count
 
-    def list_tools(self, only_enabled: bool = True) -> list:
+    def list_tools(self, only_enabled: bool = True) -> list[str]:
         """List all registered tools.
 
         Delegates to the tool registry.
