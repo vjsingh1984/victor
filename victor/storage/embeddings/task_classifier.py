@@ -56,6 +56,10 @@ logger = logging.getLogger(__name__)
 # TaskType is now imported from victor.classification.pattern_registry
 # This ensures a single source of truth across the codebase
 
+__all__ = [
+    "TaskType",
+]
+
 
 @dataclass
 class TaskTypeResult:
