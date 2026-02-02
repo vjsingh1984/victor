@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Dependency management protocol types.
+"""PackageDependency management protocol types.
 
 Defines data structures for dependency analysis and management.
 """
@@ -126,7 +126,7 @@ class Version:
 class PackageDependency:
     """A package dependency for package management.
 
-    Renamed from Dependency to be semantically distinct:
+    Renamed from PackageDependency to be semantically distinct:
     - PackageDependency (here): Package management with version tracking
     - SecurityDependency (victor.security.protocol): Security scanning with CVE info
     """
@@ -159,7 +159,6 @@ class PackageDependency:
 
 
 # Backward compatibility alias
-Dependency = PackageDependency
 
 
 @dataclass
@@ -203,8 +202,8 @@ class DependencyUpdate:
 class DependencyGraph:
     """Graph of dependencies and their relationships."""
 
-    root_packages: list[Dependency] = field(default_factory=list)
-    all_packages: dict[str, Dependency] = field(default_factory=dict)
+    root_packages: list[PackageDependency] = field(default_factory=list)
+    all_packages: dict[str, PackageDependency] = field(default_factory=dict)
     edges: dict[str, list[str]] = field(default_factory=dict)  # package -> [dependencies]
 
     def get_dependents(self, package: str) -> list[str]:
@@ -240,7 +239,7 @@ class LockFile:
     """A parsed lock file."""
 
     path: Path
-    packages: dict[str, Dependency] = field(default_factory=dict)
+    packages: dict[str, PackageDependency] = field(default_factory=dict)
     hash_algorithm: str = "sha256"
     hashes: dict[str, str] = field(default_factory=dict)
 
@@ -249,8 +248,8 @@ class LockFile:
 class DependencyAnalysis:
     """Result of dependency analysis."""
 
-    dependencies: list[Dependency] = field(default_factory=list)
-    dev_dependencies: list[Dependency] = field(default_factory=list)
+    dependencies: list[PackageDependency] = field(default_factory=list)
+    dev_dependencies: list[PackageDependency] = field(default_factory=list)
     graph: Optional[DependencyGraph] = None
     conflicts: list[DependencyConflict] = field(default_factory=list)
     vulnerabilities: list[DependencyVulnerability] = field(default_factory=list)
