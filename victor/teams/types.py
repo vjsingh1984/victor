@@ -905,7 +905,7 @@ class TeamMemberAdapter:
             result = self.message_handler(message)
             # Check if result is awaitable
             if isinstance(result, Awaitable):
-                handler_result = await result  # type: ignore[unreachable]
+                handler_result = await result
             else:
                 handler_result = result
             # The handler is typed to return Optional[AgentMessage], so this should be safe

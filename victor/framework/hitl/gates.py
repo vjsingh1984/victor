@@ -817,7 +817,7 @@ class ChoiceInputGate(BaseHITLGate):
             selected = self.choices[self.default_index]
 
         # Validate
-        is_valid, error = await self.validator.validate(selected)  # type: ignore
+        is_valid, error = await self.validator.validate(selected)
         if not is_valid:
             return ChoiceResponse(
                 gate_id=self.gate_id,

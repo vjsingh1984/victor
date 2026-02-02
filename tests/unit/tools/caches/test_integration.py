@@ -26,7 +26,7 @@ from __future__ import annotations
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.agent.protocols import ToolSelectionContext
+from victor.agent.protocols import AgentToolSelectionContext
 from victor.providers.base import ToolDefinition
 from victor.tools.caches import (
     get_tool_selection_cache,
@@ -90,7 +90,7 @@ def mock_tools():
 @pytest.fixture
 def mock_context():
     """Create mock tool selection context."""
-    context = MagicMock(spec=ToolSelectionContext)
+    context = MagicMock(spec=AgentToolSelectionContext)
     context.conversation_history = []
     context.pending_actions = []
     context.planned_tools = []

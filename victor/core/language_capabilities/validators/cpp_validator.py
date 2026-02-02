@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # Check if libclang is available
 try:
-    import clang.cindex as cindex  # type: ignore[import-not-found]
+    import clang.cindex as cindex
 
     LIBCLANG_AVAILABLE = True
 except ImportError:
@@ -166,7 +166,7 @@ class CppValidator:
             )
 
         # Type narrowing: self._index and cindex are not None here
-        assert self._index is not None  # type: ignore[unreachable]
+        assert self._index is not None
         assert cindex is not None
 
         # Parse options - use c++ for cpp, c for c
@@ -250,7 +250,7 @@ class CppValidator:
             return self._ts_validator.has_errors(code, language)
 
         # Type narrowing: self._index and cindex are not None here
-        assert self._index is not None  # type: ignore[unreachable]
+        assert self._index is not None
         assert cindex is not None
 
         # Build args based on language

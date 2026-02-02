@@ -25,7 +25,7 @@ The tool selection system supports three strategies:
 Example:
     from victor.tools.selection import (
         ToolSelectionStrategy,
-        ToolSelectionContext,
+        CrossVerticalToolSelectionContext,
         PerformanceProfile,
     )
 
@@ -43,7 +43,7 @@ Example:
 
         async def select_tools(
             self,
-            context: ToolSelectionContext,
+            context: CrossVerticalToolSelectionContext,
             max_tools: int = 10,
         ) -> List[str]:
             # Custom selection logic
@@ -83,7 +83,7 @@ class PerformanceProfile:
 class CrossVerticalToolSelectionContext:
     """Extended context for cross-vertical tool selection decisions.
 
-    Renamed from ToolSelectionContext to be semantically distinct:
+    Renamed from CrossVerticalToolSelectionContext to be semantically distinct:
     - CrossVerticalToolSelectionContext (here): Extended cross-vertical selection
     - AgentToolSelectionContext (victor.agent.protocols): Basic agent-level context
     - VerticalToolSelectionContext (victor.core.verticals.protocols.tool_provider): Vertical-specific
@@ -138,7 +138,7 @@ class CrossVerticalToolSelectionContext:
             agent_context: Agent's _exec_ctx or similar context dict
 
         Returns:
-            ToolSelectionContext populated from agent context
+            CrossVerticalToolSelectionContext populated from agent context
         """
         return cls(
             prompt=prompt,
@@ -160,7 +160,6 @@ class CrossVerticalToolSelectionContext:
 
 
 # Backward compatibility alias
-ToolSelectionContext = CrossVerticalToolSelectionContext
 
 
 @dataclass
@@ -215,13 +214,13 @@ class ToolSelectionStrategy(Protocol):
 
             async def select_tools(
                 self,
-                context: ToolSelectionContext,
+                context: CrossVerticalToolSelectionContext,
                 max_tools: int = 10,
             ) -> List[str]:
                 # Selection logic
                 return ["read", "write", "shell"]
 
-            def supports_context(self, context: ToolSelectionContext) -> bool:
+            def supports_context(self, context: CrossVerticalToolSelectionContext) -> bool:
                 return True
 
             def get_supported_features(self) -> ToolSelectorFeatures:
@@ -249,7 +248,7 @@ class ToolSelectionStrategy(Protocol):
 
     async def select_tools(
         self,
-        context: ToolSelectionContext,
+        context: CrossVerticalToolSelectionContext,
         max_tools: int = 10,
     ) -> list[str]:
         """Select relevant tools for the context.
@@ -263,7 +262,7 @@ class ToolSelectionStrategy(Protocol):
         """
         ...
 
-    def supports_context(self, context: ToolSelectionContext) -> bool:
+    def supports_context(self, context: CrossVerticalToolSelectionContext) -> bool:
         """Check if this strategy can handle the context.
 
         Some strategies may require embeddings or specific providers.
@@ -325,7 +324,7 @@ class BaseToolSelectionStrategy(ABC):
 
             async def select_tools(
                 self,
-                context: ToolSelectionContext,
+                context: CrossVerticalToolSelectionContext,
                 max_tools: int = 10,
             ) -> List[str]:
                 # Implementation
@@ -349,13 +348,13 @@ class BaseToolSelectionStrategy(ABC):
     @abstractmethod
     async def select_tools(
         self,
-        context: ToolSelectionContext,
+        context: CrossVerticalToolSelectionContext,
         max_tools: int = 10,
     ) -> list[str]:
         """Select relevant tools for the context."""
         ...
 
-    def supports_context(self, context: ToolSelectionContext) -> bool:
+    def supports_context(self, context: CrossVerticalToolSelectionContext) -> bool:
         """Default: supports all contexts.
 
         Override in subclass if strategy has requirements.
@@ -391,7 +390,7 @@ class BaseToolSelectionStrategy(ABC):
 
 __all__ = [
     "PerformanceProfile",
-    "ToolSelectionContext",
+    "CrossVerticalToolSelectionContext",
     "ToolSelectorFeatures",
     "ToolSelectionStrategy",
     "BaseToolSelectionStrategy",

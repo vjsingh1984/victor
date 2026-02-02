@@ -411,8 +411,8 @@ class TeamTracer:
                         otel_span.set_attribute(key, str(value))
 
                 # Store reference for ending
-                span._otel_span = otel_span  # type: ignore
-                span._otel_token = token  # type: ignore
+                span._otel_span = otel_span
+                span._otel_token = token
             except Exception as e:
                 logger.warning(f"Failed to start OpenTelemetry span: {e}")
 

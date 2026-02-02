@@ -50,7 +50,7 @@ from typing import TYPE_CHECKING
 
 # Tool Provider
 from victor.core.verticals.protocols.tool_provider import (
-    ToolSelectionContext,
+    VerticalToolSelectionContext,
     ToolSelectionResult,
     ToolSelectionStrategyProtocol,
     VerticalToolSelectionProviderProtocol,
@@ -265,7 +265,7 @@ class VerticalExtensions:
 
 __all__ = [
     # Tool Selection
-    "ToolSelectionContext",
+    "VerticalToolSelectionContext",
     "ToolSelectionResult",
     "ToolSelectionStrategyProtocol",
     "VerticalToolSelectionProviderProtocol",

@@ -473,7 +473,7 @@ class ProjectManifest:
             import tomli  # type: ignore[import-not-found]
         except ImportError:
             try:
-                import tomllib as tomli  # type: ignore
+                import tomllib as tomli
             except ImportError:
                 return
 

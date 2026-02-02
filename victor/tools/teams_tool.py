@@ -44,7 +44,7 @@ try:
 
     HTTPX_AVAILABLE = True
 except ImportError:
-    httpx = None  # type: ignore
+    httpx = None
     HTTPX_AVAILABLE = False
 
 from victor.tools.enums import AccessMode, CostTier, DangerLevel, Priority

@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from typing import Protocol as TypingProtocol
 else:
     # For runtime, we need a placeholder
-    TypingProtocol = type[object]  # type: ignore
+    TypingProtocol = type[object]
 
 logger = logging.getLogger(__name__)
 

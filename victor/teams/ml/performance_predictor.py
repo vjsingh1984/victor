@@ -598,7 +598,7 @@ class PerformancePredictor:
         Args:
             training_data: List of training examples
         """
-        from sklearn.ensemble import RandomForestRegressor  # type: ignore[import-untyped]
+        from sklearn.ensemble import RandomForestRegressor
 
         self._train_model(
             metric_name="execution_time",

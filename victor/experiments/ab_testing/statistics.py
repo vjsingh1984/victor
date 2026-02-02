@@ -21,7 +21,7 @@ experiment variants.
 from typing import Any, Literal
 
 import numpy as np
-from scipy import stats  # type: ignore[import-untyped]
+from scipy import stats
 
 
 class StatisticalAnalyzer:
@@ -372,7 +372,7 @@ class StatisticalAnalyzer:
             ImportError: If statsmodels is not available
         """
         try:
-            from statsmodels.stats.power import tt_ind_solve_power  # type: ignore[import-not-found]
+            from statsmodels.stats.power import tt_ind_solve_power
         except ImportError:
             raise ImportError(
                 "statsmodels is required for sample size calculation. "

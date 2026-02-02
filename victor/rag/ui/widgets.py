@@ -30,8 +30,8 @@ try:
 except ImportError:
     TEXTUAL_AVAILABLE = False
 
-    Widget = object  # type: ignore
-    ComposeResult = object  # type: ignore
+    Widget = object
+    ComposeResult = object
 
 
 if TEXTUAL_AVAILABLE:
@@ -279,5 +279,5 @@ else:
         def __init__(self, *args, **kwargs):
             raise ImportError("Textual required for RAG UI")
 
-    DocumentList = DocumentListStub  # type: ignore
-    SearchResults = SearchResultsStub  # type: ignore
+    DocumentList = DocumentListStub
+    SearchResults = SearchResultsStub

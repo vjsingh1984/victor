@@ -59,8 +59,8 @@ try:
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
-    FastAPI = None  # type: ignore
-    WebSocket = None  # type: ignore
+    FastAPI = None
+    WebSocket = None
 
 from victor.workflows.team_collaboration import (
     CommunicationLog,

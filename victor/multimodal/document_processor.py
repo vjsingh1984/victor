@@ -41,7 +41,7 @@ except ImportError:
     logger.warning("PyPDF2 not available. Install with: pip install PyPDF2")
 
 try:
-    from docx import Document  # type: ignore[import-not-found]
+    from docx import Document
 
     DOCX_AVAILABLE = True
 except ImportError:
@@ -49,7 +49,7 @@ except ImportError:
     logger.warning("python-docx not available. Install with: pip install python-docx")
 
 try:
-    from pptx import Presentation  # type: ignore[import-not-found]
+    from pptx import Presentation
 
     PPTX_AVAILABLE = True
 except ImportError:

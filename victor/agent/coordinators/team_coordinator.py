@@ -162,7 +162,7 @@ class TeamCoordinator:
             registry_specs = get_team_registry().find_by_vertical(vertical_name)
             # Strip namespace prefix for compatibility with local team names
             if not isinstance(registry_specs, dict):
-                registry_specs = {}  # type: ignore[unreachable]
+                registry_specs = {}
             normalized: dict[str, Any] = registry_specs
             for name, spec in registry_specs.items():
                 short_name = name.split(":", 1)[-1] if ":" in name else name

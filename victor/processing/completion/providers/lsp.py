@@ -308,6 +308,6 @@ class LSPCompletionProvider(BaseCompletionProvider):
         )
 
         # Attach original LSP data for resolution
-        item._lsp_data = lsp_item  # type: ignore
+        item._lsp_data = lsp_item
 
         return item

@@ -72,7 +72,7 @@ else:
         from typing_extensions import Self
     except ImportError:
         # Fallback for older Python versions - use string annotation
-        Self = Any  # type: ignore
+        Self = Any
 
 if TYPE_CHECKING:
     from victor.core.verticals.protocols import PromptContributorProtocol

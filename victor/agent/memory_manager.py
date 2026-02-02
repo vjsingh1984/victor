@@ -340,7 +340,7 @@ class SessionRecoveryManager:
                     logger.info(f"Recovered session {session_id[:8]}... via direct recovery")
                     return True
 
-                logger.warning(f"Session {session_id} not found")  # type: ignore[unreachable]
+                logger.warning(f"Session {session_id} not found")
                 return False
             else:
                 logger.warning("Conversation store not available")

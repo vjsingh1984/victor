@@ -44,7 +44,7 @@ from collections.abc import Callable
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
 else:
-    ToolRegistry = Any  # type: ignore
+    ToolRegistry = Any
 
 logger = logging.getLogger(__name__)
 

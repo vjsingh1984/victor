@@ -114,7 +114,7 @@ class LazyVerticalProxy:
         with self._load_lock:
             # Double-check: another thread may have loaded it
             if self._loaded:
-                assert self._instance is not None  # type: ignore[unreachable]
+                assert self._instance is not None
                 return self._instance
 
             # Check for recursive loading

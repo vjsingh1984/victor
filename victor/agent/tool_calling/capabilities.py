@@ -83,7 +83,7 @@ def normalize_model_name(model_name: str) -> str:
     """
     # Handle non-string input (e.g., Mock objects in tests)
     if not isinstance(model_name, str):
-        return str(model_name) if model_name is not None else ""  # type: ignore[unreachable]
+        return str(model_name) if model_name is not None else ""
 
     if not model_name:
         return model_name
@@ -323,7 +323,7 @@ class ModelCapabilityLoader:
         """
         # Handle non-string input (e.g., Mock objects in tests)
         if not isinstance(model_name, str):
-            return False  # type: ignore[unreachable]
+            return False
 
         # Try fnmatch first
         if fnmatch.fnmatch(model_name, pattern):

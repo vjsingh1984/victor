@@ -21,13 +21,13 @@ on a single responsibility: tool configuration and selection.
 Usage:
     from victor.core.verticals.protocols.tool_provider import (
         ToolSelectionStrategyProtocol,
-        ToolSelectionContext,
+        VerticalToolSelectionContext,
         ToolSelectionResult,
         VerticalToolSelectionProviderProtocol,
     )
 
     class CodingToolStrategy(ToolSelectionStrategyProtocol):
-        def select_tools(self, context: ToolSelectionContext) -> ToolSelectionResult:
+        def select_tools(self, context: VerticalToolSelectionContext) -> ToolSelectionResult:
             if context.task_type == "edit":
                 return ToolSelectionResult(
                     priority_tools=["read", "edit"],
@@ -51,7 +51,7 @@ from typing import Any, Optional, Protocol, runtime_checkable
 class VerticalToolSelectionContext:
     """Vertical-specific context for tool selection decisions.
 
-    Renamed from ToolSelectionContext to be semantically distinct:
+    Renamed from VerticalToolSelectionContext to be semantically distinct:
     - VerticalToolSelectionContext (here): Vertical-specific selection context
     - AgentToolSelectionContext (victor.agent.protocols): Basic agent-level context
     - CrossVerticalToolSelectionContext (victor.tools.selection.protocol): Extended cross-vertical
@@ -74,7 +74,6 @@ class VerticalToolSelectionContext:
 
 
 # Backward compatibility alias
-ToolSelectionContext = VerticalToolSelectionContext
 
 
 @dataclass
@@ -118,7 +117,7 @@ class ToolSelectionStrategyProtocol(Protocol):
         class CodingToolSelectionStrategy(ToolSelectionStrategyProtocol):
             def select_tools(
                 self,
-                context: ToolSelectionContext,
+                context: VerticalToolSelectionContext,
             ) -> ToolSelectionResult:
                 if context.task_type == "refactor":
                     return ToolSelectionResult(
@@ -139,7 +138,7 @@ class ToolSelectionStrategyProtocol(Protocol):
 
     def select_tools(
         self,
-        context: ToolSelectionContext,
+        context: VerticalToolSelectionContext,
     ) -> ToolSelectionResult:
         """Select tools based on vertical-specific strategy.
 
@@ -290,7 +289,7 @@ class VerticalTieredToolProviderProtocol(Protocol):
 
 
 __all__ = [
-    "ToolSelectionContext",
+    "VerticalToolSelectionContext",
     "ToolSelectionResult",
     "ToolSelectionStrategyProtocol",
     "VerticalToolSelectionProviderProtocol",

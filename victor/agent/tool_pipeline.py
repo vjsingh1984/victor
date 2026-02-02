@@ -76,7 +76,7 @@ try:
     _SIGNATURE_ACCELERATOR_AVAILABLE = True
 except ImportError:
     _SIGNATURE_ACCELERATOR_AVAILABLE = False
-    get_signature_accelerator = None  # type: ignore
+    get_signature_accelerator = None
 
 # Legacy import for backward compatibility
 try:
@@ -85,7 +85,7 @@ try:
     _NATIVE_SIGNATURE_AVAILABLE = True
 except ImportError:
     _NATIVE_SIGNATURE_AVAILABLE = False
-    native_compute_signature = None  # type: ignore
+    native_compute_signature = None
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry

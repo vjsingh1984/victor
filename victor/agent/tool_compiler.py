@@ -84,7 +84,7 @@ class ToolExecutionCompiler:
         for tc in tool_calls:
             # Skip invalid structures
             if not isinstance(tc, dict):
-                continue  # type: ignore[unreachable]
+                continue
 
             tool_name = tc.get("name", "")
             if not tool_name or tool_name in seen_tools:

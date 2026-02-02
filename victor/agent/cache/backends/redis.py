@@ -82,7 +82,7 @@ from collections.abc import Awaitable, Callable
 try:
     import redis.asyncio as aioredis
 except ImportError:
-    aioredis = None  # type: ignore
+    aioredis = None
 
 from victor.agent.cache.backends.protocol import ICacheBackend
 

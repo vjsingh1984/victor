@@ -773,7 +773,7 @@ class ToolCoordinator:
         for tool_call in tool_calls:
             # Validate structure
             if not isinstance(tool_call, dict):
-                logger.warning(f"Skipping invalid tool call (not a dict): {tool_call}")  # type: ignore[unreachable]
+                logger.warning(f"Skipping invalid tool call (not a dict): {tool_call}")
                 continue
 
             tool_name = tool_call.get("name")

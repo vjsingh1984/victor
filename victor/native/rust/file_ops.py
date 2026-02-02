@@ -70,12 +70,12 @@ except ImportError:
     RUST_AVAILABLE = False
 
     # Stub classes for type hints when Rust is not available
-    class FileInfo:  # type: ignore
+    class FileInfo:
         """Stub class when Rust extension is not available."""
 
         pass
 
-    class FileMetadata:  # type: ignore
+    class FileMetadata:
         """Stub class when Rust extension is not available."""
 
         pass

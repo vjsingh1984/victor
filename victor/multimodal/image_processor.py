@@ -51,7 +51,7 @@ except ImportError:
     logger.warning("OpenCV not available. Install with: pip install opencv-python")
 
 try:
-    import pytesseract  # type: ignore[import-untyped]
+    import pytesseract
 
     TESSERACT_AVAILABLE = True
 except ImportError:

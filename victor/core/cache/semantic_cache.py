@@ -196,7 +196,7 @@ class SemanticCache:
             with self._embedding_lock:
                 if self._embedding_service is None:
                     try:
-                        from victor.agents.embeddings import EmbeddingService  # type: ignore[import-not-found]
+                        from victor.agents.embeddings import EmbeddingService
 
                         self._embedding_service = EmbeddingService(model_name=self.embedding_model)
                         logger.info(
@@ -452,7 +452,7 @@ class SemanticCache:
                 for key, entry in batch:
                     # Skip entries without embeddings
                     if entry.embedding is None:
-                        continue  # type: ignore[unreachable]
+                        continue
 
                     # Skip expired entries
                     if entry.is_expired():

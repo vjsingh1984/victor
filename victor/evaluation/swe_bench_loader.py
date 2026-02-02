@@ -353,7 +353,7 @@ class SWEBenchLoader:
         cfg = config or self.config
 
         try:
-            from datasets import load_dataset  # type: ignore
+            from datasets import load_dataset
         except ImportError:
             raise ImportError(
                 "datasets package required for HuggingFace loading. "

@@ -251,7 +251,7 @@ def retry_with_backoff(
 
                     await asyncio.sleep(delay)
 
-            raise last_exception  # type: ignore
+            raise last_exception
 
         @functools.wraps(func)
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -282,11 +282,11 @@ def retry_with_backoff(
 
                     time.sleep(delay)
 
-            raise last_exception  # type: ignore
+            raise last_exception
 
         if asyncio.iscoroutinefunction(func):
-            return async_wrapper  # type: ignore
-        return sync_wrapper  # type: ignore
+            return async_wrapper
+        return sync_wrapper
 
     return decorator
 
@@ -478,7 +478,7 @@ class ObservableCircuitBreaker:
             async with self:
                 return await func(*args, **kwargs)
 
-        return wrapper  # type: ignore
+        return wrapper
 
     def reset(self) -> None:
         """Reset circuit breaker to closed state."""
@@ -688,7 +688,7 @@ def with_timeout(
                 msg = error_message or f"{func.__name__} timed out after {timeout}s"
                 raise TimeoutError(msg)
 
-        return wrapper  # type: ignore
+        return wrapper
 
     return decorator
 
@@ -834,7 +834,7 @@ class ResiliencePolicy:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             return await self.execute(func, *args, **kwargs)
 
-        return wrapper  # type: ignore
+        return wrapper
 
     async def execute(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Execute function with resilience policy.
@@ -912,7 +912,7 @@ class ResiliencePolicy:
 
                     await asyncio.sleep(delay)
 
-            raise last_exception  # type: ignore
+            raise last_exception
 
         return await execute_once()
 

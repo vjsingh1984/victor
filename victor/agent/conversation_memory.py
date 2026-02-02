@@ -1675,7 +1675,7 @@ class ConversationStore:
         if role == MessageRole.TOOL_CALL:
             return MessagePriority.MEDIUM
 
-        return MessagePriority.MEDIUM  # type: ignore[unreachable]
+        return MessagePriority.MEDIUM
 
     def _estimate_tokens(self, content: str) -> int:
         """Estimate token count from content.
@@ -2235,12 +2235,12 @@ class ConversationStore:
                 # Convert numpy arrays to lists for cosine_similarity
                 similarity = self._cosine_similarity(
                     (
-                        list(query_embedding)  # type: ignore[arg-type]
+                        list(query_embedding)
                         if hasattr(query_embedding, "tolist")
                         else query_embedding
                     ),
                     (
-                        list(summary_embedding)  # type: ignore[arg-type]
+                        list(summary_embedding)
                         if hasattr(summary_embedding, "tolist")
                         else summary_embedding
                     ),

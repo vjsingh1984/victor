@@ -35,25 +35,25 @@ except ImportError:
     RUST_AVAILABLE = False
 
     # Create stub classes for when Rust is not available
-    class RustArgumentNormalizer:  # type: ignore
+    class RustArgumentNormalizer:
         pass
 
-    class RustAstIndexer:  # type: ignore
+    class RustAstIndexer:
         pass
 
-    class RustTextChunker:  # type: ignore
+    class RustTextChunker:
         pass
 
-    class RustSimilarityComputer:  # type: ignore
+    class RustSimilarityComputer:
         pass
 
-    class ToolSelectorAccelerator:  # type: ignore
+    class ToolSelectorAccelerator:
         pass
 
-    def get_tool_selector_accelerator(*args, **kwargs):  # type: ignore
+    def get_tool_selector_accelerator(*args, **kwargs):
         return None
 
-    def reset_tool_selector_accelerator(*args, **kwargs):  # type: ignore
+    def reset_tool_selector_accelerator(*args, **kwargs):
         pass
 
 

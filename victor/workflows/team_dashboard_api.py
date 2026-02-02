@@ -47,8 +47,8 @@ try:
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
-    FastAPI = None  # type: ignore
-    Query = None  # type: ignore
+    FastAPI = None
+    Query = None
 
 from victor.workflows.team_dashboard_server import (
     TeamDashboardServer,

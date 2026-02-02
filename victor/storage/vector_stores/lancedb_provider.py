@@ -417,7 +417,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             return []
 
         # Generate query embedding
-        query_embedding = await self.embed_text(query)  # type: ignore
+        query_embedding = await self.embed_text(query)
 
         # Search in LanceDB
         table = self._ensure_table()
@@ -461,7 +461,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if self.table is None:
             return
 
-        self.table.delete(f"id = '{doc_id}'")  # type: ignore
+        self.table.delete(f"id = '{doc_id}'")
 
     async def delete_by_file(self, file_path: str) -> int:
         """Delete all documents from a specific file.

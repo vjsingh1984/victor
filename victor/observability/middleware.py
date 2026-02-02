@@ -63,9 +63,9 @@ try:
     STARLETTE_AVAILABLE = True
 except ImportError:
     STARLETTE_AVAILABLE = False
-    Request = None  # type: ignore
-    Response = None  # type: ignore
-    Headers = None  # type: ignore
+    Request = None
+    Response = None
+    Headers = None
 from victor.observability.production_metrics import ProductionMetricsCollector
 from victor.observability.distributed_tracing import (
     DistributedTracer,

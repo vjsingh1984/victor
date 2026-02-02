@@ -105,7 +105,7 @@ except ImportError:
 
 # Touch ID / biometric auth on macOS
 try:
-    import LocalAuthentication  # type: ignore
+    import LocalAuthentication
 
     BIOMETRIC_AVAILABLE = platform.system() == "Darwin"
 except ImportError:

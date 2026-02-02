@@ -132,8 +132,8 @@ try:
     _LIGHTWEIGHT_AVAILABLE = True
 except ImportError:
     _LIGHTWEIGHT_AVAILABLE = False
-    SQLiteEventBackend = None  # type: ignore
-    register_lightweight_backends = None  # type: ignore
+    SQLiteEventBackend = None
+    register_lightweight_backends = None
 
 # Distributed backends (optional - require additional dependencies)
 try:
@@ -142,7 +142,7 @@ try:
     _REDIS_BACKEND_AVAILABLE = True
 except ImportError:
     _REDIS_BACKEND_AVAILABLE = False
-    RedisEventBackend = None  # type: ignore
+    RedisEventBackend = None
 
 try:
     from victor.core.events.kafka_backend import KafkaEventBackend
@@ -150,7 +150,7 @@ try:
     _KAFKA_BACKEND_AVAILABLE = True
 except ImportError:
     _KAFKA_BACKEND_AVAILABLE = False
-    KafkaEventBackend = None  # type: ignore
+    KafkaEventBackend = None
 
 # Adapters for bridging with existing systems
 from victor.core.events.adapter import (

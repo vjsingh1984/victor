@@ -90,21 +90,21 @@ class ModeConfig:
         """Validate configuration at construction time."""
         # Validate tool_budget (1-500)
         if not isinstance(self.tool_budget, int):
-            self.tool_budget = int(self.tool_budget)  # type: ignore[unreachable]
+            self.tool_budget = int(self.tool_budget)
 
         if not (1 <= self.tool_budget <= 500):
             raise ValueError(f"tool_budget must be between 1 and 500, got {self.tool_budget}")
 
         # Validate max_iterations (1-500)
         if not isinstance(self.max_iterations, int):
-            self.max_iterations = int(self.max_iterations)  # type: ignore[unreachable]
+            self.max_iterations = int(self.max_iterations)
 
         if not (1 <= self.max_iterations <= 500):
             raise ValueError(f"max_iterations must be between 1 and 500, got {self.max_iterations}")
 
         # Validate exploration_multiplier (0.1-10.0)
         if not isinstance(self.exploration_multiplier, (int, float)):
-            self.exploration_multiplier = float(self.exploration_multiplier)  # type: ignore[unreachable]
+            self.exploration_multiplier = float(self.exploration_multiplier)
 
         if not (0.1 <= self.exploration_multiplier <= 10.0):
             raise ValueError(
@@ -181,32 +181,32 @@ class ModeDefinition:
 
         # Validate tool_budget (1-500)
         if not isinstance(self.tool_budget, int):
-            self.tool_budget = int(self.tool_budget)  # type: ignore[unreachable]
+            self.tool_budget = int(self.tool_budget)
         if not (1 <= self.tool_budget <= 500):
             raise ValueError(f"tool_budget must be between 1 and 500, got {self.tool_budget}")
 
         # Validate max_iterations (1-500)
         if not isinstance(self.max_iterations, int):
-            self.max_iterations = int(self.max_iterations)  # type: ignore[unreachable]
+            self.max_iterations = int(self.max_iterations)
         if not (1 <= self.max_iterations <= 500):
             raise ValueError(f"max_iterations must be between 1 and 500, got {self.max_iterations}")
 
         # Validate temperature (0.0-2.0)
         if not isinstance(self.temperature, (int, float)):
-            self.temperature = float(self.temperature)  # type: ignore[unreachable]
+            self.temperature = float(self.temperature)
         if not (0.0 <= self.temperature <= 2.0):
             raise ValueError(f"temperature must be between 0.0 and 2.0, got {self.temperature}")
 
         # Validate description (max 500 chars)
         if not isinstance(self.description, str):
-            self.description = str(self.description)  # type: ignore[unreachable]
+            self.description = str(self.description)
         if len(self.description) > 500:
             logger.warning(f"description exceeds 500 chars ({len(self.description)}), truncating")
             self.description = self.description[:500]
 
         # Validate exploration_multiplier (0.1-10.0)
         if not isinstance(self.exploration_multiplier, (int, float)):
-            self.exploration_multiplier = float(self.exploration_multiplier)  # type: ignore[unreachable]
+            self.exploration_multiplier = float(self.exploration_multiplier)
         if not (0.1 <= self.exploration_multiplier <= 10.0):
             raise ValueError(
                 f"exploration_multiplier must be between 0.1 and 10.0, "

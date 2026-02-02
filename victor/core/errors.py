@@ -1310,8 +1310,8 @@ class ErrorHandler:
 
 
 # Alias for builtin FileNotFoundError
-if isinstance(__builtins__, dict):  # type: ignore[unreachable]
-    builtins_FileNotFoundError = __builtins__["FileNotFoundError"]  # type: ignore[unreachable]
+if isinstance(__builtins__, dict):
+    builtins_FileNotFoundError = __builtins__["FileNotFoundError"]
 else:
     builtins_FileNotFoundError = __builtins__.FileNotFoundError
 
@@ -1363,7 +1363,7 @@ def handle_errors(
                         recovery_hint=recovery_hint or error_info.recovery_hint,
                         cause=e,
                     ) from e
-                return default_return  # type: ignore
+                return default_return
 
         return wrapper
 

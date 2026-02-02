@@ -109,7 +109,7 @@ class ModelCircuitBreaker:
         elif self.state == CircuitState.HALF_OPEN:
             # Allow limited requests in half-open
             return True
-        return False  # type: ignore[unreachable]
+        return False
 
     def _transition_to(self, new_state: CircuitState) -> None:
         """Transition to a new state."""

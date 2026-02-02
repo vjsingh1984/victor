@@ -58,7 +58,7 @@ from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING
 
 try:
-    import lancedb  # type: ignore[import-untyped]
+    import lancedb
     import pyarrow as pa  # type: ignore[import-untyped]  # noqa: F401 - Required by LanceDB
 
     LANCEDB_AVAILABLE = True
@@ -350,7 +350,7 @@ class ConversationEmbeddingStore:
             self._create_table_with_first_record(records[0])
             # MyPy can't determine that _create_table_with_first_record sets _table
             if len(records) > 1:
-                self._table.add(records[1:])  # type: ignore[attr-defined]
+                self._table.add(records[1:])
         else:
             self._table.add(records)
 

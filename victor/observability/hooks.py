@@ -653,7 +653,7 @@ class StateHookManager:
         for hook in self._hooks:
             if hook.should_fire_on_enter(stage):
                 try:
-                    hook.callback(stage, context)  # type: ignore
+                    hook.callback(stage, context)
                 except Exception as e:
                     logger.warning(f"Hook '{hook.name or 'unnamed'}' error on enter {stage}: {e}")
 
@@ -670,7 +670,7 @@ class StateHookManager:
         for hook in self._hooks:
             if hook.should_fire_on_exit(stage):
                 try:
-                    hook.callback(stage, context)  # type: ignore
+                    hook.callback(stage, context)
                 except Exception as e:
                     logger.warning(f"Hook '{hook.name or 'unnamed'}' error on exit {stage}: {e}")
 
@@ -712,7 +712,7 @@ class StateHookManager:
         for hook in self._hooks:
             if hook.on_transition:
                 try:
-                    hook.callback(old_stage, new_stage, context)  # type: ignore
+                    hook.callback(old_stage, new_stage, context)
                 except Exception as e:
                     logger.warning(f"Hook '{hook.name or 'unnamed'}' error on transition: {e}")
 
@@ -722,7 +722,7 @@ class StateHookManager:
         for hook in self._hooks:
             if hook.on_transition_with_history:
                 try:
-                    hook.callback(old_stage, new_stage, context, history)  # type: ignore
+                    hook.callback(old_stage, new_stage, context, history)
                 except Exception as e:
                     logger.warning(
                         f"Hook '{hook.name or 'unnamed'}' error on transition (with history): {e}"

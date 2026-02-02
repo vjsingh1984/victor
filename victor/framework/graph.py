@@ -238,7 +238,7 @@ class CopyOnWriteState(Generic[StateType]):
             return self._source
         # For modified state, lock ensures consistent read
         with self._lock:
-            return self._copy  # type: ignore
+            return self._copy
 
     def __getitem__(self, key: str) -> Any:
         """Get item (thread-safe).
@@ -257,7 +257,7 @@ class CopyOnWriteState(Generic[StateType]):
             return self._source[key]
         # Lock for consistent read from modified state
         with self._lock:
-            return self._copy[key]  # type: ignore
+            return self._copy[key]
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Set item, triggering copy on first mutation (thread-safe).
@@ -294,7 +294,7 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return key in self._source
         with self._lock:
-            return key in self._copy  # type: ignore
+            return key in self._copy
 
     def __len__(self) -> int:
         """Get length (thread-safe).
@@ -306,7 +306,7 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return len(self._source)
         with self._lock:
-            return len(self._copy)  # type: ignore
+            return len(self._copy)
 
     def __iter__(self) -> Iterator[Any]:
         """Iterate over keys (thread-safe snapshot).
@@ -338,7 +338,7 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return self._source.get(key, default)
         with self._lock:
-            return self._copy.get(key, default)  # type: ignore
+            return self._copy.get(key, default)
 
     def keys(self) -> list[Any]:
         """Get keys (thread-safe snapshot).
@@ -451,7 +451,7 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return self._source
         with self._lock:
-            return self._copy  # type: ignore
+            return self._copy
 
     @property
     def was_modified(self) -> bool:

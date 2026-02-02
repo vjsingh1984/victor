@@ -46,8 +46,8 @@ try:
 
     _HAS_TREE_SITTER = True
 except ImportError:
-    TreeSitterEntityExtractor = None  # type: ignore
-    TreeSitterFileExtractor = None  # type: ignore
+    TreeSitterEntityExtractor = None
+    TreeSitterFileExtractor = None
     _HAS_TREE_SITTER = False
 
 __all__ = [

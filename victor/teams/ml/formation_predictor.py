@@ -267,7 +267,7 @@ class FormationPredictor:
         probabilities = {k: v / total for k, v in scores.items()}
 
         # Select best formation
-        best_formation_str = max(scores, key=scores.get)  # type: ignore[arg-type]
+        best_formation_str = max(scores, key=scores.get)
         best_formation = TeamFormation(best_formation_str)
         confidence = probabilities[best_formation_str]
 
@@ -376,8 +376,8 @@ class FormationPredictor:
                 - formation: TeamFormation (label)
                 - success: bool (optional, for weighting)
         """
-        from sklearn.ensemble import RandomForestClassifier  # type: ignore[import-untyped]
-        from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.preprocessing import StandardScaler
 
         # Prepare features
         X = []

@@ -75,7 +75,7 @@ from enum import Enum
 from typing import Any, Optional
 
 try:
-    import pandas as pd  # type: ignore[import-untyped]
+    import pandas as pd
 
     PANDAS_AVAILABLE = True
 except ImportError:

@@ -291,7 +291,7 @@ class ParameterEnforcer:
         if spec.inference_strategy == InferenceStrategy.FROM_DEFAULT:
             return spec.default
 
-        return None  # type: ignore[unreachable]
+        return None
 
     def _infer_from_previous_args(
         self,
@@ -441,7 +441,7 @@ class ParameterEnforcer:
                 examples=['{"key": "value"}', '{"name": "test", "count": 5}'],
             )
 
-        return value  # type: ignore[unreachable]
+        return value
 
 
 def enforce_parameters(
@@ -479,7 +479,7 @@ def enforce_parameters(
             return func(*args, **enforced_kwargs)
 
         # Attach enforcer for introspection
-        wrapper._parameter_enforcer = enforcer  # type: ignore[attr-defined]
+        wrapper._parameter_enforcer = enforcer
         return wrapper
 
     return decorator

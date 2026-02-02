@@ -933,7 +933,7 @@ def get_global_store(persistent: bool = False) -> HITLStore:
     if persistent:
         if _global_sqlite_store is None:
             _global_sqlite_store = SQLiteHITLStore()
-        return _global_sqlite_store  # type: ignore
+        return _global_sqlite_store
 
     if _global_store is None:
         _global_store = HITLStore()
@@ -1060,7 +1060,7 @@ try:
 
 except ImportError:
     # Define a placeholder if pydantic not installed
-    ResponseSubmit = None  # type: ignore
+    ResponseSubmit = None
 
 
 def create_hitl_router(

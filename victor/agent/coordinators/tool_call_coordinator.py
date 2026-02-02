@@ -351,7 +351,7 @@ class ToolCallCoordinator(IToolCallCoordinator):
 
         for raw_call in raw_calls:
             if not isinstance(raw_call, dict):
-                logger.warning(f"Skipping invalid tool call (not a dict): {raw_call}")  # type: ignore[unreachable]
+                logger.warning(f"Skipping invalid tool call (not a dict): {raw_call}")
                 continue
 
             tool_name = raw_call.get("name")

@@ -235,7 +235,7 @@ class ResponseQualityScorer:
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return  # type: ignore[unreachable]
+                return
 
             # Extract dimension scores for metadata
             dimension_data = {ds.dimension.value: ds.score for ds in result.dimension_scores}

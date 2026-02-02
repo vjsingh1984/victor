@@ -382,7 +382,7 @@ class RetryCommandMiddleware(CommandMiddleware):
                     )
                     await asyncio.sleep(self._retry_delay)
 
-        raise last_error  # type: ignore
+        raise last_error
 
 
 class CachingQueryMiddleware(QueryMiddleware):

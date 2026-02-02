@@ -699,27 +699,27 @@ class TieredToolTemplate:
     @classmethod
     def for_coding(cls) -> TieredToolConfig:
         """Get TieredToolConfig for coding vertical."""
-        return cls.for_vertical("coding")  # type: ignore
+        return cls.for_vertical("coding")
 
     @classmethod
     def for_research(cls) -> TieredToolConfig:
         """Get TieredToolConfig for research vertical."""
-        return cls.for_vertical("research")  # type: ignore
+        return cls.for_vertical("research")
 
     @classmethod
     def for_devops(cls) -> TieredToolConfig:
         """Get TieredToolConfig for devops vertical."""
-        return cls.for_vertical("devops")  # type: ignore
+        return cls.for_vertical("devops")
 
     @classmethod
     def for_data_analysis(cls) -> TieredToolConfig:
         """Get TieredToolConfig for data analysis vertical."""
-        return cls.for_vertical("data_analysis")  # type: ignore
+        return cls.for_vertical("data_analysis")
 
     @classmethod
     def for_rag(cls) -> TieredToolConfig:
         """Get TieredToolConfig for RAG vertical."""
-        return cls.for_vertical("rag")  # type: ignore
+        return cls.for_vertical("rag")
 
     @classmethod
     def register_vertical(

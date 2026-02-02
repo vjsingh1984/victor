@@ -74,7 +74,7 @@ from collections.abc import Awaitable, Callable
 try:
     import redis.asyncio as aioredis
 except ImportError:
-    aioredis = None  # type: ignore
+    aioredis = None
 
 from victor.core.events.pattern_matcher import matches_topic_pattern
 from victor.core.events.protocols import (

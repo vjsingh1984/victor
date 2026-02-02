@@ -116,7 +116,7 @@ class LazyImport:
         """Allow calling the module if it's callable."""
         if self._module is None:
             self.__getattr__("__call__")  # Trigger import
-        return self._module(*args, **kwargs)  # type: ignore
+        return self._module(*args, **kwargs)
 
 
 def lazy_import(module_name: str, package: Optional[str] = None) -> LazyImport:
@@ -150,7 +150,7 @@ try:
     logger.debug("orjson available for fast JSON serialization")
 except ImportError:
     _ORJSON_AVAILABLE = False
-    orjson = None  # type: ignore
+    orjson = None
     logger.debug("orjson not available, falling back to standard json")
 
 
@@ -308,10 +308,10 @@ class ThreadSafeMemoized:
                 return result
 
         # Add cache management methods
-        wrapped.cache_clear = lambda: self._cache_clear()  # type: ignore
-        wrapped.cache_info = lambda: self._cache_info()  # type: ignore
+        wrapped.cache_clear = lambda: self._cache_clear()
+        wrapped.cache_info = lambda: self._cache_info()
 
-        return wrapped  # type: ignore
+        return wrapped
 
     def _cache_clear(self) -> None:
         """Clear the cache."""
@@ -451,7 +451,7 @@ def timed(
                     f"{func.__name__} executed in {elapsed:.4f}s",
                 )
 
-        return wrapped  # type: ignore
+        return wrapped
 
     return decorator
 
@@ -511,9 +511,9 @@ def retry(
                         logger.error(f"{func.__name__} failed after {max_attempts} attempts: {e}")
 
             # All attempts failed
-            raise last_exception  # type: ignore
+            raise last_exception
 
-        return wrapped  # type: ignore
+        return wrapped
 
     return decorator
 
@@ -565,9 +565,9 @@ def async_retry(
                         logger.error(f"{func.__name__} failed after {max_attempts} attempts: {e}")
 
             # All attempts failed
-            raise last_exception  # type: ignore
+            raise last_exception
 
-        return wrapped  # type: ignore
+        return wrapped
 
     return decorator
 

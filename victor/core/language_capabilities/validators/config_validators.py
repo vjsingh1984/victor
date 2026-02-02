@@ -169,14 +169,14 @@ class TomlValidator:
 
         # Try tomllib (Python 3.11+) first
         try:
-            import tomllib  # type: ignore[import-not-found]
+            import tomllib
 
             self._toml_module = tomllib
             self._toml_available = True
         except ImportError:
             # Fall back to tomli
             try:
-                import tomli  # type: ignore[import-not-found]
+                import tomli
 
                 self._toml_module = tomli
                 self._toml_available = True
@@ -456,5 +456,5 @@ def get_config_validator(
     validator_class = CONFIG_VALIDATORS.get(language.lower())
     if validator_class:
         result = validator_class(ts_validator)
-        return result  # type: ignore[return-value]
+        return result
     return None

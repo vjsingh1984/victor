@@ -734,7 +734,7 @@ def render_workflow(
             has_hitl = True
         except ImportError:
             # Create a dummy HITLNode type for type checking
-            class HITLNode:  # type: ignore
+            class HITLNode:
                 pass
 
             has_hitl = False
