@@ -166,7 +166,7 @@ def _auto_register_providers() -> None:
     # It is not required for core functionality. LanceDB is the default.
     try:
         # First check if the actual proximaDB package is importable
-        import proximadb  # type: ignore[import-untyped]
+        import proximadb
 
         from victor.coding.codebase.embeddings.proximadb_provider import ProximaDBProvider
 

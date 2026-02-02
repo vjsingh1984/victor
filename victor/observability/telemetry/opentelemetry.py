@@ -58,12 +58,12 @@ try:
     from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 
     try:
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # type: ignore[import-not-found]
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     except ImportError:
         OTLPSpanExporter = None
 
     try:
-        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter  # type: ignore[import-not-found]
+        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
     except ImportError:
         OTLPMetricExporter = None
     from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION

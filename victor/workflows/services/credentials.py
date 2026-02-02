@@ -83,7 +83,7 @@ try:
     KEYRING_AVAILABLE = True
 except ImportError:
     KEYRING_AVAILABLE = False
-    keyring = None  # type: ignore[assignment]
+    keyring = None
 
 try:
     from cryptography.fernet import Fernet
@@ -96,7 +96,7 @@ except ImportError:
 
 # TOTP for authenticator apps
 try:
-    import pyotp  # type: ignore[import-not-found]
+    import pyotp
 
     TOTP_AVAILABLE = True
 except ImportError:
@@ -1292,7 +1292,7 @@ class SystemAuthenticator:
             return False
 
         try:
-            import pam  # type: ignore[import-not-found]
+            import pam
 
             p = pam.pam()
             auth_result: bool = p.authenticate(username, password, service=service)
@@ -1300,7 +1300,7 @@ class SystemAuthenticator:
         except ImportError:
             # Try python-pam
             try:
-                import PAM  # type: ignore[import-not-found]
+                import PAM
 
                 def pam_conv(auth: Any, query_list: Any, userData: Any) -> Any:
                     resp = []
@@ -1447,7 +1447,7 @@ class SystemAuthenticator:
         """
         try:
             # Try GSSAPI (Unix/macOS)
-            import gssapi  # type: ignore[import-not-found]
+            import gssapi
 
             server_name = gssapi.Name(service, gssapi.NameType.hostbased_service)
 
@@ -1464,7 +1464,7 @@ class SystemAuthenticator:
 
         # Try pyspnego (cross-platform)
         try:
-            import spnego  # type: ignore[import-not-found]
+            import spnego
 
             ctx = spnego.client(service)
             token = ctx.step()
@@ -1500,7 +1500,7 @@ class SystemAuthenticator:
             return self._verify_ntlm_pyspnego(username, password, domain)
 
         try:
-            import win32security  # type: ignore[import-untyped]
+            import win32security
 
             if domain:
                 pass
@@ -1564,8 +1564,8 @@ class SystemAuthenticator:
         """
         if platform.system() == "Windows":
             try:
-                import sspi  # type: ignore[import-not-found]
-                import sspicon  # type: ignore[import-untyped]
+                import sspi
+                import sspicon
 
                 sspi.QuerySecurityPackageInfo("NTLM")
 
@@ -1626,7 +1626,7 @@ class SystemAuthenticator:
         """
         # Try LDAP bind
         try:
-            import ldap3  # type: ignore[import-untyped]
+            import ldap3
 
             server = ldap3.Server(
                 domain,
@@ -1705,8 +1705,8 @@ class SystemAuthenticator:
         """
         if platform.system() == "Windows":
             try:
-                import win32net  # type: ignore[import-untyped]
-                import win32api  # type: ignore[import-untyped]
+                import win32net
+                import win32api
 
                 username = win32api.GetUserName()
                 win32api.GetDomainName()
@@ -1924,7 +1924,7 @@ class AWSCredentials:
     def to_boto3_session(self) -> Any:
         """Create boto3 session from these credentials."""
         try:
-            import boto3  # type: ignore[import-untyped]
+            import boto3
 
             return boto3.Session(
                 aws_access_key_id=self.access_key_id,

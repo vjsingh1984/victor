@@ -857,7 +857,7 @@ class DockerDeploymentHandler(DeploymentHandler):
                 import docker
 
                 # docker.from_env() is a runtime function, not in type stubs
-                self._client = docker.from_env()  # type: ignore[attr-defined]
+                self._client = docker.from_env()
             except ImportError:
                 raise RuntimeError("docker package not installed. Install with: pip install docker")
         return self._client
@@ -990,7 +990,7 @@ class KubernetesDeploymentHandler(DeploymentHandler):
         """Get or create Kubernetes CoreV1Api client."""
         if self._core_v1 is None:
             try:
-                from kubernetes import client, config as k8s_config  # type: ignore[import-not-found]
+                from kubernetes import client, config as k8s_config
 
                 # Try in-cluster config first, fall back to kubeconfig
                 try:
@@ -1103,7 +1103,7 @@ class KubernetesDeploymentHandler(DeploymentHandler):
 
         logger.debug(f"Executing node {node.id} in pod {self.pod_name}")
 
-        from kubernetes.stream import stream  # type: ignore[import-not-found]
+        from kubernetes.stream import stream
 
         api = self._get_api()
 
@@ -1182,7 +1182,7 @@ class ECSDeploymentHandler(DeploymentHandler):
         """Get or create boto3 ECS client."""
         if self._ecs_client is None:
             try:
-                import boto3  # type: ignore[import-untyped]
+                import boto3
 
                 self._ecs_client = boto3.client("ecs")
             except ImportError:

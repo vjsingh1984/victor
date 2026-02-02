@@ -79,7 +79,7 @@ def extract_text_from_html(html_content: str) -> str:
         Extracted text content
     """
     try:
-        from bs4 import BeautifulSoup  # type: ignore[import-untyped]
+        from bs4 import BeautifulSoup
 
         soup = BeautifulSoup(html_content, "html.parser")
 

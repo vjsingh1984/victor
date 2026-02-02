@@ -71,8 +71,8 @@ logger = logging.getLogger(__name__)
 
 # Check for debugpy availability
 try:
-    import debugpy  # type: ignore[import-untyped]
-    from debugpy.common import messaging  # type: ignore[import-untyped]
+    import debugpy
+    from debugpy.common import messaging
 
     HAS_DEBUGPY = True
 except ImportError:
@@ -340,7 +340,7 @@ class PythonDebugAdapter(BaseDebugAdapter):
         for loc in breakpoints:
             bp = {"line": loc.line}
             if loc.line in conditions:
-                bp["condition"] = conditions[loc.line]  # type: ignore[assignment]
+                bp["condition"] = conditions[loc.line]
             bp_args.append(bp)
 
         response = await self._send_request(

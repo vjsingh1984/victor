@@ -62,9 +62,9 @@ logger = logging.getLogger(__name__)
 
 # Optional kubernetes import
 try:
-    from kubernetes import client, config as k8s_config  # type: ignore[import-not-found]
-    from kubernetes.client.rest import ApiException  # type: ignore[import-not-found]
-    from kubernetes.stream import stream  # type: ignore[import-not-found]
+    from kubernetes import client, config as k8s_config
+    from kubernetes.client.rest import ApiException
+    from kubernetes.stream import stream
 
     K8S_AVAILABLE = True
 except ImportError:
@@ -528,7 +528,7 @@ class KubernetesServiceProvider(BaseServiceProvider):
 
             for dep in deployments.items:
                 try:
-                    from kubernetes.client import V1Deployment  # type: ignore[import-not-found]
+                    from kubernetes.client import V1Deployment
 
                     def delete_deployment(d: V1Deployment = dep) -> None:
                         self.apps_v1.delete_namespaced_deployment(

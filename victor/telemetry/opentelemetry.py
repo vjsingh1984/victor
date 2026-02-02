@@ -26,14 +26,14 @@ try:
 
     # Optional exporters that may not be installed
     try:
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # type: ignore[import-not-found]
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
             OTLPSpanExporter as _OTLPSpanExporter,
         )
     except ImportError:
         _OTLPSpanExporter = None
 
     try:
-        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (  # type: ignore[import-not-found]
+        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (
             OTLPMetricExporter as _OTLPMetricExporter,
         )
     except ImportError:
@@ -53,31 +53,31 @@ except ImportError:
     OPENTELEMETRY_AVAILABLE = False
 
     # Create dummy objects to avoid import errors
-    class TracerProvider:  # type: ignore[no-redef]
+    class TracerProvider:
         def __init__(self, *args, **kwargs):
             pass
 
-    class BatchSpanProcessor:  # type: ignore[no-redef]
+    class BatchSpanProcessor:
         def __init__(self, *args, **kwargs):
             pass
 
-    class MeterProvider:  # type: ignore[no-redef]
+    class MeterProvider:
         def __init__(self, *args, **kwargs):
             pass
 
-    class PeriodicExportingMetricReader:  # type: ignore[no-redef]
+    class PeriodicExportingMetricReader:
         def __init__(self, *args, **kwargs):
             pass
 
-    class OTLPSpanExporter:  # type: ignore[no-redef]
+    class OTLPSpanExporter:
         def __init__(self, *args, **kwargs):
             pass
 
-    class OTLPMetricExporter:  # type: ignore[no-redef]
+    class OTLPMetricExporter:
         def __init__(self, *args, **kwargs):
             pass
 
-    class Resource:  # type: ignore[no-redef]
+    class Resource:
         @staticmethod
         def create(*args, **kwargs):
             return {}

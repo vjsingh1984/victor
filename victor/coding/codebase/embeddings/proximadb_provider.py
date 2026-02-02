@@ -163,7 +163,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         """Start ProximaDB in embedded mode if available."""
         try:
             # Try to import proximadb embedded module
-            from proximadb import EmbeddedProximaDB, EmbeddedConfig  # type: ignore[import-untyped]
+            from proximadb import EmbeddedProximaDB, EmbeddedConfig
 
             if not isinstance(self._data_dir, Path):
                 raise ValueError("Data directory not initialized")
@@ -179,7 +179,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
             self._db = EmbeddedProximaDB(config=config)
             if self._db is not None:
-                await self._db.start()  # type: ignore[unreachable]
+                await self._db.start()
                 self._started = True
                 # Access rest_url safely (db is not None here)
                 self._server_url = getattr(self._db, "rest_url", self._server_url)
@@ -347,7 +347,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # Add content to metadata for retrieval
         full_metadata = {"content": content, **(metadata or {})}
-        vector_data["metadata"] = self._convert_metadata(full_metadata)  # type: ignore[assignment]
+        vector_data["metadata"] = self._convert_metadata(full_metadata)
 
         # Insert into collection
         if self._client is None:
@@ -611,7 +611,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
 
         # Stop embedded server if we started it
         if self._db is not None:
-            if self._started:  # type: ignore[unreachable]
+            if self._started:
                 try:
                     await self._db.stop()
                 except Exception:

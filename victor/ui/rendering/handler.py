@@ -49,7 +49,7 @@ async def stream_response(
         The accumulated response content
     """
     renderer.start()
-    stream_gen = await agent.stream_chat(message)
+    stream_gen = agent.stream_chat(message)
 
     # Initialize content filter for thinking markers
     content_filter = StreamingContentFilter(suppress_thinking=suppress_thinking)

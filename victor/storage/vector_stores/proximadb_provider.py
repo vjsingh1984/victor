@@ -162,7 +162,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
         """Start ProximaDB in embedded mode if available."""
         try:
             # Try to import proximadb embedded module
-            from proximadb import EmbeddedProximaDB, EmbeddedConfig  # type: ignore[import-untyped]
+            from proximadb import EmbeddedProximaDB, EmbeddedConfig
 
             config = EmbeddedConfig(
                 data_dir=str(self._data_dir),
@@ -174,9 +174,9 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             )
 
             self._db = EmbeddedProximaDB(config=config)
-            await self._db.start()  # type: ignore[attr-defined]
+            await self._db.start()
             self._started = True
-            self._server_url = self._db.rest_url  # type: ignore[attr-defined]
+            self._server_url = self._db.rest_url
             print(f"Started embedded ProximaDB: {self._server_url}")
 
         except ImportError:
@@ -581,8 +581,8 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             self._client = None
 
         # Stop embedded server if we started it
-        if self._db and self._started:  # type: ignore[unreachable]
-            try:  # type: ignore[unreachable]
+        if self._db and self._started:
+            try:
                 await self._db.stop()
             except Exception:
                 pass

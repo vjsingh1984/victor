@@ -31,8 +31,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    import chromadb  # type: ignore[import-not-found]
-    from chromadb.config import Settings  # type: ignore[import-not-found]
+    import chromadb
+    from chromadb.config import Settings
 
 try:
     import chromadb
