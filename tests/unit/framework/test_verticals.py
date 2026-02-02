@@ -662,12 +662,12 @@ class TestVerticalIntegration:
 
     def test_vertical_stages_match_framework(self):
         """Vertical stages should be compatible with framework."""
-        from victor.framework.state import Stage
+        from victor.framework.state import ConversationStage
 
         coding_stages = CodingAssistant.get_stages()
 
         # Coding stages should map to framework stages
-        {s.value.upper() for s in Stage}
+        {s.value.upper() for s in ConversationStage}
 
         for _stage_name in coding_stages:
             # At least some stages should match

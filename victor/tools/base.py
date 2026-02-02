@@ -41,6 +41,12 @@ from victor.tools.metadata import ToolMetadata
 # ToolRegistry, Hook, and HookError have been moved to victor/tools/registry.py
 # and are imported above for backward compatibility.
 
+# Re-export enums for backward compatibility
+__all__ = [
+    "CostTier",
+    "SchemaLevel",
+]
+
 
 @dataclass
 class ToolValidationResult:

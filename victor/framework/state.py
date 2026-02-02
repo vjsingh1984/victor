@@ -35,6 +35,12 @@ from victor.core.state import ConversationStage
 if TYPE_CHECKING:
     from victor.framework.protocols import OrchestratorProtocol
 
+__all__ = [
+    "ConversationStage",
+    "StateHooks",
+    "State",
+]
+
 
 # ConversationStage is an alias to ConversationStage for framework API compatibility
 # This maintains backward compatibility while eliminating duplicate enums

@@ -166,22 +166,22 @@ class TestEvent:
         assert "timestamp" in d
 
 
-class TestStage:
-    """Tests for Stage enum."""
+class TestConversationStage:
+    """Tests for ConversationStage enum."""
 
     def test_all_stages_exist(self):
         """All expected stages should exist."""
-        assert Stage.INITIAL.value == "initial"
-        assert Stage.PLANNING.value == "planning"
-        assert Stage.READING.value == "reading"
-        assert Stage.ANALYSIS.value == "analysis"
-        assert Stage.EXECUTION.value == "execution"
-        assert Stage.VERIFICATION.value == "verification"
-        assert Stage.COMPLETION.value == "completion"
+        assert ConversationStage.INITIAL.value == "initial"
+        assert ConversationStage.PLANNING.value == "planning"
+        assert ConversationStage.READING.value == "reading"
+        assert ConversationStage.ANALYSIS.value == "analysis"
+        assert ConversationStage.EXECUTION.value == "execution"
+        assert ConversationStage.VERIFICATION.value == "verification"
+        assert ConversationStage.COMPLETION.value == "completion"
 
     def test_stage_count(self):
         """Should have exactly 7 stages."""
-        assert len(Stage) == 7
+        assert len(ConversationStage) == 7
 
 
 class TestTaskResult:

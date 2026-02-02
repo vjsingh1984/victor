@@ -240,11 +240,11 @@ class TestConversationStageIntegration:
         assert CoreStage is ConversationStage
 
     def test_framework_stage_alias(self):
-        """Framework's Stage should be an alias to ConversationStage."""
+        """Framework's ConversationStage should be an alias to ConversationStage."""
         from victor.core.state import ConversationStage
-        from victor.framework.state import Stage
+        from victor.framework.state import ConversationStage as FrameworkStage
 
-        assert Stage is ConversationStage
+        assert FrameworkStage is ConversationStage
 
     def test_stage_in_annotations(self):
         """ConversationStage should work in type annotations."""

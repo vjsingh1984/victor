@@ -387,9 +387,9 @@ class TestTypeConsistency:
     def test_conversation_stage_consistency(self):
         """ConversationStage should be the same type everywhere."""
         from victor.core.state import ConversationStage as CoreStage
-        from victor.framework.state import Stage as FrameworkStage
+        from victor.framework.state import ConversationStage as FrameworkStage
 
-        # Framework's Stage should be an alias to Core's ConversationStage
+        # Framework's ConversationStage should be an alias to Core's ConversationStage
         assert FrameworkStage is CoreStage
 
     def test_sub_agent_role_consistency(self):
@@ -620,11 +620,11 @@ class TestLayerIndependenceSummary:
         )
 
         # Import framework modules
-        from victor.framework.state import State, Stage
+        from victor.framework.state import State, ConversationStage
         from victor.framework.teams import AgentTeam, TeamMemberSpec
 
         # Verify types are correct
-        assert Stage is ConversationStage
+        assert ConversationStage is ConversationStage
         assert State is not None
         assert AgentTeam is not None
         assert TeamMemberSpec is not None
