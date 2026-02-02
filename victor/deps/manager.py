@@ -28,7 +28,7 @@ from victor.deps.parsers import (
     get_parser,
 )
 from victor.deps.protocol import (
-    Dependency,
+    PackageDependency,
     DependencyAnalysis,
     DependencyConflict,
     DependencyGraph,
@@ -37,6 +37,9 @@ from victor.deps.protocol import (
     PackageManager,
     Version,
 )
+
+# Legacy alias for backward compatibility
+Dependency = PackageDependency
 
 logger = logging.getLogger(__name__)
 

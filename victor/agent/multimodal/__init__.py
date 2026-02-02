@@ -56,20 +56,15 @@ from victor.agent.multimodal.vision_agent import (
     PlotData,
     VisionAgent,
     VisionAnalysisResult,
-    # Legacy aliases
-    ImageAnalysis,
-    ImageComparison,
 )
 
 __all__ = [
     # Vision
     "VisionAgent",
     "VisionAnalysisResult",
-    "ImageAnalysis",  # Legacy alias
     "DetectedObject",
     "PlotData",
     "ComparisonResult",
-    "ImageComparison",  # Legacy alias
     "BoundingBox",
     "ColorInfo",
     "FaceDetection",

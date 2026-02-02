@@ -24,8 +24,11 @@ from victor.agent.multimodal.audio_agent import (
     AudioAnalysis,
     AudioAgent,
     SpeechSegment,
-    Transcription,
+    TranscriptionResult,
 )
+
+# Legacy alias for backward compatibility
+Transcription = TranscriptionResult
 from victor.core.errors import ValidationError
 from tests.factories import MockProviderFactory
 

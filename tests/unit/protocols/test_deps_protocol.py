@@ -22,7 +22,7 @@ from victor.deps.protocol import (
     PackageManager,
     VersionConstraint,
     Version,
-    Dependency,
+    PackageDependency,
     DependencyConflict,
     DependencyVulnerability,
     DependencyUpdate,
@@ -31,6 +31,9 @@ from victor.deps.protocol import (
     DependencyAnalysis,
     DepsConfig,
 )
+
+# Legacy alias for backward compatibility
+Dependency = PackageDependency
 
 
 class TestDependencyType:

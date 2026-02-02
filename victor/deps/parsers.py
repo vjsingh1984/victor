@@ -31,10 +31,13 @@ if TYPE_CHECKING:
         pass
 
 from victor.deps.protocol import (
-    Dependency,
+    PackageDependency,
     DependencyType,
     PackageManager,
 )
+
+# Legacy alias for backward compatibility
+Dependency = PackageDependency
 
 logger = logging.getLogger(__name__)
 

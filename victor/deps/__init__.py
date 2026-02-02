@@ -48,7 +48,7 @@ Example usage:
 """
 
 from victor.deps.protocol import (
-    Dependency,
+    PackageDependency,
     DependencyAnalysis,
     DependencyConflict,
     DependencyGraph,
@@ -77,9 +77,13 @@ from victor.deps.manager import (
     reset_deps_manager,
 )
 
+# Legacy alias for backward compatibility
+Dependency = PackageDependency
+
 __all__ = [
     # Protocol types
-    "Dependency",
+    "PackageDependency",
+    "Dependency",  # Legacy alias for PackageDependency
     "DependencyAnalysis",
     "DependencyConflict",
     "DependencyGraph",

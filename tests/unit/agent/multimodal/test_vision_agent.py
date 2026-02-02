@@ -24,11 +24,15 @@ import pytest
 from victor.agent.multimodal.vision_agent import (
     ChartType,
     DetectedObject,
-    ImageAnalysis,
-    ImageComparison,
+    VisionAnalysisResult,
+    ComparisonResult,
     PlotData,
     VisionAgent,
 )
+
+# Legacy aliases for backward compatibility
+ImageAnalysis = VisionAnalysisResult
+ImageComparison = ComparisonResult
 from victor.core.errors import ValidationError
 from tests.factories import MockProviderFactory
 
