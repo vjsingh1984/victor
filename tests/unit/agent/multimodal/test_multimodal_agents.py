@@ -24,6 +24,9 @@ from pathlib import Path
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+
+# Skip entire module if PIL is not available (e.g., on Windows runners without Pillow)
+pil = pytest.importorskip("PIL")
 from PIL import Image
 
 from victor.agent.multimodal.audio_agent import (
