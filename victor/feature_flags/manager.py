@@ -273,7 +273,7 @@ class FeatureFlagManager:
         if isinstance(self._resolver, ChainedFlagResolver):
             success = self._resolver.set(flag_name, value)
         else:
-            success = self._resolver.set(flag_name, value)  # type: ignore[unreachable]
+            success = self._resolver.set(flag_name, value)
 
         if not success:
             logger.warning(f"Failed to set flag {flag_name}={value}")

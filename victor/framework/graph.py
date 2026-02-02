@@ -1334,7 +1334,7 @@ class NodeExecutor:
                 if isinstance(result, CopyOnWriteState):
                     state = result.get_state()
                 elif isinstance(result, dict):
-                    state = result  # type: ignore[assignment]
+                    state = result
                 else:
                     # Node returned something else, use COW state
                     state = cow_state.get_state()
@@ -1667,7 +1667,7 @@ class GraphCheckpointManager:
             checkpoint = await self.checkpointer.load(thread_id)
             if checkpoint:
                 logger.info(f"Resuming from checkpoint at node: {checkpoint.node_id}")
-                return checkpoint.state.copy(), checkpoint.node_id  # type: ignore[return-value]
+                return checkpoint.state.copy(), checkpoint.node_id
 
         # No checkpoint, use input state
         return copy.deepcopy(input_state), entry_point
@@ -2330,7 +2330,7 @@ class CompiledGraph(Generic[StateType]):
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return  # type: ignore[unreachable]
+                return
 
             quality = 0.8 if success else 0.2
             if success and iterations < 10:
@@ -2890,7 +2890,7 @@ class StateGraph(Generic[StateType]):
                 ) -> Callable[[StateType], StateType]:
                     def agent_placeholder(state: StateType) -> StateType:
                         # Store node config in state for executor to use
-                        return {  # type: ignore[return-value]
+                        return {
                             **state,
                             "_pending_agent": node_config,
                         }
@@ -2908,7 +2908,7 @@ class StateGraph(Generic[StateType]):
                 ) -> Callable[[StateType], StateType]:
                     def compute_placeholder(state: StateType) -> StateType:
                         # Store node config in state for executor to use
-                        return {  # type: ignore[return-value]
+                        return {
                             **state,
                             "_pending_compute": node_config,
                         }

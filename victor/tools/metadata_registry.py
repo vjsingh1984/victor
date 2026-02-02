@@ -335,9 +335,23 @@ class ToolMetadataEntry:
         access_mode = getattr(tool, "access_mode", AccessMode.READONLY)
         danger_level = getattr(tool, "danger_level", DangerLevel.SAFE)
         aliases: set[str] = getattr(tool, "aliases", set())
+
+        # Extract category: check direct attribute first, then metadata property
         category = getattr(tool, "category", None)
+        if category is None and hasattr(tool, "metadata"):
+            # Tool has explicit metadata property (from ToolMetadataProvider)
+            tool_metadata = tool.get_metadata() if callable(tool.get_metadata) else tool.metadata
+            if tool_metadata and tool_metadata.category:
+                category = tool_metadata.category
+
         # Extract keywords from tool decorator metadata, filtering short keywords
         raw_keywords = getattr(tool, "keywords", None) or []
+        # If no direct keywords, check metadata property
+        if not raw_keywords and hasattr(tool, "metadata"):
+            tool_metadata = tool.get_metadata() if callable(tool.get_metadata) else tool.metadata
+            if tool_metadata and tool_metadata.keywords:
+                raw_keywords = tool_metadata.keywords
+
         keywords = (
             {k.lower() for k in raw_keywords if len(k) >= MIN_KEYWORD_LENGTH}
             if raw_keywords

@@ -136,7 +136,7 @@ class ChatCoordinator:
                     # Ensure content is a string before adding
                     content = chunk.content
                     if not isinstance(content, str):
-                        content = str(content)  # type: ignore[unreachable]
+                        content = str(content)
                     full_content.append(content)
 
             # Collect tool calls for tracking
@@ -477,7 +477,7 @@ class ChatCoordinator:
                 else:
                     fallback_msg: str = ""
                     if orch._recovery_coordinator is not None:
-                        recovery_ctx = self._create_recovery_context(stream_ctx)  # type: ignore[unreachable]
+                        recovery_ctx = self._create_recovery_context(stream_ctx)
                         fallback_msg = orch._recovery_coordinator.get_recovery_fallback_message(
                             recovery_ctx
                         )

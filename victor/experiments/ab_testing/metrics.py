@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
-from scipy import stats  # type: ignore[import-untyped]
+from scipy import stats
 
 from victor.core.events import MessagingEvent, get_observability_bus
 from victor.experiments.ab_testing.models import (

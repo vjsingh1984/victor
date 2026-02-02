@@ -420,7 +420,7 @@ class ToolDependencyValidator:
         # Validate using JSON Schema if available and requested
         if self._use_json_schema:
             try:
-                import jsonschema  # type: ignore[import-untyped]
+                import jsonschema
 
                 jsonschema.validate(instance=data, schema=TOOL_DEPENDENCY_SCHEMA)
             except ImportError:

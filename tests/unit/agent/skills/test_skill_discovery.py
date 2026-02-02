@@ -156,11 +156,14 @@ def mock_tools():
 def mock_tool_registry(mock_tool, mock_tools):
     """Create a mock tool registry."""
     registry = Mock()
-    registry.list_tools = Mock(return_value=[tool.name for tool in mock_tools])
-    registry.get_tool = Mock(
-        side_effect=lambda name: next((t for t in mock_tools if t.name == name), None)
-    )
-    registry.tools = {tool.name: tool for tool in mock_tools}
+
+    # Capture tools at fixture creation time
+    tool_names = [tool.name for tool in mock_tools]
+    tools_dict = {tool.name: tool for tool in mock_tools}
+
+    registry.list_tools = Mock(return_value=tool_names)
+    registry.get_tool = Mock(side_effect=lambda name, tools=tools_dict: tools.get(name))
+    registry.tools = tools_dict
     return registry
 
 

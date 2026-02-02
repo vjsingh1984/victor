@@ -549,7 +549,7 @@ class ExplorationStrategyImpl:
         else:
             # Fallback for unknown strategies (should never happen with Enum)
             # This is kept for defensive programming and future extensibility
-            return self._epsilon_greedy(q_values, available_actions)  # type: ignore[unreachable]
+            return self._epsilon_greedy(q_values, available_actions)
 
     def _epsilon_greedy(self, q_values: dict[Any, float], available_actions: list[Any]) -> Any:
         """Epsilon-greedy action selection."""

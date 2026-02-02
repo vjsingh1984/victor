@@ -365,7 +365,7 @@ class IntelligentAgentPipeline:
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return  # type: ignore[unreachable]
+                return
 
             # Build rich metadata with context about what failed
             metadata: dict[str, Any] = {

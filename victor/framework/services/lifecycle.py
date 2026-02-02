@@ -659,9 +659,9 @@ class DockerServiceHandler(BaseService):
         """Start Docker container."""
         try:
             import docker
-            from docker.models.containers import Container  # type: ignore[import-not-found]
+            from docker.models.containers import Container
 
-            self._client = docker.from_env(skip_ssl_verification=True)  # type: ignore[attr-defined]
+            self._client = docker.from_env(skip_ssl_verification=True)
 
             # Check if image exists, pull if needed
             try:

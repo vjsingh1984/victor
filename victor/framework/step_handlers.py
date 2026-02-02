@@ -1153,7 +1153,7 @@ class FrameworkStepHandler(BaseStepHandler):
 
         # First check if vertical implements WorkflowProviderProtocol
         if isinstance(vertical, WorkflowProviderProtocol):
-            workflow_provider = vertical  # type: ignore[unreachable]
+            workflow_provider = vertical
         # Fallback to hasattr() for legacy code (deprecated)
         elif hasattr(vertical, "get_workflow_provider"):
             workflow_provider = vertical.get_workflow_provider()
@@ -1555,7 +1555,7 @@ class FrameworkStepHandler(BaseStepHandler):
                         loader.register_capability(
                             name=cap.name,
                             handler=cap.handler,
-                            capability_type=cap_type if cap_type is not None else "custom",  # type: ignore[arg-type]
+                            capability_type=cap_type if cap_type is not None else "custom",
                             version=getattr(cap, "version", "1.0"),
                         )
 
@@ -2176,7 +2176,7 @@ class ExtensionsStepHandler(BaseStepHandler):
             # OCP: Apply all registered extension handlers
             self._extension_registry.apply_all(orchestrator, extensions, context, result)
         else:
-            logger.debug("No extensions available for vertical")  # type: ignore[unreachable]
+            logger.debug("No extensions available for vertical")
 
     def _get_step_details(self, result: "IntegrationResult") -> Optional[dict[str, Any]]:
         """Return extension application details."""

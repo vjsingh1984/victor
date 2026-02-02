@@ -384,7 +384,7 @@ class EnhancedRLCoordinator:
         elif strategy == RewardShapingStrategy.COST_AWARE:
             shaped_value, components = self._cost_aware_reward(outcome, base_reward)
         else:
-            shaped_value, components = base_reward, {"base": base_reward}  # type: ignore[unreachable]
+            shaped_value, components = base_reward, {"base": base_reward}
 
         # Apply hyperparameter scaling
         if outcome.success:

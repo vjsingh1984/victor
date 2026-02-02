@@ -602,7 +602,7 @@ class VerticalTemplate:
         if not self.tools:
             errors.append("Template must specify at least one tool")
         elif not isinstance(self.tools, list):
-            errors.append("Template tools must be a list")  # type: ignore[unreachable]
+            errors.append("Template tools must be a list")
 
         # Validate system prompt
         if not self.system_prompt:

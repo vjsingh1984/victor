@@ -943,7 +943,7 @@ class VictorFastAPIServer:
             """Reset conversation history."""
             await self._record_rl_feedback()
             if self._orchestrator is not None:
-                self._orchestrator.reset_conversation()  # type: ignore[unreachable]
+                self._orchestrator.reset_conversation()
             return JSONResponse({"success": True, "message": "Conversation reset"})
 
         @app.get("/conversation/export", tags=["Conversation"])
@@ -952,7 +952,7 @@ class VictorFastAPIServer:
             if self._orchestrator is None:
                 return JSONResponse({"messages": []})
 
-            messages = self._orchestrator.get_messages()  # type: ignore[unreachable]
+            messages = self._orchestrator.get_messages()
 
             if format == "markdown":
                 content = self._format_messages_markdown(messages)
@@ -1591,7 +1591,7 @@ Respond with just the command to run."""
                             except Exception:
                                 pass
 
-                file_sizes.sort(key=lambda x: int(x.get("lines", 0) or 0), reverse=True)  # type: ignore[call-overload]
+                file_sizes.sort(key=lambda x: int(x.get("lines", 0) or 0), reverse=True)
                 metrics["largest_files"] = file_sizes[:10]
 
                 return JSONResponse(metrics)
@@ -3294,7 +3294,7 @@ Respond with just the command to run."""
 
             # Create and include the HITL router
             hitl_router = create_hitl_router(
-                store=self._hitl_store,  # type: ignore[arg-type]
+                store=self._hitl_store,
                 require_auth=bool(self.hitl_auth_token),
                 auth_token=self.hitl_auth_token,
             )
@@ -3447,9 +3447,9 @@ Respond with just the command to run."""
                 # Store auth state in the scope dict for future operations
                 # Note: WebSocket.scope is the correct place to store custom state
                 if not hasattr(ws, "auth_state"):
-                    ws.auth_state = {}  # type: ignore[attr-defined]
-                ws.auth_state["authenticated"] = True  # type: ignore[attr-defined]
-                ws.auth_state["api_key"] = api_key  # type: ignore[attr-defined]
+                    ws.auth_state = {}
+                ws.auth_state["authenticated"] = True
+                ws.auth_state["api_key"] = api_key
                 logger.debug("WebSocket client authenticated via message")
                 await ws.send_json({"type": "auth_success"})
             else:

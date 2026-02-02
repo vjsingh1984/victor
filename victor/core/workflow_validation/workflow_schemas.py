@@ -178,7 +178,7 @@ class WorkflowNodeSchema(BaseModel):
 
             for branch_key, branch_val in v.items():
                 if not isinstance(branch_val, str):
-                    continue  # type: ignore[unreachable]
+                    continue
                 if not re.match(r"^[a-zA-Z0-9_\-]+$", branch_val):
                     # Allow __end__ as a special terminal marker
                     if branch_val != "__end__":

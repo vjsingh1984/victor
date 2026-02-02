@@ -79,28 +79,28 @@ async def test_planned_tools_prepended_to_selection():
     orch = _orch()
     try:
         # Use real tools that exist in the registry
-        # "read", "ls", "grep" are core tools that should exist
+        # "read", "ls", "search" are core tools that should exist
         context = ToolSelectionContext(
             task_description="summarize",
             conversation_stage="initial",
-            planned_tools=["grep", "read", "ls"],  # Use real tool names
+            planned_tools=["search", "read", "ls"],  # Use real tool names
         )
 
         tools = await orch.tool_selector.select_tools("summarize", context)
         names = [t.name for t in tools]
 
         # Planned tools should be included and appear early in selection
-        assert "grep" in names
+        assert "search" in names
         assert "read" in names
         assert "ls" in names
 
         # Verify planned tools come before non-planned tools
-        grep_idx = names.index("grep")
+        search_idx = names.index("search")
         read_idx = names.index("read")
         ls_idx = names.index("ls")
 
         # All planned tools should be in the first 5 positions
-        assert max(grep_idx, read_idx, ls_idx) < 5
+        assert max(search_idx, read_idx, ls_idx) < 5
     finally:
         await orch.shutdown()
 

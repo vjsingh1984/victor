@@ -153,7 +153,7 @@ class TeamCoordinator(ITeamCoordinator):
         self.orchestrator = orchestrator
         # Type ignore: SubAgentOrchestrator expects AgentOrchestrator, but we have IAgentOrchestrator
         # At runtime, this will be AgentOrchestrator which satisfies the protocol
-        self.sub_agents = sub_agent_orchestrator or SubAgentOrchestrator(orchestrator)  # type: ignore[arg-type]
+        self.sub_agents = sub_agent_orchestrator or SubAgentOrchestrator(orchestrator)
         self._active_teams: dict[str, TeamExecution] = {}
         self._on_progress: Optional[Callable[[str, str, float], None]] = None
 
@@ -527,7 +527,7 @@ class TeamCoordinator(ITeamCoordinator):
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return  # type: ignore[unreachable]
+                return
 
             event = RLEvent(
                 type=RLEventType.TEAM_COMPLETED,

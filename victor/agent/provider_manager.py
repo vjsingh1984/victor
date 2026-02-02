@@ -428,7 +428,7 @@ class ProviderManager:
             return self._capability_cache[cache_key]
 
         try:
-            discovery = await self.provider.discover_capabilities(self.model)  # type: ignore[union-attr]
+            discovery = await self.provider.discover_capabilities(self.model)
         except Exception as exc:
             logger.warning(
                 f"Capability discovery failed for {self.provider_name}:{self.model} ({exc}); "
@@ -759,7 +759,7 @@ class ProviderManager:
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return  # type: ignore[unreachable]
+                return
 
             event = RLEvent(
                 type=RLEventType.MODEL_SELECTED,
@@ -823,7 +823,7 @@ class ProviderManager:
         """
         # Register with ProviderSwitcher for automatic notification
         # Type ignore: ProviderSwitcher expects ProviderSwitcherState, but we provide ProviderState
-        self._provider_switcher.on_switch(callback)  # type: ignore[arg-type]
+        self._provider_switcher.on_switch(callback)
 
     # IProviderEventEmitter implementation
     def emit_switch_event(self, event: dict[str, Any]) -> None:

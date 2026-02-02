@@ -147,7 +147,7 @@ class CitationFormatterHandler(BaseHandler):
     def _format_citation(self, ref: dict[str, Any], style: str) -> str:
         """Format a single citation."""
         if not isinstance(ref, dict):
-            return str(ref)  # type: ignore[unreachable]
+            return str(ref)
 
         authors = ref.get("authors", ["Unknown"])
         year = ref.get("year", "n.d.")

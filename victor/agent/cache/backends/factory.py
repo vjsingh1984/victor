@@ -306,7 +306,7 @@ class CacheBackendFactory:
 
         # Check config type
         if not isinstance(config, dict):
-            errors.append(f"Config must be a dict, got {type(config).__name__}")  # type: ignore[unreachable]
+            errors.append(f"Config must be a dict, got {type(config).__name__}")
             return False, errors
 
         # Check backend type

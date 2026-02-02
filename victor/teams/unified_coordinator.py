@@ -331,7 +331,7 @@ class UnifiedTeamCoordinator(ObservabilityMixin, RLMixin):
                 }
 
         # Should never reach here, but satisfy type checker
-        return {  # type: ignore[unreachable]
+        return {
             "success": False,
             "error": "Unexpected execution flow",
             "member_results": {},

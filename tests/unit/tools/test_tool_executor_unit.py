@@ -487,13 +487,12 @@ class TestToolExecutorCacheableTools:
         """Test cacheable tools detection via registry.
 
         Note: Tools are registered by canonical names after alias resolution.
-        The code_search function is registered as 'grep' due to TOOL_ALIASES.
         """
         self._ensure_tools_loaded()
         # Registry-based detection for idempotent tools
         assert ToolExecutor.is_cacheable_tool("read")  # read_file
         assert ToolExecutor.is_cacheable_tool("ls")  # list_directory
-        assert ToolExecutor.is_cacheable_tool("grep")  # code_search -> grep
+        assert ToolExecutor.is_cacheable_tool("search")  # code_search
 
     def test_cache_invalidating_tools(self):
         """Test cache invalidating tools detection via registry.

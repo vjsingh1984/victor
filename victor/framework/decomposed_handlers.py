@@ -181,7 +181,7 @@ class WorkflowStepHandler(BaseStepHandler):
         workflow_provider = None
 
         if isinstance(vertical, WorkflowProviderProtocol):
-            workflow_provider = vertical  # type: ignore[unreachable]
+            workflow_provider = vertical
         elif hasattr(vertical, "get_workflow_provider"):
             workflow_provider = vertical.get_workflow_provider()
         elif isinstance(vertical, type) and hasattr(vertical, "get_workflows"):

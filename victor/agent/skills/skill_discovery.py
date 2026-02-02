@@ -669,7 +669,7 @@ class SkillDiscoveryEngine:
                 # Handle both ToolSelectionResult and List[ToolDefinition] return types
                 if isinstance(result, list):
                     # result is List[ToolDefinition]
-                    from victor.tools.tool import ToolDefinition  # type: ignore[import-not-found]
+                    from victor.tools.tool import ToolDefinition
 
                     tool_map = {t.name: t for t in available_tools}
                     matched_tools = [
@@ -681,7 +681,7 @@ class SkillDiscoveryEngine:
                     # result is ToolSelectionResult
                     tool_map = {t.name: t for t in available_tools}
                     matched_tools = [
-                        tool_map[name] for name in result.selected_tool_names if name in tool_map  # type: ignore[attr-defined]
+                        tool_map[name] for name in result.selected_tool_names if name in tool_map
                     ]
 
                 logger.info(f"Matched {len(matched_tools)} tools using selector")

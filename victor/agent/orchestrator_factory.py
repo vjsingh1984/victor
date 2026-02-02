@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
     from victor.agent.response_sanitizer import ResponseSanitizer
     from victor.agent.prompt_builder import SystemPromptBuilder
-    from victor.agent.context_project import ProjectContext  # type: ignore[import-not-found]
+    from victor.agent.context_project import ProjectContext
     from victor.framework.task import TaskComplexityService as ComplexityClassifier
     from victor.agent.action_authorizer import ActionAuthorizer
     from victor.agent.search_router import SearchRouter
@@ -488,7 +488,7 @@ class OrchestratorFactory(ModeAwareMixin):
             from victor.core.container import ServiceContainer
 
             new_container: ServiceContainer = ensure_bootstrapped(self.settings)
-            self._container = new_container  # type: ignore[assignment]
+            self._container = new_container
 
             # Verify orchestrator services are registered
             # If ResponseSanitizer is not registered, bootstrapping was incomplete
@@ -497,7 +497,7 @@ class OrchestratorFactory(ModeAwareMixin):
                 from victor.core.bootstrap import bootstrap_container
 
                 # Create a new fully-bootstrapped container
-                self._container = bootstrap_container(self.settings)  # type: ignore[assignment]
+                self._container = bootstrap_container(self.settings)
 
         return self._container
 
@@ -2347,7 +2347,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.info(f"Provider pool stats: {stats}")
 
         # Return pool as BaseProvider (ProviderPool is a BaseProvider subclass)
-        return pool, True  # type: ignore[return-value]
+        return pool, True
 
     async def _create_provider_for_url(
         self,
@@ -3086,14 +3086,14 @@ class OrchestratorFactory(ModeAwareMixin):
             from victor.framework.agent import Agent
 
             # Create foreground Agent
-            agent = Agent(orchestrator)  # type: ignore[arg-type]
+            agent = Agent(orchestrator)
 
             # Apply tools if specified
             tools = kwargs.get("tools")
             if tools:
                 from victor.framework.tool_config import configure_tools
 
-                configure_tools(orchestrator, tools)  # type: ignore[arg-type]
+                configure_tools(orchestrator, tools)
 
             # Apply vertical configuration if specified
             vertical = kwargs.get("vertical")

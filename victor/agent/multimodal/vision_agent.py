@@ -1584,6 +1584,3 @@ class VisionAgent:
 # Legacy Aliases for Backwards Compatibility
 # =============================================================================
 
-# Aliases for tests that use old naming
-ImageAnalysis = VisionAnalysisResult
-ImageComparison = ComparisonResult

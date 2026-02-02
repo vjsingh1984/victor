@@ -668,7 +668,7 @@ class WorkflowEngine:
                 async for event in compiled.stream(initial_state or {}, **kwargs):
                     # Convert CompiledGraph events to WorkflowEvent format
                     if isinstance(event, dict):
-                        yield WorkflowEvent(  # type: ignore[unreachable]
+                        yield WorkflowEvent(
                             event_type=event.get("event_type", "state_update"),
                             node_id=event.get("node_id", ""),
                             timestamp=time.time(),
@@ -696,7 +696,7 @@ class WorkflowEngine:
         else:
             # Fall back to coordinator for backward compatibility
             coordinator = self._get_yaml_coordinator()
-            async for event in coordinator.stream(  # type: ignore[assignment]
+            async for event in coordinator.stream(
                 yaml_path=yaml_path,
                 initial_state=initial_state,
                 workflow_name=workflow_name,
@@ -707,7 +707,7 @@ class WorkflowEngine:
                 # Event should be WorkflowEvent from coordinator.stream()
                 # Type: Union[WorkflowEvent, tuple[str, Dict[str, Any]]] for backward compat
                 if isinstance(event, WorkflowEvent):
-                    yield event  # type: ignore[unreachable]
+                    yield event
                 else:
                     # Handle tuple format for backward compatibility
                     event_type, data = event

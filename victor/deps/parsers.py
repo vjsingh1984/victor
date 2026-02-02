@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     try:
-        import tomllib  # type: ignore[import-not-found]
+        import tomllib
     except ImportError:
         pass
 

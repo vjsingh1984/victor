@@ -92,7 +92,7 @@ class DirectProtocolAdapter(VictorProtocol):
             usage=response.usage if hasattr(response, "usage") else {},
         )
 
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:  # type: ignore[override,misc]
+    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
         """Stream a chat response."""
         message = messages[-1].content if messages else ""
 
@@ -109,7 +109,7 @@ class DirectProtocolAdapter(VictorProtocol):
 
     async def semantic_search(self, query: str, max_results: int = 10) -> list[CodeSearchResult]:
         """Search code by semantic meaning."""
-        from victor.tools.semantic_search import SemanticCodeSearchTool  # type: ignore[import-not-found]
+        from victor.tools.semantic_search import SemanticCodeSearchTool
 
         tool = SemanticCodeSearchTool()
         result = await tool.execute(query=query, max_results=max_results)
@@ -139,7 +139,7 @@ class DirectProtocolAdapter(VictorProtocol):
         file_pattern: str | None = None,
     ) -> list[CodeSearchResult]:
         """Search code by pattern."""
-        from victor.tools.code_search import CodeSearchTool  # type: ignore[import-not-found]
+        from victor.tools.code_search import CodeSearchTool
 
         tool = CodeSearchTool()
         result = await tool.execute(
@@ -341,7 +341,7 @@ class HTTPProtocolAdapter(VictorProtocol):
         data = response.json()
         return ChatResponse.from_dict(data)
 
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:  # type: ignore[override,misc]
+    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
         """Stream a chat response."""
         async with self._client.stream(
             "POST",

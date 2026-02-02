@@ -945,7 +945,7 @@ class AgentOrchestrator(
                     project_root=intelligent_project_root,
                 )
                 self._intelligent_integration = OrchestratorIntegration(
-                    orchestrator=self,  # type: ignore[arg-type]
+                    orchestrator=self,
                     pipeline=pipeline,
                     config=self._intelligent_integration_config,
                 )
@@ -1682,7 +1682,7 @@ class AgentOrchestrator(
 
         except Exception as e:
             logger.warning(f"Failed to initialize ConversationEmbeddingStore: {e}")
-            self._conversation_embedding_store = None  # type: ignore[assignment]
+            self._conversation_embedding_store = None
 
     def _finalize_stream_metrics(
         self, usage_data: Optional[dict[str, int]] = None
@@ -2568,7 +2568,7 @@ class AgentOrchestrator(
             unified_tracker_config=self.unified_tracker.config if self.unified_tracker else {},
             task_completion_signals=None,  # Legacy caller doesn't use this
             # Task Completion Detection Enhancement (Phase 2 - Feature Flag Protected)
-            task_completion_detector=self._task_completion_detector,  # type: ignore[call-arg]
+            task_completion_detector=self._task_completion_detector,
             # Progress Metrics for intelligent continuation decisions
             progress_metrics=self._progress_metrics,
             # Complexity-based continuation thresholds
@@ -2939,7 +2939,7 @@ class AgentOrchestrator(
         for tool_call in tool_calls:
             # Validate tool call structure
             if not isinstance(tool_call, dict):
-                self.console.print(  # type: ignore[unreachable]
+                self.console.print(
                     f"[yellow]{self._presentation.icon('warning', with_color=False)} Skipping invalid tool call (not a dict): {tool_call}[/]"
                 )
                 continue
@@ -3440,7 +3440,7 @@ class AgentOrchestrator(
             }
 
         try:
-            stats = self.memory_manager.get_session_stats(self._memory_session_id)  # type: ignore[call-arg]
+            stats = self.memory_manager.get_session_stats(self._memory_session_id)
             # Handle empty stats (session not found)
             if not stats or not any(k in stats for k in ("message_count", "total_tokens", "found")):
                 return {

@@ -187,7 +187,7 @@ class OrchestratorIntegration:
             ),
         )
 
-        return cls(orchestrator, pipeline, config)  # type: ignore[arg-type]
+        return cls(orchestrator, pipeline, config)
 
     async def prepare_request(
         self,
@@ -770,7 +770,7 @@ class OrchestratorIntegration:
 
             hooks = get_rl_hooks()
             if hooks is None:
-                return  # type: ignore[unreachable]
+                return
 
             if event_type == "prompt":
                 event = RLEvent(

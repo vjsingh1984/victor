@@ -1314,7 +1314,7 @@ class ToolPipeline:
             # Skip invalid structures - let execute_tool_calls handle them
             if not isinstance(tc, dict):
                 # Preserve invalid calls as-is for proper error handling
-                unique_calls.append(tc)  # type: ignore[unreachable]
+                unique_calls.append(tc)
                 continue
 
             tool_name = tc.get("name", "")
@@ -1644,7 +1644,7 @@ class ToolPipeline:
         for exec_result in parallel_result.results:
             call_result = ToolCallResult(
                 tool_name=exec_result.tool_name,
-                arguments={},  # Arguments already logged  # type: ignore[unreachable]
+                arguments={},  # Arguments already logged
                 success=exec_result.success,
                 result=exec_result.result,
                 error=exec_result.error,
@@ -1697,7 +1697,7 @@ class ToolPipeline:
         """
         # Validate structure
         if not isinstance(tool_call, dict):
-            return ToolCallResult(  # type: ignore[unreachable]
+            return ToolCallResult(
                 tool_name="unknown",
                 arguments={},
                 success=False,
