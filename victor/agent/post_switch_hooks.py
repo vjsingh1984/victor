@@ -48,9 +48,9 @@ from collections.abc import Callable
 from victor.agent.provider_switch_coordinator import SwitchContext
 
 if TYPE_CHECKING:
-    from victor.agent.unified_tracker import UnifiedTracker
+    from victor.agent.unified_tracker import UnifiedTracker  # type: ignore[import-not-found]
     from victor.agent.tool_calling.base import ToolCallingCapabilities
-    from victor.agent.prompts.system_prompt_builder import SystemPromptBuilder
+    from victor.agent.prompts.system_prompt_builder import SystemPromptBuilder  # type: ignore[import-not-found]
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -137,7 +137,7 @@ class PromptBuilderHook:
     def execute(self, context: SwitchContext) -> None:
         """Reinitialize prompt builder with new capabilities."""
         try:
-            from victor.agent.prompts.system_prompt_builder import SystemPromptBuilder
+            from victor.agent.prompts.system_prompt_builder import SystemPromptBuilder  # type: ignore[import-not-found]
 
             prompt_contributors = self._get_prompt_contributors()
 

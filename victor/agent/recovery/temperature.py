@@ -276,11 +276,11 @@ class ProgressiveTemperatureAdjuster:
         state_key = f"{context.to_state_key()}:temp={new_temperature:.1f}"
 
         # Update Q-value (using ADJUST_TEMPERATURE action)
-        from victor.agent.recovery.protocols import RecoveryAction
+        from victor.agent.recovery.protocols import StrategyRecoveryAction
 
         self._q_store.update_q_value(
             state_key,
-            RecoveryAction.ADJUST_TEMPERATURE.name,
+            StrategyRecoveryAction.ADJUST_TEMPERATURE.name,
             reward,
         )
 

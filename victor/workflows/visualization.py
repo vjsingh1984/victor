@@ -99,7 +99,7 @@ def _detect_best_backend() -> "RenderBackend":
     if _check_command("d2"):
         return RenderBackend.D2
     try:
-        import matplotlib
+        import matplotlib  # type: ignore[import-not-found]
         import networkx  # type: ignore[import-untyped]
 
         return RenderBackend.MATPLOTLIB
@@ -907,10 +907,10 @@ class WorkflowVisualizer:
         """Render SVG using matplotlib and networkx."""
         import io
 
-        import matplotlib
+        import matplotlib  # type: ignore[import-not-found]
 
         matplotlib.use("Agg")  # Non-interactive backend
-        import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt  # type: ignore[import-not-found]
         import networkx as nx
 
         # Build networkx graph
@@ -1171,7 +1171,7 @@ def get_available_backends() -> dict[str, bool]:
 def _has_matplotlib() -> bool:
     """Check if matplotlib is available."""
     try:
-        import matplotlib
+        import matplotlib  # type: ignore[import-not-found]
         import networkx
 
         return True

@@ -224,7 +224,6 @@ from victor.protocols.lifecycle import (
 # UI Agent Protocol (for UI-orchestrator decoupling)
 from victor.protocols.ui_agent import (
     UIAgentProtocol,
-    UIAgent,
 )
 
 # Workflow Agent Protocol (for workflow-orchestrator decoupling)
@@ -468,7 +467,6 @@ __all__ = [
     "RecoveryResult",
     # UI Agent Protocol
     "UIAgentProtocol",
-    "UIAgent",
     # Workflow Agent Protocol
     "WorkflowAgentProtocol",
     # Agent Conversation Protocols

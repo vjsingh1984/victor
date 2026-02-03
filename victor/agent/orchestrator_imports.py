@@ -183,7 +183,7 @@ __all__ = [
     # Recovery
     "RecoveryOutcome",
     "FailureType",
-    "RecoveryAction",
+    "StrategyRecoveryAction",
     "VerticalContext",
     "create_vertical_context",
     "VerticalIntegrationAdapter",
@@ -388,7 +388,7 @@ from victor.agent.memory_manager import (
 # RECOVERY - Enums and Functions
 # =============================================================================
 
-from victor.agent.recovery import RecoveryOutcome, FailureType, RecoveryAction
+from victor.agent.recovery import RecoveryOutcome, FailureType, StrategyRecoveryAction
 from victor.agent.vertical_context import VerticalContext, create_vertical_context
 from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
 from victor.agent.orchestrator_recovery import (

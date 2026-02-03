@@ -3698,7 +3698,7 @@ class AgentOrchestrator(
 
     # --- MessagesProtocol ---
 
-    def get_messages(self) -> list:
+    def get_messages(self) -> list[dict[str, Any]]:
         """Get all messages from conversation history (protocol method).
 
         Returns:

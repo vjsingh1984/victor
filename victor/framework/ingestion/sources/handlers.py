@@ -241,7 +241,7 @@ class PDFHandler:
             SourceContent with extracted text
         """
         try:
-            from pypdf import PdfReader
+            from pypdf import PdfReader  # type: ignore[import-not-found]
         except ImportError:
             raise ImportError("pypdf is required for PDF extraction: pip install pypdf")
 

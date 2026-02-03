@@ -26,7 +26,7 @@ import pytest
 
 from victor.agent.recovery.protocols import (
     FailureType,
-    RecoveryAction,
+    StrategyRecoveryAction as RecoveryAction,  # TEMP: for migration
     RecoveryContext,
     RecoveryResult,
 )

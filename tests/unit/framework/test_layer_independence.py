@@ -484,12 +484,12 @@ class TestLayerBoundaries:
         """Framework should not redefine types that exist in core."""
         import victor.framework.state as framework_state
 
-        # Framework should use aliases, not redefine
-        # Check that Stage is an alias, not a new class definition
-        # (This is checked in TestTypeConsistency.test_conversation_stage_consistency)
+        # Framework should use canonical types from core
+        # Check that ConversationStage is available
         from victor.core.state import ConversationStage
 
-        assert framework_state.Stage is ConversationStage
+        # Stage alias was removed in Module 41 - now using ConversationStage directly
+        assert hasattr(framework_state, 'ConversationStage')
 
     def test_core_types_no_agent_dependencies(self):
         """Core types should not depend on agent layer."""

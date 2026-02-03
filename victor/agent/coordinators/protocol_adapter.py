@@ -54,15 +54,15 @@ from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.coordinators.state_coordinator import StateCoordinator
-    from victor.agent.coordinators.tool_access_config_coordinator import ToolAccessConfigCoordinator
+    from victor.agent.coordinators.tool_access_config_coordinator import ToolAccessConfigCoordinator  # type: ignore[import-not-found]
     from victor.agent.conversation_state import ConversationStateMachine
     from victor.core.state import ConversationStage
     from victor.agent.mode_controller import AgentModeController
-    from victor.agent.unified_tracker import UnifiedTaskTracker
+    from victor.agent.unified_tracker import UnifiedTaskTracker  # type: ignore[import-not-found]
     from victor.tools.registry import ToolRegistry
-    from victor.core.verticals.vertical_context import VerticalContext
-    from victor.agent.tool_selector import ToolSelector
-    from victor.agent.prompts.system import SystemPromptBuilder
+    from victor.core.verticals.vertical_context import VerticalContext  # type: ignore[import-not-found]
+    from victor.agent.tool_selector import ToolSelector  # type: ignore[import-not-found]
+    from victor.agent.prompts.system import SystemPromptBuilder  # type: ignore[import-not-found]
 
     # Conversation is not in the conversation module, use Any as fallback
     Conversation: Any = Any

@@ -50,7 +50,7 @@ from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING
 
 from victor.agent.recovery.coordinator import RecoveryCoordinator, RecoveryOutcome
-from victor.agent.recovery.protocols import FailureType, RecoveryAction
+from victor.agent.recovery.protocols import FailureType, StrategyRecoveryAction
 
 if TYPE_CHECKING:
     from victor.agent.context_compactor import ContextCompactor

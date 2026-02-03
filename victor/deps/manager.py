@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Dependency management manager.
+"""PackageDependency management manager.
 
 Provides high-level API for dependency analysis and management.
 """
@@ -38,8 +38,6 @@ from victor.deps.protocol import (
     Version,
 )
 
-# Legacy alias for backward compatibility
-Dependency = PackageDependency
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +171,7 @@ class DepsManager:
             directory: Project directory
 
         Returns:
-            Dependency tree as nested dict
+            PackageDependency tree as nested dict
         """
         analysis = self.analyze(directory)
         if not analysis.graph:
@@ -232,7 +230,7 @@ class DepsManager:
         """Format analysis as report.
 
         Args:
-            analysis: Dependency analysis
+            analysis: PackageDependency analysis
             format: Output format (text, json, markdown)
 
         Returns:
@@ -299,7 +297,7 @@ class DepsManager:
     def _format_markdown(self, analysis: DependencyAnalysis) -> str:
         """Format as Markdown."""
         lines = []
-        lines.append("# Dependency Analysis Report")
+        lines.append("# PackageDependency Analysis Report")
         lines.append("")
         lines.append("## Summary")
         lines.append("")
@@ -406,7 +404,7 @@ class DepsManager:
 
         return files
 
-    def _dedupe_dependencies(self, deps: list[Dependency]) -> list[Dependency]:
+    def _dedupe_dependencies(self, deps: list[PackageDependency]) -> list[PackageDependency]:
         """Remove duplicate dependencies, keeping most specific version."""
         seen = {}
         for dep in deps:
@@ -414,7 +412,7 @@ class DepsManager:
                 seen[dep.name] = dep
         return list(seen.values())
 
-    def _get_installed_pip_versions(self, deps: list[Dependency]) -> None:
+    def _get_installed_pip_versions(self, deps: list[PackageDependency]) -> None:
         """Get installed versions for pip packages."""
         try:
             result = subprocess.run(
@@ -434,7 +432,7 @@ class DepsManager:
 
     def _get_installed_npm_versions(
         self,
-        deps: list[Dependency],
+        deps: list[PackageDependency],
         directory: Path,
     ) -> None:
         """Get installed versions for npm packages."""
@@ -457,7 +455,7 @@ class DepsManager:
 
     def _check_updates(
         self,
-        deps: list[Dependency],
+        deps: list[PackageDependency],
         pkg_manager: PackageManager,
     ) -> list[DependencyUpdate]:
         """Check for available updates."""
@@ -563,13 +561,13 @@ class DepsManager:
 
     def _detect_conflicts(
         self,
-        deps: list[Dependency],
+        deps: list[PackageDependency],
     ) -> list[DependencyConflict]:
         """Detect version conflicts."""
         conflicts = []
 
         # Group by package name
-        by_name: dict[str, list[Dependency]] = {}
+        by_name: dict[str, list[PackageDependency]] = {}
         for dep in deps:
             if dep.name not in by_name:
                 by_name[dep.name] = []
@@ -590,7 +588,7 @@ class DepsManager:
 
         return conflicts
 
-    def _build_graph(self, deps: list[Dependency]) -> DependencyGraph:
+    def _build_graph(self, deps: list[PackageDependency]) -> DependencyGraph:
         """Build dependency graph."""
         graph = DependencyGraph(
             root_packages=[d for d in deps if d.is_direct],

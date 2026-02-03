@@ -171,7 +171,7 @@ class VerticalPackageMetadata(BaseModel):
             ValidationError: If the TOML is invalid
         """
         try:
-            import tomllib
+            import tomllib  # type: ignore[import-not-found]
 
             toml_data = tomllib.loads(path.read_text())
         except ImportError:
@@ -197,7 +197,7 @@ class VerticalPackageMetadata(BaseModel):
             path: Path to write the TOML file
         """
         try:
-            import tomllib
+            import tomllib  # type: ignore[import-not-found]
         except ImportError:
             pass
 

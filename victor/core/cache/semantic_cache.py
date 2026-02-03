@@ -196,7 +196,7 @@ class SemanticCache:
             with self._embedding_lock:
                 if self._embedding_service is None:
                     try:
-                        from victor.agents.embeddings import EmbeddingService
+                        from victor.agents.embeddings import EmbeddingService  # type: ignore[import-not-found]
 
                         self._embedding_service = EmbeddingService(model_name=self.embedding_model)
                         logger.info(

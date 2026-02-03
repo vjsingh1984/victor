@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     try:
-        import tomllib
+        import tomllib  # type: ignore[import-not-found]
     except ImportError:
         pass
 
@@ -166,7 +166,7 @@ class PyprojectParser(BasePackageDependencyParser):
     def parse(self, path: Path) -> tuple[list[PackageDependency], list[PackageDependency]]:
         """Parse pyproject.toml file."""
         try:
-            import tomllib
+            import tomllib  # type: ignore[import-not-found]
         except ImportError:
             try:
                 import tomli as tomllib
@@ -372,7 +372,7 @@ class CargoTomlParser(BasePackageDependencyParser):
     def parse(self, path: Path) -> tuple[list[PackageDependency], list[PackageDependency]]:
         """Parse Cargo.toml file."""
         try:
-            import tomllib
+            import tomllib  # type: ignore[import-not-found]
         except ImportError:
             try:
                 import tomli as tomllib

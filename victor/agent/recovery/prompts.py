@@ -303,10 +303,10 @@ class ModelSpecificPromptRegistry:
             # Q-learning boost if available
             if self._q_store:
                 state_key = f"{context.to_state_key()}:template={template.id}"
-                from victor.agent.recovery.protocols import RecoveryAction
+                from victor.agent.recovery.protocols import StrategyRecoveryAction
 
                 q_value = self._q_store.get_q_value(
-                    state_key, RecoveryAction.RETRY_WITH_TEMPLATE.name
+                    state_key, StrategyRecoveryAction.RETRY_WITH_TEMPLATE.name
                 )
                 score += q_value * 0.2
 

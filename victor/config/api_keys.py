@@ -264,7 +264,7 @@ def _get_key_from_keyring(provider: str) -> Optional[str]:
         return None
 
     try:
-        import keyring
+        import keyring  # type: ignore[import-not-found]
 
         key = keyring.get_password(KEYRING_SERVICE, f"{provider}_api_key")
         return key if key is not None else None
@@ -288,7 +288,7 @@ def _set_key_in_keyring(provider: str, key: str) -> bool:
         return False
 
     try:
-        import keyring
+        import keyring  # type: ignore[import-not-found]
 
         keyring.set_password(KEYRING_SERVICE, f"{provider}_api_key", key)
         logger.info(f"API key for {provider} stored in system keyring")
@@ -311,7 +311,7 @@ def _delete_key_from_keyring(provider: str) -> bool:
         return False
 
     try:
-        import keyring
+        import keyring  # type: ignore[import-not-found]
 
         keyring.delete_password(KEYRING_SERVICE, f"{provider}_api_key")
         return True

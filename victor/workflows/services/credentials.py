@@ -78,7 +78,7 @@ logger = logging.getLogger(__name__)
 
 # Optional imports
 try:
-    import keyring
+    import keyring  # type: ignore[import-not-found]
 
     KEYRING_AVAILABLE = True
 except ImportError:
@@ -96,7 +96,7 @@ except ImportError:
 
 # TOTP for authenticator apps
 try:
-    import pyotp
+    import pyotp  # type: ignore[import-not-found]
 
     TOTP_AVAILABLE = True
 except ImportError:
@@ -105,7 +105,7 @@ except ImportError:
 
 # Touch ID / biometric auth on macOS
 try:
-    import LocalAuthentication
+    import LocalAuthentication  # type: ignore[import-not-found]
 
     BIOMETRIC_AVAILABLE = platform.system() == "Darwin"
 except ImportError:
@@ -1292,7 +1292,7 @@ class SystemAuthenticator:
             return False
 
         try:
-            import pam
+            import pam  # type: ignore[import-not-found]
 
             p = pam.pam()
             auth_result: bool = p.authenticate(username, password, service=service)
@@ -1300,7 +1300,7 @@ class SystemAuthenticator:
         except ImportError:
             # Try python-pam
             try:
-                import PAM
+                import PAM  # type: ignore[import-not-found]
 
                 def pam_conv(auth: Any, query_list: Any, userData: Any) -> Any:
                     resp = []
@@ -1447,7 +1447,7 @@ class SystemAuthenticator:
         """
         try:
             # Try GSSAPI (Unix/macOS)
-            import gssapi
+            import gssapi  # type: ignore[import-not-found]
 
             server_name = gssapi.Name(service, gssapi.NameType.hostbased_service)
 
@@ -1464,7 +1464,7 @@ class SystemAuthenticator:
 
         # Try pyspnego (cross-platform)
         try:
-            import spnego
+            import spnego  # type: ignore[import-not-found]
 
             ctx = spnego.client(service)
             token = ctx.step()
@@ -1534,7 +1534,7 @@ class SystemAuthenticator:
     ) -> bool:
         """Verify NTLM credentials using pyspnego (cross-platform)."""
         try:
-            import spnego
+            import spnego  # type: ignore[import-not-found]
 
             # Create NTLM context for validation
             ctx = spnego.client(
@@ -1564,7 +1564,7 @@ class SystemAuthenticator:
         """
         if platform.system() == "Windows":
             try:
-                import sspi
+                import sspi  # type: ignore[import-not-found]
                 import sspicon
 
                 sspi.QuerySecurityPackageInfo("NTLM")
@@ -1593,7 +1593,7 @@ class SystemAuthenticator:
 
         # Try pyspnego
         try:
-            import spnego
+            import spnego  # type: ignore[import-not-found]
 
             ctx = spnego.client(service="host", hostname="localhost", protocol="ntlm")
             token = ctx.step()

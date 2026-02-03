@@ -217,7 +217,7 @@ class ToolResultCache:
         """Lazily initialize FAISS index."""
         if self._faiss_index is None:
             try:
-                import faiss
+                import faiss  # type: ignore[import-not-found]
 
                 # IndexFlatIP for cosine similarity (with normalized vectors)
                 self._faiss_index = faiss.IndexFlatIP(dim)
@@ -295,7 +295,7 @@ class ToolResultCache:
             return
 
         try:
-            import faiss
+            import faiss  # type: ignore[import-not-found]
 
             self._faiss_index = faiss.IndexFlatIP(self._embedding_dim)
             self._embeddings = []

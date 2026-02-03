@@ -404,7 +404,7 @@ class AudioAgent:
             True if whisper package is installed
         """
         try:
-            import whisper
+            import whisper  # type: ignore[import-not-found]
 
             return whisper is not None
         except ImportError:
@@ -612,7 +612,7 @@ class AudioAgent:
             RuntimeError: If transcription fails
         """
         try:
-            import whisper
+            import whisper  # type: ignore[import-not-found]
 
             logger.info(f"Loading local Whisper model: {self.local_whisper_model}")
 
@@ -696,7 +696,7 @@ class AudioAgent:
             bitrate = None
 
             try:
-                from mutagen import File as MutagenFile
+                from mutagen import File as MutagenFile  # type: ignore[import-not-found]
 
                 audio_file = MutagenFile(path)
                 if audio_file is not None:
@@ -846,8 +846,8 @@ class AudioAgent:
             RuntimeError: If diarization fails
         """
         try:
-            from pyannote.audio import Pipeline
-            from pyannote.core import Annotation, Segment
+            from pyannote.audio import Pipeline  # type: ignore[import-not-found]
+            from pyannote.core import Annotation, Segment  # type: ignore[import-not-found]
 
             logger.info("Loading pyannote diarization pipeline")
 
@@ -946,7 +946,7 @@ class AudioAgent:
         # Fallback: Use local Whisper
         if self._local_whisper_available:
             try:
-                import whisper
+                import whisper  # type: ignore[import-not-found]
 
                 model = whisper.load_model(self.local_whisper_model)
                 audio = whisper.load_audio(str(audio_path))

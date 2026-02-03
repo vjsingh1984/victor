@@ -185,7 +185,7 @@ class AgentNodeExecutor:
         Raises:
             ValueError: If role is not recognized
         """
-        from victor.agent.subagents.roles import SubAgentRole
+        from victor.agent.subagents.roles import SubAgentRole  # type: ignore[import-not-found]
 
         role_map: dict[str, SubAgentRole] = {
             "researcher": SubAgentRole.RESEARCHER,

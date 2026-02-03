@@ -32,7 +32,7 @@ from typing import Any, Optional
 from victor.agent.recovery.protocols import (
     FailureType,
     QLearningStore,
-    RecoveryAction,
+    StrategyRecoveryAction,
     RecoveryContext,
     RecoveryResult,
 )
@@ -125,7 +125,7 @@ class BaseRecoveryStrategy:
 
         return min(1.0, max(0.0, priority))
 
-    def _matches_action(self, action: RecoveryAction) -> bool:
+    def _matches_action(self, action: StrategyRecoveryAction) -> bool:
         """Check if an action matches this strategy's typical actions.
 
         Override in subclasses.
@@ -205,7 +205,7 @@ class EmptyResponseRecovery(BaseRecoveryStrategy):
     def handles_failure_types(self) -> list[FailureType]:
         return [FailureType.EMPTY_RESPONSE]
 
-    def _matches_action(self, action: RecoveryAction) -> bool:
+    def _matches_action(self, action: StrategyRecoveryAction) -> bool:
         return action in (RecoveryAction.PROMPT_TOOL_CALL, RecoveryAction.ADJUST_TEMPERATURE)
 
     async def recover(self, context: RecoveryContext) -> RecoveryResult:
@@ -296,7 +296,7 @@ class StuckLoopRecovery(BaseRecoveryStrategy):
     def handles_failure_types(self) -> list[FailureType]:
         return [FailureType.STUCK_LOOP, FailureType.REPEATED_RESPONSE]
 
-    def _matches_action(self, action: RecoveryAction) -> bool:
+    def _matches_action(self, action: StrategyRecoveryAction) -> bool:
         return action in (RecoveryAction.FORCE_SUMMARY, RecoveryAction.PROMPT_TOOL_CALL)
 
     async def recover(self, context: RecoveryContext) -> RecoveryResult:
@@ -358,7 +358,7 @@ class HallucinatedToolRecovery(BaseRecoveryStrategy):
     def handles_failure_types(self) -> list[FailureType]:
         return [FailureType.HALLUCINATED_TOOL]
 
-    def _matches_action(self, action: RecoveryAction) -> bool:
+    def _matches_action(self, action: StrategyRecoveryAction) -> bool:
         return action == RecoveryAction.RETRY_WITH_TEMPLATE
 
     async def recover(self, context: RecoveryContext) -> RecoveryResult:
@@ -424,7 +424,7 @@ class TimeoutRecovery(BaseRecoveryStrategy):
     def handles_failure_types(self) -> list[FailureType]:
         return [FailureType.TIMEOUT_APPROACHING]
 
-    def _matches_action(self, action: RecoveryAction) -> bool:
+    def _matches_action(self, action: StrategyRecoveryAction) -> bool:
         return action == RecoveryAction.FORCE_SUMMARY
 
     def can_handle(self, context: RecoveryContext) -> bool:

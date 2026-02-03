@@ -492,7 +492,8 @@ class TestToolExecutorCacheableTools:
         # Registry-based detection for idempotent tools
         assert ToolExecutor.is_cacheable_tool("read")  # read_file
         assert ToolExecutor.is_cacheable_tool("ls")  # list_directory
-        assert ToolExecutor.is_cacheable_tool("search")  # code_search
+        assert ToolExecutor.is_cacheable_tool("find")  # find_files
+        assert ToolExecutor.is_cacheable_tool("overview")  # overview
 
     def test_cache_invalidating_tools(self):
         """Test cache invalidating tools detection via registry.

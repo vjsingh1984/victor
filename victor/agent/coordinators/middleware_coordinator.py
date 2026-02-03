@@ -159,7 +159,7 @@ class MiddlewareCoordinator:
             return None
 
         try:
-            from victor.agent.middleware.base import MiddlewareChain
+            from victor.agent.middleware.base import MiddlewareChain  # type: ignore[import-not-found]
 
             chain = MiddlewareChain(middleware_list)
             self._middleware_chain = chain

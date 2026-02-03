@@ -267,7 +267,7 @@ class MetadataActionAuthorizer:
         self._cache.clear()
         logger.debug("Cleared authorization cache")
 
-    def get_authorization_summary(self) -> dict:
+    def get_authorization_summary(self) -> dict[str, Any]:
         """Get a summary of authorization rules.
 
         Returns:

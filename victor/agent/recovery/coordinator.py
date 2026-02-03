@@ -59,7 +59,7 @@ from typing import Any, Optional, TYPE_CHECKING, cast
 
 from victor.agent.recovery.protocols import (
     FailureType,
-    RecoveryAction,
+    StrategyRecoveryAction,
     RecoveryContext,
     RecoveryResult,
 )

@@ -570,3 +570,16 @@ def get_provider_support(model_pattern: str, provider: str) -> Optional[dict[str
     """
     loader = ModelCapabilityLoader()
     return loader.get_provider_support(model_pattern, provider)
+
+
+# Re-export tool calling types for convenience
+__all__ = [
+    "ToolCallingCapabilities",
+    "ToolCallFormat",
+    "ModelCapabilityLoader",
+    "normalize_model_name",
+    "get_model_name_variants",
+    "get_model_capabilities",
+    "get_model_training",
+    "get_provider_support",
+]

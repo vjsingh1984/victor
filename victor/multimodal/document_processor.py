@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 # Optional dependencies with graceful fallback
 try:
-    import PyPDF2
+    import PyPDF2  # type: ignore[import-not-found]
 
     PYPDF2_AVAILABLE = True
 except ImportError:
@@ -41,7 +41,7 @@ except ImportError:
     logger.warning("PyPDF2 not available. Install with: pip install PyPDF2")
 
 try:
-    from docx import Document
+    from docx import Document  # type: ignore[import-not-found]
 
     DOCX_AVAILABLE = True
 except ImportError:
@@ -49,7 +49,7 @@ except ImportError:
     logger.warning("python-docx not available. Install with: pip install python-docx")
 
 try:
-    from pptx import Presentation
+    from pptx import Presentation  # type: ignore[import-not-found]
 
     PPTX_AVAILABLE = True
 except ImportError:

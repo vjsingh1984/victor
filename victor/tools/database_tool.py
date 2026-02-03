@@ -171,7 +171,7 @@ async def _connect_mysql(
     # connection_pool is already extracted from wrapper by caller
     pool = connection_pool if connection_pool is not None else {}
     try:
-        import mysql.connector
+        import mysql.connector  # type: ignore[import-not-found]
 
         conn = mysql.connector.connect(
             host=kwargs.get("host", "localhost"),
@@ -210,7 +210,7 @@ async def _connect_sqlserver(
     # connection_pool is already extracted from wrapper by caller
     pool = connection_pool if connection_pool is not None else {}
     try:
-        import pyodbc
+        import pyodbc  # type: ignore[import-not-found]
 
         conn_string = (
             f"DRIVER={{ODBC Driver 17 for SQL Server}};"

@@ -71,8 +71,8 @@ logger = logging.getLogger(__name__)
 
 # Check for debugpy availability
 try:
-    import debugpy
-    from debugpy.common import messaging
+    import debugpy  # type: ignore[import-not-found]
+    from debugpy.common import messaging  # type: ignore[import-not-found]
 
     HAS_DEBUGPY = True
 except ImportError:

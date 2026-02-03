@@ -186,11 +186,6 @@ class UIAgentProtocol(Protocol):
         ...
 
 
-# Type alias for UI module usage
-UIAgent = UIAgentProtocol
-
-
 __all__ = [
     "UIAgentProtocol",
-    "UIAgent",
 ]

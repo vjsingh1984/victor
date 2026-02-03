@@ -40,7 +40,7 @@ from typing import Any, Optional
 
 from victor.agent.recovery.protocols import (
     FailureType,
-    RecoveryAction,
+    StrategyRecoveryAction,
     RecoveryContext,
     RecoveryResult,
 )
@@ -68,7 +68,7 @@ class RecoveryEvent:
     timestamp: datetime
     failure_type: FailureType
     strategy_name: str
-    action: RecoveryAction
+    action: StrategyRecoveryAction
     success: bool
     quality_improvement: float
     provider: str

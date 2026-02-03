@@ -30,7 +30,7 @@ Why Protocol over Duck Typing alone:
 
 Contract-based design ensures:
 - Failure modes are explicitly typed (FailureType enum)
-- Recovery actions are well-defined (RecoveryAction dataclass)
+- Recovery actions are well-defined (StrategyRecoveryAction enum)
 - State transitions are traceable (RecoveryResult)
 """
 
@@ -75,7 +75,7 @@ class StrategyRecoveryAction(Enum):
 
     Renamed from RecoveryAction to be semantically distinct:
     - ErrorRecoveryAction (victor.agent.error_recovery): Tool error recovery (string values)
-    - StrategyRecoveryAction (here): Recovery strategy actions (auto enum values)
+    - StrategyRecoveryAction (here): Recovery strategy actions (auto enum values) - canonical name
     - OrchestratorRecoveryAction (victor.agent.orchestrator_recovery): Orchestrator recovery dataclass
     """
 
@@ -88,10 +88,6 @@ class StrategyRecoveryAction(Enum):
     RETRY_WITH_TEMPLATE = auto()  # Retry with specific prompt template
     WAIT_AND_RETRY = auto()  # Wait for rate limit, then retry
     ABORT = auto()  # Give up and return error
-
-
-# Backward compatibility alias
-RecoveryAction = StrategyRecoveryAction
 
 
 @dataclass(frozen=True)
@@ -192,7 +188,7 @@ class RecoveryResult:
     Contains the recommended action and all metadata needed for execution.
     """
 
-    action: RecoveryAction
+    action: StrategyRecoveryAction
     success: bool = False
     message: Optional[str] = None  # Message to inject into conversation
     new_temperature: Optional[float] = None
@@ -395,7 +391,7 @@ class QLearningStoreProtocol(Protocol):
     def get_q_value(self, state_key: str, action_key: str) -> float:
         """Get Q-value for state-action pair.
 
-        Note: action_key is a string (e.g., RecoveryAction.name) to match
+        Note: action_key is a string (e.g., StrategyRecoveryAction.name) to match
         the existing framework's QLearningStore interface.
         """
         ...

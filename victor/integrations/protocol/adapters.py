@@ -109,7 +109,7 @@ class DirectProtocolAdapter(VictorProtocol):
 
     async def semantic_search(self, query: str, max_results: int = 10) -> list[CodeSearchResult]:
         """Search code by semantic meaning."""
-        from victor.tools.semantic_search import SemanticCodeSearchTool
+        from victor.tools.semantic_search import SemanticCodeSearchTool  # type: ignore[import-not-found]
 
         tool = SemanticCodeSearchTool()
         result = await tool.execute(query=query, max_results=max_results)
@@ -139,7 +139,7 @@ class DirectProtocolAdapter(VictorProtocol):
         file_pattern: str | None = None,
     ) -> list[CodeSearchResult]:
         """Search code by pattern."""
-        from victor.tools.code_search import CodeSearchTool
+        from victor.tools.code_search import CodeSearchTool  # type: ignore[import-not-found]
 
         tool = CodeSearchTool()
         result = await tool.execute(
