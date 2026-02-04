@@ -59,9 +59,10 @@ from typing import Any, Optional, TYPE_CHECKING, cast
 
 from victor.agent.recovery.protocols import (
     FailureType,
-    StrategyRecoveryAction,
+    RecoveryAction,
     RecoveryContext,
     RecoveryResult,
+    StrategyRecoveryAction,
 )
 from victor.agent.recovery.strategies import CompositeRecoveryStrategy
 from victor.agent.recovery.temperature import ProgressiveTemperatureAdjuster

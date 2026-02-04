@@ -32,9 +32,10 @@ from typing import Any, Optional
 from victor.agent.recovery.protocols import (
     FailureType,
     QLearningStore,
-    StrategyRecoveryAction,
+    RecoveryAction,
     RecoveryContext,
     RecoveryResult,
+    StrategyRecoveryAction,
 )
 
 logger = logging.getLogger(__name__)
