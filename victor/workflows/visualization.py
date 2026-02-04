@@ -907,8 +907,7 @@ class WorkflowVisualizer:
         """Render SVG using matplotlib and networkx."""
         import io
 
-        import matplotlib  # type: ignore[import-not-found]
-
+        import matplotlib
         matplotlib.use("Agg")  # Non-interactive backend
         import matplotlib.pyplot as plt  # type: ignore[import-not-found]
         import networkx as nx

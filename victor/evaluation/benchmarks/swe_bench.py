@@ -400,8 +400,7 @@ class MBPPRunner(BaseBenchmarkRunner):
         tasks = []
 
         try:
-            from datasets import load_dataset  # type: ignore[import-not-found]
-
+            from datasets import load_dataset
             logger.info(f"Loading MBPP dataset (split={self._split}) from HuggingFace...")
             dataset = load_dataset(
                 "google-research-datasets/mbpp",

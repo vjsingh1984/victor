@@ -19,7 +19,7 @@ interactions within agent workflows. It supports multiple interaction
 patterns, session management, and YAML workflow integration.
 
 Components:
-    - gates: Predefined interaction patterns (ApprovalGate, TextInput, etc.)
+    - gates: Predefined interaction patterns (ApprovalGate, TextInputGate, etc.)
     - templates: Template system for common HITL prompts
     - session: Session management across workflows
     - protocols: Protocol-based interfaces for extensibility
@@ -27,7 +27,7 @@ Components:
 Example Usage:
     from victor.framework.hitl import (
         ApprovalGate,
-        TextInput,
+        TextInputGate,
         ChoiceInput,
         ConfirmationDialog,
         ReviewGate,
@@ -49,7 +49,7 @@ Example Usage:
         pass
 
     # Create a text input gate
-    input_gate = TextInput(
+    input_gate = TextInputGate(
         title="Enter Deployment Notes",
         prompt="Please provide deployment notes",
         required=True,
@@ -64,7 +64,7 @@ Example Usage:
     gate1 = ApprovalGate(title="Step 1: Review")
     result1 = await session.execute_gate(gate1)
 
-    gate2 = TextInput(title="Step 2: Comments")
+    gate2 = TextInputGate(title="Step 2: Comments")
     result2 = await session.execute_gate(gate2)
 """
 
@@ -87,7 +87,6 @@ from victor.framework.hitl.gates import (
 )
 
 # Convenience aliases
-TextInput = TextInputGate
 ChoiceInput = ChoiceInputGate
 ConfirmationDialog = ConfirmationDialogGate
 
@@ -124,7 +123,6 @@ __all__ = [
     "HITLController",
     # Gates
     "ApprovalGate",
-    "TextInput",
     "TextInputGate",
     "ChoiceInput",
     "ConfirmationDialog",

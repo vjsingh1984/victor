@@ -43,8 +43,7 @@ _NATIVE_AVAILABLE = False
 _PatternMatcher = None
 
 try:
-    import victor_native  # type: ignore[import-not-found]
-
+    import victor_native
     if hasattr(victor_native, "PatternMatcher"):
         _PatternMatcher = victor_native.PatternMatcher
     _NATIVE_AVAILABLE = True

@@ -1534,8 +1534,7 @@ class SystemAuthenticator:
     ) -> bool:
         """Verify NTLM credentials using pyspnego (cross-platform)."""
         try:
-            import spnego  # type: ignore[import-not-found]
-
+            import spnego
             # Create NTLM context for validation
             ctx = spnego.client(
                 username=username,
@@ -1593,8 +1592,7 @@ class SystemAuthenticator:
 
         # Try pyspnego
         try:
-            import spnego  # type: ignore[import-not-found]
-
+            import spnego
             ctx = spnego.client(service="host", hostname="localhost", protocol="ntlm")
             token = ctx.step()
             return token if token is not None else None

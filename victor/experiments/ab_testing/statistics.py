@@ -410,8 +410,7 @@ class StatisticalAnalyzer:
             ImportError: If statsmodels is not available
         """
         try:
-            from statsmodels.stats.power import tt_ind_solve_power  # type: ignore[import-not-found]
-        except ImportError:
+            from statsmodels.stats.power import tt_ind_solve_power        except ImportError:
             raise ImportError(
                 "statsmodels is required for MDE calculation. "
                 "Install it with: pip install statsmodels"

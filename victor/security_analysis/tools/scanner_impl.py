@@ -224,7 +224,7 @@ class PythonDependencyParser(BaseDependencyParser):
         """Parse pyproject.toml for dependencies."""
         deps: list[SecurityDependency] = []
         try:
-            import tomllib  # type: ignore[import-not-found]
+            import tomllib
         except ImportError:
             try:
                 import tomli as tomllib
@@ -383,7 +383,7 @@ class RustDependencyParser(BaseDependencyParser):
         """Parse Cargo.toml."""
         deps: list[SecurityDependency] = []
         try:
-            import tomllib  # type: ignore[import-not-found]
+            import tomllib
         except ImportError:
             try:
                 import tomli as tomllib
@@ -423,7 +423,7 @@ class RustDependencyParser(BaseDependencyParser):
         """Parse Cargo.lock."""
         deps: list[SecurityDependency] = []
         try:
-            import tomllib  # type: ignore[import-not-found]
+            import tomllib
         except ImportError:
             try:
                 import tomli as tomllib

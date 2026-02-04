@@ -295,8 +295,7 @@ class ToolResultCache:
             return
 
         try:
-            import faiss  # type: ignore[import-not-found]
-
+            import faiss
             self._faiss_index = faiss.IndexFlatIP(self._embedding_dim)
             self._embeddings = []
             self._hash_to_idx = {}

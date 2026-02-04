@@ -1015,9 +1015,6 @@ class ReviewGate(BaseHITLGate):
 # Convenience Aliases
 # =============================================================================
 
-# Alias for backward compatibility
-TextInput = TextInputGate
-
 # Export additional convenience names
 ChoiceInput = ChoiceInputGate
 ConfirmationDialog = ConfirmationDialogGate

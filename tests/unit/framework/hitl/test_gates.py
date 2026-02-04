@@ -29,7 +29,6 @@ from victor.framework.hitl.gates import (
     RequiredValidator,
     ReviewResponse,
     TextResponse,
-    TextInput,
     TextInputGate,
 )
 
@@ -566,19 +565,6 @@ class TestReviewGate:
 # Alias Tests
 # =============================================================================
 
+# NOTE: The TextInput alias was removed in Module 49.
+# All code should now use the canonical name TextInputGate.
 
-class TestAliases:
-    """Tests for backward compatibility aliases."""
-
-    def test_text_input_alias(self):
-        """TextInput should be an alias for TextInputGate."""
-        assert TextInput is TextInputGate
-
-    def test_text_input_creates_same_instance(self):
-        """TextInput should create TextInputGate instances."""
-        gate = TextInput(
-            title="Test",
-            prompt="Test",
-        )
-
-        assert isinstance(gate, TextInputGate)

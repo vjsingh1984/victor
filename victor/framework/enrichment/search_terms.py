@@ -46,8 +46,7 @@ _NATIVE_AVAILABLE = False
 _native = None
 
 try:
-    import victor_native as _native_module  # type: ignore[import-not-found]
-
+    import victor_native as _native_module
     _NATIVE_AVAILABLE = True
     logger.debug("Native pattern matching available for search term extraction")
 except ImportError:
