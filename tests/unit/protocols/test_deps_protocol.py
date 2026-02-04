@@ -32,9 +32,6 @@ from victor.deps.protocol import (
     DepsConfig,
 )
 
-# Legacy alias for backward compatibility
-Dependency = PackageDependency
-
 
 class TestDependencyType:
     """Tests for DependencyType enum."""
@@ -271,12 +268,12 @@ class TestVersion:
         assert v != "0.5.0"
 
 
-class TestDependency:
-    """Tests for Dependency dataclass."""
+class TestPackageDependency:
+    """Tests for PackageDependency dataclass."""
 
     def test_default_values(self):
         """Test default values."""
-        dep = Dependency(name="test")
+        dep = PackageDependency(name="test")
         assert dep.name == "test"
         assert dep.version_spec == ""
         assert dep.installed_version is None
@@ -289,32 +286,32 @@ class TestDependency:
 
     def test_is_outdated_true(self):
         """Test is_outdated when package is outdated."""
-        dep = Dependency(name="test", installed_version="0.5.0", latest_version="2.0.0")
+        dep = PackageDependency(name="test", installed_version="0.5.0", latest_version="2.0.0")
         assert dep.is_outdated is True
 
     def test_is_outdated_false(self):
         """Test is_outdated when package is current."""
-        dep = Dependency(name="test", installed_version="2.0.0", latest_version="2.0.0")
+        dep = PackageDependency(name="test", installed_version="2.0.0", latest_version="2.0.0")
         assert dep.is_outdated is False
 
     def test_is_outdated_no_installed(self):
         """Test is_outdated when no installed version."""
-        dep = Dependency(name="test", latest_version="2.0.0")
+        dep = PackageDependency(name="test", latest_version="2.0.0")
         assert dep.is_outdated is False
 
     def test_is_outdated_no_latest(self):
         """Test is_outdated when no latest version."""
-        dep = Dependency(name="test", installed_version="0.5.0")
+        dep = PackageDependency(name="test", installed_version="0.5.0")
         assert dep.is_outdated is False
 
     def test_update_available_when_outdated(self):
         """Test update_available when outdated."""
-        dep = Dependency(name="test", installed_version="0.5.0", latest_version="2.0.0")
+        dep = PackageDependency(name="test", installed_version="0.5.0", latest_version="2.0.0")
         assert dep.update_available == "2.0.0"
 
     def test_update_available_when_current(self):
         """Test update_available when current."""
-        dep = Dependency(name="test", installed_version="2.0.0", latest_version="2.0.0")
+        dep = PackageDependency(name="test", installed_version="2.0.0", latest_version="2.0.0")
         assert dep.update_available is None
 
 

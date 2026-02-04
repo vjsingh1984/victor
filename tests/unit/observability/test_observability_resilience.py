@@ -20,7 +20,7 @@ import pytest
 from victor.observability.resilience import (
     Bulkhead,
     BulkheadFullError,
-    CircuitBreaker,
+    ObservableCircuitBreaker,
     CircuitBreakerError,
     ConstantBackoff,
     ExponentialBackoff,
@@ -194,13 +194,13 @@ class TestRetryDecorator:
 # =============================================================================
 
 
-class TestCircuitBreaker:
+class TestObservableCircuitBreaker:
     """Tests for CircuitBreaker pattern."""
 
     @pytest.mark.asyncio
     async def test_initial_state_closed(self):
         """Test circuit starts in closed state."""
-        breaker = CircuitBreaker(failure_threshold=3)
+        breaker = ObservableCircuitBreaker(failure_threshold=3)
 
         assert breaker.state == CircuitState.CLOSED
         assert breaker.is_closed
@@ -208,7 +208,7 @@ class TestCircuitBreaker:
     @pytest.mark.asyncio
     async def test_opens_after_failures(self):
         """Test circuit opens after failure threshold."""
-        breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=60.0)
+        breaker = ObservableCircuitBreaker(failure_threshold=3, recovery_timeout=60.0)
 
         for i in range(3):
             try:
@@ -223,7 +223,7 @@ class TestCircuitBreaker:
     @pytest.mark.asyncio
     async def test_rejects_when_open(self):
         """Test circuit rejects calls when open."""
-        breaker = CircuitBreaker(failure_threshold=1, recovery_timeout=60.0)
+        breaker = ObservableCircuitBreaker(failure_threshold=1, recovery_timeout=60.0)
 
         # Trip the circuit
         try:
@@ -240,7 +240,7 @@ class TestCircuitBreaker:
     @pytest.mark.asyncio
     async def test_half_open_after_timeout(self):
         """Test circuit enters half-open after recovery timeout."""
-        breaker = CircuitBreaker(
+        breaker = ObservableCircuitBreaker(
             failure_threshold=1,
             success_threshold=1,  # Close after just one success
             recovery_timeout=0.1,
@@ -267,7 +267,7 @@ class TestCircuitBreaker:
     @pytest.mark.asyncio
     async def test_closes_on_success_in_half_open(self):
         """Test circuit closes after successes in half-open."""
-        breaker = CircuitBreaker(
+        breaker = ObservableCircuitBreaker(
             failure_threshold=1,
             success_threshold=2,
             recovery_timeout=0.1,
@@ -293,7 +293,7 @@ class TestCircuitBreaker:
     @pytest.mark.asyncio
     async def test_decorator_usage(self):
         """Test circuit breaker as decorator."""
-        breaker = CircuitBreaker(failure_threshold=3)
+        breaker = ObservableCircuitBreaker(failure_threshold=3)
 
         call_count = 0
 
@@ -310,7 +310,7 @@ class TestCircuitBreaker:
 
     def test_reset(self):
         """Test circuit breaker reset."""
-        breaker = CircuitBreaker(failure_threshold=1)
+        breaker = ObservableCircuitBreaker(failure_threshold=1)
         breaker._failure_count = 10
         breaker._state = CircuitState.OPEN
 
@@ -321,7 +321,7 @@ class TestCircuitBreaker:
 
     def test_get_metrics(self):
         """Test metrics collection."""
-        breaker = CircuitBreaker(failure_threshold=5, name="test_breaker")
+        breaker = ObservableCircuitBreaker(failure_threshold=5, name="test_breaker")
 
         metrics = breaker.get_metrics()
 
@@ -337,7 +337,7 @@ class TestCircuitBreaker:
         def on_change(old, new):
             changes.append((old.value, new.value))
 
-        breaker = CircuitBreaker(
+        breaker = ObservableCircuitBreaker(
             failure_threshold=1,
             recovery_timeout=0.1,
             on_state_change=on_change,
@@ -510,7 +510,7 @@ class TestResiliencePolicy:
     async def test_combined_policies(self):
         """Test combined resilience policies."""
         policy = ResiliencePolicy(
-            circuit_breaker=CircuitBreaker(failure_threshold=5),
+            circuit_breaker=ObservableCircuitBreaker(failure_threshold=5),
             retry_config=ObservabilityRetryConfig(max_retries=2, base_delay=0.01),
             timeout=1.0,
         )
@@ -529,7 +529,7 @@ class TestResiliencePolicy:
         call_count = 0
 
         policy = ResiliencePolicy(
-            circuit_breaker=CircuitBreaker(failure_threshold=10),
+            circuit_breaker=ObservableCircuitBreaker(failure_threshold=10),
             retry_config=ObservabilityRetryConfig(max_retries=2, base_delay=0.01),
         )
 
@@ -549,7 +549,7 @@ class TestResiliencePolicy:
     def test_get_metrics(self):
         """Test combined metrics."""
         policy = ResiliencePolicy(
-            circuit_breaker=CircuitBreaker(failure_threshold=5, name="cb"),
+            circuit_breaker=ObservableCircuitBreaker(failure_threshold=5, name="cb"),
             bulkhead=Bulkhead(max_concurrent=10, name="bh"),
             rate_limiter=RateLimiter(rate=100, name="rl"),
             name="test_policy",

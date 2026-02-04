@@ -19,7 +19,7 @@ import time
 import pytest
 
 from victor.agent.resilience import (
-    CircuitBreaker,
+    MultiCircuitBreaker,
     MultiCircuitBreakerConfig,
     CircuitOpenError,
     RateLimiter,
@@ -31,19 +31,19 @@ from victor.agent.resilience import (
 from victor.providers.circuit_breaker import CircuitState
 
 
-class TestCircuitBreaker:
-    """Tests for CircuitBreaker."""
+class TestMultiCircuitBreaker:
+    """Tests for MultiCircuitBreaker."""
 
     def test_initial_state_is_closed(self):
         """Circuit should start in CLOSED state."""
-        breaker = CircuitBreaker()
+        breaker = MultiCircuitBreaker()
         assert breaker.get_state("test") == CircuitState.CLOSED
         assert breaker.is_allowed("test") is True
 
     def test_circuit_opens_after_threshold_failures(self):
         """Circuit should open after reaching failure threshold."""
         config = MultiCircuitBreakerConfig(failure_threshold=3)
-        breaker = CircuitBreaker(config)
+        breaker = MultiCircuitBreaker(config)
 
         # Record failures
         breaker.record_failure("test")
@@ -59,7 +59,7 @@ class TestCircuitBreaker:
     def test_success_resets_failure_count(self):
         """Success should reset consecutive failure count."""
         config = MultiCircuitBreakerConfig(failure_threshold=3)
-        breaker = CircuitBreaker(config)
+        breaker = MultiCircuitBreaker(config)
 
         breaker.record_failure("test")
         breaker.record_failure("test")
@@ -73,7 +73,7 @@ class TestCircuitBreaker:
     def test_circuit_transitions_to_half_open_after_timeout(self):
         """Circuit should transition to HALF_OPEN after recovery timeout."""
         config = MultiCircuitBreakerConfig(failure_threshold=2, recovery_timeout=0.1)
-        breaker = CircuitBreaker(config)
+        breaker = MultiCircuitBreaker(config)
 
         # Open circuit
         breaker.record_failure("test")
@@ -92,7 +92,7 @@ class TestCircuitBreaker:
         config = MultiCircuitBreakerConfig(
             failure_threshold=2, recovery_timeout=0.1, success_threshold=2
         )
-        breaker = CircuitBreaker(config)
+        breaker = MultiCircuitBreaker(config)
 
         # Open circuit
         breaker.record_failure("test")
@@ -113,7 +113,7 @@ class TestCircuitBreaker:
         """Circuit should reopen on failure during HALF_OPEN."""
         # Use longer timeout for reliable testing under parallel load
         config = MultiCircuitBreakerConfig(failure_threshold=2, recovery_timeout=0.05)
-        breaker = CircuitBreaker(config)
+        breaker = MultiCircuitBreaker(config)
 
         # Open circuit
         breaker.record_failure("test")
@@ -130,7 +130,7 @@ class TestCircuitBreaker:
     def test_multiple_circuits_are_independent(self):
         """Different circuits should be independent."""
         config = MultiCircuitBreakerConfig(failure_threshold=2)
-        breaker = CircuitBreaker(config)
+        breaker = MultiCircuitBreaker(config)
 
         # Open circuit A
         breaker.record_failure("A")
@@ -144,7 +144,7 @@ class TestCircuitBreaker:
     def test_reset_clears_circuit_state(self):
         """Reset should return circuit to initial state."""
         config = MultiCircuitBreakerConfig(failure_threshold=2)
-        breaker = CircuitBreaker(config)
+        breaker = MultiCircuitBreaker(config)
 
         # Open circuit
         breaker.record_failure("test")
@@ -158,7 +158,7 @@ class TestCircuitBreaker:
 
     def test_get_stats_returns_circuit_info(self):
         """get_stats should return circuit statistics."""
-        breaker = CircuitBreaker()
+        breaker = MultiCircuitBreaker()
         breaker.record_success("test")
         breaker.record_failure("test")
 
@@ -175,7 +175,7 @@ class TestCircuitBreaker:
     def test_excluded_exceptions_not_counted(self):
         """Excluded exceptions should not count as failures."""
         config = MultiCircuitBreakerConfig(failure_threshold=2, exclude_exceptions=(ValueError,))
-        breaker = CircuitBreaker(config)
+        breaker = MultiCircuitBreaker(config)
 
         # Record excluded exception
         breaker.record_failure("test", ValueError("test"))
@@ -365,7 +365,7 @@ class TestResilientExecutor:
     @pytest.mark.asyncio
     async def test_execute_uses_fallback_when_circuit_open(self):
         """Should use fallback when circuit is open."""
-        circuit = CircuitBreaker(MultiCircuitBreakerConfig(failure_threshold=1))
+        circuit = MultiCircuitBreaker(MultiCircuitBreakerConfig(failure_threshold=1))
         circuit.record_failure("test")  # Open circuit
 
         executor = ResilientExecutor(circuit_breaker=circuit)
@@ -382,7 +382,7 @@ class TestResilientExecutor:
     @pytest.mark.asyncio
     async def test_execute_raises_circuit_open_error_without_fallback(self):
         """Should raise CircuitOpenError when circuit open and no fallback."""
-        circuit = CircuitBreaker(MultiCircuitBreakerConfig(failure_threshold=1))
+        circuit = MultiCircuitBreaker(MultiCircuitBreakerConfig(failure_threshold=1))
         circuit.record_failure("test")  # Open circuit
 
         executor = ResilientExecutor(circuit_breaker=circuit)

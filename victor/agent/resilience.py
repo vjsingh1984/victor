@@ -290,10 +290,6 @@ class MultiCircuitBreaker:
         return {name: self.get_stats(name) for name in self._circuits}
 
 
-# Backward compatibility alias
-CircuitBreaker = MultiCircuitBreaker
-
-
 @dataclass
 class AgentRetryConfig:
     """Configuration for agent retry with exponential backoff.
@@ -570,7 +566,7 @@ class ResilientExecutor:
 
     def __init__(
         self,
-        circuit_breaker: Optional[CircuitBreaker] = None,
+        circuit_breaker: Optional[MultiCircuitBreaker] = None,
         retry_handler: Optional[RetryHandler] = None,
         rate_limiter: Optional[RateLimiter] = None,
     ):

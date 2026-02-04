@@ -166,7 +166,8 @@ class PyprojectParser(BasePackageDependencyParser):
     def parse(self, path: Path) -> tuple[list[PackageDependency], list[PackageDependency]]:
         """Parse pyproject.toml file."""
         try:
-            import tomllib        except ImportError:
+            import tomllib
+        except ImportError:
             try:
                 import tomli as tomllib
             except ImportError:
@@ -371,7 +372,8 @@ class CargoTomlParser(BasePackageDependencyParser):
     def parse(self, path: Path) -> tuple[list[PackageDependency], list[PackageDependency]]:
         """Parse Cargo.toml file."""
         try:
-            import tomllib        except ImportError:
+            import tomllib
+        except ImportError:
             try:
                 import tomli as tomllib
             except ImportError:

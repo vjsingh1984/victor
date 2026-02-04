@@ -197,7 +197,8 @@ class VerticalPackageMetadata(BaseModel):
             path: Path to write the TOML file
         """
         try:
-            import tomllib        except ImportError:
+            import tomllib
+        except ImportError:
             pass
 
         # Build TOML structure

@@ -453,7 +453,7 @@ class ObservableCircuitBreaker:
             elif self._state == _CircuitState.HALF_OPEN:
                 self._transition_to(_CircuitState.OPEN)
 
-    async def __aenter__(self) -> "CircuitBreaker":
+    async def __aenter__(self) -> "ObservableCircuitBreaker":
         """Enter circuit breaker context."""
         if not await self._check_state():
             raise CircuitBreakerError(
@@ -499,10 +499,6 @@ class ObservableCircuitBreaker:
             "failure_threshold": self._failure_threshold,
             "timeout_seconds": self._timeout_seconds,
         }
-
-
-# Backward compatibility alias
-CircuitBreaker = ObservableCircuitBreaker
 
 
 # =============================================================================
@@ -803,7 +799,7 @@ class ResiliencePolicy:
 
     def __init__(
         self,
-        circuit_breaker: Optional[CircuitBreaker] = None,
+        circuit_breaker: Optional[ObservableCircuitBreaker] = None,
         retry_config: Optional[ObservabilityRetryConfig] = None,
         bulkhead: Optional[Bulkhead] = None,
         rate_limiter: Optional[RateLimiter] = None,
