@@ -137,7 +137,7 @@ class PromptBuilderHook:
     def execute(self, context: SwitchContext) -> None:
         """Reinitialize prompt builder with new capabilities."""
         try:
-            from victor.agent.prompts.system_prompt_builder import SystemPromptBuilder  # type: ignore[import-not-found]
+            from victor.agent.prompts.system_prompt_builder import SystemPromptBuilder
 
             prompt_contributors = self._get_prompt_contributors()
 

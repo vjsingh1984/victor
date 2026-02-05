@@ -1424,7 +1424,7 @@ def load_mbpp_prompts() -> list[tuple[str, str, str]]:
         ImportError: If datasets library is not installed
     """
     try:
-        from datasets import load_dataset  # type: ignore[import-not-found]
+        from datasets import load_dataset
 
         dataset = load_dataset("google-research-datasets/mbpp", split="test")
         prompts = []

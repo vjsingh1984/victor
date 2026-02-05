@@ -1170,7 +1170,7 @@ def get_available_backends() -> dict[str, bool]:
 def _has_matplotlib() -> bool:
     """Check if matplotlib is available."""
     try:
-        import matplotlib  # type: ignore[import-not-found]
+        import matplotlib
         import networkx
 
         return True
