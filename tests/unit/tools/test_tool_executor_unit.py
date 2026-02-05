@@ -477,11 +477,23 @@ class TestToolExecutorCacheableTools:
 
     @staticmethod
     def _ensure_tools_loaded():
-        """Force import of tool modules to populate the registry."""
+        """Force import and reload of tool modules to populate the registry.
+
+        Uses importlib.reload() to ensure tools are re-registered even if
+        the metadata registry was reset by previous tests.
+        """
+        import importlib
+
+        # Force reload to ensure tool registration happens even after registry resets
         import victor.tools.filesystem
         import victor.tools.code_search_tool
         import victor.tools.file_editor_tool
-        import victor.tools.bash  # noqa: F401
+        import victor.tools.bash
+
+        importlib.reload(victor.tools.filesystem)
+        importlib.reload(victor.tools.code_search_tool)
+        importlib.reload(victor.tools.file_editor_tool)
+        importlib.reload(victor.tools.bash)
 
     def test_default_cacheable_tools(self):
         """Test cacheable tools detection via registry.
