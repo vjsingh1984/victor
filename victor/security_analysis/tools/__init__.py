@@ -37,7 +37,7 @@ Use the canonical imports directly.
 
 # Import from local modules (canonical location)
 from victor.security_analysis.tools.scanner import (
-    BaseDependencyParser,
+    BaseSecurityDependencyParser,
     DependencyParser,
     GoDependencyParser,
     NodeDependencyParser,
@@ -74,7 +74,7 @@ from victor.security_analysis.tools.penetration_testing import (
 
 __all__ = [
     # Scanner
-    "BaseDependencyParser",
+    "BaseSecurityDependencyParser",
     "DependencyParser",
     "GoDependencyParser",
     "NodeDependencyParser",

@@ -44,6 +44,7 @@ _PatternMatcher = None
 
 try:
     import victor_native as _native
+
     _PatternMatcher = _native.PatternMatcher
     _NATIVE_AVAILABLE = True
     logger.debug("Native pattern matching available for content patterns")

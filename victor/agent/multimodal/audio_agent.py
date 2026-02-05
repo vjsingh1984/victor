@@ -613,6 +613,7 @@ class AudioAgent:
         """
         try:
             import whisper
+
             logger.info(f"Loading local Whisper model: {self.local_whisper_model}")
 
             # Load model (this is cached by whisper)
@@ -946,6 +947,7 @@ class AudioAgent:
         if self._local_whisper_available:
             try:
                 import whisper
+
                 model = whisper.load_model(self.local_whisper_model)
                 audio = whisper.load_audio(str(audio_path))
                 result = model.transcribe(audio, language=None)

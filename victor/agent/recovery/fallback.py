@@ -129,10 +129,6 @@ class ModelCircuitBreaker:
         )
 
 
-# Backward compatibility alias
-CircuitBreaker = ModelCircuitBreaker
-
-
 @dataclass
 class ModelCapability:
     """Capability profile for a model."""
@@ -254,7 +250,7 @@ class AutomaticModelFallback:
         self._airgapped_mode = airgapped_mode
 
         # Circuit breakers per model
-        self._circuit_breakers: dict[str, CircuitBreaker] = {}
+        self._circuit_breakers: dict[str, ModelCircuitBreaker] = {}
 
         # Failure-specific fallback preferences
         self._failure_preferences: dict[FailureType, list[str]] = {
@@ -266,11 +262,11 @@ class AutomaticModelFallback:
             FailureType.TIMEOUT_APPROACHING: ["haiku", "mini", "instant"],
         }
 
-    def _get_circuit_breaker(self, provider: str, model: str) -> CircuitBreaker:
+    def _get_circuit_breaker(self, provider: str, model: str) -> ModelCircuitBreaker:
         """Get or create circuit breaker for a model."""
         key = f"{provider}:{model}"
         if key not in self._circuit_breakers:
-            self._circuit_breakers[key] = CircuitBreaker(provider=provider, model=model)
+            self._circuit_breakers[key] = ModelCircuitBreaker(provider=provider, model=model)
         return self._circuit_breakers[key]
 
     def get_fallback_model(

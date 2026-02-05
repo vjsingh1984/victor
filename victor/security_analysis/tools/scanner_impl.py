@@ -83,11 +83,7 @@ class BaseSecurityDependencyParser(ABC):
         ...
 
 
-# Backward compatibility alias
-BaseDependencyParser = BaseSecurityDependencyParser
-
-
-class PythonDependencyParser(BaseDependencyParser):
+class PythonDependencyParser(BaseSecurityDependencyParser):
     """Parser for Python dependency files."""
 
     @property
@@ -272,7 +268,7 @@ class PythonDependencyParser(BaseDependencyParser):
         return deps
 
 
-class NodeDependencyParser(BaseDependencyParser):
+class NodeDependencyParser(BaseSecurityDependencyParser):
     """Parser for Node.js dependency files."""
 
     @property
@@ -362,7 +358,7 @@ class NodeDependencyParser(BaseDependencyParser):
         return deps
 
 
-class RustDependencyParser(BaseDependencyParser):
+class RustDependencyParser(BaseSecurityDependencyParser):
     """Parser for Rust dependency files."""
 
     @property
@@ -452,7 +448,7 @@ class RustDependencyParser(BaseDependencyParser):
         return deps
 
 
-class GoDependencyParser(BaseDependencyParser):
+class GoDependencyParser(BaseSecurityDependencyParser):
     """Parser for Go dependency files."""
 
     @property
@@ -547,7 +543,7 @@ class GoDependencyParser(BaseDependencyParser):
 
 
 # Registry of parsers
-DEPENDENCY_PARSERS: list[type[BaseDependencyParser]] = [
+DEPENDENCY_PARSERS: list[type[BaseSecurityDependencyParser]] = [
     PythonDependencyParser,
     NodeDependencyParser,
     RustDependencyParser,
@@ -561,7 +557,7 @@ class SecurityScanner:
     def __init__(
         self,
         cve_db: "Optional[BaseCVEDatabase]" = None,
-        parsers: Optional[list[BaseDependencyParser]] = None,
+        parsers: Optional[list[BaseSecurityDependencyParser]] = None,
         offline: bool = False,
     ):
         """Initialize the scanner.

@@ -945,6 +945,7 @@ class TaskDecomposition:
             # Return DOT format representation if pygraphviz is available
             try:
                 import pygraphviz
+
                 dot_str = nx.nx_agraph.to_agraph(self._graph).to_string()
                 plt.close()
                 return str(dot_str)

@@ -20,7 +20,7 @@ The old location (victor.security.scanner) is deprecated.
 
 # Import from local implementation (canonical location)
 from victor.security_analysis.tools.scanner_impl import (
-    BaseDependencyParser,
+    BaseSecurityDependencyParser,
     DependencyParser,
     GoDependencyParser,
     NodeDependencyParser,
@@ -31,7 +31,7 @@ from victor.security_analysis.tools.scanner_impl import (
 )
 
 __all__ = [
-    "BaseDependencyParser",
+    "BaseSecurityDependencyParser",
     "DependencyParser",
     "GoDependencyParser",
     "NodeDependencyParser",

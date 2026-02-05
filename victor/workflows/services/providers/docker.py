@@ -51,6 +51,7 @@ try:
     import docker as docker_mod
     from docker.errors import APIError, ContainerError, ImageNotFound, NotFound  # type: ignore[import-not-found]
     from docker.models.containers import Container
+
     DOCKER_AVAILABLE = True
 except ImportError:
     DOCKER_AVAILABLE = False

@@ -44,6 +44,7 @@ _PatternMatcher = None
 
 try:
     import victor_native
+
     if hasattr(victor_native, "PatternMatcher"):
         _PatternMatcher = victor_native.PatternMatcher
     _NATIVE_AVAILABLE = True

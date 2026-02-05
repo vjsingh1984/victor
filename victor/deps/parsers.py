@@ -81,8 +81,6 @@ class BasePackageDependencyParser(ABC):
         return any(fnmatch(path.name, pattern) for pattern in self.file_patterns)
 
 
-
-
 class RequirementsTxtParser(BasePackageDependencyParser):
     """Parser for requirements.txt files."""
 

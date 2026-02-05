@@ -401,6 +401,7 @@ class MBPPRunner(BaseBenchmarkRunner):
 
         try:
             from datasets import load_dataset
+
             logger.info(f"Loading MBPP dataset (split={self._split}) from HuggingFace...")
             dataset = load_dataset(
                 "google-research-datasets/mbpp",
