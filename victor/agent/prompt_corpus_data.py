@@ -1394,7 +1394,7 @@ def load_humaneval_prompts() -> list[tuple[str, str, str]]:
         ImportError: If datasets library is not installed
     """
     try:
-        from datasets import load_dataset  # type: ignore[import-not-found]
+        from datasets import load_dataset  
 
         dataset = load_dataset("openai/openai_humaneval", split="test")
         prompts = []

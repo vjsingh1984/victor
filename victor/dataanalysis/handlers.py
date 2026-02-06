@@ -328,7 +328,7 @@ class PyCaretHandler(BaseHandler):
         """Synchronous PyCaret execution."""
         try:
             if task == "classification":
-                from pycaret.classification import (  # type: ignore[import-not-found]
+                from pycaret.classification import (  
                     setup,
                     compare_models,
                     pull,
@@ -338,7 +338,7 @@ class PyCaretHandler(BaseHandler):
 
                 default_sort = "Accuracy"
             elif task == "regression":
-                from pycaret.regression import (  # type: ignore[import-not-found]
+                from pycaret.regression import (  
                     setup,
                     compare_models,
                     pull,
@@ -348,7 +348,7 @@ class PyCaretHandler(BaseHandler):
 
                 default_sort = "R2"
             elif task == "clustering":
-                from pycaret.clustering import (  # type: ignore[import-not-found]
+                from pycaret.clustering import (  
                     setup,
                     create_model,
                     pull,
@@ -365,7 +365,7 @@ class PyCaretHandler(BaseHandler):
                     "model": str(model),
                 }
             elif task == "anomaly":
-                from pycaret.anomaly import (  # type: ignore[import-not-found]
+                from pycaret.anomaly import (  
                     setup,
                     create_model,
                     pull,
@@ -572,7 +572,7 @@ class AutoSklearnHandler(BaseHandler):
             from sklearn.model_selection import train_test_split
 
             if task == "classification":
-                from autosklearn.classification import AutoSklearnClassifier  # type: ignore[import-not-found]
+                from autosklearn.classification import AutoSklearnClassifier  
 
                 default_metric = "accuracy"
                 automl = AutoSklearnClassifier(
@@ -584,7 +584,7 @@ class AutoSklearnHandler(BaseHandler):
                     seed=42,
                 )
             elif task == "regression":
-                from autosklearn.regression import AutoSklearnRegressor  # type: ignore[import-not-found]
+                from autosklearn.regression import AutoSklearnRegressor  
 
                 default_metric = "r2"
                 automl = AutoSklearnRegressor(
@@ -749,9 +749,9 @@ class RLTrainingHandler(BaseHandler):
     ) -> dict[str, Any]:
         """Synchronous RL training."""
         try:
-            import gymnasium as gym  # type: ignore[import-not-found]
-            from stable_baselines3 import PPO, A2C, DQN, SAC, TD3  # type: ignore[import-not-found]
-            from stable_baselines3.common.evaluation import evaluate_policy  # type: ignore[import-not-found]
+            import gymnasium as gym  
+            from stable_baselines3 import PPO, A2C, DQN, SAC, TD3  
+            from stable_baselines3.common.evaluation import evaluate_policy  
 
             # Algorithm mapping
             algo_map = {

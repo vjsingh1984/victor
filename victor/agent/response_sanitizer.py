@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     # Type stubs for native extensions (optional)
     try:
-        import victor_native  # type: ignore[import-not-found]
+        import victor_native  
     except ImportError:
         pass
 
@@ -382,7 +382,7 @@ def create_streaming_filter(
         StreamingContentFilter (native or Python implementation)
     """
     if _NATIVE_AVAILABLE and _native:
-        return _native.StreamingFilter(suppress_thinking, max_thinking_content)
+        return _native.StreamingFilter(suppress_thinking, max_thinking_content)  # type: ignore[no-any-return]
     return StreamingContentFilter(suppress_thinking)
 
 
@@ -398,7 +398,7 @@ def strip_thinking_tokens_fast(content: str) -> str:
         Content with thinking tokens removed
     """
     if _NATIVE_AVAILABLE and _native:
-        return _native.strip_thinking_tokens(content)
+        return _native.strip_thinking_tokens(content)  # type: ignore[no-any-return]
 
     # Fallback to simple string replacement
     patterns = [

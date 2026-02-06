@@ -211,7 +211,7 @@ class VerticalIntegrationCache:
                         f"Cache HIT for {vertical_class.__name__}: "
                         f"key={key[:8]}... (hits={self._hits}, misses={self._misses})"
                     )
-                    return entry.value
+                    return entry.value  # type: ignore[no-any-return]
 
                 # Cache miss
                 self._misses += 1

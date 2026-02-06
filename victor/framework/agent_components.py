@@ -1169,7 +1169,7 @@ class AgentSession:
             except Exception as e:
                 logger.debug(f"on_turn_end hook error: {e}")
 
-        return result
+        return result  # type: ignore[no-any-return]
 
     async def stream(self, message: str) -> AsyncIterator[AgentExecutionEvent]:
         """Stream a response.

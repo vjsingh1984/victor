@@ -108,7 +108,7 @@ from victor.framework.state import (
 from victor.framework.task import FrameworkTaskType, Task, TaskResult
 from victor.framework.checkpoint import CheckpointBackend
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
-from victor.framework.tools import ToolCategory, Tools, ToolSet, ToolsInput
+from victor.framework.tools import ToolCategory, ToolSet, ToolsInput
 from victor.framework.prompt_builder import (
     PromptBuilder,
     PromptSection,
@@ -470,7 +470,6 @@ __all__ = (
         # Core classes (the 5 concepts)
         "Agent",
         "Task",
-        "Tools",
         "State",
         "AgentExecutionEvent",
         # Agent

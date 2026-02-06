@@ -566,7 +566,7 @@ class VerticalBase(
                                     builder.add_section(section_name, content, priority)
 
                             # Build and return the prompt
-                            return builder.build()
+                            return builder.build()  # type: ignore[no-any-return]
 
                     if source == "template":
                         # Template-based prompts require the template class
@@ -1251,7 +1251,7 @@ class VerticalBase(
             List of capability names available for this vertical.
         """
         caps = cls.get_capabilities()
-        return caps.list_capabilities()
+        return caps.list_capabilities()  # type: ignore[no-any-return]
 
     # =========================================================================
     # Capability Provider (Canonical - using CapabilityLoader)
@@ -1349,7 +1349,7 @@ class VerticalBase(
             # ["code_review_team", "feature_implementation_team"]
         """
         provider = cls.get_team_provider()
-        return provider.list_teams()
+        return provider.list_teams()  # type: ignore[no-any-return]
 
     @classmethod
     async def create_agent(

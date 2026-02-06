@@ -154,7 +154,7 @@ class LSPCompletionProvider(BaseCompletionProvider):
                 return CompletionList(is_incomplete=False, items=[])
 
             # Convert LSP response to our format
-            return self._convert_lsp_response(lsp_result)
+            return self._convert_lsp_response(lsp_result)  # type: ignore[no-any-return]
 
         except Exception as e:
             logger.warning(f"LSP completion failed: {e}")

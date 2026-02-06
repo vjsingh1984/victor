@@ -515,7 +515,7 @@ class WorkflowChatCoordinator:
             compiled = workflow.get("compiled_graph")
             if compiled is None:
                 raise ValueError(f"Workflow '{workflow_name}' is not compiled")
-            return compiled
+            return compiled  # type: ignore[no-any-return]
 
         compiled_graph = getattr(workflow, "compiled_graph", None)
         if compiled_graph is None:

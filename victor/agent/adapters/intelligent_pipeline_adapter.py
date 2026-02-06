@@ -36,7 +36,7 @@ import logging
 from typing import Any, Optional, TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from victor.coding.tracker.unified import UnifiedTracker  # type: ignore[import-not-found]
+    from victor.coding.tracker.unified import UnifiedTracker  
     from victor.agent.coordinators.validation_coordinator import (
         ValidationCoordinator,
         IntelligentValidationResult,

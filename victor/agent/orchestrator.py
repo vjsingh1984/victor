@@ -3704,7 +3704,10 @@ class AgentOrchestrator(
         Returns:
             List of messages in conversation
         """
-        return self._conversation_controller.messages
+        # Convert Message objects to dict format
+        messages = self._conversation_controller.messages
+        return [m.model_dump() if hasattr(m, 'model_dump') else m  # type: ignore[return-value]
+                for m in messages]  # type: ignore[return-value]
 
     def get_message_count(self) -> int:
         """Get message count (protocol method).

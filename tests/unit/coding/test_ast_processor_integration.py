@@ -30,14 +30,14 @@ from victor.coding.codebase.tree_sitter_manager import (
     run_query,
 )
 from victor.native.accelerators.ast_processor import (
-    ASTProcessorAccelerator,
+    AstProcessorAccelerator,
     get_ast_processor,
     is_rust_available,
     reset_ast_processor,
 )
 
 
-class TestASTProcessorAccelerator:
+class TestAstProcessorAccelerator:
     """Test the AST processor accelerator."""
 
     def test_is_rust_available(self):
@@ -54,7 +54,7 @@ class TestASTProcessorAccelerator:
         processor2 = get_ast_processor()
 
         assert processor1 is processor2
-        assert isinstance(processor1, ASTProcessorAccelerator)
+        assert isinstance(processor1, AstProcessorAccelerator)
 
     def test_processor_has_backend(self):
         """Test that processor has a backend attribute."""

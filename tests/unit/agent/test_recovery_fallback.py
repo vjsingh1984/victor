@@ -18,11 +18,11 @@ import pytest
 import time
 
 from victor.agent.recovery.fallback import (
-    CircuitState,
-    CircuitBreaker,
+    ModelCircuitBreaker as CircuitBreaker,
     ModelCapability,
     AutomaticModelFallback,
 )
+from victor.providers.circuit_breaker import CircuitState
 from victor.agent.recovery.protocols import FailureType
 
 

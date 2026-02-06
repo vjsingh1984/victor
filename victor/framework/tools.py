@@ -636,9 +636,5 @@ class ToolSet:
         """Check if a tool is in this set (cached O(1) after first call)."""
         return tool in self._get_resolved_names()
 
-
-# Type alias for convenience
-Tools = ToolSet
-
 # Type for tools parameter that accepts multiple formats
 ToolsInput = Union[ToolSet, list[str], None]

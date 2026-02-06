@@ -393,7 +393,7 @@ from victor.agent.vertical_context import VerticalContext, create_vertical_conte
 from victor.agent.vertical_integration_adapter import VerticalIntegrationAdapter
 from victor.agent.orchestrator_recovery import (
     create_recovery_integration,
-    RecoveryAction as OrchestratorRecoveryAction,
+    OrchestratorRecoveryAction,
 )
 
 # =============================================================================

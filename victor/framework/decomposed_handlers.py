@@ -75,7 +75,7 @@ logger = logging.getLogger(__name__)
 def _check_capability(orchestrator: Any, capability_name: str) -> bool:
     """Check if orchestrator has a capability."""
     if hasattr(orchestrator, "has_capability"):
-        return orchestrator.has_capability(capability_name)
+        return orchestrator.has_capability(capability_name)  # type: ignore[no-any-return]
     return False
 
 

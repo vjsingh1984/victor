@@ -780,7 +780,3 @@ def reset_ast_processor() -> None:
 
     with _lock:
         _default_processor = None
-
-
-# Backward-compatible alias for older import paths/tests.
-ASTProcessorAccelerator = AstProcessorAccelerator

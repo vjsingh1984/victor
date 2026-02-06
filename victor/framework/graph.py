@@ -238,6 +238,7 @@ class CopyOnWriteState(Generic[StateType]):
             return self._source
         # For modified state, lock ensures consistent read
         with self._lock:
+            assert self._copy is not None, "_copy must exist when _modified is True"
             return self._copy
 
     def __getitem__(self, key: str) -> Any:
@@ -451,6 +452,7 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return self._source
         with self._lock:
+            assert self._copy is not None, "_copy must exist when _modified is True"
             return self._copy
 
     @property
@@ -1667,7 +1669,8 @@ class GraphCheckpointManager:
             checkpoint = await self.checkpointer.load(thread_id)
             if checkpoint:
                 logger.info(f"Resuming from checkpoint at node: {checkpoint.node_id}")
-                return checkpoint.state.copy(), checkpoint.node_id
+                # Type: StateType is bound to dict[str, Any], so checkpoint.state is compatible
+                return checkpoint.state.copy(), checkpoint.node_id  # type: ignore[return-value]
 
         # No checkpoint, use input state
         return copy.deepcopy(input_state), entry_point
@@ -2890,10 +2893,12 @@ class StateGraph(Generic[StateType]):
                 ) -> Callable[[StateType], StateType]:
                     def agent_placeholder(state: StateType) -> StateType:
                         # Store node config in state for executor to use
-                        return {
+                        # Type: StateType is bound to dict[str, Any], so this dict is compatible
+                        result: StateType = {  # type: ignore[assignment]
                             **state,
                             "_pending_agent": node_config,
                         }
+                        return result
 
                     return agent_placeholder
 
@@ -2908,10 +2913,12 @@ class StateGraph(Generic[StateType]):
                 ) -> Callable[[StateType], StateType]:
                     def compute_placeholder(state: StateType) -> StateType:
                         # Store node config in state for executor to use
-                        return {
+                        # Type: StateType is bound to dict[str, Any], so this dict is compatible
+                        result: StateType = {  # type: ignore[assignment]
                             **state,
                             "_pending_compute": node_config,
                         }
+                        return result
 
                     return compute_placeholder
 

@@ -669,7 +669,7 @@ class SkillDiscoveryEngine:
                 # Handle both ToolSelectionResult and List[ToolDefinition] return types
                 if isinstance(result, list):
                     # result is List[ToolDefinition]
-                    from victor.tools.tool import ToolDefinition  # type: ignore[import-not-found]
+                    from victor.tools.tool import ToolDefinition  
 
                     tool_map = {t.name: t for t in available_tools}
                     matched_tools = [

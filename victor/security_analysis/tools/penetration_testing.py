@@ -171,10 +171,6 @@ class Vulnerability:
         }
 
 
-# Type alias for backward compatibility
-SecurityVulnerability = Vulnerability
-
-
 @dataclass
 class SecurityReport:
     """Report from a single security test.
@@ -627,10 +623,6 @@ class ComprehensiveSecurityReport:
             "individual_reports": [r.to_dict() for r in self.individual_reports],
             "overall_passed": self.overall_passed,
         }
-
-
-# Type alias for backward compatibility
-SecurityAuditReport = ComprehensiveSecurityReport
 
 
 class SecurityTestSuite:
@@ -1448,7 +1440,7 @@ class SecurityTestSuite:
         agent: AgentOrchestrator,
         output_format: str = "text",
         output_path: Optional[Path] = None,
-    ) -> SecurityAuditReport:
+    ) -> ComprehensiveSecurityReport:
         """Run a comprehensive security audit and generate report.
 
         This is the main entry point for security auditing. It runs all security tests,
@@ -1461,7 +1453,7 @@ class SecurityTestSuite:
             output_path: Optional path to save the report. If None, report is not saved to file.
 
         Returns:
-            SecurityAuditReport with comprehensive findings, risk score, and recommendations
+            ComprehensiveSecurityReport with comprehensive findings, risk score, and recommendations
 
         Raises:
             ValueError: If output_format is not one of 'text', 'markdown', or 'json'

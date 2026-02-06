@@ -119,7 +119,7 @@ def test_framework_import_performance():
     """Benchmark victor.framework import performance.
 
     The framework module should use lazy loading for optional subsystems.
-    Core imports (Agent, Task, Tools, State) should be fast.
+    Core imports (Agent, Task, State) should be fast.
 
     Note: This test measures the incremental cost of framework imports
     after the base victor module is already imported.
@@ -137,7 +137,7 @@ baseline = time.time() - start
 # Now import framework core (incremental cost)
 gc.collect()
 start = time.time()
-from victor.framework import Agent, Task, State, Tools
+from victor.framework import Agent, Task, State
 framework_incremental = time.time() - start
 
 # Total time for both imports
@@ -328,7 +328,7 @@ def test_backward_compatibility():
     """
     code = """
 # Test various import patterns
-from victor.framework import Agent, Task, State, Tools
+from victor.framework import Agent, Task, State
 from victor.framework import CircuitBreaker, HealthChecker, MetricsCollector
 from victor.integrations import mcp, api, protocol
 
@@ -447,7 +447,7 @@ def test_startup_performance_summary():
     print()
     print("  2. Lazy Framework Optional Subsystems (framework/__init__.py)")
     print("     - 81+ optional subsystems loaded via __getattr__")
-    print("     - Core imports (Agent, Task, Tools, State) remain fast")
+    print("     - Core imports (Agent, Task, State) remain fast")
     print("     - Savings: ~0.4s (25% reduction)")
     print()
     print("  3. Lazy MCP Integration Loading (integrations/__init__.py)")

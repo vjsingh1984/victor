@@ -498,7 +498,7 @@ def with_retry(
             elif raise_on_failure and result.exception:
                 raise result.exception
             else:
-                return None
+                return None  # type: ignore[return-value]
 
         return wrapper
 
@@ -532,7 +532,7 @@ def with_retry_sync(
             elif raise_on_failure and result.exception:
                 raise result.exception
             else:
-                return None
+                return None  # type: ignore[return-value]
 
         return wrapper
 

@@ -217,7 +217,7 @@ class ToolResultCache:
         """Lazily initialize FAISS index."""
         if self._faiss_index is None:
             try:
-                import faiss  # type: ignore[import-not-found]
+                import faiss  
 
                 # IndexFlatIP for cosine similarity (with normalized vectors)
                 self._faiss_index = faiss.IndexFlatIP(dim)
@@ -231,7 +231,7 @@ class ToolResultCache:
         """Normalize vector for cosine similarity."""
         norm = np.linalg.norm(vec)
         if norm > 0:
-            return vec / norm
+            return vec / norm  # type: ignore[no-any-return]
         return vec
 
     def _hash_args(self, tool_name: str, arguments: dict[str, Any]) -> str:

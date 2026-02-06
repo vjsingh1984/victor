@@ -253,7 +253,7 @@ def get_telemetry_config() -> TelemetryConfig:
         if errors:
             logger.warning(f"Telemetry configuration errors: {errors}")
         object.__setattr__(get_telemetry_config, "_config", config)
-    return object.__getattribute__(get_telemetry_config, "_config")
+    return object.__getattribute__(get_telemetry_config, "_config")  # type: ignore[no-any-return]
 
 
 def setup_telemetry(config: Optional[TelemetryConfig] = None) -> Optional[tuple[Any, Any]]:

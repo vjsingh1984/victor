@@ -101,7 +101,6 @@ from victor.framework import (  # type: ignore[attr-defined]  # mypy can't verif
     TaskResult,
     ToolCategory,
     ToolError,
-    Tools,
     ToolSet,
 )
 
@@ -109,7 +108,6 @@ __all__ = [
     # Framework API (5 core concepts + supporting classes)
     "Agent",
     "Task",
-    "Tools",
     "State",
     "AgentExecutionEvent",
     # Supporting classes

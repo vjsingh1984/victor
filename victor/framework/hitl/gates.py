@@ -1009,12 +1009,3 @@ class ReviewGate(BaseHITLGate):
             comments="Auto-approved (no handler)",
             responder="system",
         )
-
-
-# =============================================================================
-# Convenience Aliases
-# =============================================================================
-
-# Export additional convenience names
-ChoiceInput = ChoiceInputGate
-ConfirmationDialog = ConfirmationDialogGate

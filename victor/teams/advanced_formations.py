@@ -809,7 +809,7 @@ Format your response as a JSON object:
         from . import get_formation
 
         strategy = get_formation(formation.value)  # type: ignore[misc]
-        return await strategy.execute(agents, context, task)
+        return await strategy.execute(agents, context, task)  # type: ignore[no-any-return]
 
     def get_negotiation_history(self) -> list[NegotiationResult]:
         """Get history of negotiation rounds.
@@ -1253,7 +1253,7 @@ Rationale: [your reasoning]
         from . import get_formation
 
         strategy = get_formation(formation.value)  # type: ignore[misc]
-        return await strategy.execute(agents, context, task)
+        return await strategy.execute(agents, context, task)  # type: ignore[no-any-return]
 
     def _map_choice_to_formation(self, choice: Optional[str]) -> "TeamFormation":
         """Map voting choice to formation.

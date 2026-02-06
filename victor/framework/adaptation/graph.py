@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from typing import Any as RunnableType
 
     try:
-        from langchain_core.runnables import Runnable as RunnableImport  # type: ignore[import-not-found]
+        from langchain_core.runnables import Runnable as RunnableImport  
 
         RunnableType = RunnableImport
     except ImportError:

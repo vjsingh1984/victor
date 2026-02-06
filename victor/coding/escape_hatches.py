@@ -458,7 +458,7 @@ def chat_task_complexity(ctx: dict[str, Any]) -> str:
     # First check if complexity was already determined
     complexity = ctx.get("task_complexity", "").lower()
     if complexity in ["complex", "moderate", "simple"]:
-        return complexity
+        return complexity  # type: ignore[no-any-return]
 
     # Fall back to analysis from user message
     user_message = ctx.get("user_message", "")

@@ -505,7 +505,7 @@ class OrchestratorFactory(ModeAwareMixin):
         """Create response sanitizer (from DI container)."""
         from victor.agent.protocols import ResponseSanitizerProtocol
 
-        return self.container.get(ResponseSanitizerProtocol)
+        return self.container.get(ResponseSanitizerProtocol)  # type: ignore[no-any-return]
 
     def create_prompt_builder(
         self,
@@ -551,19 +551,19 @@ class OrchestratorFactory(ModeAwareMixin):
         """Create complexity classifier (from DI container)."""
         from victor.agent.protocols import ComplexityClassifierProtocol
 
-        return self.container.get(ComplexityClassifierProtocol)
+        return self.container.get(ComplexityClassifierProtocol)  # type: ignore[no-any-return]
 
     def create_action_authorizer(self) -> "ActionAuthorizer":
         """Create action authorizer (from DI container)."""
         from victor.agent.protocols import ActionAuthorizerProtocol
 
-        return self.container.get(ActionAuthorizerProtocol)
+        return self.container.get(ActionAuthorizerProtocol)  # type: ignore[no-any-return]
 
     def create_search_router(self) -> "SearchRouter":
         """Create search router (from DI container)."""
         from victor.agent.protocols import SearchRouterProtocol
 
-        return self.container.get(SearchRouterProtocol)
+        return self.container.get(SearchRouterProtocol)  # type: ignore[no-any-return]
 
     def create_presentation_adapter(self) -> Any:
         """Create presentation adapter for icon/emoji rendering.
@@ -909,20 +909,20 @@ class OrchestratorFactory(ModeAwareMixin):
         """Create usage analytics (from DI container)."""
         from victor.agent.protocols import UsageAnalyticsProtocol
 
-        return self.container.get(UsageAnalyticsProtocol)
+        return self.container.get(UsageAnalyticsProtocol)  # type: ignore[no-any-return]
 
     def create_sequence_tracker(self) -> "ToolSequenceTracker":
         """Create tool sequence tracker (from DI container)."""
         from victor.agent.protocols import ToolSequenceTrackerProtocol
 
-        return self.container.get(ToolSequenceTrackerProtocol)
+        return self.container.get(ToolSequenceTrackerProtocol)  # type: ignore[no-any-return]
 
     def create_recovery_handler(self) -> Optional["RecoveryHandler"]:
         """Create recovery handler (from DI container)."""
         from victor.agent.protocols import RecoveryHandlerProtocol
 
         # RecoveryHandler is always registered, but may be disabled via settings
-        return self.container.get(RecoveryHandlerProtocol)
+        return self.container.get(RecoveryHandlerProtocol)  # type: ignore[no-any-return]
 
     def create_observability(self) -> Optional["ObservabilityIntegration"]:
         """Create observability integration if enabled."""
@@ -2347,7 +2347,7 @@ class OrchestratorFactory(ModeAwareMixin):
         logger.info(f"Provider pool stats: {stats}")
 
         # Return pool as BaseProvider (ProviderPool is a BaseProvider subclass)
-        return pool, True
+        return pool, True  # type: ignore[return-value]
 
     async def _create_provider_for_url(
         self,

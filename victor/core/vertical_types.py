@@ -699,27 +699,37 @@ class TieredToolTemplate:
     @classmethod
     def for_coding(cls) -> TieredToolConfig:
         """Get TieredToolConfig for coding vertical."""
-        return cls.for_vertical("coding")
+        result = cls.for_vertical("coding")
+        assert result is not None, "coding vertical should always exist"
+        return result
 
     @classmethod
     def for_research(cls) -> TieredToolConfig:
         """Get TieredToolConfig for research vertical."""
-        return cls.for_vertical("research")
+        result = cls.for_vertical("research")
+        assert result is not None, "research vertical should always exist"
+        return result
 
     @classmethod
     def for_devops(cls) -> TieredToolConfig:
         """Get TieredToolConfig for devops vertical."""
-        return cls.for_vertical("devops")
+        result = cls.for_vertical("devops")
+        assert result is not None, "devops vertical should always exist"
+        return result
 
     @classmethod
     def for_data_analysis(cls) -> TieredToolConfig:
         """Get TieredToolConfig for data analysis vertical."""
-        return cls.for_vertical("data_analysis")
+        result = cls.for_vertical("data_analysis")
+        assert result is not None, "data_analysis vertical should always exist"
+        return result
 
     @classmethod
     def for_rag(cls) -> TieredToolConfig:
         """Get TieredToolConfig for RAG vertical."""
-        return cls.for_vertical("rag")
+        result = cls.for_vertical("rag")
+        assert result is not None, "rag vertical should always exist"
+        return result
 
     @classmethod
     def register_vertical(
