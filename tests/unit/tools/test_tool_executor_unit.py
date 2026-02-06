@@ -498,15 +498,20 @@ class TestToolExecutorCacheableTools:
 
         # If registry is empty (was reset), re-register tools from modules
         if not registry.get_all_tool_names():
-            for module_name in ['victor.tools.filesystem', 'victor.tools.bash',
-                               'victor.tools.code_search_tool', 'victor.tools.file_editor_tool']:
+            for module_name in [
+                "victor.tools.filesystem",
+                "victor.tools.bash",
+                "victor.tools.code_search_tool",
+                "victor.tools.file_editor_tool",
+            ]:
                 import sys
+
                 if module_name in sys.modules:
                     module = sys.modules[module_name]
                     for attr_name in dir(module):
-                        if not attr_name.startswith('_'):
+                        if not attr_name.startswith("_"):
                             attr = getattr(module, attr_name, None)
-                            if isinstance(attr, BaseTool) and hasattr(attr, 'name'):
+                            if isinstance(attr, BaseTool) and hasattr(attr, "name"):
                                 try:
                                     registry.register(attr)
                                 except Exception:
