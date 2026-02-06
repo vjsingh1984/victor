@@ -90,11 +90,6 @@ class StrategyRecoveryAction(Enum):
     ABORT = auto()  # Give up and return error
 
 
-# Type alias for backward compatibility
-# RecoveryAction was renamed to StrategyRecoveryAction for semantic clarity
-RecoveryAction = StrategyRecoveryAction
-
-
 @dataclass(frozen=True)
 class RecoveryContext:
     """Immutable context for recovery decisions.

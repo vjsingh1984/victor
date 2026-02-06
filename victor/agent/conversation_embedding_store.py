@@ -59,7 +59,7 @@ from typing import Any, Optional, TYPE_CHECKING
 
 try:
     import lancedb
-    import pyarrow as pa  
+    import pyarrow as pa
 
     LANCEDB_AVAILABLE = True
 except ImportError:
@@ -350,7 +350,7 @@ class ConversationEmbeddingStore:
             self._create_table_with_first_record(records[0])
             # MyPy can't determine that _create_table_with_first_record sets _table
             if len(records) > 1:
-                self._table.add(records[1:])    # type: ignore[attr-defined]
+                self._table.add(records[1:])  # type: ignore[attr-defined]
         else:
             self._table.add(records)
 

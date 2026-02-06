@@ -264,7 +264,7 @@ def _get_key_from_keyring(provider: str) -> Optional[str]:
         return None
 
     try:
-        import keyring  
+        import keyring
 
         key = keyring.get_password(KEYRING_SERVICE, f"{provider}_api_key")
         return key if key is not None else None

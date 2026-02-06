@@ -420,11 +420,11 @@ class ModelSpecificPromptRegistry:
         if self._q_store and context:
             state_key = f"{context.to_state_key()}:template={template_id}"
             reward = 0.5 + quality_improvement if success else -0.3
-            from victor.agent.recovery.protocols import RecoveryAction
+            from victor.agent.recovery.protocols import StrategyRecoveryAction
 
             self._q_store.update_q_value(
                 state_key,
-                RecoveryAction.RETRY_WITH_TEMPLATE.name,
+                StrategyRecoveryAction.RETRY_WITH_TEMPLATE.name,
                 reward,
             )
 

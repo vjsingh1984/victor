@@ -49,7 +49,7 @@ from typing import (
     TypeVar,
 )
 
-from cachetools import TTLCache  
+from cachetools import TTLCache
 
 if TYPE_CHECKING:
     from victor.framework.graph import (
@@ -361,7 +361,7 @@ class CompiledGraphCache:
             stats = self._stats.copy()
 
             total = stats["hits"] + stats["misses"]
-            stats["hit_rate"] = float(stats["hits"]) / float(total) if total > 0 else 0.0    # type: ignore[assignment]
+            stats["hit_rate"] = float(stats["hits"]) / float(total) if total > 0 else 0.0  # type: ignore[assignment]
 
             if self._cache is not None:
                 stats["current_size"] = len(self._cache)

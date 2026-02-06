@@ -217,7 +217,7 @@ class ToolResultCache:
         """Lazily initialize FAISS index."""
         if self._faiss_index is None:
             try:
-                import faiss  
+                import faiss
 
                 # IndexFlatIP for cosine similarity (with normalized vectors)
                 self._faiss_index = faiss.IndexFlatIP(dim)

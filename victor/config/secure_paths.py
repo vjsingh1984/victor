@@ -1071,7 +1071,7 @@ def get_security_status() -> dict[str, Any]:
 
     # Check keyring
     try:
-        import keyring  
+        import keyring
 
         if isinstance(status.get("keyring"), dict):
             status["keyring"]["available"] = True

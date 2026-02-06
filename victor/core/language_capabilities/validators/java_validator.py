@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 
 # Check if javalang is available
 try:
-    import javalang  
-    import javalang.parser  
+    import javalang
+    import javalang.parser
 
     JAVALANG_AVAILABLE = True
 except ImportError:

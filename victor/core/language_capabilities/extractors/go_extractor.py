@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 # Check if gopygo is available
 try:
-    import gopygo  
+    import gopygo
 
     GOPYGO_AVAILABLE = True
 except ImportError:

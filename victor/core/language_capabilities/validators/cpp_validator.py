@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # Check if libclang is available
 try:
-    import clang.cindex as cindex  
+    import clang.cindex as cindex
 
     LIBCLANG_AVAILABLE = True
 except ImportError:

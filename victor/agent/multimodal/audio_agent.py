@@ -404,7 +404,7 @@ class AudioAgent:
             True if whisper package is installed
         """
         try:
-            import whisper  
+            import whisper
 
             return whisper is not None
         except ImportError:
@@ -696,7 +696,7 @@ class AudioAgent:
             bitrate = None
 
             try:
-                from mutagen import File as MutagenFile  
+                from mutagen import File as MutagenFile
 
                 audio_file = MutagenFile(path)
                 if audio_file is not None:
@@ -846,8 +846,8 @@ class AudioAgent:
             RuntimeError: If diarization fails
         """
         try:
-            from pyannote.audio import Pipeline  
-            from pyannote.core import Annotation, Segment  
+            from pyannote.audio import Pipeline
+            from pyannote.core import Annotation, Segment
 
             logger.info("Loading pyannote diarization pipeline")
 

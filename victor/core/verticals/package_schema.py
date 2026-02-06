@@ -171,7 +171,7 @@ class VerticalPackageMetadata(BaseModel):
             ValidationError: If the TOML is invalid
         """
         try:
-            import tomllib  
+            import tomllib
 
             toml_data = tomllib.loads(path.read_text())
         except ImportError:

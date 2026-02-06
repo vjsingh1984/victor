@@ -32,7 +32,6 @@ from typing import Any, Optional
 from victor.agent.recovery.protocols import (
     FailureType,
     QLearningStore,
-    RecoveryAction,
     RecoveryContext,
     RecoveryResult,
     StrategyRecoveryAction,
@@ -207,7 +206,10 @@ class EmptyResponseRecovery(BaseRecoveryStrategy):
         return [FailureType.EMPTY_RESPONSE]
 
     def _matches_action(self, action: StrategyRecoveryAction) -> bool:
-        return action in (RecoveryAction.PROMPT_TOOL_CALL, RecoveryAction.ADJUST_TEMPERATURE)
+        return action in (
+            StrategyRecoveryAction.PROMPT_TOOL_CALL,
+            StrategyRecoveryAction.ADJUST_TEMPERATURE,
+        )
 
     async def recover(self, context: RecoveryContext) -> RecoveryResult:
         """Attempt recovery from empty response."""
@@ -219,7 +221,7 @@ class EmptyResponseRecovery(BaseRecoveryStrategy):
         if context.consecutive_failures >= self._max_retries:
             # Give up on empty response recovery, force summary
             return RecoveryResult(
-                action=RecoveryAction.FORCE_SUMMARY,
+                action=StrategyRecoveryAction.FORCE_SUMMARY,
                 success=False,
                 message=(
                     "Multiple empty responses received. Please provide a summary "
@@ -234,7 +236,7 @@ class EmptyResponseRecovery(BaseRecoveryStrategy):
         # Check if temperature adjustment might help
         if context.consecutive_failures >= 2 and context.current_temperature < 0.9:
             return RecoveryResult(
-                action=RecoveryAction.ADJUST_TEMPERATURE,
+                action=StrategyRecoveryAction.ADJUST_TEMPERATURE,
                 success=True,
                 message=prompt,
                 new_temperature=min(1.0, context.current_temperature + 0.2),
@@ -244,7 +246,7 @@ class EmptyResponseRecovery(BaseRecoveryStrategy):
             )
 
         return RecoveryResult(
-            action=RecoveryAction.PROMPT_TOOL_CALL,
+            action=StrategyRecoveryAction.PROMPT_TOOL_CALL,
             success=True,
             message=prompt,
             strategy_name=self.name,
@@ -298,7 +300,10 @@ class StuckLoopRecovery(BaseRecoveryStrategy):
         return [FailureType.STUCK_LOOP, FailureType.REPEATED_RESPONSE]
 
     def _matches_action(self, action: StrategyRecoveryAction) -> bool:
-        return action in (RecoveryAction.FORCE_SUMMARY, RecoveryAction.PROMPT_TOOL_CALL)
+        return action in (
+            StrategyRecoveryAction.FORCE_SUMMARY,
+            StrategyRecoveryAction.PROMPT_TOOL_CALL,
+        )
 
     async def recover(self, context: RecoveryContext) -> RecoveryResult:
         """Attempt recovery from stuck loop."""
@@ -308,7 +313,7 @@ class StuckLoopRecovery(BaseRecoveryStrategy):
         # If many failures, force summary
         if context.consecutive_failures >= len(self.PROMPT_TEMPLATES):
             return RecoveryResult(
-                action=RecoveryAction.FORCE_SUMMARY,
+                action=StrategyRecoveryAction.FORCE_SUMMARY,
                 success=True,
                 message=prompt,
                 strategy_name=self.name,
@@ -319,7 +324,7 @@ class StuckLoopRecovery(BaseRecoveryStrategy):
         # If model has made some tool calls, encourage completion
         if context.tool_calls_made > 0:
             return RecoveryResult(
-                action=RecoveryAction.FORCE_SUMMARY,
+                action=StrategyRecoveryAction.FORCE_SUMMARY,
                 success=True,
                 message=(
                     f"You have made {context.tool_calls_made} tool calls. "
@@ -332,7 +337,7 @@ class StuckLoopRecovery(BaseRecoveryStrategy):
             )
 
         return RecoveryResult(
-            action=RecoveryAction.PROMPT_TOOL_CALL,
+            action=StrategyRecoveryAction.PROMPT_TOOL_CALL,
             success=True,
             message=prompt,
             strategy_name=self.name,
@@ -360,7 +365,7 @@ class HallucinatedToolRecovery(BaseRecoveryStrategy):
         return [FailureType.HALLUCINATED_TOOL]
 
     def _matches_action(self, action: StrategyRecoveryAction) -> bool:
-        return action == RecoveryAction.RETRY_WITH_TEMPLATE
+        return action == StrategyRecoveryAction.RETRY_WITH_TEMPLATE
 
     async def recover(self, context: RecoveryContext) -> RecoveryResult:
         """Attempt recovery from hallucinated tool call."""
@@ -369,7 +374,7 @@ class HallucinatedToolRecovery(BaseRecoveryStrategy):
         if context.consecutive_failures >= self._max_hallucinations:
             # Give up on tool calls, force text response
             return RecoveryResult(
-                action=RecoveryAction.FORCE_SUMMARY,
+                action=StrategyRecoveryAction.FORCE_SUMMARY,
                 success=True,
                 message=(
                     f"You have mentioned {mentioned} multiple times but never called them. "
@@ -398,7 +403,7 @@ class HallucinatedToolRecovery(BaseRecoveryStrategy):
             )
 
         return RecoveryResult(
-            action=RecoveryAction.RETRY_WITH_TEMPLATE,
+            action=StrategyRecoveryAction.RETRY_WITH_TEMPLATE,
             success=True,
             message=message,
             strategy_name=self.name,
@@ -426,7 +431,7 @@ class TimeoutRecovery(BaseRecoveryStrategy):
         return [FailureType.TIMEOUT_APPROACHING]
 
     def _matches_action(self, action: StrategyRecoveryAction) -> bool:
-        return action == RecoveryAction.FORCE_SUMMARY
+        return action == StrategyRecoveryAction.FORCE_SUMMARY
 
     def can_handle(self, context: RecoveryContext) -> bool:
         """Check if approaching timeout."""
@@ -442,7 +447,7 @@ class TimeoutRecovery(BaseRecoveryStrategy):
         remaining_str = f"{remaining:.0f}s" if remaining > 0 else "no time"
 
         return RecoveryResult(
-            action=RecoveryAction.FORCE_SUMMARY,
+            action=StrategyRecoveryAction.FORCE_SUMMARY,
             success=True,
             message=(
                 f"TIME LIMIT APPROACHING ({remaining_str} remaining).\n\n"
@@ -502,7 +507,7 @@ class CompositeRecoveryStrategy(BaseRecoveryStrategy):
         if not applicable:
             logger.warning(f"No strategy found for failure type: {context.failure_type}")
             return RecoveryResult(
-                action=RecoveryAction.CONTINUE,
+                action=StrategyRecoveryAction.CONTINUE,
                 success=False,
                 strategy_name=self.name,
                 confidence=0.0,

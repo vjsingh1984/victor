@@ -337,7 +337,7 @@ class OrchestratorRecoveryIntegration:
         failure_type: "FailureType",
     ) -> OrchestratorRecoveryAction:
         """Convert RecoveryOutcome to RecoveryAction."""
-        from victor.agent.recovery.protocols import RecoveryAction as RA
+        from victor.agent.recovery.protocols import StrategyRecoveryAction as RA
 
         result = outcome.result
 

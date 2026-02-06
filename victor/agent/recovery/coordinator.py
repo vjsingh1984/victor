@@ -59,7 +59,6 @@ from typing import Any, Optional, TYPE_CHECKING, cast
 
 from victor.agent.recovery.protocols import (
     FailureType,
-    RecoveryAction,
     RecoveryContext,
     RecoveryResult,
     StrategyRecoveryAction,
@@ -98,9 +97,9 @@ class RecoveryOutcome:
     @property
     def requires_retry(self) -> bool:
         return self.result.action in (
-            RecoveryAction.PROMPT_TOOL_CALL,
-            RecoveryAction.RETRY_WITH_TEMPLATE,
-            RecoveryAction.ADJUST_TEMPERATURE,
+            StrategyRecoveryAction.PROMPT_TOOL_CALL,
+            StrategyRecoveryAction.RETRY_WITH_TEMPLATE,
+            StrategyRecoveryAction.ADJUST_TEMPERATURE,
         )
 
 
@@ -425,13 +424,13 @@ class RecoveryCoordinator:
         outcome = RecoveryOutcome(result=result)
 
         # Handle temperature adjustment
-        if result.action == RecoveryAction.ADJUST_TEMPERATURE:
+        if result.action == StrategyRecoveryAction.ADJUST_TEMPERATURE:
             new_temp, reason = self._temperature.get_adjusted_temperature(context, session_id)
             outcome.new_temperature = new_temp
             result.new_temperature = new_temp
 
         # Handle model fallback via circuit breaker
-        if result.action == RecoveryAction.SWITCH_MODEL:
+        if result.action == StrategyRecoveryAction.SWITCH_MODEL:
             fallback = self._get_fallback_model(provider, model, failure_type)
             if fallback:
                 outcome.fallback_provider, outcome.fallback_model = fallback
@@ -450,9 +449,9 @@ class RecoveryCoordinator:
 
         # Get appropriate prompt template
         if result.action in (
-            RecoveryAction.PROMPT_TOOL_CALL,
-            RecoveryAction.RETRY_WITH_TEMPLATE,
-            RecoveryAction.FORCE_SUMMARY,
+            StrategyRecoveryAction.PROMPT_TOOL_CALL,
+            StrategyRecoveryAction.RETRY_WITH_TEMPLATE,
+            StrategyRecoveryAction.FORCE_SUMMARY,
         ):
             template, kwargs = self._prompts.get_template(
                 context, escalation_level=consecutive_failures

@@ -257,7 +257,7 @@ class ResponseCache:
             with self._embedding_lock:
                 if self._embedding_service is None:
                     try:
-                        from victor.agents.embeddings import EmbeddingService  
+                        from victor.agents.embeddings import EmbeddingService
                         from victor.config.settings import load_settings
 
                         settings = load_settings()

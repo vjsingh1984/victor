@@ -52,7 +52,6 @@ from typing import Any, Optional, TYPE_CHECKING
 from victor.agent.recovery.coordinator import RecoveryCoordinator, RecoveryOutcome
 from victor.agent.recovery.protocols import (
     FailureType,
-    RecoveryAction,
     StrategyRecoveryAction,
 )
 
@@ -253,7 +252,7 @@ class RecoveryHandler:
 
             return RecoveryOutcome(
                 result=RecoveryResult(
-                    action=RecoveryAction.CONTINUE,
+                    action=StrategyRecoveryAction.CONTINUE,
                     success=True,
                     strategy_name="disabled",
                     reason="Recovery system disabled",

@@ -47,7 +47,7 @@ from collections.abc import Callable
 from victor.protocols import IPromptContributor, PromptContext
 
 if TYPE_CHECKING:
-    from victor.framework.prompt import PromptBuilder  
+    from victor.framework.prompt import PromptBuilder
 
 logger = logging.getLogger(__name__)
 

@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     # Type stubs for native extensions (optional)
     try:
-        import victor_native  
+        import victor_native
     except ImportError:
         pass
 
