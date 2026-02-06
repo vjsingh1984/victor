@@ -2548,7 +2548,7 @@ class AgentOrchestrator(
         except Exception as e:
             logger.debug(f"Unable to get task complexity: {e}")
 
-        return strategy.determine_continuation_action(
+        return strategy.determine_continuation_action(  # type: ignore[call-arg]
             intent_result=intent_result,
             is_analysis_task=is_analysis_task,
             is_action_task=is_action_task,
@@ -3440,7 +3440,7 @@ class AgentOrchestrator(
             }
 
         try:
-            stats = self.memory_manager.get_session_stats(self._memory_session_id)
+            stats = self.memory_manager.get_session_stats(self._memory_session_id)  # type: ignore[call-arg]
             # Handle empty stats (session not found)
             if not stats or not any(k in stats for k in ("message_count", "total_tokens", "found")):
                 return {
@@ -3705,9 +3705,13 @@ class AgentOrchestrator(
             List of messages in conversation
         """
         # Convert Message objects to dict format
+        from typing import cast
         messages = self._conversation_controller.messages
-        return [m.model_dump() if hasattr(m, 'model_dump') else m  # type: ignore[return-value]
-                for m in messages]  # type: ignore[return-value]
+        result: list[dict[str, Any]] = cast(
+            list[dict[str, Any]],
+            [m.model_dump() if hasattr(m, 'model_dump') else m for m in messages]
+        )
+        return result
 
     def get_message_count(self) -> int:
         """Get message count (protocol method).

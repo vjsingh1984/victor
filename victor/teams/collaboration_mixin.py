@@ -719,7 +719,7 @@ class CollaborationMixin:
             return {"status": "completed", "result": "Task executed without collaboration"}
 
         # Execute task with collaboration
-        result = cast("dict[str, Any]", await self.execute_task_with_collaboration(task, context))
+        result = cast("dict[str, Any]", await self.execute_task_with_collaboration(task, context))  # type: ignore[redundant-cast]
 
         # Add collaboration metadata
         if self._communication_protocol:

@@ -78,7 +78,7 @@ try:
     _SIGNATURE_ACCELERATOR_AVAILABLE = True
 except ImportError:
     _SIGNATURE_ACCELERATOR_AVAILABLE = False
-    get_signature_accelerator: Callable[..., str] | None = None
+    get_signature_accelerator: Callable[..., str] | None = None  # type: ignore[no-redef]
 
 # Legacy import for backward compatibility
 try:
@@ -87,7 +87,7 @@ try:
     _NATIVE_SIGNATURE_AVAILABLE = True
 except ImportError:
     _NATIVE_SIGNATURE_AVAILABLE = False
-    native_compute_signature: Callable[..., str] | None = None
+    native_compute_signature: Callable[..., str] | None = None  # type: ignore[no-redef]
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry

@@ -116,7 +116,7 @@ class LazyImport:
         """Allow calling the module if it's callable."""
         if self._module is None:
             self.__getattr__("__call__")  # Trigger import
-        return self._module(*args, **kwargs)
+        return self._module(*args, **kwargs)  # type: ignore[misc]
 
 
 def lazy_import(module_name: str, package: Optional[str] = None) -> LazyImport:
@@ -311,7 +311,7 @@ class ThreadSafeMemoized:
         wrapped.cache_clear = lambda: self._cache_clear()  # type: ignore[attr-defined]
         wrapped.cache_info = lambda: self._cache_info()  # type: ignore[attr-defined]
 
-        return wrapped
+        return wrapped  # type: ignore[return-value]
 
     def _cache_clear(self) -> None:
         """Clear the cache."""
@@ -451,7 +451,7 @@ def timed(
                     f"{func.__name__} executed in {elapsed:.4f}s",
                 )
 
-        return wrapped
+        return wrapped  # type: ignore[return-value]
 
     return decorator
 
@@ -511,9 +511,9 @@ def retry(
                         logger.error(f"{func.__name__} failed after {max_attempts} attempts: {e}")
 
             # All attempts failed
-            raise last_exception
+            raise last_exception  # type: ignore[misc]
 
-        return wrapped
+        return wrapped  # type: ignore[return-value]
 
     return decorator
 
@@ -565,9 +565,9 @@ def async_retry(
                         logger.error(f"{func.__name__} failed after {max_attempts} attempts: {e}")
 
             # All attempts failed
-            raise last_exception
+            raise last_exception  # type: ignore[misc]
 
-        return wrapped
+        return wrapped  # type: ignore[return-value]
 
     return decorator
 

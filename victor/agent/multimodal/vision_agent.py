@@ -1578,8 +1578,3 @@ class VisionAgent:
         except Exception as e:
             logger.error(f"Color extraction failed: {e}")
             raise
-
-
-# =============================================================================
-# Legacy Aliases for Backwards Compatibility
-# =============================================================================

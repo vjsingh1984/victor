@@ -245,7 +245,3 @@ class TestToolSetCategories:
         # Should not raise, just ignore unknown
         names = ts.get_tool_names()
         assert "read" in names  # Core tools present
-
-    def test_refactor_alias(self):
-        """REFACTOR is an alias for REFACTORING."""
-        assert ToolCategory.REFACTOR.value == "refactoring"

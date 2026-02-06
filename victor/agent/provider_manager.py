@@ -428,7 +428,7 @@ class ProviderManager:
             return self._capability_cache[cache_key]
 
         try:
-            discovery = await self.provider.discover_capabilities(self.model)
+            discovery = await self.provider.discover_capabilities(self.model)  # type: ignore[union-attr]
         except Exception as exc:
             logger.warning(
                 f"Capability discovery failed for {self.provider_name}:{self.model} ({exc}); "

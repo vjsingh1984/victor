@@ -258,7 +258,7 @@ class CopyOnWriteState(Generic[StateType]):
             return self._source[key]
         # Lock for consistent read from modified state
         with self._lock:
-            return self._copy[key]
+            return self._copy[key]  # type: ignore[index]
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Set item, triggering copy on first mutation (thread-safe).
@@ -295,7 +295,7 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return key in self._source
         with self._lock:
-            return key in self._copy
+            return key in self._copy  # type: ignore[operator]
 
     def __len__(self) -> int:
         """Get length (thread-safe).
@@ -339,7 +339,7 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return self._source.get(key, default)
         with self._lock:
-            return self._copy.get(key, default)
+            return self._copy.get(key, default)  # type: ignore[union-attr]
 
     def keys(self) -> list[Any]:
         """Get keys (thread-safe snapshot).

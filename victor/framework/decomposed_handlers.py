@@ -91,42 +91,42 @@ def _invoke_capability(orchestrator: Any, capability_name: str, *args: Any, **kw
 # =============================================================================
 
 
-def get_workflow_registry():
+def get_workflow_registry():  # type: ignore[no-untyped-def]
     """Lazy import workflow registry."""
     from victor.workflows.registry import get_global_registry
 
     return get_global_registry()
 
 
-def get_trigger_registry():
+def get_trigger_registry():  # type: ignore[no-untyped-def]
     """Lazy import trigger registry."""
     from victor.workflows.trigger_registry import get_trigger_registry
 
     return get_trigger_registry()
 
 
-def get_team_registry():
+def get_team_registry():  # type: ignore[no-untyped-def]
     """Lazy import team registry."""
     from victor.framework.team_registry import get_team_registry
 
     return get_team_registry()
 
 
-def get_chain_registry():
+def get_chain_registry():  # type: ignore[no-untyped-def]
     """Lazy import chain registry."""
     from victor.framework.chain_registry import get_chain_registry
 
     return get_chain_registry()
 
 
-def get_persona_registry():
+def get_persona_registry():  # type: ignore[no-untyped-def]
     """Lazy import persona registry."""
     from victor.framework.persona_registry import get_persona_registry
 
     return get_persona_registry()
 
 
-def get_handler_registry():
+def get_handler_registry():  # type: ignore[no-untyped-def]
     """Lazy import handler registry."""
     from victor.framework.handler_registry import get_handler_registry
 
@@ -199,7 +199,7 @@ class WorkflowStepHandler(BaseStepHandler):
 
         # Register with workflow registry
         try:
-            registry = self._workflow_registry or get_workflow_registry()
+            registry = self._workflow_registry or get_workflow_registry()  # type: ignore[no-untyped-call]
             for name, workflow in workflows.items():
                 registry.register(
                     f"{vertical.name}:{name}",
@@ -214,7 +214,7 @@ class WorkflowStepHandler(BaseStepHandler):
 
         # Register workflow triggers
         try:
-            trigger_registry = self._trigger_registry or get_trigger_registry()
+            trigger_registry = self._trigger_registry or get_trigger_registry()  # type: ignore[no-untyped-call]
             if workflow_provider is not None and hasattr(workflow_provider, "get_auto_workflows"):
                 auto_workflows = workflow_provider.get_auto_workflows()
                 if auto_workflows:
@@ -367,7 +367,7 @@ class TeamSpecStepHandler(BaseStepHandler):
 
         # Register with global registry
         try:
-            team_registry = self._team_registry or get_team_registry()
+            team_registry = self._team_registry or get_team_registry()  # type: ignore[no-untyped-call]
             team_registry.register_from_vertical(vertical.name, team_specs, replace=True)
             logger.debug(f"Registered {team_count} teams with global registry")
         except ImportError:
@@ -427,7 +427,7 @@ class ChainStepHandler(BaseStepHandler):
 
         # Register with ChainRegistry
         try:
-            registry = self._chain_registry or get_chain_registry()
+            registry = self._chain_registry or get_chain_registry()  # type: ignore[no-untyped-call]
             for name, chain in chains.items():
                 registry.register(
                     name,
@@ -491,7 +491,7 @@ class PersonaStepHandler(BaseStepHandler):
 
         # Register with PersonaRegistry
         try:
-            registry = self._persona_registry or get_persona_registry()
+            registry = self._persona_registry or get_persona_registry()  # type: ignore[no-untyped-call]
 
             for name, persona in personas.items():
                 # Convert to PersonaSpec if needed
@@ -707,7 +707,7 @@ class HandlerRegistrationStepHandler(BaseStepHandler):
         handler_count = len(handlers)
 
         try:
-            registry = self._handler_registry or get_handler_registry()
+            registry = self._handler_registry or get_handler_registry()  # type: ignore[no-untyped-call]
 
             for name, handler in handlers.items():
                 registry.register(name, handler, vertical=vertical.name, replace=True)

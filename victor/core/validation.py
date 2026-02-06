@@ -470,7 +470,7 @@ class ModelConfigSchema(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    model_name: str = Field(
+    model_name: str = Field(  # type: ignore[pydantic-alias]
         ...,
         min_length=1,
         description="Model identifier",

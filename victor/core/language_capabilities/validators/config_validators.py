@@ -456,5 +456,5 @@ def get_config_validator(
     validator_class = CONFIG_VALIDATORS.get(language.lower())
     if validator_class:
         result = validator_class(ts_validator)
-        return result
+        return result  # type: ignore[return-value]
     return None

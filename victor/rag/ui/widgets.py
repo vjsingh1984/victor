@@ -30,8 +30,8 @@ try:
 except ImportError:
     TEXTUAL_AVAILABLE = False
 
-    Widget = object  # type: ignore[assignment]
-    ComposeResult = object  # type: ignore[assignment]
+    Widget: type[object] = object  # type: ignore[no-redef]
+    ComposeResult: type[object] = object  # type: ignore[no-redef]
 
 
 if TEXTUAL_AVAILABLE:
@@ -270,14 +270,14 @@ else:
     class DocumentListStub:  # Renamed to avoid conflict
         """Stub when Textual is not available."""
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
             raise ImportError("Textual required for RAG UI")
 
     class SearchResultsStub:  # Renamed to avoid conflict
         """Stub when Textual is not available."""
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
             raise ImportError("Textual required for RAG UI")
 
-    DocumentList = DocumentListStub  # type: ignore[assignment]
-    SearchResults = SearchResultsStub  # type: ignore[assignment]
+    DocumentList: type[object] = DocumentListStub  # type: ignore[no-redef]
+    SearchResults: type[object] = SearchResultsStub  # type: ignore[no-redef]

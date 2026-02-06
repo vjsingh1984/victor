@@ -1591,7 +1591,7 @@ Respond with just the command to run."""
                             except Exception:
                                 pass
 
-                file_sizes.sort(key=lambda x: int(x.get("lines", 0) or 0), reverse=True)
+                file_sizes.sort(key=lambda x: int(x.get("lines", 0) or 0), reverse=True)  # type: ignore[call-overload]
                 metrics["largest_files"] = file_sizes[:10]
 
                 return JSONResponse(metrics)

@@ -1363,7 +1363,7 @@ def handle_errors(
                         recovery_hint=recovery_hint or error_info.recovery_hint,
                         cause=e,
                     ) from e
-                return default_return
+                return default_return  # type: ignore[return-value]
 
         return wrapper
 

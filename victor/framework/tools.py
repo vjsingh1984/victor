@@ -62,10 +62,6 @@ class ToolCategory(str, Enum):
     REFACTORING = "refactoring"
     """Code refactoring: rename, extract, inline."""
 
-    # Legacy alias for backward compatibility
-    REFACTOR = "refactoring"
-    """Alias for REFACTORING (deprecated, use REFACTORING)."""
-
     DOCUMENTATION = "documentation"
     """Documentation: docstring generation, README updates."""
 
@@ -111,10 +107,6 @@ def _load_builtin_category_tools() -> dict[ToolCategory, set[str]]:
                 # These are handled by ToolCategoryRegistry
                 pass
 
-        # Alias for legacy REFACTOR
-        if ToolCategory.REFACTORING in result:
-            result[ToolCategory.REFACTOR] = result[ToolCategory.REFACTORING]
-
         return result
 
     # Fallback to hardcoded defaults
@@ -126,10 +118,6 @@ def _load_builtin_category_tools() -> dict[ToolCategory, set[str]]:
             result[category_enum] = tools
         except ValueError:
             pass
-
-    # Alias for legacy REFACTOR
-    if ToolCategory.REFACTORING in result:
-        result[ToolCategory.REFACTOR] = result[ToolCategory.REFACTORING]
 
     return result
 

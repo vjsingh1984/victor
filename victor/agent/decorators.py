@@ -236,7 +236,7 @@ def deprecated_class(
         original_init = cls.__init__
 
         @functools.wraps(original_init)
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:  # type: ignore[no-untyped-def]
             # Build deprecation message
             parts = [f"Class '{cls.__name__}' is deprecated"]
 

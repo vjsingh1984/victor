@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     try:
         from langchain_core.runnables import Runnable as RunnableImport  
 
-        RunnableType = RunnableImport
+        RunnableType = RunnableImport  # type: ignore[misc]
     except ImportError:
         pass  # RunnableType will remain as Any
 

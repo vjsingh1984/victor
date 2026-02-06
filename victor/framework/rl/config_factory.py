@@ -88,7 +88,7 @@ class VerticalRLConfig(BaseRLConfig):
     """
 
     # Coding-specific: tools that conflict
-    conflicting_tools: dict[str, set] = field(default_factory=dict)
+    conflicting_tools: dict[str, set] = field(default_factory=dict)  # type: ignore[type-arg]
 
     # DataAnalysis-specific: output length preferences
     preferred_output_length: dict[str, str] = field(default_factory=dict)

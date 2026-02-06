@@ -92,7 +92,7 @@ class DirectProtocolAdapter(VictorProtocol):
             usage=response.usage if hasattr(response, "usage") else {},
         )
 
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
+    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:  # type: ignore[override]
         """Stream a chat response."""
         message = messages[-1].content if messages else ""
 
@@ -341,7 +341,7 @@ class HTTPProtocolAdapter(VictorProtocol):
         data = response.json()
         return ChatResponse.from_dict(data)
 
-    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:
+    async def stream_chat(self, messages: list[ChatMessage]) -> AsyncIterator[ClientStreamChunk]:  # type: ignore[override]
         """Stream a chat response."""
         async with self._client.stream(
             "POST",

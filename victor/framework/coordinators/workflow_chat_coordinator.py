@@ -502,7 +502,7 @@ class WorkflowChatCoordinator:
             )
         return workflow
 
-    def _get_compiled_graph(self, workflow_name: str) -> "CompiledGraph":
+    def _get_compiled_graph(self, workflow_name: str) -> "CompiledGraph":  # type: ignore[type-arg]
         """Get compiled graph for a workflow.
 
         Compiles WorkflowDefinitions on-demand and caches compiled graphs
