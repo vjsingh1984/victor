@@ -137,6 +137,7 @@ dev = [
     # Type stubs
     "types-pyyaml",
     "types-aiofiles",
+    "types-cachetools",
 
     # Security Scanning
     "bandit[toml]>=1.7",
