@@ -49,8 +49,7 @@ from typing import (
     TypeVar,
 )
 
-# CI compatibility: cachetools may not have stubs in all environments
-from cachetools import TTLCache  # type: ignore[import-untyped]
+from cachetools import TTLCache
 
 if TYPE_CHECKING:
     from victor.framework.graph import (

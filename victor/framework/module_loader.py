@@ -351,8 +351,7 @@ class DynamicModuleLoader:
         # Create file event handler
         loader = self
 
-        # CI compatibility: type ignore for different MyPy versions
-        class ModuleFileHandler(FileSystemEventHandler):  # type: ignore[misc]
+        class ModuleFileHandler(FileSystemEventHandler):
             """Handler for module file changes."""
 
             def __init__(handler_self) -> None:

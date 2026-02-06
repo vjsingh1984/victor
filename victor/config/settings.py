@@ -306,7 +306,7 @@ def reset_project_paths() -> None:
     _current_project_paths = None
 
 
-class ProviderConfig(BaseSettings):  # type: ignore[misc]  # CI compatibility
+class ProviderConfig(BaseSettings):
     """Configuration for a specific provider."""
 
     api_key: Optional[str] = None
@@ -316,7 +316,7 @@ class ProviderConfig(BaseSettings):  # type: ignore[misc]  # CI compatibility
     organization: Optional[str] = None  # For OpenAI
 
 
-class ProfileConfig(BaseSettings):  # type: ignore[misc]  # CI compatibility
+class ProfileConfig(BaseSettings):
     """Configuration for a model profile."""
 
     model_config = SettingsConfigDict(extra="allow", protected_namespaces=(), populate_by_name=True)
@@ -435,7 +435,7 @@ class ProfileConfig(BaseSettings):  # type: ignore[misc]  # CI compatibility
         return v
 
 
-class ProfilesYAMLSettingsSource(PydanticBaseSettingsSource):  # type: ignore[misc]  # CI compatibility
+class ProfilesYAMLSettingsSource(PydanticBaseSettingsSource):
     """Custom settings source that loads from profiles.yaml.
 
     This allows settings to be configured in ~/.victor/profiles.yaml
@@ -494,7 +494,7 @@ class ProfilesYAMLSettingsSource(PydanticBaseSettingsSource):  # type: ignore[mi
             return {}
 
 
-class Settings(BaseSettings):  # type: ignore[misc]  # CI compatibility
+class Settings(BaseSettings):
     """Main application settings."""
 
     model_config = SettingsConfigDict(

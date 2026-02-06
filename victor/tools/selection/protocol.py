@@ -159,9 +159,6 @@ class CrossVerticalToolSelectionContext:
         )
 
 
-# Backward compatibility alias
-
-
 @dataclass
 class ToolSelectorFeatures:
     """Features supported by a tool selector implementation.

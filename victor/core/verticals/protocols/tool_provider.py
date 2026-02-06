@@ -73,9 +73,6 @@ class VerticalToolSelectionContext:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-# Backward compatibility alias
-
-
 @dataclass
 class ToolSelectionResult:
     """Result of vertical-specific tool selection.
