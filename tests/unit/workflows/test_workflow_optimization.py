@@ -604,19 +604,19 @@ class TestResourceManager:
 
 
 # =============================================================================
-# Test: ModeCompletionCriteria (Issue #6)
+# Test: ModeCompletionChecker (Issue #6)
 # =============================================================================
 
 
-class TestModeCompletionCriteria:
+class TestModeCompletionChecker:
     """Tests for mode-specific completion criteria."""
 
     @pytest.fixture
     def criteria(self):
         """Create a fresh criteria checker."""
-        from victor.agent.budget_manager import ModeCompletionCriteria
+        from victor.agent.budget_manager import ModeCompletionChecker
 
-        return ModeCompletionCriteria()
+        return ModeCompletionChecker()
 
     def test_get_explore_criteria(self, criteria):
         """Test getting EXPLORE mode criteria."""

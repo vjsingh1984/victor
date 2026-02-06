@@ -736,12 +736,12 @@ class TestWorkflowOptimizationComponents:
         ResourceManager._instance = None
 
     def test_create_mode_completion_criteria(self, factory):
-        """create_mode_completion_criteria returns ModeCompletionCriteria."""
+        """create_mode_completion_criteria returns ModeCompletionChecker."""
         criteria = factory.create_mode_completion_criteria()
 
-        from victor.agent.budget_manager import ModeCompletionCriteria
+        from victor.agent.budget_manager import ModeCompletionChecker
 
-        assert isinstance(criteria, ModeCompletionCriteria)
+        assert isinstance(criteria, ModeCompletionChecker)
 
     def test_create_workflow_optimization_components(self, factory):
         """create_workflow_optimization_components returns all components."""

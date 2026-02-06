@@ -154,7 +154,7 @@ class WorkflowOptimizationComponents:
     - TimeAwareExecutor: Manages execution with time budget awareness
     - ThinkingPatternDetector: Detects and breaks thinking loops
     - ResourceManager: Centralized resource lifecycle management
-    - ModeCompletionCriteria: Mode-specific early exit detection
+    - ModeCompletionChecker: Mode-specific early exit detection
     """
 
     task_completion_detector: Optional[Any] = None
@@ -2712,17 +2712,17 @@ class OrchestratorFactory(ModeAwareMixin):
         return manager
 
     def create_mode_completion_criteria(self) -> Any:
-        """Create ModeCompletionCriteria for mode-specific early exit.
+        """Create ModeCompletionChecker for mode-specific early exit.
 
         Issue Reference: workflow-test-issues-v2.md Issue #6
 
         Returns:
-            ModeCompletionCriteria instance
+            ModeCompletionChecker instance
         """
         from victor.agent.budget_manager import create_mode_completion_criteria
 
         criteria = create_mode_completion_criteria()
-        logger.debug("ModeCompletionCriteria created")
+        logger.debug("ModeCompletionChecker created")
         return criteria
 
     def create_checkpoint_manager(self) -> Optional[Any]:

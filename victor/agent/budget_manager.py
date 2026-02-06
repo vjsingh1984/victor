@@ -73,9 +73,6 @@ from victor.agent.protocols import (
 )
 from victor.protocols.mode_aware import ModeAwareMixin
 
-# Type alias for backward compatibility
-ModeCompletionCriteria = ModeCompletionChecker
-
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -650,8 +647,8 @@ def create_extended_budget_manager(
 
 def create_mode_completion_criteria(
     custom_criteria: Optional[dict[str, ModeCompletionConfig]] = None,
-) -> ModeCompletionCriteria:
-    """Create a ModeCompletionCriteria instance.
+) -> ModeCompletionChecker:
+    """Create a ModeCompletionChecker instance.
 
     Factory function for DI registration.
 
@@ -659,7 +656,7 @@ def create_mode_completion_criteria(
         custom_criteria: Override default criteria for specific modes
 
     Returns:
-        Configured ModeCompletionCriteria instance
+        Configured ModeCompletionChecker instance
     """
     # Create concrete implementation
     from victor.agent.budget.mode_completion_checker import ModeCompletionChecker

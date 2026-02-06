@@ -28,8 +28,8 @@ Example Usage:
     from victor.framework.hitl import (
         ApprovalGate,
         TextInputGate,
-        ChoiceInput,
-        ConfirmationDialog,
+        ChoiceInputGate,
+        ConfirmationDialogGate,
         ReviewGate,
         HITLSession,
         get_prompt_template,
@@ -86,10 +86,6 @@ from victor.framework.hitl.gates import (
     TextInputGate,
 )
 
-# Convenience aliases
-ChoiceInput = ChoiceInputGate
-ConfirmationDialog = ConfirmationDialogGate
-
 from victor.framework.hitl.protocols import (
     FallbackBehavior,
     FallbackStrategy,
@@ -124,8 +120,8 @@ __all__ = [
     # Gates
     "ApprovalGate",
     "TextInputGate",
-    "ChoiceInput",
-    "ConfirmationDialog",
+    "ChoiceInputGate",
+    "ConfirmationDialogGate",
     "ReviewGate",
     # Protocols
     "HITLGateProtocol",
