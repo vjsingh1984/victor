@@ -3706,10 +3706,11 @@ class AgentOrchestrator(
         """
         # Convert Message objects to dict format
         from typing import cast
+
         messages = self._conversation_controller.messages
         result: list[dict[str, Any]] = cast(
             list[dict[str, Any]],
-            [m.model_dump() if hasattr(m, 'model_dump') else m for m in messages]
+            [m.model_dump() if hasattr(m, "model_dump") else m for m in messages],
         )
         return result
 
