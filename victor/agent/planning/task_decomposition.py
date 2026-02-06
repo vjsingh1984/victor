@@ -847,7 +847,7 @@ class TaskDecomposition:
             >>> decomposition.visualize(output_path="task_graph.png")
         """
         try:
-            import matplotlib.pyplot as plt  # type: ignore[import-not-found]
+            import matplotlib.pyplot as plt
         except ImportError:
             raise ImportError(
                 "matplotlib is required for visualization. "
@@ -859,7 +859,7 @@ class TaskDecomposition:
 
         # Use graphviz layout if available, otherwise spring layout
         try:
-            import pygraphviz  # type: ignore[import-not-found]
+            import pygraphviz
 
             pos = nx.nx_agraph.graphviz_layout(self._graph, prog="dot")
         except (ImportError, AttributeError):
@@ -914,7 +914,7 @@ class TaskDecomposition:
         )
 
         # Add legend
-        from matplotlib.patches import Patch  # type: ignore[import-not-found]
+        from matplotlib.patches import Patch
 
         legend_elements = [
             Patch(facecolor="#90EE90", label="Completed"),
