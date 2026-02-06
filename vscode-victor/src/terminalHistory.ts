@@ -218,6 +218,7 @@ export class TerminalHistoryService implements vscode.Disposable {
                 this._shellIntegrationAvailable = true;
 
                 // Listen for command execution start
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const startEvent = (vscode.window as any).onDidStartTerminalShellExecution;
                 if (startEvent) {
                     this._disposables.push(
@@ -228,6 +229,7 @@ export class TerminalHistoryService implements vscode.Disposable {
                 }
 
                 // Listen for command execution end
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const endEvent = (vscode.window as any).onDidEndTerminalShellExecution;
                 if (endEvent) {
                     this._disposables.push(
@@ -410,9 +412,11 @@ export class TerminalHistoryService implements vscode.Disposable {
      */
     private _cleanLine(line: string): string {
         // Remove ANSI escape codes
+        // eslint-disable-next-line no-control-regex
         let cleaned = line.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
 
         // Remove shell integration escape sequences (OSC 633/133)
+        // eslint-disable-next-line no-control-regex
         cleaned = cleaned.replace(/\x1b\][0-9]+;[^\x07]*\x07/g, '');
 
         // Process carriage returns (keep only final state)

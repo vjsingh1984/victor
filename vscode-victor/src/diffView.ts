@@ -196,11 +196,13 @@ export class DiffViewProvider {
                         this._updateStatusBar();
                     }
                     break;
+                }
 
-                case 'rejectAll':
+                case 'rejectAll': {
                     this.rejectSession(sessionId);
                     panel.dispose();
                     break;
+                }
             }
         });
     }

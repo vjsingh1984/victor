@@ -199,6 +199,7 @@ suite('Output Processing', () => {
         const coloredOutput = '\x1b[32mSuccess\x1b[0m';
 
         // The service cleans these internally
+        // eslint-disable-next-line no-control-regex
         const cleaned = coloredOutput.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
         assert.strictEqual(cleaned, 'Success');
     });
