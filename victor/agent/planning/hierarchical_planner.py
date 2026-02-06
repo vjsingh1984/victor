@@ -58,7 +58,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from victor.agent.planning.task_decomposition import (
     ComplexityScore,
-    Task,
+    TaskLegacy as Task,  # Backward compatibility alias
     TaskDecomposition,
     TaskGraph,
     UpdatedPlan,

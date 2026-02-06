@@ -1369,9 +1369,6 @@ class UpdatedPlan:
         }
 
 
-# Type alias for backward compatibility
-Task = TaskLegacy
-
 
 __all__ = [
     # New NetworkX-based implementation
@@ -1382,7 +1379,7 @@ __all__ = [
     "DependencyEdge",
     "TaskDecomposition",
     # Legacy classes for backward compatibility
-    "Task",
+    "TaskLegacy",
     "TaskGraph",
     "ComplexityScore",
     "ValidationResult",

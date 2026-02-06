@@ -71,7 +71,7 @@ from victor.agent.planning.task_decomposition import (
     DependencyEdge,
     DependencyType,
     SimpleTask,
-    Task,
+    TaskLegacy as Task,  # Backward compatibility alias
     TaskDecomposition,
     TaskGraph,
     TaskNode,

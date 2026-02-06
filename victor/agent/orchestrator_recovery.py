@@ -138,10 +138,6 @@ class OrchestratorRecoveryAction:
         return self.fallback_provider is not None
 
 
-# Backward compatibility alias
-RecoveryAction = OrchestratorRecoveryAction
-
-
 class OrchestratorRecoveryIntegration:
     """Submodule for recovery handling in orchestrator.
 
@@ -217,7 +213,7 @@ class OrchestratorRecoveryIntegration:
         is_analysis_task: bool = False,
         is_action_task: bool = False,
         context_utilization: Optional[float] = None,
-    ) -> RecoveryAction:
+    ) -> OrchestratorRecoveryAction:
         """Handle a model response and determine recovery action.
 
         This is the main entry point called from stream_chat.
@@ -252,21 +248,21 @@ class OrchestratorRecoveryIntegration:
         # Check for normal completion (has content and/or tool calls)
         if (content and len(content) > 50) or tool_calls:
             self._state.on_success()
-            return RecoveryAction(
+            return OrchestratorRecoveryAction(
                 action="continue",
                 reason="Response has content or tool calls",
             )
 
         # If recovery is disabled, return continue
         if not self.enabled:
-            return RecoveryAction(
+            return OrchestratorRecoveryAction(
                 action="continue",
                 reason="Recovery disabled",
             )
 
         # Detect failure type
         if self._handler is None:
-            return RecoveryAction(
+            return OrchestratorRecoveryAction(
                 action="continue",
                 reason="No recovery handler configured",
             )
@@ -285,7 +281,7 @@ class OrchestratorRecoveryIntegration:
 
         if failure_type is None:
             self._state.on_success()
-            return RecoveryAction(
+            return OrchestratorRecoveryAction(
                 action="continue",
                 reason="No failure detected",
             )
@@ -296,7 +292,7 @@ class OrchestratorRecoveryIntegration:
 
         # Check if we've exceeded recovery attempts
         if self._state.recovery_attempts >= self._max_recovery_attempts:
-            return RecoveryAction(
+            return OrchestratorRecoveryAction(
                 action="abort",
                 failure_type=failure_type,
                 reason=f"Max recovery attempts ({self._max_recovery_attempts}) exceeded",
@@ -304,7 +300,7 @@ class OrchestratorRecoveryIntegration:
 
         # Get recovery outcome from handler
         if self._handler is None:
-            return RecoveryAction(
+            return OrchestratorRecoveryAction(
                 action="abort",
                 failure_type=failure_type,
                 reason="No recovery handler configured",
@@ -339,7 +335,7 @@ class OrchestratorRecoveryIntegration:
         self,
         outcome: "RecoveryOutcome",
         failure_type: "FailureType",
-    ) -> RecoveryAction:
+    ) -> OrchestratorRecoveryAction:
         """Convert RecoveryOutcome to RecoveryAction."""
         from victor.agent.recovery.protocols import RecoveryAction as RA
 
@@ -360,7 +356,7 @@ class OrchestratorRecoveryIntegration:
 
         action_type = action_map.get(result.action, "continue")
 
-        return RecoveryAction(
+        return OrchestratorRecoveryAction(
             action=action_type,
             message=result.message,
             new_temperature=outcome.new_temperature or result.new_temperature,

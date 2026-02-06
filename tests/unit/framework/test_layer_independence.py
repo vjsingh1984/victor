@@ -489,7 +489,7 @@ class TestLayerBoundaries:
         from victor.core.state import ConversationStage
 
         # Stage alias was removed in Module 41 - now using ConversationStage directly
-        assert hasattr(framework_state, 'ConversationStage')
+        assert hasattr(framework_state, "ConversationStage")
 
     def test_core_types_no_agent_dependencies(self):
         """Core types should not depend on agent layer."""

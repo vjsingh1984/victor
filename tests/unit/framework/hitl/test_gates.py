@@ -567,4 +567,3 @@ class TestReviewGate:
 
 # NOTE: The TextInput alias was removed in Module 49.
 # All code should now use the canonical name TextInputGate.
-
