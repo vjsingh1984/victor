@@ -647,6 +647,19 @@ disallow_untyped_defs = true
 warn_return_any = true
 strict = true
 
+# Exception: settings.py has CI-specific type ignores for pydantic compatibility
+[[tool.mypy.overrides]]
+module = "victor.config.settings"
+warn_unused_ignores = false
+
+# Exception: tool_result_cache.py and conversation_memory.py have numpy type ignores
+[[tool.mypy.overrides]]
+module = [
+    "victor.agent.tool_result_cache",
+    "victor.agent.conversation_memory",
+]
+warn_unused_ignores = false
+
 # Phase 1: Enhanced typing for coordinator modules (Jan 14, 2026) ✅ COMPLETE
 # Coordinators now pass strict mypy checks
 # See TYPE_SAFETY_PLAN.md Phase 1 for details
