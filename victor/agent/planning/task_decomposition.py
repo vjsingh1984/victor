@@ -1369,7 +1369,6 @@ class UpdatedPlan:
         }
 
 
-
 __all__ = [
     # New NetworkX-based implementation
     "SimpleTask",
