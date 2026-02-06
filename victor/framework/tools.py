@@ -380,16 +380,6 @@ def get_category_registry() -> ToolCategoryRegistry:
     return ToolCategoryRegistry.get_instance()
 
 
-# Legacy alias for backward compatibility
-# DEPRECATED: Use get_category_registry().get_tools(category) instead
-def _get_category_tools(category: ToolCategory) -> set[str]:
-    """Get tools for a category (backward compatible).
-
-    DEPRECATED: Use get_category_registry().get_tools() instead.
-    """
-    return get_category_registry().get_tools(category.value)
-
-
 @dataclass
 class ToolSet:
     """Configuration for which tools are available to an agent.

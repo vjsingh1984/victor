@@ -477,23 +477,40 @@ class TestToolExecutorCacheableTools:
 
     @staticmethod
     def _ensure_tools_loaded():
-        """Force import and reload of tool modules to populate the registry.
+        """Force import of tool modules to populate the registry.
 
-        Uses importlib.reload() to ensure tools are re-registered even if
-        the metadata registry was reset by previous tests.
+        Note: This should be called before each test to ensure tools are
+        registered even if the metadata registry was reset by previous tests.
         """
-        import importlib
-
-        # Force reload to ensure tool registration happens even after registry resets
-        import victor.tools.filesystem
+        # Import tool modules to trigger @tool decorator registration
+        import victor.tools.bash
         import victor.tools.code_search_tool
         import victor.tools.file_editor_tool
-        import victor.tools.bash
+        import victor.tools.filesystem
 
-        importlib.reload(victor.tools.filesystem)
-        importlib.reload(victor.tools.code_search_tool)
-        importlib.reload(victor.tools.file_editor_tool)
-        importlib.reload(victor.tools.bash)
+        # The @tool decorator automatically registers tools when the module is imported.
+        # If the registry was reset by previous tests, we manually re-register tools
+        # by finding them in the imported modules.
+        from victor.tools.metadata_registry import get_global_registry
+        from victor.tools.base import BaseTool
+
+        registry = get_global_registry()
+
+        # If registry is empty (was reset), re-register tools from modules
+        if not registry.get_all_tool_names():
+            for module_name in ['victor.tools.filesystem', 'victor.tools.bash',
+                               'victor.tools.code_search_tool', 'victor.tools.file_editor_tool']:
+                import sys
+                if module_name in sys.modules:
+                    module = sys.modules[module_name]
+                    for attr_name in dir(module):
+                        if not attr_name.startswith('_'):
+                            attr = getattr(module, attr_name, None)
+                            if isinstance(attr, BaseTool) and hasattr(attr, 'name'):
+                                try:
+                                    registry.register(attr)
+                                except Exception:
+                                    pass  # Already registered
 
     def test_default_cacheable_tools(self):
         """Test cacheable tools detection via registry.

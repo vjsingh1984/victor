@@ -973,16 +973,9 @@ class SkillDiscoveryEngine:
 
 __all__ = [
     "AvailableTool",
-    "DiscoveredSkill",  # Alias for AvailableTool
     "ToolSignature",
     "MCPTool",
     "Skill",
-    "CompositeSkill",  # Alias for Skill
     "SkillCapabilities",
     "SkillDiscoveryEngine",
 ]
-
-
-# Type aliases for compatibility with requirements
-DiscoveredSkill = AvailableTool
-CompositeSkill = Skill
