@@ -1199,8 +1199,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, vscode.Disp
             let result = escaped;
 
             // Comments (single line // and #, multi-line /* */)
-            result = result.replace(/(\/\/[^\\n]*)/g, '<span class="hljs-comment">$1</span>');
-            result = result.replace(/(#[^\\n]*)/g, '<span class="hljs-comment">$1</span>');
+            result = result.replace(/(\/\/[^\n]*)/g, '<span class="hljs-comment">$1</span>');
+            result = result.replace(/(#[^\n]*)/g, '<span class="hljs-comment">$1</span>');
             result = result.replace(/(\\/\\*[\\s\\S]*?\\*\\/)/g, '<span class="hljs-comment">$1</span>');
 
             // Strings (double and single quotes)

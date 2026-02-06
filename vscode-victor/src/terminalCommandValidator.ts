@@ -315,7 +315,7 @@ export class TerminalCommandValidator {
         /`[^`]*`/,
 
         // Path traversal attempts
-        /\.\.[\/\\]/,
+        /\.\.[/\\]/,
         /\.\.%2f/i,
         /\.\.%5c/i,
 

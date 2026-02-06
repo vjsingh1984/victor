@@ -16,6 +16,7 @@ import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import * as net from 'net';
 
 export interface ServerConfig {
     host: string;
@@ -184,7 +185,6 @@ export class ServerManager {
      */
     private async isPortInUse(port: number): Promise<boolean> {
         return new Promise((resolve) => {
-            const net = require('net');
             const server = net.createServer();
 
             server.once('error', (err: NodeJS.ErrnoException) => {

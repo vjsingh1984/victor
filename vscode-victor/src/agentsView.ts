@@ -49,6 +49,72 @@ export interface AgentToolCall {
     result?: string;
 }
 
+// WebSocket event data interfaces
+interface AgentStartedEvent {
+    type: 'agent_started';
+    data: AgentTask;
+}
+
+interface AgentRunningEvent {
+    type: 'agent_running';
+    data: Partial<AgentTask>;
+}
+
+interface AgentToolCallEvent {
+    type: 'agent_tool_call';
+    data: {
+        id: string;
+        name: string;
+        arguments: string;
+        status: 'pending' | 'running' | 'success' | 'error';
+        startTime: number;
+        endTime?: number;
+        result?: string;
+    };
+}
+
+interface AgentToolResultEvent {
+    type: 'agent_tool_result';
+    data: {
+        tool_call_id: string;
+        result: string;
+        error?: string;
+    };
+}
+
+interface AgentCompletedEvent {
+    type: 'agent_completed' | 'agent_error' | 'agent_cancelled';
+    data: Partial<AgentTask>;
+}
+
+type AgentEventData = AgentStartedEvent | AgentRunningEvent | AgentToolCallEvent | AgentToolResultEvent | AgentCompletedEvent;
+
+// Backend agent data format (from Victor server)
+interface BackendAgentData {
+    id: string;
+    name?: string;
+    task?: string;
+    description?: string;
+    status: string;
+    progress?: number;
+    start_time: number;
+    end_time?: number;
+    mode?: 'build' | 'plan' | 'explore';
+    output?: string;
+    error?: string;
+    tool_calls?: BackendToolCallData[];
+    agent_id?: string;
+}
+
+interface BackendToolCallData {
+    id: string;
+    name: string;
+    status: string;
+    start_time: number;
+    end_time?: number;
+    result?: string;
+}
+
 // Tree item types
 type AgentTreeItem = AgentTaskItem | AgentToolCallItem | AgentInfoItem;
 
@@ -271,24 +337,24 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
      */
     private _subscribeToAgentEvents(): void {
         // Listen for agent events via the client's event handler
-        const eventHandler = (event: { type: string; data: any }) => {
+        const eventHandler = (event: AgentEventData) => {
             switch (event.type) {
                 case 'agent_started':
-                    this._handleAgentStarted(event.data);
+                    this._handleAgentStarted(event.data as AgentTask);
                     break;
                 case 'agent_running':
-                    this._handleAgentUpdate(event.data);
+                    this._handleAgentUpdate(event.data as Partial<AgentTask>);
                     break;
                 case 'agent_tool_call':
-                    this._handleToolCall(event.data);
+                    this._handleToolCall(event.data as AgentToolCallEvent['data']);
                     break;
                 case 'agent_tool_result':
-                    this._handleToolResult(event.data);
+                    this._handleToolResult(event.data as AgentToolResultEvent['data']);
                     break;
                 case 'agent_completed':
                 case 'agent_error':
                 case 'agent_cancelled':
-                    this._handleAgentUpdate(event.data);
+                    this._handleAgentUpdate(event.data as Partial<AgentTask>);
                     break;
             }
         };
@@ -298,7 +364,7 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
         this._log('Subscribed to agent events');
     }
 
-    private _handleAgentStarted(data: any): void {
+    private _handleAgentStarted(data: AgentTask): void {
         const task = this._convertBackendAgent(data);
         this._agents.set(task.id, task);
         this.refresh();
@@ -306,7 +372,7 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
         this._log(`Agent started: ${task.id} - ${task.name}`);
     }
 
-    private _handleAgentUpdate(data: any): void {
+    private _handleAgentUpdate(data: Partial<AgentTask>): void {
         const task = this._convertBackendAgent(data);
         const previousTask = this._agents.get(task.id);
         this._agents.set(task.id, task);
@@ -341,7 +407,7 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
         }
     }
 
-    private _handleToolCall(data: any): void {
+    private _handleToolCall(data: AgentToolCallEvent['data']): void {
         const agentId = data.agent_id;
         const agent = this._agents.get(agentId);
         if (agent && data.tool_call) {
@@ -356,7 +422,7 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
         }
     }
 
-    private _handleToolResult(data: any): void {
+    private _handleToolResult(data: AgentToolResultEvent['data']): void {
         const agentId = data.agent_id;
         const toolCallId = data.tool_call_id;
         const agent = this._agents.get(agentId);
@@ -373,7 +439,7 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
     /**
      * Convert backend agent format to local AgentTask
      */
-    private _convertBackendAgent(data: any): AgentTask {
+    private _convertBackendAgent(data: BackendAgentData | Partial<BackendAgentData>): AgentTask {
         return {
             id: data.id,
             name: data.name || data.task?.slice(0, 40) || 'Agent',
@@ -385,10 +451,10 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
             mode: data.mode,
             output: data.output,
             error: data.error,
-            toolCalls: (data.tool_calls || []).map((tc: any) => ({
+            toolCalls: (data.tool_calls || []).map((tc: BackendToolCallData) => ({
                 id: tc.id,
                 name: tc.name,
-                status: tc.status,
+                status: tc.status as AgentToolCall['status'],
                 startTime: tc.start_time * 1000,
                 endTime: tc.end_time ? tc.end_time * 1000 : undefined,
                 result: tc.result,

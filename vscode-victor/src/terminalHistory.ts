@@ -19,6 +19,37 @@ export interface TerminalHistoryEntry {
     output?: string;
 }
 
+// Shell execution event interfaces (VS Code API)
+interface ShellExecutionStartEvent {
+    terminal: vscode.Terminal;
+    shellIntegration?: {
+        executeCommand: {
+            commandLine?: { value: string };
+            cwd?: { fsPath: string };
+            read?: () => vscode.ReadableStream<string>;
+        };
+    };
+    execution?: {
+        commandLine?: { value: string };
+        cwd?: { fsPath: string };
+        exitCode?: number;
+        read?: () => vscode.ReadableStream<string>;
+    };
+}
+
+interface ShellExecutionEndEvent {
+    terminal: vscode.Terminal;
+    shellIntegration?: {
+        executeCommand: {
+            exitCode?: number;
+        };
+    };
+    execution?: {
+        exitCode?: number;
+    };
+    exitCode?: number;
+}
+
 interface PendingExecution {
     command: string;
     terminalName: string;
@@ -190,7 +221,7 @@ export class TerminalHistoryService implements vscode.Disposable {
                 const startEvent = (vscode.window as any).onDidStartTerminalShellExecution;
                 if (startEvent) {
                     this._disposables.push(
-                        startEvent((event: any) => {
+                        startEvent((event: ShellExecutionStartEvent) => {
                             this._onShellExecutionStart(event);
                         })
                     );
@@ -200,7 +231,7 @@ export class TerminalHistoryService implements vscode.Disposable {
                 const endEvent = (vscode.window as any).onDidEndTerminalShellExecution;
                 if (endEvent) {
                     this._disposables.push(
-                        endEvent((event: any) => {
+                        endEvent((event: ShellExecutionEndEvent) => {
                             this._onShellExecutionEnd(event);
                         })
                     );
@@ -218,7 +249,7 @@ export class TerminalHistoryService implements vscode.Disposable {
     /**
      * Handle shell execution start event
      */
-    private _onShellExecutionStart(event: any): void {
+    private _onShellExecutionStart(event: ShellExecutionStartEvent): void {
         try {
             const terminal = event.terminal as vscode.Terminal;
             const execution = event.shellIntegration?.executeCommand || event.execution;
@@ -256,7 +287,7 @@ export class TerminalHistoryService implements vscode.Disposable {
     /**
      * Handle shell execution end event
      */
-    private _onShellExecutionEnd(event: any): void {
+    private _onShellExecutionEnd(event: ShellExecutionEndEvent): void {
         try {
             const terminal = event.terminal as vscode.Terminal;
             const execution = event.shellIntegration?.executeCommand || event.execution;
@@ -308,7 +339,7 @@ export class TerminalHistoryService implements vscode.Disposable {
     /**
      * Capture output from shell execution stream
      */
-    private async _captureOutput(key: string, execution: any): Promise<void> {
+    private async _captureOutput(key: string, execution: ShellExecutionStartEvent['shellIntegration']['executeCommand']): Promise<void> {
         try {
             const pending = this._pendingExecutions.get(key);
             if (!pending) {
