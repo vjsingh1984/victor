@@ -65,12 +65,12 @@ from typing import Any, Optional, Protocol, runtime_checkable
 
 # Import Rust-accelerated regex engine for 10-20x faster pattern matching
 try:
-    from victor.native.accelerators import get_regex_engine_accelerator  # type: ignore[attr-defined]
+    from victor.native.accelerators import get_regex_engine  # type: ignore[attr-defined]
 
     _REGEX_ACCELERATOR_AVAILABLE = True
 except ImportError:
     _REGEX_ACCELERATOR_AVAILABLE = False
-    get_regex_engine_accelerator = None
+    get_regex_engine = None
 
 logger = logging.getLogger(__name__)
 
@@ -1548,8 +1548,8 @@ class BaseLanguageAnalyzer(ABC):
         self._language_obj = None
 
         # Initialize regex accelerator for 10-20x faster pattern matching
-        if _REGEX_ACCELERATOR_AVAILABLE and get_regex_engine_accelerator is not None:
-            self._regex_accelerator = get_regex_engine_accelerator()
+        if _REGEX_ACCELERATOR_AVAILABLE and get_regex_engine is not None:
+            self._regex_accelerator = get_regex_engine()
             if self._regex_accelerator.rust_available:
                 logger.info(
                     f"Language analyzer ({self.__class__.__name__}): Using Rust accelerator "

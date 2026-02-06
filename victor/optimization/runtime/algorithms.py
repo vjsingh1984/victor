@@ -560,8 +560,8 @@ class AlgorithmOptimizer:
                 return result
 
             # Add cache management methods
-            wrapper.cache_clear = cache.clear
-            wrapper.cache_info = lambda: cache.get_stats()
+            wrapper.cache_clear = cache.clear  # type: ignore[attr-defined]
+            wrapper.cache_info = lambda: cache.get_stats()  # type: ignore[attr-defined]
 
             return wrapper
 
@@ -631,8 +631,8 @@ def lru_cache(max_size: int = 128) -> Callable[..., Any]:
 
             return result
 
-        wrapper.cache_clear = cache.clear
-        wrapper.cache_info = lambda: cache.get_stats()
+        wrapper.cache_clear = cache.clear  # type: ignore[attr-defined]
+        wrapper.cache_info = lambda: cache.get_stats()  # type: ignore[attr-defined]
 
         return wrapper
 

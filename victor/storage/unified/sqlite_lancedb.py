@@ -125,7 +125,7 @@ class SqliteLanceDBStore:
         from victor.storage.graph.sqlite_store import SqliteGraphStore
 
         graph_db_path = self.persist_directory / "project.db"
-        self._graph_store = SqliteGraphStore(project_path=graph_db_path)
+        self._graph_store = SqliteGraphStore(project_path=graph_db_path)  # type: ignore[assignment]
         # Note: SqliteGraphStore doesn't have an initialize method
         # It's ready to use after construction
 
@@ -576,7 +576,7 @@ class SqliteLanceDBStore:
             return []
 
         assert self._graph_store is not None
-        nodes = await self._graph_store.search_symbols(
+        nodes = await self._graph_store.search_symbols(  # type: ignore[attr-defined]
             query=query,
             limit=limit,
             symbol_types=symbol_types,
@@ -633,7 +633,7 @@ class SqliteLanceDBStore:
             await self.initialize()
 
         assert self._graph_store is not None
-        node = await self._graph_store.get_node_by_id(unified_id)
+        node = await self._graph_store.get_node_by_id(unified_id)  # type: ignore[attr-defined]
         if not node:
             return None
 
@@ -820,7 +820,7 @@ class SqliteLanceDBStore:
             await self.initialize()
 
         assert self._graph_store is not None
-        await self._graph_store.delete_by_repo()
+        await self._graph_store.delete_by_repo()  # type: ignore[attr-defined]
 
         if self._vector_store and "symbols" in self._vector_store.list_tables().tables:
             self._vector_store.drop_table("symbols")

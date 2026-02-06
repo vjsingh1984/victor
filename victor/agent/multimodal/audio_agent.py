@@ -1561,10 +1561,5 @@ Provide a JSON response with:
 
 
 # =============================================================================
-# Legacy Aliases (for backward compatibility)
+# End of Audio Agent
 # =============================================================================
-
-# SpeechSegment was renamed to SpeakerSegment
-SpeechSegment = SpeakerSegment
-
-# Transcription was renamed to TranscriptionResult

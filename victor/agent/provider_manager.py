@@ -823,7 +823,7 @@ class ProviderManager:
         """
         # Register with ProviderSwitcher for automatic notification
         # Type ignore: ProviderSwitcher expects ProviderSwitcherState, but we provide ProviderState
-        self._provider_switcher.on_switch(callback)
+        self._provider_switcher.on_switch(callback)  # type: ignore[arg-type]
 
     # IProviderEventEmitter implementation
     def emit_switch_event(self, event: dict[str, Any]) -> None:

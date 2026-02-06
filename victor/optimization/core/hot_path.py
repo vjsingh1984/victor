@@ -150,7 +150,7 @@ try:
     logger.debug("orjson available for fast JSON serialization")
 except ImportError:
     _ORJSON_AVAILABLE = False
-    orjson = None
+    orjson = None  # type: ignore[assignment]
     logger.debug("orjson not available, falling back to standard json")
 
 
@@ -308,8 +308,8 @@ class ThreadSafeMemoized:
                 return result
 
         # Add cache management methods
-        wrapped.cache_clear = lambda: self._cache_clear()
-        wrapped.cache_info = lambda: self._cache_info()
+        wrapped.cache_clear = lambda: self._cache_clear()  # type: ignore[attr-defined]
+        wrapped.cache_info = lambda: self._cache_info()  # type: ignore[attr-defined]
 
         return wrapped
 

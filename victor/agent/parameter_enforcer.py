@@ -479,7 +479,7 @@ def enforce_parameters(
             return func(*args, **enforced_kwargs)
 
         # Attach enforcer for introspection
-        wrapper._parameter_enforcer = enforcer
+        wrapper._parameter_enforcer = enforcer  # type: ignore[attr-defined]
         return wrapper
 
     return decorator

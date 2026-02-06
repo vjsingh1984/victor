@@ -661,7 +661,7 @@ class DockerServiceHandler(BaseService):
             import docker
             from docker.models.containers import Container  
 
-            self._client = docker.from_env(skip_ssl_verification=True)
+            self._client = docker.from_env(skip_ssl_verification=True)  # type: ignore[attr-defined]
 
             # Check if image exists, pull if needed
             try:

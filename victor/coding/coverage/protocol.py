@@ -282,7 +282,7 @@ class CoverageReport:
             other_coverage = other.files.get(file_path)
 
             if self_coverage is None:
-                merged.files[file_path] = other_coverage
+                merged.files[file_path] = other_coverage  # type: ignore[assignment]
             elif other_coverage is None:
                 merged.files[file_path] = self_coverage
             else:

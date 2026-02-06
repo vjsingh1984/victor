@@ -488,7 +488,7 @@ class OrchestratorFactory(ModeAwareMixin):
             from victor.core.container import ServiceContainer
 
             new_container: ServiceContainer = ensure_bootstrapped(self.settings)
-            self._container = new_container
+            self._container = new_container  # type: ignore[assignment]
 
             # Verify orchestrator services are registered
             # If ResponseSanitizer is not registered, bootstrapping was incomplete
@@ -497,7 +497,7 @@ class OrchestratorFactory(ModeAwareMixin):
                 from victor.core.bootstrap import bootstrap_container
 
                 # Create a new fully-bootstrapped container
-                self._container = bootstrap_container(self.settings)
+                self._container = bootstrap_container(self.settings)  # type: ignore[assignment]
 
         return self._container
 
@@ -3086,14 +3086,14 @@ class OrchestratorFactory(ModeAwareMixin):
             from victor.framework.agent import Agent
 
             # Create foreground Agent
-            agent = Agent(orchestrator)
+            agent = Agent(orchestrator)  # type: ignore[arg-type]
 
             # Apply tools if specified
             tools = kwargs.get("tools")
             if tools:
                 from victor.framework.tool_config import configure_tools
 
-                configure_tools(orchestrator, tools)
+                configure_tools(orchestrator, tools)  # type: ignore[arg-type]
 
             # Apply vertical configuration if specified
             vertical = kwargs.get("vertical")

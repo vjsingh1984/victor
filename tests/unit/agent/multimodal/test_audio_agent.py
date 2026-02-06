@@ -23,12 +23,10 @@ import pytest
 from victor.agent.multimodal.audio_agent import (
     AudioAnalysis,
     AudioAgent,
-    SpeechSegment,
+    SpeakerSegment,
     TranscriptionResult,
 )
 
-# Legacy alias for backward compatibility
-Transcription = TranscriptionResult
 from victor.core.errors import ValidationError
 from tests.factories import MockProviderFactory
 
@@ -163,7 +161,7 @@ class TestTranscribeAudio:
 
         transcription = await audio_agent_openai.transcribe_audio(sample_audio_path)
 
-        assert isinstance(transcription, Transcription)
+        assert isinstance(transcription, TranscriptionResult)
         assert transcription.text == "Hello, this is a test transcription."
         assert transcription.language == "en"
         # Duration comes from response when timestamps are included (default)
@@ -549,9 +547,9 @@ class TestDataClasses:
     """Tests for dataclass validation."""
 
     def test_speech_segment_valid(self):
-        """Test creating valid SpeechSegment."""
+        """Test creating valid SpeakerSegment."""
 
-        segment = SpeechSegment(
+        segment = SpeakerSegment(
             speaker_id="SPEAKER_00",
             start_time=0.0,
             end_time=5.0,
@@ -565,9 +563,9 @@ class TestDataClasses:
         assert segment.transcript == "Hello world"
 
     def test_speech_segment_invalid_start_time(self):
-        """Test SpeechSegment with negative start time."""
+        """Test SpeakerSegment with negative start time."""
         with pytest.raises(ValidationError, match="Start time must be non-negative"):
-            SpeechSegment(
+            SpeakerSegment(
                 speaker_id="SPEAKER_00",
                 start_time=-1.0,
                 end_time=5.0,
@@ -576,9 +574,9 @@ class TestDataClasses:
             )
 
     def test_speech_segment_invalid_end_time(self):
-        """Test SpeechSegment with end before start."""
+        """Test SpeakerSegment with end before start."""
         with pytest.raises(ValidationError, match="End time.*must be greater than start time"):
-            SpeechSegment(
+            SpeakerSegment(
                 speaker_id="SPEAKER_00",
                 start_time=5.0,
                 end_time=3.0,
@@ -587,9 +585,9 @@ class TestDataClasses:
             )
 
     def test_speech_segment_invalid_confidence(self):
-        """Test SpeechSegment with invalid confidence."""
+        """Test SpeakerSegment with invalid confidence."""
         with pytest.raises(ValidationError, match="Confidence must be between 0 and 1"):
-            SpeechSegment(
+            SpeakerSegment(
                 speaker_id="SPEAKER_00",
                 start_time=0.0,
                 end_time=5.0,
@@ -601,7 +599,7 @@ class TestDataClasses:
         """Test creating valid Transcription."""
         from datetime import datetime
 
-        transcription = Transcription(
+        transcription = TranscriptionResult(
             text="Full transcript",
             confidence=0.92,
             timestamp=datetime.now(),
@@ -619,7 +617,7 @@ class TestDataClasses:
         from datetime import datetime
 
         with pytest.raises(ValidationError, match="Confidence must be between 0 and 1"):
-            Transcription(
+            TranscriptionResult(
                 text="test",
                 confidence=1.5,
                 timestamp=datetime.now(),
@@ -633,7 +631,7 @@ class TestDataClasses:
         from datetime import datetime
 
         with pytest.raises(ValidationError, match="Duration must be non-negative"):
-            Transcription(
+            TranscriptionResult(
                 text="test",
                 confidence=0.9,
                 timestamp=datetime.now(),

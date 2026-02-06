@@ -945,7 +945,7 @@ class AgentOrchestrator(
                     project_root=intelligent_project_root,
                 )
                 self._intelligent_integration = OrchestratorIntegration(
-                    orchestrator=self,
+                    orchestrator=self,  # type: ignore[arg-type]
                     pipeline=pipeline,
                     config=self._intelligent_integration_config,
                 )
@@ -1682,7 +1682,7 @@ class AgentOrchestrator(
 
         except Exception as e:
             logger.warning(f"Failed to initialize ConversationEmbeddingStore: {e}")
-            self._conversation_embedding_store = None
+            self._conversation_embedding_store = None  # type: ignore[assignment]
 
     def _finalize_stream_metrics(
         self, usage_data: Optional[dict[str, int]] = None

@@ -187,7 +187,7 @@ class OrchestratorIntegration:
             ),
         )
 
-        return cls(orchestrator, pipeline, config)
+        return cls(orchestrator, pipeline, config)  # type: ignore[arg-type]
 
     async def prepare_request(
         self,

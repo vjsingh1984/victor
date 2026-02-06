@@ -632,7 +632,7 @@ class AdaptiveParallelExecutor(ParallelExecutor):
                     heappush(
                         priority_queue,
                         TaskWithPriority(
-                            priority if isinstance(priority, int) else 0, task_id, task_input
+                            priority if isinstance(priority, int) else 0, task_id, task_input  # type: ignore[arg-type]
                         ),
                     )
             else:

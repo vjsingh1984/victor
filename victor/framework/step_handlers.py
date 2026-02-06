@@ -1555,7 +1555,7 @@ class FrameworkStepHandler(BaseStepHandler):
                         loader.register_capability(
                             name=cap.name,
                             handler=cap.handler,
-                            capability_type=cap_type if cap_type is not None else "custom",
+                            capability_type=cap_type if cap_type is not None else "custom",  # type: ignore[arg-type]
                             version=getattr(cap, "version", "1.0"),
                         )
 

@@ -681,7 +681,7 @@ class SkillDiscoveryEngine:
                     # result is ToolSelectionResult
                     tool_map = {t.name: t for t in available_tools}
                     matched_tools = [
-                        tool_map[name] for name in result.selected_tool_names if name in tool_map
+                        tool_map[name] for name in result.selected_tool_names if name in tool_map  # type: ignore[attr-defined]
                     ]
 
                 logger.info(f"Matched {len(matched_tools)} tools using selector")

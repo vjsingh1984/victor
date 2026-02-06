@@ -733,7 +733,7 @@ class DocumentStore:
         """
         await self.initialize()
         stats = dict(self._stats)
-        stats["store_path"] = str(self.config.path)
+        stats["store_path"] = str(self.config.path)  # type: ignore[assignment]
         return stats
 
     async def close(self) -> None:

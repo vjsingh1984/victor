@@ -645,7 +645,3 @@ def reset_regex_engine() -> None:
             _regex_engine_instance.clear_cache()
         _regex_engine_instance = None
         logger.info("Reset singleton RegexEngineAccelerator")
-
-
-# Backward-compatible aliases for older imports.
-get_regex_engine_accelerator = get_regex_engine

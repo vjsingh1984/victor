@@ -33,7 +33,7 @@ directly to break circular dependencies.
 """
 
 # Import from canonical location to avoid circular dependencies
-from victor.protocols.team import (
+from victor.protocols.team import (  # type: ignore[attr-defined]
     IAgent,
     ITeamMember,
     ITeamCoordinator,

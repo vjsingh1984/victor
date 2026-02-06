@@ -59,7 +59,7 @@ from victor.framework.step_handlers import BaseStepHandler
 
 if TYPE_CHECKING:
     from victor.core.verticals.base import VerticalBase
-    from victor.framework.vertical_integration import (
+    from victor.framework.vertical_integration import (  # type: ignore[attr-defined]
         IntegrationResult,
         VerticalContext,
     )

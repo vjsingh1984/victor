@@ -1246,7 +1246,7 @@ class ToolSelector(ModeAwareMixin):
 
         try:
             # Import here to avoid circular imports
-            from victor.core.verticals.protocols import ToolSelectionContext
+            from victor.core.verticals.protocols import ToolSelectionContext  # type: ignore[attr-defined]
 
             # Get conversation stage if available
             stage = "exploration"

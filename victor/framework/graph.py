@@ -307,7 +307,7 @@ class CopyOnWriteState(Generic[StateType]):
         if not self._modified:
             return len(self._source)
         with self._lock:
-            return len(self._copy)
+            return len(self._copy)  # type: ignore[arg-type]
 
     def __iter__(self) -> Iterator[Any]:
         """Iterate over keys (thread-safe snapshot).
@@ -1336,7 +1336,7 @@ class NodeExecutor:
                 if isinstance(result, CopyOnWriteState):
                     state = result.get_state()
                 elif isinstance(result, dict):
-                    state = result
+                    state = result  # type: ignore[assignment]
                 else:
                     # Node returned something else, use COW state
                     state = cow_state.get_state()

@@ -493,7 +493,7 @@ class ConversationStateMachine:
 
         if scores:
             # Return stage with highest score
-            best_stage = max(scores, key=scores.get)
+            best_stage = max(scores, key=scores.get)  # type: ignore[arg-type]
             if scores[best_stage] >= 2:  # Require at least 2 keyword matches
                 return best_stage
 

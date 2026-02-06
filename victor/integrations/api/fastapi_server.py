@@ -3294,7 +3294,7 @@ Respond with just the command to run."""
 
             # Create and include the HITL router
             hitl_router = create_hitl_router(
-                store=self._hitl_store,
+                store=self._hitl_store,  # type: ignore[arg-type]
                 require_auth=bool(self.hitl_auth_token),
                 auth_token=self.hitl_auth_token,
             )
@@ -3447,9 +3447,9 @@ Respond with just the command to run."""
                 # Store auth state in the scope dict for future operations
                 # Note: WebSocket.scope is the correct place to store custom state
                 if not hasattr(ws, "auth_state"):
-                    ws.auth_state = {}
-                ws.auth_state["authenticated"] = True
-                ws.auth_state["api_key"] = api_key
+                    ws.auth_state = {}  # type: ignore[attr-defined]
+                ws.auth_state["authenticated"] = True  # type: ignore[attr-defined]
+                ws.auth_state["api_key"] = api_key  # type: ignore[attr-defined]
                 logger.debug("WebSocket client authenticated via message")
                 await ws.send_json({"type": "auth_success"})
             else:

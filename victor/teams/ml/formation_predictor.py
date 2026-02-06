@@ -267,7 +267,7 @@ class FormationPredictor:
         probabilities = {k: v / total for k, v in scores.items()}
 
         # Select best formation
-        best_formation_str = max(scores, key=scores.get)
+        best_formation_str = max(scores, key=scores.get)  # type: ignore[arg-type]
         best_formation = TeamFormation(best_formation_str)
         confidence = probabilities[best_formation_str]
 

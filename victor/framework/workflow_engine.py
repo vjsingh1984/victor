@@ -696,7 +696,7 @@ class WorkflowEngine:
         else:
             # Fall back to coordinator for backward compatibility
             coordinator = self._get_yaml_coordinator()
-            async for event in coordinator.stream(
+            async for event in coordinator.stream(  # type: ignore[assignment]
                 yaml_path=yaml_path,
                 initial_state=initial_state,
                 workflow_name=workflow_name,
