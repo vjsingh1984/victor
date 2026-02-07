@@ -63,22 +63,27 @@ interface AgentRunningEvent {
 interface AgentToolCallEvent {
     type: 'agent_tool_call';
     data: {
-        id: string;
-        name: string;
-        arguments: string;
-        status: 'pending' | 'running' | 'success' | 'error';
-        startTime: number;
-        endTime?: number;
-        result?: string;
+        agent_id: string;
+        tool_call: {
+            id: string;
+            name: string;
+            arguments: string;
+            status: 'pending' | 'running' | 'success' | 'error';
+            startTime?: number;
+            endTime?: number;
+            result?: string;
+        };
     };
 }
 
 interface AgentToolResultEvent {
     type: 'agent_tool_result';
     data: {
+        agent_id: string;
         tool_call_id: string;
         result: string;
         error?: string;
+        status?: 'success' | 'error';
     };
 }
 
@@ -360,7 +365,7 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
         };
 
         // Register the event handler with the client
-        this._client.onAgentEvent(eventHandler);
+        this._client.onAgentEvent(eventHandler as (event: { type: string; data: unknown }) => void);
         this._log('Subscribed to agent events');
     }
 
@@ -441,12 +446,12 @@ export class AgentsViewProvider implements vscode.TreeDataProvider<AgentTreeItem
      */
     private _convertBackendAgent(data: BackendAgentData | Partial<BackendAgentData>): AgentTask {
         return {
-            id: data.id,
-            name: data.name || data.task?.slice(0, 40) || 'Agent',
+            id: data.id || 'unknown',
+            name: data.name || (data.task ? data.task.slice(0, 40) : 'Agent'),
             description: data.description || data.task || '',
             status: data.status as AgentStatus,
             progress: data.progress,
-            startTime: data.start_time * 1000, // Convert to ms
+            startTime: (data.start_time ?? Date.now() / 1000) * 1000, // Convert to ms
             endTime: data.end_time ? data.end_time * 1000 : undefined,
             mode: data.mode,
             output: data.output,

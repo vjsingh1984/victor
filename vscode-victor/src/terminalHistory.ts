@@ -24,16 +24,16 @@ interface ShellExecutionStartEvent {
     terminal: vscode.Terminal;
     shellIntegration?: {
         executeCommand: {
-            commandLine?: { value: string };
+            commandLine?: { value: string } | string;
             cwd?: { fsPath: string };
-            read?: () => vscode.ReadableStream<string>;
+            read?: () => any; // VS Code experimental API
         };
     };
     execution?: {
-        commandLine?: { value: string };
+        commandLine?: { value: string } | string;
         cwd?: { fsPath: string };
         exitCode?: number;
-        read?: () => vscode.ReadableStream<string>;
+        read?: () => any; // VS Code experimental API
     };
 }
 
@@ -41,10 +41,12 @@ interface ShellExecutionEndEvent {
     terminal: vscode.Terminal;
     shellIntegration?: {
         executeCommand: {
+            commandLine?: { value: string } | string;
             exitCode?: number;
         };
     };
     execution?: {
+        commandLine?: { value: string } | string;
         exitCode?: number;
     };
     exitCode?: number;
@@ -260,7 +262,9 @@ export class TerminalHistoryService implements vscode.Disposable {
                 return;
             }
 
-            const commandLine = execution.commandLine?.value || execution.commandLine || '';
+            const commandLine = typeof execution.commandLine === 'string'
+                ? execution.commandLine
+                : (execution.commandLine?.value || '');
             const cwd = execution.cwd?.fsPath || undefined;
 
             if (!commandLine) {
@@ -299,7 +303,11 @@ export class TerminalHistoryService implements vscode.Disposable {
                 return;
             }
 
-            const commandLine = execution?.commandLine?.value || execution?.commandLine || '';
+            const commandLine = execution?.commandLine
+                ? (typeof execution.commandLine === 'string'
+                    ? execution.commandLine
+                    : execution.commandLine.value)
+                : '';
 
             // Find matching pending execution
             let matchingKey: string | undefined;
@@ -341,7 +349,11 @@ export class TerminalHistoryService implements vscode.Disposable {
     /**
      * Capture output from shell execution stream
      */
-    private async _captureOutput(key: string, execution: ShellExecutionStartEvent['shellIntegration']['executeCommand']): Promise<void> {
+    private async _captureOutput(key: string, execution: {
+        commandLine?: { value: string } | string;
+        cwd?: { fsPath: string };
+        read?: () => any;
+    }): Promise<void> {
         try {
             const pending = this._pendingExecutions.get(key);
             if (!pending) {
@@ -349,6 +361,9 @@ export class TerminalHistoryService implements vscode.Disposable {
             }
 
             // Read output stream if available
+            if (!execution.read) {
+                return;
+            }
             const reader = execution.read();
             if (!reader) {
                 return;
