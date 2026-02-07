@@ -2,7 +2,7 @@
 
 ## System view
 
-```
+```text
 User
   -> CLI/TUI/API
   -> Agent Orchestrator
@@ -27,12 +27,14 @@ User
 ## Data flows
 
 **Single-agent run**
+
 1. User prompt enters CLI/TUI/API.
 2. Orchestrator calls provider, handles tool calls, updates state.
 3. Tools execute; results feed back into the loop.
 4. Final response returns to the user.
 
 **Workflow execution**
+
 1. Workflow YAML compiled to a StateGraph.
 2. Nodes run in order with state transitions.
 3. Outputs are merged and returned.

@@ -24,14 +24,17 @@
 
 ## Executive Summary
 
-The coordinator-based architecture is a **facade pattern** implementation that decomposes the monolithic AgentOrchestrator (6,082 lines) into 15 specialized coordinators. This design improves:
+The coordinator-based architecture is a **facade pattern** implementation
+that decomposes the monolithic AgentOrchestrator (6,082 lines) into 15
+specialized coordinators. This design improves:
 
 - **Maintainability**: 93% reduction in core complexity
 - **Testability**: 10x faster test execution
 - **Extensibility**: Plugin-based architecture
 - **Performance**: < 5% overhead (well below 10% goal)
 
-**Key Principle**: Each coordinator has a **single, well-defined responsibility** and operates independently through well-defined interfaces.
+**Key Principle**: Each coordinator has a **single, well-defined responsibility**
+and operates independently through well-defined interfaces.
 
 ---
 
@@ -39,7 +42,7 @@ The coordinator-based architecture is a **facade pattern** implementation that d
 
 ### High-Level Diagram
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                         CLIENTS                                  │
 │  CLI/TUI  │  VS Code  │  MCP Server  │  API Server  │  Plugins │
@@ -87,30 +90,37 @@ The coordinator-based architecture is a **facade pattern** implementation that d
 ### Architectural Layers
 
 #### Layer 1: Client Layer
+
 **Purpose**: Interface to external systems
 **Components**: CLI, TUI, VS Code Extension, MCP Server, HTTP API
 
 #### Layer 2: Orchestrator Facade
+
 **Purpose**: Provide unified interface to coordinators
 **Component**: AgentOrchestrator
 **Responsibilities**:
+
 - Initialize coordinators
 - Route requests to appropriate coordinators
 - Maintain backward compatibility
 - Coordinate high-level workflows
 
 #### Layer 3: Coordinator Layer
+
 **Purpose**: Specialized functional domains
 **Components**: 15 coordinators (see [Coordinator Catalog](#coordinator-catalog))
 **Responsibilities**:
+
 - Encapsulate specific functionality
 - Maintain independent state
 - Provide clean interfaces
 
 #### Layer 4: Shared Services
+
 **Purpose**: Common utilities and infrastructure
 **Components**: ProviderManager, ToolRegistry, EventBus, CacheManager
 **Responsibilities**:
+
 - Provide shared capabilities
 - Maintain global state
 - Enable cross-coordinator communication
