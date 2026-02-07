@@ -266,9 +266,6 @@ class AgentToolSelectionContext:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-# Backward compatibility alias
-
-
 @dataclass
 class ToolSelectorFeatures:
     """Features supported by a tool selector implementation.

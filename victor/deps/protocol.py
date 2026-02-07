@@ -158,9 +158,6 @@ class PackageDependency:
         return None
 
 
-# Backward compatibility alias
-
-
 @dataclass
 class DependencyConflict:
     """A dependency version conflict."""

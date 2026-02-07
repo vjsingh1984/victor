@@ -203,10 +203,6 @@ class WorkflowValidator:
         return self.linter.get_enabled_rules()
 
 
-# Alias for backward compatibility
-ValidationResult = type("ValidationResult", (), {})
-
-
 __all__ = [
     "WorkflowValidator",
     "lint_file",

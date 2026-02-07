@@ -848,9 +848,6 @@ class GroundingVerificationResult:
         return header + "\n".join(feedback_parts)
 
 
-# Backward compatibility alias
-
-
 @dataclass
 class VerifierConfig:
     """Configuration for grounding verification.

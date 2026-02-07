@@ -100,9 +100,6 @@ class AdaptiveAgentMode(Enum):
     COMPLETE = "complete"  # Task finished
 
 
-# Backward compatibility alias
-
-
 class TransitionTrigger(Enum):
     """Triggers for mode transitions."""
 

@@ -236,7 +236,6 @@ class UnifiedSearchResult:
     matched_content: Optional[str] = None  # what matched the query
 
 
-# Backward compatibility alias
 # =============================================================================
 # PROTOCOLS - Dependency Inversion Principle
 # =============================================================================

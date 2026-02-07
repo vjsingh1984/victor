@@ -915,6 +915,3 @@ class TeamMemberAdapter:
                 else None
             )
         return None
-
-
-# Type aliases for backward compatibility

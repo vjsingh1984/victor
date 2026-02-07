@@ -202,9 +202,6 @@ _FALLBACK_CATEGORY_KEYWORDS: dict[str, set[str]] = {
     "web": {"web", "http", "api", "fetch", "url", "search"},
 }
 
-# Alias for backward compatibility
-CATEGORY_KEYWORDS = _FALLBACK_CATEGORY_KEYWORDS
-
 
 def detect_categories_from_message(message: str) -> set[str]:
     """Detect relevant tool categories from keywords in a message.

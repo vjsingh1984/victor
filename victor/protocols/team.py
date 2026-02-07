@@ -306,6 +306,3 @@ class IEnhancedTeamCoordinator(
     """
 
     pass
-
-
-# Type aliases for backward compatibility with framework

@@ -122,9 +122,6 @@ class MultiCircuitBreakerConfig:
         return self.recovery_timeout
 
 
-# Alias for backward compatibility
-
-
 class MultiCircuitBreaker:
     """Circuit breaker managing multiple named circuits.
 

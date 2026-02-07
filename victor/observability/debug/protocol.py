@@ -60,9 +60,6 @@ class DebugStopReason(Enum):
     INSTRUCTION_BREAKPOINT = "instruction breakpoint"
 
 
-# Backward compatibility alias
-
-
 @dataclass
 class SourceLocation:
     """A location in source code."""

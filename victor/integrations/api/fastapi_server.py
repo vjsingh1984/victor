@@ -182,7 +182,6 @@ class APISearchResult(BaseModel):
         )
 
 
-# Backward compatibility alias
 class SearchResponse(BaseModel):
     """Search response payload."""
 

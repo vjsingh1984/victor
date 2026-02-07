@@ -87,27 +87,31 @@ def redis_backend(mock_redis, mock_pubsub):
     in tests with proper patching. The with-context approach doesn't work
     with fixtures because the patch is undone when the fixture returns.
     """
-    # Create backend without patching
-    backend = RedisCacheBackend(
-        redis_url="redis://localhost:6379/0",
-        key_prefix="victor",
-        default_ttl_seconds=3600,
-    )
-    # Store mocks for tests to use
-    backend._mock_redis = mock_redis
-    backend._mock_pubsub = mock_pubsub
-    # Manually set pubsub
-    backend._pubsub = mock_pubsub
-
-    # Override connect to use mocks directly without calling original
-    async def mocked_connect():
-        # Skip actual connection, just mark as connected
-        backend._is_connected = True
-        backend._redis = mock_redis
+    # Patch aioredis before creating backend to avoid ImportError on Windows
+    with patch(
+        "victor.agent.cache.backends.redis.aioredis",
+        new=mock_redis,
+    ):
+        backend = RedisCacheBackend(
+            redis_url="redis://localhost:6379/0",
+            key_prefix="victor",
+            default_ttl_seconds=3600,
+        )
+        # Store mocks for tests to use
+        backend._mock_redis = mock_redis
+        backend._mock_pubsub = mock_pubsub
+        # Manually set pubsub
         backend._pubsub = mock_pubsub
 
-    backend.connect = mocked_connect
-    return backend
+        # Override connect to use mocks directly without calling original
+        async def mocked_connect():
+            # Skip actual connection, just mark as connected
+            backend._is_connected = True
+            backend._redis = mock_redis
+            backend._pubsub = mock_pubsub
+
+        backend.connect = mocked_connect
+        return backend
 
 
 # =============================================================================

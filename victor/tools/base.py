@@ -31,8 +31,6 @@ from victor.tools.enums import (
 # Import metadata classes from separate module
 from victor.tools.metadata import ToolMetadata
 
-# Import registry classes from separate module (for backward compatibility)
-
 
 # NOTE: Enums (CostTier, Priority, AccessMode, ExecutionCategory, DangerLevel)
 # have been moved to victor/tools/enums.py and are imported above.
