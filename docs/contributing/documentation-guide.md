@@ -88,10 +88,10 @@ docs/
 ├── tutorials/                        # Hands-on tutorials
 │   ├── build-custom-tool.md
 │   ├── create-workflow.md
-│   ├── integrate-provider.md
+│   ├── integrate-provider/
 │   ├── vertical_creation_guide.md
 │   ├── coordinator_quickstart.md
-│   ├── coordinator_recipes.md
+│   ├── coordinator_recipes/
 │   └── batch-processor-quickstart.md
 ├── guides/                           # How-to guides and deep dives
 │   └── index.md
