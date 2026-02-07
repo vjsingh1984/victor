@@ -55,14 +55,11 @@ Located in `/Users/vijaysingh/code/codingagent/docs/production/`:
    - Service status indicators
    - Analytics events distribution
 
-3. **coordinator_runbook.md** - Operations runbook
-   - Common issues and resolutions
+3. **coordinator_settings.md** - Configuration and troubleshooting
+   - Coordinator environment variables
    - Performance tuning guidelines
-   - Capacity planning recommendations
-   - Emergency procedures
-   - Maintenance tasks
+   - Common issues and resolutions
    - Monitoring setup instructions
-   - Contact and escalation paths
 
 ## Quick Start
 
@@ -254,7 +251,7 @@ receivers:
    jq 'select(.level == "ERROR")' /var/log/victor/coordinators.log | tail -50
    ```
 
-3. Follow runbook: [coordinator_runbook.md#high-error-rate](coordinator_runbook.md#high-error-rate)
+3. Follow runbook: [coordinator_settings.md#troubleshooting](coordinator_settings.md#troubleshooting)
 
 ### High Latency
 
@@ -268,7 +265,7 @@ receivers:
    jq 'select(.duration_ms > 2000)' /var/log/victor/coordinators.log | tail -20
    ```
 
-3. Follow runbook: [coordinator_runbook.md#high-latency](coordinator_runbook.md#high-latency)
+3. Follow runbook: [coordinator_settings.md#troubleshooting](coordinator_settings.md#troubleshooting)
 
 ### Cache Issues
 
@@ -277,7 +274,7 @@ receivers:
    curl 'http://localhost:9090/api/v1/query?query=victor_coordinator_cache_hit_rate'
    ```
 
-2. Follow runbook: [coordinator_runbook.md#cache-performance](coordinator_runbook.md#cache-performance)
+2. Follow runbook: [coordinator_settings.md#troubleshooting](coordinator_settings.md#troubleshooting)
 
 ## Maintenance
 
@@ -303,7 +300,7 @@ receivers:
 
 ## Additional Resources
 
-- [Coordinator Runbook](coordinator_runbook.md)
+- [Coordinator Settings](coordinator_settings.md)
 - [Prometheus Documentation](https://prometheus.io/docs/)
 - [Grafana Documentation](https://grafana.com/docs/)
 - [Victor Documentation](https://docs.victor.ai)

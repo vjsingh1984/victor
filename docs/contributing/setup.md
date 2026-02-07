@@ -24,7 +24,7 @@ Before you begin, ensure you have the following installed:
 
 ```bash
 # Clone the repository
-git clone https://github.com/vijayksingh/victor.git
+git clone https://github.com/vjsingh1984/victor.git
 cd victor
 
 # Create virtual environment
@@ -44,7 +44,7 @@ pytest tests/unit -v --tb=short
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/vijayksingh/victor.git
+git clone https://github.com/vjsingh1984/victor.git
 cd victor
 ```
 
@@ -350,7 +350,7 @@ victor chat --provider anthropic       # Specific provider
 
 ---
 
-**Need help?** Open an issue on [GitHub](https://github.com/vijayksingh/victor/issues) or start a [discussion](https://github.com/vijayksingh/victor/discussions).
+**Need help?** Open an issue on [GitHub](https://github.com/vjsingh1984/victor/issues) or start a [discussion](https://github.com/vjsingh1984/victor/discussions).
 
 ---
 

@@ -14,7 +14,7 @@ Get Victor AI running in production in minutes.
 ### 1. Build Image
 
 ```bash
-git clone https://github.com/vijayksingh/victor.git
+git clone https://github.com/vjsingh1984/victor.git
 cd victor
 
 docker build -f Dockerfile.production -t victor:latest .
@@ -183,8 +183,8 @@ kubectl rollout undo deployment/victor-api -n victor
 ## Support
 
 - [Documentation](README.md)
-- [GitHub Issues](https://github.com/vijayksingh/victor/issues)
-- [Discussions](https://github.com/vijayksingh/victor/discussions)
+- [GitHub Issues](https://github.com/vjsingh1984/victor/issues)
+- [Discussions](https://github.com/vjsingh1984/victor/discussions)
 
 ---
 

@@ -384,8 +384,8 @@ See [STRUCTURED_LOGGING.md](STRUCTURED_LOGGING.md) for:
 ## Support
 
 For issues and questions:
-- GitHub Issues: [https://github.com/vijayksingh/victor/issues](https://github.com/vijayksingh/victor/issues)
-- Documentation: [https://github.com/vijayksingh/victor/docs](https://github.com/vijayksingh/victor/docs)
+- GitHub Issues: [https://github.com/vjsingh1984/victor/issues](https://github.com/vjsingh1984/victor/issues)
+- Documentation: [https://github.com/vjsingh1984/victor/docs](https://github.com/vjsingh1984/victor/docs)
 
 ## License
 

@@ -124,7 +124,7 @@ Or just remove the ProximaDB configuration and use LanceDB (default).
 - [ProximaDB Documentation](../features/proximadb_experimental.md)
 - [Vector Store Architecture](../verticals/rag.md)
 - [Installation Guide](../getting-started/installation.md)
-- [GitHub Issues](https://github.com/vijayksingh/victor/issues)
+- [GitHub Issues](https://github.com/vjsingh1984/victor/issues)
 
 ---
 

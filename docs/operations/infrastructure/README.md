@@ -258,18 +258,18 @@ python scripts/benchmark_tool_selection.py run --group all
 
 ## 🔗 Links
 
-- [Victor AI Repository](https://github.com/vijayksingh/victor)
+- [Victor AI Repository](https://github.com/vjsingh1984/victor)
 - [Documentation](../index.md)
-- [Issues](https://github.com/vijayksingh/victor/issues)
-- [Discussions](https://github.com/vijayksingh/victor/discussions)
+- [Issues](https://github.com/vjsingh1984/victor/issues)
+- [Discussions](https://github.com/vjsingh1984/victor/discussions)
 
 ## 📞 Support
 
 For help:
 1. Check the troubleshooting section in [quickstart.md](quickstart.md)
-2. Search [existing issues](https://github.com/vijayksingh/victor/issues)
-3. Start a [discussion](https://github.com/vijayksingh/victor/discussions)
-4. Open a new [issue](https://github.com/vijayksingh/victor/issues/new)
+2. Search [existing issues](https://github.com/vjsingh1984/victor/issues)
+3. Start a [discussion](https://github.com/vjsingh1984/victor/discussions)
+4. Open a new [issue](https://github.com/vjsingh1984/victor/issues/new)
 
 ## 📜 License
 

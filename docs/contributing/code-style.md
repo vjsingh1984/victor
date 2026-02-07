@@ -572,7 +572,7 @@ except Exception as e:
 
 ---
 
-**Questions?** Open an issue on [GitHub](https://github.com/vijayksingh/victor/issues) or start a [discussion](https://github.com/vijayksingh/victor/discussions).
+**Questions?** Open an issue on [GitHub](https://github.com/vjsingh1984/victor/issues) or start a [discussion](https://github.com/vjsingh1984/victor/discussions).
 
 ---
 
