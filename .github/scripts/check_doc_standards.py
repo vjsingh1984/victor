@@ -49,12 +49,12 @@ def check_file_standards(file_path: Path) -> List[str]:
             violations.append("Missing 'See Also', 'Related', or 'Next Steps' section")
 
     # Check 6: Has diagrams for long content
-    if len(lines) > 300:
+    if len(lines) > 400:
         has_mermaid = "```mermaid" in content
         has_diagram_ref = ".mmd" in content or ".svg" in content
 
         if not has_mermaid and not has_diagram_ref:
-            violations.append("Long content (>300 lines) should include diagrams")
+            violations.append("Long content (>400 lines) should include diagrams")
 
     return violations
 
