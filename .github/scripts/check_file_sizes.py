@@ -67,7 +67,23 @@ def check_file_sizes(docs_dir: Path) -> List[Tuple[Path, int, int, str]]:
     """Check all markdown files in docs directory."""
     violations = []
 
+    # Files that have been split into directories (should be skipped)
+    SPLIT_FILES = {
+        "docs/operations/performance/performance/cache_troubleshooting.md",
+        "docs/reference/api/python-api.md",
+        "docs/contributing/testing/TESTING_README.md",
+    }
+
     for md_file in docs_dir.rglob("*.md"):
+        # Skip files that have been split into directories
+        file_str = str(md_file)
+        if file_str in SPLIT_FILES:
+            continue
+
+        # Skip if a directory with the same name exists (file was split)
+        if md_file.with_suffix('').is_dir():
+            continue
+
         category = categorize_file(md_file)
 
         if category == "skip":
