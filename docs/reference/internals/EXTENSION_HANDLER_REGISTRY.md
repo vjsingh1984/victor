@@ -730,9 +730,15 @@ The `ExtensionHandlerRegistry` provides a clean, OCP-compliant mechanism for ext
 4. **Fail safely** - handler errors don't crash the pipeline
 5. **Use dynamic extensions** for third-party fields without modifying core types
 
-For questions or issues, see the [Victor repository](https://github.com/anthropics/victor) or existing verticals for implementation examples.
+For questions or issues, see the [Victor repository](https://github.com/anthropics/victor) or existing verticals for
+  implementation examples.
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

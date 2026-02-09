@@ -4,7 +4,8 @@ This document describes how Victor validates workflows in the CI/CD pipeline and
 
 ## Overview
 
-Victor uses a comprehensive workflow validation system to ensure all YAML workflows are syntactically correct, compile successfully, and pass integration tests. This validation happens at multiple levels:
+Victor uses a comprehensive workflow validation system to ensure all YAML workflows are syntactically correct,
+  compile successfully, and pass integration tests. This validation happens at multiple levels:
 
 1. **Pre-commit hooks** - Local validation before committing
 2. **CI workflow validation** - Automated validation on pull requests

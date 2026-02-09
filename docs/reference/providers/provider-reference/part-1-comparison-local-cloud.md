@@ -40,6 +40,15 @@ Complete reference for supported LLM providers in Victor.
 
 [Content continues through Cloud Providers...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Enterprise, Platforms, Choosing, Troubleshooting](part-2-enterprise-platforms-choosing.md)**

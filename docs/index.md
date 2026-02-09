@@ -1,4 +1,5 @@
-<div align="center">
+# <div align="center">
+
 
 # Victor AI Documentation Index
 
@@ -43,7 +44,9 @@ New to Victor? Choose a guided learning path tailored to your role and goals.
 
 ## Welcome
 
-Victor AI is an open-source AI coding assistant with multiple providers, tools, and domain verticals. This index points to the canonical docs and avoids version-specific counts that change over time.
+Victor AI is an open-source AI coding assistant with multiple providers, tools,
+  and domain verticals. This index points to the canonical docs and avoids version-specific counts that change over
+  time.
 
 ---
 
@@ -120,7 +123,8 @@ Victor AI is an open-source AI coding assistant with multiple providers, tools, 
 
 ## Reports & Historical Material
 
-Historical reports and internal snapshots live alongside the docs. Treat metrics and completion claims as time-bound unless explicitly tied to a release or external audit.
+Historical reports and internal snapshots live alongside the docs. Treat metrics and completion claims as time-bound
+  unless explicitly tied to a release or external audit.
 
 - [Changes](changes/phase_1_1_proximadb_optional.md)
 - [Refactoring](refactoring/phase2_property_accessor_reduction.md)

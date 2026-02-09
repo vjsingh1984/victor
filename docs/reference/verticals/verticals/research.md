@@ -1,6 +1,8 @@
 # Research Vertical
 
-The Research vertical provides web research, fact-checking, literature synthesis, and report generation capabilities. It is designed to compete with Perplexity AI, Google Gemini Deep Research, and ChatGPT Browse.
+The Research vertical provides web research, fact-checking, literature synthesis,
+  and report generation capabilities. It is designed to compete with Perplexity AI, Google Gemini Deep Research,
+  and ChatGPT Browse.
 
 ## Overview
 
@@ -440,6 +442,11 @@ Research reports follow this structure:
 - **Disclose potential conflicts of interest**
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

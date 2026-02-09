@@ -6,7 +6,10 @@
 
 ## Overview
 
-Victor's unified tool selection architecture provides a flexible, pluggable strategy pattern for selecting relevant tools based on user queries. The system supports multiple selection strategies with automatic fallback and intelligent adaptation based on model capabilities, conversation context, and performance requirements.
+Victor's unified tool selection architecture provides a flexible,
+  pluggable strategy pattern for selecting relevant tools based on user queries. The system supports multiple selection
+  strategies with automatic fallback and intelligent adaptation based on model capabilities,
+  conversation context, and performance requirements.
 
 ### Key Features
 
@@ -449,6 +452,11 @@ settings = Settings(tool_selection_strategy="semantic")
 - [ ] Custom strategy plugins
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

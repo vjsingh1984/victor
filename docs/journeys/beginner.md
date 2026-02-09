@@ -6,7 +6,8 @@
 
 ## Journey Overview
 
-This journey will take you from zero to having your first productive conversation with Victor. By the end, you'll be able to:
+This journey will take you from zero to having your first productive conversation with Victor. By the end, you'll be
+  able to:
 - Install Victor on your machine
 - Have conversations with AI coding assistants
 - Switch between different LLM providers
@@ -223,6 +224,11 @@ Congratulations! 🎉 You're ready for daily use with Victor.
 - **Documentation:** [Full Docs Index](../)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** January 31, 2026
 **Reading Time:** 5 minutes

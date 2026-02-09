@@ -2,7 +2,9 @@
 
 ## Overview
 
-Victor's plugin system allows you to extend workflow compilation capabilities by creating custom compiler plugins. Plugins enable loading workflows from various sources (JSON, S3, databases, custom URIs) while maintaining a consistent interface.
+Victor's plugin system allows you to extend workflow compilation capabilities by creating custom compiler plugins.
+  Plugins enable loading workflows from various sources (JSON,
+  S3, databases, custom URIs) while maintaining a consistent interface.
 
 ## Architecture
 

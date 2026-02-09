@@ -1,6 +1,7 @@
 # Tool Calling
 
-Tool calling depends on the provider and model. Some models return structured tool calls; others return JSON in text that requires a fallback parser.
+Tool calling depends on the provider and model. Some models return structured tool calls; others return JSON in text
+  that requires a fallback parser.
 
 ## If Tool Calls Don’t Trigger
 - Try a different model or provider.

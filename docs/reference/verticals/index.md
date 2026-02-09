@@ -1,6 +1,7 @@
 # Verticals - Domain-Specific Assistants
 
-Verticals are pre-configured assistant templates optimized for specific domains. Each vertical defines tool sets, stage configurations, system prompts, and evaluation criteria tailored to its use case.
+Verticals are pre-configured assistant templates optimized for specific domains. Each vertical defines tool sets,
+  stage configurations, system prompts, and evaluation criteria tailored to its use case.
 
 ## Overview
 
@@ -481,7 +482,9 @@ Verticals have been tested across multiple LLM providers. Results from testing (
 
 1. **Edit Tool Parameter Validation**: LLMs sometimes call `edit()` without the required `ops` parameter. This is now handled gracefully with helpful error messages and examples.
 
-2. **Mode Exploration Multipliers**: Plan mode (2.5x) and Explore mode (3.0x) multipliers allow more thorough exploration before forcing completion, critical for complex verticals.
+2. **Mode Exploration Multipliers**: Plan mode (2.5x) and Explore mode (3.0x) multipliers allow more thorough
+  exploration before forcing completion,
+  critical for complex verticals.
 
 3. **Sandbox Editing**: Plan and Explore modes restrict file edits to `.victor/sandbox/` directory, preventing accidental modifications during exploration.
 

@@ -2,7 +2,9 @@
 
 ## Overview
 
-Semantic caching enhances traditional caching by using vector similarity to find cached responses that are semantically similar to the current query, even if they're not exact matches. This dramatically increases cache hit rates for natural language queries.
+Semantic caching enhances traditional caching by using vector similarity to find cached responses that are semantically
+  similar to the current query,
+  even if they're not exact matches. This dramatically increases cache hit rates for natural language queries.
 
 ## How It Works
 

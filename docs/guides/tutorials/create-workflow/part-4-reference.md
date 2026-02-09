@@ -379,3 +379,8 @@ Now that you understand Victor workflows, explore:
 - **[Workflow Scheduling](../guides/workflow-development/scheduling.md)**: Run workflows on schedules and triggers
 
 ## Reference
+
+---
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**

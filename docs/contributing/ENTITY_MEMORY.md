@@ -2,7 +2,8 @@
 
 **Victor Framework**
 
-Victor's entity memory system provides context-aware conversations by extracting, storing, and retrieving entities mentioned across conversations.
+Victor's entity memory system provides context-aware conversations by extracting, storing, and retrieving entities
+  mentioned across conversations.
 
 ## Overview
 
@@ -339,7 +340,9 @@ class EnhancedOrchestrator(AgentOrchestrator):
 
 ### Entity Extraction Tips
 
-1. **Code-Heavy Conversations**: Enable `extract_file_references`, `extract_function_references`, and `extract_class_references`
+1. **Code-Heavy Conversations**: Enable `extract_file_references`, `extract_function_references`
+, and 
+`extract_class_references`
 2. **Architecture Discussions**: Enable `enable_relation_extraction` to track dependencies
 3. **Long Conversations**: Use `get_context_summary()` to provide entity context to the LLM
 4. **Performance**: Adjust `max_entities_per_message` to balance accuracy vs. speed

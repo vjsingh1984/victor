@@ -446,5 +446,14 @@ annual_hybrid_cost = infrastructure_cost + selective_api_cost
 # Compare based on your specific needs
 ```
 
+
+**Reading Time:** 6 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 

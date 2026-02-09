@@ -56,7 +56,16 @@ pytest tests/integration/agent/multimodal/test_multimodal_integration.py -v
 pytest tests/integration/agent/multimodal/test_multimodal_integration.py::TestVisionAgentIntegration -v
 
 # Run specific test
-pytest tests/integration/agent/multimodal/test_multimodal_integration.py::TestVisionAgentIntegration::test_vision_with_mock_provider -v
+pytest
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  tests/integration/agent/multimodal/test_multimodal_integration.py::TestVisionAgentIntegration::test_vision_with_mock_provider
+  -v
 
 # Run tests matching pattern
 pytest -k "multimodal" -v

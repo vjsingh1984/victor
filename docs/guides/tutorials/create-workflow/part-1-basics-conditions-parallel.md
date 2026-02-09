@@ -15,7 +15,9 @@
 ---
 # Creating Workflows in Victor
 
-Learn how to build powerful multi-agent workflows using Victor's YAML-first workflow system. This tutorial walks you through creating a complete code review workflow with conditions, parallel execution, and human-in-the-loop approvals.
+Learn how to build powerful multi-agent workflows using Victor's YAML-first workflow system. This tutorial walks you
+  through creating a complete code review workflow with conditions,
+  parallel execution, and human-in-the-loop approvals.
 
 ## What You Will Build
 
@@ -338,6 +340,15 @@ graph = compiler.compile_yaml(
 result = await graph.invoke({"target_file": "src/main.py"})
 ```
 
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## 4. Parallel Execution

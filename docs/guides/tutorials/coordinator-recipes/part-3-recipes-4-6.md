@@ -441,5 +441,14 @@ await orchestrator.chat("Hello!")
 - **Data retention**: Aggregate data to reduce chart data points
 - **Error handling**: Handle client disconnections gracefully
 
+
+**Reading Time:** 6 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 

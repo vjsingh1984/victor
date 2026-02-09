@@ -134,3 +134,8 @@ graph TB
 - [Best Practices](../architecture/best-practices/)
 - [Design Patterns](../architecture/patterns/)
 - [Contributing Guide](../contributing/)
+
+---
+
+**Reading Time:** 2 min
+**Last Updated:** February 08, 2026**

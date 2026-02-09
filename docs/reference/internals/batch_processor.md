@@ -2,7 +2,9 @@
 
 ## Overview
 
-The Rust Batch Processing Coordinator is a high-performance native extension for parallel task execution with dependency resolution, retry policies, and result aggregation. It provides **20-40% throughput improvement** over sequential execution.
+The Rust Batch Processing Coordinator is a high-performance native extension for parallel task execution with dependency
+  resolution,
+  retry policies, and result aggregation. It provides **20-40% throughput improvement** over sequential execution.
 
 ## Architecture
 
@@ -574,6 +576,11 @@ pytest tests/unit/test_batch_processor.py -v
 - **Documentation**: `/Users/vijaysingh/code/codingagent/docs/batch_processor.md`
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 2 min

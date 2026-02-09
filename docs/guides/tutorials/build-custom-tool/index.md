@@ -6,7 +6,8 @@ Tutorial for building custom tools that extend Victor's capabilities.
 
 ## Quick Summary
 
-Learn how to create custom tools that extend Victor's capabilities. This tutorial walks you through building a weather fetching tool from scratch.
+Learn how to create custom tools that extend Victor's capabilities. This tutorial walks you through building a weather
+  fetching tool from scratch.
 
 **What You'll Build:**
 - A `weather` tool that fetches current weather conditions

@@ -2,7 +2,9 @@
 
 ## Overview
 
-The Victor Team Collaboration Dashboard provides real-time monitoring and visualization of multi-agent team executions. It combines a FastAPI WebSocket server with a React TypeScript frontend to deliver sub-second latency updates for team execution events.
+The Victor Team Collaboration Dashboard provides real-time monitoring and visualization of multi-agent team executions.
+  It combines a FastAPI WebSocket server with a React TypeScript frontend to deliver sub-second latency updates for team
+  execution events.
 
 ![Dashboard Architecture](/images/dashboard-architecture.png)
 
@@ -467,7 +469,7 @@ function MyComponent() {
     />
   );
 }
-```
+```bash
 
 ## Troubleshooting
 
@@ -535,6 +537,11 @@ To extend the dashboard:
 Apache License 2.0 - See LICENSE file for details
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

@@ -64,6 +64,15 @@ curl http://localhost:8080/api/v1/chat/stream \
 
 [Content continues through Rate Limiting...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Examples, Testing, Deployment, Monitoring](part-2-examples-testing-deployment.md)**

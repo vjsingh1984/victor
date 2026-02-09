@@ -52,4 +52,5 @@ This reference covers Victor's template system components:
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** February 01, 2026

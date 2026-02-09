@@ -280,6 +280,10 @@ class SecurityAwareQualityAssessor:
         )
 ```
 
+
+**Reading Time:** 3 min
+**Last Updated:** February 08, 2026**
+
 ---
 
 ## See Also

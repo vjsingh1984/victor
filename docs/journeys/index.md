@@ -199,4 +199,5 @@ Each journey has clear milestones:
 **Last Updated:** January 31, 2026
 **Total Reading Time:** 5 hours (all journeys)
 
-Need help? Start with the [Beginner Journey](beginner.md) or open a [GitHub Discussion](https://github.com/vjsingh1984/victor/discussions).
+Need help? Start with the [Beginner Journey](beginner.md) or open a [GitHub
+  Discussion](https://github.com/vjsingh1984/victor/discussions).

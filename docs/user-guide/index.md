@@ -4,7 +4,8 @@ Complete guide for daily usage of Victor AI Assistant.
 
 ## Overview
 
-This guide covers everything you need to use Victor effectively, from basic conversations to advanced workflows and multi-agent teams.
+This guide covers everything you need to use Victor effectively, from basic conversations to advanced workflows and
+  multi-agent teams.
 
 **New to Victor?** Start with [Getting Started](../getting-started/index.md).
 

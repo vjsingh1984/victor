@@ -1,6 +1,8 @@
 # RAG Vertical
 
-The RAG (Retrieval-Augmented Generation) vertical provides document ingestion, vector search, and question-answering capabilities. It enables building knowledge bases from documents and answering questions with source citations.
+The RAG (Retrieval-Augmented Generation) vertical provides document ingestion, vector search,
+  and question-answering capabilities. It enables building knowledge bases from documents and answering questions with
+  source citations.
 
 ## Overview
 
@@ -398,6 +400,11 @@ victor/rag/
 - **Concurrent queries**: LanceDB handles concurrent reads well
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

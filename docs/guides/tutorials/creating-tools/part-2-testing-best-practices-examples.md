@@ -285,7 +285,8 @@ class FileProcessTool(BaseTool):
 
 ## Conclusion
 
-Creating custom tools for Victor AI is straightforward. Follow the patterns in this guide to build powerful tools that extend Victor's capabilities.
+Creating custom tools for Victor AI is straightforward. Follow the patterns in this guide to build powerful tools that
+  extend Victor's capabilities.
 
 **Next Steps:**
 - Explore [Tool Examples](../../examples/tools/)
@@ -294,4 +295,5 @@ Creating custom tools for Victor AI is straightforward. Follow the patterns in t
 
 ---
 
+**Reading Time:** 3 min
 **Last Updated:** February 01, 2026

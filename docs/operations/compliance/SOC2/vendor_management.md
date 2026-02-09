@@ -4,6 +4,7 @@
 
 
 **Version:** 1.0
+**Reading Time:** 8 min
 **Last Updated:** 2026-01-20
 **Next Review:** 2026-04-20
 **Owner:** Chief Information Security Officer (CISO)
@@ -26,7 +27,8 @@
 
 ### 1.1 Purpose
 
-This document defines the procedures for managing third-party vendors in accordance with SOC2 Trust Services Criteria (CC9.2).
+This document defines the procedures for managing third-party vendors in accordance with SOC2 Trust Services Criteria
+  (CC9.2).
 
 ### 1.2 Scope
 

@@ -1,6 +1,7 @@
 # Enhanced Memory Guide
 
-Complete guide to Victor AI's dual-memory architecture combining episodic memory (experiences) and semantic memory (knowledge) for intelligent knowledge retention and retrieval.
+Complete guide to Victor AI's dual-memory architecture combining episodic memory (experiences) and semantic memory
+  (knowledge) for intelligent knowledge retention and retrieval.
 
 ---
 

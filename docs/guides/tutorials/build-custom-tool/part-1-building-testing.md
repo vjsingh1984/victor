@@ -1,6 +1,7 @@
 # Building Custom Tools in Victor - Part 1
 
-**Part 1 of 2:** Tool Anatomy, Step-by-Step Implementation, Parameter Validation, Error Handling, Registration, and Testing
+**Part 1 of 2:** Tool Anatomy, Step-by-Step Implementation, Parameter Validation, Error Handling, Registration, and
+  Testing
 
 ---
 
@@ -12,7 +13,8 @@
 
 ---
 
-Learn how to create custom tools that extend Victor's capabilities. This tutorial walks you through building a weather fetching tool from scratch.
+Learn how to create custom tools that extend Victor's capabilities. This tutorial walks you through building a weather
+  fetching tool from scratch.
 
 ## What You'll Build
 
@@ -64,6 +66,15 @@ async def my_tool(param1: str, param2: int = 5) -> Dict[str, Any]:
 
 [Content continues through Testing the Tool...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Complete Code, Advanced Topics](part-2-complete-code-advanced.md)**

@@ -6,7 +6,8 @@ Examples demonstrating migration to coordinator-based architecture.
 
 ## Quick Summary
 
-This document provides side-by-side comparisons of code before and after migration to the coordinator-based architecture.
+This document provides side-by-side comparisons of code before and after migration to the coordinator-based
+  architecture.
 
 **Key Points:**
 - **Most code requires NO changes** - 100% backward compatible

@@ -2,7 +2,8 @@
 
 ## Overview
 
-The File Operations module provides Rust-accelerated file system operations with 2-3x faster directory traversal and 3-5x faster metadata collection compared to pure Python implementations.
+The File Operations module provides Rust-accelerated file system operations with 2-3x faster directory traversal and
+  3-5x faster metadata collection compared to pure Python implementations.
 
 ## Performance Characteristics
 

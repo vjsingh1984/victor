@@ -8,7 +8,8 @@
 
 ## Overview
 
-The Victor AI documentation has been comprehensively restructured in version 0.5.0 to professional open-source standards. This guide helps you find the new locations for your favorite documentation.
+The Victor AI documentation has been comprehensively restructured in version 0.5.0 to professional open-source
+  standards. This guide helps you find the new locations for your favorite documentation.
 
 ## What Changed
 
@@ -223,6 +224,11 @@ If you can't find something:
 </div>
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

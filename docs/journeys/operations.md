@@ -6,7 +6,8 @@
 
 ## Journey Overview
 
-This journey prepares you to deploy, monitor, and scale Victor in production environments. By the end, you'll be able to:
+This journey prepares you to deploy, monitor, and scale Victor in production environments. By the end, you'll be able
+  to:
 - Deploy Victor using Docker and Kubernetes
 - Configure monitoring and alerting
 - Implement security controls

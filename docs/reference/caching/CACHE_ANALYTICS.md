@@ -2,7 +2,8 @@
 
 ## Overview
 
-Cache analytics provides comprehensive monitoring and insights into cache performance, helping you optimize hit rates, identify bottlenecks, and make data-driven tuning decisions.
+Cache analytics provides comprehensive monitoring and insights into cache performance, helping you optimize hit rates,
+  identify bottlenecks, and make data-driven tuning decisions.
 
 ## Key Metrics
 

@@ -141,6 +141,7 @@
 ---
 
 **Version:** 1.0
+**Reading Time:** 2 min
 **Last Updated:** 2026-01-20
 **Next Review:** 2026-04-20
 **Owner:** DevOps Lead

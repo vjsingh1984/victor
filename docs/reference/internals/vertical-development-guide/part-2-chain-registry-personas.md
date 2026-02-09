@@ -466,5 +466,14 @@ class MyVertical(VerticalBase):
         return MyVerticalTeamProvider()
 ```
 
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 

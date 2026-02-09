@@ -13,7 +13,9 @@
 ---
 # Advanced Team Formations
 
-Beyond the 5 basic team formation patterns (Sequential, Parallel, Hierarchical, Pipeline, Consensus), Victor provides advanced formation strategies that enable dynamic coordination, adaptive selection, and hybrid multi-phase workflows.
+Beyond the 5 basic team formation patterns (Sequential, Parallel, Hierarchical, Pipeline, Consensus),
+  Victor provides advanced formation strategies that enable dynamic coordination, adaptive selection,
+  and hybrid multi-phase workflows.
 
 ## Overview
 
@@ -334,3 +336,12 @@ hybrid_config:
 | **Hybrid** | High | Very High | Low | High | Structured multi-phase workflows |
 | **Basic** | Low | Medium | None | Low | Simple, predictable tasks |
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**

@@ -2,7 +2,8 @@
 
 **Victor Framework**
 
-Victor's checkpoint system provides time-travel debugging capabilities similar to LangGraph, enabling safe rollback and exploration of alternate execution paths.
+Victor's checkpoint system provides time-travel debugging capabilities similar to LangGraph,
+  enabling safe rollback and exploration of alternate execution paths.
 
 ## Overview
 
@@ -207,7 +208,7 @@ state_dict = StateSerializer.serialize_execution_state(state)
 
 ### Dual-Backend Design
 
-```
+```bash
 ┌─────────────────────────────────────────────────────────────┐
 │              Enhanced Checkpoint Manager                    │
 ├─────────────────────────────────────────────────────────────┤
@@ -235,7 +236,7 @@ state_dict = StateSerializer.serialize_execution_state(state)
 
 ### Checkpoint Creation Flow
 
-```
+```bash
 User Action (e.g., "Before refactoring")
     │
     ▼
@@ -248,7 +249,7 @@ EnhancedCheckpointManager.save_checkpoint()
 
 ### Checkpoint Restore Flow
 
-```
+```bash
 User Action (Restore checkpoint)
     │
     ▼
@@ -552,7 +553,7 @@ manager.checkpoint_interval  # Should be set
 # Manually trigger checkpoint
 checkpoint_id = manager.record_tool_call()
 print(f"Created: {checkpoint_id}")
-```
+```bash
 
 ## Architecture Notes
 

@@ -1,6 +1,7 @@
 # Coding Vertical
 
-The Coding vertical provides comprehensive code analysis, review, refactoring, and generation capabilities. It is designed to compete with GitHub Copilot Workspace, Cursor, and Sourcegraph Cody.
+The Coding vertical provides comprehensive code analysis, review, refactoring,
+  and generation capabilities. It is designed to compete with GitHub Copilot Workspace, Cursor, and Sourcegraph Cody.
 
 ## Overview
 
@@ -172,7 +173,8 @@ definitions = await lsp.get_definitions(file_path, position)
 
 ### Code Validation (Pre-Write Enforcement)
 
-The Coding vertical integrates with the **Unified Language Capability System** to validate code before writing to disk. This prevents syntax errors from being committed:
+The Coding vertical integrates with the **Unified Language Capability System** to validate code before writing to disk.
+  This prevents syntax errors from being committed:
 
 ```python
 from victor.core.language_capabilities.hooks import validate_code_before_write
@@ -362,6 +364,11 @@ victor/coding/
 5. **Document changes**: Update documentation as part of the workflow
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

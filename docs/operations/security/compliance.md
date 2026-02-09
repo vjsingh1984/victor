@@ -1,4 +1,5 @@
-<div align="center">
+# <div align="center">
+
 
 ![Victor Banner](assets/victor-banner.png)
 
@@ -8,7 +9,8 @@
 
 </div>
 
-This guide is for teams evaluating Victor in enterprise or regulated environments. It focuses on practical rollout, local‑first deployment, and realistic expectations.
+This guide is for teams evaluating Victor in enterprise or regulated environments. It focuses on practical rollout,
+  local‑first deployment, and realistic expectations.
 
 ## Who This Is For
 - Teams that want local models by default, with optional cloud use
@@ -74,6 +76,11 @@ Yes. Tools are gated by mode, configuration, and permissions.
 Use the CLI in pipelines or run Victor as a service and call it via API.
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 2 min

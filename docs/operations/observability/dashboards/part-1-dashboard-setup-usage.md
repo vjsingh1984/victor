@@ -1,6 +1,7 @@
 # Observability Dashboards Guide - Part 1
 
-**Part 1 of 2:** Overview, Installation, Dashboard Guide, Alerting, Alert Tuning, Query Examples, and Integration with Existing Monitoring
+**Part 1 of 2:** Overview, Installation, Dashboard Guide, Alerting, Alert Tuning, Query Examples, and Integration with
+  Existing Monitoring
 
 ---
 
@@ -33,7 +34,9 @@ Comprehensive monitoring and alerting for Victor team workflow execution.
 
 ## Overview
 
-Victor provides a complete observability solution for team workflows with four Grafana dashboards and Prometheus alerting rules. These dashboards provide real-time insights into team execution, performance, member activity, and recursion depth.
+Victor provides a complete observability solution for team workflows with four Grafana dashboards and Prometheus
+  alerting rules. These dashboards provide real-time insights into team execution,
+  performance, member activity, and recursion depth.
 
 ### Dashboards
 
@@ -524,3 +527,12 @@ sum by (role, error_type) (
 )
 ```
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 8 min
+**Last Updated:** February 08, 2026**

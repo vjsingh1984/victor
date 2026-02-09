@@ -401,7 +401,7 @@ bus.subscribe(EventCategory.TOOL, lambda e:
             duration=e.data.get("duration"),
         )
 )
-```
+```bash
 
 ## Troubleshooting
 

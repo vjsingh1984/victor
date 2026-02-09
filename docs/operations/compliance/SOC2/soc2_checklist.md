@@ -4,6 +4,7 @@
 
 
 **Version:** 1.0
+**Reading Time:** 11 min
 **Last Updated:** 2026-01-20
 **Purpose:** Track SOC2 Type II compliance progress
 **Framework:** AICPA Trust Services Criteria (TSC)
@@ -434,6 +435,7 @@ Month 10-12 (Oct-Dec 2026): Audit
 
 ---
 
+**Reading Time:** 11 min
 **Last Updated:** 2026-01-20
 **Next Review:** 2026-02-20 (Monthly during preparation)
 **Owner:** Chief Information Security Officer

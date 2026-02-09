@@ -30,7 +30,8 @@ flowchart TB
     style F fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px
 ```
 
-See [Contributor Workflow Diagram](../diagrams/user-journeys/contributor-workflow.mmd) for detailed contribution process.
+See [Contributor Workflow Diagram](../diagrams/user-journeys/contributor-workflow.mmd) for detailed contribution
+  process.
 
 ## Step 1: Development Setup (15 minutes)
 
@@ -473,6 +474,11 @@ Congratulations! 🎉 You're ready to contribute to Victor.
 - **Design Patterns:** [Design Patterns](../architecture/patterns/)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** January 31, 2026
 **Reading Time:** 10 minutes

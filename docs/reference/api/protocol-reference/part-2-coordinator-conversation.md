@@ -385,5 +385,14 @@ class PromptCoordinatorProtocol(Protocol):
         ...
 ```
 
+
+**Reading Time:** 4 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 

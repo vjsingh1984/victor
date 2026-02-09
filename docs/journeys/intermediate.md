@@ -6,7 +6,8 @@
 
 ## Journey Overview
 
-This journey expands your Victor skills from basic conversations to advanced workflows and automation. By the end, you'll be able to:
+This journey expands your Victor skills from basic conversations to advanced workflows and automation. By the end,
+  you'll be able to:
 - Create and customize workflows
 - Use multi-agent teams
 - Customize profiles for different projects
@@ -28,7 +29,7 @@ flowchart LR
     style D fill:#f3e5f5,stroke:#6a1b9a
     style E fill:#fce4ec,stroke:#880e4f
     style F fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px
-```
+```bash
 
 ## Step 1: Tools Deep Dive (15 minutes)
 
@@ -366,6 +367,11 @@ Congratulations! 🎉 You're now a power user.
 - **Architecture:** [Architecture Overview](../architecture/overview.md)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** January 31, 2026
 **Reading Time:** 8 minutes

@@ -2,7 +2,8 @@
 
 Welcome to Victor! Get up and running in minutes.
 
-**New to Victor?** Follow our [Beginner Onboarding Journey](../diagrams/user-journeys/beginner-onboarding.mmd) for a step-by-step guide (30 minutes).
+**New to Victor?** Follow our [Beginner Onboarding Journey](../diagrams/user-journeys/beginner-onboarding.mmd) for a
+  step-by-step guide (30 minutes).
 
 ## What is Victor?
 
@@ -123,7 +124,8 @@ victor "Run tests and summarize failures"
 
 ---
 
-**Next**: [Installation](installation.md) | [First Run](first-run.md) | [Local Models](local-models.md) | [Cloud Models](cloud-models.md)
+**Next**: [Installation](installation.md) | [First Run](first-run.md) | [Local Models](local-models.md) | [Cloud
+  Models](cloud-models.md)
 
 ---
 

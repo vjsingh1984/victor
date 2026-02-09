@@ -1,6 +1,7 @@
 # Semantic Tool Selection
 
-Victor can select tools by comparing embeddings of the user request to tool descriptions. This reduces tool noise and keeps prompts smaller when you have many tools.
+Victor can select tools by comparing embeddings of the user request to tool descriptions. This reduces tool noise and
+  keeps prompts smaller when you have many tools.
 
 ## When To Use
 - Large tool catalog

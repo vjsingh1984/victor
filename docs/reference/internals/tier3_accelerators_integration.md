@@ -1,6 +1,7 @@
 # Tier 3 Accelerators Integration Guide
 
-This guide documents the integration of **Tier 3 accelerators** into Victor, providing 3-10x performance improvements for medium-frequency operations.
+This guide documents the integration of **Tier 3 accelerators** into Victor, providing 3-10x performance improvements
+  for medium-frequency operations.
 
 ## Overview
 
@@ -413,7 +414,7 @@ print(accelerator.get_cache_stats())
 # Serialization accelerator cache stats
 accelerator = get_serialization_accelerator()
 print(accelerator.get_cache_stats())
-```
+```bash
 
 ## Future Enhancements
 
@@ -450,6 +451,11 @@ For issues or questions:
 4. Verify Rust compilation: `pip show victor-ai`
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

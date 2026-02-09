@@ -252,6 +252,10 @@ An emergency change is justified when:
 - [SOC2 Audit Log Requirements](./audit_log_requirements.md)
 - [SOC2 Checklist](./soc2_checklist.md)
 
+
+**Reading Time:** 4 min
+**Last Updated:** February 08, 2026**
+
 ---
 
 **END OF PROCEDURE DOCUMENT**

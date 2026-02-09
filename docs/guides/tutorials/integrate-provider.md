@@ -9,7 +9,9 @@ This tutorial has been split into 5 parts for easier reading and navigation.
 **Time estimate:** 45-60 minutes
 
 **What you will build:**
-A complete LLM provider integration that connects to any LLM API (cloud or local), supports synchronous and streaming chat completions, handles tool/function calling, integrates with Victor's circuit breaker, and is properly registered and testable.
+A complete LLM provider integration that connects to any LLM API (cloud or local),
+  supports synchronous and streaming chat completions, handles tool/function calling,
+  integrates with Victor's circuit breaker, and is properly registered and testable.
 
 ---
 
@@ -107,6 +109,11 @@ from victor.agent.tool_calling.base import (
 ```
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes (complete tutorial)

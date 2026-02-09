@@ -14,7 +14,9 @@
 
 ## Overview
 
-Hierarchical planning enables Victor AI to break down complex tasks into manageable, executable subtasks with automatic dependency tracking and dynamic re-planning. This guide explains how to use hierarchical planning effectively.
+Hierarchical planning enables Victor AI to break down complex tasks into manageable,
+  executable subtasks with automatic dependency tracking and dynamic re-planning. This guide explains how to use
+  hierarchical planning effectively.
 
 ## Table of Contents
 
@@ -67,6 +69,15 @@ An `ExecutionPlan` contains:
 
 [Content continues through Replanning Strategies...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Best Practices, Troubleshooting, Examples](part-2-best-practices-troubleshooting-examples.md)**

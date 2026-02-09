@@ -2,7 +2,8 @@
 
 **Victor AI Coding Assistant - Test Coverage & Quality**
 
-Welcome to the Victor testing documentation. This directory contains comprehensive information about test coverage, quality metrics, and improvement plans.
+Welcome to the Victor testing documentation. This directory contains comprehensive information about test coverage,
+  quality metrics, and improvement plans.
 
 > **Note**: Coverage and test counts are time-bound snapshots. Verify against current reports before making decisions.
 
@@ -385,6 +386,11 @@ With consistent effort and focus on high-value coverage, we aim to achieve 80% c
 **Maintained By**: Victor Development Team
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

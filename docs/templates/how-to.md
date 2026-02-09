@@ -135,5 +135,6 @@ If applicable:
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** YYYY-MM-DD
 **Related:** [Link to related docs]

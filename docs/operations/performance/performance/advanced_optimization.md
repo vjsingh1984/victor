@@ -22,7 +22,8 @@
 
 ## Overview
 
-Advanced optimization builds on the basic caching infrastructure (36% latency reduction) to achieve an additional 17% reduction through:
+Advanced optimization builds on the basic caching infrastructure (36% latency reduction) to achieve an additional 17%
+  reduction through:
 
 1. **Adaptive Cache Sizing**: Dynamically adjusts cache size based on workload patterns
 2. **Predictive Cache Prewarming**: Proactively warms cache for likely next queries
@@ -599,6 +600,11 @@ cache = MultiLevelCache(l1_ttl=600, l2_ttl=7200, l3_ttl=86400)
 - [Optimization Guide](./optimization_guide.md)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 5 minutes

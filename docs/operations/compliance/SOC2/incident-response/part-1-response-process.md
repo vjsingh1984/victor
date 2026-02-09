@@ -15,6 +15,7 @@
 > **Template**: This document describes intended controls. It does not assert current certification or compliance. Update with actual audit evidence and operational details.
 
 **Version:** 1.0
+**Reading Time:** 1 min
 **Last Updated:** 2026-01-20
 **Next Review:** 2026-04-20
 **Owner:** Chief Information Security Officer (CISO)
@@ -37,7 +38,8 @@
 
 ### 1.1 Purpose
 
-This document defines the procedures for detecting, responding to, and recovering from security incidents in accordance with SOC2 Trust Services Criteria (CC4.1, CC6.6, CC7.4, CC9.1).
+This document defines the procedures for detecting, responding to,
+  and recovering from security incidents in accordance with SOC2 Trust Services Criteria (CC4.1, CC6.6, CC7.4, CC9.1).
 
 ### 1.2 Scope
 
@@ -62,5 +64,10 @@ This procedure applies to:
 [Content continues through Communication Procedures...]
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Post-Incident, Reporting, Classification](part-2-post-incident-reporting-classification.md)**

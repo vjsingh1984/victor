@@ -101,7 +101,8 @@ Complete reference for all 98 protocols.
 ### [Migration Guides](MIGRATION_GUIDES.md)
 Guides for upgrading between versions.
 
-**Note**: Legacy refactoring and workflow migration guides were removed from the docs tree. Refer to git history if you need older materials.
+**Note**: Legacy refactoring and workflow migration guides were removed from the docs tree. Refer to git history if you
+  need older materials.
 
 ---
 
@@ -124,6 +125,11 @@ Guides for upgrading between versions.
 </div>
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 2 min

@@ -2,7 +2,8 @@
 
 ## Installation
 
-The batch processor is included with Victor AI v0.5.0+. No additional installation required if you have Victor installed.
+The batch processor is included with Victor AI v0.5.0+. No additional installation required if you have Victor
+  installed.
 
 ```bash
 # Verify installation

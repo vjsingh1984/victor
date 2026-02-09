@@ -1,6 +1,7 @@
 # DevOps Vertical
 
-The DevOps vertical provides infrastructure automation, deployment, and operations capabilities. It is designed to compete with Terraform Cloud AI, Pulumi Copilot, and GitLab Duo.
+The DevOps vertical provides infrastructure automation, deployment,
+  and operations capabilities. It is designed to compete with Terraform Cloud AI, Pulumi Copilot, and GitLab Duo.
 
 ## Overview
 
@@ -330,6 +331,11 @@ victor/devops/
 - **Compliance**: Follow CIS benchmarks for cloud security
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

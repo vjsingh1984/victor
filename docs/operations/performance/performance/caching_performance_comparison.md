@@ -302,10 +302,17 @@ VICTOR_PREDICTIVE_WARMING_ENABLED: "true"
 5. **Predictive warming** experimental, limited gains for complex workloads
 
 **Production Recommendation:**
-Start with minimum configuration, monitor for 24-48 hours, then enable additional features based on observed hit rate and latency requirements.
+Start with minimum configuration, monitor for 24-48 hours, then enable additional features based on observed hit rate
+  and latency requirements.
 
 ---
 
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
 **Data Source:** Benchmarking scripts in `scripts/benchmark_tool_selection.py`
+**Reading Time:** 8 min
 **Last Updated:** 2025-01-21
 **Track:** 5.3 - Production Caching

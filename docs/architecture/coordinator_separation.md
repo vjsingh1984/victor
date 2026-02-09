@@ -2,7 +2,9 @@
 
 ## Executive Summary
 
-Victor employs a **two-layer coordinator architecture** that separates application-specific orchestration from framework-agnostic workflow infrastructure. This design is **intentional and beneficial**, not harmful duplication.
+Victor employs a **two-layer coordinator architecture** that separates application-specific orchestration from
+  framework-agnostic workflow infrastructure. This design is **intentional and beneficial**,
+  not harmful duplication.
 
 - **Application Layer** (`victor/agent/coordinators/`): Manages AI agent conversation lifecycle
 - **Framework Layer** (`victor/framework/coordinators/`): Provides reusable workflow infrastructure
@@ -54,7 +56,8 @@ This separation enables:
 
 ### Purpose
 
-Application-specific orchestration for the AI agent conversation lifecycle. These coordinators manage the high-level logic of how Victor interacts with users and orchestrates the complete conversation flow.
+Application-specific orchestration for the AI agent conversation lifecycle. These coordinators manage the high-level
+  logic of how Victor interacts with users and orchestrates the complete conversation flow.
 
 ### Key Coordinators
 
@@ -337,7 +340,8 @@ This logic is **specific to Victor's use case** and doesn't belong in a generic 
 
 ### Purpose
 
-Framework-agnostic workflow infrastructure that can be reused across any vertical (Coding, DevOps, RAG, DataAnalysis, Research, or external verticals).
+Framework-agnostic workflow infrastructure that can be reused across any vertical (Coding, DevOps, RAG, DataAnalysis,
+  Research, or external verticals).
 
 ### Key Coordinators
 
@@ -883,6 +887,11 @@ This is **not harmful duplication**—it's **good architecture** following indus
 See [Coordinators Architecture Diagram](diagrams/coordinators.mmd) for a visual representation of this architecture.
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 8 minutes

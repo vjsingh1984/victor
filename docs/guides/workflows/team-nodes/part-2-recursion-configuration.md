@@ -16,7 +16,8 @@
 
 ## Recursion Depth Tracking
 
-Team nodes participate in **unified recursion tracking** to prevent infinite nesting. All nested execution types count toward the same limit:
+Team nodes participate in **unified recursion tracking** to prevent infinite nesting. All nested execution types count
+  toward the same limit:
 - Workflow invoking workflow
 - Workflow spawning team
 - Team spawning team
@@ -392,3 +393,12 @@ workflows:
         tools: [write]
 ```
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**

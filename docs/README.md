@@ -1,4 +1,5 @@
-<div align="center">
+# <div align="center">
+
 
 # Victor AI Documentation
 
@@ -60,7 +61,8 @@ Choose your path based on your goals:
 └──────────┘  └─────────┘  └────────┘
 ```
 
-**See:** [Architecture Overview](architecture/overview.md) | [Coordinator Layers](diagrams/architecture/coordinator-layers.mmd)
+**See:** [Architecture Overview](architecture/overview.md) | [Coordinator
+  Layers](diagrams/architecture/coordinator-layers.mmd)
 
 ---
 
@@ -411,6 +413,7 @@ All documentation follows the [Victor Documentation Standards](STANDARDS.md):
 
 ---
 
+**Reading Time:** 6 min
 **Last Updated:** January 31, 2026
 **Documentation Version:** 1.0
 **Maintained by:** Victor AI Documentation Team

@@ -464,3 +464,13 @@ class SecurityPromptSection(PromptSection):
     def render(self, context: dict) -> str:
         return f"""
 ## Security Guidelines
+
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 6 min
+**Last Updated:** February 08, 2026**

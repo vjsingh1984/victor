@@ -4,7 +4,8 @@ This document describes the pre-commit hook system for validating YAML workflows
 
 ## Overview
 
-Victor uses pre-commit hooks to automatically validate YAML workflow files before they are committed to git. This helps catch errors early and ensures that workflows are properly formatted and can be compiled successfully.
+Victor uses pre-commit hooks to automatically validate YAML workflow files before they are committed to git. This helps
+  catch errors early and ensures that workflows are properly formatted and can be compiled successfully.
 
 ## Installation
 

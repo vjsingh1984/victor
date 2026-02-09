@@ -2,7 +2,9 @@
 
 ## Overview
 
-The Rust AST processor accelerator has been successfully integrated into Victor's tree-sitter manager, providing **10x faster parsing** with automatic fallback to Python tree-sitter when the native extension is unavailable.
+The Rust AST processor accelerator has been successfully integrated into Victor's tree-sitter manager,
+  providing **10x faster parsing** with automatic fallback to Python tree-sitter when the native extension is
+  unavailable.
 
 ## Integration Changes
 
@@ -403,9 +405,15 @@ The Rust AST processor integration provides:
 - **Performance monitoring** built-in
 - **Full test coverage** for reliability
 
-The integration follows Victor's SOLID architecture principles, using protocol-based design, dependency injection, and backward compatibility throughout.
+The integration follows Victor's SOLID architecture principles, using protocol-based design, dependency injection,
+  and backward compatibility throughout.
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

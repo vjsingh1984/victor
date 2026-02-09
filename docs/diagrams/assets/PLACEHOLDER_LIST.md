@@ -213,3 +213,8 @@ Use the following checklist to track asset creation:
 4. Add feature-specific screenshots as documentation is written
 5. Optimize all assets for web delivery
 6. Test all assets in both light and dark documentation themes
+
+---
+
+**Reading Time:** 4 min
+**Last Updated:** February 08, 2026**

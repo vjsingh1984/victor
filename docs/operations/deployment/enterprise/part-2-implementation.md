@@ -202,7 +202,8 @@ We aim to respond within 2 business days for enterprise inquiries.
 
 ## Getting Started
 
-Victor is a new project focused on enterprise evaluation. While we don't have customer case studies yet, the platform includes features that can help enterprise deployments:
+Victor is a new project focused on enterprise evaluation. While we don't have customer case studies yet,
+  the platform includes features that can help enterprise deployments:
 
 - Apache 2.0 licensed for commercial use
 - Air-gapped deployment capabilities
@@ -227,25 +228,31 @@ docker-compose --profile demo up
 A: Yes, when you use local models and local tools. Features that call external APIs require network access.
 
 **Q: How does Apache 2.0 compare to MIT for enterprises?**
-A: Apache 2.0 includes explicit patent grants and stronger legal protections. Enterprise legal teams prefer it for commercial use.
+A: Apache 2.0 includes explicit patent grants and stronger legal protections. Enterprise legal teams prefer it for
+  commercial use.
 
 **Q: What about data privacy?**
-A: In air-gapped mode, zero data leaves your premises. In hybrid mode, only data you explicitly route to cloud APIs is sent (encrypted in transit).
+A: In air-gapped mode, zero data leaves your premises. In hybrid mode, only data you explicitly route to cloud APIs is
+  sent (encrypted in transit).
 
 **Q: Can we fine-tune models?**
-A: Yes. You can fine-tune open source models (Llama, Qwen, etc.) on your proprietary code and deploy them via Ollama or vLLM.
+A: Yes. You can fine-tune open source models (Llama, Qwen, etc.) on your proprietary code and deploy them via Ollama or
+  vLLM.
 
 **Q: What's the implementation timeline?**
 A: Pilot: 2 weeks. Full rollout: 4-6 weeks. With commercial support: 2-3 weeks total.
 
 **Q: How much does commercial support cost?**
-A: Professional tier starts at $24k/year. Enterprise tier (24/7, SLA) starts at $60k/year. Implementation services: $15k-50k one-time.
+A: Professional tier starts at $24k/year. Enterprise tier (24/7, SLA) starts at $60k/year. Implementation services:
+  $15k-50k one-time.
 
 **Q: Can Victor integrate with our CI/CD?**
-A: Yes. Victor includes tools for GitHub Actions, GitLab CI, CircleCI, Jenkins. Custom integrations available with commercial support.
+A: Yes. Victor includes tools for GitHub Actions, GitLab CI, CircleCI, Jenkins. Custom integrations available with
+  commercial support.
 
 **Q: What if we're already using another AI coding assistant?**
-A: Migration typically takes 1-2 weeks. Victor can run alongside existing tools during transition. Migration assistance available ($5k-10k depending on team size).
+A: Migration typically takes 1-2 weeks. Victor can run alongside existing tools during transition. Migration assistance
+  available ($5k-10k depending on team size).
 
 ---
 
@@ -264,5 +271,6 @@ Subject: "Victor Enterprise Deployment"
 ---
 
 **Document Version:** 1.0
+**Reading Time:** 4 min
 **Last Updated:** January 26, 2025
 **Maintained By:** Vijaykumar Singh (singhvjd@gmail.com)

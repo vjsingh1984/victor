@@ -29,7 +29,8 @@
 
 ### 1.1 Policy Statement
 
-Victor AI is committed to maintaining the confidentiality, integrity, and availability of information assets in accordance with SOC2 Trust Services Criteria.
+Victor AI is committed to maintaining the confidentiality, integrity,
+  and availability of information assets in accordance with SOC2 Trust Services Criteria.
 
 ### 1.2 Purpose
 

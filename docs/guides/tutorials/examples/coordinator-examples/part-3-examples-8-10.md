@@ -237,6 +237,15 @@ if __name__ == "__main__":
 - Implement fallback behavior
 - Log errors for debugging
 
+
+**Reading Time:** 2 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## Summary

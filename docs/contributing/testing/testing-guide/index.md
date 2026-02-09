@@ -41,4 +41,5 @@ This guide covers testing strategies for Victor:
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** February 01, 2026

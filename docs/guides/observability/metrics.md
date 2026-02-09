@@ -2,7 +2,8 @@
 
 ## Overview
 
-Victor now supports **JSONL event logging** for the observability dashboard. This allows you to visualize agent events, tool calls, state transitions, and more in real-time.
+Victor now supports **JSONL event logging** for the observability dashboard. This allows you to visualize agent events,
+  tool calls, state transitions, and more in real-time.
 
 ## Architecture
 
@@ -128,9 +129,12 @@ victor chat --log-events --observability-log-path /tmp/my-events.jsonl
 Each line is a JSON object:
 
 ```jsonl
-{"id": "evt-1a2b3c", "timestamp": "2025-01-06T12:00:00Z", "category": "TOOL", "name": "tool.start", "data": {"tool_name": "read_file", "arguments": {"path": "file.txt"}}}
-{"id": "evt-2b3c4d", "timestamp": "2025-01-06T12:00:02Z", "category": "TOOL", "name": "tool.end", "data": {"tool_name": "read_file", "duration_ms": 150}}
-{"id": "evt-3c4d5e", "timestamp": "2025-01-06T12:00:03Z", "category": "MODEL", "name": "llm.start", "data": {"model": "gpt-4", "provider": "openai"}}
+{"id": "evt-1a2b3c", "timestamp": "2025-01-06T12:00:00Z", "category": "TOOL", "name": "tool.start",
+  "data": {"tool_name": "read_file", "arguments": {"path": "file.txt"}}}
+{"id": "evt-2b3c4d", "timestamp": "2025-01-06T12:00:02Z", "category": "TOOL", "name": "tool.end",
+  "data": {"tool_name": "read_file", "duration_ms": 150}}
+{"id": "evt-3c4d5e", "timestamp": "2025-01-06T12:00:03Z", "category": "MODEL", "name": "llm.start", "data": {"model":
+  "gpt-4", "provider": "openai"}}
 ```
 
 ### Event Schema

@@ -17,6 +17,7 @@
 
 
 **Version:** 1.0
+**Reading Time:** 9 min
 **Last Updated:** 2026-01-20
 **Next Review:** 2026-04-20
 **Owner:** DevOps Lead
@@ -41,7 +42,9 @@
 
 ### 1.1 Purpose
 
-This document defines the procedures for managing changes to Victor AI systems in accordance with SOC2 Trust Services Criteria (CC7.1, CC7.2, CC7.3, CC8.1, CC8.2, CC8.3, CC8.4).
+This document defines the procedures for managing changes to Victor AI systems in accordance with SOC2 Trust Services
+  Criteria (CC7.1,
+  CC7.2, CC7.3, CC8.1, CC8.2, CC8.3, CC8.4).
 
 ### 1.2 Scope
 
@@ -509,4 +512,9 @@ change_request:
 12. Full rollout or rollback
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 

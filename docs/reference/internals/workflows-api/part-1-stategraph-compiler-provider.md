@@ -15,7 +15,8 @@
 ---
 # Workflows API Reference
 
-This document provides API reference documentation for Victor's workflow system, including the StateGraph DSL, UnifiedWorkflowCompiler, YAML workflow providers, and node types.
+This document provides API reference documentation for Victor's workflow system, including the StateGraph DSL,
+  UnifiedWorkflowCompiler, YAML workflow providers, and node types.
 
 ## Table of Contents
 
@@ -534,6 +535,15 @@ result = await compile_and_execute(
 compiler = create_unified_compiler(enable_caching=True)
 ```
 
+
+**Reading Time:** 6 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## BaseYAMLWorkflowProvider

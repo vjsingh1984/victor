@@ -9,7 +9,9 @@
 
 ## Overview
 
-Victor AI employs a comprehensive set of design patterns to achieve maintainability, testability, and extensibility. These patterns are applied consistently across the codebase, following SOLID principles and protocol-based design.
+Victor AI employs a comprehensive set of design patterns to achieve maintainability, testability,
+  and extensibility. These patterns are applied consistently across the codebase,
+  following SOLID principles and protocol-based design.
 
 ### Pattern Statistics
 

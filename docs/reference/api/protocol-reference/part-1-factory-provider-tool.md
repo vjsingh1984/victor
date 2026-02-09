@@ -36,7 +36,8 @@ Complete reference for all protocol interfaces in Victor AI.
 
 ## Overview
 
-Protocols in Victor AI define interfaces for dependency injection, testing, and SOLID compliance. All protocols are runtime-checkable and can be used for type hints and mock validation.
+Protocols in Victor AI define interfaces for dependency injection, testing,
+  and SOLID compliance. All protocols are runtime-checkable and can be used for type hints and mock validation.
 
 ### Importing Protocols
 
@@ -71,7 +72,8 @@ mock_provider = MagicMock(spec=ProviderManagerProtocol)
 
 Unified agent creation protocol.
 
-**Purpose:** Provides single interface for creating all agent types (foreground, background, team_member) following Single Responsibility Principle.
+**Purpose:** Provides single interface for creating all agent types (foreground, background, team_member) following
+  Single Responsibility Principle.
 
 ```python
 @runtime_checkable
@@ -388,6 +390,15 @@ class ToolPipelineProtocol(Protocol):
         ...
 ```
 
+
+**Reading Time:** 4 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## Coordinator Protocols

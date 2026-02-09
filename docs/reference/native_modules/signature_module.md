@@ -4,13 +4,16 @@
 
 **Version**: v0.5.0
 
-**Purpose**: High-performance tool call signature computation for deduplication, achieving 10x speedup over Python implementation.
+**Purpose**: High-performance tool call signature computation for deduplication, achieving 10x speedup over Python
+  implementation.
 
 ---
 
 ## Overview
 
-The signature module provides fast, reliable signature computation for tool call deduplication. It uses optimized hashing algorithms (SeaHash) and zero-copy JSON serialization to achieve significant performance improvements over Python-based approaches.
+The signature module provides fast,
+  reliable signature computation for tool call deduplication. It uses optimized hashing algorithms (SeaHash) and
+  zero-copy JSON serialization to achieve significant performance improvements over Python-based approaches.
 
 ### Performance Characteristics
 

@@ -1,6 +1,7 @@
 # Performance Benchmarking Guide
 
-This guide provides comprehensive instructions for running, interpreting, and extending performance benchmarks for Victor AI.
+This guide provides comprehensive instructions for running, interpreting, and extending performance benchmarks for
+  Victor AI.
 
 ## Table of Contents
 
@@ -167,6 +168,11 @@ alias bench='python scripts/benchmark_suite.py --profile quick'
 - [Architecture Documentation](../architecture/overview.md)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 1 min

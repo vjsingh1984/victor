@@ -169,6 +169,7 @@ new_method()
 
 ---
 
+**Reading Time:** 2 min
 **Last Updated:** YYYY-MM-DD
 **Module:** `victor.module.name`
 **Source:** [GitHub Link](https://github.com/vjsingh1984/victor/blob/main/victor/module/file.py)

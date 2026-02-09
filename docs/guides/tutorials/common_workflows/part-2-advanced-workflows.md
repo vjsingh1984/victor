@@ -267,11 +267,18 @@ victor chat "Generate README for this module"
 
 ## Conclusion
 
-These workflows provide a starting point for using Victor AI effectively. Adapt them to your specific needs and development style. The key is to be iterative, use the right provider for each task, and always prioritize code quality.
+These workflows provide a starting point for using Victor AI effectively. Adapt them to your specific needs and
+  development style. The key is to be iterative,
+  use the right provider for each task, and always prioritize code quality.
 
 Happy coding! 🚀
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

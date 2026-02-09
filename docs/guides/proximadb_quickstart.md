@@ -56,7 +56,7 @@ victor chat "Help me understand this codebase"
 If ProximaDB installation fails, **don't worry!** Victor automatically falls back to LanceDB.
 
 You'll see a warning:
-```
+```bash
 ProximaDB is configured but not installed.
 Install with: pip install victor-ai[vector-experimental].
 Using LanceDB as fallback.
@@ -87,7 +87,7 @@ Victor will continue working normally with LanceDB.
 **Solution**:
 ```bash
 pip install victor-ai[vector-experimental]
-```
+```bash
 
 Or just remove the ProximaDB configuration and use LanceDB (default).
 
@@ -127,6 +127,11 @@ Or just remove the ProximaDB configuration and use LanceDB (default).
 - [GitHub Issues](https://github.com/vjsingh1984/victor/issues)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 2 min

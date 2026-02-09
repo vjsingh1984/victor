@@ -308,7 +308,7 @@ Disable specific features:
 ```bash
 export VICTOR_TELEMETRY_TRACING_ENABLED=false
 export VICTOR_TELEMETRY_METRICS_ENABLED=true
-```
+```bash
 
 ## Integration Guides
 
@@ -392,6 +392,11 @@ For issues and questions:
 Apache License 2.0 - see LICENSE file for details
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

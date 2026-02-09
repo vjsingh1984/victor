@@ -13,7 +13,8 @@
 ---
 # Production Monitoring Setup Guide
 
-This guide provides step-by-step instructions for setting up comprehensive monitoring for Victor AI in production environments.
+This guide provides step-by-step instructions for setting up comprehensive monitoring for Victor AI in production
+  environments.
 
 ## Table of Contents
 
@@ -415,3 +416,12 @@ python scripts/generate_metrics_report.py \
   --output metrics_report.csv
 ```
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 4 min
+**Last Updated:** February 08, 2026**

@@ -17,7 +17,8 @@
 
 ### CRITICAL Priority (Extracted Methods - Must Test First)
 
-These coordinators contain methods extracted from AgentOrchestrator. They have **ZERO** coverage and represent the highest risk.
+These coordinators contain methods extracted from AgentOrchestrator. They have **ZERO** coverage and represent the
+  highest risk.
 
 #### 1. ChatCoordinator (4.77% coverage)
 **Risk**: Core chat and streaming logic extracted from orchestrator
@@ -434,3 +435,13 @@ class TestToolAliasResolver:
 ```
 
 ### LOW Priority (Nice to Have)
+
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**

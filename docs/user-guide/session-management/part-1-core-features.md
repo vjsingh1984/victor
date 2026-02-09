@@ -498,3 +498,12 @@ Sessions are stored in the project database:
 
 You can query sessions directly using SQLite:
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 9 min
+**Last Updated:** February 08, 2026**

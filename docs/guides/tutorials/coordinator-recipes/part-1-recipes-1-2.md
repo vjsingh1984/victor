@@ -59,7 +59,8 @@ This document provides step-by-step recipes for common coordinator customization
 
 ### Problem Statement
 
-You want to load orchestrator configuration from YAML/JSON files instead of (or in addition to) environment variables and settings objects.
+You want to load orchestrator configuration from YAML/JSON files instead of (or in addition to) environment variables
+  and settings objects.
 
 ### Solution Overview
 
@@ -200,7 +201,8 @@ async def test_file_config_provider():
 
 ### Problem Statement
 
-You want to add project-specific instructions to prompts (e.g., coding standards, compliance requirements, team conventions).
+You want to add project-specific instructions to prompts (e.g., coding standards, compliance requirements, team
+  conventions).
 
 ### Solution Overview
 
@@ -289,9 +291,11 @@ class TechStackContributor(BasePromptContributor):
         """Add tech stack specific guidance."""
 
         guidelines = {
-            "python": "- Use type hints for all functions\n- Follow PEP 8 style guide\n- Use async/await for I/O operations",
+            "python": "- Use type hints for all functions\n- Follow PEP 8 style guide\n- Use async/await for I/O
+  operations",
             "typescript": "- Use strict mode\n- Prefer interfaces over types\n- Use async/await over promises",
-            "rust": "- Use Result types for error handling\n- Prefer iterators over collections\n- Use clap for CLI argument parsing",
+            "rust": "- Use Result types for error handling\n- Prefer iterators over collections\n- Use clap for CLI
+  argument parsing",
         }
 
         instructions = [
@@ -413,3 +417,13 @@ class PostgreSQLAnalyticsExporter(BaseAnalyticsExporter):
         """
         Args:
             connection_string: PostgreSQL connection string
+
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 6 min
+**Last Updated:** February 08, 2026**

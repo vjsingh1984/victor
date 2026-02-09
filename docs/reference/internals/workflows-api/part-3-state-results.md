@@ -314,6 +314,15 @@ resumed_result = await app.invoke(
 )
 ```
 
+
+**Reading Time:** 3 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## Complete Example

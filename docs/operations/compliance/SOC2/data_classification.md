@@ -27,7 +27,8 @@
 
 ### 1.1 Purpose
 
-This document defines the data classification schema for Victor AI in accordance with SOC2 Trust Services Criteria (CC6.1, CC6.6, CC6.7).
+This document defines the data classification schema for Victor AI in accordance with SOC2 Trust Services Criteria
+  (CC6.1, CC6.6, CC6.7).
 
 ### 1.2 Scope
 

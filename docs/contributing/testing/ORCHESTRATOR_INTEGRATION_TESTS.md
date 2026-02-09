@@ -2,7 +2,8 @@
 
 ## Overview
 
-This document describes the comprehensive integration tests for orchestrator-coordinator interactions in the Victor AI coding assistant.
+This document describes the comprehensive integration tests for orchestrator-coordinator interactions in the Victor AI
+  coding assistant.
 
 ## Test File
 
@@ -362,7 +363,7 @@ cat pyproject.toml | grep -A 20 "\[tool.pytest.ini_options\]"
 
 # Verify test paths
 pytest tests/integration/agent/test_orchestrator_integration.py --collect-only
-```
+```bash
 
 ### Import Errors
 

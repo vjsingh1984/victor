@@ -418,5 +418,14 @@ victor config path                  # Show config file path
 | `use_semantic_tool_selection` | Enable semantic tool selection |
 | `unified_embedding_model` | Embedding model for RAG |
 
+
+**Reading Time:** 7 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 

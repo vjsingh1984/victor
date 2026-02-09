@@ -1,6 +1,7 @@
 # SOC2 Incident Response Procedures
 
-Procedures for detecting, responding to, and recovering from security incidents in accordance with SOC2 Trust Services Criteria.
+Procedures for detecting, responding to, and recovering from security incidents in accordance with SOC2 Trust Services
+  Criteria.
 
 ---
 
@@ -78,6 +79,7 @@ security@victor.ai
 ---
 
 **Version:** 1.0
+**Reading Time:** 1 min
 **Last Updated:** 2026-01-20
 **Next Review:** 2026-04-20
 **Owner:** Chief Information Security Officer (CISO)

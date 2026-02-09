@@ -2,7 +2,8 @@
 
 ## Overview
 
-Cache warming proactively populates the cache with frequently accessed data to reduce cold starts and improve hit rates. Victor AI's intelligent cache warming system uses multiple strategies to predict and pre-load data before it's needed.
+Cache warming proactively populates the cache with frequently accessed data to reduce cold starts and improve hit rates.
+  Victor AI's intelligent cache warming system uses multiple strategies to predict and pre-load data before it's needed.
 
 ## Benefits
 

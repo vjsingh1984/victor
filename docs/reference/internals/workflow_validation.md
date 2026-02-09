@@ -639,7 +639,8 @@ class LinterResult:
     def get_issues_by_severity(self, severity: Severity) -> List[ValidationIssue]
     def get_issues_by_category(self, category: RuleCategory) -> List[ValidationIssue]
     def get_issues_by_location(self, location: str) -> List[ValidationIssue]
-    def generate_report(self, format: str = "text", include_suggestions: bool = True, include_context: bool = False) -> str
+    def generate_report(self, format: str = "text", include_suggestions: bool = True, include_context: bool = False) ->
+  str
 ```
 
 ### ValidationIssue
@@ -659,6 +660,11 @@ class ValidationIssue:
 ```
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

@@ -55,7 +55,9 @@ User
 
 ## Coordinator Architecture
 
-Victor employs a **two-layer coordinator architecture** that separates application-specific orchestration from framework-agnostic workflow infrastructure. This design follows SOLID principles and enables clear separation of concerns.
+Victor employs a **two-layer coordinator architecture** that separates application-specific orchestration from
+  framework-agnostic workflow infrastructure. This design follows SOLID principles and enables clear separation of
+  concerns.
 
 ### Two-Layer Design
 
@@ -122,6 +124,11 @@ Victor employs a **two-layer coordinator architecture** that separates applicati
 - [Coordinator Quick Reference](coordinator_based_architecture.md) - Quick lookup guide
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 2 min

@@ -681,3 +681,12 @@ Create a README for your vertical:
 
 Domain-specific assistant for X.
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 7 min
+**Last Updated:** February 08, 2026**

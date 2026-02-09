@@ -84,4 +84,10 @@ class SessionCoordinator:
 
 ---
 
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 1 min
 **Last Updated:** January 31, 2026

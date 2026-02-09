@@ -140,7 +140,8 @@ victor chat --provider anthropic
 
 4. Ensure key has required permissions
 
-**Recovery Hint**: "Check your API key or credentials. Ensure they are correctly set in environment variables or configuration."
+**Recovery Hint**: "Check your API key or credentials. Ensure they are correctly set in environment variables or
+  configuration."
 
 ---
 
@@ -893,6 +894,11 @@ victor doctor
 **Version**: 0.5.0
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 9 minutes

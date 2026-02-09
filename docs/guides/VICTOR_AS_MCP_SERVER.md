@@ -1,6 +1,7 @@
 # Victor as an MCP Server Toolkit
 
-This guide covers how to run Victor as a Model Context Protocol (MCP) server, enabling external clients like Claude Desktop to use Victor's tool suite across multiple domain verticals.
+This guide covers how to run Victor as a Model Context Protocol (MCP) server,
+  enabling external clients like Claude Desktop to use Victor's tool suite across multiple domain verticals.
 
 ## Overview
 

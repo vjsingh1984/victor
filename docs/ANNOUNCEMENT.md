@@ -8,7 +8,10 @@
 
 ## Announcement
 
-We're thrilled to announce the **complete reorganization and enhancement of Victor AI documentation**! After 8 weeks of work, we've transformed our documentation from a cluttered, developer-centric structure into a world-class, user-friendly documentation hub.
+We're thrilled to announce the **complete reorganization and enhancement of Victor AI documentation**! After 8 weeks of
+  work,
+  we've transformed our documentation from a cluttered, developer-centric structure into a world-class,
+  user-friendly documentation hub.
 
 ---
 

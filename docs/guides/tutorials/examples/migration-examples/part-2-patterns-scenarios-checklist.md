@@ -180,4 +180,5 @@ Migrating to coordinator-based architecture provides:
 
 ---
 
+**Reading Time:** 2 min
 **Last Updated:** January 13, 2025

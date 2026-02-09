@@ -214,5 +214,9 @@ class ToolSelectionContext:
     provider_name: str = ""
 ```
 
+
+**Reading Time:** 2 min
+**Last Updated:** February 08, 2026**
+
 ---
 

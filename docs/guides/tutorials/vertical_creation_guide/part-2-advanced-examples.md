@@ -1,6 +1,7 @@
 # Vertical Creation Guide - Part 2
 
-**Part 2 of 2:** Extracting Templates from Existing Verticals, Template Validation, Best Practices, Examples, Advanced Topics, Troubleshooting, Next Steps, and Related Documentation
+**Part 2 of 2:** Extracting Templates from Existing Verticals, Template Validation, Best Practices, Examples,
+  Advanced Topics, Troubleshooting, Next Steps, and Related Documentation
 
 ---
 

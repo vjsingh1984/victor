@@ -227,6 +227,15 @@ victor workflow run workflows/code_review.yaml \
    executor = HITLExecutor(mode=HITLMode.AUTO_APPROVE)
    ```
 
+
+**Reading Time:** 3 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## 8. Complete Example: Full Code Review Workflow

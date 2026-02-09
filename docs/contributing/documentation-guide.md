@@ -273,7 +273,7 @@ Then reference it in documentation:
 ::: victor.module.example_function
     :members:
     :show-inheritance:
-````
+````bash
 
 ## Troubleshooting
 
@@ -328,6 +328,11 @@ For more information, see the [Contributing Guide](../contributing/index.md).
 Back to [Documentation Home](../index.md)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

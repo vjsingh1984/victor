@@ -16,14 +16,16 @@
 
 ## Overview
 
-Victor provides workflow scheduling and versioning capabilities inspired by Airflow, Step Functions, and Temporal.io. These features enable:
+Victor provides workflow scheduling and versioning capabilities inspired by Airflow, Step Functions, and Temporal.io.
+  These features enable:
 
 - **Cron Scheduling**: Schedule workflows with standard cron expressions
 - **Execution Limits**: Configure timeouts, retries, and iteration limits
 - **Workflow Versioning**: Semantic versioning with migration support
 - **Background Execution**: Pure Python asyncio scheduler (no system crond dependency)
 
-**Important**: This is a lightweight, embedded scheduler suitable for single-instance deployments. For distributed, high-availability scheduling, consider external orchestrators like Airflow or Temporal.io.
+**Important**: This is a lightweight, embedded scheduler suitable for single-instance deployments. For distributed,
+  high-availability scheduling, consider external orchestrators like Airflow or Temporal.io.
 
 ## Quick Start
 
@@ -561,9 +563,11 @@ Logs are written to stdout/stderr; configure systemd or your process manager to 
 
 ### Current Limitations
 
-1. **Single-Instance Only**: No distributed scheduling. Running multiple scheduler instances will cause duplicate executions.
+1. **Single-Instance Only**: No distributed scheduling. Running multiple scheduler instances will cause duplicate
+  executions.
 
-2. **No Persistence**: Schedule state is in-memory. Scheduler restart requires re-registering schedules (or loading from YAML).
+2. **No Persistence**: Schedule state is in-memory. Scheduler restart requires re-registering schedules (or loading from
+  YAML).
 
 3. **No Web UI**: CLI-only. No dashboard for monitoring or managing schedules.
 

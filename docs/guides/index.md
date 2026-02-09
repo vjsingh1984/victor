@@ -4,7 +4,8 @@ Practical guides for specific Victor tasks and workflows.
 
 ## Overview
 
-This section contains step-by-step guides for common tasks, from basic setup to advanced multi-agent coordination and observability.
+This section contains step-by-step guides for common tasks, from basic setup to advanced multi-agent coordination and
+  observability.
 
 **New to Victor?** Start with [Getting Started](../getting-started/index.md) or [User Guide](../user-guide/index.md).
 

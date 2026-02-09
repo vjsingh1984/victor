@@ -25,7 +25,8 @@
 
 ### 1.1 Purpose
 
-This document describes Victor AI's data processing activities in accordance with GDPR Articles 30 (Records of Processing Activities).
+This document describes Victor AI's data processing activities in accordance with GDPR Articles 30 (Records of
+  Processing Activities).
 
 ### 1.2 Scope
 
@@ -69,7 +70,8 @@ This document covers:
 
 **Article 9 GDPR - Not Currently Applicable**
 
-Victor AI does not currently process special category data (health, biometric, genetic, etc.). If this changes in the future, explicit consent or another Article 9(2) basis will be obtained.
+Victor AI does not currently process special category data (health, biometric, genetic,
+  etc.). If this changes in the future, explicit consent or another Article 9(2) basis will be obtained.
 
 ### 2.3 Criminal Offense Data
 
@@ -513,7 +515,8 @@ record_of_processing_activities:
 
 **Article 22 GDPR - Not Currently Applicable**
 
-Victor AI does not currently engage in solely automated decision-making that produces legal or similarly significant effects.
+Victor AI does not currently engage in solely automated decision-making that produces legal or similarly significant
+  effects.
 
 **Future Consideration:**
 If automated decision-making is implemented:

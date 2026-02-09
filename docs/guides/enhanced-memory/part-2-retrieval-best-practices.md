@@ -226,6 +226,15 @@ episodes = await orchestrator.episodic_memory.recall_relevant(
 )
 ```
 
+
+**Reading Time:** 2 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 3: Troubleshooting & Examples](part-3-troubleshooting-examples.md)**

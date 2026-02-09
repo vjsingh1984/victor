@@ -21,7 +21,9 @@
 
 ## Introduction
 
-Victor's coordinator-based architecture decomposes the monolithic orchestrator into 15 specialized coordinators, each with a single, well-defined responsibility. This design improves maintainability, testability, and extensibility while maintaining 100% backward compatibility.
+Victor's coordinator-based architecture decomposes the monolithic orchestrator into 15 specialized coordinators,
+  each with a single, well-defined responsibility. This design improves maintainability, testability,
+  and extensibility while maintaining 100% backward compatibility.
 
 ### What You'll Learn
 
@@ -364,17 +366,21 @@ A: Minimal impact. Coordinator overhead is 3-5% (well below the 10% goal). For m
 
 **Q: Should I access coordinators directly?**
 
-A: Generally no. Use the orchestrator facade unless you have a specific advanced use case. Direct coordinator access is for power users.
+A: Generally no. Use the orchestrator facade unless you have a specific advanced use case. Direct coordinator access is
+  for power users.
 
 **Q: Can I create custom coordinators?**
 
-A: Yes, but this is an advanced feature. See [Extensibility Points](../architecture/coordinator_based_architecture.md#extensibility-points) for details.
+A: Yes,
+  but this is an advanced feature. See [Extensibility
+  Points](../architecture/coordinator_based_architecture.md#extensibility-points) for details.
 
 ### Technical Questions
 
 **Q: How do coordinators communicate?**
 
-A: Coordinators communicate through the orchestrator facade. They don't directly call each other, maintaining loose coupling.
+A: Coordinators communicate through the orchestrator facade. They don't directly call each other, maintaining loose
+  coupling.
 
 **Q: What happens if a coordinator fails?**
 

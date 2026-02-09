@@ -31,7 +31,8 @@
 
 ## Overview
 
-The StateGraph DSL provides a LangGraph-compatible API for building complex, stateful agent workflows. Unlike simple linear pipelines, StateGraph supports:
+The StateGraph DSL provides a LangGraph-compatible API for building complex,
+  stateful agent workflows. Unlike simple linear pipelines, StateGraph supports:
 
 - **Typed State**: TypedDict-based state schemas for type safety
 - **Conditional Edges**: Branch execution based on state conditions
@@ -486,3 +487,12 @@ graph.add_conditional_edge(
 graph.set_entry_point("research")
 ```
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 6 min
+**Last Updated:** February 08, 2026**

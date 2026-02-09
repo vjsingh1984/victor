@@ -4,7 +4,8 @@ This guide covers Victor's multi-agent team system for orchestrating collaborati
 
 ## Overview
 
-Victor supports multi-agent workflows where multiple specialized agents collaborate to solve complex tasks. Key features:
+Victor supports multi-agent workflows where multiple specialized agents collaborate to solve complex tasks. Key
+  features:
 
 - **4 Team Formations**: Sequential, Parallel, Hierarchical, Pipeline
 - **Rich Personas**: Communication styles, expertise levels, backstories
@@ -169,7 +170,8 @@ researcher = TeamMember(
         communication_style=CommunicationStyle.TECHNICAL,
         expertise_level=ExpertiseLevel.EXPERT,
     ),
-    backstory="You have analyzed thousands of codebases and can quickly identify patterns, anti-patterns, and architectural decisions.",
+    backstory="You have analyzed thousands of codebases and can quickly identify patterns, anti-patterns, and
+  architectural decisions.",
     memory=MemoryConfig(
         enabled=True,
         persist=True,

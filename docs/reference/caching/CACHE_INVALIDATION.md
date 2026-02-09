@@ -2,7 +2,8 @@
 
 ## Overview
 
-Cache invalidation is the process of removing stale or outdated entries from the cache. Victor AI's intelligent invalidation system provides multiple strategies to keep caches fresh while maximizing hit rates.
+Cache invalidation is the process of removing stale or outdated entries from the cache. Victor AI's intelligent
+  invalidation system provides multiple strategies to keep caches fresh while maximizing hit rates.
 
 ## Invalidation Strategies
 

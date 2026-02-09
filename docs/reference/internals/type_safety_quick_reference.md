@@ -289,7 +289,9 @@ wc -l path/to/your/module.py
 
 ---
 
-**Remember**: We prefer gradual improvement with documentation over attempts at perfection. Not all code needs strict typing, but all exemptions should be justified.
+**Remember**: We prefer gradual improvement with documentation over attempts at perfection. Not all code needs strict
+  typing,
+  but all exemptions should be justified.
 
 ---
 

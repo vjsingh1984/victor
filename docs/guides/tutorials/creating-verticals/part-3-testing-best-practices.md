@@ -216,7 +216,9 @@ class SecurityVertical(VerticalBase):
 
 ## Conclusion
 
-Creating custom verticals allows you to extend Victor AI for specific domains and use cases. Follow these patterns and best practices to create robust, reusable verticals.
+Creating custom verticals allows you to extend Victor AI for specific domains and use cases. Follow these patterns and
+  best practices to create robust,
+  reusable verticals.
 
 For more examples, see:
 - `victor/coding/` - Coding vertical implementation
@@ -226,6 +228,11 @@ For more examples, see:
 Happy vertical building! 🏗️
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 2 min

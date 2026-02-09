@@ -1,6 +1,7 @@
 # Air-Gapped Mode
 
-Air-gapped mode runs Victor without external network calls by using local models, local embeddings, and local storage. It is designed for restricted environments and privacy-sensitive work.
+Air-gapped mode runs Victor without external network calls by using local models, local embeddings,
+  and local storage. It is designed for restricted environments and privacy-sensitive work.
 
 ## Requirements
 - Local LLM provider (Ollama, LM Studio, vLLM, llama.cpp)

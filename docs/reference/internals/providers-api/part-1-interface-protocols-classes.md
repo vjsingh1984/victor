@@ -14,7 +14,8 @@
 ---
 # Providers API Reference
 
-This document provides comprehensive API documentation for Victor's LLM provider system, which supports 21 different providers with a unified interface.
+This document provides comprehensive API documentation for Victor's LLM provider system,
+  which supports 21 different providers with a unified interface.
 
 ## Table of Contents
 
@@ -252,7 +253,8 @@ def reset_circuit_breaker(self) -> None:
 
 ## Provider Protocols
 
-Victor uses Protocol classes (PEP 544) for Interface Segregation, allowing providers to optionally implement specific capabilities.
+Victor uses Protocol classes (PEP 544) for Interface Segregation, allowing providers to optionally implement specific
+  capabilities.
 
 **Import:**
 ```python
@@ -766,6 +768,15 @@ class ManagedProviderFactory:
         """
 ```
 
+
+**Reading Time:** 10 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## Provider Implementation Pattern

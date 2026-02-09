@@ -2,7 +2,9 @@
 
 ## Overview
 
-Victor implements lazy loading for vertical extensions to improve startup time and reduce initial memory footprint. This document describes the lazy loading architecture, configuration options, and performance impact.
+Victor implements lazy loading for vertical extensions to improve startup time and reduce initial memory footprint. This
+  document describes the lazy loading architecture,
+  configuration options, and performance impact.
 
 ## Architecture
 

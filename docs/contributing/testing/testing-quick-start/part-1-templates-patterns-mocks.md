@@ -16,7 +16,8 @@
 
 **Fast-track guide for testing Victor AI coordinators**
 
-This quick start guide provides ready-to-use templates and common patterns for testing coordinators. Jump straight to what you need without reading the comprehensive guide.
+This quick start guide provides ready-to-use templates and common patterns for testing coordinators. Jump straight to
+  what you need without reading the comprehensive guide.
 
 ## Table of Contents
 
@@ -467,3 +468,13 @@ def mock_compactor() -> Mock:
 ```
 
 ## Coverage Commands
+
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**

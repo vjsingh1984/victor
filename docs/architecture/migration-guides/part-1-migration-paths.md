@@ -63,6 +63,15 @@ Victor 0.5.0 introduces major architectural improvements:
 
 [Content continues through Migration to Dependency Injection...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Scenarios, Testing, Rollback](part-2-scenarios-testing-rollback.md)**

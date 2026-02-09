@@ -1,6 +1,7 @@
 # Observability Guide
 
-This guide covers Victor's comprehensive observability infrastructure for monitoring, debugging, and analyzing agent behavior.
+This guide covers Victor's comprehensive observability infrastructure for monitoring, debugging, and analyzing agent
+  behavior.
 
 ## Overview
 
@@ -409,7 +410,8 @@ if stats.queue_depth > 8000:
 
 ## Protocol-Based Event System (v0.4.1+)
 
-Victor v0.4.1 introduces a protocol-based event system that enables distributed messaging across agents. This system runs alongside the existing EventBus and provides:
+Victor v0.4.1 introduces a protocol-based event system that enables distributed messaging across agents. This system
+  runs alongside the existing EventBus and provides:
 
 - **Swappable backends**: In-memory, SQLite, Kafka, Redis (via plugins)
 - **Delivery guarantees**: AT_MOST_ONCE, AT_LEAST_ONCE, EXACTLY_ONCE

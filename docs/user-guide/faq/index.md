@@ -43,7 +43,8 @@ This FAQ covers common questions about Victor AI across multiple categories:
 
 **1. What is Victor AI?**
 
-Victor AI is an open-source AI coding assistant supporting multiple LLM providers, tools, and domain verticals (Coding, DevOps, RAG, Data Analysis, Research).
+Victor AI is an open-source AI coding assistant supporting multiple LLM providers, tools, and domain verticals (Coding,
+  DevOps, RAG, Data Analysis, Research).
 
 **2. Key Features:**
 - Provider agnostic - switch models without losing context

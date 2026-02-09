@@ -1,6 +1,7 @@
 # Framework Enhancement Proposal (FEP) Process
 
-This document describes the process for creating, submitting, and reviewing Framework Enhancement Proposals (FEPs) for the Victor project.
+This document describes the process for creating, submitting, and reviewing Framework Enhancement Proposals (FEPs) for
+  the Victor project.
 
 ## Table of Contents
 
@@ -18,9 +19,12 @@ This document describes the process for creating, submitting, and reviewing Fram
 
 ## What is a FEP?
 
-A **Framework Enhancement Proposal (FEP)** is a design document providing information to the Victor community, or describing a new feature for the Victor framework or its ecosystem. FEPs provide technical specifications and the rationale behind feature design.
+A **Framework Enhancement Proposal (FEP)** is a design document providing information to the Victor community,
+  or describing a new feature for the Victor framework or its ecosystem. FEPs provide technical specifications and the
+  rationale behind feature design.
 
-The FEP process is inspired by similar processes in other open-source projects like Python (PEPs), Rust (RFCs), and Ethereum (ERCs/EIPs).
+The FEP process is inspired by similar processes in other open-source projects like Python (PEPs), Rust (RFCs), and
+  Ethereum (ERCs/EIPs).
 
 ### Goals of the FEP Process
 
@@ -287,7 +291,8 @@ A FEP is rejected when:
 - The costs outweigh the benefits
 - An alternative approach is strongly preferred
 
-**Note**: Rejection is not a judgment of quality or effort. Rejected FEPs remain in the repository as a record of the discussion.
+**Note**: Rejection is not a judgment of quality or effort. Rejected FEPs remain in the repository as a record of the
+  discussion.
 
 ---
 

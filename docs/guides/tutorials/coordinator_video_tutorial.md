@@ -26,22 +26,29 @@
 ### Script
 
 **Host (on camera)**:
-"Hey everyone! Welcome back to the channel. Today we're diving deep into Victor AI's coordinator-based architecture. If you've been using Victor or you're interested in building AI-powered applications, this video is for you."
+"Hey everyone! Welcome back to the channel. Today we're diving deep into Victor AI's coordinator-based architecture. If
+  you've been using Victor or you're interested in building AI-powered applications,
+  this video is for you."
 
 [Cut to screen recording of Victor in action]
 
 **Host (voiceover)**:
-"Victor is an open-source AI coding assistant supporting multiple LLM providers with a broad tool suite. But what makes Victor unique is its architecture."
+"Victor is an open-source AI coding assistant supporting multiple LLM providers with a broad tool suite. But what makes
+  Victor unique is its architecture."
 
 [Animated diagram appears: Monolith -> Coordinators]
 
 **Host (voiceover)**:
-"Recently, Victor underwent a major architectural refactoring. We took a 6,000-line monolithic orchestrator and broke it down into 15 specialized coordinators. The result? A 93% reduction in complexity, 10x faster test execution, and an 85% test coverage."
+"Recently,
+  Victor underwent a major architectural refactoring. We took a 6,000-line monolithic orchestrator and broke it down
+  into 15 specialized coordinators. The result? A 93% reduction in complexity,
+  10x faster test execution, and an 85% test coverage."
 
 [Show architecture diagram]
 
 **Host (voiceover)**:
-"In this video, I'll explain what coordinators are, how they work, and most importantly, how YOU can use them to build better AI applications."
+"In this video, I'll explain what coordinators are, how they work, and most importantly, how YOU can use them to build
+  better AI applications."
 
 [Section 1 transition animation]
 
@@ -66,32 +73,41 @@
 [Highlight ConfigCoordinator]
 
 **Host (voiceover)**:
-"**ConfigCoordinator** handles loading and validating configuration from multiple sources - databases, APIs, files, environment variables. It tries each source in priority order until it finds what it needs."
+"**ConfigCoordinator** handles loading and validating configuration from multiple sources - databases, APIs, files,
+  environment variables. It tries each source in priority order until it finds what it needs."
 
 [Highlight PromptCoordinator]
 
 **Host (voiceover)**:
-"**PromptCoordinator** builds prompts from multiple contributors. You can add custom instructions for coding standards, compliance requirements, or project-specific guidelines. Each contributor has a priority, so you control what gets included."
+"**PromptCoordinator** builds prompts from multiple contributors. You can add custom instructions for coding standards,
+  compliance requirements, or project-specific guidelines. Each contributor has a priority,
+  so you control what gets included."
 
 [Highlight ContextCoordinator]
 
 **Host (voiceover)**:
-"**ContextCoordinator** manages conversation context. When conversations get long, it automatically compacts the context using strategies like semantic analysis or simple truncation. This keeps token usage in check."
+"**ContextCoordinator** manages conversation context. When conversations get long,
+  it automatically compacts the context using strategies like semantic analysis or simple truncation. This keeps token
+  usage in check."
 
 [Highlight ChatCoordinator, ToolCoordinator, AnalyticsCoordinator]
 
 **Host (voiceover)**:
-"**ChatCoordinator** handles chat and streaming operations. **ToolCoordinator** manages tool execution. **AnalyticsCoordinator** tracks usage and exports to your favorite analytics platform."
+"**ChatCoordinator** handles chat and streaming operations. **ToolCoordinator** manages tool execution.
+  **AnalyticsCoordinator** tracks usage and exports to your favorite analytics platform."
 
 [Show full coordinator catalog]
 
 **Host (voiceover)**:
-"There are 15 coordinators in total, each focused on one responsibility. This follows the Single Responsibility Principle from software engineering."
+"There are 15 coordinators in total, each focused on one responsibility. This follows the Single Responsibility
+  Principle from software engineering."
 
 [Diagram showing data flow through coordinators]
 
 **Host (voiceover)**:
-"Here's how they work together. When you send a chat message, the orchestrator routes it through the relevant coordinators. Each coordinator does its job, and the orchestrator aggregates the results. Clean, modular, and testable."
+"Here's how they work together. When you send a chat message,
+  the orchestrator routes it through the relevant coordinators. Each coordinator does its job,
+  and the orchestrator aggregates the results. Clean, modular, and testable."
 
 [Section 2 transition animation]
 
@@ -130,7 +146,8 @@ response = await orchestrator.chat("Hello, Victor!")
 ```
 
 **Host (voiceover)**:
-"That's it! The coordinators are automatically initialized behind the scenes. ConfigCoordinator loads settings, PromptCoordinator builds the prompt, ContextCoordinator manages context, and so on."
+"That's it! The coordinators are automatically initialized behind the scenes. ConfigCoordinator loads settings,
+  PromptCoordinator builds the prompt, ContextCoordinator manages context, and so on."
 
 [Cut to code editor - Example 2]
 
@@ -210,7 +227,9 @@ orchestrator = AgentOrchestrator(
 ### Script
 
 **Host (on camera)**:
-"Now, for those of you with existing Victor code, here's the best part: **you don't need to change anything**. The coordinator-based architecture is 100% backward compatible."
+"Now, for those of you with existing Victor code,
+  here's the best part: **you don't need to change anything**. The coordinator-based architecture is 100% backward
+  compatible."
 
 [Side-by-side comparison]
 
@@ -230,7 +249,8 @@ config = orchestrator._config_coordinator.get_config()
 ```
 
 **Host (voiceover)**:
-"If you were accessing internal attributes (which wasn't recommended), you'll need to update to use coordinator methods. But if you're using the public API, no changes needed."
+"If you were accessing internal attributes (which wasn't recommended),
+  you'll need to update to use coordinator methods. But if you're using the public API, no changes needed."
 
 [Checklist slide]
 
@@ -272,7 +292,8 @@ config = orchestrator._config_coordinator.get_config()
 ### Script
 
 **Host (on camera)**:
-"To wrap up, the coordinator-based architecture is a game-changer for Victor. It's more modular, more testable, and more extensible, all while maintaining full backward compatibility."
+"To wrap up, the coordinator-based architecture is a game-changer for Victor. It's more modular, more testable,
+  and more extensible, all while maintaining full backward compatibility."
 
 [Links appearing on screen]
 
@@ -288,7 +309,8 @@ config = orchestrator._config_coordinator.get_config()
 [Closing slide]
 
 **Host (on camera)**:
-"If you found this video helpful, please like and subscribe. And if you build something cool with Victor, let me know in the comments. Thanks for watching, and happy coding!"
+"If you found this video helpful, please like and subscribe. And if you build something cool with Victor,
+  let me know in the comments. Thanks for watching, and happy coding!"
 
 [End screen with subscribe button and channel link]
 
@@ -422,6 +444,11 @@ Learn more: [website]
 **End of Video Tutorial Script**
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 7 minutes

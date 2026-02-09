@@ -193,4 +193,15 @@ For screenshots and diagrams:
 
 ## License
 
-All assets in this directory should be compatible with the Victor project license. Ensure you have rights to use any third-party images or graphics.
+All assets in this directory should be compatible with the Victor project license. Ensure you have rights to use any
+  third-party images or graphics.
+
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 3 min
+**Last Updated:** February 08, 2026**

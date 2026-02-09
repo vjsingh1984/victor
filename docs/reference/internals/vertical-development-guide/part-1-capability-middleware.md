@@ -16,7 +16,9 @@
 
 # Vertical Development Guide
 
-This guide provides comprehensive documentation for creating new verticals (domain-specific assistants) in Victor AI. It covers capability providers, middleware, chain registry, persona design, and complete workflow integration.
+This guide provides comprehensive documentation for creating new verticals (domain-specific assistants) in Victor AI. It
+  covers capability providers,
+  middleware, chain registry, persona design, and complete workflow integration.
 
 ## Table of Contents
 
@@ -30,7 +32,8 @@ This guide provides comprehensive documentation for creating new verticals (doma
 
 ## 1. Capability Provider Patterns
 
-Capability providers enable verticals to expose high-level capabilities that can be dynamically configured and applied to orchestrators. This pattern promotes loose coupling and runtime flexibility.
+Capability providers enable verticals to expose high-level capabilities that can be dynamically configured and applied
+  to orchestrators. This pattern promotes loose coupling and runtime flexibility.
 
 ### 1.1 BaseCapabilityProvider Inheritance
 
@@ -252,7 +255,8 @@ class DataAnalysisCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
 
 ## 2. Framework Middleware Catalog
 
-Middleware provides pre/post processing hooks for tool execution. All middleware implements the `MiddlewareProtocol` interface.
+Middleware provides pre/post processing hooks for tool execution. All middleware implements the 
+`MiddlewareProtocol` interface.
 
 ### 2.1 MiddlewareProtocol Interface
 
@@ -517,5 +521,14 @@ class MyVerticalAssistant(VerticalBase):
         ]
 ```
 
+
+**Reading Time:** 6 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 

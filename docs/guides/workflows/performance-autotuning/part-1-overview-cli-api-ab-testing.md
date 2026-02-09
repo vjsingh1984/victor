@@ -12,9 +12,11 @@
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** 2025-01-15
 
-This guide covers automatic performance optimization for team workflows in Victor, including the PerformanceAutotuner system, optimization strategies, A/B testing, and best practices.
+This guide covers automatic performance optimization for team workflows in Victor,
+  including the PerformanceAutotuner system, optimization strategies, A/B testing, and best practices.
 
 ## Table of Contents
 
@@ -32,7 +34,9 @@ This guide covers automatic performance optimization for team workflows in Victo
 
 ## Overview
 
-The PerformanceAutotuner system automatically analyzes team execution metrics and suggests optimizations to improve performance, reduce costs, and increase reliability.
+The PerformanceAutotuner system automatically analyzes team execution metrics and suggests optimizations to improve
+  performance,
+  reduce costs, and increase reliability.
 
 ### Key Features
 
@@ -62,5 +66,10 @@ Based on benchmark data, auto-tuning typically provides:
 [Content continues through A/B Testing...]
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Safety, Best Practices, Examples](part-2-safety-best-practices-examples.md)**

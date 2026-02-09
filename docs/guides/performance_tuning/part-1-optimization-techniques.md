@@ -15,7 +15,8 @@
 
 ## Overview
 
-Victor AI includes significant performance optimizations for production workloads. This guide explains how to tune and optimize Victor's performance for your specific use case.
+Victor AI includes significant performance optimizations for production workloads. This guide explains how to tune and
+  optimize Victor's performance for your specific use case.
 
 ## Table of Contents
 
@@ -458,3 +459,12 @@ async def monitor_performance():
 asyncio.create_task(monitor_performance())
 ```
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**

@@ -1,6 +1,8 @@
 # Data Analysis Vertical
 
-The Data Analysis vertical provides comprehensive data exploration, statistical analysis, visualization, and machine learning capabilities. It is designed to compete with ChatGPT Data Analysis, Claude Artifacts, and Jupyter AI.
+The Data Analysis vertical provides comprehensive data exploration, statistical analysis, visualization,
+  and machine learning capabilities. It is designed to compete with ChatGPT Data Analysis, Claude Artifacts,
+  and Jupyter AI.
 
 ## Overview
 
@@ -439,6 +441,11 @@ df.to_parquet("cleaned_data.parquet")
 ```
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

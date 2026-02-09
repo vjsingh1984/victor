@@ -224,5 +224,6 @@ Use callouts for emphasis:
 
 ---
 
+**Reading Time:** 3 min
 **Last Updated:** January 31, 2026
 **Maintained by:** Victor AI Documentation Team

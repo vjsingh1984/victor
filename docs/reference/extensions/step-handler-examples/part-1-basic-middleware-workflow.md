@@ -605,6 +605,15 @@ class MyVertical(VerticalBase):
         ]
 ```
 
+
+**Reading Time:** 7 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Safety & Configuration Management](part-2-safety-config.md)**

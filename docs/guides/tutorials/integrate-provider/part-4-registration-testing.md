@@ -384,5 +384,11 @@ async def test_real_api_chat():
 
 ---
 
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 4 min
 **Last Updated:** February 01, 2026
 **Part 4 of 5**

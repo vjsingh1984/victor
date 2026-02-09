@@ -1,6 +1,7 @@
 # Dynamic Personas Guide - Part 1
 
-**Part 1 of 2:** What are Dynamic Personas, Built-in Personas, Custom Personas, Context Adaptation, and Persona Management
+**Part 1 of 2:** What are Dynamic Personas, Built-in Personas, Custom Personas, Context Adaptation, and Persona
+  Management
 
 ---
 
@@ -15,7 +16,8 @@
 
 ## Overview
 
-Victor AI's dynamic personas enable context-adaptive agent personalities for specialized tasks. This guide explains how to use and create personas effectively.
+Victor AI's dynamic personas enable context-adaptive agent personalities for specialized tasks. This guide explains how
+  to use and create personas effectively.
 
 ## Table of Contents
 
@@ -411,3 +413,12 @@ for persona_name, metrics in effectiveness.items():
     print(f"  User satisfaction: {metrics['satisfaction']:.1%}")
 ```
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**

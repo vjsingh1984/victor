@@ -1,6 +1,7 @@
 # Vertical Creation Guide - Part 1
 
-**Part 1 of 2:** Overview, Quick Start, Template Structure, Creating a Vertical from Scratch, and Customizing Generated Verticals
+**Part 1 of 2:** Overview, Quick Start, Template Structure, Creating a Vertical from Scratch, and Customizing Generated
+  Verticals
 
 ---
 
@@ -29,7 +30,8 @@
 
 # Vertical Creation Guide
 
-This guide explains how to create new verticals in Victor using the template-based scaffolding system, which reduces code duplication by 65-70%.
+This guide explains how to create new verticals in Victor using the template-based scaffolding system, which reduces
+  code duplication by 65-70%.
 
 ## Table of Contents
 
@@ -45,7 +47,9 @@ This guide explains how to create new verticals in Victor using the template-bas
 
 ## Overview
 
-Victor's vertical template system provides a declarative way to define and generate vertical implementations. Instead of writing 500+ lines of boilerplate code, you can:
+Victor's vertical template system provides a declarative way to define and generate vertical implementations. Instead of
+  writing 500+ lines of boilerplate code,
+  you can:
 
 1. Define your vertical in a YAML template
 2. Generate all necessary files automatically
@@ -502,3 +506,12 @@ CONDITIONS = {
 }
 ```
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 6 min
+**Last Updated:** February 08, 2026**

@@ -1,6 +1,7 @@
 # Victor Production Monitoring and Observability
 
-This directory contains production-grade monitoring and observability configurations for the Victor coordinator-based orchestrator.
+This directory contains production-grade monitoring and observability configurations for the Victor coordinator-based
+  orchestrator.
 
 ## Contents
 
@@ -243,7 +244,15 @@ receivers:
 
 1. Check which coordinator is failing:
    ```bash
-   curl 'http://localhost:9090/api/v1/query?query=rate(victor_coordinator_errors_total[5m])/rate(victor_coordinator_executions_total[5m])'
+   curl
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  'http://localhost:9090/api/v1/query?query=rate(victor_coordinator_errors_total[5m])/rate(victor_coordinator_executions_total[5m])'
    ```
 
 2. Check logs:
@@ -257,7 +266,15 @@ receivers:
 
 1. Check latency breakdown:
    ```bash
-   curl 'http://localhost:9090/api/v1/query?query=rate(victor_coordinator_duration_seconds_total[5m])/rate(victor_coordinator_executions_total[5m])'
+   curl
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  'http://localhost:9090/api/v1/query?query=rate(victor_coordinator_duration_seconds_total[5m])/rate(victor_coordinator_executions_total[5m])'
    ```
 
 2. Check for slow queries:
@@ -319,6 +336,11 @@ receivers:
 **Maintained By**: Victor Operations Team
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

@@ -258,6 +258,15 @@ class StageConfigurationHandler(BaseStepHandler):
         return required.issubset(set(stages.keys()))
 ```
 
+
+**Reading Time:** 3 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 3: Advanced Patterns & Testing](part-3-advanced-testing.md)**

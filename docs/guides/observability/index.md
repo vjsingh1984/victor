@@ -4,7 +4,8 @@ Real-time TUI dashboard for monitoring Victor agent execution.
 
 ## Overview
 
-The dashboard provides a terminal-based interface (Textual TUI) for viewing events generated during agent execution. It connects to Victor's event system and displays multiple views of execution data.
+The dashboard provides a terminal-based interface (Textual TUI) for viewing events generated during agent execution. It
+  connects to Victor's event system and displays multiple views of execution data.
 
 **Launch**: `victor dashboard`
 

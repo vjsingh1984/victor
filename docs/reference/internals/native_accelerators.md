@@ -1,6 +1,7 @@
 # Native Accelerators
 
-Victor provides Rust-native accelerators for performance-critical operations, delivering 3-10x speedups through SIMD optimizations and parallel processing.
+Victor provides Rust-native accelerators for performance-critical operations,
+  delivering 3-10x speedups through SIMD optimizations and parallel processing.
 
 ## Overview
 
@@ -408,6 +409,11 @@ class MyAccelerator(InstrumentedAccelerator):
 - [Architecture Overview](../../architecture/overview.md) - Design patterns
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

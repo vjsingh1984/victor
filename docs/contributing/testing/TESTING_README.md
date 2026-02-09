@@ -4,7 +4,8 @@
 
 ## Overview
 
-This document provides an overview of the unprecedented coordinator testing initiative completed for Victor AI, an open-source AI coding assistant supporting 21 LLM providers with 55 specialized tools across 5 domain verticals.
+This document provides an overview of the unprecedented coordinator testing initiative completed for Victor AI,
+  an open-source AI coding assistant supporting 21 LLM providers with 55 specialized tools across 5 domain verticals.
 
 ## Initiative Statistics
 
@@ -60,7 +61,8 @@ This document provides an overview of the unprecedented coordinator testing init
 
 ## Architecture Overview
 
-Victor AI uses a **two-layer coordinator architecture** that separates application-specific orchestration from framework-agnostic workflow infrastructure:
+Victor AI uses a **two-layer coordinator architecture** that separates application-specific orchestration from
+  framework-agnostic workflow infrastructure:
 
 ### Application Layer (`victor/agent/coordinators/`)
 
@@ -589,7 +591,9 @@ async def test_with_ollama():
 
 ## Acknowledgments
 
-This testing initiative represents a significant investment in code quality and reliability for the Victor AI project. The comprehensive test suite ensures the coordinator architecture remains maintainable, extensible, and robust as the project evolves.
+This testing initiative represents a significant investment in code quality and reliability for the Victor AI project.
+  The comprehensive test suite ensures the coordinator architecture remains maintainable,
+  extensible, and robust as the project evolves.
 
 ### Statistics Summary
 

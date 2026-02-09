@@ -231,7 +231,9 @@ histogram_quantile(0.95, rate(victor_cache_access_duration_seconds_bucket[5m])) 
 ```bash
 # Export diagnostics
 kubectl exec -it deployment/victor-ai -n victor-ai-prod -- \
-  python -c "from victor.tools.caches import AdvancedCacheManager; from victor.config import load_settings; import json; cache = AdvancedCacheManager.from_settings(load_settings()); print(json.dumps(cache.get_metrics(), indent=2, default=str))" > cache-metrics.json
+  python -c "from victor.tools.caches import AdvancedCacheManager; from victor.config import load_settings; import json;
+  cache = AdvancedCacheManager.from_settings(load_settings()); print(json.dumps(cache.get_metrics(),
+  indent=2, default=str))" > cache-metrics.json
 
 # Export logs
 kubectl logs deployment/victor-ai -n victor-ai-prod > victor-logs.txt
@@ -242,6 +244,12 @@ kubectl cp victor-ai-prod/deployment/victor-ai:/app/.victor/cache/tool_selection
 
 ---
 
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
 **Version:** 0.5.0
+**Reading Time:** 3 min
 **Last Updated:** 2025-01-21
 **Track:** 5.3 - Production Caching

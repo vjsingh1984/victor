@@ -1,6 +1,7 @@
 # Tool Calling Formats (Local Models)
 
-Local models vary in how they emit tool calls. Victor supports multiple formats to improve compatibility in offline and air-gapped setups.
+Local models vary in how they emit tool calls. Victor supports multiple formats to improve compatibility in offline and
+  air-gapped setups.
 
 ## Supported Formats
 - Native tool call structures when the provider exposes them

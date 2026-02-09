@@ -181,3 +181,13 @@ python scripts/generate_vertical.py --validate template.yaml
 ```
 
 ## Complete Example
+
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 2 min
+**Last Updated:** February 08, 2026**

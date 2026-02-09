@@ -1,6 +1,7 @@
 # Configuration Reference - Part 1
 
-**Part 1 of 2:** Configuration Directory Structure, Configuration Priority, Quick Configuration, profiles.yaml, config.yaml, and mcp.yaml
+**Part 1 of 2:** Configuration Directory Structure, Configuration Priority, Quick Configuration, profiles.yaml,
+  config.yaml, and mcp.yaml
 
 ---
 
@@ -448,7 +449,7 @@ resources:
   allowed_resources:
     - file:///
     - git:///
-```
+```bash
 
 ### MCP Reference
 
@@ -464,5 +465,14 @@ resources:
 
 [Full mcp.yaml Reference →](#mcpyaml)
 
+
+**Reading Time:** 6 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 

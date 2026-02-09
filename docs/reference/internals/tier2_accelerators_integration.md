@@ -2,7 +2,9 @@
 
 ## Overview
 
-This document describes the integration of three Tier 2 performance accelerators into the Victor codebase. These accelerators provide 2-20x performance improvements for high-frequency operations through Rust-native implementations with automatic Python fallbacks.
+This document describes the integration of three Tier 2 performance accelerators into the Victor codebase. These
+  accelerators provide 2-20x performance improvements for high-frequency operations through Rust-native implementations
+  with automatic Python fallbacks.
 
 ## Accelerators
 
@@ -388,7 +390,9 @@ matches = analyzer.analyze_code_accelerated(code, "python")
 
 ## Future Work
 
-1. **Rust Module Implementation**: The current Python wrappers are ready for Rust implementations. The native modules will be implemented in `victor/native/rust/`:
+1. **Rust Module Implementation**: The current Python wrappers are ready for Rust implementations. The native modules
+  will be implemented in 
+`victor/native/rust/`:
    - `regex_engine.rs`: Pattern compilation and matching
    - `signature.rs`: xxHash3-based signature computation
    - `file_ops.rs`: Parallel directory traversal
@@ -438,6 +442,11 @@ matches = analyzer.analyze_code_accelerated(code, "python")
 - [Rust Native Module Development](./RUST_MIGRATION_PLAN.md)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

@@ -16,7 +16,10 @@
 
 **Comprehensive guide for testing Victor AI coordinators**
 
-This guide provides detailed instructions, patterns, and best practices for testing coordinators in the Victor AI codebase. It covers both application-layer and framework-layer coordinators, with specific guidance for different coordinator types.
+This guide provides detailed instructions, patterns,
+  and best practices for testing coordinators in the Victor AI codebase. It covers both application-layer and
+  framework-layer coordinators,
+  with specific guidance for different coordinator types.
 
 ## Table of Contents
 
@@ -75,11 +78,13 @@ As of the coordinator testing initiative completion:
 
 ### Core Principles
 
-1. **Test Isolation**: Each test should be completely independent. Use fixtures and mocks to isolate the coordinator under test.
+1. **Test Isolation**: Each test should be completely independent. Use fixtures and mocks to isolate the coordinator
+  under test.
 2. **Arrange-Act-Assert (AAA)**: Structure tests clearly with setup, execution, and verification phases.
 3. **Single Responsibility**: Each test should verify one specific behavior or edge case.
 4. **Descriptive Names**: Test names should clearly describe what is being tested and the expected outcome.
-5. **Mock External Dependencies**: Coordinators should be tested in isolation from external services (LLM providers, file system, etc.).
+5. **Mock External Dependencies**: Coordinators should be tested in isolation from external services (LLM providers,
+  file system, etc.).
 6. **Test Public APIs**: Focus on testing the public interface of coordinators, not implementation details.
 7. **Async/Await**: Always use async test methods for async coordinator methods.
 
@@ -517,3 +522,13 @@ def coordinator(self, mock_backend: Mock) -> CacheCoordinator:
 - Memory management
 
 ## Async Testing Patterns
+
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 8 min
+**Last Updated:** February 08, 2026**

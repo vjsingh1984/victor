@@ -40,4 +40,5 @@ This guide provides 9 practical recipes for:
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** February 01, 2026

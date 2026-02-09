@@ -14,7 +14,8 @@
 
 ## Overview
 
-Victor AI's dynamic skills system enables runtime tool discovery, composition, and chaining for adaptive behavior. This guide explains how to use skill discovery and chaining effectively.
+Victor AI's dynamic skills system enables runtime tool discovery, composition,
+  and chaining for adaptive behavior. This guide explains how to use skill discovery and chaining effectively.
 
 ## Table of Contents
 
@@ -65,6 +66,15 @@ Dynamic skills extend Victor's tool system with:
 
 [Content continues through Adaptation and Learning...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Best Practices, Troubleshooting, Examples](part-2-best-practices-troubleshooting-examples.md)**

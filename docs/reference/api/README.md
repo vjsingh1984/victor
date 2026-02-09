@@ -304,5 +304,6 @@ export VICTOR_SEMANTIC_SIMILARITY_THRESHOLD=0.25
 ---
 
 **Version:** 0.5.0
+**Reading Time:** 4 min
 **Last Updated:** January 18, 2026
 **License:** Apache 2.0

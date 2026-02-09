@@ -1,6 +1,7 @@
 # Production Metrics and Monitoring Guide - Part 1
 
-**Part 1 of 2:** Overview, Key Metrics, Metric Definitions, Alert Rules, Dashboard Setup, Metrics Collection, and Monitoring Stack
+**Part 1 of 2:** Overview, Key Metrics, Metric Definitions, Alert Rules, Dashboard Setup, Metrics Collection, and
+  Monitoring Stack
 
 ---
 
@@ -30,7 +31,8 @@ This guide provides comprehensive documentation for monitoring Victor AI in prod
 
 ## Overview
 
-Victor AI provides comprehensive observability through Prometheus metrics, Grafana dashboards, and structured logging. The monitoring stack tracks performance, functional, business, and domain-specific metrics.
+Victor AI provides comprehensive observability through Prometheus metrics, Grafana dashboards,
+  and structured logging. The monitoring stack tracks performance, functional, business, and domain-specific metrics.
 
 ### Monitoring Architecture
 
@@ -66,6 +68,15 @@ Victor AI provides comprehensive observability through Prometheus metrics, Grafa
 
 [Content continues through Monitoring Stack...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Best Practices, Troubleshooting](part-2-best-practices-troubleshooting.md)**

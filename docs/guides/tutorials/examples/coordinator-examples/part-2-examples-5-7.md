@@ -268,6 +268,15 @@ if __name__ == "__main__":
 - Coordinators work together through the orchestrator facade
 - Useful for complex, multi-dimensional customization
 
+
+**Reading Time:** 3 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## Example 7: Context Management

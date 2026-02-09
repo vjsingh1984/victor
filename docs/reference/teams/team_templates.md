@@ -4,7 +4,10 @@ Comprehensive library of pre-configured multi-agent team templates for Victor.
 
 ## Overview
 
-Team templates provide pre-configured, production-ready multi-agent teams for common use cases across all verticals. Templates encapsulate best practices for team composition, formation patterns, and resource allocation.
+Team templates provide pre-configured,
+  production-ready multi-agent teams for common use cases across all verticals. Templates encapsulate best practices for
+  team composition,
+  formation patterns, and resource allocation.
 
 **Key Features:**
 
@@ -405,6 +408,11 @@ To contribute new templates:
 See [Contributing Guide](../contributing/index.md) for details.
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 5 minutes

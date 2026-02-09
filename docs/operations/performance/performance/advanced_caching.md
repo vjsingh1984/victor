@@ -2,7 +2,8 @@
 
 ## Overview
 
-This document describes the advanced caching features implemented for tool selection optimization. These strategies build on the basic LRU cache from Track 5 to achieve significant performance improvements.
+This document describes the advanced caching features implemented for tool selection optimization. These strategies
+  build on the basic LRU cache from Track 5 to achieve significant performance improvements.
 
 ## Performance Improvements
 
@@ -573,6 +574,11 @@ Potential improvements for future versions:
 - [Configuration Reference](../reference/configuration/index.md)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

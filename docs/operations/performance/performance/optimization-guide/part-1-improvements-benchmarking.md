@@ -18,7 +18,8 @@
 
 ## Overview
 
-This guide documents the advanced performance optimizations implemented in Victor AI, targeting a **30-50% overall performance improvement**. These optimizations focus on four key areas:
+This guide documents the advanced performance optimizations implemented in Victor AI,
+  targeting a **30-50% overall performance improvement**. These optimizations focus on four key areas:
 
 1. **Response Caching** - Intelligent LLM response caching with semantic similarity
 2. **Request Batching** - Automatic batching of similar requests to reduce overhead
@@ -162,7 +163,8 @@ Expected results:
 
 ### Overview
 
-Context compaction strategies reduce token usage while preserving important conversation context. Victor provides three strategies:
+Context compaction strategies reduce token usage while preserving important conversation context. Victor provides three
+  strategies:
 
 1. **TruncationCompactionStrategy** - Fast, simple truncation
 2. **LLMCompactionStrategy** - LLM-based summarization with caching
@@ -519,6 +521,15 @@ if stats['hit_rate'] < 0.7:
     logger.warning(f"Low cache hit rate: {stats['hit_rate']:.1%}")
 ```
 
+
+**Reading Time:** 8 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## Benchmarking

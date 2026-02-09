@@ -1,6 +1,7 @@
 # SOC2 Access Control Procedures - Part 1
 
-**Part 1 of 2:** Overview, Access Control Principles, Provisioning, Management, Reviews, Privileged Access, Authentication, Authorization, and Revocation
+**Part 1 of 2:** Overview, Access Control Principles, Provisioning, Management, Reviews, Privileged Access,
+  Authentication, Authorization, and Revocation
 
 ---
 
@@ -15,6 +16,7 @@
 > **Template**: This document describes intended controls. It does not assert current certification or compliance. Update with actual audit evidence and operational details.
 
 **Version:** 1.0
+**Reading Time:** 1 min
 **Last Updated:** 2026-01-20
 **Next Review:** 2026-04-20
 **Owner:** DevOps Lead
@@ -43,7 +45,8 @@
 
 ### 1.1 Purpose
 
-This document defines the procedures for managing access to Victor AI systems, data, and facilities in accordance with SOC2 Trust Services Criteria (CC6.1, CC6.7, CC6.8).
+This document defines the procedures for managing access to Victor AI systems, data,
+  and facilities in accordance with SOC2 Trust Services Criteria (CC6.1, CC6.7, CC6.8).
 
 ### 1.2 Scope
 
@@ -68,4 +71,10 @@ This procedure applies to:
 
 ---
 
-**Continue to [Part 2: Logging, Third-Party, Automation, Compliance](part-2-logging-thirdparty-automation-compliance.md)**
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Continue to [Part 2: Logging, Third-Party, Automation,
+  Compliance](part-2-logging-thirdparty-automation-compliance.md)**

@@ -23,7 +23,8 @@ This guide covers the 20 specialized coordinators in Victor AI's two-layer archi
 
 ## Coordinators
 
-Coordinators are specialized components that encapsulate complex operations. Each coordinator has a single, well-defined responsibility.
+Coordinators are specialized components that encapsulate complex operations. Each coordinator has a single, well-defined
+  responsibility.
 
 ### ConfigCoordinator
 
@@ -89,6 +90,15 @@ class ConfigCoordinator:
 
 [Content continues through Tool Coordinator...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Provider, Session, Additional Coordinators](part-2-provider-session-additional.md)**

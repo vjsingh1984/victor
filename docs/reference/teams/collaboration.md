@@ -1,6 +1,8 @@
 # Team Collaboration Features
 
-Advanced collaboration features for multi-agent teams in Victor, enabling sophisticated coordination through member-to-member communication, shared context management, and consensus building.
+Advanced collaboration features for multi-agent teams in Victor,
+  enabling sophisticated coordination through member-to-member communication, shared context management,
+  and consensus building.
 
 ## Overview
 

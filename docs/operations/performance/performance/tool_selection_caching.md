@@ -6,7 +6,8 @@
 
 ## Overview
 
-Tool selection is a hot path that's called frequently during agent execution. The caching system provides **24-37% latency reduction** through intelligent LRU caching with cache warming and invalidation strategies.
+Tool selection is a hot path that's called frequently during agent execution. The caching system provides **24-37%
+  latency reduction** through intelligent LRU caching with cache warming and invalidation strategies.
 
 ## Performance Improvements
 
@@ -450,6 +451,11 @@ If cache appears ineffective:
 **Status**: ✅ Implemented and Production Ready
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 5 minutes

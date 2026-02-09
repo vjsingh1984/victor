@@ -2,11 +2,13 @@
 
 **Target Audience:** Architects and senior developers evaluating Victor's design and extending the system
 **Time Commitment:** 2.5 hours
-**Prerequisites:** Strong Python background, completed [Developer Journey](developer.md), familiar with software architecture
+**Prerequisites:** Strong Python background, completed [Developer Journey](developer.md), familiar with software
+  architecture
 
 ## Journey Overview
 
-This journey provides deep insight into Victor's architecture, design patterns, and extension points. By the end, you'll understand:
+This journey provides deep insight into Victor's architecture, design patterns, and extension points. By the end, you'll
+  understand:
 - Two-layer coordinator architecture
 - Protocol-based design principles
 - Event-driven communication
@@ -513,6 +515,11 @@ Congratulations! 🎉 You now have deep understanding of Victor's architecture.
 - [Tool Execution](../diagrams/architecture/tool-execution-detailed.mmd)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** January 31, 2026
 **Reading Time:** 12 minutes

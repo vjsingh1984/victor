@@ -33,4 +33,5 @@ This reference covers Victor's provider system:
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** February 01, 2026

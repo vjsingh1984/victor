@@ -1,6 +1,7 @@
 # Victor AI Performance Benchmark Suite
 
-Production-ready benchmarking suite for Victor AI 0.5.0 to measure and validate performance improvements from refactoring work.
+Production-ready benchmarking suite for Victor AI 0.5.0 to measure and validate performance improvements from
+  refactoring work.
 
 ## Overview
 
@@ -340,6 +341,11 @@ When adding new benchmarks:
 Apache License 2.0 - See LICENSE file for details
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 2 min

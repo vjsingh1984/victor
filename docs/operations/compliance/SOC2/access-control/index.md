@@ -1,6 +1,7 @@
 # SOC2 Access Control Procedures
 
-Procedures for managing access to Victor AI systems, data, and facilities in accordance with SOC2 Trust Services Criteria.
+Procedures for managing access to Victor AI systems, data, and facilities in accordance with SOC2 Trust Services
+  Criteria.
 
 ---
 
@@ -79,6 +80,7 @@ This document defines the procedures for managing access to:
 ---
 
 **Version:** 1.0
+**Reading Time:** 1 min
 **Last Updated:** 2026-01-20
 **Next Review:** 2026-04-20
 **Owner:** DevOps Lead

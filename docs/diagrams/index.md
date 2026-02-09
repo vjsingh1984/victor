@@ -401,7 +401,8 @@ code --install-extension bierner.markdown-mermaid
 Always provide alt text for diagrams:
 
 ```markdown
-![System architecture diagram showing Victor's layered architecture](architecture/system-overview.mmd "System Architecture")
+![System architecture diagram showing Victor's layered architecture](architecture/system-overview.mmd "System
+  Architecture")
 ```
 
 ### Descriptions
@@ -471,6 +472,11 @@ Use high contrast colors for accessibility:
 - **Data Flow**: [Data Flow →](../architecture/overview.md)
 - **Contributing**: [Contributing Guide →](../contributing/index.md)
 
+
+**Reading Time:** 6 min
+**Last Updated:** February 08, 2026**
+
 ---
 
-**Next**: [Architecture Diagrams →](architecture/system-overview.mmd) | [Workflow Diagrams →](../workflow-diagrams/index.md) | [Sequence Diagrams →](sequences/tool-execution.mmd)
+**Next**: [Architecture Diagrams →](architecture/system-overview.mmd) | [Workflow Diagrams
+  →](../workflow-diagrams/index.md) | [Sequence Diagrams →](sequences/tool-execution.mmd)

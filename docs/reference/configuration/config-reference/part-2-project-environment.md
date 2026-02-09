@@ -465,9 +465,15 @@ victor chat "Important task"  # May fail!
 
 ---
 
-**Next**: [profiles.yaml →](#profilesyaml) | [config.yaml →](#configyaml) | [API Keys →](keys.md) | [Troubleshooting →](../../user-guide/troubleshooting.md)
+**Next**: [profiles.yaml →](#profilesyaml) | [config.yaml →](#configyaml) | [API Keys →](keys.md) | [Troubleshooting
+  →](../../user-guide/troubleshooting.md)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

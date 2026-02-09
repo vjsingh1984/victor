@@ -404,5 +404,10 @@ See `examples/observability/` for complete examples:
 
 ---
 
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

@@ -136,14 +136,15 @@ Most medium severity issues are related to:
 # Upgraded pip globally
 pip install --upgrade pip
 # Current version: pip 25.3
-```
+```bash
 
 **Configuration Updates:**
 - Updated `pyproject.toml` build-system requirements to include `pip>=25.2`
 - Updated CI workflows to ensure pip is upgraded before safety checks
 - Added pip to version requirements to prevent regression
 
-**Note:** This is a development environment vulnerability, not a production dependency issue. The Victor package itself doesn't ship with pip.
+**Note:** This is a development environment vulnerability, not a production dependency issue. The Victor package itself
+  doesn't ship with pip.
 
 #### ecdsa version 0.19.1 (MONITORING)
 
@@ -341,7 +342,7 @@ assert condition, "Error message"
 
 # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query
 conn.execute(f"CREATE TABLE ...")
-```
+```bash
 
 ## Continuous Monitoring
 
@@ -383,6 +384,11 @@ All reports are retained for 30 days as GitHub Actions artifacts.
 - Tools added: Bandit 1.9.2, Safety 3.7.0, Semgrep 1.147.0
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 8 minutes

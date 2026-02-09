@@ -5,7 +5,9 @@
 
 ## Overview
 
-Victor's extension system enables developers to extend the framework with custom verticals, tools, middleware, and workflows. The system follows SOLID principles (Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion) to ensure maintainability and extensibility.
+Victor's extension system enables developers to extend the framework with custom verticals, tools, middleware,
+  and workflows. The system follows SOLID principles (Open/Closed, Liskov Substitution, Interface Segregation,
+  Dependency Inversion) to ensure maintainability and extensibility.
 
 ## Table of Contents
 
@@ -404,7 +406,8 @@ Tech stack: {tech_stack}
 
 ### What Are Step Handlers?
 
-Step handlers implement the Single Responsibility Principle for vertical integration. Each handler handles one specific aspect of applying a vertical to the orchestrator.
+Step handlers implement the Single Responsibility Principle for vertical integration. Each handler handles one specific
+  aspect of applying a vertical to the orchestrator.
 
 ### Built-in Handlers
 

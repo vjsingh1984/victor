@@ -1,6 +1,7 @@
 # Provider Setup
 
-Pick a provider based on privacy, cost, and latency. Local providers keep data on your machine. Cloud providers are convenient but require API keys.
+Pick a provider based on privacy, cost, and latency. Local providers keep data on your machine. Cloud providers are
+  convenient but require API keys.
 
 ## Quick Start
 1. Choose a provider.
@@ -83,6 +84,11 @@ Platforms:
 - For offline use, combine local models with `../embeddings/AIRGAPPED.md`.
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 1 min

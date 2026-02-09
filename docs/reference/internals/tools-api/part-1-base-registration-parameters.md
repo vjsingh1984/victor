@@ -1,6 +1,7 @@
 # Victor Tools API Reference - Part 1
 
-**Part 1 of 2:** BaseTool Interface, Tool Registration, Parameters, Cost Tiers, Access Modes, Implementation Patterns, and Decorators
+**Part 1 of 2:** BaseTool Interface, Tool Registration, Parameters, Cost Tiers, Access Modes, Implementation Patterns,
+  and Decorators
 
 ---
 
@@ -61,6 +62,15 @@ class BaseTool(ABC):
 
 [Content continues through Tool Decorator...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Advanced Features & Examples](part-2-advanced-features-examples.md)**

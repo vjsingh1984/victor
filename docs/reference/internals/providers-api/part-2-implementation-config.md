@@ -331,6 +331,15 @@ Victor supports 21 LLM providers out of the box:
 | vLLM | `vllm` | Local | Native |
 | llama.cpp | `llamacpp`, `llama-cpp`, `llama.cpp` | Local | Native |
 
+
+**Reading Time:** 4 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## Error Handling

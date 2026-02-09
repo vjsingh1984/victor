@@ -14,7 +14,9 @@
 
 ## Overview
 
-This guide helps you migrate from direct vertical extension patterns to the StepHandlerRegistry-based approach. This migration improves testability, maintainability, and reusability of your vertical extensions.
+This guide helps you migrate from direct vertical extension patterns to the StepHandlerRegistry-based approach. This
+  migration improves testability,
+  maintainability, and reusability of your vertical extensions.
 
 ## Why Migrate?
 
@@ -64,6 +66,15 @@ class CustomToolsHandler(BaseStepHandler):
 
 [Content continues through Migration Patterns...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Testing, Mistakes, Checklist, Scenarios](part-2-testing-checklist-scenarios.md)**

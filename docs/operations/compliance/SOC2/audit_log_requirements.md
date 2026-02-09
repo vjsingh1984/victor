@@ -27,7 +27,8 @@
 
 ### 1.1 Purpose
 
-This document defines the audit logging requirements for Victor AI in accordance with SOC2 Trust Services Criteria (CC3.3, CC6.7, CC7.2).
+This document defines the audit logging requirements for Victor AI in accordance with SOC2 Trust Services Criteria
+  (CC3.3, CC6.7, CC7.2).
 
 ### 1.2 Scope
 
@@ -224,7 +225,7 @@ This requirement applies to:
     "environment": "production"
   }
 }
-```
+```bash
 
 ### 4.2 Required Fields
 

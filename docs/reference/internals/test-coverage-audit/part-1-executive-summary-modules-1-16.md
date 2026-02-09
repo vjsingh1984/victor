@@ -34,7 +34,8 @@
 ### Critical Findings
 1. **19 coordinators have ZERO test coverage** (70% of all coordinators)
 2. **Extracted methods from orchestrator are largely untested** (HIGH risk)
-3. **Core coordinators like ChatCoordinator (4.77%), ToolCoordinator (21.65%), ToolSelectionCoordinator (11.49%) have minimal coverage**
+3. **Core coordinators like ChatCoordinator (4.77%), ToolCoordinator (21.65%), ToolSelectionCoordinator (11.49%) have
+  minimal coverage**
 4. **Well-tested coordinators**: ContextCoordinator (98.07%), PromptContributors (95.83%), ModeCoordinator (83.87%)
 
 ### Risk Assessment
@@ -544,3 +545,13 @@
 - **File**: `victor/agent/coordinators/search_coordinator.py`
 - **Test File**: None
 - **Coverage**: 60.00%
+
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 10 min
+**Last Updated:** February 08, 2026**

@@ -1,6 +1,7 @@
 # Embedding Architecture
 
-Victor supports pluggable embedding providers for semantic tool selection and codebase search. The design keeps providers swappable while sharing a common configuration model.
+Victor supports pluggable embedding providers for semantic tool selection and codebase search. The design keeps
+  providers swappable while sharing a common configuration model.
 
 ## Components
 - Embedding configuration (provider, model, dimensions)

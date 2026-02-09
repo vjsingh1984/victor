@@ -2,7 +2,9 @@
 
 ## Overview
 
-Victor uses **explicit signal-based task completion detection** to determine when tasks are finished, replacing the legacy buffer/size-based heuristics that were prone to false positives and unnecessary continuation loops.
+Victor uses **explicit signal-based task completion detection** to determine when tasks are finished,
+  replacing the legacy buffer/size-based heuristics that were prone to false positives and unnecessary continuation
+  loops.
 
 ## How It Works
 
@@ -319,6 +321,11 @@ Final Decision (Finish/Continue)
 - **Tests**: `tests/unit/agent/test_task_completion.py`
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

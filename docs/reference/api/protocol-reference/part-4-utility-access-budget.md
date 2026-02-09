@@ -303,3 +303,12 @@ class IBudgetManager(Protocol):
         Args:
             budget_type: Type of budget to check
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 3 min
+**Last Updated:** February 08, 2026**

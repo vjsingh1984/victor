@@ -1,6 +1,7 @@
 # Coordinator Settings Guide - Part 1
 
-**Part 1 of 2:** Feature Flags, Configuration Methods, Environment Variables, Settings File, and Coordinator-Specific Settings
+**Part 1 of 2:** Feature Flags, Configuration Methods, Environment Variables, Settings File, and Coordinator-Specific
+  Settings
 
 ---
 
@@ -339,6 +340,10 @@ No direct settings. Configured via `Settings` class.
 |---------|------|---------|-------------|
 | `tool_selection_strategy` | string | `"auto"` | Strategy: `auto`, `keyword`, `semantic`, `hybrid` |
 | `semantic_similarity_threshold` | float | `0.25` | Min similarity score |
+
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**
 
 ---
 

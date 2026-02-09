@@ -45,4 +45,5 @@ This reference covers all protocol definitions in Victor AI 0.5.0:
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** February 01, 2026

@@ -2,7 +2,9 @@
 
 ## Overview
 
-The Victor serialization module provides **5-10x faster** JSON/YAML parsing and serialization compared to Python's standard library, with comprehensive support for batch operations, validation, querying, diffing, patching, and merging.
+The Victor serialization module provides **5-10x faster** JSON/YAML parsing and serialization compared to Python's
+  standard library,
+  with comprehensive support for batch operations, validation, querying, diffing, patching, and merging.
 
 ## Performance Benchmarks
 

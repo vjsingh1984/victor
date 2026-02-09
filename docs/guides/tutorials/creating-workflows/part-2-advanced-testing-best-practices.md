@@ -194,7 +194,8 @@ graph.add_edge("deploy", "end")
 
 ## Conclusion
 
-Custom workflows enable powerful automation in Victor AI. By combining YAML and Python workflows, you can create sophisticated multi-step processes that combine AI operations with traditional code.
+Custom workflows enable powerful automation in Victor AI. By combining YAML and Python workflows,
+  you can create sophisticated multi-step processes that combine AI operations with traditional code.
 
 **Next Steps:**
 - Explore [Workflow Examples](../../examples/workflows/)
@@ -203,4 +204,5 @@ Custom workflows enable powerful automation in Victor AI. By combining YAML and 
 
 ---
 
+**Reading Time:** 2 min
 **Last Updated:** February 01, 2026

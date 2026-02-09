@@ -6,7 +6,9 @@ Guide to automatic performance optimization for team workflows in Victor.
 
 ## Quick Summary
 
-The PerformanceAutotuner system automatically analyzes team execution metrics and suggests optimizations to improve performance, reduce costs, and increase reliability.
+The PerformanceAutotuner system automatically analyzes team execution metrics and suggests optimizations to improve
+  performance,
+  reduce costs, and increase reliability.
 
 **Key Features:**
 - **Automatic Analysis**: Analyzes historical metrics to identify bottlenecks

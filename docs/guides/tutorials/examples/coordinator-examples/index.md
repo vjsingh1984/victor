@@ -40,4 +40,5 @@ This guide provides 10 complete examples:
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** February 01, 2026

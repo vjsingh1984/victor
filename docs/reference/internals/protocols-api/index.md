@@ -36,4 +36,5 @@ This reference covers all protocol definitions in Victor's internal API:
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** February 01, 2026

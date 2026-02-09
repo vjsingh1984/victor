@@ -396,10 +396,13 @@ Run the integration tests:
 pytest tests/integration/native/test_tool_selector_accelerator.py -v
 
 # Run specific test
-pytest tests/integration/native/test_tool_selector_accelerator.py::TestToolSelectorAccelerator::test_cosine_similarity_batch -v
+pytest
+  tests/integration/native/test_tool_selector_accelerator.py::TestToolSelectorAccelerator::test_cosine_similarity_batch
+  -v
 
 # Run with coverage
-pytest tests/integration/native/test_tool_selector_accelerator.py --cov=victor.native.rust.tool_selector --cov-report=html
+pytest tests/integration/native/test_tool_selector_accelerator.py --cov=victor.native.rust.tool_selector
+  --cov-report=html
 ```
 
 ### Example Test
@@ -478,6 +481,11 @@ except ImportError:
 - [Performance Benchmarks](../../performance/benchmark_results.md)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

@@ -15,7 +15,8 @@
 
 ## Overview
 
-Victor AI's multimodal capabilities enable processing and understanding of visual and audio content alongside text. This guide explains how to use vision and audio processing effectively.
+Victor AI's multimodal capabilities enable processing and understanding of visual and audio content alongside text. This
+  guide explains how to use vision and audio processing effectively.
 
 ## Table of Contents
 
@@ -397,3 +398,12 @@ settings.audio_model = "whisper-1"  # or "chirp", "transcribe-best"
 orchestrator = AgentOrchestrator(settings=settings)
 ```
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**

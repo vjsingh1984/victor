@@ -480,6 +480,15 @@ if __name__ == "__main__":
 - Strategies can be: recent messages, semantic, task-aware, hybrid
 - Useful for managing long conversations, reducing token usage
 
+
+**Reading Time:** 7 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## Example 5: Custom Analytics Exporter

@@ -1,10 +1,13 @@
 # ML-Powered Adaptive Formation Selection
 
-This document describes the machine learning system for automatically selecting optimal team formations based on task characteristics and historical execution data.
+This document describes the machine learning system for automatically selecting optimal team formations based on task
+  characteristics and historical execution data.
 
 ## Overview
 
-The ML-powered formation selection system learns from historical workflow executions to predict which team formation (sequential, parallel, hierarchical, pipeline, consensus) will perform best for a given task.
+The ML-powered formation selection system learns from historical workflow executions to predict which team formation
+  (sequential,
+  parallel, hierarchical, pipeline, consensus) will perform best for a given task.
 
 **Key Benefits:**
 - **10-15% improvement** in formation selection accuracy over heuristic scoring
@@ -457,6 +460,11 @@ workflows:
 - **scikit-learn Docs**: https://scikit-learn.org/stable/user_guide.html
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

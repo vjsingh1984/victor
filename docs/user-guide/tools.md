@@ -1,12 +1,16 @@
 # Tools Guide
 
-Victor provides a broad set of specialized tools that enable the AI assistant to interact with your codebase, execute commands, search the web, and perform complex operations. This guide covers how tools work, how they are selected, and how to configure them.
+Victor provides a broad set of specialized tools that enable the AI assistant to interact with your codebase,
+  execute commands, search the web, and perform complex operations. This guide covers how tools work,
+  how they are selected, and how to configure them.
 
 ## Overview
 
 ### What Are Tools?
 
-Tools are functions that extend Victor's capabilities beyond conversation. When you ask Victor to "read the file main.py" or "search for authentication code", it uses tools to perform these actions.
+Tools are functions that extend Victor's capabilities beyond conversation. When you ask Victor to "read the file
+  main.py" or "search for authentication code",
+  it uses tools to perform these actions.
 
 Each tool has:
 - **Name**: Unique identifier (e.g., `read`, `shell`, `git`)
@@ -123,7 +127,7 @@ Tools for running commands and code.
 User: Run the tests for the auth module
 
 Victor calls: test(path="tests/unit/test_auth.py")
-```
+```bash
 
 **Shell Safety**: The `shell` tool blocks dangerous commands like `rm -rf /`. Use `shell_readonly` for exploration without risk of modifications.
 
@@ -480,6 +484,11 @@ If wrong tools are being selected:
 **Next**: [CLI Reference](cli-reference.md) | [Session Management](session-management.md)
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 8 minutes

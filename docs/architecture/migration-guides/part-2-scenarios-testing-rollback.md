@@ -190,4 +190,5 @@ Migration to Victor 0.5.0 architecture is designed to be:
 
 ---
 
+**Reading Time:** 2 min
 **Last Updated:** January 18, 2026

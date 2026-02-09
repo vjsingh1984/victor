@@ -5,7 +5,9 @@
 
 ## Executive Summary
 
-This report presents comprehensive performance benchmarks for team node execution with recursion tracking in Victor AI. The benchmarks measure execution time, memory usage, and scalability across different team formations, member counts, and nesting depths.
+This report presents comprehensive performance benchmarks for team node execution with recursion tracking in Victor AI.
+  The benchmarks measure execution time,
+  memory usage, and scalability across different team formations, member counts, and nesting depths.
 
 **Key Findings:**
 - ✅ **All primary performance targets met**
@@ -191,7 +193,8 @@ This report presents comprehensive performance benchmarks for team node executio
 
 ### 5.2 RecursionGuard Overhead
 
-The RecursionGuard context manager provides automatic cleanup with negligible overhead compared to manual enter/exit calls.
+The RecursionGuard context manager provides automatic cleanup with negligible overhead compared to manual enter/exit
+  calls.
 
 **Benefits:**
 - Automatic cleanup on exceptions
@@ -387,7 +390,8 @@ Potential areas for further optimization (if needed):
 3. **Async Coordination**: Further optimize async/await patterns
 4. **Message Pooling**: Reuse message objects for large teams
 
-However, current performance is excellent and these optimizations are **not necessary** unless specific use cases require sub-10ms execution times.
+However, current performance is excellent and these optimizations are **not necessary** unless specific use cases
+  require sub-10ms execution times.
 
 ---
 
@@ -457,6 +461,11 @@ This ensures benchmarks measure coordination overhead, not external dependencies
 **Benchmark Version:** 0.5.0
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 10 minutes

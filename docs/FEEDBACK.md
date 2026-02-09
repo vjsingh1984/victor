@@ -331,7 +331,9 @@ High-quality feedback that leads to improvements may be highlighted in:
 
 ### Issue
 
-The explanation of the difference between Application Layer and Framework Layer coordinators is unclear. After reading this section, I'm still not sure which coordinators belong to which layer.
+The explanation of the difference between Application Layer and Framework Layer coordinators is unclear. After reading
+  this section,
+  I'm still not sure which coordinators belong to which layer.
 
 ### Expected Behavior
 
@@ -362,7 +364,8 @@ This would make it immediately clear which coordinators belong to which layer.
 
 ### What's Missing
 
-The workflows guide explains the YAML syntax well, but doesn't have complete, real-world examples that I can copy and adapt.
+The workflows guide explains the YAML syntax well, but doesn't have complete, real-world examples that I can copy and
+  adapt.
 
 ### Suggested Addition
 
@@ -387,7 +390,9 @@ This would make it much easier for new users to get started with workflows.
 ```markdown
 ## Feedback: Beginner Journey is Excellent!
 
-First, I want to say the [Beginner Journey](journeys/beginner.md) is fantastic! It got me up and running with Victor in 30 minutes exactly as promised.
+First,
+  I want to say the [Beginner Journey](journeys/beginner.md) is fantastic! It got me up and running with Victor in 30
+  minutes exactly as promised.
 
 ### What Worked Well
 
@@ -419,7 +424,8 @@ This would help users remember the basics without having to search the docs.
 
 ## Summary
 
-**Your feedback matters!** Every bug report, feature request, and suggestion helps improve the documentation for everyone.
+**Your feedback matters!** Every bug report, feature request, and suggestion helps improve the documentation for
+  everyone.
 
 **Ways to Provide Feedback:**
 - GitHub Issues (for bugs)

@@ -47,4 +47,5 @@ A complete LLM provider integration that:
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** February 01, 2026

@@ -1,6 +1,7 @@
 # Configuration Guide - Part 1
 
-**Part 1 of 3:** Configuration Overview, Quick Setup, Configuration Locations, Environment Variables, Profiles, and Global Settings
+**Part 1 of 3:** Configuration Overview, Quick Setup, Configuration Locations, Environment Variables, Profiles, and
+  Global Settings
 
 ---
 
@@ -295,5 +296,14 @@ profiles:
     # No API key needed
 ```
 
+
+**Reading Time:** 4 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 

@@ -1,6 +1,7 @@
 # Code Style Guide
 
-Victor enforces consistent code style through automated tools. This guide covers formatting, linting, and style conventions.
+Victor enforces consistent code style through automated tools. This guide covers formatting, linting, and style
+  conventions.
 
 ## Quick Reference
 
@@ -572,7 +573,8 @@ except Exception as e:
 
 ---
 
-**Questions?** Open an issue on [GitHub](https://github.com/vjsingh1984/victor/issues) or start a [discussion](https://github.com/vjsingh1984/victor/discussions).
+**Questions?** Open an issue on [GitHub](https://github.com/vjsingh1984/victor/issues) or start a
+  [discussion](https://github.com/vjsingh1984/victor/discussions).
 
 ---
 

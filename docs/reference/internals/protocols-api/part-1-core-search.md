@@ -15,7 +15,9 @@
 ---
 # Victor Protocols API Reference
 
-This document provides comprehensive API reference documentation for Victor's protocol interfaces. Protocols in Victor follow Python's `Protocol` pattern (PEP 544) to enable structural subtyping, dependency inversion, and interface segregation.
+This document provides comprehensive API reference documentation for Victor's protocol interfaces. Protocols in Victor
+  follow Python's 
+`Protocol` pattern (PEP 544) to enable structural subtyping, dependency inversion, and interface segregation.
 
 ## Table of Contents
 
@@ -606,6 +608,15 @@ if result.was_normalized:
 suggestions = resolver.suggest_similar("modls/news.py")
 ```
 
+
+**Reading Time:** 8 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## Search Protocols

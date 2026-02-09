@@ -1,6 +1,7 @@
 # Victor Architecture Overview
 
-Victor is a provider-agnostic AI coding assistant built with **protocol-based design**, **event-driven communication**, and a **two-layer coordinator architecture**.
+Victor is a provider-agnostic AI coding assistant built with **protocol-based design**, **event-driven communication**,
+  and a **two-layer coordinator architecture**.
 
 ## Quick Stats
 
@@ -28,7 +29,8 @@ graph TB
     Coordinators --> Events[EventBus<br/>5 Backends]
 ```
 
-For a detailed view of the two-layer architecture, see [Coordinator Layers Diagram](../diagrams/architecture/coordinator-layers.mmd).
+For a detailed view of the two-layer architecture, see [Coordinator Layers
+  Diagram](../diagrams/architecture/coordinator-layers.mmd).
 
 ## Two-Layer Coordinator Design
 
@@ -118,7 +120,8 @@ workflow.complete  # Workflow completed
 ## Providers
 
 ### Cloud (17)
-Anthropic, OpenAI, Google, Azure, AWS Bedrock, xAI, DeepSeek, Mistral, Cohere, Groq, Together AI, Fireworks AI, OpenRouter, Replicate, Hugging Face, Moonshot, Cerebras
+Anthropic, OpenAI, Google, Azure, AWS Bedrock, xAI, DeepSeek, Mistral, Cohere, Groq, Together AI, Fireworks AI,
+  OpenRouter, Replicate, Hugging Face, Moonshot, Cerebras
 
 ### Local (4)
 Ollama, LM Studio, vLLM, llama.cpp
@@ -373,6 +376,11 @@ agent = await Agent.create(
 - [Migration Guides](MIGRATION_GUIDES.md) - Upgrading guide
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 4 minutes

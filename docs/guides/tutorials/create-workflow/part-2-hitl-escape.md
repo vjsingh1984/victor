@@ -230,6 +230,15 @@ Victor supports several HITL interaction types:
 | `skip` | Skip this node entirely |
 | `retry` | Retry the request |
 
+
+**Reading Time:** 2 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 ## 6. Escape Hatches

@@ -34,11 +34,14 @@
 
 ## Overview
 
-Team nodes enable **hybrid orchestration** by spawning ad-hoc multi-agent teams within workflow graphs. This combines the declarative power of workflows with collaborative problem-solving of specialized agents.
+Team nodes enable **hybrid orchestration** by spawning ad-hoc multi-agent teams within workflow graphs. This combines
+  the declarative power of workflows with collaborative problem-solving of specialized agents.
 
 ### What are Team Nodes?
 
-Team nodes are a special node type in YAML workflows that create **temporary, goal-oriented multi-agent teams** as part of workflow execution. Unlike predefined team specifications, team nodes are configured directly in workflow YAML and have access to the workflow's shared context.
+Team nodes are a special node type in YAML workflows that create **temporary,
+  goal-oriented multi-agent teams** as part of workflow execution. Unlike predefined team specifications,
+  team nodes are configured directly in workflow YAML and have access to the workflow's shared context.
 
 **Key Features**:
 
@@ -397,3 +400,12 @@ nodes:
 | **Hierarchical** | Medium | High | Complex planning |
 | **Consensus** | Slow | Very High | Critical decisions |
 
+---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
+
+**Reading Time:** 7 min
+**Last Updated:** February 08, 2026**

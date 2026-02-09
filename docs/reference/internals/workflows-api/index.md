@@ -38,4 +38,5 @@ This reference covers Victor's workflow system APIs:
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** February 01, 2026

@@ -1,6 +1,7 @@
 # Victor AI FAQ - Part 2
 
-**Part 2 of 2:** Troubleshooting, Advanced Usage, Community & Support, Quick Tips, Common Pitfalls, Version Information, and Additional Resources
+**Part 2 of 2:** Troubleshooting, Advanced Usage, Community & Support, Quick Tips, Common Pitfalls, Version Information,
+  and Additional Resources
 
 ---
 

@@ -621,7 +621,9 @@ If issues persist after troubleshooting:
    ```bash
    # Export metrics
    kubectl exec -it deployment/victor-ai -n victor-ai-prod -- \
-     python -c "from victor.tools.caches import AdvancedCacheManager; from victor.config import load_settings; import json; cache = AdvancedCacheManager.from_settings(load_settings()); print(json.dumps(cache.get_metrics(), indent=2, default=str))" > cache-metrics.json
+     python -c "from victor.tools.caches import AdvancedCacheManager; from victor.config import load_settings; import
+  json; cache = AdvancedCacheManager.from_settings(load_settings()); print(json.dumps(cache.get_metrics(),
+  indent=2, default=str))" > cache-metrics.json
 
    # Export logs
    kubectl logs deployment/victor-ai -n victor-ai-prod > victor-logs.txt
@@ -654,6 +656,11 @@ When in doubt, start simple:
 - Add multi-level cache only if needed
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

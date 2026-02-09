@@ -68,6 +68,15 @@ class MyCustomTool(BaseTool):
 
 [Content continues through Advanced Features and Tool Registration...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Testing, Best Practices, Examples](part-2-testing-best-practices-examples.md)**

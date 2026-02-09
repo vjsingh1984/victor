@@ -6,7 +6,9 @@
 
 ## Overview
 
-Tool selection caching provides significant performance improvements for the tool selection hot path in the agent loop. This document describes the caching strategy, implementation details, and performance characteristics.
+Tool selection caching provides significant performance improvements for the tool selection hot path in the agent loop.
+  This document describes the caching strategy,
+  implementation details, and performance characteristics.
 
 ## Performance Impact
 
@@ -203,6 +205,11 @@ python scripts/benchmark_tool_selection.py report --format markdown
 - Added comprehensive documentation
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

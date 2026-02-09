@@ -35,4 +35,5 @@ This guide provides fast-track testing knowledge:
 
 ---
 
+**Reading Time:** 1 min
 **Last Updated:** February 01, 2026

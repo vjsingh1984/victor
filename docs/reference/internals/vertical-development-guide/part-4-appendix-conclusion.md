@@ -140,7 +140,9 @@ def create_analysis_chain(
 
 ## Conclusion
 
-This guide provides comprehensive patterns and examples for creating new verticals in Victor AI. By following these patterns, you can create well-structured, maintainable, and consistent verticals that integrate seamlessly with the framework.
+This guide provides comprehensive patterns and examples for creating new verticals in Victor AI. By following these
+  patterns,
+  you can create well-structured, maintainable, and consistent verticals that integrate seamlessly with the framework.
 
 For more information:
 - See existing vertical implementations: `victor/{coding,research,devops,dataanalysis,rag}/`
@@ -148,6 +150,11 @@ For more information:
 - Consult framework documentation: `victor/framework/`
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 5 minutes

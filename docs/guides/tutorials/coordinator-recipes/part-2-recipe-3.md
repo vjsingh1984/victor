@@ -175,7 +175,8 @@ async def test_postgresql_analytics_exporter():
 
 ### Problem Statement
 
-You want to intelligently compact conversation context to maintain the most important information while reducing token usage.
+You want to intelligently compact conversation context to maintain the most important information while reducing token
+  usage.
 
 ### Solution Overview
 
@@ -382,5 +383,14 @@ async def test_semantic_compaction():
 - **Tuning**: Tune `target_ratio` based on your use case
 - **Performance**: For high-volume scenarios, consider approximate nearest neighbor algorithms
 
+
+**Reading Time:** 5 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 

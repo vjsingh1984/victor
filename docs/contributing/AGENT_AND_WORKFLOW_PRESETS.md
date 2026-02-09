@@ -2,7 +2,8 @@
 
 **Victor Framework**
 
-This guide covers the preset system for agents and workflows, which provides ready-to-use configurations for common patterns.
+This guide covers the preset system for agents and workflows, which provides ready-to-use configurations for common
+  patterns.
 
 ## Overview
 

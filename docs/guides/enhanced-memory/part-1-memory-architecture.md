@@ -15,7 +15,9 @@
 
 ## Overview
 
-Victor AI's enhanced memory system provides a dual-memory architecture combining episodic memory (experiences) and semantic memory (knowledge) for intelligent knowledge retention and retrieval. This guide explains how to use the memory systems effectively.
+Victor AI's enhanced memory system provides a dual-memory architecture combining episodic memory (experiences) and
+  semantic memory (knowledge) for intelligent knowledge retention and retrieval. This guide explains how to use the
+  memory systems effectively.
 
 ## Table of Contents
 
@@ -102,6 +104,15 @@ print(f"Stored episode: {episode_id}")
 
 [Content continues through Memory Consolidation section...]
 
+
+**Reading Time:** 1 min
+**Last Updated:** February 08, 2026**
+
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Continue to [Part 2: Retrieval Strategies & Best Practices](part-2-retrieval-best-practices.md)**

@@ -172,7 +172,7 @@ with open("current.json") as f:
     current = json.load(f)
 
 # Compare metrics (manual comparison or use tool)
-```
+```bash
 
 ## Interpretation Guide
 
@@ -228,6 +228,11 @@ For issues or questions:
 - Run with verbose output: `-v -s` flags
 
 ---
+
+## See Also
+
+- [Documentation Home](../../README.md)
+
 
 **Last Updated:** February 01, 2026
 **Reading Time:** 3 minutes

@@ -1,6 +1,7 @@
 # Internal API Reference
 
-Developer documentation for Victor's internal protocols, components, and APIs. These documents are internal snapshots and may lag behind code changes.
+Developer documentation for Victor's internal protocols, components, and APIs. These documents are internal snapshots
+  and may lag behind code changes.
 
 ## Quick Links
 
@@ -13,7 +14,8 @@ Developer documentation for Victor's internal protocols, components, and APIs. T
 
 ## Overview
 
-Victor's internal architecture emphasizes protocol-based design, dependency inversion, and interface segregation. Verify specifics against the current codebase when making changes.
+Victor's internal architecture emphasizes protocol-based design, dependency inversion,
+  and interface segregation. Verify specifics against the current codebase when making changes.
 
 ## Protocol Categories
 
