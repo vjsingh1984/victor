@@ -82,8 +82,9 @@ ollama pull <model>  # Download missing model
 - [Installation](installation.md) - Install Victor
 - [First Run](first-run.md) - Get started
 - [Cloud Models](cloud-models.md) - Use cloud providers
+- [Advanced Local Models](../../guides/development/local-models.md) - Advanced configuration and production deployment
 
 ---
 
-**Last Updated:** February 01, 2026
+**Last Updated:** February 08, 2026
 **Reading Time:** 1 min
