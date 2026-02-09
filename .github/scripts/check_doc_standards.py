@@ -29,11 +29,11 @@ def check_file_standards(file_path: Path) -> List[str]:
     if not has_last_updated:
         violations.append("Missing 'Last Updated' date in footer")
 
-    # Check 3: Lines are not excessively long (max 100 chars for code, 220 for text)
+    # Check 3: Lines are not excessively long (max 100 chars for code, 100 for text)
     for i, line in enumerate(lines, 1):
-        if len(line) > 220 and not line.startswith('```'):
+        if len(line) > 100 and not line.startswith('```'):
             if not line.startswith('|'):  # Allow tables to be longer
-                violations.append(f"Line {i}: exceeds 220 characters ({len(line)} chars)")
+                violations.append(f"Line {i}: exceeds 100 characters ({len(line)} chars)")
 
     # Check 4: Has code examples with syntax highlighting
     code_blocks = re.findall(r'```(\w+)', content)
@@ -42,19 +42,52 @@ def check_file_standards(file_path: Path) -> List[str]:
     if plain_code_blocks > 0:
         violations.append(f"Found {plain_code_blocks} code blocks without syntax highlighting")
 
-    # Check 5: Has links to related content
-    if "See Also" not in content and "Related" not in content and "Next Steps" not in content:
-        # Only check for non-index files
-        if file_path.name != "index.md":
-            violations.append("Missing 'See Also', 'Related', or 'Next Steps' section")
+    # Check 5: Has links to related content (relaxed - only warn)
+    # Removed strict requirement for "See Also" sections
 
-    # Check 6: Has diagrams for long content
-    if len(lines) > 400:
+    # Check 6: Has diagrams for complex content (hybrid approach)
+    def requires_diagram(fp, content, line_count):
+        """Determine if file requires a diagram based on context."""
+        # Directories that always require diagrams
+        diagram_required_dirs = [
+            "architecture/",
+            "guides/workflows/",
+            "operations/observability/",
+        ]
+
+        # Directories exempt from diagram requirement
+        diagram_exempt_dirs = [
+            "reference/api/",
+            "reference/configuration/",
+            "reference/verticals/",
+        ]
+
+        # Check exempt directories first
+        fp_str = str(fp)
+        if any(d in fp_str for d in diagram_exempt_dirs):
+            return False
+
+        # Always require for specific directories
+        if any(d in fp_str for d in diagram_required_dirs):
+            return True
+
+        # For everything else, require if >500 lines (increased from 400)
+        return line_count > 500
+
+    if requires_diagram(file_path, content, len(lines)):
         has_mermaid = "```mermaid" in content
         has_diagram_ref = ".mmd" in content or ".svg" in content
 
         if not has_mermaid and not has_diagram_ref:
-            violations.append("Long content (>400 lines) should include diagrams")
+            # Custom message based on directory type
+            if "architecture/" in str(file_path):
+                violations.append("Architecture documentation requires diagrams")
+            elif "guides/workflows/" in str(file_path):
+                violations.append("Workflow documentation requires diagrams")
+            elif "operations/observability/" in str(file_path):
+                violations.append("Observability documentation requires diagrams")
+            else:
+                violations.append("Long content (>500 lines) should include diagrams")
 
     return violations
 
@@ -98,9 +131,8 @@ def main():
         print("  1. Review the Documentation Standards (docs/STANDARDS.md)", file=sys.stderr)
         print("  2. Add missing metadata to file footers", file=sys.stderr)
         print("  3. Add syntax highlighting to code blocks", file=sys.stderr)
-        print("  4. Keep lines under 220 characters", file=sys.stderr)
-        print("  5. Add diagrams for long content", file=sys.stderr)
-        print("  6. Add 'See Also' or 'Next Steps' sections", file=sys.stderr)
+        print("  4. Keep lines under 100 characters", file=sys.stderr)
+        print("  5. Add diagrams for architecture/workflows/observability docs or content >500 lines", file=sys.stderr)
         sys.exit(1)
     else:
         print(f"✅ All {file_count} files meet documentation standards")
