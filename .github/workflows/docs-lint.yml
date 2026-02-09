@@ -89,7 +89,7 @@ jobs:
             mmdc -i "$file" -o /tmp/test.svg || echo "Failed to render $file, continuing..."
           done
         env:
-          MMDPUPPETEER_LAUNCH_OPTIONS='{"args": ["--no-sandbox", "--disable-setuid-sandbox"]}'
+          MMDPUPPETEER_LAUNCH_OPTIONS: '{"args": ["--no-sandbox", "--disable-setuid-sandbox"]}'
         continue-on-error: true
 
   standards-check:
