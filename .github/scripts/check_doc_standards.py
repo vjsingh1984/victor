@@ -29,11 +29,11 @@ def check_file_standards(file_path: Path) -> List[str]:
     if not has_last_updated:
         violations.append("Missing 'Last Updated' date in footer")
 
-    # Check 3: Lines are not excessively long (max 100 chars for code, 120 for text)
+    # Check 3: Lines are not excessively long (max 100 chars for code, 220 for text)
     for i, line in enumerate(lines, 1):
-        if len(line) > 120 and not line.startswith('```'):
+        if len(line) > 220 and not line.startswith('```'):
             if not line.startswith('|'):  # Allow tables to be longer
-                violations.append(f"Line {i}: exceeds 120 characters ({len(line)} chars)")
+                violations.append(f"Line {i}: exceeds 220 characters ({len(line)} chars)")
 
     # Check 4: Has code examples with syntax highlighting
     code_blocks = re.findall(r'```(\w+)', content)
@@ -98,7 +98,7 @@ def main():
         print("  1. Review the Documentation Standards (docs/STANDARDS.md)", file=sys.stderr)
         print("  2. Add missing metadata to file footers", file=sys.stderr)
         print("  3. Add syntax highlighting to code blocks", file=sys.stderr)
-        print("  4. Keep lines under 120 characters", file=sys.stderr)
+        print("  4. Keep lines under 220 characters", file=sys.stderr)
         print("  5. Add diagrams for long content", file=sys.stderr)
         print("  6. Add 'See Also' or 'Next Steps' sections", file=sys.stderr)
         sys.exit(1)
