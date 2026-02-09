@@ -3,6 +3,28 @@
 Comprehensive guide for structured JSON logging in Victor AI.
 
 ## Overview
+## Logging Flow
+
+```mermaid
+graph TB
+    A[Application Events] --> B[Structured Logger]
+    B --> C[JSON Formatter]
+    C --> D[Log Output]
+
+    D --> E[stdout/stderr]
+    D --> F[Log File]
+    D --> G[Log Aggregator]
+
+    G --> H[ELK Stack]
+    G --> I[CloudWatch]
+    G --> J[Other SIEM]
+
+    style B fill:#e1f5ff
+    style C fill:#fff4e1
+    style H fill:#e8f5e9
+```
+
+
 
 Victor AI provides production-ready structured logging with:
 - **JSON Format**: Machine-parseable log output

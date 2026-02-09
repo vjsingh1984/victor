@@ -3,6 +3,30 @@
 Complete guide to understanding and resolving Victor errors.
 
 ## Quick Reference
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 | Error Code | Error Type | Common Cause | Quick Fix |
 |------------|------------|--------------|-----------|

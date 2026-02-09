@@ -3,6 +3,30 @@
 This guide describes the comprehensive observability system for team node execution within Victor workflows.
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Team metrics provide detailed insights into multi-agent team execution, including:
 

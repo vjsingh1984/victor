@@ -3,6 +3,30 @@
 This guide covers Victor's testing infrastructure, patterns, and best practices for writing effective tests.
 
 ## Test Structure
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Victor's tests are organized into two main categories:
 

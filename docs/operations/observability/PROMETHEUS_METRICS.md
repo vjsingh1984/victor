@@ -3,6 +3,25 @@
 Comprehensive guide for Prometheus metrics collection in Victor AI.
 
 ## Overview
+## Metrics Flow
+
+```mermaid
+graph LR
+    A[Application] --> B[Metrics Collector]
+    B --> C[Prometheus Exporter]
+    C --> D[/metrics Endpoint]
+    D --> E[Prometheus Server]
+
+    E --> F[AlertManager]
+    E --> G[Grafana Dashboards]
+    E --> H[API Queries]
+
+    style B fill:#e1f5ff
+    style C fill:#fff4e1
+    style E fill:#e8f5e9
+```
+
+
 
 Victor AI provides production-ready Prometheus metrics for:
 - **Request Metrics**: Request count, latency, error rate

@@ -4,6 +4,30 @@
 **Last Updated**: 2025-01-27
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Victor's extension system enables developers to extend the framework with custom verticals, tools, middleware,
   and workflows. The system follows SOLID principles (Open/Closed, Liskov Substitution, Interface Segregation,

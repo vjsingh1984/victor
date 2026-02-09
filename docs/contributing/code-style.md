@@ -4,6 +4,30 @@ Victor enforces consistent code style through automated tools. This guide covers
   conventions.
 
 ## Quick Reference
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 ```bash
 # Format code (run before commits)

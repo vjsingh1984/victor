@@ -3,6 +3,30 @@
 Comprehensive guide for health checks in Victor AI.
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Victor AI provides production-ready health checks for:
 - **Liveness**: Is the service running?

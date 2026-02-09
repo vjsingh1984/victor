@@ -1,6 +1,30 @@
 # Semantic Caching Guide
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Semantic caching enhances traditional caching by using vector similarity to find cached responses that are semantically
   similar to the current query,

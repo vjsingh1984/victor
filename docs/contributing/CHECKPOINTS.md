@@ -6,6 +6,30 @@ Victor's checkpoint system provides time-travel debugging capabilities similar t
   enabling safe rollback and exploration of alternate execution paths.
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 The checkpoint system uses a **dual-backend architecture**:
 

@@ -4,6 +4,30 @@ This guide covers how to run Victor as a Model Context Protocol (MCP) server,
   enabling external clients like Claude Desktop to use Victor's tool suite across multiple domain verticals.
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Victor can expose its entire tool suite via the Model Context Protocol (MCP), allowing:
 

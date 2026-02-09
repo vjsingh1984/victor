@@ -1,6 +1,30 @@
 # Real-Time Team Collaboration Dashboard
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 The Victor Team Collaboration Dashboard provides real-time monitoring and visualization of multi-agent team executions.
   It combines a FastAPI WebSocket server with a React TypeScript frontend to deliver sub-second latency updates for team

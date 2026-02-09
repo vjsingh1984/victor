@@ -4,6 +4,30 @@ This guide covers Victor's comprehensive observability infrastructure for monito
   behavior.
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Victor provides a production-grade observability stack built on a central EventBus with support for:
 

@@ -1,6 +1,30 @@
 # Observability Event Logging - Dashboard Integration
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Victor now supports **JSONL event logging** for the observability dashboard. This allows you to visualize agent events,
   tool calls, state transitions, and more in real-time.

@@ -7,6 +7,30 @@
 ---
 
 ## Executive Summary
+## Cache Architecture
+
+```mermaid
+graph TB
+    subgraph["Cache Layer"]
+        A[Cache Interface]
+        B[In-Memory Cache]
+        C[Redis Backend]
+    end
+
+    A --> B
+    A --> C
+
+    B --> D[TTL Policy]
+    C --> E[Persistence]
+
+    F[Application] --> A
+
+    style A fill:#e1f5ff
+    style B fill:#e8f5e9
+    style C fill:#fff4e1
+```
+
+
 
 Phase 6 (Cache Boundaries & Observability) has been successfully completed. The centralized cache configuration system
   has been fully integrated with the UniversalRegistry,
