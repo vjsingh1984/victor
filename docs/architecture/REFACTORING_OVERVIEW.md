@@ -69,6 +69,45 @@ Victor underwent a comprehensive three-phase architectural refactoring to addres
 
 ## Before/After Architecture
 
+### Architecture Evolution Diagram
+
+```mermaid
+graph TB
+    subgraph["Before: Monolithic Orchestrator"]
+        A[AgentOrchestrator<br/>Monolith]
+        A --> B[Provider<br/>concrete]
+        A --> C[ToolRegistry<br/>concrete]
+        A --> D[ConversationController<br/>concrete]
+        A --> E[ToolPipeline<br/>concrete]
+        A --> F["50+ dependencies<br/>tightly coupled"]
+    end
+
+    subgraph["After: Protocol-Based DI Architecture"]
+        G[ServiceContainer<br/>DI Container]
+        G --> H[Singleton Services<br/>55 registered]
+        G --> I[Scoped Services<br/>per-session]
+
+        J[AgentOrchestrator<br/>Facade]
+        J --> K[ProviderManagerProtocol<br/>ProviderCoordinator]
+        J --> L[ToolRegistryProtocol<br/>ToolRegistry]
+        J --> M[ConversationControllerProtocol<br/>ConversationController]
+
+        style A fill:#f99
+        style B fill:#f99
+        style C fill:#f99
+        style D fill:#f99
+        style E fill:#f99
+        style F fill:#f99
+        style G fill:#9f9
+        style H fill:#9f9
+        style I fill:#9f9
+        style J fill:#9f9
+        style K fill:#9f9
+        style L fill:#9f9
+        style M fill:#9f9
+    end
+```
+
 ### Before: Monolithic Orchestrator
 
 ```text

@@ -2,6 +2,37 @@
 
 Victor's architecture documentation covering design patterns, protocols, and best practices.
 
+## Architecture Documentation Map
+
+```mermaid
+mindmap
+  root((Architecture Docs))
+    Core
+      Overview
+      ARCHITECTURE.md
+      COMPONENT_REFERENCE.md
+    Design Patterns
+      DESIGN_PATTERNS.md
+      BEST_PRACTICES.md
+      anti-patterns.md
+    Protocols
+      PROTOCOLS_REFERENCE.md
+      98 protocols defined
+    Coordinators
+      coordinator_separation.md
+      coordinator_based_architecture.md
+    Best Practices
+      protocols.md
+      di-events.md
+      anti-patterns.md
+    Migration
+      migration-guides/
+      PHASE6_CACHE_BOUNDARIES_COMPLETION.md
+    Extension System
+      extension_system.md
+      middleware/migration_guide.md
+```
+
 ## Quick Links
 
 | Document | Description | Audience |

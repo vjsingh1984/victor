@@ -4,6 +4,67 @@ This document provides a comprehensive reference for all protocols defined in Vi
   loose coupling,
   testability, and flexibility through dependency inversion.
 
+## Protocol Architecture Overview
+
+```mermaid
+graph TB
+    subgraph["Core Protocols"]
+        A[IAgentFactory]
+        B[IAgent]
+        C[IServiceContainer]
+    end
+
+    subgraph["Agent Lifecycle"]
+        D[ProviderManagerProtocol]
+        E[SessionManagerProtocol]
+        F[ConversationManagerProtocol]
+    end
+
+    subgraph["Tool Protocols"]
+        G[ITool]
+        H[IToolRegistry]
+        I[IToolExecutor]
+    end
+
+    subgraph["Streaming Protocols"]
+        J[IStreamHandler]
+        K[IChunkProcessor]
+    end
+
+    subgraph["Coordinator Protocols"]
+        L[IChatCoordinator]
+        M[IToolCoordinator]
+        N[IContextCoordinator]
+    end
+
+    subgraph["Infrastructure"]
+        O[IEventBus]
+        P[ICache]
+        Q[ILogger]
+    end
+
+    A --> C
+    B --> C
+    D --> C
+    E --> C
+    F --> C
+    G --> H
+    H --> I
+    L --> C
+    M --> C
+    N --> C
+
+    style A fill:#e1f5ff
+    style B fill:#e1f5ff
+    style C fill:#ffe1e1
+    style D fill:#fff4e1
+    style E fill:#fff4e1
+    style F fill:#fff4e1
+    style G fill:#e8f5e9
+    style H fill:#e8f5e9
+    style I fill:#e8f5e9
+```
+
 ## Table of Contents
 
 1. [Core Protocols](#core-protocols)

@@ -2,6 +2,40 @@
 
 Guide to advanced team formation patterns in Victor AI workflows.
 
+## Formation Type Decision Tree
+
+```mermaid
+graph TB
+    A[Need: Execute Complex Task] --> B{Task Complexity}
+
+    B -->|Simple| C[Single Agent]
+    B -->|Multi-step| D{Step Dependencies}
+
+    D -->|Sequential| E[Pipeline Formation]
+    D -->|Independent| F[Parallel Formation]
+
+    B -->|Requires Specialists| G{Expertise Areas}
+
+    G -->|Different Roles| H[Role-Based Formation]
+    G -->|Hierarchical| I[Nested Teams]
+
+    B -->|Consensus| J[Consensus Formation]
+
+    C --> K[Execute]
+    E --> K
+    F --> K
+    H --> K
+    I --> K
+    J --> K
+
+    style B fill:#e1f5ff
+    style E fill:#fff4e1
+    style F fill:#fff4e1
+    style H fill:#e8f5e9
+    style I fill:#f3e5f5
+    style J fill:#fce4ec
+```
+
 ---
 
 ## Quick Summary

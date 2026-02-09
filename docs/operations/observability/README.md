@@ -2,6 +2,63 @@
 
 Production-ready observability features including OpenTelemetry tracing, Prometheus metrics, and structured logging.
 
+## Observability Architecture
+
+```mermaid
+graph TB
+    subgraph["Application Layer"]
+        A[Victor AI Application]
+        B[LLM Calls]
+        C[Tool Execution]
+        D[Workflows]
+    end
+
+    subgraph["Observability Layer"]
+        E[OpenTelemetry Tracing]
+        F[Prometheus Metrics]
+        G[Structured Logging]
+        H[Health Checks]
+    end
+
+    subgraph["Export Layer"]
+        I[OTLP Exporter]
+        J[/metrics Endpoint]
+        K[JSON Logs]
+        L[/health Endpoints]
+    end
+
+    subgraph["Backend Storage"]
+        M[Jaeger/Tempo]
+        N[Prometheus Server]
+        O[Log Aggregator]
+        P[Kubernetes Probes]
+    end
+
+    B --> E
+    C --> E
+    D --> E
+    B --> F
+    C --> F
+    D --> F
+    A --> G
+    A --> H
+
+    E --> I
+    F --> J
+    G --> K
+    H --> L
+
+    I --> M
+    J --> N
+    K --> O
+    L --> P
+
+    style E fill:#e1f5ff
+    style F fill:#fff4e1
+    style G fill:#e8f5e9
+    style H fill:#f3e5f5
+```
+
 ## Features
 
 ### 1. OpenTelemetry Integration
