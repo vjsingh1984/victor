@@ -5,6 +5,30 @@ Guide to monitoring Victor AI performance metrics.
 ---
 
 ## Quick Summary
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 This guide covers performance monitoring for Victor AI:
 

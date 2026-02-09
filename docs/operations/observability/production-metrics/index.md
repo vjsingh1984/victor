@@ -5,6 +5,30 @@ Guide to monitoring Victor AI in production environments.
 ---
 
 ## Quick Summary
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Victor AI provides comprehensive observability through:
 - **Prometheus metrics** - Performance and functional metrics

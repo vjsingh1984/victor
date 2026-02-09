@@ -3,6 +3,30 @@
 High-performance graph algorithms for code analysis and tool dependency management.
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 The `graph_algorithms` module provides Rust implementations of common graph algorithms that are **3-5x faster** than NetworkX for typical operations used in:
 

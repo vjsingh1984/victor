@@ -3,6 +3,30 @@
 Comprehensive library of pre-configured multi-agent team templates for Victor.
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Team templates provide pre-configured,
   production-ready multi-agent teams for common use cases across all verticals. Templates encapsulate best practices for

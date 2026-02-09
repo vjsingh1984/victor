@@ -3,6 +3,30 @@
 Welcome to Victor AI! This guide will get you up and running in minutes.
 
 ## Table of Contents
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 1. [Installation](#installation)
 2. [First Steps](#first-steps)

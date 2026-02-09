@@ -3,6 +3,30 @@
 This guide documents the `ExtensionHandlerRegistry`, Victor's primary extension mechanism for third-party plugins and custom integrations.
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 The `ExtensionHandlerRegistry` follows the **Open/Closed Principle (OCP)** - it allows new extension types to be registered without modifying existing code. This enables third-party developers to extend Victor's behavior through custom handlers that integrate seamlessly with the vertical integration pipeline.
 

@@ -3,6 +3,30 @@
 This guide helps diagnose and resolve common issues with lazy loading in Victor.
 
 ## Quick Diagnosis
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 ### Verify Lazy Loading is Enabled
 

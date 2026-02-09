@@ -5,6 +5,30 @@ Guide to setting up monitoring for Victor AI.
 ---
 
 ## Quick Summary
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 This guide covers monitoring setup:
 

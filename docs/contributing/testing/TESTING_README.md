@@ -3,6 +3,30 @@
 **Comprehensive testing documentation for the Victor AI coordinator architecture**
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 This document provides an overview of the unprecedented coordinator testing initiative completed for Victor AI,
   an open-source AI coding assistant supporting 21 LLM providers with 55 specialized tools across 5 domain verticals.

@@ -8,6 +8,30 @@
 ---
 
 ## Video Metadata
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 - **Title**: Victor AI: Understanding the Coordinator-Based Architecture
 - **Duration**: 10 minutes

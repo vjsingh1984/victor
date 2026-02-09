@@ -1,6 +1,30 @@
 # Advanced Caching Strategies (Track 5.2)
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 This document describes the advanced caching features implemented for tool selection optimization. These strategies
   build on the basic LRU cache from Track 5 to achieve significant performance improvements.

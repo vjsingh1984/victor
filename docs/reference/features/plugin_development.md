@@ -1,6 +1,30 @@
 # Plugin Development Guide
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Victor's plugin system allows you to extend workflow compilation capabilities by creating custom compiler plugins.
   Plugins enable loading workflows from various sources (JSON,

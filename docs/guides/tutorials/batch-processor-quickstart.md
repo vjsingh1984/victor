@@ -1,6 +1,30 @@
 # Batch Processor Quick Start Guide
 
 ## Installation
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 The batch processor is included with Victor AI v0.5.0+. No additional installation required if you have Victor
   installed.

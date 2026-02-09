@@ -3,6 +3,30 @@
 This guide explains how to integrate comprehensive performance benchmarks into your CI/CD pipeline for Victor AI 0.5.0.
 
 ## Table of Contents
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)

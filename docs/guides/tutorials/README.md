@@ -3,6 +3,30 @@
 This collection provides extensive tutorials and examples for users and developers working with Victor AI.
 
 ## Quick Navigation
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 ### For Users
 - **[Quick Start Guide](QUICK_START.md)** - Get started in minutes

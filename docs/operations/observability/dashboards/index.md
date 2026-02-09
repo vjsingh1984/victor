@@ -5,6 +5,30 @@ Guide to setting up and using Grafana dashboards for Victor AI observability.
 ---
 
 ## Quick Summary
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 This guide covers Grafana dashboard setup for Victor AI monitoring:
 

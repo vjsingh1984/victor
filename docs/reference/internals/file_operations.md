@@ -1,6 +1,30 @@
 # File Operations Module - High-Performance Parallel File System Operations
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 The File Operations module provides Rust-accelerated file system operations with 2-3x faster directory traversal and
   3-5x faster metadata collection compared to pure Python implementations.
