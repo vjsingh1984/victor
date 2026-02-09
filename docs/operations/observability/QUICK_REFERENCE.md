@@ -3,6 +3,30 @@
 Quick reference for Victor AI 0.5.0 observability features.
 
 ## Installation
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 ```bash
 pip install victor-ai[observability]

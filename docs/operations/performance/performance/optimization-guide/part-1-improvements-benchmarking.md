@@ -5,6 +5,30 @@
 ---
 
 ## Navigation
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 - **[Part 1: Improvements & Benchmarking](#)** (Current)
 - [Part 2: Troubleshooting & Optimizations](part-2-troubleshooting-optimizations.md)

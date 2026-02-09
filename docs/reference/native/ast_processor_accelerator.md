@@ -3,6 +3,30 @@
 High-performance AST parsing and query operations using native Rust implementations with automatic Python fallback.
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 The `AstProcessorAccelerator` provides a unified interface for Abstract Syntax Tree (AST) operations, leveraging Rust's performance for tree-sitter operations while maintaining compatibility with pure Python implementations.
 

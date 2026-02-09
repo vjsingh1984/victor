@@ -5,6 +5,30 @@
 ---
 
 ## Navigation
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 - **[Part 1: Change Process](#)** (Current)
 - [Part 2: Recovery & Emergency](part-2-recovery-emergency.md)

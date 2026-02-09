@@ -5,6 +5,30 @@
 ---
 
 ## Navigation
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 - **[Part 1: Executive Summary & Modules 1-16](#)** (Current)
 - [Part 2: Modules 17-28](part-2-modules-17-28.md)

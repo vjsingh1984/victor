@@ -5,6 +5,30 @@ Complete migration guides for Victor AI 0.5.0 architectural improvements.
 ---
 
 ## Quick Summary
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Victor 0.5.0 introduces major architectural improvements:
 - **Protocol-Based Design**: 98 protocols for loose coupling

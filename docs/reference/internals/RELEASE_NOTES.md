@@ -1,6 +1,30 @@
 # Release Notes: Architectural Improvements (Tracks 1-7)
 
 ## Version: 0.5.0
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 **Release Date**: January 2025
 **Status**: Production Ready
 

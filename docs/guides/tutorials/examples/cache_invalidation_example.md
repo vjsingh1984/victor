@@ -3,6 +3,30 @@
 This document provides practical examples of using the newly integrated cache invalidation components.
 
 ## Table of Contents
+## Cache Architecture
+
+```mermaid
+graph TB
+    subgraph["Cache Layer"]
+        A[Cache Interface]
+        B[In-Memory Cache]
+        C[Redis Backend]
+    end
+
+    A --> B
+    A --> C
+
+    B --> D[TTL Policy]
+    C --> E[Persistence]
+
+    F[Application] --> A
+
+    style A fill:#e1f5ff
+    style B fill:#e8f5e9
+    style C fill:#fff4e1
+```
+
+
 
 1. [FileWatcher Integration](#filewatcher-integration)
 2. [DependencyExtractor Integration](#dependencyextractor-integration)

@@ -8,6 +8,30 @@
 ---
 
 ## Overview
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 Victor AI employs a comprehensive set of design patterns to achieve maintainability, testability,
   and extensibility. These patterns are applied consistently across the codebase,

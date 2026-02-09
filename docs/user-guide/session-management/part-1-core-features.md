@@ -5,6 +5,30 @@
 ---
 
 ## Navigation
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 - **[Part 1: Core Features](#)** (Current)
 - [Part 2: Migration & Troubleshooting](part-2-migration-troubleshooting.md)

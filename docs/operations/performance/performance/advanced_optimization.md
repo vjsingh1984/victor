@@ -8,6 +8,30 @@
 - With advanced caching: **0.08ms (53% reduction)**
 
 ## Table of Contents
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 1. [Overview](#overview)
 2. [Adaptive Cache Sizing](#adaptive-cache-sizing)

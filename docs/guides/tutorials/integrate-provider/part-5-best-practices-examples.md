@@ -5,6 +5,30 @@
 ---
 
 ## Navigation
+## Key Concepts
+
+```mermaid
+mindmap
+  root((Key Topics))
+    Core Concepts
+      Architecture
+      Components
+      Configuration
+    Features
+      Usage
+      Examples
+      Best Practices
+    Reference
+      API
+      Options
+      Parameters
+    Troubleshooting
+      Common Issues
+      Solutions
+      FAQ
+```
+
+
 
 - [Part 1: Architecture & Steps 1-2](part-1-provider-architecture.md)
 - [Part 2: Streaming & Error Handling](part-2-streaming-error-handling.md)

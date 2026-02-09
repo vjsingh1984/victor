@@ -5,6 +5,39 @@ Guide to automatic performance optimization for team workflows in Victor.
 ---
 
 ## Quick Summary
+## Workflow Execution
+
+```mermaid
+graph TB
+    A[Start Workflow] --> B[Initialize State]
+    B --> C[Execute Node]
+
+    C --> D{Node Type}
+    D -->|Action| E[Execute Action]
+    D -->|Condition| F{Check Condition}
+    D -->|HITL| G[Request Human Input]
+
+    F -->|True| H[Continue]
+    F -->|False| I[End Branch]
+
+    G --> J[Receive Input]
+    J --> C
+
+    E --> K[Update State]
+    H --> C
+    I --> C
+    K --> C
+
+    C --> L{More Nodes?}
+    L -->|Yes| C
+    L -->|No| M[Return Final State]
+
+    style C fill:#e1f5ff
+    style G fill:#f3e5f5
+    style L fill:#fff4e1
+```
+
+
 
 The PerformanceAutotuner system automatically analyzes team execution metrics and suggests optimizations to improve
   performance,
