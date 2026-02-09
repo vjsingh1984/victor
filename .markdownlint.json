@@ -1,15 +1,12 @@
 {
   "default": true,
+  "MD001": false,
   "MD003": false,
   "MD004": {
     "style": "dash"
   },
   "MD007": false,
-  "MD013": {
-    "line_length": 120,
-    "code_blocks": false,
-    "tables": false
-  },
+  "MD013": false,
   "MD022": false,
   "MD024": false,
   "MD029": false,
@@ -19,6 +16,7 @@
   "MD034": false,
   "MD035": false,
   "MD036": false,
+  "MD040": false,
   "MD041": false,
   "MD046": false,
   "MD051": false,
