@@ -135,7 +135,7 @@ custom_config:
     Follow best practices.
 
 file_templates: {}
-```
+```text
 
 ## Migration from Legacy Templates
 
@@ -161,7 +161,7 @@ If you have templates from older versions:
    # New
    extensions:
      middleware: []
-   ```
+```text
 
 3. **Update stage structure**:
    ```yaml
@@ -200,7 +200,7 @@ See [Migration Tool Guide](migration_tool_guide.md) for automated migration.
 
 ```bash
 ❌ Validation error: Missing required field: metadata.version
-```
+```text
 
 **Solution**: Add all required metadata fields.
 

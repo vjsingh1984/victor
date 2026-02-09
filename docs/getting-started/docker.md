@@ -7,7 +7,7 @@ Run Victor in a containerized environment.
 ```bash
 docker pull ghcr.io/vjsingh1984/victor:latest
 docker run -it -v ~/.victor:/root/.victor ghcr.io/vjsingh1984/victor:latest
-```
+```text
 
 ## Options
 
@@ -19,7 +19,7 @@ docker run -it ghcr.io/vjsingh1984/victor:latest bash
 ### Mount Project Directory
 ```bash
 docker run -it -v $(pwd):/workspace ghcr.io/vjsingh1984/victor:latest
-```
+```text
 
 ### With API Keys
 ```bash
@@ -40,7 +40,7 @@ docker run -it \
   -v ~/.victor:/root/.victor \
   ghcr.io/vjsingh1984/victor:latest \
   victor chat --provider ollama
-```
+```text
 
 ## Docker Compose
 
@@ -63,7 +63,7 @@ Run with:
 ```bash
 docker-compose up -d
 docker-compose exec victor victor chat
-```
+```text
 
 ## Build from Source
 
@@ -79,7 +79,7 @@ docker build -t victor:local .
 ```bash
 # Fix volume permissions
 docker run -it -v ~/.victor:/root/.victor --user $(id -u):$(id -g) ghcr.io/vjsingh1984/victor:latest
-```
+```text
 
 **Can't connect to Ollama?**
 ```bash

@@ -21,7 +21,7 @@ def process_data(data, max_items=10):
     for item in data[:max_items]:
         result.append(transform(item))
     return result
-```
+```text
 
 **After**:
 ```python
@@ -44,7 +44,7 @@ class Provider:
 
 def use_provider(provider: Provider):
     return provider.chat(messages)
-```
+```text
 
 **After**:
 ```python
@@ -67,7 +67,7 @@ def create_tool_call(name, arguments):
         "arguments": arguments,
         "timestamp": time.time()
     }
-```
+```text
 
 **After**:
 ```python
@@ -94,7 +94,7 @@ def create_tool_call(name: str, arguments: dict[str, Any]) -> ToolCall:
 class Result:
     def __init__(self, value):
         self.value = value
-```
+```text
 
 **After**:
 ```python
@@ -115,7 +115,7 @@ def get_provider():
     if available:
         return provider
     return None
-```
+```text
 
 **After**:
 ```python
@@ -133,7 +133,7 @@ def get_provider() -> ProviderProtocol | None:
     if available:
         return provider
     return None
-```
+```text
 
 ## When to Use `type: ignore`
 
@@ -150,7 +150,7 @@ except ImportError:
 **2. Dynamic Attributes**
 ```python
 wrapper._is_tool = True  # type: ignore[attr-defined]  # Dynamic tool marker
-```
+```text
 
 **3. External Library Issues**
 ```python
@@ -160,7 +160,7 @@ import lancedb  # type: ignore  # External lib: lancedb has incomplete types
 **4. Complex Decorators**
 ```python
 return wrapper  # type: ignore  # Decorator pattern with complex typing
-```
+```text
 
 ### Unacceptable Use Cases
 
@@ -182,7 +182,7 @@ result = process("string")  # type: ignore  # Wrong type!
 
 # Do this instead:
 result = process(123)  # Correct type
-```
+```text
 
 ## Running Type Checks
 
@@ -194,7 +194,7 @@ mypy victor
 ### Check Specific Module
 ```bash
 mypy victor/agent/coordinators/chat_coordinator.py
-```
+```text
 
 ### Check with Strict Mode
 ```bash
@@ -204,7 +204,7 @@ mypy victor/agent/coordinators --strict
 ### Check with Error Codes
 ```bash
 mypy victor/agent/coordinators --show-error-codes
-```
+```text
 
 ### Count Type Errors
 ```bash
@@ -264,7 +264,7 @@ grep "type: ignore" path/to/your/module.py
 
 # Count lines of code
 wc -l path/to/your/module.py
-```
+```text
 
 **Best Practices**:
 1. Add type hints as you write code

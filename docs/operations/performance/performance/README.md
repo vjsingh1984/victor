@@ -26,7 +26,7 @@ pip install pytest pytest-benchmark locust memory-profiler
 
 # Or with dev dependencies
 pip install -e ".[dev]"
-```
+```text
 
 ### Running Benchmarks
 
@@ -52,7 +52,7 @@ python scripts/compare_benchmarks.py baseline.json
 
 # Generate HTML comparison
 python scripts/compare_benchmarks.py baseline.json current.json --format html --output comparison.html
-```
+```text
 
 ## Benchmark Categories
 
@@ -81,7 +81,7 @@ Tracks memory footprint and detects leaks.
 **Run**:
 ```bash
 python scripts/benchmark_comprehensive.py run --scenario memory
-```
+```text
 
 ### 3. Throughput
 
@@ -107,7 +107,7 @@ Measures p50, p95, p99 latencies.
 **Run**:
 ```bash
 python scripts/benchmark_comprehensive.py run --scenario latency
-```
+```text
 
 ## Configuration
 
@@ -170,7 +170,7 @@ jobs:
             LATEST=$(ls -t .benchmark_results/*.json | head -1)
             python scripts/compare_benchmarks.py baseline.json "$LATEST"
           fi
-```
+```text
 
 ## Results
 
@@ -181,7 +181,7 @@ Results are stored in `.benchmark_results/`:
 ├── comprehensive_benchmark_20250118_120000.json
 ├── comprehensive_benchmark_20250118_130000.json
 └── baseline.json
-```
+```text
 
 ### Result Format
 
@@ -233,7 +233,7 @@ VICTOR_BENCHMARK_ITERATIONS=100 python scripts/benchmark_comprehensive.py run --
 
 # Increase timeout
 VICTOR_BENCHMARK_TIMEOUT_SECONDS=600 python scripts/benchmark_comprehensive.py run --all
-```
+```text
 
 ### False Positive Regressions
 
@@ -250,7 +250,7 @@ Run longer iterations:
 
 ```bash
 python scripts/benchmark_comprehensive.py run --scenario memory
-```
+```text
 
 ## Advanced Usage
 
@@ -284,7 +284,7 @@ with open('.benchmark_results/latest.json') as f:
 
 # Export to Prometheus/InfluxDB/etc.
 # TODO: Implement monitoring integration
-```
+```text
 
 ## Contributing
 

@@ -25,7 +25,7 @@ print(f"Current hit rate: {hit_rate:.1%}")
 
 if hit_rate < 0.5:
     print("Hit rate below target, consider tuning")
-```
+```text
 
 ### Miss Rate
 
@@ -53,7 +53,7 @@ eviction_rate = analytics.get_eviction_rate()
 if eviction_rate > 0.1:
     print("High eviction rate detected")
     print("Consider: Increasing cache size or TTL")
-```
+```text
 
 ### Latency Statistics
 
@@ -89,7 +89,7 @@ for hot_key in hot_keys[:10]:
     print(f"  Miss Count: {hot_key.miss_count}")
     print(f"  Avg Latency: {hot_key.avg_latency_ms:.2f}ms")
     print()
-```
+```text
 
 ### Hot Key Characteristics
 
@@ -123,7 +123,7 @@ plt.xlabel("Namespace")
 plt.ylabel("Access Count")
 plt.xticks(rotation=45)
 plt.show()
-```
+```text
 
 ## Size Utilization
 
@@ -162,7 +162,7 @@ for i in range(24):  # 24 hours
 for entry in utilization_history:
     print(f"Hour {entry['hour']}: "
           f"L1={entry['l1']:.1%}, L2={entry['l2']:.1%}")
-```
+```text
 
 ## Optimization Recommendations
 
@@ -220,7 +220,7 @@ for priority in priority_order:
         for rec in critical_recs:
             print(f"\n{rec.title}")
             print(f"  {rec.action}")
-```
+```text
 
 ## Real-Time Monitoring
 
@@ -247,7 +247,7 @@ def on_alert(alert_type: str, alert_data: dict):
     send_to_slack(alert_type, alert_data)
 
 analytics.register_alert_callback(on_alert)
-```
+```text
 
 ### Alert Types
 
@@ -298,7 +298,7 @@ scrape_configs:
     scrape_interval: 15s
     static_configs:
       - targets: ['localhost:8080']
-```
+```text
 
 ### Metrics Endpoint
 
@@ -385,7 +385,7 @@ async def metrics():
     ]
   }
 }
-```
+```text
 
 ### Custom Dashboard
 
@@ -448,7 +448,7 @@ for hour in sorted(hourly_hit_rates.keys()):
     total = data['hits'] + data['misses']
     hit_rate = data['hits'] / total if total > 0 else 0
     print(f"Hour {hour:2d}: {hit_rate:.1%}")
-```
+```text
 
 ### Namespace Analysis
 
@@ -483,7 +483,7 @@ await analytics.start_monitoring(interval_seconds=60)
 # Register alerts
 analytics.register_alert_callback(send_to_slack)
 analytics.register_alert_callback(send_to_prometheus)
-```
+```text
 
 ### 2. Track Key Metrics
 
@@ -513,7 +513,7 @@ for rec in high_priority:
     print(f"Implementing: {rec.action}")
     # Apply recommendation
     apply_recommendation(rec)
-```
+```text
 
 ### 4. Track Trends
 

@@ -31,7 +31,7 @@ def test_my_tool():
     assert isinstance(result, ToolExecutionResult)
     assert result.success is True
     assert "output" in result.data
-```
+```text
 
 ### Integration Testing
 
@@ -65,7 +65,7 @@ def test_my_tool_with_mock():
 
         assert result.success is True
         mock_api.assert_called_once()
-```
+```text
 
 ---
 
@@ -100,7 +100,7 @@ def execute(self, **kwargs) -> ToolExecutionResult:
             success=False,
             error=str(e)
         )
-```
+```text
 
 ### 3. Parameter Validation
 
@@ -127,7 +127,7 @@ Assign appropriate cost tiers:
 # CostTier.HIGH - High cost (expensive operations)
 
 cost_tier = CostTier.LOW
-```
+```text
 
 ---
 
@@ -224,7 +224,7 @@ class DatabaseQueryTool(BaseTool):
                 success=False,
                 error=str(e)
             )
-```
+```text
 
 ### Example 3: File Processing Tool
 

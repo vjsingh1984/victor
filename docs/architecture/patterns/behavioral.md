@@ -84,7 +84,7 @@ class ProviderPool:
         healthy_providers = [p for p in self._providers if p.is_healthy()]
         provider = min(healthy_providers, key=lambda p: p.load)
         return await provider.process(request)
-```
+```text
 
 **Usage Example**:
 ```python
@@ -201,7 +201,7 @@ class LoggingObserver:
 
     async def _on_tool_event(self, event: MessagingEvent):
         logger.info(f"Tool event: {event.topic} - {event.data}")
-```
+```text
 
 **Usage Example**:
 ```python
@@ -321,7 +321,7 @@ class CommandInvoker:
         if self._history:
             command = self._history.pop()
             await command.undo()
-```
+```text
 
 **Usage Example**:
 ```python
@@ -433,7 +433,7 @@ class ProcessingHandler(Handler):
         # Final processing
         result = await self._process(request)
         return result
-```
+```text
 
 **Usage Example**:
 ```python
@@ -554,7 +554,7 @@ class TestingWorkflow(BaseWorkflow):
         # Run tests
         results = await self._run_tests(context["test_files"])
         return results
-```
+```text
 
 **Usage Example**:
 ```python

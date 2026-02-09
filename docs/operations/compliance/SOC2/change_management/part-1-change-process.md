@@ -208,7 +208,7 @@ change_request:
     - "pull_request_link"
     - "test_results"
     - "security_review"
-```
+```text
 
 ### 3.2 Change Review Process
 

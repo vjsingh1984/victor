@@ -89,7 +89,7 @@ async def basic_chat_example():
 
 if __name__ == "__main__":
     asyncio.run(basic_chat_example())
-```
+```text
 
 ### Output
 
@@ -97,7 +97,7 @@ if __name__ == "__main__":
 Response: Coordinators in Victor are specialized components that each handle
 one specific aspect of the orchestration process...
 Tokens used: 150
-```
+```text
 
 ### Key Takeaways
 
@@ -332,7 +332,7 @@ async def custom_prompt_example():
 
 if __name__ == "__main__":
     asyncio.run(custom_prompt_example())
-```
+```text
 
 ### Key Takeaways
 

@@ -46,7 +46,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # Or use full path
 ~/.local/bin/victor --version
-```
+```text
 
 ### "Provider not found"
 
@@ -75,7 +75,7 @@ victor chat --provider anthropic --model claude-sonnet-4-5
 
 # Check model capabilities
 cat victor/config/model_capabilities.yaml
-```
+```text
 
 ### "Ollama connection failed"
 
@@ -110,7 +110,7 @@ source ~/.bashrc
 
 # Or use .env file
 echo 'ANTHROPIC_API_KEY=sk-your-key' > ~/.victor/.env
-```
+```text
 
 ### "Import error: No module named victor"
 
@@ -144,7 +144,7 @@ pip cache purge
 
 # Check disk usage
 du -sh ~/.victor
-```
+```text
 
 ### Victor hangs or freezes
 
@@ -186,7 +186,7 @@ async def main():
     await agent.close()
 
 asyncio.run(main())
-```
+```text
 
 [Full API documentation](api/README.md)
 
@@ -221,7 +221,7 @@ export VICTOR_PROVIDER=anthropic
 export VICTOR_MODEL=claude-sonnet-4-5
 export VICTOR_MODE=build
 export VICTOR_LOG_LEVEL=INFO
-```
+```text
 
 ### How do I create custom workflows?
 
@@ -247,7 +247,7 @@ steps:
 **Run workflow:**
 ```bash
 victor workflow run my_workflow --file myfile.py
-```
+```text
 
 [Learn more about workflows](user-guide/workflows.md)
 
@@ -271,7 +271,7 @@ class MyTool(BaseTool):
 from victor.tools.registry import register_tool
 
 register_tool(MyTool())
-```
+```text
 
 ### How do I use Victor in CI/CD?
 
@@ -305,7 +305,7 @@ jobs:
 ```bash
 export VICTOR_LOG_LEVEL=DEBUG
 victor chat 2>&1 | tee victor.log
-```
+```text
 
 **Check session history:**
 ```bash
@@ -316,7 +316,7 @@ victor sessions
 ```bash
 # Track token usage
 export VICTOR_TRACK_TOKENS=true
-```
+```text
 
 ---
 

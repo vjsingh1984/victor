@@ -24,7 +24,7 @@ goal = "Implement JWT authentication for REST API"
 
 # Avoid: Vague goal
 goal = "Fix authentication"
-```
+```text
 
 ### 2. Estimate Complexity
 
@@ -58,7 +58,7 @@ step2.add_dependency(step1)
 
 # step3 depends on step2
 step3.add_dependency(step2)
-```
+```text
 
 ### 4. Monitor Execution
 
@@ -102,7 +102,7 @@ context = {
     "current_setup": "Uses basic API key auth",
     "requirements": ["JWT tokens", "Refresh tokens", "Revocation"]
 }
-```
+```text
 
 ### Execution Deadlock
 
@@ -137,7 +137,7 @@ plan = await planner.create_plan(
     max_replans=5,  # Allow more replans
     failure_tolerance=2  # More failures before replan
 )
-```
+```text
 
 ---
 
@@ -190,7 +190,7 @@ async def refactor_codebase():
 
     result = await planner.execute_plan(plan)
     return result
-```
+```text
 
 ### Example 3: CI/CD Setup
 

@@ -38,7 +38,7 @@ def bootstrap_application(settings: Settings):
     )
 
     return container
-```
+```text
 
 ### Use Appropriate Service Lifetimes
 
@@ -95,7 +95,7 @@ component = MyComponent(
     event_bus=container.get(IEventBackend),
     config=config,
 )
-```
+```text
 
 ### Avoid Service Location
 
@@ -155,7 +155,7 @@ class OrchestratorFactory:
             tool_pipeline=tool_pipeline,
             conversation_controller=conversation_controller,
         )
-```
+```text
 
 ### Test With Mock Services
 
@@ -213,7 +213,7 @@ kafka_bus = create_event_backend(
         extra={"bootstrap_servers": "localhost:9092"},
     )
 )
-```
+```text
 
 **Guidelines**:
 - **In-Memory**: Single-instance, low latency, no persistence
@@ -264,7 +264,7 @@ await event_bus.publish(
         correlation_id=correlation_id,  # Same ID
     )
 )
-```
+```text
 
 ### Handle Errors Gracefully
 
@@ -299,7 +299,7 @@ await event_bus.subscribe("*", self._on_all_events)
 async def _on_tool_event(self, event: MessagingEvent):
     # Handles tool.start, tool.complete, tool.error, etc.
     ...
-```
+```text
 
 ### Respect Delivery Guarantees
 

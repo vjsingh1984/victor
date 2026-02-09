@@ -36,7 +36,7 @@ victor workflow lint workflow.yaml --disable-rule complexity_analysis
 
 # Generate markdown report
 victor workflow lint . --format markdown -o lint_report.md
-```
+```text
 
 ### Python API
 
@@ -112,7 +112,7 @@ nodes:
     type: agent
     role: researcher
     goal: "Research topic"
-```
+```text
 
 ### Schema Validation
 
@@ -152,7 +152,7 @@ Required fields:
 # ✗ Missing handler
 - id: process
   type: compute
-```
+```text
 
 #### Condition Nodes
 
@@ -206,7 +206,7 @@ Member requirements:
 - id: research_team
   type: team
   team_formation: invalid_formation
-```
+```text
 
 ### Connection Validation
 
@@ -243,7 +243,7 @@ nodes:
     next: [node3]
   - id: node3
     next: [node1]  # Creates cycle
-```
+```text
 
 ### Best Practices
 
@@ -276,7 +276,7 @@ tool_budget: 150
 
 # ✗ Invalid budget
 tool_budget: -5
-```
+```text
 
 ### Complexity Analysis
 
@@ -298,7 +298,7 @@ Workflow complexity: 5 nodes, depth 2, cyclomatic complexity 1
 
 ### Text Format
 
-```
+```text
 ============================================================
 Workflow Linting Report
 ============================================================
@@ -353,7 +353,7 @@ Issues:
     }
   ]
 }
-```
+```text
 
 ### Markdown Format
 
@@ -407,7 +407,7 @@ for issue in result.issues:
     print(f"  Location: {issue.location}")
     if issue.suggestion:
         print(f"  Suggestion: {issue.suggestion}")
-```
+```text
 
 ### Custom Rules
 
@@ -464,7 +464,7 @@ for rule in rules:
 
 # Get enabled rules
 enabled = linter.get_enabled_rules()
-```
+```text
 
 ### Filtering Issues
 
@@ -494,7 +494,7 @@ result = linter.lint_directory("workflows/", recursive=True)
 
 # Custom pattern
 result = linter.lint_directory("workflows/", pattern="*.yaml")
-```
+```text
 
 ## Integration with CI/CD
 
@@ -539,7 +539,7 @@ if [ $? -ne 0 ]; then
     echo "Workflow validation failed. Please fix errors before committing."
     exit 1
 fi
-```
+```text
 
 ### GitLab CI
 
@@ -609,7 +609,7 @@ class WorkflowLinter:
     def get_rules(self) -> List[ValidationRule]
     def get_enabled_rules(self) -> List[ValidationRule]
     def get_rule(self, rule_id: str) -> Optional[ValidationRule]
-```
+```text
 
 ### LinterResult
 
@@ -657,7 +657,7 @@ class ValidationIssue:
     context: Dict[str, Any]
 
     def to_dict(self) -> Dict[str, Any]
-```
+```text
 
 ---
 

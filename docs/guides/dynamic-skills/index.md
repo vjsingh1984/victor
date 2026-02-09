@@ -46,7 +46,7 @@ result = await execute_skill(
     code="my_script.py",
     severity="medium"
 )
-```
+```text
 
 ---
 

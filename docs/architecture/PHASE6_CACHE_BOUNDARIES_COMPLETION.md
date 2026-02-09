@@ -44,7 +44,7 @@ def get_registry(cls, registry_type: str, cache_strategy: CacheStrategy = CacheS
             max_size = config.max_size if config.max_size else max_size
     except (ImportError, Exception):
         pass  # Fall back to provided parameters
-```
+```text
 
 ### 2. Tool Selection Cache Fixes
 
@@ -124,7 +124,7 @@ export VICTOR_CACHE_TOOL_SELECTION_STRATEGY=TTL
 ```bash
 $ python scripts/verify_solid_deployment.py
 ✅ ALL CHECKS PASSED - READY FOR DEPLOYMENT
-```
+```text
 
 ### Cache Config Verification
 ```python

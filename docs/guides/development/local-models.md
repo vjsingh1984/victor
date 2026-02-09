@@ -20,7 +20,7 @@ victor init --local
 # Option 2: Manual setup
 ollama serve && ollama pull llama3
 victor chat --provider ollama --model llama3
-```
+```text
 
 ## Configuration
 
@@ -53,7 +53,7 @@ victor init --airgapped
 
 # Or enable per-session
 victor chat --airgapped
-```
+```text
 
 ## Commands Reference
 

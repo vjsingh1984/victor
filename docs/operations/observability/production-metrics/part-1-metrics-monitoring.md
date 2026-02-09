@@ -36,7 +36,7 @@ Victor AI provides comprehensive observability through Prometheus metrics, Grafa
 
 ### Monitoring Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                     Victor AI System                        │
 │  (MetricsCollector, EventBus, HealthChecker)                │

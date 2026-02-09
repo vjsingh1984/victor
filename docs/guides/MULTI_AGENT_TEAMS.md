@@ -27,7 +27,7 @@ team = agent.create_team("feature_implementation")
 # Run the team
 result = await agent.run_team(team, task="Add user authentication")
 print(result.final_output)
-```
+```text
 
 ## Team Formations
 
@@ -67,7 +67,7 @@ config = TeamConfig(
     ],
     task="Review this pull request"
 )
-```
+```text
 
 **Use when**: Multiple perspectives needed independently.
 
@@ -105,7 +105,7 @@ config = TeamConfig(
     ],
     task="Add caching to the API"
 )
-```
+```text
 
 **Use when**: Tasks with clear input/output transformations.
 
@@ -180,7 +180,7 @@ researcher = TeamMember(
     max_delegation_depth=1,  # Can delegate once
     can_delegate=True,
 )
-```
+```text
 
 ### Member Properties
 
@@ -214,7 +214,7 @@ team = FEATURE_IMPLEMENTATION_TEAM
 from victor.coding.teams import BUG_FIX_TEAM
 
 # Pipeline: Investigator → Fixer → Verifier
-```
+```text
 
 ### Code Review Team
 
@@ -230,7 +230,7 @@ from victor.coding.teams import CODE_REVIEW_TEAM
 from victor.coding.teams import REFACTORING_TEAM
 
 # Hierarchical: Manager → Executors → Quality Verifier
-```
+```text
 
 ## Inter-Agent Communication
 
@@ -279,7 +279,7 @@ await team.remember(
 
 # Recall relevant memories
 memories = await team.recall("authentication patterns")
-```
+```text
 
 ## Progress Tracking
 
@@ -316,7 +316,7 @@ for member_id, member_result in result.member_results.items():
 # Communication log
 for message in result.communication_log:
     print(f"  {message.sender_id} → {message.recipient_id}: {message.content}")
-```
+```text
 
 ## Team Registry
 
@@ -361,7 +361,7 @@ config = TeamConfig(
 )
 
 # Avoid - too many agents with overlapping roles
-```
+```text
 
 ### 2. Use Appropriate Formations
 
@@ -392,7 +392,7 @@ member = TeamMember(
         namespace="findings"
     )
 )
-```
+```text
 
 ### 5. Use Backstories for Context
 
@@ -424,7 +424,7 @@ bus.subscribe(EventCategory.LIFECYCLE, lambda e:
 # - member_completed
 # - team_completed
 # - team_error
-```
+```text
 
 ## Troubleshooting
 

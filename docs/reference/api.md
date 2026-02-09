@@ -30,7 +30,7 @@ result = await agent.run("Write tests for auth.py")
 async for event in agent.stream("Analyze code"):
     if event.type == EventType.CONTENT:
         print(event.content, end="")
-```
+```text
 
 ### Core Classes
 
@@ -76,7 +76,7 @@ class ToolSet:
     @staticmethod
     def custom(tools: List[str]) -> ToolSet:
         """Custom tool selection."""
-```
+```text
 
 ### Example: Multi-Provider Workflow
 
@@ -101,7 +101,7 @@ review = await reviewer.run(f"Review: {code.content}")
 
 ```bash
 victor serve --port 8000
-```
+```text
 
 ### Endpoints
 
@@ -129,7 +129,7 @@ curl -X POST http://localhost:8000/workflow/run \
     "workflow": "code-review",
     "input": {"target": "src/auth.py"}
   }'
-```
+```text
 
 ### Authentication
 
@@ -156,7 +156,7 @@ victor mcp --stdio
 
 # SSE transport
 victor mcp --sse --port 3000
-```
+```text
 
 ### Configuration
 
@@ -207,7 +207,7 @@ victor chat --provider openai --model gpt-4
 
 # Switch mid-conversation
 /provider ollama --model qwen2.5-coder:7b
-```
+```text
 
 ### Mode Selection
 
@@ -233,7 +233,7 @@ victor chat --tools read,write,edit
 
 # Tool budget
 victor chat --tool-budget 20
-```
+```text
 
 [Full CLI Documentation ->](../user-guide/cli-reference.md)
 
@@ -283,7 +283,7 @@ profiles:
     model: claude-sonnet-4-5
     tools: [read, write, edit]
     mode: build
-```
+```text
 
 ### Programmatic Configuration
 
@@ -326,7 +326,7 @@ try:
 except ToolExecutionError as e:
     print(f"Tool failed: {e}")
     # Handle error
-```
+```text
 
 [Full Error Documentation ->](errors.md)
 

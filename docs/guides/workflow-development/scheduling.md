@@ -44,7 +44,7 @@ schedule_id = schedule_workflow(
 # Start the scheduler daemon
 scheduler = get_scheduler()
 await scheduler.start()
-```
+```text
 
 ### CLI Quick Start
 
@@ -68,7 +68,7 @@ victor scheduler list
 
 Victor uses standard 5-field cron syntax:
 
-```
+```text
 ┌───────────── minute (0-59)
 │ ┌───────────── hour (0-23)
 │ │ ┌───────────── day of month (1-31)
@@ -96,7 +96,7 @@ CronSchedule.from_cron("*/15 * * * *")
 
 # Weekdays at 9 AM and 5 PM
 CronSchedule.from_cron("0 9,17 * * 1-5")
-```
+```text
 
 ### Cron Aliases
 
@@ -118,7 +118,7 @@ schedule = CronSchedule.from_interval(hours=4)
 
 # Every 30 minutes
 schedule = CronSchedule.from_interval(minutes=30)
-```
+```text
 
 ### Scheduled Workflow Configuration
 
@@ -154,7 +154,7 @@ victor scheduler stop
 
 # Check scheduler status
 victor scheduler status
-```
+```text
 
 ### Schedule Management
 
@@ -185,7 +185,7 @@ victor scheduler install --user victor-svc
 
 # Custom config path
 victor scheduler install --config /etc/victor/scheduler.yaml
-```
+```text
 
 This generates `/etc/systemd/system/victor-scheduler.service`:
 
@@ -210,7 +210,7 @@ After installation:
 sudo systemctl daemon-reload
 sudo systemctl enable victor-scheduler
 sudo systemctl start victor-scheduler
-```
+```text
 
 ## YAML Configuration
 
@@ -270,7 +270,7 @@ scheduler:
     timezone: "UTC"
     catchup: false
     max_active_runs: 1
-```
+```text
 
 ## Execution Limits
 
@@ -296,7 +296,7 @@ node = AgentNode(
     goal="Process large dataset",
     timeout_seconds=600.0,
 )
-```
+```text
 
 ### Node-Level Retry Policy
 
@@ -333,7 +333,7 @@ workflows:
       default_node_timeout: 300
       max_iterations: 100
       max_retries: 3
-```
+```text
 
 Python equivalent:
 ```python
@@ -354,7 +354,7 @@ workflow = WorkflowDefinition(
 
 Victor uses semantic versioning (semver):
 
-```
+```text
 MAJOR.MINOR.PATCH[-prerelease][+build]
 
 Examples:
@@ -399,7 +399,7 @@ latest = registry.get_latest("data_pipeline")
 
 # List all versions
 all_versions = registry.get_all_versions("data_pipeline")
-```
+```text
 
 ### Version Compatibility
 
@@ -464,7 +464,7 @@ new_state, applied = registry.migrate_state(
     to_version="2.0.0",
 )
 # new_state = {"new_field_name": "data", "new_field": "default_value"}
-```
+```text
 
 ### Custom Migration Handlers
 
@@ -496,7 +496,7 @@ path = registry.get_migration_path(
     to_version=WorkflowVersion(2, 0, 0),
 )
 # Returns: [migration_1_0_to_1_1, migration_1_1_to_2_0]
-```
+```text
 
 ### Deprecating Versions
 
@@ -525,7 +525,7 @@ victor scheduler install --user www-data
 # Enable and start
 sudo systemctl enable victor-scheduler
 sudo systemctl start victor-scheduler
-```
+```text
 
 ### High-Availability Considerations
 
@@ -548,7 +548,7 @@ victor scheduler status
 View execution history:
 ```bash
 victor scheduler history --limit 100
-```
+```text
 
 Logs are written to stdout/stderr; configure systemd or your process manager to capture them.
 

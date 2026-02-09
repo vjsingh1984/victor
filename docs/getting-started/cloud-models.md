@@ -10,7 +10,7 @@ export ANTHROPIC_API_KEY=sk-...
 
 # Start Victor
 victor chat --provider anthropic
-```
+```text
 
 ## Supported Providers
 
@@ -39,7 +39,7 @@ victor chat --provider anthropic --model claude-sonnet-4-5
 ```bash
 export OPENAI_API_KEY=sk-...
 victor chat --provider openai --model gpt-4o
-```
+```text
 
 ### Google (Gemini)
 ```bash
@@ -55,7 +55,7 @@ victor chat --provider google --model gemini-2.0-flash-exp
 export AZURE_OPENAI_API_KEY=...
 export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
 victor chat --provider azure-openai
-```
+```text
 
 ## Model Recommendations
 
@@ -88,7 +88,7 @@ review = await reviewer.run(f"Review: {code.content}")
 victor chat --provider ollama      # Start with free
 /provider openai --model gpt-4o   # Switch for implementation
 /provider anthropic               # Switch for final review
-```
+```text
 
 ## Configuration
 
@@ -112,7 +112,7 @@ profiles:
   free:
     provider: ollama
     model: qwen2.5-coder:7b
-```
+```text
 
 ## Troubleshooting
 

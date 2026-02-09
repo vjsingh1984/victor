@@ -100,7 +100,7 @@ class CompositeValidationHandler(BaseStepHandler):
 class ValidationError(Exception):
     """Validation error."""
     pass
-```
+```text
 
 ### Example 16: Async Handler
 
@@ -206,7 +206,7 @@ class RetryableOperationHandler(BaseStepHandler):
 
         # Success
         context.apply_operation_result({"status": "success"})
-```
+```text
 
 ---
 
@@ -356,7 +356,7 @@ def test_handler_with_test_mode():
 
     assert context.data == {"test": True}
     assert "Test mode" in result.info[0]
-```
+```text
 
 ---
 

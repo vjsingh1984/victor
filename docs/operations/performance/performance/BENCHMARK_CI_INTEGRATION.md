@@ -44,7 +44,7 @@ pip install pytest pytest-benchmark locust memory-profiler
 
 # Or with dev dependencies
 pip install -e ".[dev]"
-```
+```text
 
 ### 2. Run Benchmarks Locally
 
@@ -67,7 +67,7 @@ python scripts/compare_benchmarks.py baseline.json current.json
 
 # Compare with latest run
 python scripts/compare_benchmarks.py baseline.json
-```
+```text
 
 ## GitHub Actions Integration
 
@@ -284,7 +284,7 @@ jobs:
           git add .benchmark_results/baseline.json
           git commit -m "Update performance baseline [skip ci]" || echo "No changes"
           git push
-```
+```text
 
 ## Performance Regression Detection
 
@@ -320,7 +320,7 @@ if [ $? -ne 0 ]; then
     echo "Performance regression detected!"
     # Handle regression (notify, fail CI, etc.)
 fi
-```
+```text
 
 ### CI/CD Regression Notification
 
@@ -389,7 +389,7 @@ jobs:
         run: |
           # TODO: Implement storage in your monitoring system
           # Examples: InfluxDB, Prometheus, Graphite, etc.
-```
+```text
 
 ### Performance Dashboard Integration
 
@@ -440,7 +440,7 @@ if __name__ == "__main__":
 cp .benchmark_results/comprehensive_benchmark_latest.json .benchmark_results/baseline.json
 git add .benchmark_results/baseline.json
 git commit -m "Update performance baseline for v0.5.0"
-```
+```text
 
 ### 2. Benchmark Frequency
 
@@ -484,7 +484,7 @@ When regressions are detected:
 env:
   VICTOR_PROFILE: ci
   VICTOR_BENCHMARK_ALLOWED_FLAKINESS_PCT: 5
-```
+```text
 
 ## Troubleshooting
 
@@ -519,7 +519,7 @@ regression_limits:
 # Allow more flakiness
 env:
   VICTOR_BENCHMARK_ALLOWED_FLAKINESS_PCT: 10
-```
+```text
 
 ### Memory Leaks Not Detected
 

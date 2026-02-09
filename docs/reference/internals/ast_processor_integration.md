@@ -28,7 +28,7 @@ from victor.native.accelerators.ast_processor import get_ast_processor
 processor = get_ast_processor()
 tree = processor.parse_to_ast(source_code, language="python")
 nodes = processor.execute_query(tree, query, language)
-```
+```text
 
 #### `/victor/native/accelerators/__init__.py`
 **Purpose**: Public API for native accelerators
@@ -78,7 +78,7 @@ try:
 except ImportError:
     logger.debug("Rust AST accelerator not available, using Python tree-sitter")
     _ast_accelerator = None
-```
+```text
 
 **Enhanced Functions**:
 
@@ -98,7 +98,7 @@ except ImportError:
    ```python
    def parse_file_accelerated(file_path: str, language: Optional[str] = None) -> Optional["Tree"]:
        """Parse a file to AST using Rust-accelerated parser when available."""
-   ```
+```text
 
 3. **`parse_file_with_timing()`** - Performance monitoring
    ```python
@@ -110,7 +110,7 @@ except ImportError:
    ```python
    def extract_symbols_parallel(files: List[str], symbol_types: List[str]) -> Dict[str, List[Dict]]:
        """Extract symbols from multiple files using parallel processing."""
-   ```
+```text
 
 5. **`clear_ast_cache()`** - Cache management
    ```python
@@ -122,7 +122,7 @@ except ImportError:
    ```python
    def get_cache_stats() -> Dict[str, int]:
        """Get AST cache statistics."""
-   ```
+```text
 
 7. **Helper Functions**:
    - `_read_file()`: Safe file reading
@@ -149,7 +149,7 @@ ast_cache_size: int = Field(
 ```bash
 export VICTOR_USE_RUST_AST_PROCESSOR=true
 export VICTOR_AST_CACHE_SIZE=1000
-```
+```text
 
 **Configuration via profiles.yaml**:
 ```yaml
@@ -185,7 +185,7 @@ tree = parse_file_accelerated("my_file.py")
 
 # Parse with explicit language
 tree = parse_file_accelerated("my_script", language="python")
-```
+```text
 
 ### Performance Monitoring
 
@@ -208,7 +208,7 @@ captures = run_query(tree, query, "python")
 for capture_name, nodes in captures.items():
     for node in nodes:
         print(f"{capture_name}: {node.text.decode('utf-8')}")
-```
+```text
 
 ### Parallel Symbol Extraction
 
@@ -236,7 +236,7 @@ print(f"Hit rate: {stats['hit_rate']}%")
 
 # Clear cache
 clear_ast_cache()
-```
+```text
 
 ## Backward Compatibility
 
@@ -277,7 +277,7 @@ pytest tests/unit/coding/test_ast_processor_integration.py::TestRealWorldIntegra
 
 # With coverage
 pytest tests/unit/coding/test_ast_processor_integration.py --cov=victor.native.rust.ast_processor --cov-report=html
-```
+```text
 
 ## Configuration
 
@@ -292,7 +292,7 @@ export VICTOR_USE_RUST_AST_PROCESSOR=false # Disable
 **Method 2: Settings File** (~/.victor/profiles.yaml)
 ```yaml
 use_rust_ast_processor: true
-```
+```text
 
 **Method 3: Programmatic**
 ```python
@@ -307,7 +307,7 @@ processor = get_ast_processor(use_rust=False)  # Force Python
 **Larger Cache** (more memory, better performance for large projects):
 ```yaml
 ast_cache_size: 5000
-```
+```text
 
 **Smaller Cache** (less memory, suitable for small projects):
 ```yaml
@@ -317,7 +317,7 @@ ast_cache_size: 100
 **Disable Cache** (always re-parse):
 ```yaml
 ast_cache_size: 0
-```
+```text
 
 ## Architecture
 
@@ -352,7 +352,7 @@ ast_cache_size: 0
 │  - 50% less mem  │              │  - Zero dependencies     │
 │  - Parallel exec │              │  - Stable interface      │
 └──────────────────┘              └──────────────────────────┘
-```
+```text
 
 ## Future Enhancements
 
@@ -381,7 +381,7 @@ from victor.config.settings import load_settings
 settings = load_settings()
 print(f"Use Rust: {settings.use_rust_ast_processor}")
 print(f"Cache size: {settings.ast_cache_size}")
-```
+```text
 
 ### Problem: Poor performance on first parse
 

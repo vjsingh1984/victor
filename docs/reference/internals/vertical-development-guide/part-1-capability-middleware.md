@@ -72,7 +72,7 @@ class MyVerticalCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
     def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
         """Return metadata for all capabilities."""
         return self._metadata.copy()
-```
+```text
 
 ### 1.2 Capability Metadata and Tags
 
@@ -120,7 +120,7 @@ def get_my_capability(orchestrator: Any) -> Dict[str, Any]:
         "my_capability_config",
         {"param1": "default", "param2": 100},
     )
-```
+```text
 
 ### 1.4 Apply Methods
 
@@ -199,7 +199,7 @@ class ResearchCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]):
             **kwargs,
         )
         self._applied.add("source_verification")
-```
+```text
 
 **DevOps Vertical** (`victor/devops/capabilities.py`):
 
@@ -249,7 +249,7 @@ class DataAnalysisCapabilityProvider(BaseCapabilityProvider[Callable[..., None]]
             ),
             # ... more capabilities
         }
-```
+```text
 
 ---
 
@@ -322,7 +322,7 @@ middleware = SafetyMiddleware(
     blocked_patterns=[r"rm -rf /"],
     require_confirmation=True,
 )
-```
+```text
 
 **Use cases**:
 - File deletion operations
@@ -358,7 +358,7 @@ middleware = LoggingMiddleware(
     log_results=True,
     include_timestamps=True,
 )
-```
+```text
 
 **Use cases**:
 - Audit trails
@@ -391,7 +391,7 @@ from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
 middleware = CodeCorrectionMiddleware(
     enabled_corrections=["syntax", "imports", "formatting"],
 )
-```
+```text
 
 **Use cases**:
 - Syntax error correction
@@ -441,7 +441,7 @@ class FileOperationMiddleware(MiddlewareProtocol):
 
         # Custom logic for file operations
         return MiddlewareResult(should_proceed=True)
-```
+```text
 
 ### 2.4 Composition Patterns
 
@@ -499,7 +499,7 @@ class MyVerticalMiddleware(MiddlewareProtocol):
     def _is_safe(self, arguments: Dict[str, Any]) -> bool:
         # Custom safety logic
         return True
-```
+```text
 
 #### Integration with VerticalBase
 

@@ -24,7 +24,7 @@ The Victor AI documentation has been comprehensively restructured in version 0.5
 
 #### Before (0.5.0 and earlier)
 
-```
+```text
 docs/
 ├── QUICKSTART.md (9,438 lines - verbose)
 ├── user-guide/
@@ -45,7 +45,7 @@ docs/
 
 #### After (0.5.0+)
 
-```
+```text
 docs/
 ├── getting-started/
 │   ├── installation.md (60 lines - 93% smaller!)

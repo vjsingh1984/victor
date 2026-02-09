@@ -16,7 +16,7 @@ make lint
 black victor tests                    # Format with Black
 ruff check --fix victor tests         # Lint and auto-fix with Ruff
 mypy victor                           # Type check with MyPy
-```
+```text
 
 ## Tools Overview
 
@@ -59,7 +59,7 @@ black --check victor tests
 
 # Show what would change
 black --diff victor tests
-```
+```text
 
 ### Examples
 
@@ -79,7 +79,7 @@ result = some_function(
     argument_two="another_value",
     argument_three="third_value",  # Trailing comma
 )
-```
+```text
 
 ## Ruff Linting
 
@@ -132,7 +132,7 @@ ruff check --fix victor tests
 
 # Show all issues including fixable
 ruff check --show-fixes victor tests
-```
+```text
 
 ### Common Ruff Rules
 
@@ -192,7 +192,7 @@ module = [
     "victor.storage.cache.*",
 ]
 strict = true
-```
+```text
 
 ### Running MyPy
 
@@ -228,7 +228,7 @@ async def async_function(
     """Async functions too."""
     for item in items:
         yield item
-```
+```text
 
 ### Common Type Patterns
 
@@ -295,7 +295,7 @@ def complex_function(
         'success'
     """
     pass
-```
+```text
 
 ### Class Docstrings
 
@@ -346,7 +346,7 @@ See Also:
     victor.related_module: Related functionality
     victor.other_module: Other related module
 """
-```
+```text
 
 ## Import Organization
 
@@ -403,7 +403,7 @@ class MyToolExecutor:
     def _validate_tool(self, name: str) -> None:
         """Private method."""
         pass
-```
+```text
 
 ## Async/Await Conventions
 
@@ -449,7 +449,7 @@ message = (
     "This is a very long message that needs to be split "
     "across multiple lines for readability."
 )
-```
+```text
 
 ## Pre-commit Integration
 
@@ -483,7 +483,7 @@ Install and run:
 pip install pre-commit
 pre-commit install
 pre-commit run --all-files
-```
+```text
 
 ## CI/CD Checks
 
@@ -504,7 +504,7 @@ make format
 
 # Check what's wrong
 make lint
-```
+```text
 
 ## Common Style Issues
 
@@ -532,7 +532,7 @@ def get_tools(category):
 # Good
 def get_tools(category: str) -> List[BaseTool]:
     pass
-```
+```text
 
 ### Issue: Mutable Default Arguments
 
@@ -563,7 +563,7 @@ try:
     risky_operation()
 except Exception as e:
     logger.error(f"Operation failed: {e}")
-```
+```text
 
 ## Next Steps
 

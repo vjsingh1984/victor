@@ -60,7 +60,7 @@ provider: anthropic
 model: claude-sonnet-4-5
 mode: build
 EOF
-```
+```text
 
 **2. Set API key:**
 ```bash
@@ -70,7 +70,7 @@ export ANTHROPIC_API_KEY=sk-your-key-here
 **3. Test configuration:**
 ```bash
 victor chat "Hello, Victor!"
-```
+```text
 
 ---
 

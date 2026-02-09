@@ -42,7 +42,7 @@ class MyVertical(VerticalBase):
         orchestrator._workflows = self.get_workflows()
         # ... 100+ lines
         # Violates SRP, DIP, encapsulation
-```
+```text
 
 ### After: Step Handlers
 

@@ -14,7 +14,7 @@
 
 ### Current Architecture Diagram
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           AUTHORING LAYER                                    │
 ├──────────────────────┬──────────────────────┬───────────────────────────────┤
@@ -90,7 +90,7 @@ class StateGraph(Generic[S]):  # Compiles to WorkflowDefinition
 # After: Rename to avoid confusion
 class WorkflowGraph(Generic[S]):  # Clear it produces WorkflowDefinition
     def compile(self) -> WorkflowDefinition: ...
-```
+```text
 
 **Files to modify:**
 - `victor/workflows/graph_dsl.py` - Rename class
@@ -160,7 +160,7 @@ class TransformNodeRunner:
 class HITLNodeRunner:
     """Runs human-in-the-loop nodes."""
     ...
-```
+```text
 
 **Benefits:**
 - `WorkflowExecutor` and `StateGraphExecutor` share `NodeRunner` implementations
@@ -201,7 +201,7 @@ class HITLNodeRunner:
 │                    ├── Delegates to CompiledGraph.invoke()                   │
 │                    └── Emits WorkflowEvent for observability                 │
 └──────────────────────────────────────────────────────────────────────────────┘
-```
+```text
 
 ### Phase 5: Unified Observability (SRP)
 
@@ -235,7 +235,7 @@ class CompiledGraph(Generic[StateType]):
    # victor/workflows/graph_dsl.py
    StateGraph = WorkflowGraph  # Deprecated alias
    warnings.warn("StateGraph renamed to WorkflowGraph", DeprecationWarning)
-   ```
+```text
 
 2. **Context adapters:**
    ```python

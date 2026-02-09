@@ -51,7 +51,7 @@ This schema applies to:
 
 ### 2.1 Classification Hierarchy
 
-```
+```text
 PUBLIC (Lowest Sensitivity)
     ↓
 INTERNAL
@@ -593,7 +593,7 @@ RESTRICTED (Highest Sensitivity)
 
 ## Appendix A: Classification Decision Tree
 
-```
+```text
 Is the data intended for public release?
 ├─ Yes → PUBLIC
 └─ No → Is it customer data or sensitive information?

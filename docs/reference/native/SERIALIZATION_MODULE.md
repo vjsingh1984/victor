@@ -29,7 +29,7 @@ pip install victor-ai[native]
 cd /path/to/victor
 pip install -e ".[native]"
 maturin develop --release
-```
+```text
 
 ## Quick Start
 
@@ -57,7 +57,7 @@ results = load_json_batch(json_strings)
 # Serialize multiple objects in parallel
 objects = [{"id": 1}, {"id": 2}, {"id": 3}]
 json_strings = dump_json_batch(objects)
-```
+```text
 
 ### YAML Parsing
 
@@ -88,7 +88,7 @@ config = load_config('config.yaml')
 
 # Or specify format explicitly
 config = load_config('settings.json', format='json')
-```
+```text
 
 ## Advanced Features
 
@@ -121,7 +121,7 @@ is_valid_json('{"key": invalid}')  # Returns: False
 json_strings = ['{"valid": true}', '{"invalid": }']
 results = is_valid_json_batch(json_strings)
 # Returns: [True, False]
-```
+```text
 
 ### Field Extraction
 
@@ -149,7 +149,7 @@ name: doc3'''
 
 documents = load_yaml_multi_doc(yaml_str)
 # Returns: [{'name': 'doc1'}, {'name': 'doc2'}, {'name': 'doc3'}]
-```
+```text
 
 ### Format Conversion
 
@@ -184,7 +184,7 @@ result = parser.feed('{"name": "Alice"}]}')
 
 # Reset parser
 parser.reset()
-```
+```text
 
 ### JSON Diffing and Patching
 
@@ -212,7 +212,7 @@ base = '{"users": {"name": "Alice"}}'
 merge_data = '{"users": {"age": 30}, "city": "NYC"}'
 result = merge_json(base, merge_data)
 # Returns: '{"users":{"name":"Alice","age":30},"city":"NYC"}'
-```
+```text
 
 ### Deep Operations
 
@@ -483,7 +483,7 @@ config = load_config('config/app.yaml')
 # Access config
 debug_mode = config['settings']['debug']
 database_url = config['database']['url']
-```
+```text
 
 ### 2. Batch API Processing
 
@@ -514,7 +514,7 @@ logs = load_json_batch(log_lines)
 
 # Filter errors
 errors = [log for log in logs if log['level'] == 'ERROR']
-```
+```text
 
 ### 4. Workflow YAML Compilation
 
@@ -555,7 +555,7 @@ debug_mode = deep_get_json(merged, ["settings", "debug"])
 
 # Update nested value
 updated = deep_set_json(merged, ["settings", "debug"], False)
-```
+```text
 
 ## Performance Tips
 
@@ -599,7 +599,7 @@ print(f"Native available: {info['native_available']}")
 print(f"JSON speedup: {info['json_speedup']}")
 print(f"Batch JSON speedup: {info['batch_json_speedup']}")
 print(f"YAML speedup: {info['yaml_speedup']}")
-```
+```text
 
 ## Testing
 

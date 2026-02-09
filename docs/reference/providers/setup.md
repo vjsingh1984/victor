@@ -17,7 +17,7 @@ ollama serve
 
 # Pull a model
 ollama pull <model-id>
-```
+```text
 
 ```yaml
 profiles:
@@ -34,7 +34,7 @@ providers:
 
 ```bash
 export OPENAI_API_KEY="sk-..."
-```
+```text
 
 ```yaml
 profiles:

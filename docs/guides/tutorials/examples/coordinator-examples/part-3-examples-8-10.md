@@ -54,7 +54,7 @@ async def context_management_example():
 
 if __name__ == "__main__":
     asyncio.run(context_management_example())
-```
+```text
 
 ### Key Takeaways
 
@@ -172,7 +172,7 @@ async def session_management_example():
 
 if __name__ == "__main__":
     asyncio.run(session_management_example())
-```
+```text
 
 ### Key Takeaways
 

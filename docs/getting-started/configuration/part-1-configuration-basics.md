@@ -40,7 +40,7 @@ This guide covers all configuration options for Victor, from basic setup to adva
 
 Victor uses a layered configuration system:
 
-```
+```text
 Priority (highest to lowest):
 1. CLI flags              --provider anthropic --model claude-4
 2. Environment variables  ANTHROPIC_API_KEY, VICTOR_LOG_LEVEL
@@ -60,7 +60,7 @@ Priority (highest to lowest):
 ```bash
 # Victor auto-detects Ollama
 victor chat
-```
+```text
 
 **For cloud providers**:
 ```bash
@@ -78,7 +78,7 @@ victor init
 
 # Edit profiles
 nano ~/.victor/profiles.yaml
-```
+```text
 
 ---
 
@@ -101,7 +101,7 @@ nano ~/.victor/profiles.yaml
 +-- CLAUDE.md                   # AI instructions (also read by Victor)
 +-- .victor/
     +-- init.md                 # Alternative project context location
-```
+```text
 
 ### Finding Your Config
 
@@ -144,7 +144,7 @@ export AZURE_OPENAI_API_KEY=...          # Azure OpenAI
 export AZURE_OPENAI_ENDPOINT=https://... # Azure endpoint
 export AWS_PROFILE=default               # AWS Bedrock
 export GCP_PROJECT=...                   # Google Vertex AI
-```
+```text
 
 **Secure storage (recommended):**
 ```bash
@@ -165,7 +165,7 @@ export OLLAMA_HOST=127.0.0.1:11434      # Ollama (default)
 export VICTOR_LM_STUDIO_HOST=127.0.0.1:1234   # LM Studio
 export VICTOR_VLLM_HOST=127.0.0.1:8000        # vLLM
 export VICTOR_LLAMACPP_HOST=127.0.0.1:8080    # llama.cpp
-```
+```text
 
 ### Victor Settings
 
@@ -196,7 +196,7 @@ export VICTOR_LOG_LEVEL="INFO"
 # Optional: aliases
 alias v="victor"
 alias vc="victor chat"
-```
+```text
 
 ---
 
@@ -248,7 +248,7 @@ victor chat "Hello"
 
 # List profiles
 victor config profiles
-```
+```text
 
 ### Profile Options
 
@@ -284,7 +284,7 @@ profiles:
     model: gpt-4o
     temperature: 0.3  # Lower for consistency
     max_tokens: 8192
-```
+```text
 
 **Local private profile:**
 ```yaml

@@ -83,7 +83,7 @@ response = await orchestrator.chat(
 )
 
 print(response)
-```
+```text
 
 ### Persona-Specific Capabilities
 
@@ -150,7 +150,7 @@ review = await orchestrator.chat(
     "Review the authentication implementation",
     context={"code": implementation}
 )
-```
+```text
 
 ## Creating Custom Personas
 
@@ -214,7 +214,7 @@ await personas.create_persona(
 )
 
 # Persona will be suggested automatically when keywords detected
-```
+```text
 
 ### Persona from Template
 
@@ -267,7 +267,7 @@ await personas.create_persona(
     system_prompt="You are an interactive teacher...",
     behavior_fn=custom_behavior
 )
-```
+```text
 
 ## Context Adaptation
 
@@ -316,7 +316,7 @@ async def adaptive_execution(task):
 # Usage
 result = await adaptive_execution("Review this API for security issues")
 # Automatically switches to security_auditor persona
-```
+```text
 
 ### Multi-Persona Collaboration
 
@@ -369,7 +369,7 @@ with open("custom_persona.json", "r") as f:
     persona_data = json.load(f)
 
 await personas.import_persona(persona_data)
-```
+```text
 
 ### Updating Personas
 
@@ -392,7 +392,7 @@ await personas.delete_persona("my_custom_persona")
 
 # Reset to default
 await personas.reset_persona()
-```
+```text
 
 ### Persona Analytics
 

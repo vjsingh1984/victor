@@ -54,7 +54,7 @@ victor chat "Evaluate code quality metrics:
 - Code duplication
 - Naming conventions
 - Documentation coverage"
-```
+```text
 
 **Expected Output:**
 - Detailed project structure diagram
@@ -123,7 +123,7 @@ victor chat "Look for potential memory leaks:
 - Unclosed resources
 - Global variables growing unbounded
 - Circular references"
-```
+```text
 
 **Expected Output:**
 - Performance bottleneck report
@@ -202,7 +202,7 @@ victor chat "Create database models and queries for user management using:
 - SQLAlchemy ORM
 - Proper migrations
 - Index optimization"
-```
+```text
 
 **Expected Output:**
 - OpenAPI specification
@@ -279,7 +279,7 @@ victor chat "Ensure the refactored code:
 - Maintains the same functionality
 - Passes all existing tests
 - Improves code quality metrics"
-```
+```text
 
 **Expected Output:**
 - Refactoring analysis report
@@ -354,7 +354,7 @@ victor chat "Generate integration tests for the authentication system:
 
 # 4. Generate property-based tests
 victor chat "Generate property-based tests for data validation functions"
-```
+```text
 
 **Expected Output:**
 - Test coverage report
@@ -418,7 +418,7 @@ victor chat "Generate detailed documentation for each endpoint:
 
 # 3. Generate client code
 victor chat "Generate Python client code for consuming the API"
-```
+```text
 
 **Expected Output:**
 - OpenAPI specification

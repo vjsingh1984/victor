@@ -41,7 +41,7 @@ def preprocess_image(image_path):
 # Use preprocessed image
 processed = preprocess_image("screenshot.png")
 analysis = await vision.analyze_image(processed, "Describe this image")
-```
+```text
 
 ### 2. Use Specific Prompts
 
@@ -76,7 +76,7 @@ async def transcribe_long_audio(audio_path, chunk_duration=300):
     # Combine
     full_transcript = " ".join([t.text for t in transcripts])
     return full_transcript
-```
+```text
 
 ### 4. Validate Results
 
@@ -117,7 +117,7 @@ async def cached_analyze_image(image_path, prompt):
     save_to_cache(image_hash, prompt, result)
 
     return result
-```
+```text
 
 ## Troubleshooting
 
@@ -158,7 +158,7 @@ transcript = await audio.transcribe_audio(
     language="en",
     quality="high"  # If provider supports quality setting
 )
-```
+```text
 
 ### Performance Issues
 
@@ -211,7 +211,7 @@ async def analyze_architecture(diagram_path):
         "components": components,
         "documentation": docs
     }
-```
+```text
 
 ### Example 2: Meeting Intelligence
 
@@ -266,7 +266,7 @@ async def analyze_chart(chart_path):
         "description": description,
         "insights": insights
     }
-```
+```text
 
 ### Example 4: Document Digitization
 

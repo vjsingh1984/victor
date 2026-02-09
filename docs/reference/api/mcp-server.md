@@ -23,7 +23,7 @@ pip install victor-ai
 
 # Run as MCP server (stdio mode for Claude Desktop)
 victor mcp
-```
+```text
 
 ### Option 2: Python Module
 
@@ -35,7 +35,7 @@ python -m victor.integrations.mcp.server
 
 ```bash
 docker run -it victor-ai/mcp-server
-```
+```text
 
 ## Integration with Claude Desktop
 
@@ -69,7 +69,7 @@ Add Victor to your Claude Desktop configuration file:
     }
   }
 }
-```
+```text
 
 ### Step 3: Restart Claude Desktop
 
@@ -174,7 +174,7 @@ Victor exposes tools across multiple domain verticals:
     }
   }
 }
-```
+```text
 
 ### Air-Gapped Mode (No Network Tools)
 
@@ -226,7 +226,7 @@ process.stdin.flush()
 # Read response
 response = json.loads(process.stdout.readline())
 print(f"Connected to: {response['result']['serverInfo']['name']}")
-```
+```text
 
 ### VS Code Extension
 
@@ -266,7 +266,7 @@ async def main():
     await client.disconnect()
 
 asyncio.run(main())
-```
+```text
 
 ## Docker Deployment
 
@@ -296,7 +296,7 @@ docker build -t victor-mcp-server -f docker/mcp-server/Dockerfile .
 
 # Run
 docker run -it --rm -v $(pwd):/workspace victor-mcp-server
-```
+```text
 
 ### Docker Compose
 
@@ -328,7 +328,7 @@ docker-compose down
     }
   }
 }
-```
+```text
 
 ## Security Considerations
 
@@ -377,7 +377,7 @@ For untrusted environments, use sandboxed mode:
     }
   }
 }
-```
+```text
 
 ### File System Restrictions
 
@@ -414,7 +414,7 @@ Disable network-dependent tools:
     }
   }
 }
-```
+```text
 
 ## Troubleshooting
 
@@ -428,7 +428,7 @@ Disable network-dependent tools:
 2. **Test MCP server directly**:
    ```bash
    victor mcp --log-level DEBUG
-   ```
+```text
 
 3. **Check for dependency issues**:
    ```bash
@@ -442,7 +442,7 @@ Disable network-dependent tools:
 2. **Check configuration file syntax**:
    ```bash
    cat ~/Library/Application\ Support/Claude/claude_desktop_config.json | python -m json.tool
-   ```
+```text
 
 3. **Verify Victor command path**:
    ```bash
@@ -459,7 +459,7 @@ Disable network-dependent tools:
        }
      }
    }
-   ```
+```text
 
 ### Connection Timeouts
 
@@ -480,7 +480,7 @@ victor mcp
      -v /var/run/docker.sock:/var/run/docker.sock \
      -v $(pwd):/workspace \
      victor-ai/mcp-server
-   ```
+```text
 
 ### Debugging
 
@@ -495,7 +495,7 @@ View MCP protocol messages:
 ```bash
 # In another terminal
 tail -f victor-mcp.log
-```
+```text
 
 ## Advanced Usage
 
@@ -549,7 +549,7 @@ server.register_resource(MCPResource(
     description="Project source code directory",
     mime_type="inode/directory"
 ))
-```
+```text
 
 ### Event Monitoring
 

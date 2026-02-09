@@ -30,7 +30,7 @@ extensions:
       config:                           # Optional: Middleware configuration
         strict_mode: true
         max_retries: 3
-```
+```text
 
 ### Safety Patterns
 
@@ -72,7 +72,7 @@ extensions:
       priority_tools:                   # Optional: Priority tools for this task
         - read_file
         - write_file
-```
+```text
 
 #### Common Task Types
 
@@ -112,7 +112,7 @@ extensions:
       capabilities:                    # Optional: Associated capabilities
         - capability_1
         - capability_2
-```
+```text
 
 ### Composed Chains
 
@@ -141,7 +141,7 @@ workflows:
     file: workflows/workflow.yaml      # Required: Path to workflow YAML
     description: "Description"         # Optional: Human-readable description
     enabled: true                      # Optional: Enable/disable (default: true)
-```
+```text
 
 ### Workflow File Structure
 
@@ -202,7 +202,7 @@ teams:
         persona: "Role persona..."
         tool_categories: [category1]
         capabilities: [capability1]
-```
+```text
 
 ### Formation Types
 
@@ -251,7 +251,7 @@ capabilities:
     handler: path.to.Handler           # Optional: Import path to handler
     config:                            # Optional: Capability configuration
       setting_1: value_1
-```
+```text
 
 ### Capability Types
 
@@ -300,7 +300,7 @@ custom_config:
   language_specific_prompts:
     python: "Follow PEP 8 style guidelines."
     javascript: "Follow Airbnb style guide."
-```
+```text
 
 #### Tool Budgets
 
@@ -325,7 +325,7 @@ custom_config:
     - list
 
   default_format: markdown
-```
+```text
 
 ## File Templates
 

@@ -17,7 +17,7 @@ Programmatic access to Victor's capabilities through HTTP, MCP, and Python APIs.
 **Start REST API server**:
 ```bash
 victor serve --port 8080
-```
+```text
 
 **Make requests**:
 ```bash
@@ -37,7 +37,7 @@ curl http://localhost:8080/api/v1/chat \
 **Start MCP server**:
 ```bash
 victor mcp --stdio
-```
+```text
 
 **Configure in MCP client** (e.g., Claude Desktop):
 ```json
@@ -58,7 +58,7 @@ victor mcp --stdio
 **Install Victor**:
 ```bash
 pip install victor-ai
-```
+```text
 
 **Use in Python**:
 ```python
@@ -181,7 +181,7 @@ fetch('http://localhost:8080/api/v1/chat', {
     provider: "anthropic"
   })
 })
-```
+```text
 
 **Scenario 2: Claude Desktop Integration**
 ```json
@@ -203,7 +203,7 @@ from victor import Agent
 
 agent = await Agent.create(provider="anthropic")
 result = await agent.run("Analyze this code")
-```
+```text
 
 ---
 
@@ -228,7 +228,7 @@ server:
   auth:
     enabled: true
     api_key: your-api-key
-```
+```text
 
 **Python API**:
 ```python
@@ -247,7 +247,7 @@ agent = await Agent.create(provider="anthropic")
 curl http://localhost:8080/api/v1/chat/stream \
   -H "Content-Type: application/json" \
   -d '{"message": "Write code"}'
-```
+```text
 
 **Python API**:
 ```python
@@ -265,7 +265,7 @@ async for chunk in agent.astream("Write code"):
 # 400: Bad request
 # 401: Unauthorized
 # 500: Server error
-```
+```text
 
 **Python API**:
 ```python
@@ -360,7 +360,7 @@ server:
   auth:
     enabled: true
     api_key: your-api-key
-```
+```text
 
 **MCP Server**:
 ```yaml
@@ -375,7 +375,7 @@ server:
 # Environment variables
 import os
 os.environ['ANTHROPIC_API_KEY'] = 'sk-ant-...'
-```
+```text
 
 ### Best Practices
 
@@ -392,7 +392,7 @@ api_key = os.environ['ANTHROPIC_API_KEY']
 **2. Use HTTPS in production**:
 ```bash
 victor serve --ssl-cert cert.pem --ssl-key key.pem
-```
+```text
 
 **3. Enable authentication**:
 ```yaml
@@ -407,7 +407,7 @@ server:
 # Validate user input
 if not is_safe(message):
     raise ValueError("Unsafe input")
-```
+```text
 
 ---
 
@@ -442,7 +442,7 @@ async function chat(message) {
   });
   return await response.json();
 }
-```
+```text
 
 ### Example 2: MCP Integration
 
@@ -490,7 +490,7 @@ async def analyze_code():
     # Output: "Potential division by zero error..."
 
 asyncio.run(analyze_code())
-```
+```text
 
 ---
 
@@ -520,7 +520,7 @@ result = await agent.run("Hello")
 # HTTP API (equivalent)
 curl http://localhost:8080/api/v1/chat \
   -d '{"message": "Hello"}'
-```
+```text
 
 ---
 
@@ -544,7 +544,7 @@ victor mcp --stdio
 
 # Check logs
 victor logs --tail 100
-```
+```text
 
 **Python API import error**:
 ```bash

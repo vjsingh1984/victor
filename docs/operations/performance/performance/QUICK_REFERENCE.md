@@ -24,7 +24,7 @@ python scripts/compare_benchmarks.py baseline.json current.json --format html --
 
 # Run unit tests
 pytest tests/unit/benchmark/test_comprehensive_benchmark.py -v
-```
+```text
 
 ## File Locations
 
@@ -48,7 +48,7 @@ tests/unit/benchmark/
 
 examples/
 └── benchmark_example.py            # Usage examples (5.9KB)
-```
+```text
 
 ## Benchmark Categories
 
@@ -135,7 +135,7 @@ scenarios:
     benchmarks:
       cold_start:
         threshold_ms: 200
-```
+```text
 
 ## Output
 
@@ -146,7 +146,7 @@ Results saved to `.benchmark_results/`:
 ├── comprehensive_benchmark_20250118_120000.json
 ├── comprehensive_benchmark_20250118_130000.json
 └── baseline.json
-```
+```text
 
 ## Exit Codes
 

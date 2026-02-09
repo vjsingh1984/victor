@@ -67,7 +67,7 @@ def check_cache_health():
 if __name__ == "__main__":
     success = check_cache_health()
     sys.exit(0 if success else 1)
-```
+```text
 
 ### Get Detailed Metrics
 
@@ -105,7 +105,7 @@ print(f"Cache utilization: {utilization:.1%}")
 
 if utilization > 0.9:
     print("Cache is nearly full - consider increasing size")
-```
+```text
 
 **Solutions:**
 
@@ -118,7 +118,7 @@ if utilization > 0.9:
    ```yaml
    VICTOR_TOOL_SELECTION_CACHE_QUERY_TTL: 7200  # 2 hours
    VICTOR_TOOL_SELECTION_CACHE_CONTEXT_TTL: 600  # 10 minutes
-   ```
+```text
 
 3. **Enable adaptive TTL:**
    ```yaml
@@ -128,7 +128,7 @@ if utilization > 0.9:
 4. **Enable multi-level cache:**
    ```yaml
    VICTOR_MULTI_LEVEL_CACHE_ENABLED: true
-   ```
+```text
 
 **Verification:**
 
@@ -167,7 +167,7 @@ kubectl exec -it deployment/victor-ai -- ls -la /app/.victor/cache/
 
 # Check mount point
 kubectl exec -it deployment/victor-ai -- df -h /app/.victor/cache
-```
+```text
 
 **Solutions:**
 
@@ -187,7 +187,7 @@ kubectl exec -it deployment/victor-ai -- df -h /app/.victor/cache
    - name: victor-cache
      persistentVolumeClaim:
        claimName: victor-cache-pvc
-   ```
+```text
 
 3. **Fix permissions:**
    ```yaml
@@ -199,7 +199,7 @@ kubectl exec -it deployment/victor-ai -- df -h /app/.victor/cache
 4. **Check disk space:**
    ```bash
    kubectl exec -it deployment/victor-ai -- df -h
-   ```
+```text
 
 **Verification:**
 
@@ -234,7 +234,7 @@ kubectl top pod -l app=victor-ai -n victor-ai-prod
 
 # Check memory limits
 kubectl describe pod <pod-name> -n victor-ai-prod | grep -A 5 Limits
-```
+```text
 
 **Solutions:**
 
@@ -246,7 +246,7 @@ kubectl describe pod <pod-name> -n victor-ai-prod | grep -A 5 Limits
 2. **Enable auto-compaction:**
    ```yaml
    VICTOR_PERSISTENT_CACHE_AUTO_COMPACT: "true"
-   ```
+```text
 
 3. **Reduce TTL:**
    ```yaml
@@ -259,7 +259,7 @@ kubectl describe pod <pod-name> -n victor-ai-prod | grep -A 5 Limits
    resources:
      limits:
        memory: 4Gi  # Increase from 2Gi
-   ```
+```text
 
 **Verification:**
 
@@ -292,7 +292,7 @@ print(f"Cache memory: {cache_memory_mb:.1f} MB")
 adaptive_metrics = metrics['adaptive_ttl']
 print(f"TTL adjustments: {adaptive_metrics['ttl_adjustments']}")
 print(f"TTL distribution: {adaptive_metrics.get('ttl_distribution', {})}")
-```
+```text
 
 **Solutions:**
 
@@ -304,7 +304,7 @@ print(f"TTL distribution: {adaptive_metrics.get('ttl_distribution', {})}")
 2. **Check adjustment threshold:**
    ```yaml
    VICTOR_ADAPTIVE_TTL_ADJUSTMENT_THRESHOLD: 5  # Lower to 3 for faster adaptation
-   ```
+```text
 
 3. **Verify cache is being accessed:**
    ```python
@@ -321,7 +321,7 @@ print(f"TTL distribution: {adaptive_metrics.get('ttl_distribution', {})}")
    # If min and max are too close, no room for adjustment
    VICTOR_ADAPTIVE_TTL_MIN: 60  # 1 minute
    VICTOR_ADAPTIVE_TTL_MAX: 7200  # 2 hours (needs range)
-   ```
+```text
 
 **Verification:**
 
@@ -354,7 +354,7 @@ kubectl logs -f deployment/victor-ai -n victor-ai-prod | grep -i cache
 # Check database integrity
 kubectl exec -it deployment/victor-ai -- \
   sqlite3 /app/.victor/cache/tool_selection_cache.db "PRAGMA integrity_check;"
-```
+```text
 
 **Solutions:**
 
@@ -376,7 +376,7 @@ kubectl exec -it deployment/victor-ai -- \
    # Restore
    kubectl cp ./cache-backup.db \
      victor-ai-prod/deployment/victor-ai:/app/.victor/cache/tool_selection_cache.db
-   ```
+```text
 
 3. **Disable persistent cache temporarily:**
    ```yaml
@@ -394,7 +394,7 @@ try:
     print("✅ Cache operations successful")
 except Exception as e:
     print(f"❌ Cache error: {e}")
-```
+```text
 
 ### Issue 6: Slow Cache Performance
 
@@ -430,7 +430,7 @@ if avg_latency_ms > 10:
 
    # Check PVC storage class
    kubectl get pvc victor-cache-pvc -o jsonpath='{.spec.storageClassName}'
-   ```
+```text
 
 2. **Reduce cache size (smaller cache = faster):**
    ```yaml
@@ -440,7 +440,7 @@ if avg_latency_ms > 10:
 3. **Disable persistent cache (use in-memory only):**
    ```yaml
    VICTOR_PERSISTENT_CACHE_ENABLED: "false"
-   ```
+```text
 
 4. **Check for lock contention:**
    ```python
@@ -475,7 +475,7 @@ for i in range(100):
     print(f"Throughput: {iterations / time_taken:.0f} ops/sec")
 
 benchmark_cache()
-```
+```text
 
 ### Issue 7: Cache Warming Issues
 
@@ -502,7 +502,7 @@ else:
 1. **Enable persistent cache (best solution):**
    ```yaml
    VICTOR_PERSISTENT_CACHE_ENABLED: "true"
-   ```
+```text
 
 2. **Enable predictive warming:**
    ```yaml
@@ -521,7 +521,7 @@ else:
 
    for query, tools in common_queries:
        cache.put_query(query, tools)
-   ```
+```text
 
 4. **Increase initial TTL:**
    ```yaml
@@ -552,7 +552,7 @@ while True:
     if elapsed > 600:  # 10 minutes timeout
         print("⚠️  Warm-up taking longer than expected")
         break
-```
+```text
 
 ## Debug Mode
 
@@ -569,7 +569,7 @@ Check logs:
 
 ```bash
 kubectl logs -f deployment/victor-ai -n victor-ai-prod | grep -i cache
-```
+```text
 
 ## Performance Baselines
 
@@ -601,7 +601,7 @@ kubectl exec -it deployment/victor-ai -n victor-ai-prod -- \
 
 # Or restart pods (clears in-memory cache)
 kubectl rollout restart deployment/victor-ai -n victor-ai-prod
-```
+```text
 
 ### Rollback Configuration
 
@@ -631,7 +631,7 @@ If issues persist after troubleshooting:
    # Export cache database
    kubectl cp victor-ai-prod/deployment/victor-ai:/app/.victor/cache/tool_selection_cache.db \
      ./cache-diagnostics.db
-   ```
+```text
 
 2. **Check documentation:**
    - [Production Caching Guide](production_caching_guide.md)

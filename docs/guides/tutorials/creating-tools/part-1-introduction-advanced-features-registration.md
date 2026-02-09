@@ -64,7 +64,7 @@ class MyCustomTool(BaseTool):
     name = "my_custom_tool"  # Unique tool identifier
     description = "Detailed description for LLM understanding"
     cost_tier = CostTier.LOW  # FREE, LOW, MEDIUM, HIGH
-```
+```text
 
 [Content continues through Advanced Features and Tool Registration...]
 

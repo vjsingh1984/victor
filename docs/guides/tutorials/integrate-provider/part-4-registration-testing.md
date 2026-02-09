@@ -62,7 +62,7 @@ models:
     settings:
       recommended_max_tools: 20
       recommended_tool_budget: 10
-```
+```text
 
 ---
 
@@ -90,7 +90,7 @@ For external packages, use entry points in `pyproject.toml`:
 ```toml
 [project.entry-points."victor.providers"]
 custom_llm = "victor_custom:CustomLLMProvider"
-```
+```text
 
 ---
 
@@ -345,7 +345,7 @@ pytest tests/unit/providers/test_custom_provider.py --cov=victor/providers/custo
 
 # Run all provider tests
 pytest tests/unit/providers/ -v
-```
+```text
 
 ### Integration Testing
 

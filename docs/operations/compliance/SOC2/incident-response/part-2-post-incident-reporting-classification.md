@@ -30,7 +30,7 @@ After incident resolution, create an executive summary:
 - Root cause
 
 **Example:**
-```
+```text
 INCIDENT #2025-001 - SQL Injection Attack
 
 Date: January 15, 2025, 14:23 UTC

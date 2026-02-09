@@ -34,7 +34,7 @@ class Position:
 
     @classmethod
     def from_dict(cls, data: Dict[str, int]) -> "Position": ...
-```
+```text
 
 ### Range
 
@@ -73,7 +73,7 @@ class Diagnostic:
 
     @property
     def is_warning(self) -> bool: ...
-```
+```text
 
 ### DocumentSymbol
 
@@ -108,7 +108,7 @@ class SymbolKind(IntEnum):
     FUNCTION = 12
     VARIABLE = 13
     # ... and more
-```
+```text
 
 ### Usage in Code Analysis
 
@@ -182,7 +182,7 @@ class IToolSelector(Protocol):
     def strategy(self) -> ToolSelectionStrategy:
         """Get the selection strategy used."""
         ...
-```
+```text
 
 ### Supporting Types
 

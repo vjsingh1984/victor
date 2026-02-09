@@ -23,7 +23,7 @@ This document tracks test coverage trends over time, providing insights into pro
 
 ### Coverage Growth
 
-```
+```text
 Coverage Over Time:
 
 100% |                                                                                                              █
@@ -62,7 +62,7 @@ Coverage Over Time:
 
 ### Test Count Growth
 
-```
+```text
 Test Count Over Time:
 
 25,000 |                                                                                                      ██████
@@ -341,7 +341,7 @@ No significant coverage losses detected.
 
 Based on current velocity (~130 tests/day, ~1.5% coverage per week):
 
-```
+```text
 Feb-14:  11% + (4 weeks × 1.5%) = 17% (below target of 25%)
 Mar-14:  17% + (4 weeks × 1.5%) = 23% (below target of 50%)
 Mar-31:  23% + (2 weeks × 1.5%) = 26% (far below target of 80%)
@@ -357,7 +357,7 @@ Mar-31:  23% + (2 weeks × 1.5%) = 26% (far below target of 80%)
 
 With increased velocity (~50 tests/day, ~3.5% coverage per week):
 
-```
+```text
 Feb-14:  11% + (4 weeks × 3.5%) = 25% ✅ (meets target)
 Mar-14:  25% + (4 weeks × 3.5%) = 39% (below target of 50%)
 Mar-31:  39% + (2 weeks × 3.5%) = 46% (below target of 80%)

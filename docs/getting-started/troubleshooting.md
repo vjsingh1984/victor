@@ -5,7 +5,7 @@ Solve common issues quickly.
 ## Installation Issues
 
 ### Python Version Too Old
-```
+```text
 Error: Python 3.10 or higher required
 ```
 
@@ -23,7 +23,7 @@ sudo apt-get install python3.11
 
 # Windows
 # Download from python.org
-```
+```text
 
 ### pip Not Found
 ```bash
@@ -44,7 +44,7 @@ pip install --user victor-ai
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install victor-ai
-```
+```text
 
 ## Provider Issues
 
@@ -60,14 +60,14 @@ victor chat --provider anthropic --test
 ```
 
 ### Provider Not Found
-```
+```text
 Error: Provider 'xyz' not found
 ```
 
 **Solution:** Check available providers:
 ```bash
 victor list providers
-```
+```text
 
 ### Ollama Not Running
 ```bash
@@ -99,12 +99,12 @@ ollama pull qwen2.5-coder:3b
 
 # Check RAM usage
 ollama ps
-```
+```text
 
 ### Out of Memory
 ```
 Error: Out of memory
-```
+```text
 
 **Solutions:**
 ```bash
@@ -119,14 +119,14 @@ vm_stat   # macOS
 ## Tool Issues
 
 ### Tool Not Found
-```
+```text
 Error: Tool 'xyz' not available
 ```
 
 **Solution:** Check available tools:
 ```bash
 victor list tools
-```
+```text
 
 ### Tool Execution Failed
 ```bash
@@ -149,7 +149,7 @@ cat ~/.victor/profiles.yaml
 
 # Reinitialize
 victor init
-```
+```text
 
 ### Environment Variables Not Set
 ```bash
@@ -168,7 +168,7 @@ source ~/.bashrc
 ```bash
 # Fix permissions
 docker run -it -v ~/.victor:/root/.victor --user $(id -u):$(id -g) ghcr.io/vjsingh1984/victor:latest
-```
+```text
 
 ### Can't Connect to Ollama from Docker
 ```bash
@@ -186,7 +186,7 @@ victor chat
 
 # Check log location
 ls ~/.victor/logs/
-```
+```text
 
 ### Report Issues
 1. Check [GitHub Issues](https://github.com/vjsingh1984/victor/issues)

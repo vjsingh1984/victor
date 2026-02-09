@@ -20,7 +20,7 @@
 ```bash
 export AZURE_API_KEY="your-key"
 export AZURE_ENDPOINT="https://your-resource.openai.azure.com"
-```
+```text
 
 **Models:** GPT-4, GPT-3.5, Embeddings
 
@@ -52,7 +52,7 @@ export AWS_REGION="us-east-1"
 export GOOGLE_API_KEY="your-key"
 export GOOGLE_PROJECT_ID="your-project"
 export GOOGLE_REGION="us-central1"
-```
+```text
 
 **Models:** Gemini 2.0, PaLM
 
@@ -84,7 +84,7 @@ export HF_API_KEY="your-key"
 **Setup:**
 ```bash
 export REPLICATE_API_KEY="your-key"
-```
+```text
 
 **Models:** 20K+ models
 
@@ -129,7 +129,7 @@ Need privacy/local?
     └─ No → Budget conscious?
         ├─ Yes → Grok, DeepSeek
         └─ No → Anthropic, OpenAI, Google
-```
+```text
 
 ---
 
@@ -167,7 +167,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 ```bash
 # List available models
 victor providers list-models anthropic
-```
+```text
 
 **Issue:** `Connection timeout`
 

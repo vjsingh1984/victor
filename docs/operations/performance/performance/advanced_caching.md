@@ -18,7 +18,7 @@ This document describes the advanced caching features implemented for tool selec
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │              AdvancedCacheManager (Facade)               │
 │  Coordinates all cache strategies                       │
@@ -65,7 +65,7 @@ result = cache.get("key", namespace="query")
 
 # Save on shutdown (auto-called)
 cache.close()
-```
+```text
 
 **Configuration**:
 ```python
@@ -91,7 +91,7 @@ CREATE TABLE cache_entries (
 
 CREATE INDEX idx_namespace ON cache_entries(namespace);
 CREATE INDEX idx_created_at ON cache_entries(created_at);
-```
+```text
 
 **Metrics**:
 - Total entries stored
@@ -144,7 +144,7 @@ ADAPTIVE_TTL_MIN = 60  # 1 minute
 ADAPTIVE_TTL_MAX = 7200  # 2 hours
 ADAPTIVE_TTL_INITIAL = 3600  # 1 hour
 ADAPTIVE_TTL_ADJUSTMENT_THRESHOLD = 5  # Adjust after N accesses
-```
+```text
 
 **Metrics**:
 - TTL distribution (min/low/medium/high/max)
@@ -171,7 +171,7 @@ L2: Disk Cache (1000 entries, 1 hour TTL)
      │
      ▼ (promotion on 3+ accesses)
 L3: Large Storage (10000 entries, 24 hour TTL)
-```
+```text
 
 **Implementation**:
 ```python
@@ -195,7 +195,7 @@ MULTI_LEVEL_CACHE_ENABLED = True
 MULTI_LEVEL_CACHE_L1_SIZE = 100
 MULTI_LEVEL_CACHE_L2_SIZE = 1000
 MULTI_LEVEL_CACHE_L3_SIZE = 10000
-```
+```text
 
 **Promotion/Demotion**:
 - Promotion: 3+ accesses → move to higher level
@@ -251,7 +251,7 @@ await warmer.prewarm_predictions(predictions)
 PREDICTIVE_WARMING_ENABLED = True
 PREDICTIVE_WARMING_MAX_PATTERNS = 100
 PREDICTIVE_WARMING_TOP_K = 5
-```
+```text
 
 **Metrics**:
 - Total predictions made
@@ -313,7 +313,7 @@ export VICTOR_MULTI_LEVEL_CACHE_L3_SIZE=10000
 export VICTOR_PREDICTIVE_WARMING_ENABLED=false
 export VICTOR_PREDICTIVE_WARMING_MAX_PATTERNS=100
 export VICTOR_PREDICTIVE_WARMING_TOP_K=5
-```
+```text
 
 ### profiles.yaml
 
@@ -358,7 +358,7 @@ if result:
 else:
     # Cache miss - perform selection
     tools = select_tools(...)
-```
+```text
 
 ### Advanced Usage
 
@@ -418,7 +418,7 @@ print(f"L3 hit rate: {metrics.multi_level['l3']['hit_rate']:.1%}")
 
 # Predictive warming
 print(f"Prediction accuracy: {metrics.predictive_warming['predictions']['accuracy']:.1%}")
-```
+```text
 
 ## Performance Tuning
 
@@ -437,7 +437,7 @@ cache_size = 500
 **Testing (Isolation)**
 ```python
 tool_selection_cache_enabled = False  # Disable for reproducibility
-```
+```text
 
 **Production (Maximum Performance)**
 ```python
@@ -457,7 +457,7 @@ adaptive_ttl_enabled = True
 multi_level_cache_enabled = False
 predictive_warming_enabled = False
 cache_size = 500
-```
+```text
 
 ## Benchmarking
 
@@ -531,7 +531,7 @@ from victor.tools.caches import get_tool_selection_cache
 cache = get_tool_selection_cache()
 cache.put_query(key, tools)
 result = cache.get_query(key)
-```
+```text
 
 **After** (with advanced features):
 ```python

@@ -23,7 +23,7 @@ print(settings.use_coordinator_orchestrator)  # False
 # Enable coordinator orchestrator
 settings = Settings(use_coordinator_orchestrator=True)
 print(settings.use_coordinator_orchestrator)  # True
-```
+```text
 
 Or via environment variable:
 
@@ -39,7 +39,7 @@ VICTOR_USE_COORDINATOR_ORCHESTRATOR=true
 
 ### Legacy Orchestrator
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                   AgentOrchestrator                          │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -65,7 +65,7 @@ VICTOR_USE_COORDINATOR_ORCHESTRATOR=true
 
 ### Coordinator Orchestrator
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │              AgentOrchestratorRefactored                     │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -114,7 +114,7 @@ coordinator = ConfigCoordinator(providers=[
 # Get configuration (merged from all providers)
 config = coordinator.get_config("tool_budget")
 print(config)  # 30 (merged value)
-```
+```text
 
 **Responsibilities:**
 - Load configuration from multiple sources
@@ -163,7 +163,7 @@ coordinator = ContextCoordinator(strategies=[
 
 # Compact context using best strategy
 compacted = coordinator.compact(context, budget=10000)
-```
+```text
 
 **Responsibilities:**
 - Select appropriate compaction strategy
@@ -206,7 +206,7 @@ from victor import Agent
 # Uses legacy orchestrator (default)
 agent = await Agent.create()
 result = await agent.run("Hello")
-```
+```text
 
 **Coordinator:**
 ```python
@@ -230,7 +230,7 @@ from victor.config.settings import Settings
 settings = Settings()
 
 orchestrator = await AgentOrchestrator.from_settings(settings)
-```
+```text
 
 **Coordinator:**
 ```python
@@ -262,7 +262,7 @@ coordinator = ConfigCoordinator(providers=[custom_provider])
 
 # Inject into orchestrator
 orchestrator.config_coordinator = coordinator
-```
+```text
 
 ## Benefits of Coordinator Mode
 
@@ -313,7 +313,7 @@ def test_prompt_coordinator():
     coordinator = PromptCoordinator(contributors=[mock_contributor])
     prompt = coordinator.build_prompt()
     assert "Victor" in prompt
-```
+```text
 
 ### 3. Extensibility
 
@@ -339,7 +339,7 @@ class NewFeatureCoordinator:
 
 # Register with orchestrator
 orchestrator.register_coordinator(NewFeatureCoordinator())
-```
+```text
 
 ### 4. Maintainability
 
@@ -387,7 +387,7 @@ from victor.agent.orchestrator import AgentOrchestrator
 class CustomOrchestrator(AgentOrchestrator):
     def custom_method(self):
         pass
-```
+```text
 
 **After (Coordinator):**
 ```python
@@ -415,7 +415,7 @@ orchestrator.config_coordinator = CustomConfigCoordinator()
 **Method 1: Environment Variable**
 ```bash
 export VICTOR_USE_COORDINATOR_ORCHESTRATOR=true
-```
+```text
 
 **Method 2: Settings File**
 ```yaml
@@ -428,7 +428,7 @@ use_coordinator_orchestrator: true
 from victor.config.settings import Settings
 
 settings = Settings(use_coordinator_orchestrator=True)
-```
+```text
 
 ### Custom Coordinators
 
@@ -497,7 +497,7 @@ Coordinator delegation adds ~1-2ms per call, which is negligible.
 
 ```bash
 pip install --upgrade victor-ai
-```
+```text
 
 ### Issue: Coordinator Mode Not Enabled
 
@@ -539,7 +539,7 @@ class CustomConfigCoordinator(IConfigCoordinator):
 
 # Register
 orchestrator.config_coordinator = CustomConfigCoordinator()
-```
+```text
 
 ## Best Practices
 
@@ -561,7 +561,7 @@ def test_workflow(use_coordinator):
     agent = await Agent.create(settings=settings)
     result = await agent.run("Test")
     assert result is not None
-```
+```text
 
 ### 3. Extend via Coordinators
 
@@ -587,7 +587,7 @@ from victor.agent.coordinators.config_coordinator import ConfigCoordinator
 
 def my_function(coordinator: ConfigCoordinator):
     config = coordinator.get_config("key")
-```
+```text
 
 ## Roadmap
 

@@ -42,7 +42,7 @@ export GCP_PROJECT=...
 # Platforms
 export HF_API_KEY=...
 export REPLICATE_API_TOKEN=...
-```
+```text
 
 ### Local Providers
 
@@ -74,7 +74,7 @@ export VICTOR_RETRY_ATTEMPTS=3
 # Tools
 export VICTOR_TOOL_TIMEOUT=30
 export VICTOR_MAX_CONCURRENT_TOOLS=5
-```
+```text
 
 ### Proxy Settings
 
@@ -136,7 +136,7 @@ When refactoring code:
 2. Update docstrings
 3. Add unit tests
 4. Run pytest and fix failures
-```
+```text
 
 **Usage**: Victor automatically reads `.victor.md` when working in a project directory.
 
@@ -188,7 +188,7 @@ profiles:
   default:
     provider: ollama
     model: qwen2.5-coder:7b
-```
+```text
 
 **~/.victor/config.yaml**:
 ```yaml
@@ -207,7 +207,7 @@ tools:
 ```markdown
 # Local Development
 Use Ollama for privacy and speed.
-```
+```text
 
 ### Example 2: Team Development
 
@@ -241,7 +241,7 @@ cache:
 tools:
   parallel_execution: true
   max_concurrent: 10
-```
+```text
 
 ### Example 3: Enterprise
 
@@ -280,7 +280,7 @@ cache:
     host: redis.internal.example.com
     port: 6379
     password: ${REDIS_PASSWORD}
-```
+```text
 
 ---
 
@@ -316,7 +316,7 @@ victor logs --tail 100
 
 # Trace configuration loading
 victor --debug chat "Test"
-```
+```text
 
 ---
 
@@ -343,7 +343,7 @@ victor config profiles
 
 # Check profile name in profiles.yaml
 grep -A 5 "profiles:" ~/.victor/profiles.yaml
-```
+```text
 
 **API key not found**:
 ```bash
@@ -377,7 +377,7 @@ profiles:
   production:
     provider: azure
     deployment: gpt-4o
-```
+```text
 
 **DON'T**:
 ```bash
@@ -391,7 +391,7 @@ victor chat --provider anthropic --model claude-sonnet-4-20250514 --api-key sk-.
 ```bash
 # Environment variables
 export ANTHROPIC_API_KEY=sk-ant-...
-```
+```text
 
 **DON'T**:
 ```yaml
@@ -407,7 +407,7 @@ api_key: sk-ant-...  # NEVER commit this!
 echo ".victor/" >> .gitignore
 echo "*.yaml" >> .gitignore
 echo ".env" >> .gitignore
-```
+```text
 
 **DON'T**:
 ```bash
@@ -426,7 +426,7 @@ profiles:
     provider: anthropic
     model: claude-sonnet-4-20250514
     temperature: 0.7  # Higher temp for creativity
-```
+```text
 
 **DON'T**:
 ```yaml
@@ -445,7 +445,7 @@ profiles:
 # Test before committing
 victor config validate
 victor --profile development chat "Test"
-```
+```text
 
 **DON'T**:
 ```bash

@@ -34,7 +34,7 @@ class ProviderCoordinator:
 
     def list_providers(self) -> List[str]:
         """List available providers."""
-```
+```text
 
 ### Provider Registry
 
@@ -79,7 +79,7 @@ class ToolExecutionCoordinator:
         tool_calls: List[ToolCall]
     ) -> List[ToolResult]:
         """Execute multiple tools in batch."""
-```
+```text
 
 ### Tool Registry
 
@@ -121,7 +121,7 @@ class ConversationCoordinator:
 
     def clear_history(self) -> None:
         """Clear conversation history."""
-```
+```text
 
 ---
 
@@ -172,7 +172,7 @@ class VerticalBase:
     @classmethod
     def get_system_prompt(cls) -> str:
         """Get system prompt."""
-```
+```text
 
 ---
 

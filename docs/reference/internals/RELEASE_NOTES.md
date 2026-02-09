@@ -81,7 +81,7 @@ from victor.agent.protocols import ToolPipelineProtocol
 class MyComponent:
     def __init__(self, pipeline: ToolPipelineProtocol):  # Protocol dependency
         self._pipeline = pipeline
-```
+```text
 
 ---
 
@@ -203,7 +203,7 @@ class ToolExecutor:
             MessagingEvent(topic="tool.complete", data={"result": result})
         )
         return result
-```
+```text
 
 ---
 
@@ -324,7 +324,7 @@ def test_tool_execution(tool_registry):
     tool_registry.get_tool.return_value = Mock()
     tool = tool_registry.get_tool("read_file")
     assert tool is not None
-```
+```text
 
 ---
 
@@ -390,7 +390,7 @@ tools = CodingAssistant.get_tools()
 
 # First access triggers import (56ms one-time cost)
 # Subsequent accesses use cached class (0ms)
-```
+```text
 
 ---
 
@@ -558,7 +558,7 @@ See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for adoption patterns.
 #### 1. Update Victor
 ```bash
 pip install --upgrade victor-ai
-```
+```text
 
 #### 2. Enable Lazy Loading (Optional)
 ```bash
@@ -579,7 +579,7 @@ victor chat --no-tui
 
 # Verify startup performance
 time victor --help
-```
+```text
 
 ### For Developers
 
@@ -599,7 +599,7 @@ pytest tests/integration/workflows/test_team_recursion_tracking.py
 
 # Run with coverage
 pytest --cov=victor --cov-report=html
-```
+```text
 
 #### 3. Adopt New Patterns (Optional)
 See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for detailed adoption patterns:
@@ -648,7 +648,7 @@ docs/extensions/step_handler_examples.md
 
 # Keep quick reference handy
 docs/extensions/step_handler_quick_reference.md
-```
+```text
 
 #### 2. Migrate Extension Code
 Use the migration guide to adopt step handlers:
@@ -663,7 +663,7 @@ VICTOR_LAZY_LOADING=true pytest
 
 # Test with eager loading
 VICTOR_LAZY_LOADING=false pytest
-```
+```text
 
 #### 4. Verify Compatibility
 Ensure your vertical works in both modes.

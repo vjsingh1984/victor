@@ -55,7 +55,7 @@ result = await orchestrator.tool_coordinator.execute_tool(
     "read",
     path="file.txt"
 )
-```
+```text
 
 ---
 

@@ -12,7 +12,7 @@ If you need to disable the coordinator orchestrator, run:
 
 ```bash
 python scripts/toggle_coordinator_orchestrator.py disable --backup
-```
+```text
 
 Or manually edit `/Users/vijaysingh/.victor/profiles.yaml`:
 
@@ -28,7 +28,7 @@ Check the status:
 
 ```bash
 python scripts/toggle_coordinator_orchestrator.py status
-```
+```text
 
 Expected output: `Status: DISABLED ✗`
 
@@ -83,7 +83,7 @@ Added `ProfilesYAMLSettingsSource` class to enable loading settings from `profil
 
 ```yaml
 use_coordinator_orchestrator: true
-```
+```text
 
 ### 3. Code Changes Summary
 - **Files Modified**: 1 (`victor/config/settings.py`)

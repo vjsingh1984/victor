@@ -27,7 +27,7 @@ Tier 3 accelerators provide Rust-accelerated implementations for:
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Application Layer                            │
 │  (graph_tool.py, batch_processor_tool.py, config loader)         │
@@ -72,7 +72,7 @@ batch_retry_policy: str = "exponential"  # Retry strategy
 use_rust_serialization: bool = True  # Enable/disable
 config_cache_size: int = 100  # Number of configs to cache
 config_cache_ttl_seconds: int = 300  # Cache TTL (5 minutes)
-```
+```text
 
 ### Environment Variables
 
@@ -118,7 +118,7 @@ print(f"Components: {components}")
 # Find shortest path
 path = accelerator.shortest_path(graph, source=0, target=2)
 print(f"Path: {path}")
-```
+```text
 
 **Performance**: 3-6x faster than NetworkX for graphs with 100+ nodes.
 
@@ -197,7 +197,7 @@ config = accelerator.load_config_file("config.yaml")
 
 # Validate JSON
 is_valid = accelerator.validate_json('{"test": "value"}')
-```
+```text
 
 **Performance**: 5-10x faster than Python's json/yaml for files > 10KB.
 
@@ -254,7 +254,7 @@ class BatchProcessorTool:
             self._execute_task,
             self._processor,
         )
-```
+```text
 
 ### 3. Config Loading Integration
 
@@ -318,7 +318,7 @@ except Exception as e:
     logger.error(f"Rust implementation failed: {e}, falling back to Python")
     # Use Python fallback
     result = python_implementation(data)
-```
+```text
 
 ## Testing
 
@@ -357,7 +357,7 @@ from victor.native.accelerators import get_graph_algorithms_accelerator
 accelerator = get_graph_algorithms_accelerator()
 # If Rust is compiled: uses 3-6x faster Rust implementation
 # If Rust is not available: uses Python fallback
-```
+```text
 
 ### Opt-in to Accelerators
 
@@ -392,7 +392,7 @@ print(f"Batch Rust available: {batch_accel.rust_available}")
 
 serial_accel = get_serialization_accelerator()
 print(f"Serialization Rust available: {serial_accel.rust_available}")
-```
+```text
 
 ### Enable Debug Logging
 

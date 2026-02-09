@@ -43,7 +43,7 @@ with record_workflow("my_workflow") as recorder:
 
 # Recording is automatically finalized
 print(f"Recorded {recorder.metadata.event_count} events")
-```
+```text
 
 ### Saving Recordings
 
@@ -75,7 +75,7 @@ for event in replayer.step_forward():
     state = replayer.get_state_at_event(event.event_id)
     if state:
         print(f"  State: {list(state.keys())}")
-```
+```text
 
 ## Recording Strategies
 
@@ -108,7 +108,7 @@ except Exception as e:
     # Recording will have captured the failure
     await recorder.save(f"failure_{int(time.time())}.json")
     raise
-```
+```text
 
 ### 3. Sampling Recording
 
@@ -137,7 +137,7 @@ if duration > 60:  # Longer than 60 seconds
     recorder = get_current_recorder()
     if recorder:
         await recorder.save(f"long_running_{int(duration)}s.json")
-```
+```text
 
 ## CLI Tool
 
@@ -168,7 +168,7 @@ python scripts/workflows/replay.py list --sort-by duration --sort-order desc --l
 
 ```bash
 python scripts/workflows/replay.py inspect <recording_id>
-```
+```text
 
 Output:
 ```
@@ -194,7 +194,7 @@ Execution:
 Storage:
   File size: 12.3KB
   Checksum: a1b2c3d4...
-```
+```text
 
 ### Replay with Step-Through
 
@@ -213,7 +213,7 @@ python scripts/workflows/replay.py replay <recording_id> --step --show-state
 
 ```bash
 python scripts/workflows/replay.py compare <id1> <id2>
-```
+```text
 
 Output:
 ```
@@ -236,7 +236,7 @@ First path difference:
   Position: 3
   Recording 1: process_data
   Recording 2: validate_input
-```
+```text
 
 ### Export Visualizations
 
@@ -258,7 +258,7 @@ python scripts/workflows/replay.py export <recording_id> --format summary --outp
 
 ```bash
 python scripts/workflows/replay.py stats
-```
+```text
 
 Output:
 ```
@@ -282,7 +282,7 @@ Workflows:
   data_processing: 20
   code_review: 15
   research_task: 12
-```
+```text
 
 ### Cleanup Old Recordings
 
@@ -330,7 +330,7 @@ query = RecordingQuery(
     min_duration=10.0,
 )
 results = await storage.list(query)
-```
+```text
 
 ### In-Memory Storage (Testing)
 
@@ -379,7 +379,7 @@ policy = RetentionPolicy(
 result = await storage.apply_retention_policy(policy, dry_run=False)
 print(f"Deleted {result['to_delete']} recordings")
 print(f"Freed {result['total_size_bytes']} bytes")
-```
+```text
 
 ## Advanced Usage
 
@@ -422,7 +422,7 @@ for event in replayer.step_backward(steps=3):
 
 # Reset to beginning
 replayer.reset()
-```
+```text
 
 ### Comparison and Diffing
 
@@ -474,7 +474,7 @@ recorder.record_team_member_communication(
     to_member="quality_reviewer",
     message="Found 3 security issues",
 )
-```
+```text
 
 ## Best Practices
 
@@ -497,7 +497,7 @@ recorder = ExecutionRecorder(
     workflow_name="large_workflow",
     compress=True,  # Reduces size by 5-10x
 )
-```
+```text
 
 ### 3. Selective Recording
 
@@ -526,7 +526,7 @@ async def cleanup_recordings():
     result = await storage.apply_retention_policy(policy)
 
     logger.info(f"Cleaned up {result['to_delete']} recordings")
-```
+```text
 
 ### 5. Debug Failed Executions
 
@@ -565,7 +565,7 @@ for event in replayer.events:
 # Sort by duration
 for node_id, duration in sorted(node_durations.items(), key=lambda x: -x[1]):
     print(f"{node_id}: {duration:.2f}s")
-```
+```text
 
 ## Performance Considerations
 
@@ -617,7 +617,7 @@ recorder = ExecutionRecorder(
     compress=True,
     record_state_snapshots=False,  # Disable snapshots
 )
-```
+```text
 
 ### Out of Memory During Replay
 

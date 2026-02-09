@@ -47,7 +47,7 @@ victor memory graph
 
 # List all available entity types
 victor memory types
-```
+```text
 
 ### Python API
 
@@ -86,7 +86,7 @@ files = memory.get_by_type(EntityType.FILE, limit=50)
 
 # Get related entities
 related = memory.get_related("UserService", depth=2)
-```
+```text
 
 #### Relationship Tracking
 
@@ -133,7 +133,7 @@ print(f"Relevant entities: {relevant}")
 # Get context summary
 summary = await extractor.get_context_summary()
 print(summary)
-```
+```text
 
 ## Entity Types
 
@@ -258,7 +258,7 @@ config = EntityExtractionConfig(
 )
 
 extractor = EntityExtractor(entity_memory=memory, config=config)
-```
+```text
 
 ## Entity Graph
 
@@ -321,7 +321,7 @@ class EnhancedOrchestrator(AgentOrchestrator):
         if self._entity_extractor:
             return await self._entity_extractor.get_context_summary()
         return ""
-```
+```text
 
 ## Best Practices
 
@@ -364,7 +364,7 @@ victor memory graph --entity UserService --depth 3
 
 ### 4-Tier Memory Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    Entity Memory System                      │
 ├─────────────────────────────────────────────────────────────┤
@@ -393,7 +393,7 @@ victor memory graph --entity UserService --depth 3
 
 ### Data Flow
 
-```
+```text
 User Message
     │
     ▼
@@ -437,7 +437,7 @@ config.enable_extraction  # Should be True
 
 # Check entity memory is initialized
 extractor.get_entity_memory()  # Should return EntityMemory instance
-```
+```text
 
 ### Missing Entities
 
@@ -463,7 +463,7 @@ config.enable_relation_extraction = False
 
 # Disable code-aware extraction
 config.enable_code_aware_extraction = False
-```
+```text
 
 ## See Also
 

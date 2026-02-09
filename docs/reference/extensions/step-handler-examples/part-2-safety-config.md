@@ -84,7 +84,7 @@ class SafetyValidationHandler(BaseStepHandler):
         if not hasattr(pattern, "type"):
             return False
         return True
-```
+```text
 
 ### Example 12: Strict Mode Enforcement
 
@@ -206,7 +206,7 @@ class ModeConfigurationHandler(BaseStepHandler):
                 return False
 
         return True
-```
+```text
 
 ### Example 14: Stage Configuration
 

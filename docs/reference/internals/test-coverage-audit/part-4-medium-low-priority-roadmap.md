@@ -44,7 +44,7 @@ class TestValidationCoordinator:
 
     def test_add_validator(self):
         """Test adding custom validator"""
-```
+```text
 
 #### 13. SessionCoordinator (24.52% coverage)
 **Estimated Effort**: 16 hours
@@ -103,7 +103,7 @@ class TestMetricsCoordinator:
 
     def test_histogram_percentiles(self):
         """Test histogram percentile calculation"""
-```
+```text
 
 #### 15. ResponseCoordinator (59.53% coverage)
 **Estimated Effort**: 8 hours (improve existing coverage)
@@ -138,7 +138,7 @@ class TestPromptCoordinator:
 
     async def test_validate_prompt_requirements(self):
         """Test prompt requirement validation"""
-```
+```text
 
 #### 17. ConfigCoordinator (50.27% coverage)
 **Estimated Effort**: 8 hours (improve existing coverage)
@@ -185,7 +185,7 @@ class TestCheckpointCoordinator:
 
     async def test_list_checkpoints_empty(self):
         """Test listing when no checkpoints"""
-```
+```text
 
 #### 19. EvaluationCoordinator (9.59% coverage)
 **Estimated Effort**: 12 hours
@@ -232,7 +232,7 @@ class TestWorkflowCoordinator:
 
     async def test_list_workflows_filtered(self):
         """Test listing workflows with filters"""
-```
+```text
 
 ---
 

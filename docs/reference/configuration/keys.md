@@ -18,7 +18,7 @@ This guide explains how to configure API keys for LLM providers and external dat
 
 Victor uses a secure, multi-layered approach to API key management:
 
-```
+```text
 Priority Order (highest to lowest):
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. Environment Variables  (for CI/CD, containers)          │
@@ -44,7 +44,7 @@ victor keys --set anthropic --keyring
 
 # Store OpenAI API key
 victor keys --set openai --keyring
-```
+```text
 
 ### 2. Set up a service key
 
@@ -64,7 +64,7 @@ victor keys --list
 
 # List all configured service keys
 victor keys --services
-```
+```text
 
 ## Security Best Practices
 
@@ -123,7 +123,7 @@ export FRED_API_KEY="your-key-here"
 # .env
 ANTHROPIC_API_KEY=sk-ant-...
 FINNHUB_API_KEY=your-key-here
-```
+```text
 
 ### Option 3: Keys File (Fallback)
 
@@ -146,7 +146,7 @@ api_keys:
 services:
   finnhub: "your-finnhub-key"
   fred: "your-fred-key"
-```
+```text
 
 **Important:** File must have `0600` permissions (owner read/write only).
 
@@ -220,7 +220,7 @@ victor keys --set-service finnhub --keyring
 
 # Or via environment variable
 export FINNHUB_API_KEY="your-key-here"
-```
+```text
 
 ### Setting Up FRED (Example)
 
@@ -254,7 +254,7 @@ victor keys --setup
 
 # Migrate all keys from file to keyring
 victor keys --migrate
-```
+```text
 
 ### Service Keys
 
@@ -274,7 +274,7 @@ victor keys --delete-service-keyring <service>
 
 ### Valid Provider Names
 
-```
+```text
 anthropic, openai, google, xai, grok, moonshot, kimi, deepseek,
 groqcloud, cerebras, mistral, together, openrouter, fireworks,
 vertex, vertexai, azure, azure-openai, bedrock, aws,
@@ -283,7 +283,7 @@ huggingface, hf, replicate
 
 ### Valid Service Names
 
-```
+```text
 finnhub, fred, alphavantage, polygon, tiingo, iex, quandl, nasdaq,
 newsapi, marketaux, sec, openweather, geocoding
 ```
@@ -311,7 +311,7 @@ if finnhub_key:
 from victor.config.api_keys import is_keyring_available
 if is_keyring_available():
     print("System keyring is available")
-```
+```text
 
 ### Setting Keys Programmatically
 
@@ -339,7 +339,7 @@ class DividendCollector:
                 "FINNHUB_API_KEY not configured. "
                 "Run: victor keys --set-service finnhub --keyring"
             )
-```
+```text
 
 ## Troubleshooting
 
@@ -361,7 +361,7 @@ Fix file permissions:
 
 ```bash
 chmod 600 ~/.victor/api_keys.yaml
-```
+```text
 
 ### Key not found but I set it
 
@@ -377,7 +377,7 @@ Victor logs all key access attempts. Check logs for:
 
 ```
 SECRET_ACCESS: action=loaded provider=anthropic source=keyring success=True
-```
+```text
 
 ## Configuration File Reference
 

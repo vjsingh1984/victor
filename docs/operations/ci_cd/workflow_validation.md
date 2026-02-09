@@ -80,7 +80,7 @@ git add victor/coding/workflows/feature.yaml
 
 # Commit (pre-commit will validate automatically)
 git commit -m "Update feature workflow"
-```
+```text
 
 The pre-commit hook runs automatically and prevents commits with invalid workflows.
 
@@ -109,7 +109,7 @@ The validation script supports CI mode for automated testing:
 ```bash
 # Run in CI mode
 bash scripts/hooks/validate_workflows.sh --ci victor/*/workflows/*.yaml
-```
+```text
 
 **CI Mode Features**:
 - JSON output (`validation-results.json`)
@@ -147,7 +147,7 @@ bash scripts/hooks/validate_workflows.sh --ci victor/*/workflows/*.yaml
 ### 1. YAML Syntax Errors
 
 **Error**:
-```
+```text
 YAML syntax error: mapping values are not allowed here
   in "victor/coding/workflows/feature.yaml", line 15, column 3
 ```
@@ -167,7 +167,7 @@ workflows:
   feature:
     nodes:
       - id: start  # Correct indentation
-```
+```text
 
 ### 2. Unknown Node Types
 
@@ -175,7 +175,7 @@ workflows:
 ```
 Unknown node type: 'invalid_type'
 Valid types: agent, compute, condition, parallel, transform, hitl, team
-```
+```text
 
 **Cause**: Using an invalid node type in workflow YAML
 
@@ -195,7 +195,7 @@ nodes:
 ### 3. Missing Node References
 
 **Error**:
-```
+```text
 Node 'start' references non-existent node 'next_step'
 ```
 
@@ -218,14 +218,14 @@ nodes:
   - id: analyze
     type: agent
     next: []
-```
+```text
 
 ### 4. Compilation Errors
 
 **Error**:
 ```
 Workflow validation failed: Error compiling workflow 'feature'
-```
+```text
 
 **Cause**: Workflow fails to compile (usually due to complex dependencies)
 
@@ -244,7 +244,7 @@ Workflow validation failed: Error compiling workflow 'feature'
     Baseline: 0.1234s
     Current:  0.1456s
     Change:   +18.0% (+0.0222s)
-```
+```text
 
 **Cause**: Workflow compilation is slower than baseline
 
@@ -287,7 +287,7 @@ def test_my_workflow_compiles():
     for name, definition in workflows.items():
         compiled = compiler.compile_definition(definition)
         assert compiled is not None
-```
+```text
 
 ### Option 3: Add to Performance Benchmarks
 
@@ -311,7 +311,7 @@ Add to your README.md:
 
 ```markdown
 ![Workflow Validation](https://github.com/YOUR_USERNAME/victor/actions/workflows/workflow-validation.yml/badge.svg)
-```
+```text
 
 This shows the current status of workflow validation in CI.
 
@@ -344,7 +344,7 @@ bash scripts/hooks/validate_workflows.sh --ci victor/*/workflows/*.yaml
 # Check the output
 cat validation-results.json
 cat validation-summary.txt
-```
+```text
 
 ## Performance Regression Investigation
 
@@ -392,7 +392,7 @@ profiler.disable()
 stats = pstats.Stats(profiler)
 stats.sort_stats('cumulative')
 stats.print_stats(20)  # Top 20 functions
-```
+```text
 
 ## Best Practices
 
@@ -421,7 +421,7 @@ pre-commit install
 
 # Update hooks periodically
 pre-commit autoupdate
-```
+```text
 
 ### 4. Monitor Performance
 
@@ -473,7 +473,7 @@ pip install -e ".[dev]"
 
 # Run same command as CI
 bash scripts/hooks/validate_workflows.sh --ci victor/*/workflows/*.yaml
-```
+```text
 
 ### Issue: Flaky Performance Tests
 

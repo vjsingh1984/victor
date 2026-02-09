@@ -6,7 +6,7 @@ Get productive with Victor in minutes.
 
 ```bash
 victor init
-```
+```text
 
 Creates `~/.victor/profiles.yaml` and project context file.
 
@@ -30,7 +30,7 @@ victor "explain this codebase"
 ## 4. Switch Providers
 
 ### In Chat
-```
+```text
 /provider openai --model gpt-4
 /provider anthropic --model claude-sonnet-4-5
 ```
@@ -41,7 +41,7 @@ victor "explain this codebase"
 default_profile:
   provider: anthropic
   model: claude-sonnet-4-5
-```
+```text
 
 ## 5. Choose Your Mode
 

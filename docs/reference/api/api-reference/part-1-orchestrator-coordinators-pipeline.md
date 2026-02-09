@@ -45,7 +45,7 @@ The main facade for Victor AI's agent capabilities.
 
 ### Architecture
 
-```
+```text
 AgentOrchestrator (Facade)
 ├── ConversationCoordinator     - Message history, context tracking
 ├── ToolExecutionCoordinator    - Tool validation, execution, budgeting

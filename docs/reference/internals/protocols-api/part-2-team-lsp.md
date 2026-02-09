@@ -51,7 +51,7 @@ class ISemanticSearch(Protocol):
             List of SearchHit objects ordered by relevance
         """
         ...
-```
+```text
 
 #### Usage
 
@@ -118,7 +118,7 @@ class IIndexable(Protocol):
     async def clear_index(self) -> None:
         """Clear all indexed content."""
         ...
-```
+```text
 
 #### Combined Protocol
 
@@ -169,7 +169,7 @@ class IAgent(Protocol):
             Result of task execution
         """
         ...
-```
+```text
 
 ---
 
@@ -270,7 +270,7 @@ class ITeamCoordinator(Protocol):
             List of responses from members
         """
         ...
-```
+```text
 
 #### Extended Protocols
 

@@ -23,7 +23,7 @@ invalidator = CacheInvalidator(
 )
 
 # Entries auto-expire after TTL
-```
+```text
 
 ### 2. Event-Based
 
@@ -59,7 +59,7 @@ invalidator = CacheInvalidator(
 
 # Manual invalidation
 await invalidator.invalidate("key", namespace="tool")
-```
+```text
 
 ### 4. Predictive
 
@@ -86,7 +86,7 @@ invalidator = CacheInvalidator(
     default_ttl=3600,
     enable_tagging=True,
 )
-```
+```text
 
 ## Tag-Based Invalidation
 
@@ -111,7 +111,7 @@ count = await invalidator.invalidate_tag("python_files")
 
 # Invalidate all test results
 count = await invalidator.invalidate_tag("tests")
-```
+```text
 
 ### Tag Hierarchies
 
@@ -141,7 +141,7 @@ invalidator.add_dependency("test_result", "tool", "/tests/test_main.py")
 # One key can depend on multiple resources
 invalidator.add_dependency("full_report", "tool", "/src/main.py")
 invalidator.add_dependency("full_report", "tool", "/src/utils.py")
-```
+```text
 
 ### Cascading Invalidation
 
@@ -166,7 +166,7 @@ invalidator.add_dependency("result_b", "tool", "result_c")
 # When result_c changes
 await invalidator.invalidate_dependents("result_c")
 # Invalidates: result_b (direct), result_a (transitive)
-```
+```text
 
 ## Event-Driven Invalidation
 
@@ -205,7 +205,7 @@ async def watch_config_changes():
             await invalidator.invalidate_tag("config")
 
         await asyncio.sleep(10)
-```
+```text
 
 ### Custom Events
 
@@ -232,7 +232,7 @@ if deleted:
     logger.info("Entry invalidated successfully")
 else:
     logger.info("Entry not found in cache")
-```
+```text
 
 ### Namespace Invalidation
 
@@ -250,7 +250,7 @@ logger.info(f"Invalidated {count} entries in 'tool' namespace")
 await invalidator.invalidate_all()
 
 logger.info("All cache entries invalidated")
-```
+```text
 
 ## Predictive Refresh
 
@@ -285,7 +285,7 @@ for hot_key in hot_keys:
         # Refresh entry
         new_value = await recompute_value(hot_key.key)
         await cache.set(hot_key.key, new_value, namespace=hot_key.namespace)
-```
+```text
 
 ## Best Practices
 
@@ -310,7 +310,7 @@ invalidator.tag("key1", "tool", ["data"])  # Not specific enough
 
 # Avoid: Too specific
 invalidator.tag("key1", "tool", ["python", "src", "api", "v1", "endpoint"])  # Too granular
-```
+```text
 
 ### 3. Set Up Dependencies
 
@@ -332,7 +332,7 @@ if stats['invalidations'] > 1000:
 
 if stats['tag_invalidations'] > stats['invalidations'] * 0.5:
     logger.info("Tag-based invalidation working well")
-```
+```text
 
 ### 5. Graceful Degradation
 
@@ -358,7 +358,7 @@ async def write_and_invalidate(key: str, value: Any, namespace: str):
 
     # Update cache with new value
     await cache.set(key, value, namespace)
-```
+```text
 
 ### Read-Through Invalidation
 
@@ -391,7 +391,7 @@ async def scheduled_invalidation():
 
         # Invalidate by tag
         await invalidator.invalidate_tag("hourly_data")
-```
+```text
 
 ## Monitoring and Analytics
 
@@ -425,7 +425,7 @@ invalidations_per_hour = stats['invalidations'] / hours_running
 if invalidations_per_hour > 100:
     logger.warning("High invalidation rate: "
                    f"{invalidations_per_hour:.1f}/hour")
-```
+```text
 
 ## Integration Examples
 
@@ -459,7 +459,7 @@ class FileChangeHandler(FileSystemEventHandler):
 observer = Observer()
 observer.schedule(FileChangeHandler(invalidator), path=".", recursive=True)
 observer.start()
-```
+```text
 
 ### With Cache Warming
 

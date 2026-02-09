@@ -30,7 +30,7 @@ Cache Strategy: LRU
 Cache Size: 500-1000 entries
 Cache TTL: 1 hour (query), 5 minutes (context)
 Measurement Tool: Custom Python profiling scripts
-```
+```text
 
 ### Test Scenarios
 
@@ -189,7 +189,7 @@ P75:  0.15ms  ██████████████████████
 P90:  0.18ms  █████████████████████████████████████████████████████
 P95:  0.21ms  ███████████████████████████████████████████████████████████
 P99:  0.35ms  ██████████████████████████████████████████████████████████████████████████████████
-```
+```text
 
 ## SLA Compliance
 
@@ -347,7 +347,7 @@ pip install -e ".[dev]"
   --baseline baseline.json \
   --current results/benchmark_results.json \
   --output report.md
-```
+```text
 
 ## Conclusion
 

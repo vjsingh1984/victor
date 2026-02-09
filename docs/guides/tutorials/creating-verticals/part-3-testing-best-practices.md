@@ -50,7 +50,7 @@ dev = [
 Homepage = "https://github.com/yourusername/victor-security"
 Documentation = "https://victor-security.readthedocs.io"
 Repository = "https://github.com/yourusername/victor-security"
-```
+```text
 
 ### Publishing Steps
 
@@ -105,7 +105,7 @@ class SecurityVertical(VerticalBase):
         """Return security-focused system prompt."""
         from victor_security.prompts import get_security_prompt
         return get_security_prompt()
-```
+```text
 
 ### Example 2: DevOps Vertical
 
@@ -163,7 +163,7 @@ class ComplianceChecker(BaseTool):
 # Bad: Monolithic tool
 class SecurityTool(BaseTool):
     """Does everything (hard to maintain)."""
-```
+```text
 
 ### 2. Configuration Driven
 
@@ -195,7 +195,7 @@ async def test_vulnerability_scanner():
 async def test_security_vertical():
     vertical = SecurityVertical()
     assert len(vertical.get_tools()) > 0
-```
+```text
 
 ### 4. Documentation
 

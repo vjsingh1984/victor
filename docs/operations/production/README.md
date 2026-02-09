@@ -85,7 +85,7 @@ app.add_route("/metrics", exporter.get_endpoint())
 # Start server
 import uvicorn
 uvicorn.run(app, host="0.0.0.0", port=8000)
-```
+```text
 
 Metrics will be available at `http://localhost:8000/metrics`
 
@@ -134,7 +134,7 @@ logger.info("Processing request", extra={
     "request_id": "abc-123",
     "user_id": "user@example.com",
 })
-```
+```text
 
 ### 4. Configure Prometheus
 
@@ -181,7 +181,7 @@ receivers:
   - name: 'pagerduty'
     pagerduty_configs:
       - service_key: '<PAGERDUTY_KEY>'
-```
+```text
 
 ## Monitoring Architecture
 
@@ -207,7 +207,7 @@ receivers:
                     │  Grafana     │
                     │  Dashboard   │
                     └──────────────┘
-```
+```text
 
 ## Key Metrics
 
@@ -258,7 +258,7 @@ receivers:
 2. Check logs:
    ```bash
    jq 'select(.level == "ERROR")' /var/log/victor/coordinators.log | tail -50
-   ```
+```text
 
 3. Follow runbook: [coordinator_settings.md#troubleshooting](coordinator_settings.md#troubleshooting)
 
@@ -280,7 +280,7 @@ receivers:
 2. Check for slow queries:
    ```bash
    jq 'select(.duration_ms > 2000)' /var/log/victor/coordinators.log | tail -20
-   ```
+```text
 
 3. Follow runbook: [coordinator_settings.md#troubleshooting](coordinator_settings.md#troubleshooting)
 

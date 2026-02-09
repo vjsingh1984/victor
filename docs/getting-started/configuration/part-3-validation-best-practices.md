@@ -52,7 +52,7 @@ profiles:
     model: llama-3.1-70b-versatile
 
 default_profile: default
-```
+```text
 
 ```yaml
 # ~/.victor/config.yaml
@@ -86,7 +86,7 @@ profiles:
   testing:
     provider: openai
     model: gpt-4o
-```
+```text
 
 ```yaml
 # ~/.victor/config.yaml
@@ -114,7 +114,7 @@ profiles:
     provider: ollama
     model: qwen2.5-coder:14b
     base_url: http://localhost:11434
-```
+```text
 
 ```yaml
 # ~/.victor/config.yaml
@@ -150,7 +150,7 @@ victor config show
 
 # Test a specific profile
 victor --profile development chat "Test"
-```
+```text
 
 ### Debug Configuration
 
@@ -183,7 +183,7 @@ python -c "import yaml; yaml.safe_load(open('$HOME/.victor/profiles.yaml'))"
 
 # Check for tab characters (should use spaces)
 cat -A ~/.victor/profiles.yaml | grep '\t'
-```
+```text
 
 ### Profile Not Found
 
@@ -206,7 +206,7 @@ victor keys --list
 
 # Set key
 victor keys --set anthropic --keyring
-```
+```text
 
 ---
 

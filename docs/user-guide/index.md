@@ -31,7 +31,7 @@ This guide covers everything you need to use Victor effectively, from basic conv
 /sessions                         # List saved sessions
 /resume                          # Interactive session restore
 /resume 20250107_153045          # Restore specific session
-```
+```text
 [Full Guide ->](session-management.md)
 
 **Code Review**
@@ -43,7 +43,7 @@ victor "Review this PR for bugs and improvements"
 **Refactoring**
 ```bash
 victor --mode build "Refactor to use dependency injection"
-```
+```text
 [Tools Guide ->](tools.md#file-operations)
 
 **Testing**
@@ -55,7 +55,7 @@ victor "Write unit tests for auth.py"
 **Git Operations**
 ```bash
 victor "Create commit for these changes"
-```
+```text
 [Tools Guide ->](tools.md#git-operations)
 
 ### Advanced Features
@@ -71,7 +71,7 @@ victor chat --provider anthropic
 **Workflow Execution**
 ```bash
 victor workflow run code-review
-```
+```text
 [Workflows Guide ->](workflows.md)
 
 **Multi-Agent Teams**
@@ -144,7 +144,7 @@ workflows:
         tools: [shell]
         inputs:
           command: pytest tests/
-```
+```text
 
 [Workflows Guide ->](workflows.md) | [DSL Reference ->](../guides/workflow-development/dsl.md)
 
@@ -171,7 +171,7 @@ victor  # Automatically uses Ollama
 ```bash
 export ANTHROPIC_API_KEY=sk-...
 victor chat --provider anthropic
-```
+```text
 
 **3. Profiles** (`~/.victor/profiles.yaml`):
 ```yaml
@@ -212,7 +212,7 @@ profiles:
 ```yaml
 - name: Code Review
   run: victor chat "Review this PR" --mode plan
-```
+```text
 
 [More Guides ->](../guides/index.md)
 
@@ -230,7 +230,7 @@ victor serve --port 8080
 Run as MCP server:
 ```bash
 victor mcp --stdio
-```
+```text
 
 [MCP Server Reference ->](../reference/api/mcp-server.md)
 
@@ -290,7 +290,7 @@ EventBus.subscribe("tool.execution", on_tool_execution)
 Use PLAN mode to understand before making changes:
 ```bash
 victor --mode plan "Analyze this function"
-```
+```text
 
 ### 2. Use Provider Switching
 
@@ -330,7 +330,7 @@ pipe(read_file, analyze_code, write_report)
 
 # Parallel execution
 parallel(run_tests, run_linter, run_coverage)
-```
+```text
 
 [Tool Catalog ->](../reference/tools/catalog.md)
 
@@ -370,7 +370,7 @@ victor "Write unit tests for the refactored auth module"
 
 # 5. Run tests
 victor "Execute tests and fix any failures"
-```
+```text
 
 ### Example 3: Multi-Agent Code Generation
 

@@ -40,7 +40,7 @@ file_templates:
 
     def get_safety_patterns() -> List:
         return []
-```
+```text
 
 ### Template Variables
 
@@ -129,7 +129,7 @@ metadata:
     - ToolProvider              # Valid
     - PromptContributorProvider # Valid
     - InvalidProtocol           # INVALID - will fail validation
-```
+```text
 
 Valid protocols:
 - `ToolProvider`
@@ -178,7 +178,7 @@ python scripts/generate_vertical.py --validate template.yaml
 # - Missing required field: metadata.name
 # - Invalid protocol: InvalidProtocol
 # - Workflow file not found: workflows/missing.yaml
-```
+```text
 
 ## Complete Example
 

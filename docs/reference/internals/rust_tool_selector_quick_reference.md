@@ -32,7 +32,7 @@ tools = [
 ]
 similarities = cosine_similarity_batch(query, tools)
 # Returns: [0.87, 0.92]
-```
+```text
 
 **Performance:** O(n*m) where n=tools, m=dimension
 **Speedup:** 3-5x vs Python
@@ -88,7 +88,7 @@ category_map = {
 }
 filtered = filter_by_category(tools, categories, category_map)
 # Returns: ["read_file", "write_file", "search"]
-```
+```text
 
 **Performance:** O(n) with hash set lookups
 **Speedup:** 2-3x vs Python
@@ -148,7 +148,7 @@ tool_embeddings = [
 ]
 relevant = filter_by_similarity_threshold(query, tool_embeddings, 0.7)
 # Returns: [0, 2] (indices of tools with similarity > 0.7)
-```
+```text
 
 **Performance:** O(n*m)
 **Speedup:** 3-5x vs Python
@@ -190,7 +190,7 @@ filtered_tools = filter_by_category(
     allowed_categories,
     tool_category_map
 )
-```
+```text
 
 ### Pattern 3: Combined Filtering
 
@@ -237,7 +237,7 @@ if len(relevant_indices) == 0:
         tool_embeddings,
         k=5
     )
-```
+```text
 
 ---
 
@@ -323,7 +323,7 @@ class RustEnhancedToolCoordinator(ToolCoordinator):
 
 # Build and test
 ./scripts/build_rust.sh --test
-```
+```text
 
 ### Manual Build
 
@@ -341,7 +341,7 @@ maturin develop --release
 ```bash
 cd rust
 cargo test --lib
-```
+```text
 
 ### Integration Tests
 
@@ -372,7 +372,7 @@ def test_topk_indices():
 # Error: ImportError: dynamic module does not define init function
 # Solution: Rebuild the Rust extensions
 ./scripts/build_rust.sh --release
-```
+```text
 
 ### Version Mismatch
 
@@ -393,7 +393,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 # Error: maturin not found
 # Solution: Install maturin
 pip install maturin>=1.4
-```
+```text
 
 ---
 

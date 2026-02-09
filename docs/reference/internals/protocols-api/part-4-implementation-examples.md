@@ -82,7 +82,7 @@ class CustomProviderAdapter:
         if "timeout" in error_str:
             return (True, 5.0)
         return (False, 0.0)
-```
+```text
 
 ### Custom Grounding Strategy
 
@@ -200,7 +200,7 @@ class SpecialistAgent:
                 message_type="response",
             )
         return None
-```
+```text
 
 ### Custom Quality Assessor
 

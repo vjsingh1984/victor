@@ -55,7 +55,7 @@ Vertical integration pipeline handlers (SOLID-compliant, single responsibility).
 
 ### Directory Structure
 
-```
+```text
 victor/
 ├── coding/
 │   ├── __init__.py                 # Vertical entry point
@@ -109,7 +109,7 @@ extensions:
   tool_dependencies:
     module: victor.core.tool_dependency_loader
     factory: create_vertical_tool_dependency_provider
-```
+```text
 
 ---
 
@@ -142,7 +142,7 @@ class SecurityAnalysisAssistant(VerticalBase):
 
     def get_tools(self) -> List[str]:
         return ["read", "grep", "shell", "web", "security_scan"]
-```
+```text
 
 #### Step 3: Create Tool Dependencies
 
@@ -162,7 +162,7 @@ SecurityAnalysisToolDependencyProvider = create_vertical_tool_dependency_provide
 ```toml
 [project.entry-points."victor.verticals"]
 security_analysis = "my_security_victim:SecurityAnalysisAssistant"
-```
+```text
 
 ### Advanced: Custom Configuration
 
@@ -215,7 +215,7 @@ SecurityAnalysisToolDependencyProvider = create_vertical_tool_dependency_provide
 # In security_analysis/tool_dependencies.py:
 Provider = create_vertical_tool_dependency_provider()
 # → Infers "security_analysis" from "security_analysis.tool_dependencies"
-```
+```text
 
 ### Supported Patterns
 
@@ -275,7 +275,7 @@ required_tools:
 # Optional tools
 optional_tools:
   - shell
-```
+```text
 
 ---
 
@@ -336,7 +336,7 @@ class CustomSecurityMiddleware(MiddlewareProtocol):
         """Process response after tool execution."""
         # Add security metadata
         return response
-```
+```text
 
 ### Register in Config
 
@@ -378,7 +378,7 @@ core:
     extra_sections:
       - name: "project_context"
         content: "Working on {project_name}, a {domain} application"
-```
+```text
 
 ### Custom Prompt Sections
 
@@ -446,7 +446,7 @@ class CustomIntegrationHandler(BaseStepHandler):
         """Apply custom integration logic."""
         # Your custom logic here
         result.add_info("Custom integration applied")
-```
+```text
 
 ### Register Handler
 
@@ -471,7 +471,7 @@ my_vertical = "my_package:MyVerticalAssistant"
 
 [project.entry-points."victor.capabilities"]
 my_capability = "my_package.capabilities:MyCapability"
-```
+```text
 
 ### 2. Dynamic Registration
 
@@ -498,7 +498,7 @@ registry.register_extension(
     extension_type="analytics",
     extension=AnalyticsExtension(name="analytics", api_key="key123")
 )
-```
+```text
 
 ---
 
@@ -524,7 +524,7 @@ class SecurityAssistant(VerticalBase):
 from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
 
 SecurityToolDependencyProvider = create_vertical_tool_dependency_provider()
-```
+```text
 
 ### Example 2: Advanced Vertical with Custom Middleware
 
@@ -556,7 +556,7 @@ class CompanyXMiddleware(MiddlewareProtocol):
 
     async def process_response(self, response, context):
         return response
-```
+```text
 
 ```yaml
 # company_x/config/vertical.yaml
@@ -593,7 +593,7 @@ class AnalyticsHandler(BaseStepHandler):
     def _track_event(self, event_name, data):
         """Track analytics event."""
         pass
-```
+```text
 
 ---
 
@@ -637,7 +637,7 @@ from my_vertical.tool_dependencies import MyToolDependencyProvider
 provider = MyToolDependencyProvider
 deps = provider.get_dependencies()
 print(f"Dependencies: {deps}")
-```
+```text
 
 ### Auto-Inference Failing
 

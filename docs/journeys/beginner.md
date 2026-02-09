@@ -27,7 +27,7 @@ flowchart LR
     style C fill:#fff3e0,stroke:#e65100
     style D fill:#f3e5f5,stroke:#6a1b9a
     style E fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px
-```
+```text
 
 See [Beginner Onboarding Diagram](../diagrams/user-journeys/beginner-onboarding.mmd) for detailed interactive flow.
 
@@ -49,7 +49,7 @@ pip install victor-ai
 
 ```bash
 docker pull ghcr.io/vjsingh1984/victor:latest
-```
+```text
 
 ### Option C: Development Install
 
@@ -74,7 +74,7 @@ ollama pull qwen2.5-coder:7b
 
 # Start Victor
 victor chat --provider ollama
-```
+```text
 
 **Cloud (API Key Required):**
 ```bash
@@ -89,7 +89,7 @@ victor chat --provider anthropic
 
 ### Your First Conversation
 
-```
+```text
 You: Hello, Victor! What can you do?
 
 Victor: Hello! I'm Victor, your AI coding assistant. I can help you with:
@@ -116,22 +116,22 @@ What would you like to work on today?
 ### Common Tasks
 
 **Read a file:**
-```
+```text
 You: Read the file src/main.py and summarize what it does.
 ```
 
 **Edit code:**
-```
+```text
 You: Add error handling to the parse_config function.
 ```
 
 **Run tests:**
-```
+```text
 You: Run the tests and fix any failures.
 ```
 
 **Git operations:**
-```
+```text
 You: Create a new branch feature/add-auth and commit the changes.
 ```
 
@@ -143,7 +143,7 @@ You: Create a new branch feature/add-auth and commit the changes.
 
 Switch providers mid-conversation without losing context:
 
-```
+```text
 You: switch to openai
 [Victor switches to OpenAI, maintaining your conversation history]
 ```
@@ -159,7 +159,7 @@ Supported providers:
 - **PLAN:** 2.5x more exploration, sandbox mode
 - **EXPLORE:** 3.0x exploration, no edits
 
-```
+```text
 You: switch to plan mode
 [Victor enters exploration mode, analyzing your codebase]
 ```
@@ -177,12 +177,12 @@ steps:
   - name: Fix failures
     tool: code_edit
     depends_on: Run tests
-```
+```text
 
 ```
 You: Run workflow test-and-fix.yaml
 [Victor executes the workflow steps]
-```
+```text
 
 **📖 Full Guide:** [Workflows Guide](../guides/workflows/)
 

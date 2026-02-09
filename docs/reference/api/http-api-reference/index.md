@@ -11,7 +11,7 @@ The HTTP API provides language-agnostic access to Victor's features through a RE
 **Start server**:
 ```bash
 victor serve --port 8080
-```
+```text
 
 **Base URL**: `http://localhost:8080/api/v1`
 
@@ -58,7 +58,7 @@ curl http://localhost:8080/api/v1/chat \
   "response": "Hello! How can I help you today?",
   "tokens_used": 25
 }
-```
+```text
 
 ---
 

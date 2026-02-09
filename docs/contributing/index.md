@@ -18,7 +18,7 @@ pip install -e ".[dev]"
 # Run tests
 make test
 pytest tests/unit -v
-```
+```text
 
 ## Core Contributor Docs
 

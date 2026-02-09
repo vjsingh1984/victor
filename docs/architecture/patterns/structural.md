@@ -66,7 +66,7 @@ class AgentOrchestrator:
         """Simplified provider switching."""
         # Hide complexity of provider management
         self._provider_coordinator.switch_provider(provider)
-```
+```text
 
 **Usage Example**:
 ```python
@@ -86,7 +86,7 @@ prompt = await prompt_coordinator.build_prompt(message)
 context = context_coordinator.get_context()
 result = await chat_coordinator.chat(prompt, context)
 # ... many more lines
-```
+```text
 
 **After Facade** (Simple):
 ```python
@@ -155,7 +155,7 @@ class IntelligentPipelineAdapter:
         if isinstance(result, dict):
             return result
         # ... conversion logic
-```
+```text
 
 **Usage Example**:
 ```python
@@ -190,7 +190,7 @@ class CoordinatorAdapter:
 
 # Old code continues to work
 response = await adapter.adapt_chat_call(orchestrator, "Hello")
-```
+```text
 
 **Benefits**:
 1. **Integration**: Enables incompatible interfaces to work together
@@ -286,7 +286,7 @@ class MyStatefulComponent(StateDelegation):
         state = await self.get_state()
         # ... process
         await self.update_state({"last_update": datetime.now()})
-```
+```text
 
 **Benefits**:
 1. **Reuse**: Share behavior across unrelated classes
@@ -389,7 +389,7 @@ logging_cached_tool = LoggingToolDecorator(cached_tool)
 # Use decorated tool
 result = await logging_cached_tool.execute(path="test.py")
 # Both caching and logging applied
-```
+```text
 
 **Benefits**:
 1. **Flexibility**: Add behavior without modifying classes
@@ -487,7 +487,7 @@ response = await chat_service.chat("Hello")  # Same client code
 # Add new provider without changing client
 new_provider = GoogleProvider(api_key="...")
 chat_service = ChatService(new_provider)  # Works!
-```
+```text
 
 **Benefits**:
 1. **Decoupling**: Abstraction and implementation vary independently

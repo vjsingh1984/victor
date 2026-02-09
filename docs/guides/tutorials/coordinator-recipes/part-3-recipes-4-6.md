@@ -99,7 +99,7 @@ async def authentication_middleware(orchestrator, func, *args, **kwargs):
         raise AuthenticationError(f"Invalid session: {session_id}")
 
     return None  # Continue to next middleware
-```
+```text
 
 #### Step 2: Apply Middleware
 
@@ -177,7 +177,7 @@ class TenantConfigProvider(IConfigProvider):
         if result:
             return result['config']
         return {}
-```
+```text
 
 #### Step 2: Create Tenant Prompt Contributor
 
@@ -259,7 +259,7 @@ multi_tenant = MultiTenantOrchestrator(db, settings, provider)
 
 tenant_orchestrator = await multi_tenant.get_orchestrator("tenant-abc")
 response = await tenant_orchestrator.chat("Hello!", session_id="tenant-abc:session-123")
-```
+```text
 
 ### Production Considerations
 
@@ -397,7 +397,7 @@ class WebSocketAnalyticsExporter(BaseAnalyticsExporter):
     </script>
 </body>
 </html>
-```
+```text
 
 #### Step 3: Integrate with Orchestrator
 

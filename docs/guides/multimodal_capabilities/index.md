@@ -40,7 +40,7 @@ This guide covers multimodal capabilities:
 **Image analysis:**
 ```bash
 victor chat --provider anthropic "Describe this image" < image.jpg
-```
+```text
 
 ---
 

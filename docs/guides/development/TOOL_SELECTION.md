@@ -32,7 +32,7 @@ use_semantic_tool_selection: true
 # Embedding settings
 embedding_provider: sentence-transformers
 embedding_model: BAAI/bge-small-en-v1.5
-```
+```text
 
 ## Notes
 - Offline use is possible with a local embedding model installed.

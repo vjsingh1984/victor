@@ -19,7 +19,7 @@ victor chat "Your message"
 
 # Specific provider
 victor chat --provider anthropic --model claude-sonnet-4-5
-```
+```text
 
 ## Common Options
 
@@ -73,7 +73,7 @@ async for event in agent.stream("Analyze code"):
 brainstormer = await Agent.create(provider="ollama")      # FREE
 implementer = await Agent.create(provider="openai")       # CHEAP
 reviewer = await Agent.create(provider="anthropic")       # QUALITY
-```
+```text
 
 ## ToolSet Presets
 
@@ -104,7 +104,7 @@ export GOOGLE_API_KEY=...
 # Or use secure keyring
 victor keys --set anthropic --keyring
 victor keys --set openai --keyring
-```
+```text
 
 ## Configuration Files
 
@@ -137,7 +137,7 @@ profiles:
 
 ## Slash Commands (In-Chat)
 
-```
+```text
 /provider <name>     # Switch provider
 /mode <mode>         # Change mode
 /profile <name>      # Load profile
@@ -160,7 +160,7 @@ victor workflow validate my-workflow.yaml
 
 # Schedule workflow
 victor workflow schedule code-review --cron "0 9 * * 1"
-```
+```text
 
 ## Troubleshooting
 

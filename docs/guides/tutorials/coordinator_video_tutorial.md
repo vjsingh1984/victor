@@ -143,7 +143,7 @@ orchestrator = AgentOrchestrator(
 )
 
 response = await orchestrator.chat("Hello, Victor!")
-```
+```text
 
 **Host (voiceover)**:
 "That's it! The coordinators are automatically initialized behind the scenes. ConfigCoordinator loads settings,
@@ -209,7 +209,7 @@ orchestrator = AgentOrchestrator(
     ...,
     _analytics_coordinator=analytics_coordinator
 )
-```
+```text
 
 **Host (voiceover)**:
 "Extend `BaseAnalyticsExporter`, implement the `export` method, and register it. Analytics will be sent to your webhook automatically."
@@ -246,7 +246,7 @@ config = orchestrator._config
 ```python
 orchestrator = AgentOrchestrator(settings, provider, model)
 config = orchestrator._config_coordinator.get_config()
-```
+```text
 
 **Host (voiceover)**:
 "If you were accessing internal attributes (which wasn't recommended),
@@ -377,7 +377,7 @@ Victor AI is an open-source AI coding assistant supporting multiple LLM provider
 Learn more: [website]
 
 #VictorAI #LLM #Architecture #Tutorial #Python
-```
+```text
 
 ---
 

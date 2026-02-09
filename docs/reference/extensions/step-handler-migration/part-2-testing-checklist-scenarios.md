@@ -39,7 +39,7 @@ def test_custom_tools_handler():
     # Verify
     assert "tools" in context.data
     assert result.success is True
-```
+```text
 
 ### Integration Testing
 
@@ -71,7 +71,7 @@ async def test_full_integration():
 def _do_apply(self, orchestrator, vertical, context, result):
     # Still using private attributes
     orchestrator._enabled_tools = tools  # Bad!
-```
+```text
 
 **Do this instead:**
 ```python
@@ -91,7 +91,7 @@ class EverythingHandler(BaseStepHandler):
         tools = vertical.get_tools()
         middleware = vertical.get_middleware()
         # ... 200 lines
-```
+```text
 
 **Create instead:**
 ```python
@@ -119,7 +119,7 @@ class SafetyHandler(BaseStepHandler):
 # Correct: Safety after capability config (5)
 class SafetyHandler(BaseStepHandler):
     order = 30  # Right time
-```
+```text
 
 ---
 
@@ -178,7 +178,7 @@ class Handler2(BaseStepHandler):
         # Use data from Handler1
         data = context.get("handler1_data")
         self._process_data(data)
-```
+```text
 
 ### Scenario 3: Migrating Async Operations
 

@@ -53,7 +53,7 @@ pip install victor-ai[api]
 # Node.js dependencies (for frontend)
 cd tools/team_dashboard
 npm install
-```
+```text
 
 ### Quick Start
 
@@ -82,7 +82,7 @@ npm run build
 
 # Serve with uvicorn
 python -m uvicorn victor.workflows.team_dashboard_api:app --host 0.0.0.0 --port 8000
-```
+```text
 
 ## Architecture
 
@@ -140,7 +140,7 @@ app = create_dashboard_app()
 # GET /api/v1/executions/{id}/negotiation   - Get negotiation status
 # GET /api/v1/metrics/summary               - Get metrics summary
 # WS  /ws/team/{execution_id}               - WebSocket endpoint
-```
+```text
 
 ### Frontend Components
 
@@ -168,7 +168,7 @@ tools/team_dashboard/
 ├── vite.config.ts
 ├── tsconfig.json
 └── run.sh                             # Startup script
-```
+```text
 
 #### WebSocket Integration
 
@@ -207,7 +207,7 @@ updateMember(executionId, memberId, { status: 'completed' });
 const filteredExecutions = useDashboardStore(
   selectFilteredExecutions()
 );
-```
+```text
 
 ## WebSocket Protocol
 
@@ -215,7 +215,7 @@ const filteredExecutions = useDashboardStore(
 
 ```
 WS /ws/team/{execution_id}
-```
+```text
 
 ### Client → Server Messages
 
@@ -231,7 +231,7 @@ WS /ws/team/{execution_id}
   "action": "query_state",
   "execution_id": "exec-123"
 }
-```
+```text
 
 ```json
 {
@@ -256,7 +256,7 @@ WS /ws/team/{execution_id}
     "start_time": "2025-01-15T10:00:00Z"
   }
 }
-```
+```text
 
 #### Member Started
 
@@ -287,7 +287,7 @@ WS /ws/team/{execution_id}
     "tools_used": ["read_file", "search_code"]
   }
 }
-```
+```text
 
 #### Member Completed
 
@@ -325,7 +325,7 @@ WS /ws/team/{execution_id}
     }
   }
 }
-```
+```text
 
 #### Context Updated
 
@@ -366,7 +366,7 @@ WS /ws/team/{execution_id}
     }
   }
 }
-```
+```text
 
 ## Performance
 

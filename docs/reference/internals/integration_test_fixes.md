@@ -34,7 +34,7 @@ Fixed integration test failures that arose from validation improvements in team 
         "tool_budget": 10,
     }
 ]
-```
+```text
 
 ## Validation Context
 

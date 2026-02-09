@@ -136,7 +136,7 @@ CONDITIONS = {
 TRANSFORMS = {
     "prepare_report_data": prepare_report_data,
 }
-```
+```text
 
 ### Referencing from YAML
 
@@ -172,7 +172,7 @@ victor workflow validate workflows/code_review.yaml
 # Validate with escape hatches
 victor workflow validate workflows/code_review.yaml \
   --escape-hatches victor/coding/escape_hatches.py
-```
+```text
 
 ### Run Workflows
 
@@ -202,7 +202,7 @@ victor workflow run workflows/code_review.yaml \
    result = await graph.invoke(initial_state)
    for node_id, node_result in result.state.get("_node_results", {}).items():
        print(f"{node_id}: success={node_result.success}")
-   ```
+```text
 
 3. **Enable logging**:
    ```python
@@ -218,7 +218,7 @@ victor workflow run workflows/code_review.yaml \
    test_ctx = {"analysis": {"errors": 0, "warnings": 2}}
    result = code_quality_check(test_ctx)
    assert result == "good"
-   ```
+```text
 
 5. **Use auto-approve mode for testing**:
    ```python

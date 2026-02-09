@@ -72,7 +72,7 @@ class BaseProvider(ABC):
     @abstractmethod
     def supports_streaming(self) -> bool:
         """Check if provider supports streaming."""
-```
+```text
 
 **Supported Providers**: 21 providers (Anthropic, OpenAI, Google, Azure, etc.)
 
@@ -141,7 +141,7 @@ class ProviderPool:
 
     def remove_provider(self, provider: BaseProvider) -> None:
         """Remove provider from pool."""
-```
+```text
 
 **Load Balancing Strategies**:
 
@@ -275,7 +275,7 @@ class ToolRegistry:
         Example:
             >>> tools = registry.get_tools_by_category("coding")
         """
-```
+```text
 
 ---
 
@@ -367,7 +367,7 @@ await backend.publish(
 
 # Subscribe to events
 await backend.subscribe("tool.*", my_handler)
-```
+```text
 
 ---
 
@@ -453,7 +453,7 @@ workflow.add_edge("tools", END)
 # Compile and execute
 compiled = workflow.compile()
 result = await compiled.invoke({"query": "refactor code"})
-```
+```text
 
 ---
 

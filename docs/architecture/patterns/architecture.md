@@ -99,7 +99,7 @@ component = MyComponent(real_coordinator)
 # Works with mock implementation
 mock_coordinator = MockToolCoordinator()
 component = MyComponent(mock_coordinator)
-```
+```text
 
 **Benefits**:
 1. **Structural Typing**: Duck typing with type hints
@@ -300,7 +300,7 @@ class Logger:
     async def _on_any_event(self, event: MessagingEvent):
         # Log all events
         ...
-```
+```text
 
 **Usage Example**:
 ```python
@@ -389,7 +389,7 @@ class ToolCoordinator:
                 results.append(result)
 
         return results
-```
+```text
 
 **Benefits**:
 1. **Single Responsibility**: Each coordinator has one job
@@ -451,7 +451,7 @@ Need to coordinate operations?
 │  └─ Use Coordinator Pattern
 └─ Async communication?
    └─ Use Event-Driven Architecture
-```
+```text
 
 ### Pattern Combinations
 

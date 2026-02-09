@@ -42,7 +42,7 @@ class MyVertical(VerticalBase):
         orchestrator._enabled_tools = self.get_tools()
         orchestrator._middleware = self.get_middleware()
         # ... everything in one method
-```
+```text
 
 **After:**
 ```python

@@ -6,7 +6,9 @@ The Data Analysis vertical provides comprehensive data exploration, statistical 
 
 ## Overview
 
-The Data Analysis vertical (`victor/dataanalysis/`) enables end-to-end data science workflows from data loading through visualization and machine learning. It integrates with pandas, matplotlib, seaborn, plotly, scipy, and scikit-learn for comprehensive analysis capabilities.
+The Data Analysis vertical (`victor/dataanalysis/`) enables end-to-end data science workflows from data
+loading through visualization and machine learning. It integrates with pandas, matplotlib, seaborn,
+plotly, scipy, and scikit-learn for comprehensive analysis capabilities.
 
 ### Key Use Cases
 
@@ -54,7 +56,7 @@ workflows:
       - visualizations      # Generate charts (parallel)
       - human_review        # HITL approval gate
       - report              # Generate insights report (Agent)
-```
+```text
 
 **Key Features**:
 - Parallel execution of correlation, distribution, and anomaly analysis
@@ -88,7 +90,7 @@ workflows:
       - evaluate_models      # Compare model performance
       - analyze_results      # Interpret metrics (Agent)
       - deploy_preparation   # Save model and API spec
-```
+```text
 
 **Key Features**:
 - Parallel feature engineering (numeric, categorical, text)
@@ -121,7 +123,7 @@ workflows:
       - confidence_intervals  # Compute CIs
       - effect_sizes          # Cohen's d, eta-squared
       - report_results        # Statistical report (Agent)
-```
+```text
 
 ### 4. Data Cleaning (`data_cleaning.yaml`)
 
@@ -152,7 +154,7 @@ workflows:
       - model_search             # Hyperparameter optimization
       - ensemble_creation        # Model ensembling
       - final_evaluation         # Performance assessment
-```
+```text
 
 ## Stage Definitions
 
@@ -229,7 +231,7 @@ scikit-learn compatible workflow:
 - Classification: accuracy, precision, recall, F1, ROC-AUC
 - Regression: MSE, RMSE, MAE, R-squared
 - Clustering: silhouette, Davies-Bouldin
-```
+```text
 
 ### Capability Providers
 
@@ -283,7 +285,7 @@ ml:
   random_state: 42
   cv_folds: 5
   scoring: f1_weighted
-```
+```text
 
 ### Workflow Parameters
 
@@ -315,7 +317,7 @@ result = await workflow.invoke({
 })
 
 print(result["report"])
-```
+```text
 
 ### ML Training
 
@@ -352,7 +354,7 @@ response = await orchestrator.chat(
 response = await orchestrator.chat(
     "Test if there's a significant difference in sales between Q1 and Q2"
 )
-```
+```text
 
 ### CLI Usage
 
@@ -377,7 +379,7 @@ The Data Analysis vertical integrates with:
 
 ## File Structure
 
-```
+```text
 victor/dataanalysis/
 ├── assistant.py          # DataAnalysisAssistant definition
 ├── capabilities.py       # Capability providers
@@ -438,7 +440,7 @@ monthly_revenue_by_region = df.groupby('region')['revenue'].sum()
 
 # Save intermediate results for reproducibility
 df.to_parquet("cleaned_data.parquet")
-```
+```text
 
 ---
 

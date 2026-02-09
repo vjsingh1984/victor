@@ -19,7 +19,7 @@ workflows:
         type: compute
         handler: summarize
         next: []
-```
+```text
 
 ```bash
 victor workflow render workflows/my_workflow.yaml
@@ -38,7 +38,7 @@ victor workflow execute my_workflow
 
 ## Workflow Structure
 
-```
+```text
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │  Start      │────▶│   Node 1    │────▶│   Node 2    │
 └─────────────┘     └─────────────┘     └─────────────┘
@@ -99,7 +99,7 @@ workflows:
         role: summarizer
         goal: "Summarize the review"
         next: []
-```
+```text
 
 ### Parallel Research
 
@@ -146,7 +146,7 @@ def merge_results(ctx: dict) -> dict:
 
 CONDITIONS = {"has_issues": has_issues}
 TRANSFORMS = {"merge_results": merge_results}
-```
+```text
 
 ## Scheduling
 

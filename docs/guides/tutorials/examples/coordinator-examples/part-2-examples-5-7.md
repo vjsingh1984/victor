@@ -180,7 +180,7 @@ async def custom_analytics_example():
 
 if __name__ == "__main__":
     asyncio.run(custom_analytics_example())
-```
+```text
 
 ### Key Takeaways
 

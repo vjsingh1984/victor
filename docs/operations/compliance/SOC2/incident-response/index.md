@@ -58,7 +58,7 @@ security@victor.ai
 
 # Phone
 +1 (555) 123-4567
-```
+```text
 
 **2. Incident Response Process:**
 1. Detection → 2. Classification → 3. Containment → 4. Eradication → 5. Recovery → 6. Lessons Learned

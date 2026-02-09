@@ -7,7 +7,7 @@ Victor now supports **JSONL event logging** for the observability dashboard. Thi
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────┐         ┌──────────────────────────────┐
 │ Agent Process               │         │ Dashboard Process             │
 │ (victor chat)               │         │ (victor dashboard)            │
@@ -37,7 +37,7 @@ Victor now supports **JSONL event logging** for the observability dashboard. Thi
 ```bash
 # Enable event logging for this session
 victor chat --log-events "Hello world"
-```
+```text
 
 #### Method 2: Environment Variable
 
@@ -54,7 +54,7 @@ Add to `~/.victor/profiles.yaml` or `.victor/.env`:
 ```yaml
 enable_observability_logging: true
 observability_log_path: ~/.victor/metrics/victor.jsonl  # Optional custom path
-```
+```text
 
 ### 2. Start Dashboard
 
@@ -82,7 +82,7 @@ victor dashboard
 
 Events appear in the dashboard as they happen:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │ Events Tab                                               │
 ├─────────────────────────────────────────────────────────┤
@@ -111,7 +111,7 @@ victor chat --log-events "Test message"
 
 # Then start dashboard (shows past events)
 victor dashboard
-```
+```text
 
 ## File Format
 
@@ -135,7 +135,7 @@ Each line is a JSON object:
   "data": {"tool_name": "read_file", "duration_ms": 150}}
 {"id": "evt-3c4d5e", "timestamp": "2025-01-06T12:00:03Z", "category": "MODEL", "name": "llm.start", "data": {"model":
   "gpt-4", "provider": "openai"}}
-```
+```text
 
 ### Event Schema
 
@@ -188,7 +188,7 @@ Events are buffered before writing to disk:
 2. **Rotate logs**: Periodically archive old events:
    ```bash
    mv ~/.victor/metrics/victor.jsonl ~/.victor/metrics/victor-$(date +%Y%m%d).jsonl
-   ```
+```text
 3. **Monitor disk space**: Event files can grow over time
 4. **Use filtering**: Dashboard supports filtering by category, text search, etc.
 
@@ -212,7 +212,7 @@ observability_log_path: ~/.victor/metrics/victor.jsonl
 victor chat --log-events                    # Enable with default path
 victor chat --log-events --observability-log-path /tmp/custom.jsonl  # Custom path
 victor chat --no-log-events                # Explicitly disable
-```
+```text
 
 ### Environment Variables
 
@@ -230,7 +230,7 @@ export VICTOR_OBSERVABILITY_LOG_PATH=/tmp/custom.jsonl
 **Solution**: Event logging is not enabled. Enable it:
 ```bash
 victor chat --log-events "Your message here"
-```
+```text
 
 ### Events Not Appearing Real-Time
 
@@ -262,7 +262,7 @@ gzip ~/.victor/metrics/victor-*.jsonl
 ```bash
 mkdir -p ~/.victor/metrics
 chmod 755 ~/.victor/metrics
-```
+```text
 
 ## Advanced Usage
 
@@ -299,7 +299,7 @@ error_exporter = JsonLineExporter(
     include_categories={EventCategory.ERROR}
 )
 bridge._event_bus.add_exporter(error_exporter)
-```
+```text
 
 ### Programmatic Event Reading
 
@@ -348,7 +348,7 @@ The dashboard automatically:
 
 The dashboard and agent run in separate processes:
 
-```
+```text
 Process 1: victor chat --log-events
   - EventBus emits events
   - JsonLineExporter writes to ~/.victor/metrics/victor.jsonl
@@ -379,7 +379,7 @@ bridge.setup_jsonl_exporter(log_path=Path("/tmp/custom.jsonl"))
 
 # Disable exporter
 bridge.disable_jsonl_exporter()
-```
+```text
 
 ### JsonLineExporter
 
@@ -429,7 +429,7 @@ exporter.close()
    ```bash
    victor chat --log-events "Analyze the codebase"
    victor dashboard
-   ```
+```text
 
 2. Explore dashboard features:
    - View real-time events

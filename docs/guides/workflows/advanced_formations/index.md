@@ -48,7 +48,7 @@ teams:
     roles:
       - name: reviewer
         persona: "You are a code reviewer..."
-```
+```text
 
 ---
 

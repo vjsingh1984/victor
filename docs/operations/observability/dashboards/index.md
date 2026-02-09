@@ -55,7 +55,7 @@ sudo apt-get install grafana
 
 # Docker
 docker run -d -p 3000:3000 grafana/grafana
-```
+```text
 
 **2. Import dashboards:**
 ```bash

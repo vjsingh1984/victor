@@ -83,7 +83,7 @@ analysis = await vision.analyze_image(
 
 print(analysis.description)
 print(analysis.details)
-```
+```text
 
 ### Chart Data Extraction
 
@@ -122,7 +122,7 @@ structured = await vision.extract_structured_text(
 
 for row in structured.rows:
     print(row)
-```
+```text
 
 ### Diagram Understanding
 
@@ -165,7 +165,7 @@ for issue in ui_analysis.issues:
     print(f"  - {issue.severity}: {issue.description}")
     print(f"    Location: {issue.location}")
     print(f"    Suggestion: {issue.suggestion}")
-```
+```text
 
 ### Batch Image Processing
 
@@ -203,7 +203,7 @@ transcript = await audio.transcribe_audio(
 print(f"Transcript:\n{transcript.text}")
 print(f"Duration: {transcript.duration}s")
 print(f"Confidence: {transcript.confidence:.2%}")
-```
+```text
 
 ### Speaker Diarization
 
@@ -236,7 +236,7 @@ print(f"\n=== Summary ===\n{meeting.summary}")
 print(f"\n=== Action Items ===")
 for item in meeting.action_items:
     print(f"- {item.description} (assigned to: {item.assignee})")
-```
+```text
 
 ### Audio Analysis
 
@@ -267,7 +267,7 @@ print(f"Parameters: {command.parameters}")
 # Execute command
 if command.intent == "open_file":
     await orchestrator.execute_tool("read_file", {"path": command.parameters["file"]})
-```
+```text
 
 ## Multimodal Workflows
 
@@ -332,7 +332,7 @@ async def process_document(doc_path):
     )
 
     return document_summary
-```
+```text
 
 ### Presentation Creation
 
@@ -396,7 +396,7 @@ settings.audio_provider = "openai"  # or "google", "aws"
 settings.audio_model = "whisper-1"  # or "chirp", "transcribe-best"
 
 orchestrator = AgentOrchestrator(settings=settings)
-```
+```text
 
 ---
 

@@ -6,7 +6,9 @@ The Research vertical provides web research, fact-checking, literature synthesis
 
 ## Overview
 
-The Research vertical (`victor/research/`) is specialized for web research tasks. Unlike coding assistants that focus on local codebases, the Research vertical searches the internet, fetches web pages, synthesizes information from multiple sources, and provides researched answers with citations.
+The Research vertical (`victor/research/`) is specialized for web research tasks. Unlike coding assistants
+that focus on local codebases, the Research vertical searches the internet, fetches web pages, synthesizes
+information from multiple sources, and provides researched answers with citations.
 
 ### Key Use Cases
 
@@ -66,7 +68,7 @@ workflows:
 
       # Output
       - generate_report        # Create final document
-```
+```text
 
 **Key Features**:
 - Parallel search across web, academic, and code sources
@@ -111,7 +113,7 @@ workflows:
       - generate_verdicts      # Create fact-check verdicts
       - review_verdicts        # HITL review
       - generate_report        # Final fact-check report
-```
+```text
 
 **Verdict Categories**:
 - **TRUE**: Claim is accurate
@@ -143,7 +145,7 @@ workflows:
     nodes:
       - quick_search           # Fast web search
       - quick_summary          # 2-3 paragraph summary
-```
+```text
 
 **Configuration**:
 ```yaml
@@ -181,7 +183,7 @@ credibility_factors:
   - date_recency           # How recent
   - citation_count         # Academic citations
   - bias_indicators        # Potential bias markers
-```
+```text
 
 ### Citation Management
 
@@ -199,7 +201,7 @@ Author. Title. Place: Publisher, Year.
 
 # IEEE Format
 [1] A. Author, "Title," Publication, vol. X, pp. Y-Z, Year.
-```
+```text
 
 ### Parallel Source Discovery
 
@@ -223,7 +225,7 @@ evidence_weights:
   reputable_news: 0.7      # Major news outlets
   fact_check_sites: 0.8    # Established fact-checkers
   secondary_sources: 0.5   # Derivative reporting
-```
+```text
 
 ### Capability Providers
 
@@ -284,7 +286,7 @@ output:
   include_methodology: true
   include_limitations: true
   max_report_length: 8000
-```
+```text
 
 ### Workflow Parameters
 
@@ -316,7 +318,7 @@ result = await workflow.invoke({
 
 print(result["final_report"])
 print(f"\nSources: {result['source_count']}")
-```
+```text
 
 ### Fact Checking
 
@@ -356,7 +358,7 @@ response = await orchestrator.chat(
 response = await orchestrator.chat(
     "Fact-check: The Eiffel Tower was built in 1889 for the World's Fair"
 )
-```
+```text
 
 ### CLI Usage
 
@@ -381,7 +383,7 @@ The Research vertical integrates with:
 
 ## File Structure
 
-```
+```text
 victor/research/
 ├── assistant.py          # ResearchAssistant definition
 ├── capabilities.py       # Capability providers

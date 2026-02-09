@@ -27,7 +27,7 @@ tuner = PerformanceAutotuner(
 
 # If performance drops by 5% after optimization, auto-rollback
 result = tuner.apply_optimizations(team_id)
-```
+```text
 
 ### Manual Rollback
 
@@ -58,7 +58,7 @@ tuner = PerformanceAutotuner(
         "dry_run"
     ]
 )
-```
+```text
 
 ---
 
@@ -92,7 +92,7 @@ ab_result = tuner.run_ab_test(
 # Check results before applying
 if ab_result.improvement > 0.05:
     tuner.apply_optimization(team_id, optimization)
-```
+```text
 
 ### 3. Monitor After Applying
 
@@ -120,7 +120,7 @@ tuner.export_history(
     team_id="team-1",
     output_file="optimization_history.json"
 )
-```
+```text
 
 ---
 
@@ -167,7 +167,7 @@ if ab_result.significant:
 
     if ab_result.improvement > 0:
         tuner.apply_optimization("team-1", ab_result.optimization)
-```
+```text
 
 ### Example 3: Custom Optimization Strategy
 
@@ -207,7 +207,7 @@ suggestions = tuner.suggest_optimizations(
     team_id="team-1",
     max_risk="high"
 )
-```
+```text
 
 ### Regression After Optimization
 
@@ -246,7 +246,7 @@ ab_result = tuner.run_ab_test(
     duration_hours=48,  # Longer duration
     sample_size=200  # Larger sample
 )
-```
+```text
 
 ---
 

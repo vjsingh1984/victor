@@ -26,7 +26,7 @@ from victor.framework.workflows import BaseYAMLWorkflowProvider
 class ResearchWorkflowProvider(BaseYAMLWorkflowProvider):
     def _get_escape_hatches_module(self) -> str:
         return "victor.research.escape_hatches"
-```
+```text
 
 #### Abstract Methods
 
@@ -45,7 +45,7 @@ def _get_escape_hatches_module(self) -> str
 ```python
 def _get_escape_hatches_module(self) -> str:
     return "victor.devops.escape_hatches"
-```
+```text
 
 #### Optional Override Methods
 
@@ -65,7 +65,7 @@ Get automatic workflow triggers based on query patterns.
 
 ```python
 def get_auto_workflows(self) -> List[Tuple[str, str]]
-```
+```text
 
 **Returns:** List of `(regex_pattern, workflow_name)` tuples
 
@@ -88,7 +88,7 @@ workflow = provider.get_workflow("deep_research")  # Optional[WorkflowDefinition
 
 # Get workflow names
 names = provider.get_workflow_names()  # List[str]
-```
+```text
 
 #### Compilation and Execution
 
@@ -105,7 +105,7 @@ def compile_workflow(self, workflow_name: str) -> CachedCompiledGraph
 provider = ResearchWorkflowProvider()
 compiled = provider.compile_workflow("deep_research")
 result = await compiled.invoke({"query": "AI trends"})
-```
+```text
 
 ##### run_compiled_workflow()
 
@@ -131,7 +131,7 @@ async def stream_compiled_workflow(
     context: Optional[Dict[str, Any]] = None,
     thread_id: Optional[str] = None,
 ) -> AsyncIterator[tuple]
-```
+```text
 
 **Example:**
 ```python
@@ -167,7 +167,7 @@ class AgentNode(WorkflowNode):
     timeout_seconds: Optional[float] = None  # Execution timeout
     profile: Optional[str] = None    # Provider profile
     disable_embeddings: bool = False # Disable semantic search
-```
+```text
 
 **YAML Example:**
 ```yaml
@@ -197,7 +197,7 @@ class ComputeNode(WorkflowNode):
     fail_fast: bool = True           # Stop on first failure
     parallel: bool = False           # Execute tools in parallel
     execution_target: str = "in-process"  # Execution environment
-```
+```text
 
 **YAML Example:**
 ```yaml
@@ -228,7 +228,7 @@ class TaskConstraints(ConstraintsProtocol):
     _timeout: float = 300.0          # Execution timeout in seconds
     allowed_tools: Optional[List[str]] = None
     blocked_tools: Optional[List[str]] = None
-```
+```text
 
 **Constraint Presets:**
 ```python
@@ -248,7 +248,7 @@ Branch based on a condition function.
 class ConditionNode(WorkflowNode):
     condition: Callable[[Dict[str, Any]], str]  # Returns branch name
     branches: Dict[str, str]                     # Branch name -> node ID
-```
+```text
 
 **YAML Example:**
 ```yaml
@@ -272,7 +272,7 @@ CONDITIONS = {
         else "error"
     )
 }
-```
+```text
 
 ### ParallelNode
 
@@ -293,7 +293,7 @@ nodes:
     parallel_nodes: [search_web, search_docs, search_code]
     join_strategy: all
     next: [merge_results]
-```
+```text
 
 **Join Strategies:**
 - `all`: Wait for all nodes to complete (fail if any fail)
@@ -317,7 +317,7 @@ nodes:
     type: transform
     handler: format_report  # Escape hatch transform function
     next: [final_output]
-```
+```text
 
 **Escape Hatch Definition:**
 ```python
@@ -345,7 +345,7 @@ class HITLNode(WorkflowNode):
     default_value: Optional[str]     # Default on timeout
     timeout: float = 300.0           # Timeout in seconds
     fallback: HITLFallback           # ABORT, CONTINUE, SKIP
-```
+```text
 
 **HITL Types:**
 - `APPROVAL`: Binary approve/reject gate
@@ -382,7 +382,7 @@ class TeamNode:
     shared_context: Dict[str, Any]
     max_iterations: int = 50
     total_tool_budget: int = 100
-```
+```text
 
 **YAML Example:**
 ```yaml

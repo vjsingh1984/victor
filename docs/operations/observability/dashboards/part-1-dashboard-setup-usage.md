@@ -62,7 +62,7 @@ Victor provides a complete observability solution for team workflows with four G
 
    # Install Prometheus (example for Ubuntu)
    sudo apt-get install -y prometheus
-   ```
+```text
 
 2. **Configure Prometheus to scrape Victor metrics:**
    ```yaml
@@ -77,7 +77,7 @@ Victor provides a complete observability solution for team workflows with four G
 3. **Run the setup script:**
    ```bash
    python scripts/observability/setup_dashboards.py
-   ```
+```text
 
 4. **Access dashboards:**
    - Open Grafana: http://localhost:3000
@@ -123,7 +123,7 @@ EOF
 
 # Reload Prometheus
 sudo killall -HUP prometheus
-```
+```text
 
 ### Environment Configuration
 
@@ -178,7 +178,7 @@ rate(victor_teams_duration_seconds_sum[5m])
 
 # Formation distribution
 sum by (formation) (victor_teams_executed_total)
-```
+```text
 
 ### 2. Team Performance Dashboard
 
@@ -246,7 +246,7 @@ victor_teams_recursion_depth
 
 # Depth exceeded events
 rate(victor_teams_recursion_depth_exceeded_total[5m])
-```
+```text
 
 ### 4. Team Members Dashboard
 
@@ -390,7 +390,7 @@ Edit `observability/alerts/team_alerts.yml`:
       sum(rate(victor_teams_failed_total[5m])) /
       sum(rate(victor_teams_executed_total[5m]))
     ) > 0.15  # Changed from 0.10 to 0.15
-```
+```text
 
 ### Adjusting Durations
 
@@ -425,7 +425,7 @@ route:
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
-```
+```text
 
 ### Testing Alerts
 
@@ -458,7 +458,7 @@ avg by (formation) (
   rate(victor_teams_duration_seconds_sum[5m]) by (team_id, formation)
   / rate(victor_teams_duration_seconds_count[5m]) by (team_id, formation)
 )
-```
+```text
 
 ### Failure Analysis
 
@@ -491,7 +491,7 @@ sum by (formation, tool) (
 # Tool efficiency (calls per successful team)
 sum by (formation) (rate(victor_teams_tool_calls_total[5m]))
 / sum by (formation) (rate(victor_teams_executed_total[5m]))
-```
+```text
 
 ### Recursion Analysis
 
@@ -525,7 +525,7 @@ histogram_quantile(0.95,
 sum by (role, error_type) (
   rate(victor_team_members_errors_total[5m])
 )
-```
+```text
 
 ---
 

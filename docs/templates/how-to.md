@@ -37,12 +37,12 @@ Instruction for step 1.
 ```bash
 # Command or code
 command_here
-```
+```text
 
 **Expected Output:**
 ```
 Expected result
-```
+```text
 
 #### Step 2: Title
 
@@ -84,7 +84,7 @@ example_code_here
 ```yaml
 # YAML example
 example_here
-```
+```text
 
 **Result:** What happens
 

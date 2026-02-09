@@ -80,7 +80,7 @@ settings.lazy_loading_enabled = True
 # Configure lazy loading thresholds
 settings.lazy_loading_memory_threshold = 500  # MB
 settings.lazy_loading_cpu_threshold = 0.7     # 70% CPU
-```
+```text
 
 ### Component-Level Lazy Loading
 
@@ -109,7 +109,7 @@ settings.lazy_loading_enabled = True
 start = time.time()
 orchestrator = AgentOrchestrator(settings=settings)
 print(f"Startup: {time.time() - start:.2f}s")  # 0.5-1.5s
-```
+```text
 
 ### Trade-offs
 
@@ -152,7 +152,7 @@ results = await orchestrator.execute_tools_parallel(
 )
 
 # All tools executed concurrently
-```
+```text
 
 ### Parallel Skill Chaining
 
@@ -191,7 +191,7 @@ async def parallel_tasks():
 
 # Usage
 plans = await parallel_tasks()
-```
+```text
 
 ### Performance Impact
 
@@ -229,7 +229,7 @@ settings.tool_selection_cache_ttl = 3600  # 1 hour
 settings.tool_selection_cache_query = True       # Cache by query
 settings.tool_selection_cache_context = True     # Cache by context
 settings.tool_selection_cache_rl = True          # Cache RL rankings
-```
+```text
 
 ### Response Caching
 
@@ -258,7 +258,7 @@ settings.embedding_cache_enabled = True
 settings.embedding_cache_size = 10000
 
 # Reduces redundant embedding generation
-```
+```text
 
 ### Cache Performance
 
@@ -291,7 +291,7 @@ await orchestrator.invalidate_cache(
 # Automatic invalidation
 settings.cache_auto_invalidate = True
 settings.cache_auto_invalidate_interval = 3600  # Every hour
-```
+```text
 
 ## Memory Management
 
@@ -337,7 +337,7 @@ def profile_memory():
 profile_memory()
 await orchestrator.chat("Complex task")
 profile_memory()
-```
+```text
 
 ### Memory Optimization
 
@@ -368,7 +368,7 @@ settings.use_memory_pools = True
 settings.memory_pool_size = 1000
 
 # Reduces allocation overhead
-```
+```text
 
 ## Benchmarking and Profiling
 
@@ -408,7 +408,7 @@ profiler.disable()
 stats = pstats.Stats(profiler)
 stats.sort_stats('cumulative')
 stats.print_stats(20)  # Top 20 functions
-```
+```text
 
 ### Custom Metrics
 
@@ -457,7 +457,7 @@ async def monitor_performance():
 
 # Run monitor
 asyncio.create_task(monitor_performance())
-```
+```text
 
 ---
 

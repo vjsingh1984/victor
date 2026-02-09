@@ -25,7 +25,7 @@ pip install victor-ai[native]
 cd rust
 cargo build --release
 pip install -e ..
-```
+```text
 
 ## Quick Start
 
@@ -82,7 +82,7 @@ info = FileInfo(
 
 print(info.path)      # "/test/file.txt"
 print(info.matches("*.txt"))  # True
-```
+```text
 
 #### FileMetadata
 
@@ -122,7 +122,7 @@ def walk_directory(
     follow_symlinks: bool = False,
     ignore_patterns: Optional[List[str]] = None,
 ) -> List[FileInfo]
-```
+```text
 
 **Parameters:**
 - `root`: Root directory path to traverse
@@ -161,7 +161,7 @@ Collect metadata for multiple files in parallel.
 **Signature:**
 ```python
 def get_file_metadata(paths: List[Union[str, Path]]) -> List[FileMetadata]
-```
+```text
 
 **Parameters:**
 - `paths`: List of file paths to get metadata for
@@ -186,7 +186,7 @@ def filter_files_by_extension(
     files: List[FileInfo],
     extensions: List[str]
 ) -> List[FileInfo]
-```
+```text
 
 **Parameters:**
 - `files`: List of FileInfo objects to filter
@@ -212,7 +212,7 @@ def filter_files_by_size(
     min_size: int = 0,
     max_size: int = 0
 ) -> List[FileInfo]
-```
+```text
 
 **Parameters:**
 - `files`: List of FileInfo objects to filter
@@ -242,7 +242,7 @@ def get_directory_statistics(
     root: Union[str, Path],
     max_depth: int = 100
 ) -> Dict[str, Union[int, List[tuple]]]
-```
+```text
 
 **Parameters:**
 - `root`: Root directory path to analyze
@@ -271,7 +271,7 @@ Group files by their parent directory.
 def group_files_by_directory(
     files: List[FileInfo]
 ) -> Dict[str, List[FileInfo]]
-```
+```text
 
 **Parameters:**
 - `files`: List of FileInfo objects to group
@@ -298,7 +298,7 @@ def filter_files_by_modified_time(
     since: int,
     until: int = 0
 ) -> List[FileInfo]
-```
+```text
 
 **Parameters:**
 - `files`: List of FileInfo objects to filter
@@ -328,7 +328,7 @@ def find_code_files(
     ignore_dirs: Optional[List[str]] = None,
     max_depth: int = 100,
 ) -> List[FileInfo]
-```
+```text
 
 **Parameters:**
 - `root`: Root directory to search
@@ -387,7 +387,7 @@ files = file_ops.walk_directory(
     patterns=["*.py"],
     ignore_patterns=["*.pyc", "!*.py"]  # Exclude .pyc, keep .py
 )
-```
+```text
 
 ## Performance Benchmarks
 
@@ -398,7 +398,7 @@ Test: Walk victor/ directory (3,000+ files, depth 5)
 - Rust (parallel): 0.15s
 - Python (os.walk): 0.35s
 - Speedup: 2.3x
-```
+```text
 
 ### Metadata Collection
 
@@ -407,7 +407,7 @@ Test: Collect metadata for 1,000 files
 - Rust (batch): 0.08s
 - Python (individual stat): 0.32s
 - Speedup: 4.0x
-```
+```text
 
 ### Extension Filtering
 
@@ -416,7 +416,7 @@ Test: Filter 1,000 files by extension
 - Rust (set-based): 0.002s
 - Python (list comprehension): 0.008s
 - Speedup: 4.0x
-```
+```text
 
 ## Error Handling
 
@@ -448,7 +448,7 @@ files = file_ops.walk_directory("src", max_depth=5)
 
 # Avoid: Unlimited depth in huge trees
 files = file_ops.walk_directory("/", max_depth=1000)  # Slow!
-```
+```text
 
 ### 2. Leverage Ignore Patterns
 
@@ -471,7 +471,7 @@ metadata = file_ops.get_file_metadata(paths)
 
 # Avoid: Individual calls
 metadata = [file_ops.get_file_metadata([p])[0] for p in paths]
-```
+```text
 
 ### 4. Combine Filters
 
@@ -501,7 +501,7 @@ grouped = file_ops.group_files_by_directory(code_files)
 for dir_path, files in grouped.items():
     print(f"Analyzing {dir_path} ({len(files)} files)")
     # Integrate with AST processor, etc.
-```
+```text
 
 ## Implementation Details
 

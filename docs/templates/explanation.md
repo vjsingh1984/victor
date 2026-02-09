@@ -45,7 +45,7 @@ graph TB
     style A fill:#e3f2fd,stroke:#1565c0
     style B fill:#fff3e0,stroke:#e65100
     style C fill:#e8f5e9,stroke:#2e7d32
-```
+```text
 
 **Figure 1:** Description of architecture diagram.
 
@@ -81,7 +81,7 @@ sequenceDiagram
 def example():
     # Implementation
     pass
-```
+```text
 
 ### Principle 2
 
@@ -100,7 +100,7 @@ module/
 ├── file1.py      # Description
 ├── file2.py      # Description
 └── file3.py      # Description
-```
+```text
 
 ### Key Algorithms
 
@@ -233,7 +233,7 @@ def test_concept():
 
     # Assert
     assert result == expected_output
-```
+```text
 
 ## Real-World Examples
 

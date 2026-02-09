@@ -69,7 +69,7 @@ from victor.framework.step_handlers import StepHandlerRegistry
 
 registry = StepHandlerRegistry.default()
 registry.add_handler(MinimalHandler())
-```
+```text
 
 ### Example 2: Logging Handler
 
@@ -161,7 +161,7 @@ class ConditionalExtensionHandler(BaseStepHandler):
         """Apply coding-specific extensions."""
         # Custom logic for coding vertical
         result.add_info("Applied coding-specific extensions")
-```
+```text
 
 ---
 
@@ -292,7 +292,7 @@ class TieredToolAccessHandler(BaseStepHandler):
             return vertical.get_tiered_tools()
 
         return None
-```
+```text
 
 ### Example 6: Tool Dependency Resolution
 
@@ -412,7 +412,7 @@ class CustomMiddlewareHandler(BaseStepHandler):
         return {
             "middleware_count": result.middleware_count,
         }
-```
+```text
 
 ### Example 8: Middleware Chain Validation
 
@@ -547,7 +547,7 @@ class WorkflowRegistrationHandler(BaseStepHandler):
         return {
             "workflows_count": result.workflows_count,
         }
-```
+```text
 
 ### Example 10: Workflow Trigger Registration
 

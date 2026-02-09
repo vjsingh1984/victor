@@ -33,7 +33,7 @@ def chat(message: str, provider: str = "anthropic"):
 # Use
 result = chat("Help me debug this code")
 print(result["response"])
-```
+```text
 
 ### JavaScript Client
 
@@ -78,7 +78,7 @@ def stream_chat(message: str):
 
 # Use
 stream_chat("Explain async/await in Python")
-```
+```text
 
 ---
 
@@ -114,7 +114,7 @@ async def test_full_workflow():
     # Make requests
     # Verify responses
     pass
-```
+```text
 
 ---
 
@@ -167,7 +167,7 @@ spec:
         image: victor:latest
         ports:
         - containerPort: 8080
-```
+```text
 
 ---
 
@@ -191,7 +191,7 @@ curl http://localhost:8080/metrics
 
 ```bash
 curl http://localhost:8080/health
-```
+```text
 
 **Response**:
 ```json
@@ -214,7 +214,7 @@ curl http://localhost:8080/health
 1. **Check server is running**:
    ```bash
    ps aux | grep victor
-   ```
+```text
 
 2. **Check port**:
    ```bash
@@ -224,7 +224,7 @@ curl http://localhost:8080/health
 3. **Check firewall**:
    ```bash
    sudo ufw allow 8080
-   ```
+```text
 
 ### Authentication Errors
 
@@ -256,7 +256,7 @@ curl http://localhost:8080/health
            time.sleep(2 ** attempt)  # Exponential backoff
        else:
            break
-   ```
+```text
 
 ---
 

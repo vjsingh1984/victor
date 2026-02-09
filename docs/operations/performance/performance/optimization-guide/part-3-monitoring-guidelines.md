@@ -27,7 +27,7 @@ request_batching_enabled: true
 request_batch_max_size: 10
 request_batch_timeout: 0.1  # 100ms
 request_batch_max_concurrent: 5
-```
+```text
 
 ### Usage
 
@@ -78,7 +78,7 @@ json_str = json_dumps(obj)
 
 # Deserialize
 obj = json_loads(json_str)
-```
+```text
 
 **Benchmark Results:**
 - Standard `json.dumps()`: ~0.45ms
@@ -116,7 +116,7 @@ from victor.core.optimizations import ThreadSafeMemoized
 def expensive_computation(x, y):
     # Expensive calculation
     return x + y
-```
+```text
 
 ## 4. Performance Monitoring
 
@@ -169,7 +169,7 @@ use_orjson: true
 
 # Lazy imports
 lazy_imports_enabled: true
-```
+```text
 
 ## Environment Variables
 
@@ -200,7 +200,7 @@ pytest tests/benchmarks/test_performance_optimizations.py::TestJSONSerialization
 
 # Run with coverage
 pytest tests/benchmarks/ --cov=victor.core --cov-report=html
-```
+```text
 
 ## Expected Results
 

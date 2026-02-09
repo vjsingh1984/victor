@@ -196,7 +196,7 @@
   - Low priority: 50%+
 
 ### Test Organization
-```
+```text
 tests/
 ├── unit/ (661 files)
 │   ├── agent/
@@ -229,7 +229,7 @@ tests/
 
    # Specific module coverage
    pytest tests/unit/agent/ --cov=victor.agent --cov-report=term
-   ```
+```text
 
 2. **Focus on High-Priority Gaps**:
    - Fix 7 failing integration tests

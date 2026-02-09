@@ -27,7 +27,7 @@ result = await engine.execute_yaml(
     "workflow_with_approval.yaml",
     initial_state={"task": "Deploy to production"}
 )
-```
+```text
 
 ## HITL Node Types
 
@@ -65,7 +65,7 @@ nodes:
       - diff
       - affected_files
     next: [continue_workflow]
-```
+```text
 
 ### Input Node
 
@@ -106,7 +106,7 @@ nodes:
       - reasoning
     allow_edit: true
     next: [execute_decision]
-```
+```text
 
 ## HITL Handlers
 
@@ -136,7 +136,7 @@ handler = TUIHITLHandler(
     show_context=True,
     syntax_highlight=True,
 )
-```
+```text
 
 ### API Handler
 
@@ -163,7 +163,7 @@ handler = SlackHITLHandler(
     channel="#approvals",
     mention_users=["U123ABC"],
 )
-```
+```text
 
 ### Custom Handler
 
@@ -217,7 +217,7 @@ if response.approved:
     await deploy()
 else:
     logger.info(f"Rejected: {response.feedback}")
-```
+```text
 
 ## Workflow Examples
 
@@ -319,7 +319,7 @@ nodes:
     inputs:
       review: $ctx.final_review
     next: [end]
-```
+```text
 
 ### Interactive Debugging
 
@@ -377,7 +377,7 @@ on_timeout: reject  # Options: approve, reject, skip, escalate
 # Escalate to different handler
 on_timeout: escalate
 escalate_to: manager_approval
-```
+```text
 
 Programmatic timeout handling:
 
@@ -426,7 +426,7 @@ by_user = history.get_by_responder("user@example.com")
 
 # Export for audit
 history.export_to_json("hitl_audit.json")
-```
+```text
 
 ## Event Integration
 
@@ -469,7 +469,7 @@ prompt: |
 
 # Avoid - vague prompt
 prompt: "Continue?"
-```
+```text
 
 ### 2. Set Appropriate Timeouts
 
@@ -495,7 +495,7 @@ policy = TimeoutPolicy(
         ("manager", 3600),
     ]
 )
-```
+```text
 
 ### 4. Enable Audit Logging
 
@@ -516,7 +516,7 @@ next:
 - id: handle_rejection
   type: agent
   goal: Notify stakeholders and clean up
-```
+```text
 
 ## Testing HITL Workflows
 
@@ -542,7 +542,7 @@ handler = MockHITLHandler(
         "review_changes": HITLResponse(approved=True, feedback="LGTM"),
     }
 )
-```
+```text
 
 ### Record/Replay
 

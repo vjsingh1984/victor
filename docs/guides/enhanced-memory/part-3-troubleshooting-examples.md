@@ -36,7 +36,7 @@ episodes = await orchestrator.episodic_memory.recall_relevant(
 await orchestrator.episodic_memory.clear_by_reward(
     max_reward=2.0  # Remove low-reward episodes
 )
-```
+```text
 
 ### Memory Bloat
 
@@ -84,7 +84,7 @@ from functools import lru_cache
 @lru_cache(maxsize=100)
 def cached_query(query):
     return orchestrator.episodic_memory.recall_relevant(query)
-```
+```text
 
 ---
 
@@ -149,7 +149,7 @@ async def build_knowledge_base():
         query="security best practices",
         k=5
     )
-```
+```text
 
 ### Example 3: Continuous Learning
 
@@ -194,7 +194,7 @@ enable_episodic_memory = True
 enable_semantic_memory = True
 episodic_memory_max_episodes = 1000
 semantic_memory_max_facts = 5000
-```
+```text
 
 ---
 

@@ -15,7 +15,7 @@ This directory contains templates for different types of documentation content f
 
 Victor AI documentation follows the **Diátaxis framework**, which categorizes documentation into four types:
 
-```
+```text
                     Tutorials
                         │
                         │ Learning
@@ -71,7 +71,7 @@ cp docs/templates/how-to.md docs/guides/my-guide.md
 
 # Or copy from template content
 cat docs/templates/tutorial.md > docs/tutorials/my-tutorial.md
-```
+```text
 
 ### 3. Customize Template
 
@@ -137,7 +137,7 @@ Add diagrams using Mermaid.js:
 ```mermaid
 graph TB
     A[Start] --> B[End]
-```
+```text
 
 **Figure 1:** Description of diagram.
 ```
@@ -152,7 +152,7 @@ Add code examples with syntax highlighting:
 def example_function():
     """Example function."""
     return "Hello, World!"
-```
+```text
 
 **Explanation:** This code does X, Y, Z.
 ```
@@ -169,7 +169,7 @@ Use callouts for emphasis:
 **Warning:** Cautionary advice
 
 **Important:** Critical information
-```
+```text
 
 ## Quick Reference
 

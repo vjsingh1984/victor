@@ -71,7 +71,7 @@ Victor underwent a comprehensive three-phase architectural refactoring to addres
 
 ### Before: Monolithic Orchestrator
 
-```
+```text
 ┌─────────────────────────────────────────────────┐
 │          AgentOrchestrator (Monolith)           │
 │  - Direct dependencies on concrete classes      │
@@ -95,7 +95,7 @@ Victor underwent a comprehensive three-phase architectural refactoring to addres
 
 ### After: Protocol-Based, DI-Driven Architecture
 
-```
+```text
 ┌───────────────────────────────────────────────────────────┐
 │            ServiceContainer (DI Container)                 │
 │  ┌────────────────────────────────────────────────────┐   │
@@ -154,7 +154,7 @@ class ToolCoordinatorProtocol(Protocol):
     ) -> ToolCallResult:
         """Execute a single tool."""
         ...
-```
+```text
 
 **Benefits**:
 - Multiple protocols can be implemented by one class
@@ -259,7 +259,7 @@ class OrchestratorFactory:
             streaming_controller=streaming_controller,
             # ... other dependencies
         )
-```
+```text
 
 **Benefits**:
 - Centralized creation logic
@@ -365,7 +365,7 @@ class MetricsCollector:
             self._track_tool_start(event.data)
         elif event.topic == "tool.complete":
             self._track_tool_complete(event.data)
-```
+```text
 
 **Benefits**:
 - Loose coupling between components
@@ -457,7 +457,7 @@ class MetricsCollector:
 │              Event Backends (Pluggable)                     │
 │  In-Memory │ Kafka │ SQS │ RabbitMQ │ Redis │ Database     │
 └────────────────────────────────────────────────────────────┘
-```
+```text
 
 ### Dependency Flow
 
@@ -504,7 +504,7 @@ CLI/API Entry Point
      │                          └─> RecoveryHandler
      │
      └─> Response to User
-```
+```text
 
 ## Migration Path
 

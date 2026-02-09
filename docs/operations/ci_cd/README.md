@@ -69,7 +69,7 @@ bash scripts/hooks/validate_workflows.sh --ci victor/*/workflows/*.yaml
 
 # Verbose mode
 VICTOR_VERBOSE_VALIDATION=1 bash scripts/hooks/validate_workflows.sh feature.yaml
-```
+```text
 
 #### Workflow Test Runner (`/scripts/ci/run_workflow_tests.sh`)
 
@@ -112,7 +112,7 @@ bash scripts/ci/run_workflow_tests.sh --verbose
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                     Developer Workflow                       │
 └─────────────────────────────────────────────────────────────┘
@@ -228,7 +228,7 @@ bash scripts/hooks/validate_workflows.sh victor/coding/workflows/feature.yaml
 
 # Run all workflow tests
 bash scripts/ci/run_workflow_tests.sh
-```
+```text
 
 **Before Pushing**:
 ```bash
@@ -256,7 +256,7 @@ git checkout main
 bash scripts/ci/run_workflow_tests.sh  # Record baseline
 git checkout pr-branch
 bash scripts/ci/run_workflow_tests.sh  # Compare
-```
+```text
 
 **Debugging Failures**:
 1. Download artifacts from failed run
@@ -315,7 +315,7 @@ pip install --upgrade pip
 pip install -e ".[dev]"
 pre-commit autoupdate
 pre-commit run --all-files
-```
+```text
 
 ### Issue: Performance regression false positive
 

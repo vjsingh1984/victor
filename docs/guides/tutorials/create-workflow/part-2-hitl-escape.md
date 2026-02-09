@@ -75,7 +75,7 @@ workflows:
         role: reporter
         goal: "Compile all findings into a comprehensive report"
         tool_budget: 5
-```
+```text
 
 ### Join Strategies
 
@@ -165,7 +165,7 @@ workflows:
         role: executor
         goal: "Merge the approved changes"
         tool_budget: 5
-```
+```text
 
 ### HITL Node Types
 

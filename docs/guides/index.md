@@ -65,7 +65,7 @@ edges:
     target: test
   - source: test
     target: report
-```
+```text
 
 [Full Workflow Guide →](workflow-development/dsl.md)
 
@@ -133,7 +133,7 @@ def on_tool_execution(event: Event):
 EventBus.subscribe("tool.execution", on_tool_execution)
 
 # Now every tool execution will trigger this callback
-```
+```text
 
 [Full Observability Guide →](observability/index.md)
 
@@ -201,7 +201,7 @@ ollama pull qwen2.5-coder:7b
 
 # Run Victor with local model
 victor chat --provider ollama --model qwen2.5-coder:7b
-```
+```text
 
 [Full Development Setup →](development/local-models.md)
 
@@ -235,7 +235,7 @@ nodes:
     cache:
       enabled: true
       ttl: 3600  # Cache for 1 hour
-```
+```text
 
 **3. Profile Workflows**
 ```bash
@@ -268,7 +268,7 @@ profiles:
   secure:
     provider: anthropic
     api_key_env: ANTHROPIC_API_KEY
-```
+```text
 
 **2. Use project context for security**
 ```markdown
@@ -295,7 +295,7 @@ def audit_workflow(event):
     write_audit_log(log)
 
 EventBus.subscribe("workflow.complete", audit_workflow)
-```
+```text
 
 [Security Compliance →](../operations/security/compliance.md)
 
@@ -379,7 +379,7 @@ edges:
     target: approve
   - source: approve
     target: deploy
-```
+```text
 
 [Full HITL Guide →](HITL_WORKFLOWS.md)
 
@@ -409,7 +409,7 @@ results = parallel(
     run_coverage,
     run_typecheck
 )
-```
+```text
 
 ### 3. Conditional Workflow
 
@@ -453,7 +453,7 @@ orchestrator.set_providers([
 ])
 
 result = await orchestrator.run("Analyze this code")
-```
+```text
 
 ## Additional Resources
 

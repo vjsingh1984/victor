@@ -59,7 +59,7 @@ Workflows are reusable, multi-step processes that automate complex tasks. They c
 
 ### Workflow Components
 
-```
+```text
 ┌─────────────────────────────────────┐
 │         Workflow Engine              │
 ├─────────────────────────────────────┤

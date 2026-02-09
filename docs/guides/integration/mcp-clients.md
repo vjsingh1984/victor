@@ -21,7 +21,7 @@ victor serve --mcp --port 8080
 
 # With specific tools exposed
 victor serve --mcp --tools read,write,search
-```
+```text
 
 External clients can now connect and use Victor's tools.
 
@@ -60,7 +60,7 @@ config = MCPServerConfig(
 
 server = MCPServer(config)
 await server.start()
-```
+```text
 
 ### Exposed Endpoints
 
@@ -105,7 +105,7 @@ config = MCPClientConfig(
 
 client = MCPClient(config)
 await client.connect()
-```
+```text
 
 ### Discovering Tools
 
@@ -137,7 +137,7 @@ if result.error:
     print(f"Tool error: {result.error}")
 else:
     print(result.content)
-```
+```text
 
 ## MCP Registry
 
@@ -191,7 +191,7 @@ agent = await Agent.create(
 
 # Agent can now use external_search tool
 result = await agent.run("Search for authentication bugs")
-```
+```text
 
 ## Sandboxed Execution
 
@@ -244,7 +244,7 @@ mcp_schema = adapter.to_mcp_schema(victor_tool)
 # MCP schema to Victor tool
 mcp_tool = external_client.get_tool_schema("search")
 victor_tool = adapter.from_mcp_schema(mcp_tool)
-```
+```text
 
 ## Authentication
 
@@ -279,7 +279,7 @@ client = MCPClient(
     url="http://localhost:8080",
     oauth=oauth,
 )
-```
+```text
 
 ## Event Integration
 
@@ -323,7 +323,7 @@ victor mcp test code_tools
 
 # List tools from server
 victor mcp tools code_tools
-```
+```text
 
 ## Configuration File
 
@@ -367,7 +367,7 @@ sandbox = MCPSandbox(SandboxConfig(
     network_access=False,
     filesystem_readonly=True,
 ))
-```
+```text
 
 ### 2. Validate Tool Inputs
 
@@ -389,7 +389,7 @@ client.set_reconnect_policy(
     max_attempts=5,
     backoff="exponential",
 )
-```
+```text
 
 ### 4. Monitor Tool Usage
 

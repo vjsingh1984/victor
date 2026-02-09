@@ -47,7 +47,7 @@ This audit report covers:
 **Enable cache:**
 ```bash
 export VICTOR_CACHE_ENABLED=true
-```
+```text
 
 ---
 

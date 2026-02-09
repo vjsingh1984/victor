@@ -91,7 +91,7 @@ class OrchestratorFactory:
     def _create_conversation_components(self) -> ConversationComponents:
         """Create conversation components."""
         # Implementation
-```
+```text
 
 **Usage Example**:
 ```python
@@ -172,7 +172,7 @@ class PromptBuilder:
         return "\n\n".join(
             section.render() for section in self._sections
         )
-```
+```text
 
 **Usage Example**:
 ```python

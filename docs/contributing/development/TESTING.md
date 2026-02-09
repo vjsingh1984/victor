@@ -19,7 +19,7 @@ make test-cov
 
 # Run tests with CI configuration (includes coverage)
 make test-ci
-```
+```text
 
 ## Test Configurations
 
@@ -87,7 +87,7 @@ make test-cov
 
 # Full coverage with branch checking
 make test-cov-all
-```
+```text
 
 ### Coverage Reports
 
@@ -134,7 +134,7 @@ async def test_async_with_coverage():
 
 ## Test Organization
 
-```
+```text
 tests/
 ├── unit/              # Fast, isolated tests (no external services)
 │   ├── core/          # Core functionality tests
@@ -170,7 +170,7 @@ pytest -m "not slow"
 
 # Run tests requiring specific dependencies
 pytest -m requires_docker
-```
+```text
 
 ## Troubleshooting
 
@@ -186,7 +186,7 @@ pytest --no-cov -v
 **Solution 2**: Use CI config for coverage
 ```bash
 pytest -c pytest-ci.ini -v
-```
+```text
 
 **Solution 3**: Kill hanging pytest processes
 ```bash
@@ -200,7 +200,7 @@ pkill -9 pytest
 **Solution**: Exclude slow tests
 ```bash
 pytest -m "not slow" -v
-```
+```text
 
 ### Import Errors
 
@@ -222,7 +222,7 @@ Use `pytest-ci.ini` for CI pipelines:
   run: |
     pytest -c pytest-ci.ini -v
     # Coverage reports will be generated automatically
-```
+```text
 
 ### Coverage Thresholds
 

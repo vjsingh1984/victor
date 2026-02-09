@@ -35,7 +35,7 @@ nodes:
 edges:
   - [start, [analyze_code, run_tests, check_coverage]]
   - [[analyze_code, run_tests, check_coverage], end]
-```
+```text
 
 ### Conditional Branching
 
@@ -83,7 +83,7 @@ async def error_handler(state):
             return "error_node"
 
     return "next_node"
-```
+```text
 
 ---
 
@@ -118,7 +118,7 @@ def test_workflow_integration():
         use_real_tools=True
     )
     assert result["success"] is True
-```
+```text
 
 ---
 
@@ -188,7 +188,7 @@ graph.add_conditional_edge(
     lambda s: "deploy" if s["tests_passed"] else "end"
 )
 graph.add_edge("deploy", "end")
-```
+```text
 
 ---
 

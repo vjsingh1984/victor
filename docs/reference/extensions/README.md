@@ -136,7 +136,7 @@
 
 ## Documentation Structure
 
-```
+```text
 docs/extensions/
 ├── README.md                           # This file (completion summary)
 ├── step_handler_guide.md              # Main guide (811 lines)
@@ -231,7 +231,7 @@ docs/extensions/step_handler_examples.md
 
 # Keep quick reference handy
 docs/extensions/step_handler_quick_reference.md
-```
+```text
 
 ### For Migrating Existing Code
 
@@ -253,7 +253,7 @@ docs/extensions/step_handler_migration.md#migration-checklist
 ```bash
 # Look up handler orders, APIs, patterns
 docs/extensions/step_handler_quick_reference.md
-```
+```text
 
 ## Documentation Features
 

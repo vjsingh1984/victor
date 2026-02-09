@@ -26,7 +26,7 @@ from victor.providers.base import (
     ProviderConnectionError,
     ProviderInvalidResponseError,
 )
-```
+```text
 
 ### Error Classes
 
@@ -103,7 +103,7 @@ stats = provider.get_circuit_breaker_stats()
 
 # Reset circuit breaker manually
 provider.reset_circuit_breaker()
-```
+```text
 
 ### Error Handling Example
 

@@ -29,7 +29,7 @@ async def test_async_method_success(coordinator: ChatCoordinator):
 
     # Assert
     assert response.content == "Expected response"
-```
+```text
 
 ### Testing Async Generators
 
@@ -76,7 +76,7 @@ def _create_async_stream(self):
         yield StreamChunk(content="Chunk 1")
         yield StreamChunk(content="Chunk 2")
     return stream
-```
+```text
 
 ### Testing Async Error Handling
 
@@ -108,7 +108,7 @@ async def test_async_context_manager(coordinator: SessionCoordinator):
 
     # Assert after context exit
     assert session.active is False
-```
+```text
 
 ### Testing Concurrent Execution
 
@@ -171,7 +171,7 @@ pytest --cov=victor.agent.coordinators \
 
 # HTML report
 open htmlcov/index.html
-```
+```text
 
 ### Coverage Goals
 
@@ -236,7 +236,7 @@ async def test_successful_execution(coordinator: CoordinatorName):
     # Assert
     assert result.success is True
     assert result.output is not None
-```
+```text
 
 ### Error Handling Tests
 
@@ -299,7 +299,7 @@ async def test_handles_concurrent_requests(coordinator: CoordinatorName):
 
     # Assert
     assert len(results) == 100
-```
+```text
 
 ### State Management Tests
 

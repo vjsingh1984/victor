@@ -85,7 +85,7 @@ and operates independently through well-defined interfaces.
                             │  Event Bus          │
                             │  Cache Manager      │
                             └──────────────────────┘
-```
+```text
 
 ### Architectural Layers
 
@@ -214,7 +214,7 @@ class AgentOrchestrator:
 
         # 4. Execute chat
         return await self._chat_coordinator.chat(prompt, context)
-```
+```text
 
 #### Pattern 2: Direct Coordinator Access (Advanced)
 
@@ -243,7 +243,7 @@ class ContextCoordinator:
             "context.compacted",
             {"tokens_before": 10000, "tokens_after": 5000}
         )
-```
+```text
 
 ### Communication Protocols
 
@@ -264,7 +264,7 @@ class PromptCoordinator:
         """Asynchronous prompt building."""
         contributors = await self._load_contributors()
         return await self._assemble_prompt(contributors, message, context)
-```
+```text
 
 #### Streaming Communication
 
@@ -282,7 +282,7 @@ class ChatCoordinator:
 
 ### Chat Request Flow
 
-```
+```text
 User Request
      │
      ▼
@@ -339,7 +339,7 @@ User Request
 
 ### Tool Execution Flow
 
-```
+```text
 Tool Call Request
      │
      ▼
@@ -379,7 +379,7 @@ Tool Call Request
 
 ### Context Compaction Flow
 
-```
+```text
 Context Threshold Exceeded
      │
      ▼
@@ -436,7 +436,7 @@ class ConfigCoordinator:
     def get_config(self): ...
     def chat(self): ...
     def execute_tools(self): ...
-```
+```text
 
 ### 2. Dependency Inversion Principle (DIP)
 
@@ -472,7 +472,7 @@ class ICoordinator(Protocol):
     def get_context(self) -> Context: ...
     def execute_tools(self) -> None: ...
     # ... 20 more methods
-```
+```text
 
 ### 4. Open/Closed Principle (OCP)
 
@@ -506,7 +506,7 @@ class AgentOrchestrator:
 # Client doesn't need to know about coordinators
 orchestrator = AgentOrchestrator(...)
 await orchestrator.chat("Hello")
-```
+```text
 
 ---
 
@@ -605,7 +605,7 @@ class CompliancePromptContributor(BasePromptContributor):
         if context.get("requires_compliance"):
             return "\nCompliance: Follow all regulatory requirements."
         return ""
-```
+```text
 
 ### 3. Custom Compaction Strategies
 
@@ -635,7 +635,7 @@ class CustomSelectionStrategy(IToolSelectionStrategy):
     async def select_tools(self, query: str, available_tools: List[Tool]) -> List[Tool]:
         # Implement custom selection logic
         return selected_tools
-```
+```text
 
 ---
 

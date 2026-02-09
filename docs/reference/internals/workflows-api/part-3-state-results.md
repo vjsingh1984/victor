@@ -36,7 +36,7 @@ class WorkflowState(TypedDict):
     _workflow_id: str
     _node_results: Dict[str, Any]
     _parallel_results: Dict[str, Any]
-```
+```text
 
 ### Context Variables
 
@@ -78,7 +78,7 @@ state = {
     "_workflow_id": "abc123",
     "_node_results": {"search": {...}, "analyze": {...}}
 }
-```
+```text
 
 ### CopyOnWriteState
 
@@ -117,7 +117,7 @@ class GraphExecutionResult(Generic[StateType]):
     iterations: int            # Number of iterations executed
     duration: float            # Total execution time in seconds
     node_history: List[str]    # Sequence of executed node IDs
-```
+```text
 
 **Example:**
 ```python
@@ -144,7 +144,7 @@ class NodeExecutionResult:
     error: Optional[str] = None  # Error message if failed
     duration_seconds: float = 0.0  # Execution time
     tool_calls_used: int = 0   # Number of tool calls made
-```
+```text
 
 ### Streaming Events
 
@@ -181,7 +181,7 @@ if not result.success:
     for node_id, node_result in node_results.items():
         if not node_result.get("success", True):
             print(f"Node {node_id} failed: {node_result.get('error')}")
-```
+```text
 
 ---
 
@@ -233,7 +233,7 @@ class ExecutionConfig:
     max_iterations: int = 25        # Maximum cycles allowed
     timeout: Optional[float] = None # Overall timeout in seconds
     recursion_limit: int = 100      # Maximum recursion depth
-```
+```text
 
 ### CheckpointConfig
 
@@ -252,7 +252,7 @@ class CheckpointConfig:
 class InterruptConfig:
     interrupt_before: List[str] = field(default_factory=list)
     interrupt_after: List[str] = field(default_factory=list)
-```
+```text
 
 ### PerformanceConfig
 
@@ -271,7 +271,7 @@ class ObservabilityConfig:
     emit_events: bool = True
     log_node_execution: bool = False
     graph_id: Optional[str] = None
-```
+```text
 
 ### UnifiedCompilerConfig
 
@@ -312,7 +312,7 @@ resumed_result = await app.invoke(
     {},  # State loaded from checkpoint
     thread_id=thread_id  # Same thread_id to resume
 )
-```
+```text
 
 
 **Reading Time:** 3 min

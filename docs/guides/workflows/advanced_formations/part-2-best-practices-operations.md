@@ -77,7 +77,7 @@ dynamic_config:
       target_formation: parallel
     - trigger: quality_concerns
       target_formation: consensus
-```
+```text
 
 ### Adaptive Formation Tuning
 
@@ -126,7 +126,7 @@ hybrid_config:
       duration_budget: 60.0  # Longer budget
     - formation: consensus
       goal: "Validate with consensus"
-```
+```text
 
 ## Monitoring and Observability
 
@@ -165,7 +165,7 @@ formation_scores = metadata["formation_scores"]
 print(f"Selected: {selected_formation}")
 print(f"Characteristics: {task_characteristics}")
 print(f"Scores: {formation_scores}")
-```
+```text
 
 ### Hybrid Formation Metadata
 
@@ -192,7 +192,7 @@ teams:
   - name: review_team
     formation: parallel
     members: [...]
-```
+```text
 
 **After (dynamic):**
 ```yaml
@@ -221,7 +221,7 @@ teams:
   - name: complex_team
     formation: hierarchical
     members: [...]
-```
+```text
 
 **After (adaptive):**
 ```yaml
@@ -252,7 +252,7 @@ workflow2:
 workflow3:
   formation: consensus
   ...
-```
+```text
 
 **After (hybrid):**
 ```yaml
@@ -355,7 +355,7 @@ from victor.teams import create_coordinator
 coordinator = create_coordinator()
 coordinator.set_formation("dynamic")  # or "adaptive", "hybrid"
 result = await coordinator.execute_task(task, context)
-```
+```text
 
 ## References
 

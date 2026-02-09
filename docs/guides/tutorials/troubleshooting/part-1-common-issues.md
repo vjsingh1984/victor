@@ -34,7 +34,7 @@ This guide helps you diagnose and fix common issues with Victor AI.
 ### Issue: "No module named 'victor'"
 
 **Symptoms:**
-```
+```text
 ModuleNotFoundError: No module named 'victor'
 ```
 
@@ -44,7 +44,7 @@ ModuleNotFoundError: No module named 'victor'
 ```bash
 cd /path/to/victor
 pip install -e ".[dev]"
-```
+```text
 
 2. **Check Python path:**
 ```bash
@@ -56,7 +56,7 @@ python -c "import sys; print(sys.path)"
 ```bash
 pip uninstall victor-ai
 pip install -e ".[dev]"
-```
+```text
 
 [Content continues through Debugging Tips...]
 

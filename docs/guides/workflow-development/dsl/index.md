@@ -48,7 +48,7 @@ workflow:
   steps:
     - name: analyze
       agent: true
-```
+```text
 
 ---
 

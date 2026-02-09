@@ -45,7 +45,7 @@ victor checkpoint cleanup --keep 10
 
 # Configure auto-checkpointing
 victor checkpoint auto --enable --interval 5
-```
+```text
 
 ### Python API
 
@@ -98,7 +98,7 @@ success = manager.restore_checkpoint(
     checkpoint_id=checkpoint.id,
     restore_git=True,  # Also restore git working tree
 )
-```
+```text
 
 #### Listing Checkpoints
 
@@ -125,7 +125,7 @@ print(f"New session: {new_session_id}")
 
 # The new session has the same state as the checkpoint
 new_state = manager.load_checkpoint_by_session(new_session_id)
-```
+```text
 
 ## Auto-Checkpointing
 
@@ -166,7 +166,7 @@ manager = EnhancedCheckpointManager(
     checkpoint_interval=10,
     db_path=Path("/path/to/checkpoints.db"),  # Custom database path
 )
-```
+```text
 
 ## Checkpoint State Structure
 
@@ -202,7 +202,7 @@ context_dict = StateSerializer.serialize_context(context)
 
 # Serialize execution state
 state_dict = StateSerializer.serialize_execution_state(state)
-```
+```text
 
 ## Architecture
 
@@ -245,7 +245,7 @@ EnhancedCheckpointManager.save_checkpoint()
     ├──► GitBackend.create() ──► git stash (working tree)
     │
     └──► SQLiteBackend.save() ──► checkpoints table (state)
-```
+```text
 
 ### Checkpoint Restore Flow
 
@@ -299,7 +299,7 @@ checkpoint = manager.save_checkpoint(
     session_id="custom_session",
     state=state,
 )
-```
+```text
 
 ### Integration with Orchestrator
 
@@ -361,7 +361,7 @@ recent = [cp for cp in checkpoints if cp["timestamp"] > "2025-01-10"]
 # Delete old checkpoints
 removed = backend.delete_old_checkpoints(keep_count=20)
 print(f"Removed {removed} old checkpoints")
-```
+```text
 
 ## Best Practices
 
@@ -410,7 +410,7 @@ async def periodic_cleanup():
     while True:
         await asyncio.sleep(3600)  # Every hour
         manager.cleanup_old(keep_count=20)
-```
+```text
 
 ### Session Forking for Exploration
 
@@ -441,7 +441,7 @@ Options:
   --session, -s TEXT    Session ID (default: current)
   --auto, -a          Enable auto-checkpointing
   --interval, -i INT   Auto-checkpoint interval (default: 5)
-```
+```text
 
 ### victor checkpoint list
 
@@ -463,7 +463,7 @@ Show detailed checkpoint information.
 
 ```bash
 victor checkpoint show CHECKPOINT_ID
-```
+```text
 
 ### victor checkpoint restore
 
@@ -483,7 +483,7 @@ Create a new session from a checkpoint.
 
 ```bash
 victor checkpoint fork CHECKPOINT_ID
-```
+```text
 
 ### victor checkpoint cleanup
 
@@ -507,7 +507,7 @@ victor checkpoint auto [OPTIONS]
 Options:
   --enable/--disable   Enable or disable auto-checkpointing
   --interval, -i INT   Checkpoint interval (default: 5)
-```
+```text
 
 ## Performance Considerations
 
@@ -541,7 +541,7 @@ if not state:
 
 # Try restoring state only (no git)
 manager.restore_checkpoint(checkpoint_id, restore_git=False)
-```
+```text
 
 ### Auto-Checkpointing Not Working
 

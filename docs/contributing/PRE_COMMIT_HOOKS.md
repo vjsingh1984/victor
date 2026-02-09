@@ -17,7 +17,7 @@ pip install pre-commit
 
 # Or using pipx (recommended for system-wide installation)
 pipx install pre-commit
-```
+```text
 
 ### Setup
 
@@ -62,7 +62,7 @@ The workflow validation hook (`validate-workflows`) performs the following check
 
 The hook only validates YAML files in workflow directories:
 
-```
+```text
 victor/*/workflows/*.yaml
 victor/*/workflows/*.yml
 ```
@@ -90,7 +90,7 @@ git add victor/coding/workflows/feature.yaml
 
 # Commit - hooks run automatically
 git commit -m "Update feature workflow"
-```
+```text
 
 If validation fails, the commit is aborted with an error message.
 
@@ -122,7 +122,7 @@ You can also run the validation script directly:
 
 # With verbose output
 VICTOR_VERBOSE_VALIDATION=1 ./scripts/hooks/validate_workflows.sh victor/coding/workflows/feature.yaml
-```
+```text
 
 ## Configuration
 
@@ -163,7 +163,7 @@ The hook configuration is stored in `.pre-commit-hooks.yaml`:
       language: script
       files: '^victor/[^/]+/workflows/.*\.ya?ml$'
       pass_filenames: true
-```
+```text
 
 You can customize the hook behavior by modifying this file.
 
@@ -187,7 +187,7 @@ pre-commit uninstall
 
 # Or disable specific hook
 # Edit .pre-commit-config.yaml and comment out the hook
-```
+```text
 
 ## Troubleshooting
 
@@ -203,7 +203,7 @@ If the hook doesn't run automatically:
 2. **Verify hooks are installed:**
    ```bash
    ls -la .git/hooks/pre-commit
-   ```
+```text
 
 3. **Reinstall hooks:**
    ```bash
@@ -214,7 +214,7 @@ If the hook doesn't run automatically:
 
 #### YAML Syntax Error
 
-```
+```text
 [FAIL] Invalid YAML syntax in: victor/coding/workflows/feature.yaml
 ```
 
@@ -226,14 +226,14 @@ If the hook doesn't run automatically:
 Use a YAML validator to identify the exact issue:
 ```bash
 python3 -c "import yaml; yaml.safe_load(open('victor/coding/workflows/feature.yaml'))"
-```
+```text
 
 #### Compilation Error
 
 ```
 [FAIL] Workflow validation failed: victor/coding/workflows/feature.yaml
   Error: Node 'step1' references non-existent node 'step2'
-```
+```text
 
 **Solution:** Fix the workflow definition:
 - Ensure all node references exist
@@ -244,7 +244,7 @@ python3 -c "import yaml; yaml.safe_load(open('victor/coding/workflows/feature.ya
 
 ```
 bash: ./scripts/hooks/validate_workflows.sh: Permission denied
-```
+```text
 
 **Solution:** Make the script executable:
 ```bash
@@ -253,7 +253,7 @@ chmod +x scripts/hooks/validate_workflows.sh
 
 ### Python Not Found
 
-```
+```text
 [FAIL] Python not found: python3
 ```
 
@@ -267,7 +267,7 @@ sudo apt-get install python3
 
 # Or set custom Python path
 export PYTHON_BIN=/usr/local/bin/python3.9
-```
+```text
 
 ### Slow Validation
 
@@ -281,7 +281,7 @@ If validation is slow:
 2. **Validate only changed files:**
    ```bash
    pre-commit run validate-workflows --files victor/coding/workflows/changed.yaml
-   ```
+```text
 
 3. **Run hooks in parallel:**
    ```bash
@@ -326,7 +326,7 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Run pre-commit
         run: pre-commit run --all-files
-```
+```text
 
 ### GitLab CI
 
@@ -348,7 +348,7 @@ When adding new validation rules:
 2. Test the hook manually:
    ```bash
    ./scripts/hooks/validate_workflows.sh victor/coding/workflows/feature.yaml
-   ```
+```text
 3. Update this documentation with new rules
 4. Add tests to `tests/integration/workflows/test_workflow_yaml_validation.py`
 

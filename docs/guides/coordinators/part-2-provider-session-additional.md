@@ -42,7 +42,7 @@ class ProviderCoordinator:
             >>> provider_coord.switch_provider("anthropic")
             >>> provider_coord.switch_provider("openai", "gpt-4")
         """
-```
+```text
 
 ### SessionCoordinator
 

@@ -74,7 +74,7 @@ Your feedback helps us improve the Victor AI documentation. This guide explains 
 ## Screenshots (if applicable)
 
 [Attach screenshots for visual feedback]
-```
+```text
 
 ### Bug Reports (GitHub Issues)
 
@@ -154,7 +154,7 @@ git commit -m "docs: improve something"
 git push origin docs/improve-something
 
 # Create PR on GitHub
-```
+```text
 
 ---
 
@@ -383,7 +383,7 @@ Each example should be:
 ### Impact
 
 This would make it much easier for new users to get started with workflows.
-```
+```text
 
 ### Good General Feedback
 
@@ -418,7 +418,7 @@ This would help users remember the basics without having to search the docs.
 ### Overall Experience
 
 5/5 stars! The journey format is perfect for onboarding.
-```
+```text
 
 ---
 

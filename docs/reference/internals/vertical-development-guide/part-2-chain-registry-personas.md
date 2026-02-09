@@ -38,7 +38,7 @@ registry.register_chain(
     author="Your Name",
     deprecated=False,
 )
-```
+```text
 
 #### Decorator Registration
 
@@ -88,7 +88,7 @@ def register_coding_chains():
         category="editing",
         description="Edit code with validation and verification",
     )
-```
+```text
 
 **By Category**:
 ```python
@@ -126,7 +126,7 @@ registry.register_chain(
     chain=my_chain,
     category="editing",
 )
-```
+```text
 
 **Version retrieval**:
 ```python
@@ -170,7 +170,7 @@ class LazyChainRegistry:
             self._loaded[name] = self._factories[name]()
 
         return self._loaded[name]
-```
+```text
 
 **Usage**:
 ```python
@@ -206,7 +206,7 @@ def find_chains_by_tag(tag: str) -> List[str]:
         if tag in metadata.tags:
             matching.append(name)
     return matching
-```
+```text
 
 ### 3.6 Real-World Example: Coding Chains
 
@@ -299,7 +299,7 @@ persona = PersonaTraits(
         "focus_areas": ["OWASP_TOP_10", "crypto"],
     },
 )
-```
+```text
 
 ### 4.2 Communication Styles
 
@@ -341,7 +341,7 @@ ExpertiseLevel.EXPERT
 
 ExpertiseLevel.SPECIALIST
 # Highly specialized in narrow domain
-```
+```text
 
 **Level selection guide**:
 - **NOVICE**: Training agents, learning mode, tutorial assistants
@@ -409,7 +409,7 @@ provider.register_persona(
 
 # Retrieve persona
 persona = provider.get_persona("security_auditor")
-```
+```text
 
 #### Template-Based Registration
 
@@ -464,7 +464,7 @@ class MyVertical(VerticalBase):
         """Return team specification provider."""
         from myvertical.teams import MyVerticalTeamProvider
         return MyVerticalTeamProvider()
-```
+```text
 
 
 **Reading Time:** 5 min

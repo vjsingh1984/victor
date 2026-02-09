@@ -40,7 +40,7 @@ This guide covers dynamic personas for context-aware AI assistance:
 **Use a persona:**
 ```bash
 victor chat --persona senior-developer "Review this code"
-```
+```text
 
 ---
 

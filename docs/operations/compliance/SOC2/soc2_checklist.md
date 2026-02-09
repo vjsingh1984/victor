@@ -393,7 +393,7 @@
 
 ## Timeline
 
-```
+```text
 Month 1-3 (Jan-Mar 2026): Foundation
 ├─ Governance structure
 ├─ Risk assessment methodology

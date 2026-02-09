@@ -87,7 +87,7 @@ team_node = template.to_team_node(
     goal="Review authentication changes",
     output_key="review_results"
 )
-```
+```text
 
 ### Template Manager CLI
 
@@ -143,7 +143,7 @@ Each team member includes:
   can_delegate: false
   memory: true
   cache: true
-```
+```text
 
 ## Team Formations
 
@@ -210,7 +210,7 @@ Then validate and use:
 
 ```bash
 python -m scripts.teams.template_manager validate my_template.yaml
-```
+```text
 
 ### Option 2: Python API
 
@@ -251,7 +251,7 @@ register_template(template)
 
 ```bash
 python -m scripts.teams.template_manager create --output my_template.yaml
-```
+```text
 
 ## Best Practices
 
@@ -318,7 +318,7 @@ from victor.workflows.team_templates import get_template
 
 template = get_template("code_review_parallel")
 config = template.to_team_config(goal="Review PR #123")
-```
+```text
 
 ## Advanced Usage
 
@@ -354,7 +354,7 @@ template = registry.suggest_template(
     vertical="coding",
     complexity="standard",
 )
-```
+```text
 
 ### Template Validation
 
@@ -379,7 +379,7 @@ python -m scripts.teams.template_manager list
 
 # Search for similar templates
 python -m scripts.teams.template_manager search "review"
-```
+```text
 
 ### Validation Errors
 

@@ -44,7 +44,7 @@ Choose your path based on your goals:
 
 ### Architecture Highlights
 
-```
+```text
 ┌─────────────────────────────────────────────────┐
 │          Clients: CLI/TUI, HTTP, MCP            │
 └──────────────────┬──────────────────────────────┘
@@ -73,7 +73,7 @@ Choose your path based on your goals:
 **Quick Install (pipx):**
 ```bash
 pipx install victor-ai
-```
+```text
 
 **Docker:**
 ```bash
@@ -86,7 +86,7 @@ docker run -it ghcr.io/vjsingh1984/victor:latest
 git clone https://github.com/vjsingh1984/victor.git
 cd victor
 pip install -e ".[dev]"
-```
+```text
 
 ### First Run
 
@@ -108,7 +108,7 @@ export ANTHROPIC_API_KEY=sk-ant-your-key
 
 # Start Victor
 victor chat --provider anthropic "Help me refactor this code"
-```
+```text
 
 **See:** [Installation Guide](getting-started/installation.md) | [First Run](getting-started/first-run.md)
 
@@ -204,19 +204,19 @@ Victor includes 20+ Mermaid diagrams for visual learning:
 ```
 You: Create a FastAPI endpoint for user authentication with JWT tokens
 [Victor generates code with best practices]
-```
+```text
 
 **Refactoring:**
 ```
 You: Refactor this function to use the Strategy pattern
 [Victor applies pattern with tests]
-```
+```text
 
 **Testing:**
 ```
 You: Write unit tests for the UserService class
 [Victor generates comprehensive tests]
-```
+```text
 
 ### For Teams
 
@@ -224,7 +224,7 @@ You: Write unit tests for the UserService class
 ```
 You: Review this PR and suggest improvements
 [Victor analyzes and provides actionable feedback]
-```
+```text
 
 **Multi-Agent Collaboration:**
 ```bash
@@ -242,7 +242,7 @@ steps:
   - name: Review code
     tool: code_review
     depends_on: [Run tests]
-```
+```text
 
 ### For DevOps/SRE
 
@@ -256,7 +256,7 @@ victor chat "Help me create a Kubernetes deployment for Victor"
 ```bash
 victor chat "Set up Prometheus monitoring for Victor API"
 [Victor creates dashboards and alerts]
-```
+```text
 
 ---
 
@@ -269,7 +269,7 @@ Switch providers mid-conversation without losing context:
 ```
 You: switch to openai
 [Victor switches to OpenAI, maintaining conversation history]
-```
+```text
 
 **Supported Providers:** 21 providers across cloud and local
 - **Cloud:** Anthropic, OpenAI, Google, Azure, AWS Bedrock, Cohere, etc.
@@ -305,7 +305,7 @@ agents:
     role: QA Engineer
   - name: optimizer
     role: Performance Engineer
-```
+```text
 
 **See:** [Multi-Agent Teams](guides/multi-agent-teams.md)
 

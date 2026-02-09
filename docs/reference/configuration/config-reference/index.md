@@ -48,7 +48,7 @@ profiles:
   default:
     provider: ollama
     model: qwen2.5-coder:7b
-```
+```text
 
 **Full Documentation:**
 - Part 1: Core system configuration

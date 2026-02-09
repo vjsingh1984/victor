@@ -54,7 +54,7 @@ Team nodes are a special node type in YAML workflows that create **temporary,
 
 ### Architecture
 
-```
+```text
 Workflow Graph (YAML)
     └── Team Node
         ├── Member 1 (Researcher)
@@ -116,7 +116,7 @@ workflows:
             role: reviewer
             goal: "Check code quality"
         next: [summarize]
-```
+```text
 
 ### Execution
 
@@ -165,7 +165,7 @@ nodes:
         tool_budget: 50
         tools: [read, write]
     next: [next_node]
-```
+```text
 
 ### Required Fields
 
@@ -233,7 +233,7 @@ nodes:
         role: executor
         goal: "Implement based on research"
         tool_budget: 35
-```
+```text
 
 **Use when**: Tasks have clear dependent stages where output feeds into input.
 
@@ -304,7 +304,7 @@ nodes:
         role: reviewer
         goal: "Review and refine documentation"
         tools: [read]
-```
+```text
 
 **Use when**: Processing pipeline with clear stages and handoff requirements.
 
@@ -379,7 +379,7 @@ nodes:
         role: planner
         goal: "Evaluate design from maintainability perspective"
         expertise: [architecture, maintainability]
-```
+```text
 
 **Use when**: Critical decisions requiring unanimous agreement.
 

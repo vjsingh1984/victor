@@ -81,7 +81,7 @@ Complete configuration for Victor's behavior and integrations.
 ```bash
 # If a local provider is installed and configured
 victor
-```
+```text
 
 **Cloud provider**:
 ```bash
@@ -98,7 +98,7 @@ profiles:
   production:
     provider: openai
     model: gpt-4
-```
+```text
 
 [**Full Configuration Reference ->**](configuration/index.md)
 
@@ -166,7 +166,7 @@ victor chat --provider anthropic --model claude-sonnet-4-20250514
 
 # Finish with local model (context preserved)
 /provider ollama --model qwen2.5-coder:7b
-```
+```text
 
 ### Mode Selection
 
@@ -192,7 +192,7 @@ victor workflow run code-review
 
 # Schedule workflow
 victor workflow schedule code-review --cron "0 9 * * 1"
-```
+```text
 
 ---
 

@@ -58,7 +58,7 @@ class BaseProvider(ABC):
     ):
         # Initialization with built-in circuit breaker support
         ...
-```
+```text
 
 ### Required Methods
 
@@ -222,7 +222,7 @@ class CustomLLMProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         """Whether this provider supports streaming responses."""
         return True
-```
+```text
 
 ### Step 2: Implement the chat() Method
 

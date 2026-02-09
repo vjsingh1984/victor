@@ -49,7 +49,7 @@ The caching system is included with Victor AI 0.5.0+:
 
 ```bash
 pip install victor-ai>=0.5.0
-```
+```text
 
 ## Quick Start
 
@@ -83,7 +83,7 @@ warmer = CacheWarmer(cache=cache, strategy=WarmingStrategy.HYBRID)
 
 # Start background warming
 await warmer.start_background_warming()
-```
+```text
 
 ### Semantic Caching
 
@@ -129,7 +129,7 @@ result = await cache.get("key", namespace="tool")
 # Monitor performance
 stats = analytics.get_comprehensive_stats()
 print(f"Hit rate: {stats['hit_rate']:.1%}")
-```
+```text
 
 ## Configuration
 
@@ -222,7 +222,7 @@ invalidator = CacheInvalidator(
         enable_tagging=True,
     ),
 )
-```
+```text
 
 ## Performance
 
@@ -310,7 +310,7 @@ async def execute_tool(tool_name: str, **kwargs) -> Any:
     invalidator.tag(cache_key, "tool", [tool_name, kwargs.get("category")])
 
     return result
-```
+```text
 
 ### 3. File Analysis Caching
 
@@ -361,7 +361,7 @@ await cache.set("result", value, ttl=3600)  # 1 hour
 
 # Long TTL for stable data
 await cache.set("result", value, ttl=86400)  # 1 day
-```
+```text
 
 ### 3. Use Namespaces
 
@@ -385,7 +385,7 @@ if stats['hit_rate'] < 0.5:
 
 if stats['latency']['avg_ms'] > 5.0:
     logger.warning("High latency, investigate")
-```
+```text
 
 ### 5. Handle Errors Gracefully
 

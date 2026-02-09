@@ -77,7 +77,7 @@ victor chat
 # Disable
 export VICTOR_USE_COORDINATOR_ORCHESTRATOR=false
 victor chat
-```
+```text
 
 **Pros**:
 - No file modifications needed
@@ -133,7 +133,7 @@ python scripts/toggle_coordinator_orchestrator.py validate
 
 # Disable if needed
 python scripts/toggle_coordinator_orchestrator.py disable --backup
-```
+```text
 
 **Pros**:
 - Automatic backup before changes
@@ -184,7 +184,7 @@ export VICTOR_ENABLE_OBSERVABILITY_LOGGING=true
 export VICTOR_OBSERVABILITY_LOG_PATH=~/.victor/metrics/victor.jsonl
 
 victor chat
-```
+```text
 
 ---
 
@@ -270,7 +270,7 @@ profiles:
       base_threshold: 0.6  # Higher threshold (more selective)
       base_max_tools: 10    # Fewer tools
       model_size_tier: "medium"
-```
+```text
 
 ---
 

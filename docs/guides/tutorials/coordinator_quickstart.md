@@ -47,7 +47,7 @@ In this guide, you'll learn:
 
 Coordinators are specialized components that each handle one specific aspect of the orchestration process:
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │         AgentOrchestrator (Facade)      │
 └──────────────┬──────────────────────────┘
@@ -104,7 +104,7 @@ orchestrator = AgentOrchestrator(
 )
 
 response = await orchestrator.chat("Hello, Victor!")
-```
+```text
 
 ### For Advanced Users: More Control
 
@@ -154,7 +154,7 @@ async def main():
     print(response.content)
 
 asyncio.run(main())
-```
+```text
 
 ### 2. Custom Configuration
 
@@ -202,7 +202,7 @@ async def stream_chat():
         print(chunk.content, end="", flush=True)
 
 asyncio.run(stream_chat())
-```
+```text
 
 ---
 
@@ -257,7 +257,7 @@ class CompliancePromptContributor(BasePromptContributor):
 orchestrator._prompt_coordinator.add_contributor(
     CompliancePromptContributor()
 )
-```
+```text
 
 ### Pattern 3: Custom Compaction Strategy
 
@@ -305,7 +305,7 @@ analytics_coordinator = AnalyticsCoordinator(exporters=[
     DatabaseAnalyticsExporter(),
     ConsoleAnalyticsExporter(),  # Also log to console
 ])
-```
+```text
 
 ### Pattern 5: Access Coordinator State
 
@@ -399,7 +399,7 @@ settings = Settings(
     enable_analytics=False,  # Disable analytics
     enable_metrics=False,    # Disable metrics
 )
-```
+```text
 
 ### Migration Questions
 
@@ -455,7 +455,7 @@ orchestrator = AgentOrchestrator(
     provider=provider,
     model="claude-sonnet-4-5"
 )
-```
+```text
 
 ### Common Operations
 

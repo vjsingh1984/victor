@@ -9,7 +9,7 @@ The Multi-Level Cache (MLC) system implements a two-tier caching hierarchy for V
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                     Application                             │
 └────────────────────┬────────────────────────────────────────┘
@@ -62,7 +62,7 @@ cache = MultiLevelCache(
     ),
     write_policy=WritePolicy.WRITE_THROUGH,
 )
-```
+```text
 
 ### Write Policies
 
@@ -91,7 +91,7 @@ cache = MultiLevelCache(
 
 # Periodically flush L1 to L2
 await cache.flush()
-```
+```text
 
 #### Write-Around
 Writes to L2 only, bypassing L1.
@@ -121,7 +121,7 @@ config = CacheLevelConfig(eviction_policy=EvictionPolicy.FIFO)
 
 # TTL (Time-based expiration)
 config = CacheLevelConfig(eviction_policy=EvictionPolicy.TTL)
-```
+```text
 
 ## Usage Examples
 
@@ -155,7 +155,7 @@ result = await cache.get("key", namespace="tool")  # ~1-5ms
 
 # Subsequent accesses: Promoted to L1
 result = await cache.get("key", namespace="tool")  # ~0.1ms
-```
+```text
 
 ### Namespace Isolation
 
@@ -185,7 +185,7 @@ print(f"Write Policy: {stats['write_policy']}")
 # L2 Hit Rate: 28.1%
 # Combined Hit Rate: 83.3%
 # Write Policy: write_through
-```
+```text
 
 ## Performance Tuning
 
@@ -228,7 +228,7 @@ await cache.set("result", value, namespace="tool", ttl=60)
 
 # Long TTL for static data
 await cache.set("config", value, namespace="app", ttl=86400)
-```
+```text
 
 ### 3. Monitor Performance
 
@@ -259,7 +259,7 @@ except Exception as e:
 result = compute_value()
 await cache.set(key, result, namespace="tool")
 return result
-```
+```text
 
 ## Integration with Other Systems
 
@@ -285,7 +285,7 @@ analytics = CacheAnalytics(cache=cache, track_hot_keys=True)
 
 # Monitor performance
 await analytics.start_monitoring(interval_seconds=60)
-```
+```text
 
 ### Enable Intelligent Invalidation
 

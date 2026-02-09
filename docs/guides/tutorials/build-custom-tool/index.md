@@ -64,7 +64,7 @@ async def weather(location: str, units: str = "metric") -> Dict[str, Any]:
     """
     # Implementation...
     pass
-```
+```text
 
 ---
 

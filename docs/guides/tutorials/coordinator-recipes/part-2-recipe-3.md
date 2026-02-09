@@ -68,7 +68,7 @@
         """Close connection pool."""
         if self._pool:
             await self._pool.close()
-```
+```text
 
 #### Step 2: Create Database Schema
 
@@ -123,7 +123,7 @@ orchestrator = AgentOrchestrator(
     model=model,
     _analytics_coordinator=analytics_coordinator
 )
-```
+```text
 
 ### Testing
 
@@ -310,7 +310,7 @@ class RecentImportantCompactionStrategy(BaseCompactionStrategy):
         unique_messages.sort(key=lambda m: message_order.get(m, float('inf')))
 
         return Context(messages=system_messages + unique_messages)
-```
+```text
 
 #### Step 2: Use with Orchestrator
 
@@ -373,7 +373,7 @@ async def test_semantic_compaction():
     assert len(compacted.messages) < len(messages)
     # Should still have system message
     assert any(m.role == "system" for m in compacted.messages)
-```
+```text
 
 ### Production Considerations
 

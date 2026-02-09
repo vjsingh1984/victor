@@ -54,7 +54,7 @@ pip install victor-ai[observability]
 
 # Or install all optional dependencies
 pip install victor-ai[all]
-```
+```text
 
 ### Basic Configuration
 
@@ -93,7 +93,7 @@ print("Structured logging initialized")
 
 # 3. Start metrics server (optional, or integrate with existing app)
 start_metrics_server(port=9090)
-```
+```text
 
 ## Architecture
 
@@ -129,7 +129,7 @@ start_metrics_server(port=9090)
 │              │    │              │    │              │
 │  /metrics    │    │  /traces     │    │  /logs       │
 └──────────────┘    └──────────────┘    └──────────────┘
-```
+```text
 
 ## Environment Variables
 
@@ -196,7 +196,7 @@ histogram = registry.histogram(
     help="Operation latency",
 )
 histogram.observe(45.2)
-```
+```text
 
 ### Structured Logging
 
@@ -223,7 +223,7 @@ checker.add_check(ProviderHealthCheck("anthropic", provider))
 
 report = await checker.check_health()
 print(f"Status: {report.status}")
-```
+```text
 
 ## Docker Compose Example
 
@@ -290,7 +290,7 @@ export VICTOR_TELEMETRY_SAMPLING=0.5
 
 # Sample 10% of debug logs
 export VICTOR_LOG_SAMPLING=0.1
-```
+```text
 
 ### Batch Configuration
 

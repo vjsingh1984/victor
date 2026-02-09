@@ -30,7 +30,7 @@ pytest tests/unit/agent/coordinators/test_chat_coordinator.py -v
 
 # Run specific test
 pytest tests/unit/agent/coordinators/test_chat_coordinator.py::TestChatCoordinatorChat::test_chat_with_tools -v
-```
+```text
 
 ### Coverage for Specific Coordinator
 
@@ -57,7 +57,7 @@ pytest tests/unit/agent/coordinators/ \
 
 # Open report
 open htmlcov/index.html
-```
+```text
 
 ### Run Tests in Parallel
 
@@ -89,7 +89,7 @@ pytest -m slow tests/unit/agent/coordinators/
 
 # Skip slow tests
 pytest -m "not slow" tests/unit/agent/coordinators/
-```
+```text
 
 ### Debug Failed Tests
 
@@ -169,7 +169,7 @@ async def test_chat_with_tools(coordinator: ChatCoordinator):
     # Assert
     assert response.content is not None
     coordinator._orchestrator._handle_tool_calls.assert_called_once()
-```
+```text
 
 ### ToolCoordinator Patterns
 
@@ -310,7 +310,7 @@ async def test_semantic_compaction(coordinator: ContextCoordinator):
 
     # Assert
     assert len(result.compacted_context["messages"]) == 2
-```
+```text
 
 ### ProviderCoordinator Patterns
 
@@ -385,7 +385,7 @@ async def test_session_analytics(coordinator: AnalyticsCoordinator):
     assert analytics.total_messages == 0
     assert analytics.total_tool_calls == 0
     assert analytics.total_duration > 0
-```
+```text
 
 ### PromptCoordinator Patterns
 

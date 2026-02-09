@@ -182,7 +182,7 @@ vendor_security_assessment:
     backup_frequency: "Daily"
     recovery_time_objective: "4 hours"
     recovery_point_objective: "1 hour"
-```
+```text
 
 ---
 

@@ -107,7 +107,7 @@ Complete reference for all environment variables recognized by Victor.
 
 ```bash
 export LMSTUDIO_BASE_URLS="http://192.168.1.20:1234,http://127.0.0.1:1234"
-```
+```text
 
 ---
 
@@ -268,7 +268,7 @@ export GOOGLE_API_KEY="..."
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
 victor chat
-```
+```text
 
 ### Permanent (Shell Profile)
 
@@ -286,7 +286,7 @@ Create `.env` in your project root:
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 VICTOR_LOG_LEVEL=DEBUG
-```
+```text
 
 ### Using Victor's Secure Key Storage
 
@@ -305,7 +305,7 @@ victor keys --set anthropic
 1. **Use system keyring** for API keys when possible
 2. **Never commit** `.env` files or `api_keys.yaml` to version control
 3. **Add to .gitignore**:
-   ```
+```text
    .env
    .victor/api_keys.yaml
    ```

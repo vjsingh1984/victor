@@ -85,7 +85,7 @@ results = await executor.execute_batch(
     ],
     max_concurrency=4,  # Maximum 4 parallel executions
 )
-```
+```text
 
 ### Performance Characteristics
 
@@ -96,13 +96,13 @@ Tool 2: 0.05s
 Tool 3: 0.05s
 Tool 4: 0.05s
 Total: 0.20s
-```
+```text
 
 **Batch Execution (concurrency=4):**
 ```
 All 4 tools in parallel: 0.05s
 Total: 0.05s (75% faster)
-```
+```text
 
 ### Configuration Options
 
@@ -134,7 +134,7 @@ tool_calls = [
     ("read_file", {"path": "b.txt"}),                      # Group 2 (read)
 ]
 # Group 1 runs sequentially, Group 2 runs in parallel
-```
+```text
 
 ### Best Practices
 
@@ -192,7 +192,7 @@ strategy = TruncationCompactionStrategy(
 )
 
 compacted = strategy.compact(messages, target_tokens=1000)
-```
+```text
 
 **Performance:**
 - Time: ~1ms for 50 messages
@@ -237,7 +237,7 @@ strategy = HybridCompactionStrategy(
 )
 
 compacted = await strategy.compact_async(messages, target_tokens=1000)
-```
+```text
 
 **Decision Logic:**
 - Small context (< 5K): Truncation (faster)
@@ -285,7 +285,7 @@ strategy = create_compaction_strategy(
     summarization_model="gpt-4o-mini",
     cache_summaries=True,
 )
-```
+```text
 
 ### Best Practices
 
@@ -342,7 +342,7 @@ prompt1 = await coordinator.build_system_prompt(
 prompt2 = await coordinator.build_system_prompt(
     PromptContext({"task": "code_review", "language": "python"})
 )
-```
+```text
 
 ### Cache Keys
 
@@ -371,7 +371,7 @@ coordinator = PromptCoordinator(
 )
 
 # After 5 minutes, cache entries expire automatically
-```
+```text
 
 ### Cache Statistics
 
@@ -385,7 +385,7 @@ print(f"Total requests: {stats['total_requests']}")
 ```
 
 Output:
-```
+```text
 Hit rate: 85.3%
 Cache size: 42
 Total requests: 287
@@ -399,7 +399,7 @@ Total requests: 287
 coordinator.invalidate_cache(
     PromptContext({"task": "code_review"})
 )
-```
+```text
 
 #### Invalidate All
 
@@ -425,13 +425,13 @@ Cache is automatically invalidated when:
 ### Performance Characteristics
 
 **First build (cache miss):**
-```
+```text
 Time: ~50ms (for 5 contributors)
 Operations: Hash computation + 5 async calls
 ```
 
 **Subsequent builds (cache hit):**
-```
+```text
 Time: ~5ms (90% faster)
 Operations: Hash computation + dict lookup
 ```
@@ -440,7 +440,7 @@ Operations: Hash computation + dict lookup
 
 ```bash
 pytest tests/benchmark/test_performance_optimizations.py::test_prompt_building_cache_performance -v -s
-```
+```text
 
 Expected: 90%+ improvement on cache hit
 
@@ -494,7 +494,7 @@ prompt_coordinator = PromptCoordinator(
     enable_cache=True,
     cache_ttl=3600.0,  # 1 hour TTL
 )
-```
+```text
 
 ### Example 3: Adaptive Configuration
 

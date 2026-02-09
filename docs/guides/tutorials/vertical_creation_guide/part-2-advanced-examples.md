@@ -66,7 +66,7 @@ stages:
     tools: [read, grep, code_search]
     keywords: [read, find, search, look]
     next_stages: [ANALYSIS, EXECUTION]
-```
+```text
 
 ### 3. Use Task Type Hints
 
@@ -104,7 +104,7 @@ extensions:
       description: "Force pushing to main branch"
       severity: high
       category: git
-```
+```text
 
 ### 5. Specify Tool Dependencies
 
@@ -142,7 +142,7 @@ teams:
       - name: quality_reviewer
         persona: "You are a code quality expert..."
         capabilities: [complexity_analysis, style_check]
-```
+```text
 
 ## Examples
 
@@ -271,7 +271,7 @@ teams:
       - name: code_auditor
         persona: "You audit code for security issues..."
         capabilities: [security_scan]
-```
+```text
 
 ## Advanced Topics
 
@@ -327,7 +327,7 @@ from victor.framework import VerticalGenerator
 
 generator = VerticalGenerator(template, "victor/my_vertical")
 generator.generate()
-```
+```text
 
 ## Troubleshooting
 
@@ -337,7 +337,7 @@ generator.generate()
 Template validation errors:
   - Template metadata.name is required
   - Template must specify at least one tool
-```
+```text
 
 **Solution**: Ensure all required fields are present in your template.
 
@@ -345,7 +345,7 @@ Template validation errors:
 
 ```
 ImportError: cannot import name 'MyVerticalAssistant'
-```
+```text
 
 **Solution**:
 1. Check that the vertical is in the correct location: `victor/my_vertical/`
@@ -356,7 +356,7 @@ ImportError: cannot import name 'MyVerticalAssistant'
 
 ```
 ToolError: Tool 'my_custom_tool' not found
-```
+```text
 
 **Solution**:
 1. Ensure the tool is registered in the tool registry

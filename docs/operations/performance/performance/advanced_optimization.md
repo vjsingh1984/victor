@@ -71,7 +71,7 @@ if cache.should_adjust():
     result = cache.adjust_size()
     print(f"Adjusted: {result['old_size']} -> {result['new_size']}")
     print(f"Reason: {result['reason']}")
-```
+```text
 
 ### Expansion Logic
 
@@ -104,7 +104,7 @@ cache = AdaptiveLRUCache(
     target_hit_rate=0.5,  # Lower target
     adjustment_interval=600,  # Less frequent adjustments
 )
-```
+```text
 
 **For High-Performance Systems**:
 ```python
@@ -153,7 +153,7 @@ predictions = warmer.predict_next_queries(
 
 # Prewarm cache asynchronously
 await warmer.prewarm_predictions(predictions)
-```
+```text
 
 ### Prediction Strategies
 
@@ -167,7 +167,7 @@ await warmer.prewarm_predictions(predictions)
 ```python
 # Analyze sequences: "read" → "analyze" → "test"
 # If current sequence matches, predict next in sequence
-```
+```text
 
 **3. Time-Based Patterns** (10% weight):
 ```python
@@ -199,7 +199,7 @@ async def select_and_record(query, tools):
     await warmer.prewarm_predictions(predictions, selection_fn=prewarm_selection)
 
     return tools
-```
+```text
 
 ### Prediction Accuracy
 
@@ -219,7 +219,7 @@ warmer = PredictiveCacheWarmer(
     ngram_size=2,  # Only 2-query sequences
 )
 warmer.predict_next_queries(query, min_confidence=0.4)  # Higher threshold
-```
+```text
 
 **For Aggressive Predictions**:
 ```python
@@ -257,7 +257,7 @@ cache = MultiLevelCache(
 # Use like a normal cache
 cache.put("key", value)
 value = cache.get("key")  # Checks L1, then L2, then L3
-```
+```text
 
 ### Promotion/Demotion
 
@@ -289,7 +289,7 @@ print(f"L3 hit rate: {metrics['l3']['hit_rate']:.1%}")
 print(f"Overall hit rate: {metrics['combined']['hit_rate']:.1%}")
 print(f"Total promotions: {metrics['combined']['total_promotions']}")
 print(f"Total demotions: {metrics['combined']['total_demotions']}")
-```
+```text
 
 ### Configuration Tuning
 
@@ -313,7 +313,7 @@ cache = MultiLevelCache(
     l1_ttl=600,     # Longer TTL
     l2_ttl=7200,    # Longer TTL
 )
-```
+```text
 
 ---
 
@@ -401,7 +401,7 @@ async def select_tools(query):
         l1_cache.adjust_size()
 
     return tools
-```
+```text
 
 ### Example 2: Integration with SemanticSelector
 
@@ -464,7 +464,7 @@ async def monitor_cache():
             print(f"WARNING: L1 cache nearly full: {l1_util:.1%}")
 
         await asyncio.sleep(60)  # Check every minute
-```
+```text
 
 ---
 
@@ -540,7 +540,7 @@ cache = AdaptiveLRUCache(target_hit_rate=0.5)
 
 # Clear old patterns
 warmer.clear_patterns()
-```
+```text
 
 ### Problem: Prediction Accuracy Low
 
@@ -579,7 +579,7 @@ cache = MultiLevelCache(l1_size=200, l2_size=2000, l3_size=20000)
 
 # Increase TTL
 cache = MultiLevelCache(l1_ttl=600, l2_ttl=7200, l3_ttl=86400)
-```
+```text
 
 ---
 

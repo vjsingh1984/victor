@@ -103,7 +103,7 @@ class TestCoordinatorNameErrorHandling:
         # Act & Assert
         with pytest.raises(ValueError):
             await coordinator.method({"invalid": "data"})
-```
+```text
 
 ### Minimal Test Template
 
@@ -146,7 +146,7 @@ async def test_async_method(coordinator: CoordinatorName):
     # Assert
     assert result == "expected"
     mock_dependency.assert_called_once_with("input")
-```
+```text
 
 ### Pattern 2: Testing Error Handling
 
@@ -178,7 +178,7 @@ async def test_state_transition(coordinator: CoordinatorName):
 
     # Assert new state
     assert coordinator.state == "running"
-```
+```text
 
 ### Pattern 4: Testing with Return Values
 
@@ -218,7 +218,7 @@ async def test_multiple_calls(coordinator: CoordinatorName):
     # Assert
     assert len(results) == 3
     assert coordinator._dependency.call_count == 3
-```
+```text
 
 ### Pattern 6: Testing Streaming Responses
 
@@ -268,7 +268,7 @@ async def test_tool_execution(coordinator: ToolCoordinator):
     assert result.success is True
     assert result.output == "File content"
     mock_tool.assert_called_once_with("read_file", {"path": "test.txt"})
-```
+```text
 
 ### Pattern 8: Testing Context Management
 
@@ -311,7 +311,7 @@ async def test_provider_switch(coordinator: ProviderCoordinator):
     # Assert
     assert coordinator._current_provider == new_provider
     assert old_provider != new_provider
-```
+```text
 
 ### Pattern 10: Testing Budget Enforcement
 
@@ -375,7 +375,7 @@ def mock_orchestrator() -> Mock:
     orch._context_compactor.compact = AsyncMock()
 
     return orch
-```
+```text
 
 ### Mock Provider Template
 
@@ -420,7 +420,7 @@ def mock_tool_registry() -> Mock:
     ))
     registry.has_tool = Mock(return_value=True)
     return registry
-```
+```text
 
 ### Mock Tool Pipeline Template
 
@@ -465,7 +465,7 @@ def mock_compactor() -> Mock:
     )
     compactor.can_compact = Mock(return_value=True)
     return compactor
-```
+```text
 
 ## Coverage Commands
 

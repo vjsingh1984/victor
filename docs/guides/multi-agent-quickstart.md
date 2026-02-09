@@ -23,7 +23,7 @@ team = TeamFormation(
 # Execute
 coordinator = create_coordinator(team)
 result = await coordinator.run("Review the authentication module")
-```
+```text
 
 ## Team Topologies
 
@@ -34,7 +34,7 @@ HIERARCHY              MESH               PIPELINE           HUB_SPOKE
   ╱ │ ╲           ╱ │ ╲                  │                    │
  ●  ●  ●         ●──●──●                ◀──▶               ◀──┼──▶
                                                    ●  ●  ●
-```
+```text
 
 | Topology | Use Case | Communication | Pros | Cons |
 |----------|----------|----------------|------|------|
@@ -102,7 +102,7 @@ research_team = TeamSpec(
         TeamMember(persona=synthesizer, role="writer"),
     ],
 )
-```
+```text
 
 ## Execution Modes
 

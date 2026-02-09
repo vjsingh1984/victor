@@ -37,7 +37,7 @@ pip install -e ".[dev]"
 # Verify installation
 victor --version
 pytest tests/unit -v --tb=short
-```
+```text
 
 ## Step-by-Step Installation
 
@@ -60,7 +60,7 @@ python -m venv .venv
 source .venv/bin/activate          # macOS/Linux
 .venv\Scripts\activate             # Windows CMD
 .venv\Scripts\Activate.ps1         # Windows PowerShell
-```
+```text
 
 ### 3. Install Development Dependencies
 
@@ -102,7 +102,7 @@ pip install -e ".[lang-all]"
 
 # Everything for full development
 pip install -e ".[dev,docs,api,google,lang-all]"
-```
+```text
 
 ### 5. Verify Installation
 
@@ -130,7 +130,7 @@ pre-commit install
 
 # Run hooks manually (optional)
 pre-commit run --all-files
-```
+```text
 
 The hooks will run automatically on `git commit` and check:
 - Black formatting
@@ -225,7 +225,7 @@ Create `.vscode/launch.json` for debugging:
         }
     ]
 }
-```
+```text
 
 ### PyCharm
 
@@ -261,7 +261,7 @@ For testing, the `isolate_environment_variables` fixture automatically clears AP
 Ensure you installed in editable mode:
 ```bash
 pip install -e ".[dev]"
-```
+```text
 
 ### Permission denied on `.venv`
 
@@ -276,7 +276,7 @@ MyPy needs to be run from the project root:
 ```bash
 cd /path/to/victor
 mypy victor
-```
+```text
 
 ### Tests fail with Docker errors
 
@@ -293,7 +293,7 @@ Update hooks to latest versions:
 pre-commit autoupdate
 pre-commit clean
 pre-commit install
-```
+```text
 
 ## Project Structure Overview
 
@@ -321,7 +321,7 @@ victor/
 ├── pyproject.toml          # Project configuration
 ├── Makefile                # Development commands
 └── CLAUDE.md               # AI assistant context
-```
+```text
 
 ## Daily Development Commands
 

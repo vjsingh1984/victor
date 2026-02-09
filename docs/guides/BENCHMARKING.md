@@ -23,7 +23,7 @@ victor benchmark run humaneval --max-tasks 5 --profile default
 # Run SWE-bench with setup
 victor benchmark setup swe-bench --max-tasks 10
 victor benchmark run swe-bench --max-tasks 10 --profile deepseek
-```
+```text
 
 ## SWE-bench Setup
 
@@ -42,7 +42,7 @@ SWE-bench evaluates agents on real GitHub issues. Each task requires cloning and
 2. **Execution phase**:
    ```bash
    victor benchmark run swe-bench --max-tasks 50 --profile anthropic
-   ```
+```text
    - Uses cached repos if available
    - Falls back to on-the-fly setup if not
 
@@ -80,7 +80,7 @@ victor benchmark run mbpp --parallel 4 --max-tasks 100
 
 # Save results to file
 victor benchmark run humaneval --output results.json
-```
+```text
 
 ### Resuming Interrupted Runs
 
@@ -142,7 +142,7 @@ Results are automatically saved to `~/.victor/evaluations/`:
     "total_tokens": 500000
   }
 }
-```
+```text
 
 ## Framework Comparison
 
@@ -168,7 +168,7 @@ victor benchmark leaderboard --benchmark swe-bench
 **Solution**: Run setup separately before benchmarking:
 ```bash
 victor benchmark setup swe-bench --max-tasks 100
-```
+```text
 
 ### Rate Limiting
 
@@ -186,7 +186,7 @@ victor benchmark run swe-bench --parallel 1 --timeout 600
 **Solution**: Limit parallel tasks:
 ```bash
 victor benchmark run swe-bench --parallel 2 --max-tasks 20
-```
+```text
 
 ### Checkpoint Recovery
 

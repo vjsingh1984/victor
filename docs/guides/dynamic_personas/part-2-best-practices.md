@@ -23,7 +23,7 @@ review = await orchestrator.chat("Review authentication code")
 # Bad: Mismatched persona
 await personas.set_persona("writer")
 review = await orchestrator.chat("Review authentication code")
-```
+```text
 
 ### 2. Define Clear System Prompts
 
@@ -62,7 +62,7 @@ triggers=[
         "confidence": 0.5
     }
 ]
-```
+```text
 
 ### 4. Combine Personas with Features
 
@@ -98,7 +98,7 @@ for query in test_queries:
     print(f"Response: {response}\n")
 
 # Evaluate and refine
-```
+```text
 
 ## Troubleshooting
 
@@ -149,7 +149,7 @@ suggested = await personas.suggest_persona(
     task_type="implementation",
     domain="security"
 )
-```
+```text
 
 ### Persona Conflicts
 
@@ -192,7 +192,7 @@ async def task_specific_execution(task):
     # Execute with appropriate persona
     result = await orchestrator.chat(task)
     return result
-```
+```text
 
 ### Example 2: Progressive Persona Workflow
 
@@ -266,7 +266,7 @@ async def adaptive_tutoring_behavior(context):
     response += "\n\nDid you understand this? (yes/no)"
 
     return response
-```
+```text
 
 ### Example 4: Specialized Domain Persona
 

@@ -79,7 +79,7 @@ graph TB
     style ProviderRegistry fill:#10b981,color:#fff
     style ToolRegistry fill:#f59e0b,color:#fff
     style WorkflowCompiler fill:#8b5cf6,color:#fff
-```
+```text
 
 ## Provider System Architecture
 
@@ -179,7 +179,7 @@ graph TB
     style BaseTool fill:#6366f1,color:#fff
     style CostTier fill:#f59e0b,color:#fff
     style Hybrid fill:#10b981,color:#fff
-```
+```text
 
 ## Workflow Execution Flow
 
@@ -286,7 +286,7 @@ graph TB
 
     style Coordinator fill:#6366f1,color:#fff
     style Formation fill:#8b5cf6,color:#fff
-```
+```text
 
 ## Dependency Injection Container
 
@@ -387,7 +387,7 @@ graph LR
     Agent --> LLMError
 
     style EventBus fill:#6366f1,color:#fff
-```
+```text
 
 ## Vertical Architecture
 
@@ -476,7 +476,7 @@ graph TB
     style Settings fill:#6366f1,color:#fff
     style Provider fill:#10b981,color:#fff
     style Tool fill:#f59e0b,color:#fff
-```
+```text
 
 ## Testing Architecture
 
@@ -551,7 +551,7 @@ sequenceDiagram
     Provider-->>User: Final response
 
     Note over Orchestrator,Tool: Tools run in parallel when safe
-```
+```text
 
 ## Data Flow: Workflow Execution
 
@@ -608,7 +608,7 @@ To use these diagrams in Markdown files:
 
 ```mermaid
 paste diagram code here
-```
+```text
 ```
 
 MkDocs with the Material theme automatically renders Mermaid diagrams.

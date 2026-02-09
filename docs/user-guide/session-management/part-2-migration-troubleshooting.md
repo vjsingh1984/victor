@@ -31,7 +31,7 @@ sqlite3 .victor/project.db "
   WHERE name LIKE '%authentication%'
   ORDER BY created_at DESC;
 "
-```
+```text
 
 ### Backup and Restore
 
@@ -52,7 +52,7 @@ To migrate JSON sessions to SQLite (manual process):
 1. List JSON sessions:
    ```bash
    ls -la ~/.victor/sessions/
-   ```
+```text
 
 2. For each JSON session, manually:
    - Load the JSON file
@@ -109,7 +109,7 @@ A migration utility may be added in a future release.
 2. **Use descriptive titles**: Include context and status
    ```bash
    /save "API Design - Draft 1 - In Progress"
-   ```
+```text
 
 3. **Leverage model switching**: Use different models for different phases
    ```bash
@@ -127,7 +127,7 @@ A migration utility may be added in a future release.
    /resume 20250107_153045
    /compact --smart
    /save "Refactored - Compact version"
-   ```
+```text
 
 5. **Organize by task**: Use consistent naming
    ```bash
@@ -168,7 +168,7 @@ sessions = persistence.search_sessions("authentication", limit=5)
 
 # Delete session
 persistence.delete_session(session_id)
-```
+```text
 
 See also:
 - [CLI Reference](cli-reference.md) - All slash commands

@@ -48,7 +48,7 @@ Victor AI provides comprehensive observability through:
 **1. Access Metrics:**
 ```bash
 curl http://localhost:8080/metrics
-```
+```text
 
 **2. View Dashboards:**
 ```bash
@@ -60,7 +60,7 @@ http://localhost:3000
 ```bash
 # AlertManager
 http://localhost:9093/#/alerts
-```
+```text
 
 ---
 

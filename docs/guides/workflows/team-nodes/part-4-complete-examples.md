@@ -209,7 +209,7 @@ workflows:
         name: "Mark Complete"
         transform: "status = approved"
         next: []
-```
+```text
 
 ### Example: Research and Implementation Workflow
 
@@ -445,7 +445,7 @@ class TeamNodeWorkflow(WorkflowNode):
         output_key: Context key for result (default: "team_result")
         continue_on_error: Continue workflow on failure (default: true)
     """
-```
+```text
 
 #### TeamFormation
 
@@ -479,7 +479,7 @@ class RecursionContext:
         can_nest(levels): Check if nesting is possible
         get_depth_info(): Get current depth information
     """
-```
+```text
 
 ### Implementation Files
 

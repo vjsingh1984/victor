@@ -63,7 +63,7 @@ Check for:
 
 Report any compliance violations with specific references to the standard.
 """
-```
+```text
 
 ### Feature 4: Event Handlers
 
@@ -156,7 +156,7 @@ class OWASPComplianceValidator(Validator):
         """Check for injection vulnerabilities."""
         # Implementation
         return True
-```
+```text
 
 ## Vertical Configuration
 
@@ -230,7 +230,7 @@ def test_mode_config(security_vertical):
     mode = security_vertical.get_mode_config("audit")
     assert mode.name == "audit"
     assert mode.tool_budget_multiplier == 2.0
-```
+```text
 
 ### Integration Tests
 

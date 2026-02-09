@@ -26,7 +26,7 @@ value = cache.get("key")
 if cache.should_adjust():
     result = cache.adjust_size()
     print(f"Adjusted: {result['old_size']} -> {result['new_size']}")
-```
+```text
 
 ## 2. Predictive Warming
 
@@ -66,7 +66,7 @@ value = cache.get("key")  # Checks L1 → L2 → L3
 # Get metrics
 metrics = cache.get_metrics()
 print(f"Overall hit rate: {metrics['combined']['hit_rate']:.1%}")
-```
+```text
 
 ## 4. Enable All Optimizations
 
@@ -129,7 +129,7 @@ print(f"L3 hit rate: {metrics['l3']['hit_rate']:.1%}")
 print(f"Overall: {metrics['combined']['hit_rate']:.1%}")
 print(f"Promotions: {metrics['combined']['total_promotions']}")
 print(f"Demotions: {metrics['combined']['total_demotions']}")
-```
+```text
 
 ## Common Patterns
 
@@ -153,7 +153,7 @@ cache = MultiLevelCache(
     l1_ttl=600,   # Longer TTL
     l2_ttl=7200,
 )
-```
+```text
 
 ### Conservative Predictions
 ```python
@@ -171,7 +171,7 @@ predictions = warmer.predict_next_queries(
     query,
     min_confidence=0.1,  # Lower threshold
 )
-```
+```text
 
 ## Next Steps
 
@@ -197,7 +197,7 @@ cache = MultiLevelCache(l1_size=50, l2_size=500, l3_size=5000)
 
 # More aggressive adaptive sizing
 cache = AdaptiveLRUCache(target_hit_rate=0.5)
-```
+```text
 
 ### Poor Prediction Accuracy?
 ```python

@@ -44,7 +44,7 @@ pip install "pip>=25.2"
 
 # Install dev dependencies
 pip install -e ".[dev]"
-```
+```text
 
 Or install individually:
 
@@ -69,7 +69,7 @@ pip --version
 
 # Pin minimum version in environment
 pip install "pip>=25.2"
-```
+```text
 
 **CI/CD Integration:**
 - All CI workflows automatically upgrade pip before running dependency installation
@@ -93,7 +93,7 @@ bandit -r victor/
 **High/critical severity only:**
 ```bash
 bandit -r victor/ -lll
-```
+```text
 
 **Exclude directories:**
 ```bash
@@ -103,7 +103,7 @@ bandit -r victor/ --exclude victor/test/,victor/tests/,tests/
 **JSON output:**
 ```bash
 bandit -r victor/ -f json -o bandit-report.json
-```
+```text
 
 **Filter by severity:**
 ```bash
@@ -126,7 +126,7 @@ Safety checks for known security vulnerabilities in dependencies.
 **Basic usage:**
 ```bash
 safety check
-```
+```text
 
 **JSON output:**
 ```bash
@@ -136,7 +136,7 @@ safety check --json --output safety-report.json
 **Check specific requirements file:**
 ```bash
 safety check --file requirements.txt
-```
+```text
 
 **Ignore vulnerabilities (use caution):**
 ```bash
@@ -146,7 +146,7 @@ safety check --ignore 12345
 **Update vulnerability database:**
 ```bash
 safety check --continue-on-error
-```
+```text
 
 ### Semgrep
 
@@ -160,7 +160,7 @@ semgrep --config=auto
 **Auto-configuration with exclusions:**
 ```bash
 semgrep --config=auto --exclude=tests/ --exclude=archive/
-```
+```text
 
 **JSON output:**
 ```bash
@@ -170,7 +170,7 @@ semgrep --config=auto --json --output=semgrep-report.json
 **Error severity only:**
 ```bash
 semgrep --config=auto --severity ERROR
-```
+```text
 
 **Specific rule sets:**
 ```bash
@@ -199,7 +199,7 @@ Pip Audit checks for known vulnerabilities in dependencies.
 **Basic usage:**
 ```bash
 pip-audit
-```
+```text
 
 **Specific requirements:**
 ```bash
@@ -209,7 +209,7 @@ pip-audit --requirement requirements.txt
 **JSON output:**
 ```bash
 pip-audit --format json --output pip-audit-report.json
-```
+```text
 
 **Check installed packages:**
 ```bash
@@ -223,7 +223,7 @@ Gitleaks scans for secrets and credentials in code and commit history.
 **Basic usage:**
 ```bash
 gitleaks detect --source .
-```
+```text
 
 **Scan git history:**
 ```bash
@@ -233,7 +233,7 @@ gitleaks git --source .
 **Configuration:**
 ```bash
 gitleaks detect --source . --config .gitleaks.toml
-```
+```text
 
 **Common findings:**
 - API keys
@@ -261,7 +261,7 @@ skips:
 ```python
 # nosemgrep: python.lang.security.audit.dangerous-exec-call.dangerous-exec-call
 os.system(command)
-```
+```text
 
 **Safety:** Use `--ignore` flag:
 ```bash
@@ -273,7 +273,7 @@ safety check --ignore 12345
 **Bandit TOML support:**
 ```bash
 pip install "bandit[toml]"
-```
+```text
 
 **Semgrep installation:**
 ```bash
@@ -291,7 +291,7 @@ pip install --upgrade safety
 
 # Check database connectivity
 safety check --debug
-```
+```text
 
 ### Performance Issues
 
@@ -308,7 +308,7 @@ bandit -r victor/providers/ victor/tools/
 
 # Use parallel processing
 bandit -r victor/ -n 4
-```
+```text
 
 ### CI/CD Issues
 
@@ -338,7 +338,7 @@ bandit -r victor/ -n 4
 3. **Keep tools updated**
    ```bash
    pip install --upgrade bandit safety semgrep
-   ```
+```text
 
 4. **Document legitimate exceptions**
    - Use inline suppressions sparingly
@@ -366,7 +366,7 @@ skips:
 
 ### Semgrep Configuration (`.semgrepignore`)
 
-```
+```text
 tests/
 archive/
 victor_test/
@@ -383,7 +383,7 @@ title = "Gitleaks Custom Configuration"
 description = "GitHub Token"
 id = "github-token"
 regex = '''ghp_[a-zA-Z0-9]{36}'''
-```
+```text
 
 ## Integration with Development Workflow
 
@@ -426,7 +426,7 @@ security-full:
 	safety check --json --output safety-report.json
 	semgrep --config=auto --json --output=semgrep-report.json
 	pip-audit --format json --output pip-audit-report.json
-```
+```text
 
 ## Additional Resources
 

@@ -110,7 +110,7 @@ This document describes the comprehensive integration tests for orchestrator-coo
 
 ```bash
 pytest tests/integration/agent/test_orchestrator_integration.py -v
-```
+```text
 
 Expected output: All tests SKIPPED (requires coordinator flag)
 
@@ -130,7 +130,7 @@ pytest tests/integration/agent/test_orchestrator_integration.py \
   --cov-report=html \
   --cov-report=term-missing \
   -v
-```
+```text
 
 ### Run Individual Test Class
 
@@ -199,7 +199,7 @@ pytest tests/integration/agent/test_orchestrator_integration.py \
   --cov=victor.agent.coordinators \
   --cov-report=html \
   --cov-report=term-missing
-```
+```text
 
 View HTML report:
 ```bash
@@ -239,7 +239,7 @@ open htmlcov/index.html
     coverage report --sort=cover >> $GITHUB_STEP_SUMMARY
     echo "### Coordinator Modules Coverage" >> $GITHUB_STEP_SUMMARY
     coverage report --include='victor/agent/coordinators/*' >> $GITHUB_STEP_SUMMARY
-```
+```text
 
 #### Coverage Upload
 
@@ -284,7 +284,7 @@ modules = [
 ]
 min_coverage = 80.0
 fail_under = true
-```
+```text
 
 ## Test Structure
 
@@ -331,7 +331,7 @@ class TestFeatureName:
 2. **Run Tests with Flag**
    ```bash
    USE_COORDINATOR_ORCHESTRATOR=true pytest tests/integration/agent/test_orchestrator_integration.py -v
-   ```
+```text
 
 3. **Generate Coverage Report**
    ```bash

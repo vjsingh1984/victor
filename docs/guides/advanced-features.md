@@ -24,7 +24,7 @@ All advanced features follow these principles:
 
 ## Feature Locations
 
-```
+```text
 victor/
 ├── multimodal/              # Multi-Modal Support
 │   ├── processor.py         # Main processor
@@ -68,7 +68,7 @@ result = await processor.process_audio(
     "meeting.mp3",
     query="Extract action items"
 )
-```
+```text
 
 ### Advanced RAG
 
@@ -106,7 +106,7 @@ result = await swarm.execute_task(
     "Design a REST API",
     options=["approach_a", "approach_b"]
 )
-```
+```text
 
 ### Tool Composition
 
@@ -141,7 +141,7 @@ memories = await memory.retrieve_relevant(
     query="user preferences",
     limit=5
 )
-```
+```text
 
 ## Testing
 
@@ -223,7 +223,7 @@ config = MemoryConfig(
     enable_summarization=True,
     enable_clustering=True
 )
-```
+```text
 
 ## Performance Considerations
 

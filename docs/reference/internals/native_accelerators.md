@@ -34,7 +34,7 @@ from victor.native.rust import get_tool_selector_accelerator
 
 accelerator = get_tool_selector_accelerator()
 results = accelerator.filter_and_rank(query, tools, names, categories, category_map, k=10)
-```
+```text
 
 ### RustSimilarityComputer
 
@@ -76,7 +76,7 @@ from victor.native.rust import RustTextChunker
 
 chunker = RustTextChunker()
 chunks = chunker.chunk_with_overlap(text, chunk_size=1000, overlap=100)
-```
+```text
 
 ### RustArgumentNormalizer
 
@@ -117,7 +117,7 @@ from victor.native.rust import RustAstIndexer
 
 indexer = RustAstIndexer()
 functions = indexer.extract_functions(source_code, lang="python")
-```
+```text
 
 ## Installation
 
@@ -131,7 +131,7 @@ Or build from source:
 
 ```bash
 pip install victor-ai[native] --no-binary :all:
-```
+```text
 
 ## Architecture
 
@@ -156,7 +156,7 @@ pip install victor-ai[native] --no-binary :all:
 │  - Parallel processing (rayon)                          │
 │  - Memory-efficient data structures                     │
 └─────────────────────────────────────────────────────────┘
-```
+```text
 
 ## Observability Integration
 
@@ -190,7 +190,7 @@ with traced_native_call("tool_selection", {"num_tools": 100}) as span:
     results = accelerator.filter_and_rank(...)
     if span:
         span.set_attribute("results_count", len(results))
-```
+```text
 
 ## Performance Comparison
 
@@ -249,7 +249,7 @@ print(f"Rust Available: {accelerator.rust_available}")
 # Get version if available
 if accelerator.rust_available:
     print(f"Version: {accelerator.get_version()}")
-```
+```text
 
 ## Testing
 
@@ -274,7 +274,7 @@ from victor.native.rust import ToolSelectorAccelerator
 # Test Python fallback
 accelerator = ToolSelectorAccelerator(force_python=True)
 assert accelerator.backend == "python"
-```
+```text
 
 ## Best Practices
 
@@ -300,7 +300,7 @@ tool_embeddings = [embed(tool.description) for tool in tools]
 # Use multiple times
 for query in queries:
     similarities = accelerator.cosine_similarity_batch(embed(query), tool_embeddings)
-```
+```text
 
 ### 3. Use Combined Operations
 
@@ -324,7 +324,7 @@ stats = metrics.get_stats("cosine_similarity_batch")
 
 if stats["rust_ratio"] < 0.8:
     logger.warning("Low Rust usage, check native extension")
-```
+```text
 
 ## Troubleshooting
 
@@ -357,7 +357,7 @@ stats = metrics.get_stats()
 print(stats)
 
 # Look for high error rates or low Rust ratio
-```
+```text
 
 ### Import Errors
 
@@ -399,7 +399,7 @@ class MyAccelerator(InstrumentedAccelerator):
                 return victor_native.my_operation(data)
             else:
                 return self._python_my_operation(data)
-```
+```text
 
 ## References
 

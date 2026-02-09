@@ -31,7 +31,7 @@ class ClassName:
         *args,
         **kwargs
     ) -> return_type:
-```
+```text
 
 **Description:**
 
@@ -68,7 +68,7 @@ print(result)
 ```
 
 **Expected Output:**
-```
+```text
 Expected output from example
 ```
 
@@ -91,7 +91,7 @@ Expected output from example
 # config.yaml
 option1: value1
 option2: value2
-```
+```text
 
 ## Usage
 
@@ -114,7 +114,7 @@ component = Component(
     option2="value2"
 )
 result = component.do_something_advanced()
-```
+```text
 
 ## Performance
 

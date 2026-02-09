@@ -49,7 +49,7 @@ Background information needed for this step.
 def example_function():
     """Example function."""
     return "Hello, World!"
-```
+```text
 
 **Explanation:**
 
@@ -58,7 +58,7 @@ What this code does and how it works.
 **Expected Output:**
 ```
 What you should see after running the code
-```
+```text
 
 ### Verification
 

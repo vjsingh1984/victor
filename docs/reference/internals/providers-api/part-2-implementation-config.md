@@ -191,7 +191,7 @@ class CustomProvider(BaseProvider):
             provider=self.name,
             raw_error=error,
         )
-```
+```text
 
 ### Registering Your Provider
 
@@ -290,7 +290,7 @@ models:
       recommended_max_tools: 50
       recommended_tool_budget: 25
       argument_format: json
-```
+```text
 
 #### Resolution Order
 

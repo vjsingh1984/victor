@@ -35,7 +35,7 @@ victor chat "Setup CI/CD pipeline"
 /save "CI/CD Pipeline"        # Creates session: 20250107_100000
 # ... continue working ...
 /save                         # UPDATES 20250107_100000 (not create new!)
-```
+```text
 
 **Terminal 2 (Testing)**:
 ```bash
@@ -54,7 +54,7 @@ victor chat "Write unit tests"
 
 # Or combine resume + switch
 /switch ollama:qwen2.5-coder:7b --resume 20250107_100100
-```
+```text
 
 **Key Behavior**:
 - `/save` updates the **active session** (the one you resumed)
@@ -102,7 +102,7 @@ Save your current conversation to SQLite.
 /save "Refactoring Authentication"       # Update active with new title
 /save --new                              # Always create new session
 /save --new "New Topic"                  # Create new with custom title
-```
+```text
 
 **Behavior**:
 - **First save**: Creates new session with auto-generated ID
@@ -125,7 +125,7 @@ Save your current conversation to SQLite.
 │ Use '/save --new' to create a new      │
 │ session                                │
 └────────────────────────────────────────┘
-```
+```text
 
 ### `/sessions` - List Sessions
 
@@ -137,7 +137,7 @@ List saved sessions with metadata.
 ```
 
 **Example Output**:
-```
+```text
 ╔═══════════╤═══════════════════════════════╤═══════════════════╤══════════╤════════════╤═════════╗
 ║ ID        │ Title                         │ Model             │ Provider │ Messages   │ Created ║
 ╠═══════════╪═══════════════════════════════╪═══════════════════╪══════════╪════════════╪═════════╣
@@ -157,7 +157,7 @@ Restore a previously saved session.
 ```bash
 /resume                                 # Interactive selection
 /resume 20250107_153045                 # Direct session ID
-```
+```text
 
 **Interactive Mode**:
 Shows a numbered list of recent sessions. Enter a number to select.
@@ -173,7 +173,7 @@ Shows a numbered list of recent sessions. Enter a number to select.
 
 Enter session number to resume (1-3)
 Or use: /resume <session_id>
-```
+```text
 
 **Restored Session**:
 ```
@@ -189,7 +189,7 @@ Or use: /resume <session_id>
 │ Messages: 42                          │
 │ Created: 2025-01-07T14:30:45          │
 └────────────────────────────────────────┘
-```
+```text
 
 ### `/switch` - Switch Model/Provider
 
@@ -210,17 +210,17 @@ Switch models or providers, optionally resuming a session first.
 1. **Switch model only**:
    ```bash
    /switch claude-opus-4-20250514
-   ```
+```text
    ```
    ✓ Switched to claude-opus-4-20250514
      Native tools: True, Thinking: True
-   ```
+```text
 
 2. **Switch provider and model**:
    ```bash
    /switch ollama:qwen2.5-coder:7b
    ```
-   ```
+```text
    ✓ Switched to ollama:qwen2.5-coder:7b
      Native tools: False, Thinking: False
    ```
@@ -228,13 +228,13 @@ Switch models or providers, optionally resuming a session first.
 3. **Resume then switch**:
    ```bash
    /switch claude-opus-4 --resume 20250107_153045
-   ```
+```text
    ```
    ✓ Resumed: Refactoring Authentication (42 messages)
 
    ✓ Switched to claude-opus-4-20250514
      Native tools: True, Thinking: True
-   ```
+```text
 
 ### `/compact` - Reduce Context Size
 
@@ -247,7 +247,7 @@ Compress conversation history to reduce token usage.
 ```
 
 **Smart Compaction Example**:
-```
+```text
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃    Smart Compaction Complete         ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
@@ -277,7 +277,7 @@ victor sessions list              # List last 10 sessions
 victor sessions list --limit 20   # List last 20 sessions
 victor sessions list --all        # List all sessions (no limit)
 victor sessions list --json       # Output as JSON
-```
+```text
 
 **Examples**:
 ```bash
@@ -307,7 +307,7 @@ View detailed information about a specific session.
 ```bash
 victor sessions show <session_id>       # Show formatted details
 victor sessions show <session_id> --json # Output as JSON
-```
+```text
 
 **Example**:
 ```bash
@@ -335,7 +335,7 @@ Search for sessions by title or content.
 victor sessions search <query>        # Search sessions
 victor sessions search CI/CD --limit 5 # Limit results
 victor sessions search test --json    # Output as JSON
-```
+```text
 
 **Example**:
 ```bash
@@ -368,7 +368,7 @@ victor sessions clear myproj-9Kx
 
 # Clear sessions by prefix (skip confirmation)
 victor sessions clear myproj-9Kx --yes
-```
+```text
 
 **Safety Features**:
 - **Confirmation prompt**: Prevents accidental deletion
@@ -393,7 +393,7 @@ victor sessions clear myproj-9Kx --yes
 
    ⚠  Found 2 session(s) matching prefix 'myproj-9Kx7'.
    ✓ Cleared 2 session(s) matching prefix 'myproj-9Kx7'.
-   ```
+```text
 
 3. Skip confirmation for automation:
    ```bash
@@ -415,7 +415,7 @@ Delete a single session by ID.
 ```bash
 victor sessions delete <session_id>        # Delete with confirmation
 victor sessions delete <session_id> --yes  # Skip confirmation
-```
+```text
 
 **Example**:
 ```bash
@@ -433,7 +433,7 @@ Export all sessions to a JSON file.
 victor sessions export                              # Auto-generated filename
 victor sessions export --output sessions.json      # Custom filename
 victor sessions export --no-pretty                  # Minified JSON
-```
+```text
 
 **Example**:
 ```bash
@@ -471,7 +471,7 @@ victor chat --provider anthropic "Design a REST API"
 
 # 4. Finish with local model for privacy
 /switch ollama:qwen2.5-coder:7b
-```
+```text
 
 ### Session Organization
 
@@ -490,7 +490,7 @@ Then use `/sessions` to browse and find what you need.
 ### Location
 
 Sessions are stored in the project database:
-```
+```text
 <project-root>/.victor/project.db
 ```
 

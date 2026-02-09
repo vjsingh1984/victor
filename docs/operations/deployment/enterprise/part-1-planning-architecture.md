@@ -105,7 +105,7 @@ flowchart TB
     style CLUSTER fill:#d1fae5,stroke:#10b981
     style LLM fill:#fef3c7,stroke:#f59e0b
     style GATEWAY fill:#e0e7ff,stroke:#4f46e5
-```
+```text
 
 ### Security Zones
 
@@ -189,7 +189,7 @@ EOF
 # 6. Start services
 docker-compose --profile ollama up -d
 victor
-```
+```text
 
 **Compliance (evaluate internally):**
 - HIPAA-aligned deployment option
@@ -259,7 +259,7 @@ routing:
     - architecture_decisions
     - production_debugging
     - security_analysis
-```
+```text
 
 **Potential Cost Model (Theoretical Example):**
 
@@ -276,7 +276,7 @@ Hybrid Approach (local + selective cloud):
 └─ Total: Primarily infrastructure costs
 
 Potential Benefit: Cost reduction through selective API usage
-```
+```text
 
 ### 3. Multi-Tenant SaaS Deployment
 
@@ -334,7 +334,7 @@ Victor includes secret scanning:
 - OAuth tokens
 - JWT tokens
 - Passwords in config files
-```
+```text
 
 **Pre-commit hook:**
 
@@ -375,7 +375,7 @@ services:
       nofile:
         soft: 1024
         hard: 2048
-```
+```text
 
 ### Audit Logging
 
@@ -444,7 +444,7 @@ selective_api_cost = W  # For critical tasks only
 annual_hybrid_cost = infrastructure_cost + selective_api_cost
 
 # Compare based on your specific needs
-```
+```text
 
 
 **Reading Time:** 6 min

@@ -110,7 +110,7 @@ class TimeOrderedTableView(DataTable):
     - Rebuilds table on each update
     - Optional deduplication
     """
-```
+```text
 
 **Views using TimeOrderedTableView**:
 - EventTableView
@@ -137,7 +137,7 @@ class EventFileWatcher:
 
 ### Event Processing Flow
 
-```
+```text
 JSONL File (ascending)
     ↓
 EventFileWatcher (reverses to descending)
@@ -159,7 +159,7 @@ victor dashboard
 
 # With debug logging
 victor dashboard --log-level debug
-```
+```text
 
 ### Keyboard Navigation
 
@@ -199,7 +199,7 @@ victor dashboard --log-level debug
 
 # View logs
 tail -f ~/.victor/logs/victor.log
-```
+```text
 
 ## Implementation Details
 
@@ -252,7 +252,7 @@ class MyEventView(TimeOrderedTableView):
 **Verify**: All time-based tabs should show newest at top, oldest at bottom.
 
 Check logs for event order:
-```
+```text
 grep "FIRST event at" ~/.victor/logs/victor.log
 # Should show descending timestamps (newest first)
 ```
@@ -264,7 +264,7 @@ grep "FIRST event at" ~/.victor/logs/victor.log
 ```python
 # In app.py
 EventTableView(max_rows=200)  # Reduced from 500
-```
+```text
 
 ## Testing
 

@@ -45,7 +45,7 @@ container = ServiceContainer()
 executor = container.get(ToolExecutorProtocol)
 
 result = await executor.execute_tool(tool, arguments)
-```
+```text
 
 ## See Also
 

@@ -28,7 +28,7 @@ class DependentTool(BaseTool):
     @property
     def name(self) -> str:
         return "dependent_tool"
-```
+```text
 
 ### Async Tool Execution
 
@@ -58,7 +58,7 @@ class StreamingTool(BaseTool):
         """Stream results incrementally."""
         for item in large_dataset:
             yield process(item)
-```
+```text
 
 ---
 

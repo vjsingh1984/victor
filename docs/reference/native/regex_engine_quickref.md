@@ -5,7 +5,7 @@
 ```bash
 cd /Users/vijaysingh/code/codingagent/rust
 cargo build --release
-```
+```text
 
 ## Basic Usage
 
@@ -40,7 +40,7 @@ regex_set = compile_language_patterns("python")
 
 # Specific categories
 regex_set = compile_language_patterns("python", ["function", "class"])
-```
+```text
 
 ### `CompiledRegexSet.match_all(text)`
 Match all patterns, return detailed results.
@@ -56,7 +56,7 @@ Check if any patterns match.
 
 ```python
 has_function = regex_set.contains_any("def foo():")
-```
+```text
 
 ### `CompiledRegexSet.matched_pattern_names(text)`
 Get names of matched patterns.
@@ -72,7 +72,7 @@ Count matches per pattern.
 ```python
 counts = regex_set.count_by_pattern(code)
 # {'function_def': 3, 'class_def': 1, 'import_statement': 5}
-```
+```text
 
 ### `CompiledRegexSet.list_patterns()`
 List all pattern names.
@@ -88,7 +88,7 @@ Get patterns in a category.
 ```python
 function_patterns = regex_set.patterns_by_category("function")
 # ['function_def', 'async_function_def', 'lambda']
-```
+```text
 
 ### `CompiledRegexSet.list_categories()`
 List all categories.
@@ -104,7 +104,7 @@ Get total number of patterns.
 ```python
 count = regex_set.pattern_count()
 # 13
-```
+```text
 
 ## MatchResult Attributes
 
@@ -198,7 +198,7 @@ matches = regex_set.match_all(code)
 
 function_count = sum(1 for m in matches if m.category == "function")
 class_count = sum(1 for m in matches if m.category == "class")
-```
+```text
 
 ### Find All Imports
 
@@ -213,7 +213,7 @@ imports = [m for m in matches if m.category == "import"]
 ```python
 matches = regex_set.match_all(code)
 matches_in_range = [m for m in matches if 10 <= m.line_number <= 50]
-```
+```text
 
 ### Group by Category
 
@@ -242,7 +242,7 @@ pytest tests/unit/native/test_regex_engine.py -v
 
 # Integration test
 python test_regex_engine.py
-```
+```text
 
 ## Files
 

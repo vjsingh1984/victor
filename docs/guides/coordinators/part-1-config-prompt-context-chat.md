@@ -54,7 +54,7 @@ class ConfigCoordinator:
             >>> print(config.model)
             'gpt-4'
         """
-```
+```text
 
 ### PromptCoordinator
 

@@ -21,7 +21,7 @@ The Rust accelerator is included in the `victor-ai` package with the `native` ex
 
 ```bash
 pip install victor-ai[native]
-```
+```text
 
 If the Rust extension is not available, the accelerator automatically uses Python fallbacks.
 
@@ -83,7 +83,7 @@ accelerator = ToolSelectorAccelerator(force_python=True)
 # Check backend
 print(accelerator.backend)  # "rust" or "python"
 print(accelerator.rust_available)  # True or False
-```
+```text
 
 #### Methods
 
@@ -110,7 +110,7 @@ similarities = accelerator.cosine_similarity_batch(query, tools)
 
 # Find most similar tools
 top_tools = sorted(zip(tool_names, similarities), key=lambda x: x[1], reverse=True)[:5]
-```
+```text
 
 ##### topk_indices
 
@@ -132,7 +132,7 @@ indices = accelerator.topk_indices(
 similarities = [0.1, 0.9, 0.5, 0.3, 0.8]
 top_3 = accelerator.topk_indices(similarities, k=3)
 # Returns: [1, 4, 2] (indices of 0.9, 0.8, 0.5)
-```
+```text
 
 ##### topk_with_scores
 
@@ -150,7 +150,7 @@ results = accelerator.topk_with_scores(
 similarities = [0.1, 0.9, 0.5, 0.3, 0.8]
 top_3 = accelerator.topk_with_scores(similarities, k=3)
 # Returns: [(1, 0.9), (4, 0.8), (2, 0.5)]
-```
+```text
 
 ##### filter_by_category
 
@@ -181,7 +181,7 @@ category_map = {
 
 filtered = accelerator.filter_by_category(tools, categories, category_map)
 # Returns: ["read_file", "write_file"]
-```
+```text
 
 ##### filter_and_rank
 
@@ -213,7 +213,7 @@ category_map = {t.name: t.category for t in tool_registry}
 # Get top 5 git-related tools
 top_5 = accelerator.filter_and_rank(query, tools, names, categories, category_map, k=5)
 # Returns: [("git_commit", 0.95), ("create_pull_request", 0.87), ...]
-```
+```text
 
 ### Singleton Access
 
@@ -258,7 +258,7 @@ summary = metrics.get_summary()
 print(f"Total calls: {summary['total_calls']}")
 print(f"Rust ratio: {summary['rust_ratio']:.1%}")
 print(f"Average duration: {summary['avg_duration_ms']:.2f}ms")
-```
+```text
 
 ### Metrics Collected
 
@@ -341,7 +341,7 @@ for query_emb in query_embeddings:
     similarities = accelerator.cosine_similarity_batch(query_emb, tool_embeddings)
     top_k = accelerator.topk_indices(similarities, k=5)
     all_results.append([tool_names[i] for i in top_k])
-```
+```text
 
 ### Performance Benchmarking
 
@@ -385,7 +385,7 @@ except Exception as e:
     # Automatically falls back to Python if Rust fails
     print(f"Rust failed, using Python: {e}")
     similarities = accelerator._python_cosine_similarity_batch(query, tools)
-```
+```text
 
 ## Testing
 
@@ -427,7 +427,7 @@ def test_tool_selection():
     assert len(results) == 10
     assert all(isinstance(pair, tuple) for pair in results)
     assert all(category_map[name] in categories for name, _ in results)
-```
+```text
 
 ## Performance Tips
 
@@ -471,7 +471,7 @@ try:
     print("Rust extension available")
 except ImportError:
     print("Rust extension not available, using Python fallback")
-```
+```text
 
 ## References
 

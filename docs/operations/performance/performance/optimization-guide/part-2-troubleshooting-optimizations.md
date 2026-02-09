@@ -24,7 +24,7 @@ pytest tests/benchmark/test_performance_optimizations.py::test_batch_tool_execut
 
 # Run with coverage
 pytest tests/benchmark/test_performance_optimizations.py --cov=victor.agent -v
-```
+```text
 
 ### Expected Results
 
@@ -94,7 +94,7 @@ tool_calls = [
     ("read_file", {"path": "b.txt"}),  # Independent
     # Avoid: write then read same file (sequential dependency)
 ]
-```
+```text
 
 ### LLM Compaction Too Slow
 
@@ -146,7 +146,7 @@ coordinator = PromptCoordinator(
 # Monitor invalidations
 stats = coordinator.get_cache_stats()
 print(f"Invalidations: {stats['cache_invalidations']}")
-```
+```text
 
 ---
 
@@ -176,7 +176,7 @@ coordinator = PromptCoordinator(enable_cache=False, cache_ttl=None)
 # Good balance
 strategy = HybridCompactionStrategy()
 coordinator = PromptCoordinator(enable_cache=True, cache_ttl=1800.0)
-```
+```text
 
 **High-Performance Systems (> 16GB RAM):**
 ```python
@@ -215,7 +215,7 @@ import logging
 logging.getLogger("victor.agent.tool_executor").setLevel(logging.INFO)
 logging.getLogger("victor.agent.coordinators.compaction_strategies").setLevel(logging.INFO)
 logging.getLogger("victor.agent.coordinators.prompt_coordinator").setLevel(logging.INFO)
-```
+```text
 
 ---
 
@@ -317,7 +317,7 @@ similar_response = await cache.get_similar(
 # Get cache statistics
 stats = cache.get_stats()
 print(f"Hit rate: {stats['hit_rate']:.2%}")
-```
+```text
 
 ### Performance Characteristics
 

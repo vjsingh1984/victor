@@ -90,7 +90,7 @@ Yes. Victor supports **air-gapped mode** with local providers:
 ```bash
 export VICTOR_AIRGAPPED_MODE=true
 victor chat --provider ollama
-```
+```text
 
 ---
 
@@ -106,7 +106,7 @@ pipx install victor-ai
 **Alternative (pip):**
 ```bash
 pip install victor-ai
-```
+```text
 
 **Verify:**
 ```bash
@@ -132,7 +132,7 @@ victor --version
 pipx upgrade victor-ai
 # or
 pip install --upgrade victor-ai
-```
+```text
 
 ### Installation fails with "Permission denied"
 
@@ -172,7 +172,7 @@ export ANTHROPIC_API_KEY=sk-your-key-here
 
 # Use Victor
 victor chat --provider anthropic --model claude-sonnet-4-5
-```
+```text
 
 Get API key: https://console.anthropic.com/
 
@@ -201,7 +201,7 @@ ollama pull qwen2.5-coder:7b
 
 # Use Victor
 victor chat --provider ollama
-```
+```text
 
 ### Can I switch providers mid-conversation?
 
@@ -243,7 +243,7 @@ victor chat "Your question here"
 
 # With specific provider
 victor chat --provider anthropic "Explain async/await"
-```
+```text
 
 ### What's the difference between TUI and CLI mode?
 
@@ -288,7 +288,7 @@ Three modes for different use cases:
 
 ```bash
 victor chat --mode plan "Analyze this architecture"
-```
+```text
 
 ### What tools does Victor have?
 
@@ -346,7 +346,7 @@ victor team create review-team.yaml
 
 # Run team
 victor team run review-team "Review this PR"
-```
+```text
 
 [Learn more about teams](guides/MULTI_AGENT_TEAMS.md)
 
@@ -375,7 +375,7 @@ victor chat --provider ollama "Brainstorm ideas"
 **2. Use cheaper models for drafts:**
 ```bash
 victor chat --provider openai --model gpt-4o-mini "Draft this"
-```
+```text
 
 **3. Use best models only for final polish:**
 ```bash
@@ -388,7 +388,7 @@ victor chat --provider openai --model gpt-4o-mini "Draft this"
 # In ~/.victor/config.yaml
 cache_enabled: true
 cache_ttl: 3600  # 1 hour
-```
+```text
 
 ### Victor is slow, how can I speed it up?
 
@@ -400,7 +400,7 @@ victor chat --provider groq "Quick question"  # 300+ tok/s
 **2. Use caching:**
 ```bash
 export VICTOR_CACHE_ENABLED=true
-```
+```text
 
 **3. Reduce context:**
 ```bash
@@ -410,7 +410,7 @@ victor chat --max-tokens 1000 "Brief answer"
 **4. Use local model for offline:**
 ```bash
 victor chat --provider ollama
-```
+```text
 
 ### How many tokens will this cost?
 

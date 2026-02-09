@@ -8,7 +8,7 @@ Victor's plugin system allows you to extend workflow compilation capabilities by
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                     Workflow Source                          │
 │  (YAML, JSON, S3, Database, Custom URI, etc.)               │
@@ -89,7 +89,7 @@ class MyPlugin(WorkflowCompilerPlugin):
         """
         # Your cache key generation here
         return source
-```
+```text
 
 ## Creating a Custom Plugin
 
@@ -243,7 +243,7 @@ class DatabaseCompilerPlugin(WorkflowCompilerPlugin):
         import hashlib
         cache_string = f"{self.db_path}:{self.table}:{source}"
         return hashlib.md5(cache_string.encode()).hexdigest()
-```
+```text
 
 ### Example 3: HTTP Plugin
 
@@ -320,7 +320,7 @@ registry.register('my-scheme', MyPlugin)
 # Use plugin
 compiler = registry.create('my-scheme://')
 workflow = compiler.compile('my-source')
-```
+```text
 
 ### Method 2: Via create_compiler()
 
@@ -346,7 +346,7 @@ Register plugins via entry points in `pyproject.toml`:
 [project.entry-points."victor.workflow_plugins"]
 my_plugin = "my_package.my_plugin:MyPlugin"
 json_plugin = "my_package.json_plugin:JsonCompilerPlugin"
-```
+```text
 
 ## Plugin URI Schemes
 
@@ -398,7 +398,7 @@ compiler = registry.create(
     option2=20,
     custom_option='custom'
 )
-```
+```text
 
 ### Settings Integration
 
@@ -421,7 +421,7 @@ settings = Settings(config_file='config.yaml')
 plugin_config = settings.workflow_plugins.get('my_plugin', {})
 
 compiler = MyPlugin(**plugin_config.get('options', {}))
-```
+```text
 
 ## Advanced Features
 
@@ -475,7 +475,7 @@ class TTLCachePlugin(WorkflowCompilerPlugin):
         _, timestamp = cache_key.split(':')
         age = int(time.time()) - int(timestamp)
         return age < self.cache_ttl
-```
+```text
 
 ### Lazy Loading
 
@@ -553,7 +553,7 @@ class RobustPlugin(WorkflowCompilerPlugin):
                     f"Failed to compile workflow '{source}': "
                     f"Primary: {e}, Fallback: {e2}"
                 ) from e2
-```
+```text
 
 ### Validation Errors
 
@@ -618,7 +618,7 @@ def test_plugin_cache_key():
     key1 = plugin.get_cache_key('source')
     key2 = plugin.get_cache_key('source')
     assert key1 == key2  # Same source, same key
-```
+```text
 
 ### Integration Tests
 
@@ -650,7 +650,7 @@ Use descriptive, unique URI schemes:
 # Avoid
 'custom://'    # Too generic
 'plugin1://'   # Not descriptive
-```
+```text
 
 ### 2. Error Messages
 
@@ -692,7 +692,7 @@ class MyPlugin(WorkflowCompilerPlugin):
         FileNotFoundError: If source doesn't exist
         ValueError: If source is invalid
     """
-```
+```text
 
 ### 4. Caching
 
@@ -722,7 +722,7 @@ def compile(self, source: str, *, workflow_name: Optional[str] = None, validate:
 
     # Proceed with compilation
     ...
-```
+```text
 
 ## Examples
 

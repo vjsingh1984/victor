@@ -18,7 +18,7 @@ This separation enables:
 
 ## Architecture Overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                     APPLICATION LAYER                            │
 │                  victor/agent/coordinators/                     │
@@ -73,7 +73,7 @@ response = await coordinator.chat(
     tools=[...],
     stream=True
 )
-```
+```text
 
 **Key Features**:
 - Non-streaming chat with agentic loop
@@ -136,7 +136,7 @@ coordinator = ContextCoordinator(
 
 # Compact context when needed
 compacted = await coordinator.compact_context(messages)
-```
+```text
 
 **Key Features**:
 - Multiple compaction strategies (truncation, summarization, semantic, hybrid)
@@ -192,7 +192,7 @@ prompt = await coordinator.build_prompt(
     contributors=[SystemPromptContributor(), TaskHintContributor()],
     context={"mode": "build"}
 )
-```
+```text
 
 **Key Features**:
 - Composable prompt contributors
@@ -248,7 +248,7 @@ await coordinator.switch_provider("openai", model="gpt-4")
 
 # Get current provider
 provider = coordinator.get_current_provider()
-```
+```text
 
 **Key Features**:
 - Dynamic provider switching
@@ -303,7 +303,7 @@ tools = await coordinator.select_tools(
     query="analyze code quality",
     available_tools=all_tools
 )
-```
+```text
 
 **Key Features**:
 - Semantic similarity-based selection
@@ -394,7 +394,7 @@ result = await coordinator.execute(
 # Stream execution events
 async for event in coordinator.stream(compiled_graph, state):
     print(f"{event.node_id}: {event.event_type}")
-```
+```text
 
 **Key Features**:
 - Direct CompiledGraph execution
@@ -452,7 +452,7 @@ coordinator.clear_cache()
 
 # Get cache stats
 stats = coordinator.get_stats()
-```
+```text
 
 **Key Features**:
 - Definition-level caching
@@ -498,7 +498,7 @@ Framework Layer (Domain-agnostic)
     - Provides workflow execution primitives
     - No knowledge of Victor's business logic
     - Reusable across verticals
-```
+```text
 
 ### Example: Workflow Execution in Chat
 
@@ -531,7 +531,7 @@ class ChatCoordinator:
 
 ### Dependency Flow
 
-```
+```text
 Application Layer Components
     └── depend on ──→ Framework Layer Components
                           └── depend on ──→ Core Protocols
@@ -552,7 +552,7 @@ Each coordinator has **one reason to change**:
 
 Clear separation between **application logic** and **framework infrastructure**:
 
-```
+```text
 ┌─────────────────────────────────────┐
 │   Application Logic (Victor)        │  Business rules, conversation mgmt
 ├─────────────────────────────────────┤
@@ -583,7 +583,7 @@ class ResearchWorkflowProvider:
 class SecurityVertical:
     def __init__(self):
         self.yaml_coordinator = YAMLWorkflowCoordinator()  # Reusable!
-```
+```text
 
 ### 4. Testability
 
@@ -650,7 +650,7 @@ class CustomExporter(BaseAnalyticsExporter):
     async def export(self, analytics):
         # Custom logic
         pass
-```
+```text
 
 ## Why This Is NOT Harmful Duplication
 
@@ -743,7 +743,7 @@ class ICoordinator(Protocol):
     async def manage_context(self): ...
     async def track_analytics(self): ...
     # ... 20 more methods
-```
+```text
 
 ### Dependency Inversion Principle
 
@@ -785,7 +785,7 @@ class ContextCoordinator:
         elif strategy == "semantic":
             # ...
         # Must modify this file to add new strategies
-```
+```text
 
 ### Liskov Substitution Principle
 
@@ -827,7 +827,7 @@ class AgentOrchestrator:
     def _handle_chat(self): ...
     def _track_analytics(self): ...
     # ... 20+ more methods
-```
+```text
 
 ### After: Coordinator-Based Architecture
 

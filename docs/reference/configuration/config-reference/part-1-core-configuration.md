@@ -29,7 +29,7 @@ Complete reference for configuring Victor's behavior and integrations.
 
 ## Configuration Directory Structure
 
-```
+```text
 ~/.victor/                      # User configuration (global)
 ├── profiles.yaml                # Provider/model profiles
 ├── config.yaml                  # Global settings
@@ -62,7 +62,7 @@ Victor loads configuration in this order (later overrides earlier):
 # Environment: VICTOR_TEMPERATURE=0.1
 # CLI flag: --temperature 0.0
 # Result: 0.0 (CLI flag wins)
-```
+```text
 
 ## Quick Configuration
 
@@ -81,7 +81,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 # Use Victor
 victor chat --provider anthropic "Hello!"
-```
+```text
 
 **3. Profile-based** (recommended):
 ```yaml
@@ -95,7 +95,7 @@ profiles:
 ```bash
 # Use profile
 victor chat "Hello!"  # Automatically uses profile
-```
+```text
 
 ---
 
@@ -147,7 +147,7 @@ profiles:
     temperature: 0.7
     max_tokens: 4096
     api_key_env: ANTHROPIC_API_KEY
-```
+```text
 
 **Production Profile**:
 ```yaml
@@ -170,7 +170,7 @@ profiles:
     model: qwen2.5-coder:7b
     # No API key needed
     base_url: http://127.0.0.1:11434
-```
+```text
 
 **Cost-Optimized Profile**:
 ```yaml
@@ -194,7 +194,7 @@ profiles:
         model: gpt-4o
       - provider: ollama
         model: qwen2.5-coder:7b
-```
+```text
 
 ### Using Profiles
 
@@ -207,7 +207,7 @@ victor --profile development chat "Hello"
 ```yaml
 # ~/.victor/profiles.yaml
 default_profile: development
-```
+```text
 
 **List available profiles**:
 ```bash
@@ -217,7 +217,7 @@ victor config profiles
 **Show current profile**:
 ```bash
 victor config show
-```
+```text
 
 ### Profile Reference
 
@@ -309,7 +309,7 @@ logging:
   rotation: daily          # Log rotation (daily, weekly, size)
   retention: 30            # Days to keep logs
   console: true            # Also log to console
-```
+```text
 
 **Log Levels**:
 - **DEBUG**: Detailed diagnostic information
@@ -353,7 +353,7 @@ tools:
   parallel_execution: true # Execute tools in parallel when possible
   timeout: 30              # Tool execution timeout (seconds)
   max_concurrent: 5        # Max parallel tool executions
-```
+```text
 
 #### Conversation
 
@@ -375,7 +375,7 @@ providers:
     enabled: true          # Enable circuit breaker
     failure_threshold: 5   # Failures before opening circuit
     recovery_timeout: 60   # Seconds before retry
-```
+```text
 
 **Circuit Breaker**: Prevents cascading failures by temporarily disabling failing providers.
 
@@ -399,7 +399,7 @@ ui:
   font_size: 14
   editor: vim              # Default editor
   pager: less              # Default pager
-```
+```text
 
 [Full config.yaml Reference →](#configyaml)
 

@@ -68,7 +68,7 @@ from victor.agent.orchestrator import AgentOrchestrator
 orchestrator = AgentOrchestrator()
 response = orchestrator.chat("Hello, Victor!")
 print(response.content)
-```
+```text
 
 ### After (Coordinator-Based)
 

@@ -6,7 +6,9 @@ The RAG (Retrieval-Augmented Generation) vertical provides document ingestion, v
 
 ## Overview
 
-The RAG vertical (`victor/rag/`) implements a complete RAG pipeline with document processing, semantic chunking, embedding generation, and hybrid search. It uses LanceDB for embedded vector storage (no server required) and supports multiple embedding providers.
+The RAG vertical (`victor/rag/`) implements a complete RAG pipeline with document processing,
+semantic chunking, embedding generation, and hybrid search. It uses LanceDB for embedded vector
+storage (no server required) and supports multiple embedding providers.
 
 ### Key Use Cases
 
@@ -52,7 +54,7 @@ workflows:
       - generate_embeddings    # Batch embedding generation
       - ingest_vectors         # Store in vector database
       - generate_report        # Create ingestion summary
-```
+```text
 
 **Key Features**:
 - Multi-format parsing: PDF, DOCX, Markdown, Text, Code
@@ -85,7 +87,7 @@ workflows:
       - check_coverage       # Evaluate context sufficiency
       - generate_answer      # Synthesize with citations
       - verify_answer        # Fact-check against sources
-```
+```text
 
 **Key Features**:
 - Hybrid search (dense vectors + BM25 + entity matching)
@@ -121,7 +123,7 @@ workflows:
       - execute_plan       # Multi-step search
       - synthesize         # Combine findings
       - generate_response  # Final answer
-```
+```text
 
 ### 5. Index Maintenance (`query.yaml`)
 
@@ -165,7 +167,7 @@ Victor's RAG uses LanceDB, an embedded vector database that requires no server:
 - HNSW indexing for fast similarity search
 - Hybrid search support
 - Automatic persistence
-```
+```text
 
 ### Supported Document Formats
 
@@ -215,7 +217,7 @@ Combines multiple retrieval methods:
 # RRF Formula
 score = sum(1 / (k + rank)) for each result set
 # k = 60 (default smoothing constant)
-```
+```text
 
 ## Configuration Options
 
@@ -245,7 +247,7 @@ embedding_dimensions: 1536
 batch_size: 100               # Chunks per API call
 ocr_enabled: false            # Enable for scanned PDFs
 retention_days: 365           # Document retention
-```
+```text
 
 ### Query Configuration
 
@@ -273,7 +275,7 @@ project_db:
 vector_store:
   type: lancedb
   path: $project/.victor/vectors
-```
+```text
 
 ## Example Usage
 
@@ -309,7 +311,7 @@ print(result["answer"])
 print("\nSources:")
 for source in result["sources"]:
     print(f"  [{source['id']}] {source['title']}")
-```
+```text
 
 ### Using RAG Tools Directly
 
@@ -347,7 +349,7 @@ victor rag list
 
 # Get statistics
 victor rag stats
-```
+```text
 
 ## Integration with Other Verticals
 
@@ -379,7 +381,7 @@ victor/rag/
 ├── escape_hatches.py     # Complex condition logic
 ├── rl.py                 # Reinforcement learning config
 └── teams.py              # Multi-agent team specs
-```
+```text
 
 ## Best Practices
 

@@ -35,7 +35,7 @@ facts = await orchestrator.semantic_memory.query_knowledge(
     k=5,
     threshold=0.25
 )
-```
+```text
 
 ### 2. Temporal Retrieval
 
@@ -91,7 +91,7 @@ best = await orchestrator.episodic_memory.recall_by_reward(
     min_reward=8.0,
     n=10
 )
-```
+```text
 
 ### 4. Hybrid Retrieval
 
@@ -160,7 +160,7 @@ episode_id = await orchestrator.episodic_memory.store_episode(
         "technologies": ["JWT", "Python"]
     }
 )
-```
+```text
 
 ### 2. Semantic Knowledge
 
@@ -199,7 +199,7 @@ fact_id = await orchestrator.semantic_memory.store_knowledge(
 ```python
 # Trigger consolidation
 await orchestrator.consolidate_memories()
-```
+```text
 
 ### 4. Performance Optimization
 

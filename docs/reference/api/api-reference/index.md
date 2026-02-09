@@ -54,7 +54,7 @@ async for chunk in orchestrator.stream_chat(
     messages=[{"role": "user", "content": "Hello!"}]
 ):
     print(chunk.content, end="")
-```
+```text
 
 ---
 

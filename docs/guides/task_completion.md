@@ -57,7 +57,7 @@ VICTOR_USE_SIGNAL_BASED_COMPLETION=true
 
 # Disable to use legacy buffer/size heuristics (not recommended)
 VICTOR_USE_SIGNAL_BASED_COMPLETION=false
-```
+```text
 
 Or in code:
 
@@ -98,7 +98,7 @@ Each task type has specific completion signal instructions:
 **User Request**: "Create a Python hello world script"
 
 **Victor's Response**:
-```
+```text
 I'll create a hello world script for you.
 
 [Creates file]
@@ -113,7 +113,7 @@ _DONE_ Created hello.py with a simple hello world program.
 **User Request**: "Fix the authentication bug in login.py"
 
 **Victor's Response**:
-```
+```text
 Let me examine the login.py file first...
 
 [Reading and analyzing]
@@ -132,7 +132,7 @@ _TASK_DONE_ Fixed authentication bug in login.py
 **User Request**: "Analyze the performance bottlenecks in the codebase"
 
 **Victor's Response**:
-```
+```text
 I'll analyze the codebase for performance issues...
 
 [Exploring multiple files]
@@ -195,7 +195,7 @@ from victor.config import Settings
 
 settings = Settings()
 settings.use_signal_based_completion = False
-```
+```text
 
 Or via environment variable:
 
@@ -219,7 +219,7 @@ Victor emits structured events for completion detection:
         "source": "TaskCompletionDetector"
     }
 }
-```
+```text
 
 ### Log Messages
 
@@ -229,7 +229,7 @@ Look for these log messages to understand completion decisions:
 INFO: Task completion: HIGH confidence detected (active signal), forcing completion after this response
 INFO: Task completion: MEDIUM confidence detected (file mods + passive signal)
 INFO: ContinuationStrategy: HIGH confidence from TaskCompletionDetector - finishing
-```
+```text
 
 ## Migration from Legacy Behavior
 
@@ -296,7 +296,7 @@ get_completion_confidence()
 ContinuationStrategy / IntentClassifier
     ↓
 Final Decision (Finish/Continue)
-```
+```text
 
 ### Components
 

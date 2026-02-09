@@ -56,7 +56,7 @@ async def weather(
     """
     # Implementation...
     pass
-```
+```text
 
 ---
 
@@ -113,7 +113,7 @@ async def process_weather_data(location: str):
     formatted = format_weather(parsed)
 
     return formatted
-```
+```text
 
 ### Batch Operations
 

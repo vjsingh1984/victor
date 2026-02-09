@@ -28,7 +28,7 @@ flowchart TB
     style D fill:#f3e5f5,stroke:#6a1b9a
     style E fill:#fce4ec,stroke:#880e4f
     style F fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px
-```
+```text
 
 See [Contributor Workflow Diagram](../diagrams/user-journeys/contributor-workflow.mmd) for detailed contribution
   process.
@@ -73,7 +73,7 @@ make lint
 
 # Check all checks pass
 make qa
-```
+```text
 
 **📖 Full Guide:** [Development Setup](../contributing/setup.md)
 
@@ -94,7 +94,7 @@ victor/
 │   ├── integration/     # Integration tests
 │   └── conftest.py      # Test fixtures
 └── docs/                # Documentation
-```
+```text
 
 **📖 Architecture:** [Architecture Overview](../architecture/overview.md)
 
@@ -137,7 +137,7 @@ pytest tests/integration -v
 
 # Skip slow tests
 pytest -m "not slow"
-```
+```text
 
 **Test Markers:**
 - `@pytest.mark.unit` - Unit tests
@@ -242,7 +242,7 @@ class MyTool(BaseTool):
     def _do_work(self, param: str) -> Any:
         # Actual implementation
         return f"Processed: {param}"
-```
+```text
 
 #### Register Tool
 
@@ -265,7 +265,7 @@ def test_my_tool_execution():
     tool = MyTool()
     result = await tool.execute(param1="test")
     assert result["success"] == True
-```
+```text
 
 **📖 Tutorial:** [Creating Tools](../guides/tutorials/CREATING_TOOLS.md)
 
@@ -336,7 +336,7 @@ class MyVerticalAssistant(VerticalBase):
         return """You are an expert in my vertical.
         You have access to specialized tools for...
         """
-```
+```text
 
 ### Register Vertical
 
@@ -353,7 +353,7 @@ Or use entry points for external verticals:
 # pyproject.toml
 [project.entry-points."victor.verticals"]
 myvertical = "victor.myvertical:MyVerticalAssistant"
-```
+```text
 
 ### Test Vertical
 
@@ -389,7 +389,7 @@ flowchart LR
     J -->|No| K[Address Feedback]
     K --> G
     J -->|Yes| L[Merge PR]
-```
+```text
 
 ### Making Changes
 

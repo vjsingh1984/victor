@@ -77,7 +77,7 @@ class MyVertical(VerticalBase):
     def get_system_prompt(self) -> str:
         """Return system prompt for this vertical."""
         return "You are a specialized assistant for..."
-```
+```text
 
 ### Vertical Directory Structure
 
@@ -103,7 +103,7 @@ my_vertical/
 └── tests/                   # Tests
     ├── test_vertical.py
     └── test_tools.py
-```
+```text
 
 ## Basic Vertical Creation
 
@@ -241,7 +241,7 @@ class VulnerabilityScanner(BaseTool):
             if pattern in line:
                 return i
         return 0
-```
+```text
 
 ### Step 3: Create Vertical Configuration
 
@@ -315,7 +315,7 @@ capabilities:
 handlers:
   audit_report: my_vertical.reporting:SecurityAuditReportGenerator
   compliance_validator: my_vertical.validators:ComplianceValidator
-```
+```text
 
 ```yaml
 # my_vertical/config/teams.yaml
@@ -358,7 +358,7 @@ teams:
 from my_vertical.vertical import SecurityVertical
 
 __all__ = ["SecurityVertical"]
-```
+```text
 
 ### Step 5: Register Vertical
 
@@ -417,7 +417,7 @@ workflows:
 
       - id: end
         type: end
-```
+```text
 
 ### Feature 2: Custom Modes with Complexity Mapping
 

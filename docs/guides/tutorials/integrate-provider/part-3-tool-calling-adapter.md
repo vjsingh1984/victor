@@ -118,7 +118,7 @@ class CustomLLMAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             content,
             validate_name_fn=self.is_valid_tool_name,
         )
-```
+```text
 
 ---
 

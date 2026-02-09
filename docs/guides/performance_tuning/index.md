@@ -44,7 +44,7 @@ This guide covers performance optimization:
 ```bash
 export VICTOR_LAZY_LOADING=true
 export VICTOR_CACHE_ENABLED=true
-```
+```text
 
 ---
 

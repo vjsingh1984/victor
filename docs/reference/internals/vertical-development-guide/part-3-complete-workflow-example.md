@@ -20,7 +20,7 @@ This section provides a complete, step-by-step guide to creating a new vertical 
 
 ### 5.1 Vertical Structure
 
-```
+```text
 victor/
   myvertical/
     __init__.py                 # Package initialization
@@ -49,7 +49,7 @@ victor/
 from victor.myvertical.assistant import MyVerticalAssistant
 
 __all__ = ["MyVerticalAssistant"]
-```
+```text
 
 ```python
 # victor/myvertical/assistant.py
@@ -170,7 +170,7 @@ __all__ = [
     "get_my_capability",
     "MyVerticalCapabilityProvider",
 ]
-```
+```text
 
 #### Step 3: Create Middleware
 
@@ -272,7 +272,7 @@ REVIEWER = PersonaTraits(
 )
 
 __all__ = ["SPECIALIST", "REVIEWER"]
-```
+```text
 
 ```python
 # victor/myvertical/teams.py
@@ -345,7 +345,7 @@ def register_myvertical_chains():
     )
 
 __all__ = ["analysis_chain", "register_myvertical_chains"]
-```
+```text
 
 #### Step 6: Create Workflow Handlers
 
@@ -441,7 +441,7 @@ TRANSFORMS = {
 }
 
 __all__ = ["CONDITIONS", "TRANSFORMS"]
-```
+```text
 
 #### Step 8: Create YAML Workflow
 
@@ -533,7 +533,7 @@ from victor.myvertical.handlers import register_handlers
 register_handlers()
 
 __all__ = ["MyVerticalWorkflowProvider"]
-```
+```text
 
 #### Step 10: Register Vertical
 
@@ -593,7 +593,7 @@ async def test_create_agent():
         model="claude-sonnet-4-5",
     )
     assert agent is not None
-```
+```text
 
 ```python
 # tests/unit/myvertical/test_capabilities.py
@@ -670,7 +670,7 @@ async def test_workflow_execution():
         {"query": "test"},
     )
     assert result is not None
-```
+```text
 
 ### 5.4 Documentation
 

@@ -110,7 +110,7 @@ class FileConfigProvider(IConfigProvider):
         except Exception as e:
             print(f"Error loading config: {e}")
             return {}
-```
+```text
 
 #### Step 2: Use with Orchestrator
 
@@ -161,7 +161,7 @@ context_compaction_threshold: 0.8
 # Analytics
 enable_analytics: true
 analytics_export_interval: 60
-```
+```text
 
 ### Testing
 
@@ -305,7 +305,7 @@ class TechStackContributor(BasePromptContributor):
         ]
 
         return "\n".join(instructions)
-```
+```text
 
 #### Step 2: Register with Orchestrator
 
@@ -357,7 +357,7 @@ orchestrator = AgentOrchestrator(
 - No secrets in code
 - Use environment variables for configuration
 - Run security scans before commits
-```
+```text
 
 ### Testing
 

@@ -46,7 +46,7 @@ Provider errors occur when communicating with LLM providers.
 1. List available providers:
    ```bash
    victor providers list
-   ```
+```text
 
 2. Check for typos in provider name
 
@@ -62,7 +62,7 @@ victor chat --provider anthproc
 
 # Correct
 victor chat --provider anthropic
-```
+```text
 
 **Recovery Hint**: "Check provider name spelling. Use 'victor providers list' to list available providers."
 
@@ -86,7 +86,7 @@ victor chat --provider anthropic
 2. Set missing API key:
    ```bash
    export ANTHROPIC_API_KEY="your-key-here"
-   ```
+```text
 
 3. Verify API key format and validity
 
@@ -132,7 +132,7 @@ victor chat --provider anthropic
 1. Verify API key is correct:
    ```bash
    echo $PROVIDER_API_KEY
-   ```
+```text
 
 2. Check API key hasn't expired
 
@@ -181,7 +181,7 @@ victor chat --provider anthropic
 1. Increase timeout:
    ```bash
    victor chat --timeout 120
-   ```
+```text
 
 2. Check provider status page
 
@@ -245,7 +245,7 @@ agent.use_tool("file_read")
 
 # Correct
 agent.use_tool("read")
-```
+```text
 
 **Recovery Hint**: "Check tool name spelling. Use list_tools() to see available tools."
 
@@ -278,7 +278,7 @@ tool.execute(path="/tmp/file")
 
 # Correct - all required arguments
 tool.execute(path="/tmp/file", mode="read")
-```
+```text
 
 **Recovery Hint**: "Check tool arguments or try with different parameters."
 
@@ -351,7 +351,7 @@ Configuration errors occur when Victor is misconfigured.
 1. Validate workflow YAML:
    ```bash
    victor workflow validate path/to/workflow.yaml
-   ```
+```text
 
 2. Check YAML syntax
 
@@ -403,7 +403,7 @@ config.set_mode("invalid_mode")
 
 # Correct - valid mode
 config.set_mode("build")
-```
+```text
 
 **Recovery Hint**: "Check input values and types."
 
@@ -457,7 +457,7 @@ Workflow errors occur during workflow execution.
 3. Resume from checkpoint:
    ```bash
    victor workflow resume --checkpoint-id {checkpoint_id}
-   ```
+```text
 
 4. Validate workflow definition
 
@@ -505,7 +505,7 @@ File errors occur during file operations.
 1. Check file permissions:
    ```bash
    ls -l /path/to/file
-   ```
+```text
 
 2. Verify disk space available
 
@@ -574,7 +574,7 @@ Extension errors occur when loading vertical extensions.
 
 Every error includes a correlation ID (8-character hex) for tracking:
 
-```
+```text
 [abc12345] Provider 'anthropic' failed to initialize
 Recovery hint: Set ANTHROPIC_API_KEY environment variable
 ```
@@ -584,7 +584,7 @@ Recovery hint: Set ANTHROPIC_API_KEY environment variable
 1. **Find full error in logs**:
    ```bash
    grep "abc12345" ~/.victor/logs/victor.log
-   ```
+```text
 
 2. **Track error across services**:
    Use the same correlation ID in distributed systems
@@ -609,7 +609,7 @@ Recovery hint: Set ANTHROPIC_API_KEY environment variable
 pip install -e ".[dev]"
 # Or for specific provider
 pip install victor-ai[anthropic]
-```
+```text
 
 ---
 
@@ -641,7 +641,7 @@ sudo victor chat  # Use with caution
    ```bash
    echo $HTTP_PROXY
    echo $HTTPS_PROXY
-   ```
+```text
 3. Check firewall rules
 4. Try alternative endpoint
 
@@ -677,7 +677,7 @@ victor config list modes
 # Use valid mode
 victor chat --mode build  # Valid
 victor chat --mode invalid  # Invalid
-```
+```text
 
 ---
 
@@ -744,7 +744,7 @@ gh issue list --search "error message"
 
 # Or search web
 https://github.com/your-org/victor/issues
-```
+```text
 
 ### 3. Create Bug Report
 
@@ -759,7 +759,7 @@ Include:
 - Environment:
   ```bash
   victor doctor  # System diagnostics
-  ```
+```text
 - Logs:
   ```bash
   victor logs show --correlation-id abc12345 > error.log
@@ -784,7 +784,7 @@ Before running:
 ```bash
 victor workflow validate workflow.yaml
 victor config check
-```
+```text
 
 ### 4. Use Appropriate Timeouts
 ```bash
@@ -794,7 +794,7 @@ victor chat --timeout 120  # Increase for long operations
 ### 5. Monitor Error Rates
 ```bash
 victor errors stats  # Check error patterns
-```
+```text
 
 ### 6. Keep Dependencies Updated
 ```bash
@@ -886,7 +886,7 @@ victor config check
 
 # System diagnostics
 victor doctor
-```
+```text
 
 ---
 

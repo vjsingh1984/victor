@@ -13,7 +13,7 @@ ollama pull qwen2.5-coder:7b
 
 # Start Victor
 victor chat --provider ollama
-```
+```text
 
 ## Supported Local Providers
 
@@ -48,7 +48,7 @@ agent = await Agent.create(
     provider="ollama",
     airgapped_mode=True  # Only local providers and tools
 )
-```
+```text
 
 Or set environment variable:
 ```bash
@@ -70,7 +70,7 @@ victor chat --provider ollama
 ```bash
 ollama list  # Check installed models
 ollama pull <model>  # Download missing model
-```
+```text
 
 **Out of memory?**
 - Use a smaller model (3B instead of 7B)

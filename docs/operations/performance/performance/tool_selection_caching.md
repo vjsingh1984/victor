@@ -82,7 +82,7 @@ cache.put("cache_key", cache_entry)
 # Get statistics
 stats = cache.get_stats()
 print(f"Hit rate: {stats['hit_rate']:.1%}")
-```
+```text
 
 ### Cache Key Generation
 
@@ -128,7 +128,7 @@ if result is None:
     tools = await select_tools(query)
     # Store in cache
     cache.put_query("cache_key", tool_names, tools=tools)
-```
+```text
 
 ### Integration with SemanticToolSelector
 
@@ -161,7 +161,7 @@ invalidate_tool_selection_cache(cache_type="query")
 
 # Invalidate specific key
 invalidate_tool_selection_cache(cache_type="query", key="specific_key")
-```
+```text
 
 ### Performance Metrics
 
@@ -187,7 +187,7 @@ from victor.tools.caches import CacheWarmer
 
 warmer = CacheWarmer(cache)
 await warmer.warmup_common_queries(tool_registry, semantic_selector)
-```
+```text
 
 ### Common Query Patterns
 
@@ -230,7 +230,7 @@ semantic_selector.notify_tools_changed()
 # Invalidate all caches
 from victor.tools.caches import invalidate_tool_selection_cache
 invalidate_tool_selection_cache()
-```
+```text
 
 ### Background Cleanup
 
@@ -261,7 +261,7 @@ stats = cache.get_stats()
     "expirations": 300,
     "utilization": 0.45,  # 45% full
 }
-```
+```text
 
 ### Latency Tracking
 
@@ -298,7 +298,7 @@ python scripts/benchmark_tool_selection.py report --format markdown
 
 # Compare runs
 python scripts/benchmark_tool_selection.py compare run1.json run2.json
-```
+```text
 
 ### Benchmark Scenarios
 
@@ -339,7 +339,7 @@ Entries are checked for expiration on access:
 ```python
 def is_expired(self) -> bool:
     return time.time() - self.timestamp > self.ttl_seconds
-```
+```text
 
 ## Best Practices
 
@@ -374,7 +374,7 @@ To disable caching entirely (not recommended):
 ```python
 # Set cache sizes to 0
 CacheConfig.QUERY_CACHE_MAX_SIZE = 0
-```
+```text
 
 ## Troubleshooting
 

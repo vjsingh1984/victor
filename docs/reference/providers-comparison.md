@@ -40,7 +40,7 @@ flowchart TD
     style START fill:#e0e7ff
     style OLLAMA fill:#d1fae5
     style ANTHROPIC fill:#fef3c7
-```
+```text
 
 ## Feature Matrix
 
@@ -94,7 +94,7 @@ victor chat
 
 # Using .env file
 echo "ANTHROPIC_API_KEY=sk-..." > ~/.victor/.env
-```
+```text
 
 ## Air-Gapped Setup
 

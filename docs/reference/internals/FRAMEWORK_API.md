@@ -13,7 +13,7 @@ from victor.framework import Agent
 agent = await Agent.create(provider="anthropic")
 result = await agent.run("Write a function to parse JSON")
 print(result.content)
-```
+```text
 
 ---
 
@@ -74,7 +74,7 @@ agent = await Agent.create(
     provider="anthropic",
     tools=ToolSet.default()
 )
-```
+```text
 
 ### Execution
 
@@ -118,7 +118,7 @@ agent = await Agent.create(tools=ToolSet.minimal())
 agent = await Agent.create(tools=ToolSet.default())
 agent = await Agent.create(tools=ToolSet.full())
 agent = await Agent.create(tools=ToolSet.airgapped())
-```
+```text
 
 ### Tool Categories
 
@@ -178,7 +178,7 @@ async for event in agent.stream("Refactor this code"):
         print(event.content, end="")
     elif event.type == EventType.STAGE_CHANGE:
         print(f"📍 {event.old_stage} → {event.new_stage}")
-```
+```text
 
 ### Event Data Structure
 
@@ -214,7 +214,7 @@ stateDiagram-v2
     EXECUTION --> VERIFICATION
     VERIFICATION --> COMPLETION
     COMPLETION --> [*]
-```
+```text
 
 ### State Properties
 
@@ -281,7 +281,7 @@ if result.success:
     print(f"Tools: {[t.name for t in result.tool_calls]}")
 else:
     print(f"Error: {result.error}")
-```
+```text
 
 ---
 
@@ -339,7 +339,7 @@ graph TB
 agent = await Agent.create(provider="anthropic")
 result = await agent.run("Write a hello world function")
 print(result.content)
-```
+```text
 
 ### Pattern 2: Streaming with Events
 
@@ -372,7 +372,7 @@ result = await agent.run("Refactor this function")
 # Check final state
 print(f"Stage: {agent.state.stage}")
 print(f"Tools used: {agent.state.tool_calls_used}")
-```
+```text
 
 ### Pattern 4: Tool Control
 
@@ -409,7 +409,7 @@ streaming = orchestrator._streaming_controller
 
 # Use advanced features
 await orchestrator.checkpoint_manager.save_checkpoint("checkpoint_1")
-```
+```text
 
 ---
 

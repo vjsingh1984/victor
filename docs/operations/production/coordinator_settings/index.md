@@ -40,7 +40,7 @@ This guide covers coordinator configuration:
 **Configure coordinator:**
 ```bash
 export VICTOR_COORDINATOR_TIMEOUT=30
-```
+```text
 
 ---
 

@@ -26,7 +26,7 @@ pip install victor-ai[native]
 
 # Or install with maturin for development
 pip install victor-ai[native] --extra-index-url https://pypi.fury.io/cairo/
-```
+```text
 
 ## Quick Start
 
@@ -81,7 +81,7 @@ results = processor.extract_symbols_parallel(
 
 for idx, symbols in results.items():
     print(f"File {idx}: {len(symbols)} symbols")
-```
+```text
 
 ## API Reference
 
@@ -116,7 +116,7 @@ parse_to_ast(
     language: str,
     file_path: Optional[str] = None
 ) -> Any
-```
+```text
 
 Parse source code to AST with caching.
 
@@ -148,7 +148,7 @@ execute_query(
     ast: Any,
     query_string: str
 ) -> AstQueryResult
-```
+```text
 
 Execute tree-sitter query with compiled cursor.
 
@@ -181,7 +181,7 @@ extract_symbols(
     ast: Any,
     symbol_types: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]
-```
+```text
 
 Extract symbols from AST.
 
@@ -217,7 +217,7 @@ extract_symbols_parallel(
     files: List[Tuple[str, str]],
     symbol_types: Optional[List[str]] = None
 ) -> Dict[int, List[Dict[str, Any]]]
-```
+```text
 
 Extract symbols from multiple files in parallel.
 
@@ -249,7 +249,7 @@ for idx, symbols in results.items():
 
 ```python
 normalize_language(language: str) -> str
-```
+```text
 
 Normalize language name to tree-sitter identifier.
 
@@ -270,7 +270,7 @@ processor.normalize_language("rust")    # "rust"
 
 ```python
 get_supported_languages() -> List[str]
-```
+```text
 
 Get list of supported programming languages.
 
@@ -289,7 +289,7 @@ print(f"Supported: {', '.join(languages)}")
 ```python
 @property
 cache_stats() -> Dict[str, Any]
-```
+```text
 
 Get cache statistics.
 
@@ -307,7 +307,7 @@ print(f"Hit rate: {stats.get('hit_rate', 0):.1f}%")
 ```python
 @property
 parse_stats() -> Dict[str, float]
-```
+```text
 
 Get parse operation statistics.
 
@@ -327,7 +327,7 @@ print(f"Cache hit rate: {stats['cache_hit_rate']:.1f}%")
 
 ```python
 clear_cache() -> None
-```
+```text
 
 Clear the AST cache and reset statistics.
 
@@ -341,7 +341,7 @@ print("Cache cleared")
 
 ```python
 get_version() -> Optional[str]
-```
+```text
 
 Get version string of the native backend.
 
@@ -406,7 +406,7 @@ query = "(decorator (identifier) @decorator)"
 
 # Find imports
 query = "(import_statement name: (dotted_name) @import)"
-```
+```text
 
 ### JavaScript
 
@@ -461,7 +461,7 @@ processor = AstProcessorAccelerator(max_cache_size=5000)
 
 # Small cache for memory-constrained environments
 processor = AstProcessorAccelerator(max_cache_size=100)
-```
+```text
 
 ### Force Python Backend
 
@@ -475,7 +475,7 @@ processor = AstProcessorAccelerator(force_python=True)
 ```python
 # For single-threaded environments
 processor = AstProcessorAccelerator(enable_parallel=False)
-```
+```text
 
 ### Working with Multiple Languages
 
@@ -519,7 +519,7 @@ class FastCodebaseIndexer(CodebaseIndexer):
 
         for symbol in symbols:
             self.add_to_index(symbol)
-```
+```text
 
 ### Symbol Search
 
@@ -555,7 +555,7 @@ try:
 except (ValueError, NotImplementedError) as e:
     print(f"Language not supported: {e}")
     # Fallback to manual parsing
-```
+```text
 
 ### Malformed Source
 
@@ -574,7 +574,7 @@ results = processor.execute_query(ast, "invalid query")
 
 if results.matches == 0:
     print("Query returned no results")
-```
+```text
 
 ## Best Practices
 
@@ -604,7 +604,7 @@ stats = processor.cache_stats
 if stats.get("hit_rate", 0) < 50:
     print("Low cache hit rate, consider increasing cache size")
     processor = AstProcessorAccelerator(max_cache_size=2000)
-```
+```text
 
 ### High Memory Usage
 

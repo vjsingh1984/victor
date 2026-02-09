@@ -35,7 +35,7 @@ async def create_agent(
     **kwargs: Any,
 ) -> Any:
     """Create any agent type using shared infrastructure."""
-```
+```text
 
 **Usage**:
 ```python
@@ -61,7 +61,7 @@ agent = await factory.create_agent(mode="foreground", task="Implement feature X"
 ```python
 async def execute(self, task: str, context: Dict[str, Any]) -> str:
     """Execute a task and return result."""
-```
+```text
 
 **Usage**:
 ```python
@@ -100,7 +100,7 @@ async def switch_provider(
     model: Optional[str] = None,
 ) -> bool:
     """Switch to different provider/model."""
-```
+```text
 
 **Usage**:
 ```python
@@ -132,7 +132,7 @@ def fail_task(self, task_id: str, error: Exception) -> None:
 
 def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
     """Get task information."""
-```
+```text
 
 **Usage**:
 ```python
@@ -167,7 +167,7 @@ def get_tool_cost(self, name: str) -> CostTier:
 
 def register_before_hook(self, hook: Callable[..., Any]) -> None:
     """Register hook to run before tool execution."""
-```
+```text
 
 **Usage**:
 ```python
@@ -199,7 +199,7 @@ async def execute(
 
 def is_budget_exhausted(self) -> bool:
     """Check if budget is exhausted."""
-```
+```text
 
 **Usage**:
 ```python
@@ -241,7 +241,7 @@ def validate_arguments(
     arguments: Dict[str, Any],
 ) -> bool:
     """Validate tool arguments before execution."""
-```
+```text
 
 **Usage**:
 ```python
@@ -271,7 +271,7 @@ async def select_tools(
 
 def compute_similarity(self, query: str, tool_description: str) -> float:
     """Compute similarity score between query and tool."""
-```
+```text
 
 **Usage**:
 ```python
@@ -309,7 +309,7 @@ def compact_if_needed(self) -> bool:
 
 def set_system_prompt(self, prompt: str) -> None:
     """Set system prompt."""
-```
+```text
 
 **Usage**:
 ```python
@@ -337,7 +337,7 @@ def record_tool_execution(self, tool_name: str, args: Dict[str, Any]) -> None:
 
 def record_message(self, content: str, is_user: bool = True) -> None:
     """Record message for stage inference."""
-```
+```text
 
 **Usage**:
 ```python
@@ -363,7 +363,7 @@ async def handle_chunk(self, chunk: Any) -> None:
 
 async def end_session(self, session_id: str) -> None:
     """End a streaming session."""
-```
+```text
 
 ---
 
@@ -401,7 +401,7 @@ adapter = container.get(StreamingToolAdapterProtocol)
 async for chunk in adapter.execute_streaming_single("read_file", {"path": "/file"}):
     if chunk.chunk_type == "result":
         print(f"Result: {chunk.content}")
-```
+```text
 
 ---
 
@@ -441,7 +441,7 @@ async def execute_tools(
 coordinator = container.get(ToolCoordinatorProtocol)
 context = AgentToolSelectionContext(max_tools=5)
 results = await coordinator.select_and_execute("Read Python files", context)
-```
+```text
 
 ---
 
@@ -471,7 +471,7 @@ async def get_stage_history(self) -> List[Dict[str, Any]]:
 ```python
 coordinator = container.get(StateCoordinatorProtocol)
 await coordinator.transition_to(ConversationStage.EXECUTING, reason="Starting tool execution")
-```
+```text
 
 ---
 
@@ -502,7 +502,7 @@ async def add_prompt_section(
 ```python
 coordinator = container.get(PromptCoordinatorProtocol)
 prompt = await coordinator.build_prompt(AgentMode.BUILD)
-```
+```text
 
 ---
 
@@ -567,7 +567,7 @@ async def invalidate(self, key: str) -> None:
 
 async def clear(self) -> None:
     """Clear all cache."""
-```
+```text
 
 **Usage**:
 ```python
@@ -599,7 +599,7 @@ def get_remaining_budget(self) -> int:
 
 def reset_budget(self) -> None:
     """Reset budget to initial value."""
-```
+```text
 
 **Usage**:
 ```python
@@ -643,7 +643,7 @@ def record_outcome(
     quality_improvement: float = 0.0,
 ) -> None:
     """Record recovery outcome for learning."""
-```
+```text
 
 ---
 
@@ -693,7 +693,7 @@ await backend.subscribe("tool.*", my_handler)
 await backend.publish(MessagingEvent(topic="tool.start", data={}))
 
 await backend.disconnect()
-```
+```text
 
 ---
 
@@ -731,7 +731,7 @@ async def subscribe(
 
 async def unsubscribe(self, handle: SubscriptionHandle) -> bool:
     """Unsubscribe from pattern."""
-```
+```text
 
 ---
 
@@ -765,7 +765,7 @@ event = MessagingEvent(
     correlation_id="task_abc123",
 )
 await event_bus.publish(event)
-```
+```text
 
 ---
 
@@ -803,7 +803,7 @@ chunk_type: str  # "start", "progress", "result", "error", "cache_hit"
 content: Any  # Chunk payload
 is_final: bool  # Is this the final chunk
 metadata: Dict[str, Any]  # Additional context
-```
+```text
 
 ---
 
@@ -871,7 +871,7 @@ def test_my_component():
 
     # Verify
     mock_tool_executor.aexecute.assert_called_once()
-```
+```text
 
 ## Additional Resources
 

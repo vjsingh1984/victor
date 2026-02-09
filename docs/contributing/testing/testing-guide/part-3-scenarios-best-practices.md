@@ -27,7 +27,7 @@ async def test_propagates_provider_errors(coordinator: ChatCoordinator):
     # Act & Assert
     with pytest.raises(ProviderRateLimitError):
         await coordinator.chat("Test message")
-```
+```text
 
 ### Testing Error Recovery
 
@@ -79,7 +79,7 @@ async def test_falls_back_to_secondary_provider(coordinator: ChatCoordinator):
     assert response.content == "Fallback response"
     primary_provider.assert_called_once()
     secondary_provider.assert_called_once()
-```
+```text
 
 ### Testing Timeout Handling
 
@@ -117,7 +117,7 @@ async def test_execution_time(coordinator: ToolCoordinator):
     # Assert
     elapsed = time.time() - start_time
     assert elapsed < 1.0, f"Execution took {elapsed}s, expected < 1.0s"
-```
+```text
 
 ### Testing Memory Usage
 
@@ -161,7 +161,7 @@ async def test_concurrent_performance(coordinator: ToolCoordinator):
     elapsed = time.time() - start_time
     assert len(results) == 100
     assert elapsed < 5.0, f"100 operations took {elapsed}s"
-```
+```text
 
 ## Integration Testing
 
@@ -217,7 +217,7 @@ async def test_end_to_end_workflow(orchestrator: Mock):
     # Assert
     assert response is not None
     assert context_coord.context_size < 10000  # Context compacted
-```
+```text
 
 ### Testing with Real Dependencies
 

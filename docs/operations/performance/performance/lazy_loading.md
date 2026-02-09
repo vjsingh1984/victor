@@ -51,7 +51,7 @@ export VICTOR_LAZY_EXTENSIONS=false
 
 # Auto mode (profile-based)
 export VICTOR_LAZY_EXTENSIONS=auto
-```
+```text
 
 #### VICTOR_VERTICAL_LOADING_MODE
 
@@ -78,7 +78,7 @@ settings = Settings()
 
 # Check current mode
 print(settings.vertical_loading_mode)  # "eager", "lazy", or "auto"
-```
+```text
 
 ## Performance Impact
 
@@ -160,7 +160,7 @@ class LazyVerticalExtensions:
     def safety_extensions(self):
         extensions = self._load_extensions()  # Uses cached value
         return extensions.safety_extensions
-```
+```text
 
 All extension properties trigger loading on first access and cache the result.
 
@@ -209,7 +209,7 @@ def load(self, name: str, lazy: Optional[bool] = None):
     # Eager mode: activate immediately
     self._activate(vertical)
     return vertical
-```
+```text
 
 ## Testing
 
@@ -240,7 +240,7 @@ pytest tests/unit/verticals/test_extension_loader.py -v
 
 # Test vertical loading
 pytest tests/unit/verticals/test_vertical_loader.py -v
-```
+```text
 
 ## Troubleshooting
 
@@ -329,7 +329,7 @@ class MyExtension:
    ```python
    # Future API
    get_extensions(lazy=["safety", "workflow"], eager=["middleware"])
-   ```
+```text
 
 2. **Async preloading**: Start loading in background, return when ready
    ```python
@@ -340,7 +340,7 @@ class MyExtension:
 3. **Dependency tracking**: Automatically load dependent extensions
    ```python
    # Future: Automatically load workflow if provider loaded
-   ```
+```text
 
 4. **Metrics integration**: Track lazy loading effectiveness
    ```python

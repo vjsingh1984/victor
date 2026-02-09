@@ -91,7 +91,7 @@ self._query_registry = UniversalRegistry.get_registry(
     cache_strategy=CacheStrategy.LRU,
     max_size=1000,
 )
-```
+```text
 
 ### 3. Cache Key Generation ✅
 
@@ -147,7 +147,7 @@ common_queries = [
     "create endpoint",
     # ... 10 more patterns
 ]
-```
+```text
 
 ### 5. Cache Invalidation Strategy ✅
 
@@ -179,7 +179,7 @@ common_queries = [
    ```python
    # Called automatically when tools are added/removed
    cache.invalidate_on_tools_change()
-   ```
+```text
 
 ### 6. Performance Metrics ✅
 
@@ -351,7 +351,7 @@ if cached_result is not None:
     self._cache_hit_count += 1
     self._total_selections += 1
     return cached_result
-```
+```text
 
 **Cache Store** (lines 1692-1700):
 ```python
@@ -383,7 +383,7 @@ async def select_semantic(self, user_message: str, ...):
         similarity_threshold=threshold,
     )
     # ... tools are returned from cache if available
-```
+```text
 
 ---
 
@@ -414,7 +414,7 @@ TOOL_SELECTION_CACHE_QUERY_TTL = 3600
 TOOL_SELECTION_CACHE_CONTEXT_TTL = 300
 TOOL_SELECTION_CACHE_RL_TTL = 3600
 TOOL_SELECTION_CACHE_ENABLED = True
-```
+```text
 
 ---
 

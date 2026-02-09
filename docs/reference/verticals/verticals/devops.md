@@ -5,7 +5,9 @@ The DevOps vertical provides infrastructure automation, deployment,
 
 ## Overview
 
-The DevOps vertical (`victor/devops/`) handles infrastructure-as-code, container orchestration, CI/CD pipeline management, and cloud operations. It supports multiple cloud providers and infrastructure tools with built-in safety checks for production environments.
+The DevOps vertical (`victor/devops/`) handles infrastructure-as-code, container orchestration, CI/CD
+pipeline management, and cloud operations. It supports multiple cloud providers and infrastructure tools
+with built-in safety checks for production environments.
 
 ### Key Use Cases
 
@@ -51,7 +53,7 @@ workflows:
       - execute_deployment   # Apply changes
       - verify_deployment    # Health checks
       - rollback_on_failure  # Automatic rollback if needed
-```
+```text
 
 **Key Features**:
 - Pre-deployment validation
@@ -124,7 +126,7 @@ resource "aws_instance" "web" {
     ManagedBy   = "victor"
   }
 }
-```
+```text
 
 ### Container Orchestration
 
@@ -171,7 +173,7 @@ jobs:
       - name: Deploy to production
         run: |
           ./scripts/deploy.sh
-```
+```text
 
 ### Safety Features
 
@@ -219,7 +221,7 @@ environments:
     auto_rollback: true
     health_check_timeout: 600
     change_window: "weekdays 9am-5pm"
-```
+```text
 
 ### Workflow Parameters
 
@@ -254,7 +256,7 @@ result = await workflow.invoke({
     "changes": terraform_plan,
     "approval_required": True
 })
-```
+```text
 
 ### Container Setup
 
@@ -281,7 +283,7 @@ orchestrator = AgentOrchestrator(
 response = await orchestrator.chat(
     "Create a Terraform module for an AWS EKS cluster with autoscaling"
 )
-```
+```text
 
 ## Integration with Other Verticals
 
@@ -308,7 +310,7 @@ victor/devops/
 ├── escape_hatches.py     # Complex condition logic
 ├── rl.py                 # Reinforcement learning config
 └── teams.py              # Multi-agent team specs
-```
+```text
 
 ## Best Practices
 

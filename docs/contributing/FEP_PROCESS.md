@@ -110,7 +110,7 @@ graph LR
     C -->|Implemented| E[Implemented]
     B -->|Deferred| F[Deferred]
     A -->|Withdrawn| G[Withdrawn]
-```
+```text
 
 ### Status Values
 
@@ -171,7 +171,7 @@ Check your FEP for completeness:
 
 ```bash
 victor fep validate fep-XXXX-my-enhancement.md
-```
+```text
 
 This checks:
 - YAML frontmatter is valid
@@ -374,7 +374,7 @@ reviewers:
 discussion: https://github.com/vijayps-ingh/victor/discussions/1
 implementation: https://github.com/vijayps-ingh/victor/pull/1
 ---
-```
+```text
 
 ---
 

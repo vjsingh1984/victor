@@ -29,7 +29,7 @@ pip install mkdocs-material>=9.5
 pip install mkdocstrings[python]>=0.24
 pip install mkdocs-git-revision-date-localized-plugin
 pip install pymdown-extensions
-```
+```text
 
 ### Build Commands
 
@@ -55,7 +55,7 @@ mkdocs build -v
 1. Start the local development server:
    ```bash
    mkdocs serve
-   ```
+```text
 
 2. Open your browser to `http://127.0.0.1:8000`
 
@@ -112,7 +112,7 @@ docs/
 ├── security/                         # Security practices
 ├── testing/                          # Testing docs and QA
 └── contributing/                     # Contributor docs
-```
+```text
 
 ## Deployment to GitHub Pages
 
@@ -158,7 +158,7 @@ To use a custom domain (e.g., `docs.victor-ai.com`):
 1. Create a `CNAME` file in the `docs/` directory:
    ```
    docs.victor-ai.com
-   ```
+```text
 
 2. Commit the CNAME file:
    ```bash
@@ -214,7 +214,7 @@ The documentation uses the **Material for MkDocs** theme with:
 
    !!! warning
        This is a warning
-   ```
+```text
 
 4. Use code blocks with language specification:
    ````markdown
@@ -228,7 +228,7 @@ The documentation uses the **Material for MkDocs** theme with:
    ```markdown
    - [x] Completed task
    - [ ] Incomplete task
-   ```
+```text
 
 ### Adding New Pages
 
@@ -265,7 +265,7 @@ def example_function(param1: str, param2: int) -> bool:
         ValueError: If param1 is empty
     """
     pass
-```
+```text
 
 Then reference it in documentation:
 

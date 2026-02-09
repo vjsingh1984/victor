@@ -90,7 +90,7 @@ As of the coordinator testing initiative completion:
 
 ### Test Pyramid
 
-```
+```text
         E2E (5%)
        /        \
     Integration (15%)
@@ -108,7 +108,7 @@ Unit Tests (80%)
 
 Test files mirror the source code structure:
 
-```
+```text
 tests/
 ├── unit/
 │   ├── agent/
@@ -260,7 +260,7 @@ class TestCoordinatorNameEdgeCases:
 
         # Assert
         assert result is not None
-```
+```text
 
 ### Test Class Organization
 
@@ -337,7 +337,7 @@ def _create_stream_generator(self):
         for chunk in chunks:
             yield chunk
     return stream_gen
-```
+```text
 
 **Key Test Scenarios:**
 - Non-streaming chat with no tools
@@ -430,7 +430,7 @@ def mock_orchestrator(self) -> Mock:
         )
     )
     return orch
-```
+```text
 
 **Key Test Scenarios:**
 - Context budget checking
@@ -511,7 +511,7 @@ def mock_backend(self) -> Mock:
 def coordinator(self, mock_backend: Mock) -> CacheCoordinator:
     """Create CacheCoordinator."""
     return CacheCoordinator(backend=mock_backend)
-```
+```text
 
 **Key Test Scenarios:**
 - Cache hit/miss behavior

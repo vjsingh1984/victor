@@ -44,7 +44,7 @@ def analyze_code_accelerated(
     patterns: Optional[List[str]] = None,
 ) -> List[PatternMatch]:
     """Analyze code using Rust-accelerated regex engine."""
-```
+```text
 
 **Usage Example**:
 ```python
@@ -88,7 +88,7 @@ def _get_call_signature(self, tool_name: str, args: Dict[str, Any]) -> str:
     if self._signature_accelerator is not None:
         return self._signature_accelerator.compute_signature(tool_name, args)
     # Falls back to legacy implementations
-```
+```text
 
 **Usage Example**:
 ```python
@@ -143,7 +143,7 @@ files = accelerator.walk_directory(
 
 for file_info in files:
     print(f"{file_info.path}: {file_info.size} bytes")
-```
+```text
 
 ## Settings Configuration
 
@@ -171,7 +171,7 @@ export VICTOR_USE_RUST_SIGNATURE=true
 export VICTOR_SIGNATURE_CACHE_SIZE=10000
 export VICTOR_USE_RUST_FILE_OPS=true
 export VICTOR_FILE_OPS_MAX_DEPTH=100
-```
+```text
 
 ## Architecture
 
@@ -198,7 +198,7 @@ All accelerators follow the same architecture pattern:
        @property
        def cache_stats(self) -> CacheStats:
            return self._stats
-   ```
+```text
 
 3. **Methods with Rust/Python dual paths**:
    ```python
@@ -221,7 +221,7 @@ All accelerators follow the same architecture pattern:
                if _accelerator is None:
                    _accelerator = RegexEngineAccelerator()
        return _accelerator
-   ```
+```text
 
 ### Statistics Tracking
 
@@ -277,7 +277,7 @@ try:
 except Exception as e:
     logger.warning(f"Rust implementation failed: {e}, using Python fallback")
     result = self._python_fallback(data)
-```
+```text
 
 ## Testing
 
@@ -319,7 +319,7 @@ pytest tests/unit/test_accelerators.py::test_regex_accelerator -v
 
 # Run with coverage
 pytest tests/unit/test_accelerators.py --cov=victor.native.accelerators
-```
+```text
 
 ## Performance Benchmarks
 
@@ -372,7 +372,7 @@ issues = analyzer.check_security(code, file_path)
 
 # Or use new accelerated method explicitly:
 matches = analyzer.analyze_code_accelerated(code, "python")
-```
+```text
 
 ### For Developers Using Tool Pipeline
 
@@ -386,7 +386,7 @@ matches = analyzer.analyze_code_accelerated(code, "python")
 ```python
 # No code changes needed - signature accelerator is automatic
 # Faster deduplication happens transparently
-```
+```text
 
 ## Future Work
 

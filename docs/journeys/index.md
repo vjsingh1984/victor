@@ -21,7 +21,7 @@ flowchart LR
     style Developer fill:#fff3e0,stroke:#e65100
     style Operations fill:#f3e5f5,stroke:#6a1b9a
     style Advanced fill:#fce4ec,stroke:#880e4f
-```
+```text
 
 ## 🚀 Beginner Journey
 

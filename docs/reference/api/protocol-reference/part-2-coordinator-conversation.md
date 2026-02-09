@@ -169,7 +169,7 @@ class IToolSelectionCoordinator(Protocol):
             Set of required output identifiers
         """
         ...
-```
+```text
 
 ---
 
@@ -314,7 +314,7 @@ class StateCoordinatorProtocol(Protocol):
             True if in execution phase
         """
         ...
-```
+```text
 
 ---
 

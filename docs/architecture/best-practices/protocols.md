@@ -29,7 +29,7 @@ class MyService:
     async def process(self, data: str) -> dict:
         # Implementation
         return {"result": data.upper()}
-```
+```text
 
 **Why**:
 - Clear interface contract
@@ -89,7 +89,7 @@ class ConsoleWriter:
 # Both match WriterProtocol
 writer: WriterProtocol = FileWriter()  # OK
 writer = ConsoleWriter()  # Also OK
-```
+```text
 
 ### Use Runtime Checkable for Protocols
 
@@ -154,7 +154,7 @@ class ToolExecutorProtocol(Protocol):
             ValidationError: If arguments are invalid
         """
         ...
-```
+```text
 
 ---
 

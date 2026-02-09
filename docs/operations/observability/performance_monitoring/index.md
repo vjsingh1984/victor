@@ -45,7 +45,7 @@ This guide covers performance monitoring for Victor AI:
 ```bash
 export VICTOR_MONITORING_ENABLED=true
 victor chat
-```
+```text
 
 ---
 

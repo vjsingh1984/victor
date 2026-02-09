@@ -49,7 +49,7 @@ Start Victor in TUI (Terminal User Interface) mode.
 victor                              # TUI mode with default profile
 victor --profile local              # TUI with specific profile
 victor --provider anthropic         # TUI with specific provider
-```
+```text
 
 **Options:**
 
@@ -104,7 +104,7 @@ victor chat --mode plan
 
 # Resume a previous session
 victor chat --resume myproj-9Kx7Z2
-```
+```text
 
 ---
 
@@ -136,7 +136,7 @@ victor init --force                 # Overwrite existing config
 victor init --provider anthropic    # Pre-configure provider
 victor init --model claude-3-5-sonnet
 victor init --index                 # Build codebase index
-```
+```text
 
 **Options:**
 
@@ -197,7 +197,7 @@ Run Victor as an MCP (Model Context Protocol) server.
 victor mcp                          # Run in stdio mode
 victor mcp --stdio                  # Explicit stdio mode
 victor mcp --log-level DEBUG        # Verbose logging
-```
+```text
 
 **Options:**
 
@@ -236,7 +236,7 @@ victor keys --set anthropic --keyring  # Set key (secure keyring)
 victor keys --migrate               # Migrate file to keyring
 victor keys --services              # List external services
 victor keys --set-service finnhub --keyring
-```
+```text
 
 **Options:**
 
@@ -299,7 +299,7 @@ victor profiles show default        # Show profile details
 victor profiles create fast --provider groqcloud --model llama3-70b
 victor profiles delete old-profile
 victor profiles set-default local
-```
+```text
 
 **Subcommands:**
 
@@ -342,7 +342,7 @@ victor models list                  # Same as above
 victor models pull qwen2.5-coder:7b # Download model
 victor models remove old-model      # Remove model
 victor models info qwen2.5-coder:7b # Show model details
-```
+```text
 
 **Subcommands:**
 
@@ -394,7 +394,7 @@ victor config get default_provider  # Get specific value
 victor config set default_provider anthropic
 victor config edit                  # Open in editor
 victor config path                  # Show config file path
-```
+```text
 
 **Subcommands:**
 

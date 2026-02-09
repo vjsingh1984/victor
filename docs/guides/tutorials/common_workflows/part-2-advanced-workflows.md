@@ -45,7 +45,7 @@ victor chat "Apply the fix and verify it:
 - Explains what was changed
 - Runs tests to ensure no regressions
 - Verifies the bug is fixed"
-```
+```text
 
 **Expected Output:**
 - Root cause analysis
@@ -126,7 +126,7 @@ victor chat --provider anthropic "Review the implementation for:
 
 # 5. Generate tests with free model
 victor chat --provider ollama "Generate comprehensive tests for the implementation"
-```
+```text
 
 **Expected Output:**
 - Multiple design approaches
@@ -211,7 +211,7 @@ victor chat --provider anthropic \
 victor chat --provider ollama \
   "Generate tests for $FEATURE_NAME" \
   > tests.md
-```
+```text
 
 **Usage:**
 ```bash
@@ -225,7 +225,7 @@ bash workflows/feature.sh "user authentication system"
 ```bash
 # Always explore first
 victor chat --mode explore "Explore different approaches for..."
-```
+```text
 
 ### 2. Use Appropriate Modes
 
@@ -248,7 +248,7 @@ victor chat "Step 1: Create basic structure"
 victor chat "Step 2: Add error handling"
 victor chat "Step 3: Add logging"
 victor chat "Step 4: Add tests"
-```
+```text
 
 ### 4. Always Test
 
@@ -263,7 +263,7 @@ victor chat "Generate tests for the code above"
 # Document as you go
 victor chat "Add docstrings to all functions"
 victor chat "Generate README for this module"
-```
+```text
 
 ## Conclusion
 

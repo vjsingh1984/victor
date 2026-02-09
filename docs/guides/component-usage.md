@@ -73,7 +73,7 @@ class IntelligentPipelineAdapter:
             >>> async for chunk in adapter.adapt_stream(stream):
             ...     print(chunk)
         """
-```
+```text
 
 ### CoordinatorAdapter
 
@@ -159,7 +159,7 @@ class ComponentAccessor:
         """Get context coordinator."""
 
     # ... other getters
-```
+```text
 
 **Usage Example**:
 
@@ -197,7 +197,7 @@ class StateDelegation:
 
     async def reset_state(self) -> None:
         """Reset state."""
-```
+```text
 
 **Usage Example**:
 
@@ -226,7 +226,7 @@ class LegacyAPI:
 
     def legacy_method(self, *args, **kwargs) -> Any:
         """Legacy method implementation."""
-```
+```text
 
 **Usage Example**:
 
@@ -268,7 +268,7 @@ sequenceDiagram
     Provider-->>ChatCoord: response
     ChatCoord-->>Orchestrator: result
     Orchestrator-->>User: "Hi there!"
-```
+```text
 
 ### Tool Execution Flow
 
@@ -309,7 +309,7 @@ class MyCoordinator:
     async def do_specialized_work(self):
         """Do specialized work."""
         # Implementation
-```
+```text
 
 ### Custom Prompt Contributors
 
@@ -362,7 +362,7 @@ class MyTool(BaseTool):
 
 # Register
 tool_registry.register_tool(MyTool())
-```
+```text
 
 ### Custom Event Backends
 

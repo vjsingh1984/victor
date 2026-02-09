@@ -37,7 +37,7 @@ class ImageProcessor:
             ImageAnalysisResult: Analysis result
         """
         ...
-```
+```text
 
 ## Persona APIs
 
@@ -79,7 +79,7 @@ class PerformanceMonitor:
             PerformanceMetrics: Current metrics
         """
         ...
-```
+```text
 
 ## Configuration APIs
 
@@ -114,7 +114,7 @@ class ExecutionPlan:
     steps: List[ExecutionStep]
     dependencies: Dict[str, List[str]]
     estimated_duration: Optional[float] = None
-```
+```text
 
 ### MemoryEntry
 

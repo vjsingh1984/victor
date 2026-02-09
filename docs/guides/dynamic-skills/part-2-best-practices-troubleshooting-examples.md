@@ -30,7 +30,7 @@ skill = await discover_skill(
     task="analyze code",
     strategy="keyword"
 )
-```
+```text
 
 ### 2. Chain Intelligently
 
@@ -59,7 +59,7 @@ except SkillExecutionError as e:
     # Try fallback
     fallback = get_fallback_skill(e.failed_skill)
     result = await fallback.execute(**e.params)
-```
+```text
 
 ### 4. Cache Discovered Skills
 
@@ -99,7 +99,7 @@ skill = await discover_skill(
     task="my task",
     strategy="hybrid"
 )
-```
+```text
 
 ### Chain Failures
 
@@ -147,7 +147,7 @@ skill = await discover_skill(
     task="my task",
     categories=["analysis", "processing"]
 )
-```
+```text
 
 ---
 
@@ -192,7 +192,7 @@ result = await execute_skill_chain(plan)
 
 print(f"Success: {result.success}")
 print(f"Output: {result.output}")
-```
+```text
 
 ### Example 3: Compose Custom Skill
 

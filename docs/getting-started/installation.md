@@ -6,7 +6,7 @@ Install Victor AI in minutes.
 
 ```bash
 pipx install victor-ai
-```
+```text
 
 ## Alternative Methods
 
@@ -20,7 +20,7 @@ pip install -e ".[dev]"
 ### pip (Direct)
 ```bash
 pip install victor-ai
-```
+```text
 
 ### Docker
 ```bash
@@ -50,7 +50,7 @@ docker run -it -v ~/.victor:/root/.victor ghcr.io/vjsingh1984/victor:latest
 ```bash
 victor --version
 victor --help
-```
+```text
 
 ## Next Steps
 

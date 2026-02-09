@@ -45,7 +45,7 @@ This guide covers monitoring setup:
 **Quick setup:**
 ```bash
 docker-compose up -d
-```
+```text
 
 ---
 

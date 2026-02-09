@@ -12,7 +12,7 @@ pytest tests/performance/test_team_node_performance_benchmark.py::test_team_node
 # Using the convenience script
 python scripts/run_team_node_benchmarks.py --all
 python scripts/run_team_node_benchmarks.py --report
-```
+```text
 
 ## Benchmark Categories
 
@@ -149,7 +149,7 @@ pytest tests/performance/test_team_node_performance_benchmark.py -k "memory" -v
 ### Summary Report
 ```bash
 python scripts/run_team_node_benchmarks.py --report
-```
+```text
 
 ### Full Benchmark Results
 ```bash

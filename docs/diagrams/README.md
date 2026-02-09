@@ -81,7 +81,7 @@ mmdc -i docs/diagrams/architecture/coordinator-layers.mmd -o docs/diagrams/archi
 
 # Render all diagrams
 find docs/diagrams -name "*.mmd" -exec sh -c 'mmdc -i "$1" -o "${1%.mmd}.svg"' _ {} \;
-```
+```text
 
 ### Using VS Code
 

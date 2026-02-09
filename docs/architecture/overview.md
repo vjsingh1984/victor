@@ -27,7 +27,7 @@ graph TB
     Coordinators --> Workflows[StateGraph + YAML]
     Coordinators --> Verticals[5 Verticals]
     Coordinators --> Events[EventBus<br/>5 Backends]
-```
+```text
 
 For a detailed view of the two-layer architecture, see [Coordinator Layers
   Diagram](../diagrams/architecture/coordinator-layers.mmd).
@@ -93,7 +93,7 @@ container.register(
     lambda c: ToolRegistry(),
     ServiceLifetime.SINGLETON,
 )
-```
+```text
 
 ## Event-Driven Architecture
 
@@ -115,7 +115,7 @@ tool.error         # Tool execution failed
 agent.message      # Agent message sent
 workflow.start     # Workflow started
 workflow.complete  # Workflow completed
-```
+```text
 
 ## Providers
 
@@ -154,7 +154,7 @@ class BaseTool(Protocol):
     parameters: dict  # JSON Schema
     cost_tier: CostTier
     async def execute(self, **kwargs) -> ToolResult: ...
-```
+```text
 
 ## Workflows
 
@@ -179,7 +179,7 @@ nodes:
   - id: review
     type: agent
     depends_on: [analyze]
-```
+```text
 
 ## Verticals
 
@@ -217,7 +217,7 @@ name: build
 exploration_multiplier: 1.0
 allow_edits: true
 tools: [read, write, edit, run_tests]
-```
+```text
 
 ```yaml
 # config/teams/code-review.yaml
@@ -253,7 +253,7 @@ should_proceed, result = validate_code_before_write(
     file_path=Path("main.py"),
     strict=False  # True = block on any error
 )
-```
+```text
 
 ### CLI Validation
 
@@ -268,7 +268,7 @@ victor validate check app.ts               # Check validation support
 ```bash
 VICTOR_VALIDATION_ENABLED=false  # Disable validation globally
 VICTOR_STRICT_VALIDATION=true    # Block writes on any error
-```
+```text
 
 ## Key Design Patterns
 
@@ -306,7 +306,7 @@ agent = await Agent.create(
     provider="ollama",
     airgapped_mode=True  # Only local providers and tools
 )
-```
+```text
 
 - Only local providers (Ollama, LM Studio, vLLM)
 - No web tools

@@ -29,7 +29,7 @@ orchestrator = pool.get_orchestrator("my-profile")
 
 # Get default orchestrator
 default_orch = pool.get_default_orchestrator()
-```
+```text
 
 ## Profile Configuration
 
@@ -98,7 +98,7 @@ async def cost_optimized_workflow():
     return review
 
 asyncio.run(cost_optimized_workflow())
-```
+```text
 
 ### 2. Quality-Optimized Workflow
 
@@ -161,7 +161,7 @@ async def performance_workflow():
     )
 
     return best
-```
+```text
 
 ## OrchestratorPool API Reference
 
@@ -187,7 +187,7 @@ Get orchestrator for a specific profile:
 
 ```python
 orchestrator = pool.get_orchestrator(profile="my-profile")
-```
+```text
 
 **Parameters:**
 - `profile` (Optional[str]): Profile name. Defaults to "default"
@@ -222,7 +222,7 @@ pool.clear_cache(profile="my-profile")
 
 # Clear all profiles
 pool.clear_cache()
-```
+```text
 
 **Parameters:**
 - `profile` (Optional[str]): Specific profile to clear, or None to clear all
@@ -245,7 +245,7 @@ Shutdown all orchestrators and providers:
 
 ```python
 pool.shutdown()
-```
+```text
 
 **Note:** Cleans up resources for all cached instances.
 
@@ -286,7 +286,7 @@ class MultiProviderWorkflow:
         tests = await tester.run(f"Test: {code}")
 
         return tests
-```
+```text
 
 ### Resource Management
 
@@ -325,7 +325,7 @@ profiles:
   review:           # Clear purpose
     provider: anthropic
     model: claude-sonnet-4-5
-```
+```text
 
 ### 2. Cost Monitoring
 
@@ -372,7 +372,7 @@ async def resilient_workflow():
             continue
 
     raise RuntimeError("All providers failed")
-```
+```text
 
 ### 4. Parallel Execution
 
@@ -404,7 +404,7 @@ async def parallel_workflow():
 
 ### Strategy 1: Funnel Approach
 
-```
+```text
 Wide exploration (cheap) → Narrow implementation (medium) → Final review (premium)
 ```
 
@@ -417,7 +417,7 @@ Wide exploration (cheap) → Narrow implementation (medium) → Final review (pr
 
 ### Strategy 2: Tiered Quality
 
-```
+```text
 Quick prototype (fast) → Iterative refinement (better) → Polish (best)
 ```
 
@@ -429,7 +429,7 @@ Quick prototype (fast) → Iterative refinement (better) → Polish (best)
 
 ### Strategy 3: Specialized Models
 
-```
+```text
 Research (large context) → Coding (code-optimized) → Testing (fast)
 ```
 
@@ -457,13 +457,13 @@ print(f"Cold start: {time.time() - start:.2f}s")
 start = time.time()
 pool.get_orchestrator("profile1")
 print(f"Cached: {time.time() - start:.2f}s")
-```
+```text
 
 **Expected Output:**
 ```
 Cold start: 1.23s
 Cached: 0.001s
-```
+```text
 
 ### Memory Management
 
@@ -502,7 +502,7 @@ profiles:
   my-profile:
     provider: openai
     model: gpt-4o-mini
-```
+```text
 
 ### Provider Initialization Failed
 
@@ -528,7 +528,7 @@ pool.clear_cache(profile="temp-profile")
 
 # Clear all profiles
 pool.clear_cache()
-```
+```text
 
 ## Examples
 

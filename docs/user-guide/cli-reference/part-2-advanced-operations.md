@@ -36,7 +36,7 @@ victor rag delete doc_abc123        # Delete document
 # Demos
 victor rag demo docs                # Ingest project docs
 victor rag demo-sec --preset faang  # SEC filings demo
-```
+```text
 
 **Subcommands:**
 
@@ -139,7 +139,7 @@ victor workflow validate path/to/workflow.yaml
 victor workflow render workflow.yaml --format ascii
 victor workflow list                # List workflows
 victor workflow run my_workflow     # Execute workflow
-```
+```text
 
 **Subcommands:**
 
@@ -218,7 +218,7 @@ victor sessions search "keyword"    # Search sessions
 victor sessions delete session_id   # Delete session
 victor sessions export              # Export to JSON
 victor sessions clear               # Clear all sessions
-```
+```text
 
 **Subcommands:**
 

@@ -48,7 +48,7 @@ members:
     tool_budget: 50  # Too much for research
   - id: implementer
     tool_budget: 50  # Not enough for implementation
-```
+```text
 
 ### 3. Define Clear, Actionable Goals
 
@@ -82,7 +82,7 @@ members:
     # - Task assignment
     # - Tool selection
     # - Coordination decisions
-```
+```text
 
 ### 5. Handle Timeouts Gracefully
 
@@ -121,7 +121,7 @@ workflows:
         # Level 1: team_node
         # Level 2: workflow spawned by team member
         # Level 3: MAX - no further nesting
-```
+```text
 
 ### 7. Leverage Output Keys
 
@@ -160,7 +160,7 @@ nodes:
 
     # Or for list aggregation
     merge_strategy: list  # Aggregate lists
-```
+```text
 
 ### 9. Optimize Team Size
 
@@ -195,7 +195,7 @@ Decide whether team failure should stop the workflow:
   type: team
   continue_on_error: true  # Workflow continues even if team fails
   next: [fallback_analysis]
-```
+```text
 
 ## Error Handling
 
@@ -209,7 +209,7 @@ Attempting to enter team:nested_review_team
 
 Execution stack:
   workflow:main → team:review_team → workflow:sub_analysis → team:nested_review_team
-```
+```text
 
 **Solutions**:
 - Increase `max_recursion_depth` in workflow metadata
@@ -221,7 +221,7 @@ Execution stack:
 
 ```
 YAMLWorkflowError: Team execution failed: All members failed to complete
-```
+```text
 
 **Solutions**:
 - Check member goals are achievable with given tool budgets
@@ -235,7 +235,7 @@ YAMLWorkflowError: Team execution failed: All members failed to complete
 ```
 ValueError: Unknown role 'invalid_role'
 Valid roles: researcher, executor, planner, reviewer, assistant
-```
+```text
 
 **Solutions**:
 - Use valid role: `researcher`, `executor`, `planner`, `reviewer`, `assistant`
@@ -246,7 +246,7 @@ Valid roles: researcher, executor, planner, reviewer, assistant
 
 ```
 TimeoutError: Team execution exceeded 300 seconds
-```
+```text
 
 **Solutions**:
 - Increase `timeout_seconds` in team configuration
@@ -261,7 +261,7 @@ TimeoutError: Team execution exceeded 300 seconds
 StateMergeError: Conflict merging state for key 'result'
 Team value: {...}
 Graph value: {...}
-```
+```text
 
 **Solutions**:
 - Change `merge_mode` to `team_wins` (team overrides) or `graph_wins` (graph overrides)
@@ -317,7 +317,7 @@ nodes:
     team_formation: parallel  # Different approach
     members:
       # Different team configuration
-```
+```text
 
 #### Error Recovery Node
 

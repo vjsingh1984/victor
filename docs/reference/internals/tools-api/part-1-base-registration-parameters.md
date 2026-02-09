@@ -56,7 +56,7 @@ class BaseTool(ABC):
     def parameters(self) -> Dict[str, Any]:
         """JSON Schema for tool parameters."""
         pass
-```
+```text
 
 ### Optional Attributes
 

@@ -29,7 +29,7 @@ flowchart LR
     style D fill:#f3e5f5,stroke:#6a1b9a
     style E fill:#fce4ec,stroke:#880e4f
     style F fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px
-```
+```text
 
 See [Deployment Patterns Diagram](../diagrams/operations/deployment.mmd) for deployment options.
 
@@ -128,7 +128,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Start API server
 CMD ["uvicorn", "victor.api.server:app", "--host", "0.0.0.0", "--port", "8000"]
-```
+```text
 
 ### Building and Running
 
@@ -186,7 +186,7 @@ services:
 volumes:
   victor_data:
   redis_data:
-```
+```text
 
 ```bash
 # Start all services
@@ -270,7 +270,7 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: victor-data
-```
+```text
 
 ### Service Manifest
 
@@ -314,7 +314,7 @@ type: Opaque
 stringData:
   anthropic-api-key: sk-ant-xxx
   openai-api-key: sk-xxx
-```
+```text
 
 ### Deploy to Kubernetes
 
@@ -363,7 +363,7 @@ spec:
       target:
         type: Utilization
         averageUtilization: 80
-```
+```text
 
 **📖 Full Guide:** [Kubernetes Deployment](../operations/deployment/kubernetes.md)
 
@@ -413,7 +413,7 @@ roles:
     permissions:
       - "chat:read"
       - "file:read"
-```
+```text
 
 **📖 Full Guide:** [Security Overview](../operations/security/overview.md)
 
@@ -461,7 +461,7 @@ metrics:
   labels:
     environment: production
     region: us-east-1
-```
+```text
 
 **Logging (Structured JSON):**
 ```yaml
@@ -477,7 +477,7 @@ tracing:
   enabled: true
   exporter: otlp
   endpoint: http://jaeger:4317
-```
+```text
 
 ### Key Metrics to Monitor
 
@@ -520,7 +520,7 @@ Import pre-configured dashboards:
 ```bash
 # Import dashboard
 kubectl apply -f ops/production/grafana-dashboard.json
-```
+```text
 
 **Key Dashboards:**
 - API Performance

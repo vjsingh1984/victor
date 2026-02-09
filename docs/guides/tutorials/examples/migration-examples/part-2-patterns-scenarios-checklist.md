@@ -21,7 +21,7 @@
 # Direct access to private attributes
 orchestrator._enabled_tools = tools
 orchestrator._middleware = middleware
-```
+```text
 
 **After**:
 ```python
@@ -38,7 +38,7 @@ from victor.providers.anthropic import AnthropicProvider
 
 provider = AnthropicProvider(api_key="...")
 response = provider.chat(messages)
-```
+```text
 
 **After**:
 ```python
@@ -57,7 +57,7 @@ state = {
     "context": {},
     "stage": "initial"
 }
-```
+```text
 
 **After**:
 ```python
@@ -99,7 +99,7 @@ class ChatApp:
             messages=[{"role": "user", "content": message}]
         )
         return response.content
-```
+```text
 
 ### Scenario 2: Migrating Tool Execution
 

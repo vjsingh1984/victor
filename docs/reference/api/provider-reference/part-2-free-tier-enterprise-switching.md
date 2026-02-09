@@ -26,7 +26,7 @@
 **Setup**:
 ```bash
 export GROQ_API_KEY="your-key"
-```
+```text
 
 ### Mistral
 
@@ -54,7 +54,7 @@ export MISTRAL_API_KEY="your-key"
 **Setup**:
 ```bash
 export TOGETHER_API_KEY="your-key"
-```
+```text
 
 ### OpenRouter
 
@@ -82,7 +82,7 @@ export OPENROUTER_API_KEY="your-key"
 **Setup**:
 ```bash
 export FIREWORKS_API_KEY="your-key"
-```
+```text
 
 ### Cerebras
 
@@ -114,7 +114,7 @@ export CEREBRAS_API_KEY="your-key"
 **Setup**:
 ```bash
 export HF_API_KEY="your-key"
-```
+```text
 
 ### Replicate
 
@@ -154,7 +154,7 @@ response2 = await orchestrator.chat(
     messages=[{"role": "user", "content": "Continue"}],
     provider="openai"
 )
-```
+```text
 
 ### Automatic Fallback
 

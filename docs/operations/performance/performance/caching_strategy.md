@@ -125,7 +125,7 @@ result = cache.get_query("abc123...")
 if result:
     tools = result.value  # ["read", "write", "edit"]
     latency_saved = result.selection_latency_ms  # 0.15ms
-```
+```text
 
 ### Accessing Metrics
 
@@ -152,7 +152,7 @@ ToolSelectionCache(
     rl_ttl=3600,                # RL cache TTL (1 hour)
     enabled=True,               # Enable caching
 )
-```
+```text
 
 ### Tuning Guidelines
 

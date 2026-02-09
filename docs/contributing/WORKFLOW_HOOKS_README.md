@@ -12,7 +12,7 @@ pip install pre-commit
 pre-commit install
 
 # That's it! Hooks will now run automatically on git commit
-```
+```text
 
 ## What Gets Validated
 
@@ -43,7 +43,7 @@ git commit -m "Update feature workflow"
 ```bash
 # Skip hooks for a single commit (not recommended)
 git commit --no-verify -m "WIP: skip hooks"
-```
+```text
 
 ## Manual Validation
 
@@ -71,7 +71,7 @@ VICTOR_CACHE_VALIDATION=1 git commit
 
 # Skip validation temporarily
 VICTOR_SKIP_VALIDATION=1 git commit
-```
+```text
 
 ## Troubleshooting
 
@@ -98,7 +98,7 @@ Fix the errors and try again.
 ```bash
 # Run with verbose output
 VICTOR_VERBOSE_VALIDATION=1 ./scripts/hooks/validate_workflows.sh path/to/workflow.yaml
-```
+```text
 
 ## Documentation
 

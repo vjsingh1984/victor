@@ -22,7 +22,7 @@
 ```bash
 # Set API key
 export ANTHROPIC_API_KEY="sk-ant-..."
-```
+```text
 
 ### "Connection timeout"
 
@@ -48,7 +48,7 @@ victor tools list
 
 # Check tool configuration
 victor tools info <tool_name>
-```
+```text
 
 ---
 
@@ -87,7 +87,7 @@ victor --version
 **Python Version:**
 ```bash
 python --version
-```
+```text
 
 **Operating System:**
 ```bash
@@ -99,7 +99,7 @@ uname -a
 **Settings File:**
 ```bash
 cat ~/.victor/settings.yaml
-```
+```text
 
 **Environment Variables:**
 ```bash
@@ -109,7 +109,7 @@ env | grep VICTOR
 ### Error Message
 
 **Full Error:**
-```
+```text
 [Paste full error message here]
 ```
 
@@ -121,14 +121,14 @@ env | grep VICTOR
 ### Expected Behavior
 
 **What should happen:**
-```
+```text
 [Describe expected behavior]
 ```
 
 ### Actual Behavior
 
 **What actually happened:**
-```
+```text
 [Describe actual behavior]
 ```
 

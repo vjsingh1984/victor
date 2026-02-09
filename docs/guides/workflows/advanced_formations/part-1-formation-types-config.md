@@ -77,7 +77,7 @@ teams:
       - id: reviewer_3
         role: reviewer
         goal: "Review code for performance issues"
-```
+```text
 
 **Performance Characteristics:**
 - **Latency**: Moderate (overhead from monitoring and switching)
@@ -208,7 +208,7 @@ teams:
       - id: synthesizer
         role: planner
         goal: "Synthesize final report"
-```
+```text
 
 **Common Hybrid Patterns:**
 
@@ -232,7 +232,7 @@ phases:
     goal: "Integration and testing stages"
   - formation: hierarchical
     goal: "Manager coordination and deployment"
-```
+```text
 
 **Review Pattern:**
 ```yaml
@@ -275,7 +275,7 @@ dynamic_config:
       target_formation: consensus
     - trigger: time_pressure
       target_formation: parallel
-```
+```text
 
 ### Adaptive Formation Configuration
 
@@ -325,7 +325,7 @@ hybrid_config:
   # Optional
   enable_phase_logging: true  # Log phase transitions (default: true)
   stop_on_first_failure: false  # Stop on phase failure (default: false)
-```
+```text
 
 ## Comparison Table
 

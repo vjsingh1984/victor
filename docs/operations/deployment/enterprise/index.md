@@ -43,7 +43,7 @@ This guide covers enterprise deployment:
 **Enterprise deployment:**
 ```bash
 victor deploy --mode enterprise --config enterprise.yaml
-```
+```text
 
 ---
 

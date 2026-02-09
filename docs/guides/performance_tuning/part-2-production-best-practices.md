@@ -40,7 +40,7 @@ settings.semantic_memory_max_facts = 10000
 # Connection pooling
 settings.connection_pool_size = 20
 settings.connection_pool_max_overflow = 10
-```
+```text
 
 ### Provider-Specific Tuning
 
@@ -72,7 +72,7 @@ settings.response_cache_size = 5000
 # Disable expensive features
 settings.enable_episodic_memory = False  # If not needed
 settings.enable_semantic_memory = False
-```
+```text
 
 ### Low-Latency Configuration
 
@@ -106,7 +106,7 @@ stats = pstats.Stats(profiler)
 stats.print_stats(20)
 
 # Identify bottlenecks before optimizing
-```
+```text
 
 ### 2. Use Appropriate Caching
 
@@ -131,7 +131,7 @@ async def monitor_and_alert():
 
     if metrics['error_rate'] > 0.05:  # 5%
         send_alert("High error rate detected")
-```
+```text
 
 ### 4. Scale Resources
 
@@ -159,7 +159,7 @@ elif priority == "quality":
 elif priority == "cost":
     settings.provider = "openai"
     settings.model = "gpt-3.5-turbo"  # Lowest cost
-```
+```text
 
 ## Troubleshooting
 
@@ -198,7 +198,7 @@ settings.tool_selection_cache_enabled = True
 settings.parallel_execution_enabled = True
 settings.tool_selection_max_tools = 10
 settings.model = "claude-3-haiku"
-```
+```text
 
 ### High CPU Usage
 
@@ -230,7 +230,7 @@ settings.lazy_loading_enabled = True
 # Improve cache hit rate
 settings.tool_selection_cache_size = 1000
 settings.tool_selection_cache_ttl = 7200  # 2 hours
-```
+```text
 
 ## Performance Checklist
 

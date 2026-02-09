@@ -69,7 +69,7 @@ docker run -d --name victor-api \
 
 # Test
 curl http://localhost:8000/health/live
-```
+```text
 
 ### Docker Compose Deployment
 
@@ -102,7 +102,7 @@ helm upgrade --install victor ./config/helm/victor \
 
 # Verify
 kubectl get pods -n victor
-```
+```text
 
 ## 🔧 CI/CD Pipeline
 
@@ -168,7 +168,7 @@ docker scan victor:latest
 
 # Trivy scan
 trivy image victor:latest
-```
+```text
 
 ## 📈 Scaling
 
@@ -189,7 +189,7 @@ kubectl scale deployment victor-api --replicas=5 -n victor
 
 # Check HPA status
 kubectl get hpa -n victor
-```
+```text
 
 ## 🔄 Rollback
 
@@ -211,7 +211,7 @@ helm rollback victor -n victor
 ```bash
 ./scripts/ci/smoke_test.sh staging
 ./scripts/ci/smoke_test.sh production
-```
+```text
 
 ### Performance Tests
 

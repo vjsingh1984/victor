@@ -61,7 +61,7 @@ Victor employs a **two-layer coordinator architecture** that separates applicati
 
 ### Two-Layer Design
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                     APPLICATION LAYER                            │
 │                  victor/agent/coordinators/                     │

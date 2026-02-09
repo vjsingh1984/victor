@@ -27,7 +27,7 @@ The performance monitoring system provides:
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Victor AI Components                         │
 │  Tool Selection Cache │ Provider Pool │ Tool Execution │ etc.  │
@@ -95,7 +95,7 @@ cache_metrics = collector.get_cache_metrics()
 
 # Export for Prometheus
 prometheus_text = collector.export_prometheus()
-```
+```text
 
 ### 2. REST API
 
@@ -136,7 +136,7 @@ curl http://localhost:8000/api/performance/cache
 
 # Prometheus format
 curl http://localhost:8000/api/performance/prometheus
-```
+```text
 
 ### 3. Grafana Dashboard
 
@@ -255,7 +255,7 @@ kubectl apply -f deployment/kubernetes/monitoring/performance-alerts.yaml
 # Verify in Prometheus
 kubectl port-forward -n victor-monitoring svc/prometheus 9090:9090
 open http://localhost:9090/alerts
-```
+```text
 
 ## Installation & Setup
 
@@ -288,7 +288,7 @@ kubectl rollout restart deployment/prometheus -n victor-monitoring
 # Verify rules are loaded
 kubectl port-forward -n victor-monitoring svc/prometheus 9090:9090
 # Open http://localhost:9090/rules
-```
+```text
 
 ### Step 3: Deploy Grafana Dashboard
 
@@ -319,7 +319,7 @@ from victor.api.endpoints.performance import register_performance_routes
 
 app = FastAPI(title="Victor AI API")
 register_performance_routes(app)
-```
+```text
 
 ### Step 5: Verify Metrics Collection
 
@@ -341,7 +341,7 @@ kubectl port-forward -n victor-monitoring svc/prometheus 9090:9090
    ```bash
    kubectl port-forward -n victor-monitoring svc/grafana 3000:3000
    open http://localhost:3000/d/victor-performance
-   ```
+```text
 
 2. **Key Metrics to Monitor**:
    - **Cache Hit Rate**: Should be > 40% (warning if < 40%, critical if < 20%)

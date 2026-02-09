@@ -77,7 +77,7 @@ custom_config: {}       # Optional: Vertical-specific config
 file_templates: {}      # Optional: Custom file templates
 
 extends: string         # Optional: Parent template name
-```
+```text
 
 ## Metadata
 
@@ -114,7 +114,7 @@ metadata:
   evaluation_criteria:                  # Optional: Evaluation metrics
     - metric_name_1
     - metric_name_2
-```
+```text
 
 ### Field Descriptions
 
@@ -178,7 +178,7 @@ tools:
   # Domain-specific tools
   - custom_tool_1
   - custom_tool_2
-```
+```text
 
 ### Available Tools
 
@@ -259,7 +259,7 @@ custom_config:
       description: "Custom tool description"
       category: custom
       cost_tier: LOW
-```
+```text
 
 ## System Prompt
 
@@ -289,7 +289,7 @@ system_prompt: |
 
   Guidelines:
   {guidelines}
-```
+```text
 
 Variables will be substituted during generation:
 - `{vertical_name}` - Vertical name
@@ -376,7 +376,7 @@ stages:
     tools: []
     keywords: [done, finish, complete, summarize]
     next_stages: []
-```
+```text
 
 ### Custom Workflow Example
 

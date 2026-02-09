@@ -8,7 +8,7 @@ The Rust Batch Processing Coordinator is a high-performance native extension for
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    BatchProcessor (Rust)                     │
 │  ┌──────────────┐  ┌───────────────┐  ┌─────────────────┐ │
@@ -103,7 +103,7 @@ summary = processor.process_batch(tasks, my_task)
 print(f"Completed: {summary.successful_count}/{len(summary.results)}")
 print(f"Throughput: {summary.throughput_per_second:.2f} tasks/sec")
 print(f"Success rate: {summary.success_rate():.1f}%")
-```
+```text
 
 ### Dependency Management
 
@@ -145,7 +145,7 @@ summary = processor.process_batch_streaming(
     executor=my_executor,
     callback=result_callback
 )
-```
+```text
 
 ### Load Balancing
 
@@ -171,7 +171,7 @@ class BatchTask:
     timeout_ms: Optional[int] = None      # Timeout in milliseconds
     retry_count: int = 0                  # Number of retries performed
     dependencies: List[str] = None        # Task IDs this task depends on
-```
+```text
 
 ### BatchResult
 
@@ -200,7 +200,7 @@ class BatchProcessSummary:
 
     def success_rate(self) -> float:      # Success rate as percentage
     def avg_duration_ms(self) -> float:   # Average task duration
-```
+```text
 
 ### BatchProcessor
 
@@ -259,7 +259,7 @@ def create_task_batches_py(
     batch_size: int
 ) -> List[List[BatchTask]]:
     """Split tasks into batches of specified size."""
-```
+```text
 
 ### merge_batch_summaries_py
 
@@ -279,7 +279,7 @@ def calculate_optimal_batch_size_py(
     min_batch_size: int = 1
 ) -> int:
     """Calculate optimal batch size based on task count and concurrency."""
-```
+```text
 
 ### estimate_batch_duration_py
 
@@ -305,7 +305,7 @@ tasks = [
 ]
 
 summary = processor.process_batch(tasks, tool_executor)
-```
+```text
 
 ### 2. Batch File Processing
 
@@ -349,7 +349,7 @@ agents = {
 }
 
 summary = processor.process_batch(list(agents.values()), agent_executor)
-```
+```text
 
 ### 4. Parallel API Calls
 
@@ -383,7 +383,7 @@ tasks = [
 ]
 
 summary = processor.process_batch(tasks, embedding_generator)
-```
+```text
 
 ## Performance Optimization Tips
 
@@ -404,7 +404,7 @@ processor = BatchProcessor(max_concurrent=50)
 # Set timeouts based on task complexity
 quick_tasks = BatchTask(task_id="quick", task_data=quick_fn, timeout_ms=1000)
 slow_tasks = BatchTask(task_id="slow", task_data=slow_fn, timeout_ms=30000)
-```
+```text
 
 ### 3. Use Priority for Important Tasks
 
@@ -423,7 +423,7 @@ summary = processor.process_batch_streaming(
     executor,
     callback=lambda r: print(f"Completed: {r.task_id}")
 )
-```
+```text
 
 ### 5. Use Dependencies for Sequential Stages
 
@@ -448,7 +448,7 @@ result = BatchResult(
     error="Timeout after 5000ms",
     duration_ms=5000.0
 )
-```
+```text
 
 ### Execution Errors
 
@@ -467,7 +467,7 @@ try:
 except ValueError as e:
     if "Circular dependency" in str(e):
         print("Invalid task dependencies!")
-```
+```text
 
 ## Implementation Details
 
@@ -551,7 +551,7 @@ fn resolve_execution_order(&self, tasks: Vec<BatchTask>) -> PyResult<Vec<Vec<Str
 
     Ok(layers)
 }
-```
+```text
 
 ## Future Enhancements
 

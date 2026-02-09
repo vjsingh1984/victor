@@ -58,7 +58,7 @@ class TestChatCoordinator:
 
     async def test_stream_chat_intent_classification(self):
         """Test streaming chat with intent detection"""
-```
+```text
 
 #### 2. ConversationCoordinator (27.27% coverage)
 **Risk**: Message management extracted from orchestrator
@@ -126,7 +126,7 @@ class TestSearchCoordinator:
 
     def test_get_recommended_search_tool_none(self):
         """Test recommendation when no tools available"""
-```
+```text
 
 #### 4. TeamCoordinator (44.44% coverage)
 **Risk**: Multi-agent coordination extracted from orchestrator
@@ -214,7 +214,7 @@ class TestToolCoordinator:
 
     async def test_execute_tool_calls_failure_handling(self):
         """Test error handling in tool calls"""
-```
+```text
 
 #### 6. ToolSelectionCoordinator (11.49% coverage)
 **Risk**: Tool discovery and ranking
@@ -294,7 +294,7 @@ class TestProviderCoordinator:
 
     def test_list_providers_filtered(self):
         """Test listing providers with filters"""
-```
+```text
 
 ### MEDIUM Priority (Important but Lower Risk)
 
@@ -364,7 +364,7 @@ class TestToolAccessCoordinator:
 
     def test_disable_tool_required(self):
         """Test disabling required tool"""
-```
+```text
 
 #### 10. ToolExecutionCoordinator (22.46% coverage)
 **Estimated Effort**: 16 hours
@@ -432,7 +432,7 @@ class TestToolAliasResolver:
 
     def test_remove_alias_not_found(self):
         """Test removing non-existent alias"""
-```
+```text
 
 ### LOW Priority (Nice to Have)
 

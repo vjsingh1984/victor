@@ -36,7 +36,7 @@ resilient = ResilientProvider(
 
 # Use normally - resilience is automatic
 response = await resilient.chat(messages)
-```
+```text
 
 ## Circuit Breaker
 
@@ -48,7 +48,7 @@ Prevents cascade failures by "tripping" after too many errors.
     [Closed] ──(failures)─> [Open] ──(timeout)─> [Half-Open]
         ^                                            │
         └────────(success)───────────────────────────┘
-```
+```text
 
 | State | Behavior |
 |-------|----------|
@@ -96,7 +96,7 @@ print(f"Last failure: {stats.last_failure_time}")
 breaker.on_state_change(lambda old, new:
     print(f"Circuit changed: {old} -> {new}")
 )
-```
+```text
 
 ### Circuit Breaker Registry
 
@@ -161,7 +161,7 @@ jittered = JitteredBackoff(
     base_strategy=exponential,
     jitter_factor=0.2,  # +/- 20%
 )
-```
+```text
 
 ### Using Retry
 
@@ -194,7 +194,7 @@ config = RetryConfig(
         print(f"Retry {attempt} after {delay}s: {error}"),
     timeout=30.0,  # Total timeout for all retries
 )
-```
+```text
 
 ## Bulkhead Pattern
 
@@ -243,7 +243,7 @@ if limiter.try_acquire():
     result = await api_call()
 else:
     print("Rate limited, try later")
-```
+```text
 
 ## Fallback Strategies
 
@@ -316,7 +316,7 @@ resilient = ResilientProvider(
 
 # Use like normal provider
 response = await resilient.chat(messages)
-```
+```text
 
 ## Timeout Handling
 
@@ -365,7 +365,7 @@ for name, status in results.items():
 overall = checker.get_overall_status()
 if overall == HealthStatus.UNHEALTHY:
     alert_ops_team()
-```
+```text
 
 ## Best Practices
 
@@ -394,7 +394,7 @@ config = RetryConfig(
         jitter_factor=0.3,
     )
 )
-```
+```text
 
 ### 3. Set Reasonable Timeouts
 
@@ -413,7 +413,7 @@ breaker.on_state_change(lambda old, new:
     if new == CircuitState.OPEN:
         send_alert(f"Circuit {breaker.name} opened")
 )
-```
+```text
 
 ### 5. Log Retry Attempts
 
@@ -445,7 +445,7 @@ bus.subscribe(EventCategory.ERROR, lambda e:
 # - retry_attempted
 # - rate_limited
 # - bulkhead_rejected
-```
+```text
 
 ## Troubleshooting
 

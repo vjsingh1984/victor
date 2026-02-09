@@ -60,7 +60,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-```
+```text
 
 ### With ToolPipeline
 
@@ -126,7 +126,7 @@ deps = extractor.extract_file_dependencies(
     {"directory": "/src", "recursive": True}
 )
 print(deps)  # Output: {"/src"}
-```
+```text
 
 ### Custom Extraction Patterns
 
@@ -217,7 +217,7 @@ core:
   system_prompt:
     source: inline
     text: "You are an expert assistant..."
-```
+```text
 
 ### Programmatic Configuration
 
@@ -328,7 +328,7 @@ class MyVertical(VerticalBase):
     @classmethod
     def get_middleware(cls):
         return [LoggingMiddleware(log_level="DEBUG")]
-```
+```text
 
 ---
 
@@ -439,7 +439,7 @@ agent = await MyVertical.create_agent(
     provider="anthropic",
     model="claude-sonnet-4-5"
 )
-```
+```text
 
 ---
 
@@ -497,7 +497,7 @@ deps = pipeline._dependency_extractor.extract_file_dependencies(
     {"path": "/src/main.py"}
 )
 print(f"Dependencies: {deps}")
-```
+```text
 
 ### Middleware Not Executing
 

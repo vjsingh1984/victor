@@ -45,7 +45,7 @@
    - Developer satisfaction
 
 8. Iterate based on feedback
-```
+```text
 
 **Success Criteria (targets):**
 - 80%+ pilot users active daily
@@ -107,7 +107,7 @@
    - Calculate actual cost savings
    - Measure productivity gains
    - Document success stories
-```
+```text
 
 ---
 
@@ -130,7 +130,7 @@ victor_cache_hit_rate
 victor_api_calls_total{provider="anthropic"}
 victor_tokens_used{provider="anthropic"}
 victor_estimated_cost_usd
-```
+```text
 
 **Reliability:**
 ```bash
@@ -146,7 +146,7 @@ Import pre-built dashboard:
 
 ```bash
 curl -O https://raw.githubusercontent.com/vjsingh1984/victor/main/monitoring/grafana-dashboard.json
-```
+```text
 
 **Key Panels:**
 - Request rate and latency
@@ -218,7 +218,7 @@ docker-compose --profile demo up
 
 # This demonstrates building a complete SQLite-based webapp
 # with Victor's capabilities
-```
+```text
 
 ---
 

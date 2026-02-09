@@ -50,7 +50,7 @@ response = await orchestrator.chat(
     messages=[{"role": "user", "content": "Hello!"}],
     provider="anthropic"  # or "openai", "google", "ollama", etc.
 )
-```
+```text
 
 ---
 

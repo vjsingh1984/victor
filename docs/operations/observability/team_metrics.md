@@ -13,7 +13,7 @@ Team metrics provide detailed insights into multi-agent team execution, includin
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Team Node Runner                             │
 │  ┌─────────────────────────────────────────────────────────┐   │
@@ -96,7 +96,7 @@ runner = TeamNodeRunner(
     enable_observability=True,
     enable_metrics=True,  # Enable metrics collection
 )
-```
+```text
 
 ### Option 2: Runtime Control
 
@@ -121,7 +121,7 @@ collector = TeamMetricsCollector(
     enabled=True,
     priority_threshold=MetricPriority.HIGH,  # Only collect HIGH and CRITICAL
 )
-```
+```text
 
 ## Querying Metrics
 
@@ -151,7 +151,7 @@ parallel_stats = collector.get_formation_stats("parallel")
 print(f"Parallel executions: {parallel_stats['total_executions']}")
 print(f"Average duration: {parallel_stats['average_duration_seconds']:.2f}s")
 print(f"Success rate: {parallel_stats['successful_executions'] / parallel_stats['total_executions']:.1%}")
-```
+```text
 
 ### Recursion Depth Analysis
 
@@ -175,7 +175,7 @@ if team_metrics:
     print(f"Duration: {team_metrics.duration_seconds:.2f}s")
     print(f"Tool calls: {team_metrics.total_tool_calls}")
     print(f"Members: {len(team_metrics.member_metrics)}")
-```
+```text
 
 ### Member-Level Metrics
 
@@ -237,7 +237,7 @@ async def on_depth_exceeded(event):
     print(f"Execution stack: {' -> '.join(data['execution_stack'])}")
 
 bus.subscribe("team.recursion.depth_exceeded", on_depth_exceeded)
-```
+```text
 
 ## Distributed Tracing
 
@@ -279,7 +279,7 @@ tracer_provider = trace.get_tracer_provider()
 tracer_provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
 
 # Team traces are now automatically exported to OpenTelemetry
-```
+```text
 
 ### Querying Traces
 
@@ -320,7 +320,7 @@ def get_most_successful_formations():
 # Usage
 for formation, rate in get_most_successful_formations():
     print(f"{formation}: {rate:.1%} success rate")
-```
+```text
 
 ### Slowest Team Executions
 
@@ -357,7 +357,7 @@ def get_most_used_tools(limit=10):
     # (implementation depends on your specific needs)
 
     return sorted(tool_counts.items(), key=lambda x: x[1], reverse=True)[:limit]
-```
+```text
 
 ## Prometheus Integration
 
@@ -389,7 +389,7 @@ sum by (formation) (victor_teams_formation_{formation}_total)
 
 # Recursion depth over time
 victor_teams_recursion_depth
-```
+```text
 
 ## Grafana Dashboard
 
@@ -461,7 +461,7 @@ collector.set_enabled(False)
    ```python
    collector = get_team_metrics_collector()
    print(collector.is_enabled())  # Should be True
-   ```
+```text
 
 2. Check if team is executing:
    ```python
@@ -475,7 +475,7 @@ collector.set_enabled(False)
    registry = MetricsRegistry.get_instance()
    metrics = registry.collect()
    print(f"Total metrics: {len(metrics)}")
-   ```
+```text
 
 ### Events Not Streaming
 
@@ -497,7 +497,7 @@ collector.set_enabled(False)
        print(f"Received: {event.topic}")
 
    bus.subscribe("team.*", test_handler)
-   ```
+```text
 
 ### Tracing Not Working
 
@@ -511,7 +511,7 @@ collector.set_enabled(False)
 2. Check OpenTelemetry installation:
    ```bash
    pip show opentelemetry-api
-   ```
+```text
 
 3. Verify trace context propagation:
    ```python

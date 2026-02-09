@@ -114,7 +114,7 @@ config = SecurityAssistant.get_config()
 print(f'Vertical: {config.metadata[\"vertical_name\"]}')
 print(f'Tools: {len(config.tools.tools)}')
 "
-```
+```text
 
 ### Extract Template from Existing Vertical
 
@@ -147,7 +147,7 @@ metadata:
   tags:                       # Tags for discovery
     - security
     - vulnerability
-```
+```text
 
 ### 2. Core Configuration
 
@@ -201,7 +201,7 @@ extensions:
       description: "Dangerous file deletion"
       severity: critical
       category: commands
-```
+```text
 
 ### 4. Workflows and Teams
 
@@ -239,7 +239,7 @@ capabilities:
     handler: victor.security.tools:CVSSCalculator
     config:
       version: "3.1"
-```
+```text
 
 ## Creating a Vertical from Scratch
 
@@ -292,7 +292,7 @@ python scripts/generate_vertical.py \
   --template templates/my_vertical.yaml \
   --output victor/my_vertical \
   --overwrite
-```
+```text
 
 This generates:
 ```
@@ -307,7 +307,7 @@ victor/my_vertical/
 ├── capabilities.py          # Capability configs
 └── config/
     └── vertical.yaml        # YAML configuration
-```
+```text
 
 ### Step 3: Customize (Optional)
 
@@ -340,7 +340,7 @@ MY_VERTICAL_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
     ),
     # ... other hints ...
 }
-```
+```text
 
 ### Step 4: Register Your Vertical
 
@@ -369,7 +369,7 @@ agent = await Agent.create(
 
 # Use the agent
 result = await agent.run("Help me with...")
-```
+```text
 
 ## Extracting Templates from Existing Verticals
 
@@ -400,7 +400,7 @@ registry.save_to_yaml(template, "templates/coding.yaml")
 python -m victor.framework.vertical_extractor \
   --module victor.coding \
   --output templates/coding.yaml
-```
+```text
 
 ### Extract from Directory
 
@@ -419,7 +419,7 @@ Templates are validated before generation to ensure completeness:
 # Validate a template
 python scripts/generate_vertical.py \
   --validate templates/my_vertical.yaml
-```
+```text
 
 Validation checks:
 - Required fields are present (metadata.name, metadata.description, tools, system_prompt)
@@ -456,7 +456,7 @@ def get_tools(cls):
         "my_custom_tool",  # Add your custom tool
     ])
     return tools
-```
+```text
 
 ### Add Custom Middleware
 
@@ -486,7 +486,7 @@ async def my_custom_handler(ctx: Dict[str, Any]) -> Dict[str, Any]:
 HANDLERS = {
     "my_custom_handler": my_custom_handler,
 }
-```
+```text
 
 ### Add Custom Escape Hatches
 

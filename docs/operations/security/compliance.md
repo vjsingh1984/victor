@@ -27,7 +27,7 @@ pipx install victor-ai
 victor init
 ollama pull qwen2.5-coder:7b
 victor chat --provider ollama --model qwen2.5-coder:7b
-```
+```text
 
 ## Deployment Options
 ### Local‑only (air‑gapped)

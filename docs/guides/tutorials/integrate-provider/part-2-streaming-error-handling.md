@@ -184,7 +184,7 @@ The `stream()` method provides streaming responses:
             stop_reason=finish_reason,
             is_final=finish_reason is not None,
         )
-```
+```text
 
 ### Step 4: Add Error Handling and close()
 

@@ -20,7 +20,7 @@ print(f'Entries: {metrics[\"combined\"][\"total_entries\"]:,}')
 print(f'Memory: {metrics.get(\"memory_usage_mb\", 0):.1f}MB')
 print(f'Strategies: {sum(metrics[\"combined\"][\"strategies_enabled\"].values())} enabled')
 "
-```
+```text
 
 ## Key Metrics
 
@@ -50,7 +50,7 @@ kubectl rollout restart deployment/victor-ai -n victor-ai-prod
 # Clear persistent cache
 kubectl exec -it deployment/victor-ai -n victor-ai-prod -- \
   rm /app/.victor/cache/tool_selection_cache.db
-```
+```text
 
 ### Monitor Cache
 ```bash
@@ -70,7 +70,7 @@ kubectl logs -f deployment/victor-ai -n victor-ai-prod | grep -i cache
 
 # All logs
 kubectl logs -f deployment/victor-ai -n victor-ai-prod
-```
+```text
 
 ## Environment Variables
 
@@ -84,7 +84,7 @@ VICTOR_TOOL_SELECTION_CACHE_ENABLED: "true"  # Master switch
 VICTOR_PERSISTENT_CACHE_ENABLED: "true"
 VICTOR_PERSISTENT_CACHE_PATH: "/app/.victor/cache/tool_selection_cache.db"
 VICTOR_PERSISTENT_CACHE_AUTO_COMPACT: "true"
-```
+```text
 
 ### Adaptive TTL
 ```yaml
@@ -100,7 +100,7 @@ VICTOR_ADAPTIVE_TTL_ADJUSTMENT_THRESHOLD: "5"
 VICTOR_CACHE_SIZE: "2000"                            # Max entries
 VICTOR_TOOL_SELECTION_CACHE_QUERY_TTL: "3600"        # 1 hour
 VICTOR_TOOL_SELECTION_CACHE_CONTEXT_TTL: "300"       # 5 minutes
-```
+```text
 
 ## Troubleshooting
 
@@ -126,7 +126,7 @@ kubectl set env deployment/victor-ai VICTOR_TOOL_SELECTION_CACHE_QUERY_TTL=1800 
 
 # Enable auto-compaction
 kubectl set env deployment/victor-ai VICTOR_PERSISTENT_CACHE_AUTO_COMPACT=true -n victor-ai-prod
-```
+```text
 
 ### Cache Not Persisting
 ```bash
@@ -150,7 +150,7 @@ kubectl set env deployment/victor-ai VICTOR_CACHE_SIZE=1000 -n victor-ai-prod
 
 # Disable persistent cache (use in-memory only)
 kubectl set env deployment/victor-ai VICTOR_PERSISTENT_CACHE_ENABLED=false -n victor-ai-prod
-```
+```text
 
 ## Emergency Procedures
 
@@ -162,7 +162,7 @@ kubectl set env deployment/victor-ai VICTOR_TOOL_SELECTION_CACHE_ENABLED=false -
 ### Rollback Deployment
 ```bash
 kubectl rollout undo deployment/victor-ai -n victor-ai-prod
-```
+```text
 
 ### Force Restart
 ```bash
@@ -177,7 +177,7 @@ VICTOR_CACHE_SIZE: "5000"
 VICTOR_TOOL_SELECTION_CACHE_QUERY_TTL: "7200"
 VICTOR_ADAPTIVE_TTL_ENABLED: "true"
 VICTOR_MULTI_LEVEL_CACHE_ENABLED: "true"
-```
+```text
 
 ### Interactive CLI (Low Traffic)
 ```yaml
@@ -191,7 +191,7 @@ VICTOR_ADAPTIVE_TTL_ENABLED: "true"
 VICTOR_CACHE_SIZE: "500"
 VICTOR_TOOL_SELECTION_CACHE_QUERY_TTL: "1800"
 VICTOR_PERSISTENT_CACHE_ENABLED: "false"
-```
+```text
 
 ## Monitoring Alerts
 
@@ -214,7 +214,7 @@ rate(victor_cache_hits_total[5m]) / (rate(victor_cache_hits_total[5m]) + rate(vi
 
 # High latency alert
 histogram_quantile(0.95, rate(victor_cache_access_duration_seconds_bucket[5m])) > 0.01
-```
+```text
 
 ## Documentation
 

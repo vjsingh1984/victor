@@ -10,7 +10,7 @@ profiles:
   local:
     embedding_provider: sentence-transformers
     embedding_model: BAAI/bge-small-en-v1.5
-```
+```text
 
 Or with Ollama:
 ```yaml
@@ -31,7 +31,7 @@ profiles:
 
 ```yaml
 tool_selection_strategy: hybrid
-```
+```text
 
 ## Models
 
@@ -62,7 +62,7 @@ profiles:
 
 ## Architecture
 
-```
+```text
 User Request → Embedding Provider → Vector Comparison → Tool Selection
                      ↓
               Embedding Cache

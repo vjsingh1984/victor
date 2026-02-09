@@ -64,7 +64,7 @@ VICTOR_CACHE_SIZE=1000  # Max entries per namespace
 VICTOR_CACHE_QUERY_TTL=3600  # Query cache TTL (1 hour)
 VICTOR_CACHE_CONTEXT_TTL=300  # Context cache TTL (5 minutes)
 VICTOR_CACHE_RL_TTL=3600  # RL cache TTL (1 hour)
-```
+```text
 
 **Tuning Guidelines**:
 - **High cache miss rate**: Increase `VICTOR_CACHE_SIZE` or TTL values
@@ -114,7 +114,7 @@ kubectl port-forward -n victor-monitoring svc/prometheus 9090:9090
 # Check if metrics endpoint is accessible
 kubectl port-forward -n victor-production svc/victor-api 8000:8000
 curl http://localhost:8000/api/performance/prometheus
-```
+```text
 
 **Solutions**:
 1. Verify Prometheus is scraping Victor pods:
@@ -130,7 +130,7 @@ curl http://localhost:8000/api/performance/prometheus
 3. Check network policies:
    ```bash
    kubectl get networkpolicy -n victor-production
-   ```
+```text
 
 ### Alerts Not Firing
 
@@ -152,7 +152,7 @@ kubectl port-forward -n victor-monitoring svc/alertmanager 9093:9093
    ```bash
    kubectl get configmap performance-alerts -n victor-monitoring
    kubectl rollout restart deployment/prometheus -n victor-monitoring
-   ```
+```text
 
 2. Check alert expression syntax:
    - Use Prometheus expression browser: http://localhost:9090/graph
@@ -178,7 +178,7 @@ kubectl port-forward -n victor-monitoring svc/alertmanager 9093:9093
 1. Reduce cache size:
    ```yaml
    VICTOR_CACHE_SIZE=500  # Reduce from 1000
-   ```
+```text
 
 2. Reduce cache TTL:
    ```yaml
@@ -189,7 +189,7 @@ kubectl port-forward -n victor-monitoring svc/alertmanager 9093:9093
    ```bash
    kubectl autoscale deployment/victor-api \
      --cpu-percent=70 --min=2 --max=10
-   ```
+```text
 
 ### Poor Cache Performance
 
@@ -209,7 +209,7 @@ kubectl port-forward -n victor-monitoring svc/alertmanager 9093:9093
 2. Increase cache TTL:
    ```yaml
    VICTOR_CACHE_QUERY_TTL=7200  # Increase from 3600
-   ```
+```text
 
 3. Analyze workload patterns:
    - Check if queries are diverse (low locality)
@@ -302,7 +302,7 @@ class CustomMetrics:
 
 # Register with collector
 collector._custom_metrics = CustomMetrics()
-```
+```text
 
 ### Dashboard Templating
 

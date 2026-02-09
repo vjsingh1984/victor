@@ -20,7 +20,7 @@ pip install victor-ai
 
 # Verify installation
 victor --version
-```
+```text
 
 ### Option 2: Development Installation
 
@@ -45,7 +45,7 @@ pip install victor-ai[api]         # FastAPI server
 pip install victor-ai[checkpoints] # SQLite checkpoint persistence
 pip install victor-ai[lang-all]    # All tree-sitter language grammars
 pip install victor-ai[native]      # Rust-accelerated extensions
-```
+```text
 
 ## First Steps
 
@@ -76,7 +76,7 @@ victor chat --provider ollama --model qwen2.5-coder:7b
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
 victor chat --provider anthropic --model claude-sonnet-4-5
-```
+```text
 
 **OpenAI GPT** (Fast & Popular):
 ```bash
@@ -88,7 +88,7 @@ victor chat --provider openai --model gpt-4
 ```bash
 export GOOGLE_API_KEY="..."
 victor chat --provider google --model gemini-1.5-pro
-```
+```text
 
 See the [Provider Reference](../reference/providers/index.md) for the current list.
 
@@ -123,7 +123,7 @@ victor chat "Review this file for bugs: src/main.py"
 
 # Documentation
 victor chat "Generate API documentation for my codebase"
-```
+```text
 
 ## Your First Project
 
@@ -164,7 +164,7 @@ mode: build  # Options: build, plan, explore
 
 # Vertical (domain) selection
 vertical: coding  # Options: coding, devops, rag, dataanalysis, research
-```
+```text
 
 ### Step 3: Create Project Instructions
 
@@ -203,7 +203,7 @@ victor chat
 
 # Victor will load your project context automatically
 # Try: "Analyze my codebase and suggest improvements"
-```
+```text
 
 ## Common Workflows
 
@@ -239,7 +239,7 @@ victor chat "Generate unit tests for the authentication module"
 
 # Generate documentation
 victor chat "Generate API documentation for all endpoints in src/api/"
-```
+```text
 
 ### Workflow 3: Refactoring
 
@@ -270,7 +270,7 @@ victor chat "Find why the user session is expiring prematurely"
 # Performance issue
 victor chat "Identify why this API endpoint is slow:
 GET /api/users/list"
-```
+```text
 
 ### Workflow 5: Testing
 
@@ -302,7 +302,7 @@ victor chat "Generate OpenAPI specification for all REST endpoints"
 
 # Generate code comments
 victor chat "Add docstrings to all functions in src/utils.py"
-```
+```text
 
 ## Advanced Features
 
@@ -332,7 +332,7 @@ victor chat --mode plan "Plan the architecture for this feature"
 
 # EXPLORE mode - 3.0x exploration, no edits
 victor chat --mode explore "Explore different implementation options"
-```
+```text
 
 ### Profiles
 
@@ -362,7 +362,7 @@ Use profiles:
 victor chat --profile development
 victor chat --profile production
 victor chat --profile fast
-```
+```text
 
 ### Workflow Automation
 
@@ -392,7 +392,7 @@ export VICTOR_AIRGAPPED=true
 # Local embeddings only
 
 victor chat --provider ollama
-```
+```text
 
 ## Tips & Best Practices
 
@@ -449,7 +449,7 @@ echo $OPENAI_API_KEY
 
 # Set key if missing
 export ANTHROPIC_API_KEY="sk-ant-..."
-```
+```text
 
 ### Import Errors
 

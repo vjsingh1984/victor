@@ -18,7 +18,7 @@ from victor.tools.decorators import tool
 async def my_tool(param: str) -> dict:
     """Short description of the tool."""
     return {"success": True, "result": param}
-```
+```text
 
 ## Notes
 - Both styles are supported during migration.

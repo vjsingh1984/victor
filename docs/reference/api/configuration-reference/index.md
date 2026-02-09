@@ -58,7 +58,7 @@ default_provider: anthropic
 anthropic_api_key: sk-ant-...
 tool_call_budget: 50
 EOF
-```
+```text
 
 ---
 

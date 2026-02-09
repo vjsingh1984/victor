@@ -8,7 +8,7 @@ The batch processor is included with Victor AI v0.5.0+. No additional installati
 ```bash
 # Verify installation
 python -c "from victor.native.rust.batch_processor import RUST_AVAILABLE; print(f'Rust available: {RUST_AVAILABLE}')"
-```
+```text
 
 ## Basic Usage
 
@@ -72,7 +72,7 @@ tasks = [
 
 # Process with automatic dependency resolution
 summary = processor.process_batch(tasks, my_executor)
-```
+```text
 
 ### 3. Streaming Results
 
@@ -118,7 +118,7 @@ tasks = [
 # Process in parallel
 summary = processor.process_batch(tasks, file_processor)
 print(f"Processed {summary.successful_count} files")
-```
+```text
 
 ### Parallel API Calls
 
@@ -176,7 +176,7 @@ summary = processor.process_batch(
     [researcher, writer, reviewer],
     agent_executor
 )
-```
+```text
 
 ## Configuration Options
 
@@ -210,7 +210,7 @@ processor = BatchProcessor(aggregation_strategy="streaming")
 
 # Higher priority first
 processor = BatchProcessor(aggregation_strategy="priority")
-```
+```text
 
 ### Load Balancing
 
@@ -241,7 +241,7 @@ except ValueError as e:
     if "Circular dependency" in str(e):
         print("Error: Tasks have circular dependencies!")
     raise
-```
+```text
 
 ## Performance Tips
 
@@ -273,7 +273,7 @@ slow_task = BatchTask(
     task_data=slow_fn,
     timeout_ms=60000  # 60 seconds
 )
-```
+```text
 
 ### 3. Use Priority for Important Tasks
 
@@ -307,7 +307,7 @@ for batch in batches:
 # Merge results
 from victor.native.rust.batch_processor import merge_batch_summaries_py
 final_summary = merge_batch_summaries_py(all_summaries)
-```
+```text
 
 ## Utility Functions
 
@@ -329,7 +329,7 @@ from victor.native.rust.batch_processor import estimate_batch_duration_py
 # 100 tasks, 100ms avg duration, 10 concurrent
 duration = estimate_batch_duration_py(100, 100.0, 10)
 print(f"Estimated duration: {duration:.2f}ms")
-```
+```text
 
 ### Validate Dependencies
 
@@ -352,7 +352,7 @@ for i, layer in enumerate(layers):
 # Layer 0: ['task1', 'task2']
 # Layer 1: ['task3', 'task4']
 # Layer 2: ['task5']
-```
+```text
 
 ## Advanced Usage
 
@@ -384,7 +384,7 @@ progress = processor.get_progress()
 print(f"Progress: {progress.progress_percentage:.1f}%")
 print(f"Completed: {progress.completed_tasks}/{progress.total_tasks}")
 print(f"ETA: {progress.estimated_remaining_ms:.0f}ms remaining")
-```
+```text
 
 ### Load Balancing
 
@@ -414,7 +414,7 @@ tasks = [
 summary = processor.process_batch(tasks, test_executor)
 assert summary.successful_count == 10
 print("✓ Batch processor working!")
-```
+```text
 
 ## Troubleshooting
 
@@ -439,7 +439,7 @@ tasks = [
     BatchTask(task_id="b", dependencies=["a"]),  # Circular!
 ]
 # Fix: Remove circular dependency
-```
+```text
 
 ### Timeout Issues
 
@@ -460,7 +460,7 @@ batches = create_task_batches_py(all_tasks, batch_size=100)
 for batch in batches:
     summary = processor.process_batch(batch, executor)
     # Results are automatically cleaned up between batches
-```
+```text
 
 ## Next Steps
 

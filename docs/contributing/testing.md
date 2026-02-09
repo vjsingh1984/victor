@@ -6,7 +6,7 @@ This guide covers Victor's testing infrastructure, patterns, and best practices 
 
 Victor's tests are organized into two main categories:
 
-```
+```text
 tests/
 ├── unit/                      # Fast, isolated unit tests
 │   ├── providers/             # Provider tests
@@ -35,7 +35,7 @@ make test-all
 
 # Run with coverage report
 make test-cov
-```
+```text
 
 ### pytest Commands
 
@@ -77,7 +77,7 @@ open htmlcov/index.html
 
 # XML for CI tools
 pytest tests/unit --cov=victor --cov-report=xml
-```
+```text
 
 ## Test Markers
 
@@ -132,7 +132,7 @@ def test_first(reset_singletons):
 def test_second(reset_singletons):
     # Singletons reset again - fresh state
     pass
-```
+```text
 
 This fixture resets:
 - `EmbeddingService`
@@ -174,7 +174,7 @@ def test_with_mock_client(mock_docker_client):
     """Test with mocked Docker client."""
     # docker.from_env() returns a mock
     pass
-```
+```text
 
 The `auto_mock_docker_for_orchestrator` fixture automatically mocks Docker for tests that:
 - Have "orchestrator" in the test name
@@ -224,7 +224,7 @@ def test_approval_node(hitl_approval_node):
     """Test with pre-configured approval node."""
     # HITLNode with APPROVAL type, 5s timeout, ABORT fallback
     pass
-```
+```text
 
 ### Multi-Agent Fixtures
 
@@ -261,7 +261,7 @@ def test_registered(registered_mode_registry):
     """Test with pre-registered verticals."""
     # Has "test_vertical" with "custom" mode
     pass
-```
+```text
 
 ## Mocking Patterns
 
@@ -310,7 +310,7 @@ async def test_anthropic_chat():
 
     # Test your code that calls Anthropic
     pass
-```
+```text
 
 ### Mocking with unittest.mock
 
@@ -350,7 +350,7 @@ async def test_ollama_integration():
 @pytest.mark.skipif(not is_ollama_available(), reason="Ollama not available")
 async def test_ollama_feature():
     pass
-```
+```text
 
 ## Writing Effective Tests
 
@@ -398,7 +398,7 @@ def test_uppercase(input_value, expected):
 async def test_provider_support(provider, model):
     """Test different provider/model combinations."""
     pass
-```
+```text
 
 ### Testing Async Code
 
@@ -433,7 +433,7 @@ async def test_async_exception():
     """Test async exception handling."""
     with pytest.raises(TimeoutError):
         await slow_operation(timeout=0.001)
-```
+```text
 
 ### Using Temporary Files
 
@@ -477,7 +477,7 @@ Victor aims for comprehensive test coverage:
 # Generate and open HTML report
 make test-cov
 open htmlcov/index.html
-```
+```text
 
 ### Coverage Configuration
 
@@ -520,7 +520,7 @@ pytest tests/unit -x
 
 # Enter debugger on failure
 pytest tests/unit --pdb
-```
+```text
 
 ### VS Code Debugging
 

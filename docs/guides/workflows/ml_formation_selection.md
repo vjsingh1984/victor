@@ -17,7 +17,7 @@ The ML-powered formation selection system learns from historical workflow execut
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    Task & Context                            │
 └────────────────────┬────────────────────────────────────────┘
@@ -88,7 +88,7 @@ results = await formation.execute(agents, context, task)
 selected_formation = results[0].metadata['selected_formation']
 selection_method = results[0].metadata['selection_method']
 print(f"Selected: {selected_formation} (method: {selection_method})")
-```
+```text
 
 ### Direct ML Prediction
 
@@ -133,7 +133,7 @@ python scripts/ml/collect_training_data.py \
     --input-dir logs/workflows/ \
     --output-data data/historical_executions.json \
     --min-samples 100
-```
+```text
 
 **Input Format:**
 ```json
@@ -174,7 +174,7 @@ python scripts/ml/collect_training_data.py \
   },
   ...
 ]
-```
+```text
 
 ### 2. Train Model
 
@@ -216,7 +216,7 @@ Check training metrics:
     "consensus": 8
   }
 }
-```
+```text
 
 **Target Metrics:**
 - **Accuracy**: > 0.80 (vs ~0.70 for heuristic)
@@ -239,7 +239,7 @@ for feature, score in sorted(importance.items(), key=lambda x: x[1], reverse=Tru
 ```
 
 **Example Output:**
-```
+```text
 dependencies: 0.2850
 complexity: 0.2420
 urgency: 0.1830
@@ -265,7 +265,7 @@ formation = AdaptiveFormation(
 
 # Or manually save online learning data
 selector.save_online_learning_data("data/online_learning.json")
-```
+```text
 
 **Online Learning Process:**
 
@@ -328,7 +328,7 @@ selector.save_online_learning_data("data/online_learning.json")
        enable_online_learning=True,
        online_learning_threshold=50,  # Update every 50 executions
    )
-   ```
+```text
 
 3. **Monitor performance:**
    ```python
@@ -350,7 +350,7 @@ selector.save_online_learning_data("data/online_learning.json")
    python scripts/ml/train_model.py \
        --training-data data/historical_executions_v2.json \
        --output-model models/formation_selector/production_v2.pkl
-   ```
+```text
 
 ### Monitoring Metrics
 
@@ -399,7 +399,7 @@ python scripts/ml/collect_training_data.py \
     --input-dir logs/workflows/ \
     --output-data data/temp.json \
     --verbose
-```
+```text
 
 ### Slow Inference
 

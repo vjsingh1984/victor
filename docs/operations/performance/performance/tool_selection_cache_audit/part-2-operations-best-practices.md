@@ -51,30 +51,30 @@ stats = cache.get_stats()
         "avg_latency_per_hit_ms": 0.13,
     }
 }
-```
+```text
 
 ### Logging
 
 **Cache Hit** (DEBUG):
 ```
 Cache hit: namespace=query, key=ed562b17..., saved=0.13ms
-```
+```text
 
 **Cache Miss** (DEBUG):
 ```
 Cache miss: namespace=query, key=abc123...
-```
+```text
 
 **Cache Put** (DEBUG):
 ```
 Cache put: namespace=query, key=ed562b17..., tools=5, latency=0.15ms
-```
+```text
 
 **Invalidation** (INFO):
 ```
 Invalidated 450 entries in namespace 'query'
 All caches invalidated due to tools registry change
-```
+```text
 
 ---
 

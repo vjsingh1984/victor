@@ -31,7 +31,7 @@ flowchart TB
     style D fill:#f3e5f5,stroke:#6a1b9a
     style E fill:#fce4ec,stroke:#880e4f
     style F fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px
-```
+```text
 
 ## Step 1: Architecture Overview (30 minutes)
 
@@ -68,7 +68,7 @@ graph TB
 
 ### System Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                     Clients (CLI/TUI, HTTP, MCP)             │
 └───────────────────────────┬─────────────────────────────────┘
@@ -136,7 +136,7 @@ class AgentOrchestrator:
         context = await self._context_coordinator.load_context()
         response = await self._chat_coordinator.send_message(message, context)
         return response
-```
+```text
 
 **Benefits:**
 - Hides complexity from clients
@@ -203,7 +203,7 @@ class SemanticStrategy:
     def select_tools(self, query, available_tools):
         # Use vector embeddings for semantic matching
         return self._semantic_search(query, available_tools)
-```
+```text
 
 **Benefits:**
 - Pluggable algorithms
@@ -241,7 +241,7 @@ class ToolRegistryProtocol(Protocol):
     def get_tool(self, name: str) -> BaseTool: ...
     def get_all_tools(self) -> List[BaseTool]: ...
     def register_tool(self, tool: BaseTool) -> None: ...
-```
+```text
 
 **Benefits:**
 - Swappable storage backends
@@ -269,7 +269,7 @@ class ChatCoordinator: ...
 class ToolCoordinator: ...
 class CacheCoordinator: ...
 class EventCoordinator: ...
-```
+```text
 
 **Service Locator:**
 ```python
@@ -284,7 +284,7 @@ class MyComponent:
 class MyComponent:
     def __init__(self, service: Service):
         self.service = service  # Explicit dependency
-```
+```text
 
 **📖 Full Guide:** [Best Practices](../architecture/best-practices/)
 
@@ -358,7 +358,7 @@ tool_registry = container.get(ToolRegistryProtocol)
 # Create scoped container
 scoped = container.create_scope()
 state_machine = scoped.get(ConversationStateMachineProtocol)
-```
+```text
 
 **Service Lifetimes:**
 
@@ -410,7 +410,7 @@ events:
   kafka:
     bootstrap_servers: localhost:9092
     topic: victor-events
-```
+```text
 
 **📖 Full Guide:** [Event System](../architecture/event-system.md)
 
@@ -460,7 +460,7 @@ python -m memory_profiler victor/agent/orchestrator.py
 
 Victor validates code before writing:
 
-```
+```text
 User Request → Parse → Validate → AST Check → LSP Check → Write
 ```
 
@@ -479,7 +479,7 @@ export VICTOR_STRICT_VALIDATION=true
 
 # Disable validation (for trusted environments)
 export VICTOR_VALIDATION_ENABLED=false
-```
+```text
 
 **📖 Full Guide:** [Code Validation](../reference/features/code-validation.md)
 

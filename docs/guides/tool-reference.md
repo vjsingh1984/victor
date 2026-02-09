@@ -85,7 +85,7 @@
 tool_selection:
   strategy: hybrid  # keyword | semantic | hybrid
   semantic_threshold: 0.7
-```
+```text
 
 ## Progressive Tools
 

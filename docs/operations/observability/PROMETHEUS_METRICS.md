@@ -18,7 +18,7 @@ Dependencies are included with observability support:
 
 ```bash
 pip install victor-ai[observability]
-```
+```text
 
 ## Quick Start
 
@@ -40,7 +40,7 @@ from victor.observability.metrics_endpoint import start_metrics_server
 # Start standalone metrics server
 start_metrics_server(port=9090)
 # Metrics available at http://localhost:9090/metrics
-```
+```text
 
 ### 3. Configure Prometheus
 
@@ -65,7 +65,7 @@ scrape_configs:
 | `victor_request_errors_total` | Counter | endpoint, method, error_type | Total errors |
 
 **Example**:
-```
+```text
 victor_requests_total{endpoint="/chat",method="POST"} 1234
 victor_request_duration_ms_bucket{endpoint="/chat",method="POST",le="100"} 800
 victor_request_errors_total{endpoint="/chat",method="POST",error_type="rate_limit"} 5
@@ -81,7 +81,7 @@ victor_request_errors_total{endpoint="/chat",method="POST",error_type="rate_limi
 | `victor_llm_errors_total` | Counter | provider, model, error_type | LLM errors |
 
 **Example**:
-```
+```text
 victor_llm_requests_total{provider="anthropic",model="claude-sonnet-4-5"} 500
 victor_llm_tokens_total{provider="anthropic",model="claude-sonnet-4-5",type="prompt"} 25000
 victor_llm_tokens_total{provider="anthropic",model="claude-sonnet-4-5",type="completion"} 50000
@@ -97,7 +97,7 @@ victor_llm_duration_ms_bucket{provider="anthropic",model="claude-sonnet-4-5",le=
 | `victor_tool_errors_total` | Counter | tool_name, error_type | Tool errors |
 
 **Example**:
-```
+```text
 victor_tool_executions_total{tool_name="read_file",status="success"} 1200
 victor_tool_executions_total{tool_name="read_file",status="error"} 5
 victor_tool_duration_ms_bucket{tool_name="read_file",le="50"} 1150
@@ -113,7 +113,7 @@ victor_tool_duration_ms_bucket{tool_name="read_file",le="50"} 1150
 | `victor_cache_size_bytes` | Gauge | cache_name | Cache size |
 
 **Example**:
-```
+```text
 victor_cache_hits_total{cache_name="tool_selection"} 4500
 victor_cache_misses_total{cache_name="tool_selection"} 500
 victor_cache_hit_rate{cache_name="tool_selection"} 0.9
@@ -131,7 +131,7 @@ victor_cache_size_bytes{cache_name="tool_selection"} 1048576
 | `victor_coordinator_cpu_percent` | Gauge | coordinator_name | CPU usage |
 
 **Example**:
-```
+```text
 victor_coordinator_executions_total{coordinator_name="ToolCoordinator"} 300
 victor_coordinator_duration_seconds_bucket{coordinator_name="ToolCoordinator",le="1"} 250
 victor_coordinator_memory_bytes{coordinator_name="ToolCoordinator"} 52428800
@@ -164,7 +164,7 @@ collector.model_latency.observe(45.2)
 summary = collector.get_summary()
 print(f"Tool calls: {summary['tool_calls']}")
 print(f"Error rate: {summary['tool_error_rate']:.2%}")
-```
+```text
 
 ### Custom Metrics
 
@@ -234,7 +234,7 @@ histogram.observe(75)
     }
   ]
 }
-```
+```text
 
 ### Recommended Queries
 
@@ -246,7 +246,7 @@ sum(rate(victor_requests_total{endpoint=~"/api/.*"}[5m])) by (endpoint)
 **P95 latency by provider**:
 ```promql
 histogram_quantile(0.95, sum(rate(victor_llm_duration_ms_bucket[5m])) by (provider, le))
-```
+```text
 
 **Error rate by model**:
 ```promql
@@ -256,7 +256,7 @@ sum(rate(victor_llm_errors_total[5m])) by (model) / sum(rate(victor_llm_requests
 **Cache hit rate**:
 ```promql
 victor_cache_hit_rate{cache_name="tool_selection"}
-```
+```text
 
 **Token usage per provider**:
 ```promql
@@ -315,7 +315,7 @@ groups:
         annotations:
           summary: "Low cache hit rate"
           description: "Cache {{ $labels.cache_name }} hit rate is {{ $value | humanizePercentage }}"
-```
+```text
 
 ## Best Practices
 
@@ -347,7 +347,7 @@ scrape_interval: 60s
 storage:
   tsdb:
     retention.time: 15d
-```
+```text
 
 ### Recording Rules
 
@@ -369,7 +369,7 @@ groups:
 1. Check metrics endpoint:
 ```bash
 curl http://localhost:9090/metrics
-```
+```text
 
 2. Verify Prometheus configuration:
 ```bash
@@ -379,7 +379,7 @@ promtool check config prometheus.yml
 3. Check Prometheus targets:
 ```bash
 curl http://localhost:9090/api/v1/targets
-```
+```text
 
 ### High memory usage
 

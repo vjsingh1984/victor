@@ -8,7 +8,7 @@ Semantic caching enhances traditional caching by using vector similarity to find
 
 ## How It Works
 
-```
+```text
 Query: "How do I parse JSON in Python?"
     ↓
 Compute Embedding: [0.23, -0.45, 0.67, ...]  (1536-dim vector)
@@ -44,7 +44,7 @@ cache = SemanticCache(
     enable_exact_match_fallback=True,
     batch_size=100,
 )
-```
+```text
 
 ### Similarity Threshold
 
@@ -76,7 +76,7 @@ cache = SemanticCache(embedding_model="text-embedding-ada-002")
 
 # Custom embedding model
 cache = SemanticCache(embedding_model="your-custom-model")
-```
+```text
 
 ## Usage Examples
 
@@ -114,7 +114,7 @@ result = await cache.get_similar(messages2)
 # Similarity score is tracked
 stats = cache.get_stats()
 print(f"Semantic hit rate: {stats['semantic_hit_rate']:.1%}")
-```
+```text
 
 ### Exact Match Fallback
 
@@ -136,7 +136,7 @@ result = await cache.get_similar(
     messages,
     threshold=0.90,  # Stricter than default
 )
-```
+```text
 
 ## Similarity Metrics
 
@@ -182,7 +182,7 @@ cache = SemanticCache(batch_size=50)
 
 # Large batches: Faster computation
 cache = SemanticCache(batch_size=200)
-```
+```text
 
 **Trade-off**:
 - Small batches: More accurate, slightly slower
@@ -213,7 +213,7 @@ cache = SemanticCache(default_ttl=3600)  # 1 hour
 
 # Long TTL: High hit rate, stale data risk
 cache = SemanticCache(default_ttl=86400)  # 1 day
-```
+```text
 
 ## Monitoring and Analytics
 
@@ -250,7 +250,7 @@ semantic_ratio = semantic_hits / total_hits if total_hits > 0 else 0
 
 print(f"Semantic hits: {semantic_ratio:.1%} of all hits")
 print(f"Semantic hit rate advantage: {semantic_ratio - 0.5:.1%}")
-```
+```text
 
 ## Best Practices
 
@@ -275,7 +275,7 @@ if is_critical_query(messages):
     result = await cache.get(messages)  # Exact match
 else:
     result = await cache.get_similar(messages)  # Semantic match
-```
+```text
 
 ### 3. Monitor Semantic Hit Rate
 
@@ -302,7 +302,7 @@ except Exception as e:
     logger.error(f"Semantic cache error: {e}")
     # Fall back to computation
     result = await compute_result(messages)
-```
+```text
 
 ## Use Cases
 
@@ -326,7 +326,7 @@ q2 = "How to configure auth"
 q3 = "Authentication setup guide"
 
 # Return same cached documentation
-```
+```text
 
 ### 3. Error Resolution
 
@@ -371,7 +371,7 @@ async def get_with_semantic(key: str, messages: list):
     await l1_cache.put(messages, result)
     await l2_cache.set(key, result, namespace="tool")
     return result
-```
+```text
 
 ### With Analytics
 

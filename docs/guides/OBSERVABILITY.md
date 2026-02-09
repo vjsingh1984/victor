@@ -28,7 +28,7 @@ def on_tool_event(event):
 bus.subscribe(EventCategory.TOOL, on_tool_event)
 
 # Run your agent - events will be emitted automatically
-```
+```text
 
 ## EventBus Architecture
 
@@ -85,7 +85,7 @@ bus.subscribe(
 
 # Unsubscribe
 bus.unsubscribe(EventCategory.TOOL, my_handler)
-```
+```text
 
 ### Emitting Custom Events
 
@@ -124,7 +124,7 @@ result = await graph.compile().invoke(
         graph_id="my-graph-001"  # Optional correlation ID
     )
 )
-```
+```text
 
 ### Graph Events
 
@@ -194,7 +194,7 @@ filtered = FilteringExporter(
 )
 
 bus.add_exporter(filtered)
-```
+```text
 
 ## TUI Dashboard
 
@@ -227,7 +227,7 @@ with profiler.profile(ProfileType.CPU):
 
 # Get profiling results
 stats = profiler.get_stats(ProfileType.CPU)
-```
+```text
 
 ### Profile Types
 
@@ -283,7 +283,7 @@ config = SamplingConfig(
 )
 
 bus.configure_sampling(config)
-```
+```text
 
 ## Streaming Metrics
 
@@ -317,7 +317,7 @@ engine = WorkflowEngine()
 
 # Events: workflow_started, workflow_completed, workflow_error
 result = await engine.execute_yaml("workflow.yaml", initial_state)
-```
+```text
 
 Subscribe to workflow events:
 
@@ -341,7 +341,7 @@ bus.emit_tool_start("search", {
 
 # Avoid - unstructured string
 bus.emit_tool_start("search", {"info": f"Searching for {query}"})
-```
+```text
 
 ### 2. Set Appropriate Priority
 
@@ -364,7 +364,7 @@ bus.emit_lifecycle_event("task_started", {
     "task_id": task_id,
     "parent_id": parent_task_id
 })
-```
+```text
 
 ### 4. Handle Backpressure
 
@@ -382,7 +382,7 @@ if stats.queue_depth > 8000:
 1. Check subscription is active:
    ```python
    print(bus.get_subscriber_count(EventCategory.TOOL))
-   ```
+```text
 
 2. Verify sampling isn't filtering:
    ```python
@@ -394,7 +394,7 @@ if stats.queue_depth > 8000:
    ```python
    stats = bus.get_stats()
    print(f"Dropped: {stats.events_dropped}")
-   ```
+```text
 
 ### High Memory Usage
 
@@ -435,7 +435,7 @@ Victor v0.4.1 introduces a protocol-based event system that enables distributed 
 │ High-throughput  │                     │ Delivery guarantees  │
 │ Lossy OK         │                     │ Agent-to-agent       │
 └──────────────────┘                     └──────────────────────┘
-```
+```text
 
 ### Quick Start
 
@@ -495,7 +495,7 @@ await backend.publish(Event(topic="task.created", data={"id": "123"}))
 
 # Cleanup old events
 deleted = backend.cleanup_old_events(max_age_seconds=86400)  # 24 hours
-```
+```text
 
 ### Pattern Matching
 
@@ -544,7 +544,7 @@ adapter.enable_forwarding()
 
 # Legacy events now flow to new backend
 legacy_bus.emit_tool_start("read", {"file": "test.py"})
-```
+```text
 
 ### Creating Custom Backends
 
@@ -586,7 +586,7 @@ Register with the factory:
 from victor.core.events import register_backend_factory, BackendType
 
 register_backend_factory(BackendType.CUSTOM, lambda config: MyBackend())
-```
+```text
 
 ### Delivery Guarantees
 
@@ -619,7 +619,7 @@ event = Event(
 4. **Set correlation IDs** for distributed tracing:
    ```python
    Event(topic="task", data={...}, correlation_id=trace_id)
-   ```
+```text
 5. **Clean up old events** in persistent backends:
    ```python
    backend.cleanup_old_events(max_age_seconds=86400)

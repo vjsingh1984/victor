@@ -20,7 +20,7 @@ victor chat "Hello, Victor!"
 # Cloud model (full capability)
 export ANTHROPIC_API_KEY=sk-ant-...
 victor chat --provider anthropic "Hello, Victor!"
-```
+```text
 
 **Documentation:** [Installation Guide](../getting-started/installation.md)
 
@@ -63,7 +63,7 @@ victor chat --mode build "Refactor auth.py based on the strategy"
 
 # 4. Review the changes
 victor chat --provider anthropic "Review the refactored code"
-```
+```text
 
 **Modes:**
 - `build` (default): Full edits
@@ -124,7 +124,7 @@ pytest tests/unit/auth/test_auth.py -v
 
 # 5. Coverage report
 pytest tests/unit/auth/ --cov=src/auth --cov-report=html
-```
+```text
 
 **Documentation:** [Testing Guide](../contributing/testing.md)
 
@@ -173,7 +173,7 @@ nodes:
     type: agent
     provider: anthropic
     depends_on: [tests]
-```
+```text
 
 ```bash
 # Run workflow
@@ -198,7 +198,7 @@ victor chat " diagnose the Ollama connection issue"
 
 # 4. Use diagnostics
 victor doctor  # (if available)
-```
+```text
 
 **Documentation:** [Troubleshooting](../getting-started/troubleshooting.md)
 
@@ -250,7 +250,7 @@ git commit -m "feat: add feature X"
 
 # 6. Push and create PR
 git push origin feature/my-feature
-```
+```text
 
 **Documentation:** [Contributing Guide](../contributing/index.md)
 
@@ -311,7 +311,7 @@ nodes:
     type: agent
     provider: anthropic
     tools: [run_tests]
-```
+```text
 
 ### Event-Driven Integration
 
@@ -387,7 +387,7 @@ victor chat --mode plan "How should I refactor this module?"
 
 # 3. Implementation (build mode)
 victor chat --mode build "Refactor the module"
-```
+```text
 
 ### Pattern 2: Multi-Provider Review
 
@@ -410,7 +410,7 @@ victor chat --tools read,write "Just modify this file"
 
 # Tool budget for cost control
 victor chat --tool-budget 10 "Analyze with max 10 tool calls"
-```
+```text
 
 ---
 
@@ -434,7 +434,7 @@ ollama serve
 
 # Verify connection
 ollama ps
-```
+```text
 
 ### Issue: "API key not found"
 

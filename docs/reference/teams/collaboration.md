@@ -87,7 +87,7 @@ coordinator.enable_collaboration({
         }
     }
 })
-```
+```text
 
 ### YAML Configuration
 
@@ -134,7 +134,7 @@ response = await coordinator.collaborative_send_request(
 
 if response:
     print(f"Response: {response.content}")
-```
+```text
 
 **Use cases**:
 - Delegating specific tasks
@@ -175,7 +175,7 @@ responses = await coordinator.collaborative_multicast(
 
 for recipient_id, response in responses.items():
     print(f"{recipient_id}: {response.content if response else 'No response'}")
-```
+```text
 
 **Use cases**:
 - Targeted requests
@@ -226,7 +226,7 @@ stats = coordinator.get_communication_stats()
 print(f"Total messages: {stats['total_messages']}")
 print(f"Average response time: {stats['avg_response_time_ms']:.2f}ms")
 print(f"Messages by sender: {stats['by_sender']}")
-```
+```text
 
 ## Shared Context
 
@@ -275,7 +275,7 @@ await context.set("key", "value1", "member1")
 await context.set("key", "value2", "member2")
 
 # Result: "value2"
-```
+```text
 
 #### First Write Wins
 
@@ -305,7 +305,7 @@ await context.set("data", {"items": ["a", "b"]}, "member1")
 await context.merge("data", {"items": ["b", "c"], "count": 5}, "member2")
 
 # Result: {'items': ['a', 'b', 'c'], 'count': 5}
-```
+```text
 
 #### Custom Resolver
 
@@ -344,7 +344,7 @@ key1_history = coordinator.get_shared_context_history("key1")
 import time
 cutoff_time = time.time() - 300  # 5 minutes ago
 await coordinator.shared_context_rollback(cutoff_time)
-```
+```text
 
 ### State Snapshots
 
@@ -388,7 +388,7 @@ if result.success:
     print(f"Consensus: {result.consensus_achieved}")
 else:
     print("No agreement reached")
-```
+```text
 
 #### Weighted by Expertise
 
@@ -430,7 +430,7 @@ result = await coordinator.negotiate(
     proposals=["Merge PR", "Request changes"],
     topic="PR approval"
 )
-```
+```text
 
 ### Negotiation Types
 
@@ -462,7 +462,7 @@ result = await coordinator.negotiate(
     proposals=["Python", "JavaScript", "Go"],
     topic="Implementation language"
 )
-```
+```text
 
 #### Ranked Choice
 
@@ -497,7 +497,7 @@ result = await coordinator.negotiate(
     proposals=["Option A", "Option B"],
     topic="Updated decision"
 )
-```
+```text
 
 ## Performance Considerations
 
@@ -529,7 +529,7 @@ The collaboration framework is designed for minimal performance impact:
    "communication": {
        "log_messages": False  # Reduce overhead
    }
-   ```
+```text
 
 3. **Use appropriate conflict resolution**: Simple strategies are faster
    ```python
@@ -545,7 +545,7 @@ The collaboration framework is designed for minimal performance impact:
    "negotiation": {
        "max_rounds": 2  # Limit rounds
    }
-   ```
+```text
 
 5. **Use broadcast selectively**: Multicast is more efficient
    ```python
@@ -588,7 +588,7 @@ context_keys = [
 
 # Bad: Flat, unorganized
 context_keys = ["data", "stuff", "results"]
-```
+```text
 
 ### 3. Choose Conflict Resolution Wisely
 
@@ -641,7 +641,7 @@ if len(history) > 1000:
 # Analyze negotiation outcomes
 if result.rounds == result.max_rounds:
     print("Warning: Max rounds reached, consider increasing")
-```
+```text
 
 ## Example Workflows
 
@@ -705,7 +705,7 @@ result = await coordinator.negotiate(
     proposals=["Monolith", "Microservices", "Modular monolith"],
     topic="Architecture pattern"
 )
-```
+```text
 
 ## Troubleshooting
 
@@ -806,7 +806,7 @@ class SharedTeamContext:
     def get_state() -> Dict[str, Any]
     def get_update_history(key: Optional[str] = None) -> List[ContextUpdate]
     async def rollback(to_timestamp: float) -> bool
-```
+```text
 
 ### NegotiationFramework
 
@@ -854,7 +854,7 @@ class CollaborationMixin:
     # Negotiation
     async def negotiate(proposals: List[str], topic: str) -> NegotiationResult
     def set_expertise_weights(weights: Dict[str, float]) -> None
-```
+```text
 
 ## See Also
 

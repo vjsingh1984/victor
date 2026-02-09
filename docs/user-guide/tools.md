@@ -44,14 +44,14 @@ Tools for reading, writing, and navigating the filesystem.
 | `overview` | Project structure overview | FREE | "Show me the project structure" |
 
 **Example: Reading a File**
-```
+```text
 User: Read the first 100 lines of utils.py
 
 Victor calls: read(path="utils.py", limit=100)
 ```
 
 **Example: Editing a File**
-```
+```text
 User: Change the timeout from 30 to 60 seconds in config.py
 
 Victor calls: edit(ops=[{
@@ -75,14 +75,14 @@ Tools for understanding code structure and relationships.
 | `graph` | Query codebase structure/relationships | FREE | "What modules depend on auth.py?" |
 
 **Example: Semantic Search**
-```
+```text
 User: Find code related to authentication
 
 Victor calls: code_search(query="authentication login user credentials", mode="semantic")
 ```
 
 **Example: Finding References**
-```
+```text
 User: Where is the validate_email function used?
 
 Victor calls: refs(name="validate_email")
@@ -123,7 +123,7 @@ Tools for running commands and code.
 | `test` | Run pytest with structured output | FREE | "Run the unit tests" |
 
 **Example: Running Tests**
-```
+```text
 User: Run the tests for the auth module
 
 Victor calls: test(path="tests/unit/test_auth.py")
@@ -149,7 +149,7 @@ User: Stage all changes and commit with a descriptive message
 Victor calls: git(operation="stage")
 Victor calls: commit_msg()  # Generates message from diff
 Victor calls: git(operation="commit", message="feat(auth): add OAuth2 support for SSO login")
-```
+```text
 
 ### Web Tools
 
@@ -165,7 +165,7 @@ Tools for accessing web content (disabled in air-gapped mode).
 User: Search for FastAPI authentication best practices
 
 Victor calls: web_search(query="FastAPI authentication best practices", ai_summarize=true)
-```
+```text
 
 ### Additional Categories
 
@@ -199,7 +199,7 @@ The hybrid strategy combines semantic and keyword approaches:
 
 ```
 Final Score = (0.7 * Semantic Score) + (0.3 * Keyword Score)
-```
+```text
 
 This ensures:
 - **High-quality selection** via semantic similarity
@@ -260,7 +260,7 @@ profiles:
 
     # Maximum concurrent tool executions
     max_concurrent_tools: 5
-```
+```text
 
 When the budget is exhausted, Victor will inform you and wait for confirmation before continuing.
 
@@ -297,7 +297,7 @@ Preview tool effects without executing:
 
 ```bash
 victor --dry-run "Refactor the auth module"
-```
+```text
 
 In dry run mode:
 - Write operations show what would change
@@ -337,7 +337,7 @@ Victor automatically:
 
 In **EXPLORE** and **PLAN** modes, write operations are restricted to `.victor/sandbox/`:
 
-```
+```text
 [EXPLORE MODE] Cannot write to 'src/main.py'.
 In EXPLORE mode, edits are restricted to: .victor/sandbox/
 Use /mode build to switch to build mode for unrestricted access.
@@ -375,7 +375,7 @@ class MyCustomTool(BaseTool):
     async def execute(self, _exec_ctx, **kwargs):
         result = process(kwargs["input"])
         return ToolResult(success=True, output=result)
-```
+```text
 
 Register in `pyproject.toml`:
 
@@ -407,7 +407,7 @@ For detailed custom tool development, see:
 ### Common Patterns
 
 **Explore, Then Edit**
-```
+```text
 1. Use overview() to understand project structure
 2. Use code_search() to find relevant code
 3. Use read() to examine specific files
@@ -415,7 +415,7 @@ For detailed custom tool development, see:
 ```
 
 **Review and Commit**
-```
+```text
 1. Use git(operation="status") to see changes
 2. Use git(operation="diff") to review modifications
 3. Use commit_msg() to generate message
@@ -423,7 +423,7 @@ For detailed custom tool development, see:
 ```
 
 **Research and Implement**
-```
+```text
 1. Use web_search() to find documentation
 2. Use code_search() to find similar implementations
 3. Use read() to understand existing code
@@ -435,7 +435,7 @@ For detailed custom tool development, see:
 
 ### Tool Not Found
 
-```
+```text
 Error: Tool 'my_tool' not found
 ```
 
@@ -445,7 +445,7 @@ Error: Tool 'my_tool' not found
 
 ### Permission Denied
 
-```
+```text
 Error: Permission denied for shell execution
 ```
 
@@ -455,7 +455,7 @@ Error: Permission denied for shell execution
 
 ### Tool Timeout
 
-```
+```text
 Error: Tool execution timed out after 60 seconds
 ```
 

@@ -179,7 +179,7 @@ class BaseYAMLWorkflowProvider:
 
     def get_transforms(self) -> Dict[str, Callable]:
         return {}  # Default implementation
-```
+```text
 
 **Vertical Extensions** (open for extension):
 - `CodingWorkflowProvider` (victor/coding/workflows/)
@@ -244,7 +244,7 @@ class CacheStrategy(Enum):
     MANUAL = "manual"
     LFU = "lfu"  # NEW: Least frequently used
     ARC = "arc"  # NEW: Adaptive replacement cache
-```
+```text
 
 **UniversalRegistry** implements strategy pattern with `_evict_lru()` method that can be extended for new strategies.
 
@@ -343,7 +343,7 @@ def process_with_provider(provider: BaseProvider, prompt: str) -> str:
 process_with_provider(AnthropicProvider(...), "Hello")
 process_with_provider(OpenAIProvider(...), "Hello")
 process_with_provider(OllamaProvider(...), "Hello")  # Local provider
-```
+```text
 
 **LSP Compliance Check**:
 - ✅ All providers implement `chat()`, `stream_chat()`, `supports_tools()`, `name`
@@ -394,7 +394,7 @@ async def execute(self, graph: CompiledGraph, initial_state: Dict[str, Any]) -> 
         nodes_executed = []
 
     return WorkflowExecutionResult(...)
-```
+```text
 
 **Issue**: Requires `hasattr()` checks (not ideal LSP)
 **Severity**: Minor
@@ -447,7 +447,7 @@ process_with_vertical(DevOpsAssistant, "Deploy to production")
          node_history: List[str]
          success: bool
          error: Optional[str]
-     ```
+```text
    - **Impact**: Low - current code works correctly
 
 2. **YAMLWorkflowCoordinator Dual Execution Paths**
@@ -621,7 +621,7 @@ High-level modules should not depend on low-level modules. Both should depend on
 ├─────────────────────────────────────────┤
 │  Provider Layer (LLM providers)         │  ← Lowest
 └─────────────────────────────────────────┘
-```
+```text
 
 **Rule**: Dependencies should flow **downward** (agent → framework → core → provider)
 
@@ -661,7 +661,7 @@ container.register(
 
 # Resolution (injects dependencies)
 executor = container.get(ToolExecutorProtocol)  # Returns concrete implementation
-```
+```text
 
 **DI Usage**:
 - 55+ services registered in `ServiceContainer`

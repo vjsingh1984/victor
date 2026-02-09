@@ -62,7 +62,7 @@ enable_episodic_memory = True
 enable_semantic_memory = True
 episodic_memory_max_episodes = 1000
 semantic_memory_max_facts = 5000
-```
+```text
 
 ---
 

@@ -71,7 +71,7 @@ services:
 volumes:
   prometheus-data:
   grafana-data:
-```
+```text
 
 Start the stack:
 
@@ -106,7 +106,7 @@ spec:
 EOF
 
 kubectl apply -f victor-servicemonitor.yaml
-```
+```text
 
 ### Grafana Helm Chart
 
@@ -134,7 +134,7 @@ helm install grafana grafana/grafana \
 1. Check if Victor AI metrics server is running:
    ```bash
    curl http://localhost:9091/metrics
-   ```
+```text
 
 2. Verify Prometheus configuration:
    ```bash
@@ -145,7 +145,7 @@ helm install grafana grafana/grafana \
 3. Check Prometheus logs:
    ```bash
    docker logs prometheus
-   ```
+```text
 
 4. Verify network connectivity:
    ```bash
@@ -164,7 +164,7 @@ helm install grafana grafana/grafana \
    storage:
      tsdb:
        retention.time: 7d  # Reduce from 15d
-   ```
+```text
 
 2. Adjust scrape interval:
    ```yaml
@@ -182,7 +182,7 @@ helm install grafana grafana/grafana \
 1. Check AlertManager is running:
    ```bash
    curl http://localhost:9093/-/healthy
-   ```
+```text
 
 2. Verify alert rules are loaded:
    ```bash
@@ -192,7 +192,7 @@ helm install grafana grafana/grafana \
 3. Check AlertManager logs:
    ```bash
    docker logs alertmanager
-   ```
+```text
 
 ### Grafana Dashboards Not Loading
 
@@ -268,7 +268,7 @@ curl http://localhost:3000/api/health
 
 # AlertManager health
 curl http://localhost:9093/-/healthy
-```
+```text
 
 ### Metrics About Monitoring
 

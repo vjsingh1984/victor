@@ -4,7 +4,7 @@ A quick reference card for step handler development in Victor.
 
 ## Execution Order
 
-```
+```text
 Order | Handler                | Purpose
 ------|------------------------|------------------------------------------
 5     | capability_config      | Centralized capability config storage
@@ -81,7 +81,7 @@ class MyCustomHandler(BaseStepHandler):
             "applied": True,
             "value": "details",
         }
-```
+```text
 
 ## Common Imports
 
@@ -131,7 +131,7 @@ stages = context.stages
 middleware = context.middleware
 safety_patterns = context.safety_patterns
 mode_configs = context.mode_configs
-```
+```text
 
 ## Result Methods
 
@@ -190,7 +190,7 @@ if _check_capability(orchestrator, "enabled_tools", min_version="1.1"):
 # Strict mode (raises error instead of fallback)
 if _check_capability(orchestrator, "enabled_tools", strict_mode=True):
     _invoke_capability(orchestrator, "enabled_tools", tools)
-```
+```text
 
 ## Common Capabilities
 
@@ -258,7 +258,7 @@ registry = StepHandlerRegistry.default()
 handlers = registry.get_ordered_handlers()
 for handler in handlers:
     print(f"{handler.order}: {handler.name}")
-```
+```text
 
 ## Factory Functions
 
@@ -312,7 +312,7 @@ registry.register(
         priority=50,
     )
 )
-```
+```text
 
 ## Testing Helpers
 
@@ -364,7 +364,7 @@ def _validate(self, vertical) -> bool:
     """Validate vertical data."""
     data = vertical.get_data()
     return data is not None and len(data) > 0
-```
+```text
 
 ### Filtering Pattern
 
@@ -404,7 +404,7 @@ def _do_apply(self, orchestrator, vertical, context, result):
             else:
                 result.add_error(f"Failed after {max_retries} attempts")
                 raise
-```
+```text
 
 ### Conditional Pattern
 
@@ -453,7 +453,7 @@ def _do_apply(self, orchestrator, vertical, context, result):
         result.add_error(f"Unexpected error: {e}")
         if self._strict_mode:
             raise
-```
+```text
 
 ## Observability
 
@@ -528,7 +528,7 @@ order = 65  # After framework, before context
 order = 95  # Before context attachment
 order = 100  # Same as ContextStepHandler
 order = 105  # After context attachment
-```
+```text
 
 ## Naming Conventions
 
@@ -577,7 +577,7 @@ class MyHandler(BaseStepHandler):
     ) -> None:
         """Implement the step."""
         pass
-```
+```text
 
 ## Quick Checklist
 

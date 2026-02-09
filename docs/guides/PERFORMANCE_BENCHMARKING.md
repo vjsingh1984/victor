@@ -52,7 +52,7 @@ python scripts/benchmark_suite.py --profile full
 
 # Export results
 python scripts/benchmark_suite.py --profile quick --export results.json
-```
+```text
 
 ## Running Benchmarks
 
@@ -81,7 +81,7 @@ pytest tests/performance/benchmarks/test_initialization.py -v --benchmark-only
 
 # Save to JSON
 pytest tests/performance/benchmarks/ --benchmark-only --benchmark-json=results.json
-```
+```text
 
 ## Interpreting Results
 
@@ -93,7 +93,7 @@ Name (time in ms)                       Min       Max      Mean    StdDev    Med
 ------------------------------------------------------------------------------------------
 test_cold_start_orchestrator_factory  45.2341  67.8912  52.3456   8.2345   51.2345        10
 ------------------------------------------------------------------------------------------
-```
+```text
 
 - **Min**: Fastest execution time
 - **Max**: Slowest execution time
@@ -114,7 +114,7 @@ assert elapsed < 0.5, f"Factory initialization too slow: {elapsed:.3f}s (target:
 ```bash
 # Generate comparison report
 python scripts/benchmark_suite.py --compare baseline.json current.json --report comparison.html
-```
+```text
 
 ## Adding New Benchmarks
 
@@ -152,7 +152,7 @@ Add to CI pipeline:
 ```yaml
 - name: Run benchmarks
   run: python scripts/benchmark_suite.py --profile quick --export results.json
-```
+```text
 
 ### Pre-commit Hook
 

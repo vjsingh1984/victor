@@ -55,7 +55,7 @@ hashlib.md5(content.encode()).hexdigest()
 
 # To:
 hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
-```
+```text
 
 **Timeline:** Low priority - cosmetic change to clarify intent
 
@@ -163,7 +163,7 @@ pip install --upgrade pip
 **Impact:** Low - not directly used by Victor for security-critical operations
 
 **Dependency Chain:**
-```
+```text
 victor-invest (external)
   └─ python-jose 3.5.0
       └─ ecdsa 0.19.1
@@ -195,7 +195,7 @@ conn.execute(f"CREATE TABLE IF NOT EXISTS {_Q_TABLE} (...)")
 # Recommended:
 from sqlalchemy import text
 conn.execute(text(f"CREATE TABLE IF NOT EXISTS {_Q_TABLE} (...)"))
-```
+```text
 
 **Subprocess shell=True (multiple)**
 - Already documented under Bandit findings above

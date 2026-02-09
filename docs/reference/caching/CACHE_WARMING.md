@@ -31,7 +31,7 @@ warmer = CacheWarmer(
 
 # Warm top 100 most frequently accessed items
 await warmer.warm_top_items(n=100)
-```
+```text
 
 **How it works**:
 1. Tracks access frequency for each key
@@ -74,12 +74,12 @@ warmer = CacheWarmer(
 
 # Warm top items using hybrid scoring
 await warmer.warm_top_items(n=100)
-```
+```text
 
 **Scoring Formula**:
 ```
 hybrid_score = recency_weight * recency_score + (1 - recency_weight) * frequency_score
-```
+```text
 
 **Tuning**:
 - `recency_weight=0.0`: Frequency-only (stable data)
@@ -128,7 +128,7 @@ await warmer.record_access(
 
 # Warm items for specific user
 await warmer.warm_top_items(user_id="user@example.com", n=50)
-```
+```text
 
 ## Configuration
 
@@ -163,7 +163,7 @@ warmer = CacheWarmer(
     cache=cache,
     value_loader=load_tool_result,
 )
-```
+```text
 
 ## Usage Examples
 
@@ -207,7 +207,7 @@ await warmer.start_background_warming()
 
 # Stop when shutting down
 await warmer.stop_background_warming()
-```
+```text
 
 ### Manual Warming
 
@@ -241,7 +241,7 @@ await warmer.save_patterns_to_history()
 await warmer.load_patterns_from_history()
 
 # Patterns are persisted to ~/.victor/cache_warming_history.json
-```
+```text
 
 ## Monitoring and Statistics
 
@@ -269,7 +269,7 @@ warmer = CacheWarmer(cache=cache, strategy=WarmingStrategy.RECENCY)
 
 # Balanced: Hybrid (recommended)
 warmer = CacheWarmer(cache=cache, strategy=WarmingStrategy.HYBRID)
-```
+```text
 
 ### 2. Set Appropriate Warm Intervals
 
@@ -297,7 +297,7 @@ async def get_with_warming(key: str, namespace: str):
     await warmer.record_access(key, namespace, hit=hit)
 
     return value
-```
+```text
 
 ### 4. Handle Errors Gracefully
 
@@ -350,7 +350,7 @@ warmer = CacheWarmer(cache=cache)
 
 # Warm both L1 and L2
 await warmer.warm_top_items(n=100)
-```
+```text
 
 ### With Analytics
 
@@ -381,7 +381,7 @@ async def on_invalidate(key: str, namespace: str):
     await invalidator.invalidate(key, namespace)
     # Re-warm if important
     await warmer.warm_item(key, reload_value(key), namespace)
-```
+```text
 
 ## Troubleshooting
 

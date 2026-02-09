@@ -58,7 +58,7 @@ pip install prometheus-client psutil requests
 
 # Optional: For metrics report generation
 pip install pandas
-```
+```text
 
 ## Quick Start
 
@@ -81,7 +81,7 @@ export VICTOR_PROMETHEUS_PORT=9091
 
 # Start Victor AI
 victor chat --no-tui
-```
+```text
 
 ### 3. Access Dashboards
 
@@ -129,7 +129,7 @@ cp /path/to/victor/configs/prometheus/*.yml .
 
 # Start Prometheus
 ./prometheus --config.file=prometheus.yml
-```
+```text
 
 ### Step 2: Install Grafana
 
@@ -184,7 +184,7 @@ sudo apt install grafana
 # Start Grafana
 sudo systemctl start grafana-server
 sudo systemctl enable grafana-server
-```
+```text
 
 ### Step 3: Configure AlertManager
 
@@ -275,7 +275,7 @@ async def chat_handler(request):
 # Use context managers
 with collector.track_provider_request("anthropic", "claude-sonnet-4-5"):
     response = await provider.chat(messages)
-```
+```text
 
 #### Environment Variables
 
@@ -309,7 +309,7 @@ for dashboard in configs/grafana/*.json; do
     -d @"$dashboard" \
     http://admin:admin@localhost:3000/api/dashboards/import
 done
-```
+```text
 
 ## Configuration
 
@@ -344,7 +344,7 @@ groups:
         for: 2m
         annotations:
           summary: "High error rate detected"
-```
+```text
 
 ### Grafana Datasource
 
@@ -372,7 +372,7 @@ Expected output:
   "health": "up",
   "lastError": ""
 }
-```
+```text
 
 ### 2. Query Metrics
 
@@ -388,7 +388,7 @@ curl 'http://localhost:9090/api/v1/query?query=victor_request_duration_seconds_c
 ```bash
 # Trigger a test alert
 curl 'http://localhost:9090/api/v1/alerts' | jq '.data.alerts[] | select(.state=="firing")'
-```
+```text
 
 ### 4. View Metrics in Grafana
 

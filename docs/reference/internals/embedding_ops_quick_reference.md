@@ -18,7 +18,7 @@ top_k = accelerator.topk_indices(similarities, k=10)
 stats = accelerator.cache_stats
 print(f"Avg time: {stats.avg_similarity_ms:.3f}ms")
 print(f"Cache hit rate: {stats.cache_hit_rate:.2%}")
-```
+```text
 
 ## API Reference
 
@@ -45,7 +45,7 @@ similarities = accelerator.batch_cosine_similarity(
     query=[0.1, 0.2, ...],      # 384-dim query
     embeddings=[[0.3, 0.4, ...], ...],  # N x 384 corpus
 )
-```
+```text
 
 **topk_indices(scores, k)**
 - Select top-k indices using partial sort
@@ -70,7 +70,7 @@ matrix = accelerator.similarity_matrix(
     corpus=[[0.3, 0.4, ...], ...],     # N x 384
 )
 # matrix[i][j] = similarity(queries[i], corpus[j])
-```
+```text
 
 **Properties**
 ```python
@@ -96,7 +96,7 @@ stats.total_fallback_calls       # int: Total NumPy fallback calls
 stats.avg_similarity_ms          # float: Average similarity time (ms)
 stats.avg_topk_ms                # float: Average top-k time (ms)
 stats.cache_hit_rate             # float: Overall cache hit rate (0-1)
-```
+```text
 
 ## Usage Patterns
 
@@ -135,7 +135,7 @@ matrix = accelerator.similarity_matrix(queries, corpus)
 for i, similarities in enumerate(matrix):
     top_k = accelerator.topk_indices(similarities, k=5)
     print(f"Query {i}: top docs = {top_k}")
-```
+```text
 
 ### Cache Monitoring
 ```python
@@ -162,7 +162,7 @@ accelerator.clear_cache()
 1. **Enable caching for repeated queries**
    ```python
    accelerator = get_embedding_accelerator(enable_cache=True)
-   ```
+```text
 
 2. **Use batch processing for multiple queries**
    ```python
@@ -181,7 +181,7 @@ accelerator.clear_cache()
 
    # Long TTL for static data
    accelerator = EmbeddingOpsAccelerator(cache_ttl_seconds=7200)
-   ```
+```text
 
 4. **Monitor cache effectiveness**
    ```python
@@ -221,7 +221,7 @@ except ValueError as e:
 # Empty inputs - no error, returns empty list
 similarities = accelerator.batch_cosine_similarity(query, [])
 assert similarities == []
-```
+```text
 
 ## Testing
 
@@ -262,7 +262,7 @@ print("✓ All tests passed")
 export VICTOR_USE_RUST_EMBEDDING_OPS=true
 export VICTOR_EMBEDDING_CACHE_SIZE=1000
 export VICTOR_EMBEDDING_CACHE_TTL=3600
-```
+```text
 
 ### Python Configuration
 ```python
@@ -311,7 +311,7 @@ doc_similarities = accelerator.batch_cosine_similarity(
 )
 top_docs = accelerator.topk_indices(doc_similarities, k=5)
 retrieved_docs = [documents[i] for i in top_docs]
-```
+```text
 
 ### Vector Database
 ```python
@@ -331,7 +331,7 @@ matrix = accelerator.similarity_matrix(
     document_embeddings,
 )
 # Use matrix for clustering algorithms
-```
+```text
 
 ## Further Reading
 

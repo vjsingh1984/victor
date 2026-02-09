@@ -45,7 +45,10 @@ This document provides comprehensive API reference documentation for Victor's pr
 
 ### What are Protocols in Victor?
 
-Victor uses Python's `Protocol` pattern (from `typing`) to define interfaces without requiring inheritance. This approach, known as structural subtyping or "duck typing with type hints," allows any class that implements the required methods to satisfy a protocol, regardless of its inheritance hierarchy.
+Victor uses Python's `Protocol` pattern (from `typing`) to define interfaces without requiring
+inheritance. This approach, known as structural subtyping or "duck typing with type hints," allows
+any class that implements the required methods to satisfy a protocol, regardless of its inheritance
+hierarchy.
 
 ```python
 from typing import Protocol, runtime_checkable
@@ -57,7 +60,7 @@ class IExample(Protocol):
     def required_method(self, arg: str) -> int:
         """Method that implementations must provide."""
         ...
-```
+```text
 
 ### ISP Compliance Design
 
@@ -109,7 +112,7 @@ class MyProviderAdapter:
         return not response.strip()
 
     # ... implement other required methods
-```
+```text
 
 ---
 
@@ -121,7 +124,9 @@ class MyProviderAdapter:
 
 **Import**: `from victor.protocols import IProviderAdapter`
 
-The `IProviderAdapter` protocol defines the interface for adapting provider-specific behaviors. Each LLM provider (OpenAI, Anthropic, DeepSeek, etc.) has different response formats, tool calling conventions, and quality thresholds.
+The `IProviderAdapter` protocol defines the interface for adapting provider-specific behaviors.
+Each LLM provider (OpenAI, Anthropic, DeepSeek, etc.) has different response formats, tool
+calling conventions, and quality thresholds.
 
 #### Protocol Definition
 
@@ -209,7 +214,7 @@ class ProviderCapabilities:
     supports_parallel_tools: bool = True
     grounding_required: bool = True
     grounding_strictness: float = 0.8
-```
+```text
 
 #### Usage
 
@@ -237,7 +242,8 @@ if adapter.detect_continuation_needed(response):
 
 **Import**: `from victor.protocols import IGroundingStrategy`
 
-The `IGroundingStrategy` protocol defines the interface for verifying claims in LLM responses against verifiable sources (files, symbols, content).
+The `IGroundingStrategy` protocol defines the interface for verifying claims in LLM responses
+against verifiable sources (files, symbols, content).
 
 #### Protocol Definition
 
@@ -287,7 +293,7 @@ class IGroundingStrategy(Protocol):
             List of claims found in the response
         """
         ...
-```
+```text
 
 #### Supporting Types
 
@@ -345,7 +351,7 @@ verifier = CompositeGroundingVerifier([
 result = await verifier.verify(response, context)
 if result.is_grounded:
     print(f"Verified {result.verified_claims}/{result.total_claims} claims")
-```
+```text
 
 ---
 
@@ -418,7 +424,7 @@ class QualityScore:
     dimension_scores: Dict[ProtocolQualityDimension, DimensionScore]
     feedback: str = ""
     suggestions: List[str] = field(default_factory=list)
-```
+```text
 
 #### Built-in Assessors
 
@@ -477,7 +483,7 @@ class IModeController(Protocol):
     def get_tool_priority(self, tool_name: str) -> float:
         """Get priority adjustment for a tool in current mode."""
         ...
-```
+```text
 
 #### Supporting Types
 
@@ -511,7 +517,7 @@ class MyComponent(ModeAwareMixin):
         elif self.is_explore_mode:
             # Read-only exploration
             pass
-```
+```text
 
 ---
 
@@ -590,7 +596,7 @@ class PathResolution:
     exists: bool = False
     is_file: bool = False
     is_directory: bool = False
-```
+```text
 
 #### Usage
 

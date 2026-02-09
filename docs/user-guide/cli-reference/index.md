@@ -54,7 +54,7 @@ Victor AI provides a comprehensive CLI interface:
 victor chat "Help me with..."
 victor ask "Quick question"
 victor serve  # Start API server
-```
+```text
 
 ---
 

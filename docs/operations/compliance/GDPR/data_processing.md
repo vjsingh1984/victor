@@ -342,7 +342,7 @@ transfer_impact_assessment:
 
   conclusion: "Transfer can proceed with SCCs and supplementary measures"
   review_date: "2027-01-20"
-```
+```text
 
 ### 5.3 International Data Transfer Policy
 

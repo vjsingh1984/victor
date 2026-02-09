@@ -33,7 +33,7 @@ ollama pull qwen2.5-coder:7b
 
 # Start Victor
 victor chat "Hello, Victor!"
-```
+```text
 
 ### Cloud Provider (API Key Required)
 
@@ -53,7 +53,7 @@ victor chat --provider anthropic "Hello, Victor!"
 ```bash
 docker pull ghcr.io/vjsingh1984/victor:latest
 docker run -it -v ~/.victor:/root/.victor ghcr.io/vjsingh1984/victor:latest
-```
+```text
 
 ## Getting Started Guides
 
@@ -106,7 +106,7 @@ victor "Add error handling to db.py"
 
 # Run tests
 victor "Run tests and summarize failures"
-```
+```text
 
 ## What's Next?
 

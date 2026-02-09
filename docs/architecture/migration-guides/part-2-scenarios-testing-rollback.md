@@ -23,7 +23,7 @@ from victor.tools import read_file, write_file
 
 content = read_file("file.txt")
 write_file("output.txt", content)
-```
+```text
 
 **After**:
 ```python
@@ -47,7 +47,7 @@ from victor.providers.anthropic import AnthropicProvider
 
 provider = AnthropicProvider(api_key="...")
 response = provider.chat(messages)
-```
+```text
 
 **After**:
 ```python
@@ -67,7 +67,7 @@ state = {
     "context": {},
     "stage": "initial"
 }
-```
+```text
 
 **After**:
 ```python
@@ -96,7 +96,7 @@ def test_coordinator_integration():
     # Test coordinator exists
     assert orchestrator.tool_coordinator is not None
     assert orchestrator.provider_coordinator is not None
-```
+```text
 
 ### Integration Tests
 
@@ -127,7 +127,7 @@ def test_backward_compatibility():
 
     content = read_file("test.txt")
     assert content is not None
-```
+```text
 
 ---
 
@@ -159,7 +159,7 @@ legacy_result = await legacy_tool_execute(...)
 
 # Compare and log
 log_comparison(new_result, legacy_result)
-```
+```text
 
 ### Strategy 3: Gradual Rollout
 

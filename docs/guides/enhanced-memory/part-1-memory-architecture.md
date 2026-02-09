@@ -100,7 +100,7 @@ episode_id = await orchestrator.episodic_memory.store_episode(
 )
 
 print(f"Stored episode: {episode_id}")
-```
+```text
 
 [Content continues through Memory Consolidation section...]
 

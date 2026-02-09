@@ -42,7 +42,7 @@ This guide covers session management:
 **List sessions:**
 ```bash
 victor sessions list
-```
+```text
 
 **Resume session:**
 ```bash

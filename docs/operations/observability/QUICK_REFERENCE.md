@@ -6,7 +6,7 @@ Quick reference for Victor AI 0.5.0 observability features.
 
 ```bash
 pip install victor-ai[observability]
-```
+```text
 
 ## Environment Variables
 
@@ -36,7 +36,7 @@ logger, perf_logger, req_logger = setup_structured_logging(log_format="json")
 
 # Start server (optional)
 start_metrics_server(port=9090)
-```
+```text
 
 ## Common Patterns
 
@@ -57,7 +57,7 @@ from victor.observability.prometheus_metrics import get_prometheus_registry
 registry = get_prometheus_registry()
 counter = registry.counter("operations_total", help="Total operations")
 counter.inc()
-```
+```text
 
 ### Log with Correlation
 ```python
@@ -77,7 +77,7 @@ checker = HealthChecker()
 checker.add_check(ProviderHealthCheck("anthropic", provider))
 report = await checker.check_health()
 print(f"Status: {report.status}")
-```
+```text
 
 ## HTTP Endpoints
 
@@ -137,7 +137,7 @@ curl http://localhost:4317
 
 # Check env
 env | grep TELEMETRY
-```
+```text
 
 ### No metrics
 ```bash
@@ -152,7 +152,7 @@ curl http://localhost:9091/api/v1/targets
 ```bash
 # Check status
 curl http://localhost:9090/health/detailed | jq
-```
+```text
 
 ## Performance
 

@@ -176,7 +176,7 @@ End-to-end workflow execution.
 **VS Code**: Install Mermaid Preview extension
 ```bash
 code --install-extension bierner.markdown-mermaid
-```
+```text
 
 **CLI**: Install mermaid-cli
 ```bash
@@ -191,7 +191,7 @@ mmdc -i diagram.mmd -o diagram.png
 **Markdown**: Embed in markdown
 ```markdown
 ![Workflow](../workflow-diagrams/benchmark_code_generation.svg)
-```
+```text
 
 **VS Code**: Built-in SVG preview
 
@@ -212,7 +212,7 @@ touch docs/diagrams/architecture/my-diagram.mmd
 flowchart TB
     A[Start] --> B[Process]
     B --> C[End]
-```
+```text
 
 **3. Reference in documentation**:
 ```markdown
@@ -220,7 +220,7 @@ flowchart TB
 flowchart TB
     A[Start] --> B[Process]
 ```
-```
+```text
 
 ### Best Practices
 
@@ -266,7 +266,7 @@ Info: #0066CC
 ```bash
 # Regenerate all workflows
 victor workflows generate-diagrams
-```
+```text
 
 **Sequence Diagrams**: Update when:
 - New interaction patterns
@@ -288,7 +288,7 @@ git commit -m "Update diagrams"
   run: |
     pip install mermaid-cli
     mmdc -i docs/diagrams/**/*.mmd -o docs/diagrams/**/*.png
-```
+```text
 
 ---
 
@@ -345,7 +345,7 @@ mmdc -i diagram.mmd -o diagram.svg
 
 # All diagrams
 find docs/diagrams -name "*.mmd" -exec sh -c 'mmdc -i $0 -o ${0%.mmd}.svg' {} \;
-```
+```text
 
 ### Export to PDF
 
@@ -384,7 +384,7 @@ convert *.svg diagrams.pdf
 **Install**:
 ```bash
 code --install-extension bierner.markdown-mermaid
-```
+```text
 
 **Use**:
 1. Open .mmd file
@@ -420,7 +420,7 @@ The system architecture consists of four layers:
 4. **Infrastructure Layer**: DI container, event bus, configuration
 
 [Diagram](architecture/system-overview.mmd)
-```
+```text
 
 ### High Contrast
 

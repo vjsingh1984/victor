@@ -18,7 +18,7 @@ git clone https://github.com/vjsingh1984/victor.git
 cd victor
 
 docker build -f Dockerfile.production -t victor:latest .
-```
+```text
 
 ### 2. Run Container
 
@@ -40,7 +40,7 @@ docker run -d --name victor-api \
 
 ```bash
 curl http://localhost:8000/health/live
-```
+```text
 
 ## Option 2: Docker Compose (Full Stack)
 
@@ -58,7 +58,7 @@ EOF
 
 ```bash
 docker-compose -f docker-compose.production.yml up -d
-```
+```text
 
 ### 3. Access Services
 
@@ -79,7 +79,7 @@ kubectl cluster-info
 
 ```bash
 kubectl create namespace victor
-```
+```text
 
 ### 3. Create Secrets
 
@@ -101,7 +101,7 @@ kubectl apply -f config/k8s/pvc.yaml
 kubectl apply -f config/k8s/deployment.yaml
 kubectl apply -f config/k8s/service.yaml
 kubectl apply -f config/k8s/hpa.yaml
-```
+```text
 
 ### 5. Deploy (Helm)
 
@@ -118,7 +118,7 @@ helm upgrade --install victor ./config/helm/victor \
 ```bash
 kubectl get pods -n victor
 kubectl logs -f deployment/victor-api -n victor
-```
+```text
 
 ## CI/CD Deployment
 
@@ -164,7 +164,7 @@ helm upgrade victor ./config/helm/victor \
 ```bash
 kubectl describe pod victor-api-xxx -n victor
 kubectl logs victor-api-xxx -n victor
-```
+```text
 
 ### Health Checks Failing
 
@@ -178,7 +178,7 @@ curl http://localhost:8000/health/live
 
 ```bash
 kubectl rollout undo deployment/victor-api -n victor
-```
+```text
 
 ## Support
 

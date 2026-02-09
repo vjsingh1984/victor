@@ -18,7 +18,7 @@ The module is included in the `victor_native` Rust extension:
 
 ```bash
 pip install victor-ai[native]
-```
+```text
 
 ## Architecture
 
@@ -61,7 +61,7 @@ graph = Graph(directed=True)
 
 # Create undirected graph
 graph = Graph(directed=False)
-```
+```text
 
 #### Adding Nodes and Edges
 
@@ -90,7 +90,7 @@ matrix = [
     [0.0, 1.0, 0.0],
 ]
 graph = graph_from_adjacency_matrix(matrix, directed=False)
-```
+```text
 
 ### Graph Properties
 
@@ -125,7 +125,7 @@ pr = graph.pagerank(
 # Returns: List of PageRank scores indexed by node
 for node, score in enumerate(pr):
     print(f"Node {node}: {score:.4f}")
-```
+```text
 
 **Algorithm:** Power iteration method
 - Handles dangling nodes (redistributes their PageRank)
@@ -161,7 +161,7 @@ distances, predecessors = graph.dijkstra(
 # Returns: (distances, predecessors)
 # distances: List of shortest distances from source
 # predecessors: For path reconstruction
-```
+```text
 
 #### Path Reconstruction
 
@@ -184,7 +184,7 @@ has_path = graph.has_path(0, 2)
 # Find all connected components
 components = graph.connected_components()
 # Returns: [[nodes_in_component_1], [nodes_in_component_2], ...]
-```
+```text
 
 **Algorithm:** Union-Find with path compression
 - O(E α(V)) where α is the inverse Ackermann function
@@ -206,7 +206,7 @@ sccs = graph.strongly_connected_components()
 ```python
 # Check if graph is connected
 is_connected = graph.is_connected()
-```
+```text
 
 ### Centrality Measures
 
@@ -228,7 +228,7 @@ centrality = graph.betweenness_centrality(normalized=True)
 ```python
 centrality = graph.degree_centrality()
 # Normalized by (n-1)
-```
+```text
 
 #### Closeness Centrality
 
@@ -244,7 +244,7 @@ centrality = graph.closeness_centrality()
 ```python
 density = graph.density()
 # Returns: 0.0 to 1.0 (edges / possible_edges)
-```
+```text
 
 #### Diameter
 
@@ -258,7 +258,7 @@ diameter = graph.diameter()
 ```python
 avg_path_length = graph.average_path_length()
 # Returns: Average of all shortest paths
-```
+```text
 
 #### Clustering Coefficient
 
@@ -274,7 +274,7 @@ clustering = graph.clustering_coefficient()
 ```python
 visitation_order = graph.dfs(source=0)
 # Returns: List of nodes in visitation order
-```
+```text
 
 ## Use Cases
 
@@ -318,7 +318,7 @@ print(f"Function importance: {pr}")
 # Find shortest call chain from main to util
 path = graph.shortest_path(0, 3)
 print(f"Shortest call chain: {path}")
-```
+```text
 
 ### 3. Workflow Dependency Resolution
 
@@ -362,7 +362,7 @@ print(f"Circular dependencies: {circular_deps}")
 degree = graph.degree_centrality()
 most_imported = sorted(enumerate(degree), key=lambda x: x[1], reverse=True)
 print(f"Most imported files: {most_imported}")
-```
+```text
 
 ### 5. Team Communication Graph Metrics
 
@@ -471,7 +471,7 @@ try:
     graph.shortest_path(0, 999)
 except Exception as e:
     print(f"Error: {e}")  # "No path exists between source and target"
-```
+```text
 
 ## Limitations
 

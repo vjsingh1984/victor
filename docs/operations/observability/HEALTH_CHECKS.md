@@ -24,7 +24,7 @@ app = create_observability_app()
 # - /health - Liveness probe
 # - /ready - Readiness probe
 # - /health/detailed - Full health report
-```
+```text
 
 ### 2. Configure Kubernetes Probes
 
@@ -68,7 +68,7 @@ Determines if the container is running. If this fails, Kubernetes restarts the c
   "timestamp": 1737179696.789,
   "service": "victor-observability"
 }
-```
+```text
 
 **Usage**: Kubernetes livenessProbe
 
@@ -132,7 +132,7 @@ Provides comprehensive health status of all components.
     }
   }
 }
-```
+```text
 
 ## Built-in Health Checks
 
@@ -168,7 +168,7 @@ check = ToolHealthCheck(
 
 health = await check.check()
 print(f"Status: {health.status}")
-```
+```text
 
 ### Cache Health Check
 
@@ -201,7 +201,7 @@ check = MemoryHealthCheck(
 health = await check.check()
 print(f"Status: {health.status}")
 print(f"Memory: {health.details['rss_mb']}MB")
-```
+```text
 
 ### Custom Health Check
 
@@ -256,7 +256,7 @@ checker.add_check(MemoryHealthCheck())
 # Get health report
 report = await checker.check_health()
 print(f"Overall: {report.status}")
-```
+```text
 
 ### Health Status Values
 
@@ -348,7 +348,7 @@ spec:
             limits:
               memory: "2Gi"
               cpu: "2000m"
-```
+```text
 
 ### Service Example
 
@@ -384,7 +384,7 @@ health_checker = create_production_health_checker()
 # - victor_health_status{component="..."}
 # - vixtor_health_latency_ms{component="..."}
 # - victor_health_consecutive_failures{component="..."}
-```
+```text
 
 ### Alerting Rules
 
@@ -425,7 +425,7 @@ startupProbe:
   failureThreshold: 30
   periodSeconds: 5
   # Gives 30 * 5 = 150 seconds for startup
-```
+```text
 
 3. **Cache health results**:
 ```python
@@ -443,7 +443,7 @@ report = await checker.check_health()
 for name, health in report.components.items():
     if health.latency_ms > 1000:
         logger.warning(f"Slow health check: {name}")
-```
+```text
 
 6. **Use status change callbacks**:
 ```python
@@ -463,7 +463,7 @@ checker.on_status_change(on_status_change)
 report = await checker.check_health()
 for name, health in report.components.items():
     print(f"{name}: {health.message}")
-```
+```text
 
 2. Verify dependencies:
 ```bash
@@ -478,7 +478,7 @@ redis-cli ping
 ```python
 # Increase timeout for slow components
 check = ProviderHealthCheck("provider", provider, timeout=30.0)
-```
+```text
 
 ### Container restarting
 

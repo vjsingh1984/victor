@@ -29,7 +29,7 @@ class SuperCoordinator:
     async def do_everything(self, ...):
         # Hundreds of lines of coordination logic
         ...
-```
+```text
 
 **Solution**: Split into focused coordinators:
 
@@ -61,7 +61,7 @@ class MyComponent:
         tool_registry = self._container.get(ToolRegistryProtocol)
         event_bus = self._container.get(IEventBackend)
         ...
-```
+```text
 
 **Solution**: Constructor injection:
 
@@ -96,7 +96,7 @@ class ComponentA:
 
         result = await future  # Wait for response
         return result
-```
+```text
 
 **Solution**: Direct calls or proper async patterns:
 
@@ -136,7 +136,7 @@ factory_creator_factory = ToolExecutorFactoryCreatorFactory()
 factory_creator = factory_creator_factory.create_factory_creator()
 factory = factory_creator.create_factory()
 executor = factory.create_executor()
-```
+```text
 
 **Solution**: Direct factory or DI:
 
@@ -161,7 +161,7 @@ async def on_event(self, event: MessagingEvent):
         process_event(event)
     except Exception:
         pass  # Error swallowed!
-```
+```text
 
 **Solution**: Log and handle errors:
 
@@ -194,7 +194,7 @@ class ServiceA:
 class ServiceB:
     def __init__(self, service_a: ServiceAProtocol):
         self._service_a = service_a
-```
+```text
 
 **Solution**: Break cycle with events or third service:
 

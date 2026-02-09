@@ -31,7 +31,7 @@ victor workflow presets --type workflows --category code_review
 # Show details for a specific preset
 victor workflow preset-info code_reviewer --type agent
 victor workflow preset-info bug_investigation --type workflow
-```
+```text
 
 ### Using Presets in Python
 
@@ -70,7 +70,7 @@ result = await executor.execute(
     workflow,
     context={"pr_number": 123, "target_files": ["src/auth.py"]}
 )
-```
+```text
 
 ## Agent Presets
 
@@ -209,7 +209,7 @@ result = await executor.execute(
     "refactoring_goal": "extract validation logic",
     "safety_level": "high"
   }
-  ```
+```text
 
 ### research
 - **Category**: `research`
@@ -239,7 +239,7 @@ result = await executor.execute(
     "severity": "high",
     "environment": "production"
   }
-  ```
+```text
 
 ### feature_development
 - **Category**: `development`
@@ -269,7 +269,7 @@ result = await executor.execute(
     "compliance_standards": ["OWASP", "SOC2"],
     "severity_threshold": "medium"
   }
-  ```
+```text
 
 ## Creating Custom Presets
 
@@ -328,7 +328,7 @@ MY_CUSTOM_WORKFLOW = WorkflowPreset(
 
 # Register it
 _WORKFLOW_PRESETS["my_custom_workflow"] = MY_CUSTOM_WORKFLOW
-```
+```text
 
 ## Best Practices
 
@@ -390,7 +390,7 @@ custom_workflow.add_agent("performance_check", "performance_reviewer", "Performa
 
 # Build customized workflow
 final_workflow = custom_workflow.build()
-```
+```text
 
 ## Architecture Notes
 
@@ -451,7 +451,7 @@ class WorkflowPreset:
     example_context: Dict[str, Any] = field(default_factory=dict)
     estimated_duration_minutes: int = 10
     complexity: str = "medium"
-```
+```text
 
 ### Preset Functions
 

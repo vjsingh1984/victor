@@ -15,7 +15,7 @@ Victor AI is built from modular,
 
 ### Component Hierarchy
 
-```
+```text
 Victor AI
 ├── Core Components
 │   ├── AgentOrchestrator (Facade)
@@ -162,7 +162,7 @@ class AgentOrchestrator:
         Example:
             >>> await orchestrator.load_checkpoint("before_refactor")
         """
-```
+```text
 
 **Usage Example**:
 
@@ -286,7 +286,7 @@ class OrchestratorFactory:
             - recovery_handler: RecoveryHandler
             - observability: ObservabilityIntegration
         """
-```
+```text
 
 **Usage Example**:
 
@@ -377,7 +377,7 @@ class ServiceContainer:
             >>> scoped = container.create_scope()
             >>> state_machine = scoped.get(ConversationStateMachineProtocol)
         """
-```
+```text
 
 **Service Lifetime**:
 

@@ -27,7 +27,7 @@ victor_tools_executed_total
 # Avoid: Flat naming
 api_requests
 tool_duration
-```
+```text
 
 ### 2. Label Usage
 
@@ -57,7 +57,7 @@ status = "200"              # Low cardinality
 # Avoid: High cardinality labels
 user_id = "12345"            # High cardinality - don't use!
 request_id = "abc-def"      # High cardinality - don't use!
-```
+```text
 
 ### 4. Sampling
 
@@ -91,7 +91,7 @@ curl http://localhost:8080/metrics
 
 # Check Prometheus targets
 curl http://localhost:9090/api/v1/targets
-```
+```text
 
 ### High Memory Usage
 
@@ -130,7 +130,7 @@ inhibit_rules:
     target_match:
       alertname: 'Watchdog'
     equal: ['maintenance']
-```
+```text
 
 ---
 

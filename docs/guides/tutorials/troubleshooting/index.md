@@ -39,7 +39,7 @@ This guide helps you diagnose and fix:
 **1. Check Version:**
 ```bash
 victor --version
-```
+```text
 
 **2. Check Logs:**
 ```bash

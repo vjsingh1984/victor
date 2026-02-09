@@ -38,7 +38,7 @@ class MyVertical(VerticalBase):
     @classmethod
     def get_system_prompt(cls) -> str:
         return "You are an expert in..."
-```
+```text
 
 ### 2. Register Vertical
 
@@ -53,7 +53,7 @@ def _register_builtin_verticals():
 
 ```bash
 victor chat --vertical my_vertical
-```
+```text
 
 ## Vertical Architecture
 
@@ -100,7 +100,7 @@ class SimpleVertical(VerticalBase):
             keywords=[],
             next_stages=set(),
         )}
-```
+```text
 
 ### Multi-Stage Vertical
 
@@ -132,7 +132,7 @@ workflows:
         type: compute
         handler: my_handler
         next: []
-```
+```text
 
 ## Tool Selection
 

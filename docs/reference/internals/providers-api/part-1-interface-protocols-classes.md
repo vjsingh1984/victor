@@ -35,7 +35,7 @@ All LLM providers in Victor inherit from `BaseProvider`, which defines the core 
 **Import:**
 ```python
 from victor.providers.base import BaseProvider
-```
+```text
 
 ### Constructor
 
@@ -74,7 +74,7 @@ class BaseProvider(ABC):
 @abstractmethod
 def name(self) -> str:
     """Provider name (e.g., 'anthropic', 'openai', 'ollama')."""
-```
+```text
 
 ### Abstract Methods
 
@@ -138,7 +138,7 @@ async def stream(
     Raises:
         ProviderError: If the request fails
     """
-```
+```text
 
 #### `close()`
 ```python
@@ -160,7 +160,7 @@ def supports_tools(self) -> bool:
     Returns:
         True if provider supports tools, False otherwise (default)
     """
-```
+```text
 
 #### `supports_streaming()`
 ```python
@@ -192,7 +192,7 @@ async def stream_chat(
     This is an alias for the stream() method, provided for compatibility
     with different naming conventions across SDKs.
     """
-```
+```text
 
 #### `discover_capabilities()`
 ```python
@@ -219,7 +219,7 @@ async def count_tokens(self, text: str) -> int:
     Returns:
         Estimated token count (default: ~4 characters per token)
     """
-```
+```text
 
 ### Circuit Breaker Methods
 
@@ -241,7 +241,7 @@ def get_circuit_breaker_stats(self) -> Optional[Dict[str, Any]]:
     Returns:
         Dictionary with stats or None if circuit breaker disabled
     """
-```
+```text
 
 #### `reset_circuit_breaker()`
 ```python
@@ -264,7 +264,7 @@ from victor.providers.base import (
     is_streaming_provider,
     is_tool_calling_provider,
 )
-```
+```text
 
 ### StreamingProvider
 
@@ -345,7 +345,7 @@ class ToolCallingProvider(Protocol):
     def supports_tools(self) -> bool:
         """Whether the provider supports tool/function calling."""
         ...
-```
+```text
 
 ### Helper Functions
 
@@ -408,7 +408,7 @@ class Message(BaseModel):
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert message to dictionary representation."""
-```
+```text
 
 ### ToolDefinition
 
@@ -471,7 +471,7 @@ class CompletionResponse(BaseModel):
 
     metadata: Optional[Dict[str, Any]] = None
     """Additional metadata (e.g., reasoning_content for thinking models)"""
-```
+```text
 
 ### StreamChunk
 
@@ -539,7 +539,7 @@ class ProviderRuntimeCapabilities:
 
     raw: Optional[Dict[str, Any]] = None
     """Raw discovery response"""
-```
+```text
 
 ### ProviderRegistry
 
@@ -716,7 +716,7 @@ class ProviderManager:
 
     async def close(self) -> None:
         """Close provider and cleanup."""
-```
+```text
 
 ### ManagedProviderFactory
 

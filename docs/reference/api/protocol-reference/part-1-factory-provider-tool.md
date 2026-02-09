@@ -48,7 +48,7 @@ from victor.agent.protocols import (
     ConversationControllerProtocol,
     ToolExecutorProtocol,
 )
-```
+```text
 
 ### Using Protocols
 
@@ -97,7 +97,7 @@ class IAgentFactory(Protocol):
             Agent instance (Agent, BackgroundAgent, or TeamMember/SubAgent)
         """
         ...
-```
+```text
 
 **Implementation Example:**
 
@@ -154,7 +154,7 @@ class IAgent(Protocol):
             Execution result
         """
         ...
-```
+```text
 
 **Compliance:** All agent types (Agent, BackgroundAgent, TeamMember, SubAgent) must implement this protocol.
 
@@ -232,7 +232,7 @@ async def switch_to_local(manager: ProviderManagerProtocol) -> bool:
         provider_name="ollama",
         model="qwen2.5:32b"
     )
-```
+```text
 
 ---
 
@@ -329,7 +329,7 @@ class ToolExecutorProtocol(Protocol):
             True if arguments are valid for the tool, False otherwise
         """
         ...
-```
+```text
 
 **Usage Example:**
 
@@ -388,7 +388,7 @@ class ToolPipelineProtocol(Protocol):
     def is_budget_exhausted(self) -> bool:
         """Check if tool budget is exhausted."""
         ...
-```
+```text
 
 
 **Reading Time:** 4 min

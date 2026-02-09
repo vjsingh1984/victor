@@ -54,7 +54,7 @@ orchestrator = AgentOrchestrator(
 # Simple chat
 response = await orchestrator.chat("Explain decorators in Python")
 print(response.content)
-```
+```text
 
 ### 2. Configuration
 
@@ -83,7 +83,7 @@ See [Provider Reference](PROVIDER_REFERENCE.md) for all 21 providers.
 
 Victor AI uses a **facade pattern** with specialized coordinators following SOLID principles:
 
-```
+```text
 AgentOrchestrator (Facade)
 ├── ConversationCoordinator    - Message history, context tracking
 ├── ToolExecutionCoordinator   - Tool validation, execution, budgeting
@@ -139,7 +139,7 @@ async for chunk in orchestrator.chat("Implement a binary search tree", stream=Tr
         print(chunk.content, end="", flush=True)
     elif chunk.type == "tool_start":
         print(f"\n[Tool: {chunk.tool_name}]")
-```
+```text
 
 ### Tool Execution
 
@@ -173,7 +173,7 @@ await orchestrator.switch_provider(
     model="claude-sonnet-4-5",
     reason="quality"
 )
-```
+```text
 
 ### Semantic Search
 
@@ -206,7 +206,7 @@ response = await orchestrator.chat_with_team(
     message="Review this PR for security issues",
     team_spec=team_spec
 )
-```
+```text
 
 ## Configuration Examples
 
@@ -235,7 +235,7 @@ tool_selection_strategy: semantic
 log_level: WARNING
 show_cost_metrics: true
 write_approval_mode: all_writes
-```
+```text
 
 ### Air-Gapped Profile
 
@@ -265,7 +265,7 @@ tool_selection:
   model_size_tier: small
   base_threshold: 0.3
   base_max_tools: 10
-```
+```text
 
 ### Provider Pool Configuration
 
@@ -286,7 +286,7 @@ export VICTOR_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
 
 # Adjust similarity threshold
 export VICTOR_SEMANTIC_SIMILARITY_THRESHOLD=0.25
-```
+```text
 
 ## See Also
 

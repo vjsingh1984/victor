@@ -57,7 +57,7 @@ Dashboard JSON includes links to other Victor dashboards. Update URLs to match y
     }
   ]
 }
-```
+```text
 
 ### Prometheus
 
@@ -96,7 +96,7 @@ receivers:
     slack_configs:
       - api_url: '${SLACK_WEBHOOK_URL}'
         channel: '#victor-teams'
-```
+```text
 
 ### Custom Metrics
 
@@ -119,7 +119,7 @@ Then query in Grafana:
 ```promql
 rate(victor_teams_custom_duration_seconds_sum[5m])
 / rate(victor_teams_custom_duration_seconds_count[5m])
-```
+```text
 
 ## Troubleshooting
 
@@ -180,7 +180,7 @@ rate(victor_teams_custom_duration_seconds_sum[5m])
        enabled=True,
        priority_threshold=MetricPriority.HIGH  # Only collect HIGH and CRITICAL
    )
-   ```
+```text
 
 2. Reduce scrape interval in Prometheus (30s → 60s)
 
@@ -273,7 +273,7 @@ groups:
             +
             (1 - (max(victor_teams_recursion_depth) / 10)) * 0.2
           ) * 100
-```
+```text
 
 ## Maintenance
 
@@ -320,7 +320,7 @@ for file in backup_*.json; do
     -d "{\"dashboard\": $(cat $file), \"overwrite\": true}" \
     http://localhost:3000/api/dashboards/db
 done
-```
+```text
 
 ## Support
 

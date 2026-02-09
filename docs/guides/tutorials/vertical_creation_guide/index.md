@@ -48,7 +48,7 @@ This guide covers creating custom verticals for Victor AI:
 **1. Create a vertical using the CLI:**
 ```bash
 victor vertical create myvertical --description "My custom vertical"
-```
+```text
 
 **2. Or manually:**
 ```bash
@@ -71,7 +71,7 @@ class MyVertical(VerticalBase):
 
     def get_system_prompt(self):
         return "You are a specialized assistant for..."
-```
+```text
 
 ---
 

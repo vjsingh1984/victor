@@ -33,7 +33,7 @@ config = assistant.get_config()
 
 # Use with orchestrator
 orchestrator = AgentOrchestrator(config=config)
-```
+```text
 
 ## Workflows
 
@@ -82,7 +82,7 @@ from victor.core.verticals import VerticalRegistry
 VerticalRegistry.register(MyVerticalAssistant)
 
 __all__ = ["MyVerticalAssistant"]
-```
+```text
 
 ### B. Capability Delegation Pattern
 
@@ -117,7 +117,7 @@ class CompositeMiddleware(MiddlewareProtocol):
                 arguments = result.modified_arguments
 
         return MiddlewareResult(should_proceed=True)
-```
+```text
 
 ### D. Chain Factory Pattern
 

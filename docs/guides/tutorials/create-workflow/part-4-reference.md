@@ -233,7 +233,7 @@ workflows:
         allowed_tools:
           - read
         output_key: final_report
-```
+```text
 
 ### Supporting escape_hatches.py
 
@@ -365,7 +365,7 @@ victor workflow validate workflows/complete_code_review.yaml \
 victor workflow run workflows/complete_code_review.yaml \
   --workflow complete_code_review \
   --input '{"target_files": ["src/api/routes.py", "src/api/handlers.py"]}'
-```
+```text
 
 ---
 

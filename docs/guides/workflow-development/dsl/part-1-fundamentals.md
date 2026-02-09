@@ -76,7 +76,7 @@ graph.set_entry_point("process")
 app = graph.compile()
 result = await app.invoke({"task": "Hello", "result": "", "attempts": 0})
 print(result.state)  # {"task": "Hello", "result": "Processed: Hello", "attempts": 1}
-```
+```text
 
 ## Core Concepts
 
@@ -131,7 +131,7 @@ async def call_agent(state: WorkflowState) -> WorkflowState:
     result = await agent.run(state["prompt"])
     state["response"] = result.content
     return state
-```
+```text
 
 ### Edges
 
@@ -162,7 +162,7 @@ Every graph must have an entry point.
 
 ```python
 graph.set_entry_point("first_node")
-```
+```text
 
 ## Building Workflows
 
@@ -210,7 +210,7 @@ graph.add_edge("clarify", "classify")  # Loop back for clarification
 graph.add_edge("finalize", END)
 
 graph.set_entry_point("classify")
-```
+```text
 
 ### Retry Loop
 
@@ -272,7 +272,7 @@ graph.add_conditional_edge(
         "error": END,
     }
 )
-```
+```text
 
 ### Multi-Path Convergence
 
@@ -304,7 +304,7 @@ result = await app.invoke(initial_state, thread_id=thread_id)
 # Inspect latest checkpoint
 checkpoint = await checkpointer.load(thread_id)
 resumed = await app.invoke(initial_state, thread_id=thread_id)
-```
+```text
 
 ### RL System Integration
 
@@ -342,7 +342,7 @@ class RedisCheckpointer(CheckpointerProtocol):
     async def list(self, thread_id: str) -> list[WorkflowCheckpoint]:
         keys = await self.redis.keys(f"workflow:{thread_id}:*")
         return [await self.load(k) for k in keys if k]
-```
+```text
 
 ## Streaming
 
@@ -398,7 +398,7 @@ result = await app.invoke({
     "result": "",
     "_agent": agent,
 })
-```
+```text
 
 ### Tool-Specific Nodes
 
@@ -485,7 +485,7 @@ graph.add_conditional_edge(
     {"done": END, "revise": "implement"}
 )
 graph.set_entry_point("research")
-```
+```text
 
 ---
 

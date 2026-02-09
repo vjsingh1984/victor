@@ -84,7 +84,7 @@ class RecoveryHandlerProtocol(Protocol):
     def get_diagnostics(self) -> Dict[str, Any]:
         """Get diagnostic information about recovery system."""
         ...
-```
+```text
 
 ---
 
@@ -147,7 +147,7 @@ class TaskTrackerProtocol(Protocol):
     def is_loop_detected(self) -> bool:
         """Check if execution loop is detected."""
         ...
-```
+```text
 
 ---
 
@@ -196,7 +196,7 @@ class ArgumentNormalizerProtocol(Protocol):
         Handles malformed arguments, type coercion, etc.
         """
         ...
-```
+```text
 
 ---
 

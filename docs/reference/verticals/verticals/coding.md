@@ -5,7 +5,9 @@ The Coding vertical provides comprehensive code analysis, review, refactoring,
 
 ## Overview
 
-The Coding vertical (`victor/coding/`) is Victor's core vertical for software development tasks. It provides intelligent code understanding through Tree-sitter AST parsing, LSP integration for real-time code intelligence, and semantic code search capabilities.
+The Coding vertical (`victor/coding/`) is Victor's core vertical for software development tasks. It
+provides intelligent code understanding through Tree-sitter AST parsing, LSP integration for real-time
+code intelligence, and semantic code search capabilities.
 
 ### Key Use Cases
 
@@ -48,7 +50,7 @@ workflows:
       - review_performance    # Performance considerations
       - synthesize_review     # Combine all feedback
       - generate_report       # Create review document
-```
+```text
 
 **Key Features**:
 - Parallel review of correctness, quality, security, and performance
@@ -94,7 +96,7 @@ workflows:
       - run_tests_green        # Verify test passes
       - refactor               # REFACTOR: Improve code
       - run_tests_final        # Verify still passes
-```
+```text
 
 **Key Features**:
 - Strict TDD cycle enforcement
@@ -150,7 +152,7 @@ from victor.coding.ast.tree_sitter_manager import TreeSitterManager
 manager = TreeSitterManager()
 tree = manager.parse_file("example.py")
 # Access nodes, find definitions, analyze structure
-```
+```text
 
 **Supported Languages**: Python, JavaScript, TypeScript, Go, Rust, Java, C, C++, Ruby, PHP, and more.
 
@@ -188,7 +190,7 @@ should_proceed, result = validate_code_before_write(
 
 if not should_proceed:
     print(f"Validation failed: {result.errors}")
-```
+```text
 
 **Supported Languages** (40+):
 - **Tier 1** (Full Support): Python, JavaScript, TypeScript - Native AST + Tree-sitter + LSP
@@ -208,7 +210,7 @@ victor validate check app.ts                 # Check validation support
 ```bash
 VICTOR_VALIDATION_ENABLED=false    # Disable validation globally
 VICTOR_STRICT_VALIDATION=true      # Block writes on any error
-```
+```text
 
 ### Semantic Code Search
 
@@ -242,7 +244,7 @@ tiered_tools = CodingAssistant.get_tiered_tools()
 
 # Access capability provider
 capabilities = CodingAssistant.get_capability_provider()
-```
+```text
 
 ### Mode Configuration
 
@@ -287,7 +289,7 @@ result = await workflow.invoke({
 })
 
 print(result["review_report"])
-```
+```text
 
 ### Feature Implementation
 
@@ -313,7 +315,7 @@ orchestrator = AgentOrchestrator(
 response = await orchestrator.chat(
     "Review the changes in the last commit for security issues"
 )
-```
+```text
 
 ## Integration with Other Verticals
 
@@ -353,7 +355,7 @@ victor/coding/
 ├── escape_hatches.py     # Complex condition logic
 ├── rl.py                 # Reinforcement learning config
 └── teams.py              # Multi-agent team specs
-```
+```text
 
 ## Best Practices
 

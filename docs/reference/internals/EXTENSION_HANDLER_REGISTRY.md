@@ -15,7 +15,7 @@ The `ExtensionHandlerRegistry` follows the **Open/Closed Principle (OCP)** - it 
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                  VerticalIntegrationPipeline                     │
 │                                                                  │
@@ -61,7 +61,7 @@ class ExtensionHandler:
     name: str
     handler: Callable[[Any, Any, Any, "VerticalContext", "IntegrationResult"], None]
     priority: int = 50
-```
+```text
 
 ### Handler Signature
 
@@ -104,7 +104,7 @@ class ExtensionHandlerRegistry:
         result: IntegrationResult,
     ) -> None:
         """Apply all registered extension handlers."""
-```
+```text
 
 ## Default Handlers and Priorities
 
@@ -195,7 +195,7 @@ if extensions_step:
             priority=65,
         )
     )
-```
+```text
 
 ### Method 3: Plugin Entry Point
 
@@ -220,7 +220,7 @@ def register_extension_handlers(registry):
 # In pyproject.toml
 [project.entry-points."victor.extension_handlers"]
 your_package = "your_package:register_extension_handlers"
-```
+```text
 
 ## Adding Custom Extension Fields
 
@@ -262,7 +262,7 @@ def handle_analytics_config(orchestrator, value, extensions, context, result):
         # Apply analytics configuration
         sample_rate = config.get("sample_rate", 0.01)
         result.add_info(f"Analytics enabled with sample rate: {sample_rate}")
-```
+```text
 
 ## Complete Example: Custom Telemetry Handler
 
@@ -349,7 +349,7 @@ def register_extension_handlers(registry):
     registry.register(get_telemetry_handler())
 
 __all__ = ["register_extension_handlers", "get_telemetry_handler"]
-```
+```text
 
 ### Step 3: Configure Entry Point
 
@@ -391,7 +391,7 @@ class MyVertical(VerticalBase):
         }
 
         return extensions
-```
+```text
 
 ## Error Handling
 
@@ -439,7 +439,7 @@ def my_safe_handler(orchestrator, value, extensions, context, result):
         import logging
         logging.getLogger(__name__).debug(f"my_extension error: {e}", exc_info=True)
         result.add_warning(f"my_extension failed: {e}")
-```
+```text
 
 ## Testing Extension Handlers
 
@@ -614,7 +614,7 @@ class TestMyExtensionIntegration:
         assert result.is_success
         # Check for info messages from handler
         assert any("my_extension" in str(info).lower() for info in result.infos)
-```
+```text
 
 ## Debugging Tips
 
@@ -640,7 +640,7 @@ handler = ExtensionsStepHandler()
 # List all registered handlers
 for h in handler.extension_registry.get_ordered_handlers():
     print(f"Priority {h.priority}: {h.name}")
-```
+```text
 
 ### Check Integration Result
 
@@ -670,7 +670,7 @@ class ExtensionHandler:
         None
     ]
     priority: int = 50  # Lower = runs first
-```
+```text
 
 ### ExtensionHandlerRegistry
 
@@ -700,7 +700,7 @@ class VerticalContext:
     mode: str
     config: Dict[str, Any]
     # Additional context fields...
-```
+```text
 
 ### IntegrationResult
 

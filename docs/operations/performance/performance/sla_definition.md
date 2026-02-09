@@ -194,7 +194,7 @@ groups:
         expr: victor_bootstrap_time_ms > 850
         annotations:
           summary: "Bootstrap time exceeds alert threshold"
-```
+```text
 
 ### Monitoring Dashboards
 

@@ -334,7 +334,7 @@ Current memory usage is excellent (<50KB), but consider:
 ## 9. Detailed Benchmark Results
 
 Full benchmark results are available in:
-```
+```text
 /tmp/benchmark_results/team_node_performance_benchmark.json
 ```
 
@@ -355,7 +355,7 @@ pytest tests/performance/test_team_node_performance_benchmark.py::test_team_node
 # Generate benchmark JSON report
 pytest tests/performance/test_team_node_performance_benchmark.py --benchmark-only \
     --benchmark-json=team_node_results.json
-```
+```text
 
 ---
 

@@ -20,7 +20,7 @@
 # Enable/disable caching
 cache_enabled: true
 cache_ttl: 3600  # Cache TTL in seconds
-```
+```text
 
 ### Optimization
 
@@ -37,7 +37,7 @@ batch_size: 10
 # Memory limits
 max_memory_mb: 4096
 context_window_tokens: 200000
-```
+```text
 
 ---
 
@@ -70,7 +70,7 @@ verticals:
       - docker
       - kubectl
     mode: explore
-```
+```text
 
 ---
 
@@ -96,7 +96,7 @@ code_execution:
   enabled: true
   backend: local
   timeout: 10
-```
+```text
 
 ---
 

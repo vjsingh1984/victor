@@ -39,7 +39,7 @@ cargo build --release
 
 # The module will be available as:
 # from victor.native.rust.regex_engine import ...
-```
+```text
 
 ## Quick Start
 
@@ -88,7 +88,7 @@ regex_set = compile_language_patterns("python")
 
 # Compile only function and class patterns
 regex_set = compile_language_patterns("python", ["function", "class"])
-```
+```text
 
 #### `list_supported_languages()`
 
@@ -117,7 +117,7 @@ Get available pattern categories for a language.
 ```python
 categories = get_language_categories("python")
 # ['comment', 'decorator', 'documentation', 'function', 'class', 'import', 'string']
-```
+```text
 
 ### Classes
 
@@ -158,7 +158,7 @@ Check if text contains any matches.
 ```python
 has_function = regex_set.contains_any("def foo():")
 has_class = regex_set.contains_any("class Foo:")
-```
+```text
 
 ##### `matched_pattern_names(text)`
 
@@ -190,7 +190,7 @@ Count matches per pattern.
 ```python
 counts = regex_set.count_by_pattern(code)
 # {'function_def': 3, 'class_def': 1, 'import_statement': 5}
-```
+```text
 
 ##### `list_patterns()`
 
@@ -219,7 +219,7 @@ Get patterns by category.
 ```python
 function_patterns = regex_set.patterns_by_category("function")
 # ['function_def', 'async_function_def', 'lambda']
-```
+```text
 
 ##### `list_categories()`
 
@@ -245,7 +245,7 @@ Get total number of patterns.
 ```python
 count = regex_set.pattern_count()
 # 13
-```
+```text
 
 #### `MatchResult`
 
@@ -397,7 +397,7 @@ function_count = sum(1 for m in matches if m.category == "function")
 class_count = sum(1 for m in matches if m.category == "class")
 
 print(f"Found {function_count} functions and {class_count} classes")
-```
+```text
 
 ### Dependency Detection
 
@@ -420,7 +420,7 @@ unsafe_matches = regex_set.match_all(code)
 unsafe_functions = [m for m in unsafe_matches if "unsafe" in m.matched_text.lower()]
 
 print(f"Found {len(unsafe_functions)} unsafe functions")
-```
+```text
 
 ### Multi-Language Codebase Analysis
 
@@ -469,7 +469,7 @@ Run the test suite:
 
 ```bash
 python test_regex_engine.py
-```
+```text
 
 Or run with pytest:
 

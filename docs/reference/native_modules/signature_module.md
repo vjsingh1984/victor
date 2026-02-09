@@ -61,7 +61,7 @@ sig = victor_native.compute_tool_call_signature(
     {"path": "/tmp/test.txt", "offset": 0, "limit": 100}
 )
 print(sig)  # 12345678901234567890
-```
+```text
 
 **Performance:** < 0.5ms per call
 
@@ -116,7 +116,7 @@ calls = [
 ]
 unique = victor_native.deduplicate_tool_calls(calls)
 print(len(unique))  # 2
-```
+```text
 
 **Performance:** O(n) with HashSet for O(1) lookups, 5-10x faster than Python
 
@@ -168,7 +168,7 @@ call = victor_native.ToolCallData(
     tool_name="read_file",
     arguments={"path": "/tmp/test.txt"}
 )
-```
+```text
 
 ##### `compute_signature() -> int`
 
@@ -204,7 +204,7 @@ let json_str = serialize_dict_sorted(arguments)?;
 let combined = format!("{}:{}", tool_name, json_str);
 let mut hasher = SeaHasher::new();
 hasher.write(combined.as_bytes());
-```
+```text
 
 This ensures:
 - **Consistency**: `{"a": 1, "b": 2}` and `{"b": 2, "a": 1}` produce same signature
@@ -255,7 +255,7 @@ calls = [
 # Deduplicate
 unique = victor_native.deduplicate_tool_calls(calls)
 print(f"Removed {len(tool_calls) - len(unique)} duplicates")
-```
+```text
 
 ### Pattern 2: Batch Signature Computation
 
@@ -298,7 +298,7 @@ for call in tool_calls:
 
     if signature_counts[sig] > 3:
         print(f"Potential loop detected: {call['name']}")
-```
+```text
 
 ### Pattern 4: Caching Signatures
 
@@ -338,7 +338,7 @@ sig = victor_native.compute_tool_call_signature(
     {"file_handle": open("/tmp/test.txt")}  # Not JSON-serializable
 )
 # ValueError: Failed to serialize arguments: ...
-```
+```text
 
 ### Mismatched Batch Lengths
 
@@ -362,7 +362,7 @@ args["self"] = args  # Circular reference
 
 # Will be handled gracefully (converted to string representation)
 sig = victor_native.compute_tool_call_signature("test", args)
-```
+```text
 
 ---
 
@@ -430,7 +430,7 @@ pub fn compute_tool_call_signature(
     hasher.write(combined.as_bytes());
     Ok(hasher.finish())
 }
-```
+```text
 
 **Performance:** < 0.5ms per call
 
@@ -498,7 +498,7 @@ pytest tests/unit/test_signature_module.py::TestToolCallSignature::test_signatur
 **Problem:**
 ```python
 ImportError: No module named 'victor_native'
-```
+```text
 
 **Solution:**
 Build the Rust extension:

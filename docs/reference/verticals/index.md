@@ -7,7 +7,7 @@ Verticals are pre-configured assistant templates optimized for specific domains.
 
 Victor's vertical system uses the **Template Method Pattern** - `VerticalBase` defines the skeleton, and concrete verticals override specific steps.
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                      VerticalBase (Abstract)                     │
 ├─────────────────────────────────────────────────────────────────┤
@@ -37,7 +37,7 @@ from victor.verticals import CodingAssistant
 config = CodingAssistant.get_config()
 # 30 tools: filesystem, git, shell, code analysis, web search
 # 7 stages: INITIAL → PLANNING → READING → ANALYSIS → EXECUTION → VERIFICATION → COMPLETION
-```
+```text
 
 **Capabilities:**
 - Code reading, writing, editing
@@ -87,7 +87,7 @@ from victor.verticals import DevOpsAssistant
 config = DevOpsAssistant.get_config()
 # 13 tools: docker, shell, git, test, web_search, web_fetch, etc.
 # 8 stages: INITIAL → ASSESSMENT → PLANNING → IMPLEMENTATION → VALIDATION → DEPLOYMENT → MONITORING → COMPLETION
-```
+```text
 
 **Capabilities:**
 - Docker container management
@@ -137,7 +137,7 @@ from victor.verticals import RAGAssistant
 config = RAGAssistant.get_config()
 # 10 tools: rag_ingest, rag_search, rag_query, rag_list, rag_delete, rag_stats, read, ls, web_fetch, shell
 # Stages: INITIAL → INGESTING → SEARCHING → QUERYING → SYNTHESIZING
-```
+```text
 
 **Capabilities:**
 - Document ingestion from files (PDF, Markdown, Text, Code)
@@ -197,7 +197,7 @@ victor chat --observability "Your prompt"
 
 # Without observability
 victor chat --no-observability "Quick question"
-```
+```text
 
 ### Legacy Mode
 
@@ -223,7 +223,7 @@ agent = await Agent.create(
     provider="anthropic",
     tools=config.tools,
 )
-```
+```text
 
 ### With Full Vertical Config
 
@@ -251,7 +251,7 @@ names = VerticalRegistry.list_names()  # ["coding", "research", "devops", "data_
 # Get vertical by name
 vertical = VerticalRegistry.get("research")
 config = vertical.get_config()
-```
+```text
 
 ## Creating Custom Verticals
 
@@ -357,7 +357,7 @@ class SecurityAuditAssistant(CodingAssistant):
             "Secret exposure prevention",
             "Dependency vulnerability awareness",
         ]
-```
+```text
 
 ## StageDefinition
 
@@ -399,7 +399,7 @@ config = VerticalConfig(
 
 # Get kwargs for agent creation
 agent_kwargs = config.to_agent_kwargs()
-```
+```text
 
 ## Provider Hints
 
@@ -431,7 +431,7 @@ def get_evaluation_criteria(cls):
         "Security best practices",
         "Performance considerations",
     ]
-```
+```text
 
 ## Best Practices
 

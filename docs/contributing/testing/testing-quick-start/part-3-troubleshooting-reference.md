@@ -25,7 +25,7 @@ pip install pytest-asyncio
 # Add to pyproject.toml if needed
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-```
+```text
 
 #### Issue: Mock not being called
 
@@ -48,7 +48,7 @@ coordinator._dependency = AsyncMock(return_value="result")
 
 export PYTHONPATH=/Users/vijaysingh/code/codingagent:$PYTHONPATH
 pytest --cov=victor.agent.coordinators.chat_coordinator tests/
-```
+```text
 
 #### Issue: Tests pass locally but fail in CI
 
@@ -72,7 +72,7 @@ pytest tests/unit/agent/coordinators/ -n auto
 
 # Or skip slow tests
 pytest -m "not slow" tests/unit/agent/coordinators/
-```
+```text
 
 #### Issue: Fixture not found
 
@@ -105,7 +105,7 @@ pytest tests/unit/agent/coordinators/ -l
 
 # Run specific test with maximum verbosity
 pytest tests/unit/agent/coordinators/test_chat_coordinator.py::TestChatCoordinatorChat::test_chat_with_tools -vvvl -s
-```
+```text
 
 ### Getting Help
 
@@ -158,7 +158,7 @@ mock_method.assert_called_with(arg1, arg2)
 
 # State
 assert coordinator.state == "running"
-```
+```text
 
 ### Common Mocks
 
@@ -188,7 +188,7 @@ pytest --cov=victor.agent.coordinators.chat_coordinator tests/
 
 # Run in parallel
 pytest tests/unit/agent/coordinators/ -n 4
-```
+```text
 
 ## Next Steps
 

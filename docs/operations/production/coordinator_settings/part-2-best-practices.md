@@ -37,7 +37,7 @@ python scripts/toggle_coordinator_orchestrator.py enable --backup
 
 # Stage 4: Monitor
 tail -f ~/.victor/metrics/victor.jsonl
-```
+```text
 
 ### 2. Enable Observability
 
@@ -64,7 +64,7 @@ cp ~/.victor/profiles.yaml ~/.victor/profiles.yaml.backup.$(date +%Y%m%d)
 
 # Or use the toggle script with automatic backup
 python scripts/toggle_coordinator_orchestrator.py enable --backup
-```
+```text
 
 ### 4. Test Before Full Rollout
 
@@ -104,7 +104,7 @@ python scripts/toggle_coordinator_orchestrator.py disable --backup
 
 # Or restore from backup
 cp ~/.victor/profiles.yaml.backup.YYYYMMDD ~/.victor/profiles.yaml
-```
+```text
 
 ### 7. Document Your Configuration
 
@@ -145,7 +145,7 @@ profiles:
     model: claude-sonnet-4-5
     # Gradual rollout: only enable for specific users initially
     use_coordinator_orchestrator: false  # Legacy until validated
-```
+```text
 
 ---
 
@@ -169,7 +169,7 @@ unset VICTOR_USE_COORDINATOR_ORCHESTRATOR
 ```bash
 python -c "import yaml; yaml.safe_load(open('~/.victor/profiles.yaml'))"
 # Check for syntax errors
-```
+```text
 
 3. **Check file location**:
 ```bash
@@ -182,7 +182,7 @@ ls -la ~/.victor/profiles.yaml
 # Victor caches settings on startup
 # Exit and restart
 victor chat
-```
+```text
 
 ### Issue: Performance Degradation
 
@@ -200,7 +200,7 @@ analytics_enabled: false  # Try disabling
 ```yaml
 # For faster performance
 tool_selection_strategy: "keyword"  # Faster than semantic
-```
+```text
 
 3. **Reduce metrics collection**:
 ```yaml
@@ -210,7 +210,7 @@ streaming_metrics_enabled: false
 4. **Run performance benchmark**:
 ```bash
 pytest tests/benchmark/test_orchestrator_refactoring_performance.py -v
-```
+```text
 
 ### Issue: Coordinator Import Errors
 
@@ -228,7 +228,7 @@ victor --version
 2. **Reinstall Victor**:
 ```bash
 pip install --upgrade victor-ai
-```
+```text
 
 3. **Verify installation**:
 ```bash
@@ -245,7 +245,7 @@ python -c "from victor.agent.coordinators import ConfigCoordinator; print('OK')"
 1. **Run with verbose output**:
 ```bash
 python scripts/validate_coordinator_orchestrator.py --verbose
-```
+```text
 
 2. **Check specific failures**:
 ```bash
@@ -256,7 +256,7 @@ cat report.json | jq '.results[] | select(.passed == false)'
 3. **Run unit tests**:
 ```bash
 pytest tests/unit/agent/coordinators/ -v
-```
+```text
 
 ### Issue: Settings Not Persisting
 
@@ -274,7 +274,7 @@ ls -la ~/.victor/profiles.yaml
 2. **Check disk space**:
 ```bash
 df -h ~/.victor
-```
+```text
 
 3. **Use toggle script** (handles errors gracefully):
 ```bash
@@ -302,7 +302,7 @@ profiles:
     tool_selection:
       base_threshold: 0.4
       base_max_tools: 20
-```
+```text
 
 ### Example 2: Production Environment
 
@@ -356,7 +356,7 @@ jobs:
         with:
           name: validation-report
           path: report.json
-```
+```text
 
 ### Example 4: Gradual Rollout Script
 

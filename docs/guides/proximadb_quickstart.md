@@ -8,7 +8,7 @@
 # Just install and use Victor
 pip install victor-ai
 victor chat "Help me understand this codebase"
-```
+```text
 
 LanceDB provides excellent performance for:
 - Semantic code search
@@ -43,7 +43,7 @@ from victor.storage.vector_stores.registry import EmbeddingRegistry
 
 config = EmbeddingConfig(vector_store='proximadb')
 provider = EmbeddingRegistry.create(config)
-```
+```text
 
 ### Step 3: Use Victor Normally
 
@@ -60,7 +60,7 @@ You'll see a warning:
 ProximaDB is configured but not installed.
 Install with: pip install victor-ai[vector-experimental].
 Using LanceDB as fallback.
-```
+```text
 
 Victor will continue working normally with LanceDB.
 

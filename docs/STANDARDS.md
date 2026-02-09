@@ -135,7 +135,7 @@ To maintain readability and findability:
 ### Subsection (H3) - Sub-sections
 
 #### Detail (H4) - Rarely used
-```
+```text
 
 **Rules:**
 - Start with H1 (document title)
@@ -180,7 +180,7 @@ To maintain readability and findability:
 [Link text](path/to/file.md)
 [External link](https://example.com)
 [Section link](#heading-id)
-```
+```text
 
 **Rules:**
 - Use descriptive link text (not "click here")
@@ -209,7 +209,7 @@ To maintain readability and findability:
 **Tip:** Helpful suggestion
 **Warning:** Cautionary advice
 **Important:** Critical information
-```
+```text
 
 ---
 
@@ -263,7 +263,7 @@ class MyTool(BaseTool):
         """Execute the tool."""
         # Tool implementation here
         return {"success": True, "data": param}
-```
+```text
 
 This code defines a custom tool. Use this template when creating tools that extend Victor's capabilities.
 
@@ -331,7 +331,7 @@ Description of diagram.
 ```mermaid
 graph TB
     A[Start] --> B[End]
-```
+```text
 
 **Figure 1:** Diagram description for accessibility.
 ```
@@ -411,7 +411,7 @@ By the end of this tutorial, you will be able to:
 **Code Example:**
 ```python
 [code here]
-```
+```text
 
 [Explanation of what code does]
 
@@ -461,12 +461,12 @@ By the end of this tutorial, you will be able to:
 **Example:**
 ```bash
 [command or code]
-```
+```text
 
 **Expected Output:**
 ```
 [what you should see]
-```
+```text
 
 ## Method 2: Title (Alternative)
 
@@ -508,7 +508,7 @@ By the end of this tutorial, you will be able to:
 **Signature:**
 ```python
 function_name(param1: type, param2: type) -> return_type
-```
+```text
 
 **Description:**
 [Detailed description]
@@ -544,7 +544,7 @@ result = function_name("value")
 ---
 
 **Last Updated:** [Date]
-```
+```text
 
 ### Explanation Template
 
@@ -602,7 +602,7 @@ result = function_name("value")
 
 **Last Updated:** [Date]
 **Reading Time:** X minutes
-```
+```text
 
 ---
 
@@ -630,7 +630,7 @@ lychee docs/ --verbose
 # CI/CD check
 - name: Check links
   run: lychee docs/ --verbose
-```
+```text
 
 ### Spell Check
 
@@ -652,7 +652,7 @@ mmdc -i docs/diagrams/example.mmd -o /tmp/test.svg
 # CI/CD check
 - name: Render diagrams
   run: find docs/diagrams -name "*.mmd" -exec mmdc -i {} -o {}.svg \;
-```
+```text
 
 ---
 

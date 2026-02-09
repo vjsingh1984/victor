@@ -48,7 +48,7 @@ class AgentState(TypedDict):
     result: Optional[str]
 
 graph = StateGraph(AgentState)
-```
+```text
 
 #### Constructor
 
@@ -76,7 +76,7 @@ def add_node(
     func: Callable[[StateType], Union[StateType, Awaitable[StateType]]],
     **metadata: Any,
 ) -> "StateGraph[StateType]"
-```
+```text
 
 **Parameters:**
 - `node_id`: Unique node identifier
@@ -106,7 +106,7 @@ def add_edge(
     source: str,
     target: str,
 ) -> "StateGraph[StateType]"
-```
+```text
 
 **Parameters:**
 - `source`: Source node ID
@@ -131,7 +131,7 @@ def add_conditional_edge(
     condition: Callable[[StateType], str],
     branches: Dict[str, str],
 ) -> "StateGraph[StateType]"
-```
+```text
 
 **Parameters:**
 - `source`: Source node ID
@@ -160,7 +160,7 @@ Set the entry point node for the graph.
 
 ```python
 def set_entry_point(self, node_id: str) -> "StateGraph[StateType]"
-```
+```text
 
 **Parameters:**
 - `node_id`: Node to start execution from
@@ -192,7 +192,7 @@ def compile(
     checkpointer: Optional[CheckpointerProtocol] = None,
     **config_kwargs: Any,
 ) -> CompiledGraph[StateType]
-```
+```text
 
 **Parameters:**
 - `checkpointer`: Optional checkpointer for state persistence
@@ -227,7 +227,7 @@ async def invoke(
     thread_id: Optional[str] = None,
     debug_hook: Optional[Any] = None,
 ) -> GraphExecutionResult[StateType]
-```
+```text
 
 **Parameters:**
 - `input_state`: Initial state dictionary
@@ -262,7 +262,7 @@ async def stream(
     config: Optional[GraphConfig] = None,
     thread_id: Optional[str] = None,
 ) -> AsyncIterator[Tuple[str, StateType]]
-```
+```text
 
 **Parameters:**
 - `input_state`: Initial state dictionary
@@ -284,7 +284,7 @@ Get graph structure as a dictionary.
 
 ```python
 def get_graph_schema(self) -> Dict[str, Any]
-```
+```text
 
 **Returns:** Dictionary describing nodes and edges
 
@@ -310,7 +310,7 @@ class ResearchState(TypedDict):
     findings: Optional[str]
     report: Optional[str]
     iteration: int
-```
+```text
 
 ---
 
@@ -343,7 +343,7 @@ def __init__(
     cache_ttl: int = 3600,
     config: Optional[UnifiedCompilerConfig] = None,
 ) -> None
-```
+```text
 
 **Parameters:**
 - `definition_cache`: Cache for parsed YAML definitions
@@ -393,7 +393,7 @@ graph = compiler.compile_yaml(
     "deep_research",
     condition_registry=conditions
 )
-```
+```text
 
 #### compile_yaml_content()
 
@@ -421,7 +421,7 @@ def compile_definition(
     cache_key: Optional[str] = None,
     **kwargs: Any,
 ) -> CachedCompiledGraph
-```
+```text
 
 #### Cache Management
 
@@ -454,7 +454,7 @@ class CachedCompiledGraph:
     default_node_timeout_seconds: Optional[float] = None
     max_iterations: int = 25
     max_retries: int = 0
-```
+```text
 
 #### invoke()
 
@@ -491,7 +491,7 @@ async def stream(
     config: Optional[GraphConfig] = None,
     thread_id: Optional[str] = None,
 ) -> AsyncIterator[Tuple[str, Dict[str, Any]]]
-```
+```text
 
 ### Two-Level Caching
 
@@ -533,7 +533,7 @@ result = await compile_and_execute(
 
 # Create compiler with default caches
 compiler = create_unified_compiler(enable_caching=True)
-```
+```text
 
 
 **Reading Time:** 6 min

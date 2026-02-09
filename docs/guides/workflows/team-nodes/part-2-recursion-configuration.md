@@ -43,7 +43,7 @@ workflows:
       - id: outer_team
         type: team
         goal: "Team that may spawn nested workflows"
-```
+```text
 
 #### Method 2: Execution Settings
 
@@ -73,7 +73,7 @@ context = {
 }
 
 result = await compiler.invoke(context)
-```
+```text
 
 ### Recursion Depth Example
 
@@ -100,7 +100,7 @@ workflows:
 
 ### Execution Stack Example
 
-```
+```text
 Current Depth: 3 / 3
 Execution Stack:
   1. workflow:main
@@ -139,7 +139,7 @@ info = ctx.get_depth_info()
 with RecursionGuard(ctx, "workflow", "nested"):
     # Nested execution here
     pass  # Automatically exits
-```
+```text
 
 ## Member Configuration
 
@@ -210,7 +210,7 @@ members:
       Security engineer with OWASP certification. Has conducted
       hundreds of security audits and penetration tests. Passionate
       about secure coding practices and threat modeling.
-```
+```text
 
 ## Configuration Examples
 
@@ -322,7 +322,7 @@ workflows:
             tool_budget: 30
             tools: [read, grep]
         next: [final_report]
-```
+```text
 
 ### Example 3: Hierarchical Analysis
 

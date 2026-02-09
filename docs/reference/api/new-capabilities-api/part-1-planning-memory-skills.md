@@ -82,7 +82,7 @@ class AutonomousPlanner:
             ExecutionResult: Execution result with outcomes
         """
         ...
-```
+```text
 
 [Content continues through Memory and Skill APIs...]
 

@@ -18,7 +18,7 @@ Welcome to the Victor testing documentation. This directory contains comprehensi
 
 ### Current Coverage (as of 2026-01-14)
 
-```
+```text
 Overall Coverage:  11% (20,171 / 182,186 lines)
 Total Tests:       ~21,496 tests
   - Unit Tests:    ~20,083 (93.5%)
@@ -30,7 +30,7 @@ Failing Tests:     7 integration tests
 
 ### Target Coverage (by 2026-03-31)
 
-```
+```text
 Overall Coverage:  80% (145,749 / 182,186 lines)
 Total Tests:       ~25,000+ tests
   - Unit Tests:    ~23,000+
@@ -43,7 +43,7 @@ Failing Tests:     0
 
 ## Coverage by Layer
 
-```
+```text
 Agent Layer:        11% (CRITICAL - Needs immediate attention)
   - orchestrator.py:        45% (3,298 missing lines)
   - coordinators/:          82% (average - GOOD)
@@ -129,7 +129,7 @@ pytest tests/ --cov=victor --cov-report=html --cov-report=term
 
 # Open HTML coverage report
 open htmlcov/index.html
-```
+```text
 
 ### Run Specific Test Types
 
@@ -161,7 +161,7 @@ pytest tests/unit/agent/test_orchestrator.py --cov=victor.agent.orchestrator --c
 
 # Run specific test
 pytest tests/unit/agent/test_orchestrator.py::test_chat_flow --cov=victor.agent.orchestrator --cov-report=term
-```
+```text
 
 ### Generate Coverage Reports
 
@@ -182,7 +182,7 @@ pytest --cov=victor --cov-report=html --cov-report=json --cov-report=term
 
 ## Test Organization
 
-```
+```text
 tests/
 ├── unit/ (661 files)
 │   ├── agent/
@@ -213,7 +213,7 @@ tests/
 @pytest.mark.workflows      # Workflow tests
 @pytest.mark.agents         # Agent tests
 @pytest.mark.hitl           # Human-in-the-loop tests
-```
+```text
 
 ## Coverage Targets
 
@@ -272,7 +272,7 @@ Target badges (end of Q1):
 ![Coverage](https://img.shields.io/badge/coverage-80%25-brightgreen.svg)
 ![Tests](https://img.shields.io/badge/tests-25,000-blue.svg)
 ![Pass Rate](https://img.shields.io/badge/pass_rate-98%25-brightgreen.svg)
-```
+```text
 
 ## CI/CD Integration
 

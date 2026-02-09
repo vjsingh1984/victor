@@ -106,7 +106,7 @@ from victor.agent.tool_calling.base import (
     ToolCallingCapabilities,
     ToolCallFormat,
 )
-```
+```text
 
 ---
 

@@ -32,7 +32,7 @@ async def parallel_analysis(state: WorkflowState) -> WorkflowState:
         "style": results[2],
     }
     return state
-```
+```text
 
 ### Dynamic Node Selection
 
@@ -91,7 +91,7 @@ graph.add_conditional_edge("execute", handle_error, {
     "retry": "execute",
     "fail": "error_handler",
 })
-```
+```text
 
 ### Timeout Configuration
 
@@ -132,7 +132,7 @@ class StateGraph(Generic[T]):
         max_iterations: int = 25,
         timeout: Optional[float] = None,
     ) -> "CompiledGraph[T]": ...
-```
+```text
 
 ### CompiledGraph
 
@@ -160,7 +160,7 @@ class ExecutionResult(Generic[T]):
     node_history: List[str]
     iterations: int
     error: Optional[str]
-```
+```text
 
 ### END Constant
 

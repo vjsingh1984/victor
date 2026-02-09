@@ -62,7 +62,7 @@ async def my_tool(param1: str, param2: int = 5) -> Dict[str, Any]:
 
     Args:
         param1: Description of the first parameter.
-```
+```text
 
 [Content continues through Testing the Tool...]
 

@@ -21,7 +21,7 @@ Victor's unified tool selection architecture provides a flexible,
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    OrchestratorFactory                      │
 │  create_tool_selector() → uses new strategy factory         │
@@ -76,7 +76,7 @@ selector = create_tool_selector_strategy(
 
 result = selector.select_tools("Search for Python files", limit=10)
 # Returns: ["search", "read", "ls", ...]
-```
+```text
 
 ### 2. Semantic Strategy (`semantic`)
 
@@ -123,7 +123,7 @@ selector = create_tool_selector_strategy(
 
 result = selector.select_tools("Debug failing test", limit=10)
 # Returns semantic + keyword blend with RL boost applied
-```
+```text
 
 ### 4. Auto Strategy (`auto`)
 
@@ -159,7 +159,7 @@ tool_selection_strategy: auto  # auto | keyword | semantic | hybrid
 
 # Legacy setting (DEPRECATED - auto-migrates to new setting)
 use_semantic_tool_selection: true  # Will be removed in v2.0
-```
+```text
 
 ### Environment Variables
 
@@ -182,7 +182,7 @@ settings = Settings(tool_selection_strategy="semantic")
 # Legacy setting (DEPRECATED - shows warning)
 settings = Settings(use_semantic_tool_selection=True)
 # Auto-migrates to tool_selection_strategy="semantic"
-```
+```text
 
 ## Migration Guide
 
@@ -196,7 +196,7 @@ settings = Settings(use_semantic_tool_selection=True)
 **New (Recommended)**:
 ```python
 settings = Settings(tool_selection_strategy="semantic")
-```
+```text
 
 ### Mapping Table
 
@@ -230,7 +230,7 @@ selector = create_tool_selector_strategy(
     settings=settings,
     embedding_service=get_embedding_service(),
 )
-```
+```text
 
 ## API Reference
 
@@ -291,7 +291,7 @@ class IToolSelector(Protocol):
     @property
     def strategy(self) -> ToolSelectionStrategy:
         ...
-```
+```text
 
 ### `ToolSelectionResult`
 
@@ -330,7 +330,7 @@ pytest tests/unit/agent/test_tool_selector_factory.py -v
 
 # Test settings migration
 pytest tests/unit/config/test_settings.py::test_tool_selection_migration -v
-```
+```text
 
 ### Integration Tests
 
@@ -365,7 +365,7 @@ result = selector.select_tools("Search for Python files", limit=10)
 print(f"Selected tools: {result.tool_names}")
 print(f"Scores: {result.scores}")
 print(f"Strategy: {result.strategy_used}")
-```
+```text
 
 ## Troubleshooting
 
@@ -400,7 +400,7 @@ selector = create_tool_selector_strategy(strategy="invalid", ...)
 
 # Valid
 selector = create_tool_selector_strategy(strategy="semantic", ...)
-```
+```text
 
 ### Issue: Deprecation warning for `use_semantic_tool_selection`
 

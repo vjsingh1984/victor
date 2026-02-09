@@ -21,7 +21,7 @@ report = await suite.run_security_audit(
 # Check results
 print(f"Risk Score: {report.risk_score}/10.0")
 print(f"Status: {'PASSED' if report.overall_passed else 'FAILED'}")
-```
+```text
 
 ## Key Classes
 
@@ -60,7 +60,7 @@ report.medium_count            # Medium vulnerabilities
 report.low_count               # Low vulnerabilities
 report.overall_passed          # True if no critical/high vulns
 report.recommendations         # List of recommendations
-```
+```text
 
 **Methods:**
 ```python
@@ -88,7 +88,7 @@ pattern = ExploitPattern(
 # Test input
 if pattern.matches(user_input):
     print("Attack detected!")
-```
+```text
 
 ## Report Formats
 
@@ -102,7 +102,7 @@ print(text_report)
 ```python
 markdown_report = report.generate_markdown_report()
 Path("report.md").write_text(markdown_report)
-```
+```text
 
 ### JSON Report
 ```python
@@ -129,7 +129,7 @@ print(f"Passed: {auth_report.passed}")
 code_report = await suite.test_code_injection(agent)
 for vuln in code_report.vulnerabilities_found:
     print(f"{vuln.severity.value}: {vuln.description}")
-```
+```text
 
 ## Filtering Vulnerabilities
 
@@ -161,7 +161,7 @@ SeverityLevel.HIGH      # Exploitable, significant impact
 SeverityLevel.MEDIUM   # Exploitable with conditions
 SeverityLevel.LOW      # Hard to exploit, minimal impact
 SeverityLevel.INFO     # Informational only
-```
+```text
 
 ## Attack Types
 
@@ -179,7 +179,7 @@ AttackType.SESSION_HIJACKING       # Session theft
 
 ## Risk Score Calculation
 
-```
+```text
 Weighted scoring:
 - CRITICAL: 10.0 points each
 - HIGH: 7.0 points each
@@ -203,7 +203,7 @@ Access prioritized recommendations:
 ```python
 for i, rec in enumerate(report.recommendations, 1):
     print(f"{i}. {rec}")
-```
+```text
 
 Example output:
 ```
@@ -211,7 +211,7 @@ Example output:
 2. HIGH PRIORITY: Fix 5 high-severity issue(s) within 7 days...
 3. Implement prompt injection defenses: Use system prompt...
 4. Strengthen authorization: Implement role-based access control...
-```
+```text
 
 ## Safe Mode
 
@@ -260,7 +260,7 @@ logging.basicConfig(level=logging.INFO)
 # - Vulnerability detection
 # - Risk score calculation
 # - Report generation
-```
+```text
 
 ## Type Aliases
 
@@ -287,7 +287,7 @@ from victor.security.penetration_testing import (
 **Tests timeout?**
 ```python
 suite = SecurityTestSuite(max_test_duration_ms=10000.0)
-```
+```text
 
 **Too many false positives?**
 - Review vulnerability patterns

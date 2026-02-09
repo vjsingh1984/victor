@@ -26,7 +26,7 @@ export VICTOR_LOG_FORMAT=json
 
 # Set log level
 export VICTOR_LOG_LEVEL=info
-```
+```text
 
 ### 2. Initialize in Application
 
@@ -69,13 +69,13 @@ logger.info("Processing request")
     "status_code": 200
   }
 }
-```
+```text
 
 ### Text Structure
 
 ```
 2025-01-18 12:34:56 - victor.agent - INFO - Processing request
-```
+```text
 
 ## Configuration
 
@@ -139,7 +139,7 @@ logger.info("Processing request")
 
 # Get current correlation ID
 corr_id = get_correlation_id()
-```
+```text
 
 ### Performance Logging
 
@@ -194,7 +194,7 @@ req_logger.log_response(
     headers={"content-type": "application/json"},
     body='{"response": "hi there"}',
 )
-```
+```text
 
 ### Error Logging
 
@@ -240,7 +240,7 @@ sampled_logger.debug("Processing item: item-124")
 # Warnings and errors are never sampled
 sampled_logger.warning("This will always be logged")
 sampled_logger.error("This will always be logged")
-```
+```text
 
 ## Integration with Log Aggregators
 
@@ -312,7 +312,7 @@ scrape_configs:
           level:
           logger:
           correlation_id:
-```
+```text
 
 ### CloudWatch
 
@@ -350,7 +350,7 @@ logger.info(
         "status_code": 200,
     }
 )
-```
+```text
 
 3. **Use correlation IDs**:
 ```python
@@ -376,7 +376,7 @@ except Exception as e:
             "error_type": type(e).__name__,
         }
     )
-```
+```text
 
 5. **Sanitize sensitive data**:
 ```python
@@ -396,7 +396,7 @@ for item in items:
 
 # Use sampling
 sampled_logger = SamplingLogger(logger, sample_rate=0.01)
-```
+```text
 
 ## Performance Considerations
 
@@ -429,7 +429,7 @@ logger.addHandler(queue_handler)
 file_handler = logging.FileHandler("app.log")
 listener = QueueListener(log_queue, file_handler)
 listener.start()
-```
+```text
 
 ### Sampling
 
@@ -449,7 +449,7 @@ export VICTOR_LOG_LEVEL=debug
 ```python
 import logging
 print(logging.getLogger().level)
-```
+```text
 
 2. Verify handlers:
 ```python
@@ -459,7 +459,7 @@ print(logging.getLogger().handlers)
 3. Check environment variables:
 ```bash
 env | grep VICTOR_LOG
-```
+```text
 
 ### Missing correlation IDs
 

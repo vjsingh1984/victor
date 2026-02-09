@@ -79,7 +79,7 @@ ui:
   theme: dark              # dark or light
   syntax_highlighting: true
   line_numbers: true
-```
+```text
 
 ---
 
@@ -172,7 +172,7 @@ victor chat --mode build "Implement feature X"
 /mode plan
 /mode explore
 /mode build
-```
+```text
 
 ### Mode Budgets
 
@@ -233,7 +233,7 @@ servers:
     args: ["-y", "@anthropic/mcp-server-github"]
     env:
       GITHUB_TOKEN: ${GITHUB_TOKEN}
-```
+```text
 
 
 **Reading Time:** 3 min

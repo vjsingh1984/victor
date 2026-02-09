@@ -90,7 +90,7 @@ class DomainSpecificToolSelectionStrategy(IToolSelectionStrategy):
         ]
 
         return domain_tools
-```
+```text
 
 #### Step 2: Register Strategy
 
@@ -191,7 +191,7 @@ class ABTestingConfigCoordinator(ConfigCoordinator):
         """Track A/B assignment in analytics."""
         # Emit analytics event
         pass
-```
+```text
 
 ### Usage
 

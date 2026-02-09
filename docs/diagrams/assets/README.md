@@ -81,7 +81,7 @@ Technical diagrams and architecture visuals including:
 
 # From docs/getting-started/
 ![Victor Logo](../assets/images/victor-logo.png)
-```
+```text
 
 ### Absolute References (for MkDocs)
 ```markdown
@@ -93,7 +93,7 @@ Technical diagrams and architecture visuals including:
 <img src="../assets/screenshots/tui-screenshot.png" alt="Victor TUI" width="600"/>
 
 <img src="../assets/images/logo.png" alt="Victor Logo" width="128" height="128"/>
-```
+```text
 
 ### Mermaid Diagrams (Inline)
 ````markdown
@@ -128,7 +128,7 @@ Use descriptive, lowercase names with hyphens separating words:
 
 ### Versioning
 For screenshots that change between versions:
-```
+```text
 tui-main-interface-0.5.0.png
 tui-main-interface-0.6.0.png
 ```
@@ -148,7 +148,7 @@ tui-main-interface-0.6.0.png
    optipng -o7 docs/assets/**/*.png
    # or
    pngquant --quality=80-95 docs/assets/**/*.png
-   ```
+```text
 
 2. **JPEG Optimization**:
    ```bash
@@ -160,7 +160,7 @@ tui-main-interface-0.6.0.png
    ```bash
    # Optimize SVG files
    svgo --config=svgo.config.js docs/assets/**/*.svg
-   ```
+```text
 
 ## Adding New Assets
 

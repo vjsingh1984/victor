@@ -57,7 +57,7 @@ workflows:
         # node-specific configuration
         next:
           - next_node_id
-```
+```text
 
 ### Node Types Summary
 
@@ -135,7 +135,7 @@ workflows:
         - quality
     nodes:
       # ... nodes from above
-```
+```text
 
 ### Step 3: Configure Node Details
 
@@ -172,7 +172,7 @@ victor workflow validate workflows/simple_review.yaml
 # Run the workflow
 victor workflow run workflows/simple_review.yaml --workflow simple_review \
   --input '{"target_file": "src/main.py"}'
-```
+```text
 
 Or programmatically in Python:
 
@@ -256,7 +256,7 @@ workflows:
         role: reporter
         goal: "Generate final review summary"
         tool_budget: 5
-```
+```text
 
 ### Escape Hatch Functions
 
@@ -338,7 +338,7 @@ graph = compiler.compile_yaml(
 )
 
 result = await graph.invoke({"target_file": "src/main.py"})
-```
+```text
 
 
 **Reading Time:** 5 min

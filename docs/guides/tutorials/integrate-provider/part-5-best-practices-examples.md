@@ -46,7 +46,7 @@ if self.is_circuit_open():
 
 # Get circuit stats
 stats = self.get_circuit_breaker_stats()
-```
+```text
 
 ### Retry Strategy
 
@@ -443,7 +443,7 @@ class CustomLLMProvider(BaseProvider):
 
     async def close(self) -> None:
         await self.client.aclose()
-```
+```text
 
 ---
 

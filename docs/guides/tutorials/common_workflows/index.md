@@ -42,7 +42,7 @@ This guide covers common workflows for everyday tasks:
 **Quick analysis:**
 ```bash
 victor chat "Analyze this codebase"
-```
+```text
 
 ---
 

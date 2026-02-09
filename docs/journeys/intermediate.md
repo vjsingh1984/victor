@@ -64,7 +64,7 @@ Victor includes 55+ specialized tools organized into categories:
 - `docker_operations` - Docker container management
 
 **Tool Discovery:**
-```
+```text
 You: List all available tools
 [Victor displays categorized tool list]
 
@@ -112,7 +112,7 @@ steps:
       auto_fix: true
     depends_on:
       - Review code
-```
+```text
 
 ### Running Workflows
 
@@ -145,7 +145,7 @@ vim my-workflow.yaml
 
 # Validate workflow
 victor workflow validate my-workflow.yaml
-```
+```text
 
 **📖 Tutorial:** [Workflow Development Quickstart](../guides/workflows/quickstart.md)
 
@@ -196,7 +196,7 @@ victor chat --team code-quality-team
 
 # From chat
 You: Use the code-quality-team to review this PR
-```
+```text
 
 **📖 Full Guide:** [Multi-Agent Teams](../guides/multi-agent-teams.md)
 
@@ -251,7 +251,7 @@ context:
 checkpoints:
   enabled: true
   directory: .victor/checkpoints
-```
+```text
 
 ### Using Profiles
 
@@ -274,7 +274,7 @@ victor profile set-default web-development
 
 Control what Victor knows about your project:
 
-```
+```text
 You: Only include src/ and tests/ in context
 [Victor updates context configuration]
 
@@ -295,7 +295,7 @@ victor checkpoint list
 
 # Load checkpoint
 victor checkpoint load before-refactor
-```
+```text
 
 ### Provider-Specific Features
 
@@ -307,7 +307,7 @@ You: What tools does this provider support?
 
 You: Switch to provider with vision support
 [Victor suggests appropriate provider]
-```
+```text
 
 ### Advanced Modes
 
@@ -327,7 +327,7 @@ You: Enter plan mode
 
 You: Apply the planned changes
 [Victor implements the plan]
-```
+```text
 
 ## What's Next?
 

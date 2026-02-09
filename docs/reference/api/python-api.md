@@ -13,7 +13,7 @@ pip install "victor-ai[dev]"
 
 # From source
 pip install -e .
-```
+```text
 
 ## Quick Start
 
@@ -51,7 +51,7 @@ async def main():
     print(result)
 
 asyncio.run(main())
-```
+```text
 
 ---
 
@@ -103,7 +103,7 @@ agent = await Agent.create(
     temperature=0.3,
     max_tokens=8192
 )
-```
+```text
 
 #### agent.run()
 
@@ -144,7 +144,7 @@ result = await agent.run(
     "Run tests",
     tools=["pytest", "coverage"]
 )
-```
+```text
 
 #### agent.astream()
 
@@ -172,7 +172,7 @@ async for token in agent.astream("Write a REST API"):
     print(token, end="", flush=True)
 
 # Output streams in real-time
-```
+```text
 
 #### agent.chat()
 
@@ -204,7 +204,7 @@ response2 = await agent.chat("Add authentication")
 response3 = await agent.chat("Add tests")
 
 # Agent maintains conversation context
-```
+```text
 
 ---
 
@@ -276,7 +276,7 @@ task = Task(
 )
 
 await task.execute()
-```
+```text
 
 ### Tools
 
@@ -341,7 +341,7 @@ registry.register(MyTool())
 
 # Use
 agent = await Agent.create(tools=["my_tool"])
-```
+```text
 
 ### State Management
 
@@ -385,7 +385,7 @@ state.save("state.json")
 # Load state from file
 loaded_state = State.load("state.json")
 print(loaded_state["data"])
-```
+```text
 
 ---
 
@@ -425,7 +425,7 @@ team = AgentTeam.hierarchical(
     lead="lead_agent",
     subagents=["agent1", "agent2", "agent3"]
 )
-```
+```text
 
 **Flat** (all agents equal):
 ```python
@@ -440,7 +440,7 @@ team = AgentTeam.flat(
 team = AgentTeam.pipeline(
     agents=["analyzer", "implementer", "tester"]
 )
-```
+```text
 
 **Consensus** (voting):
 ```python
@@ -456,7 +456,7 @@ team = AgentTeam.debate(
     agents=["agent1", "agent2", "agent3"],
     rounds=3
 )
-```
+```text
 
 ---
 
@@ -517,7 +517,7 @@ agent = await Agent.from_profile(profile)
 
 # Or directly
 agent = await Agent.from_profile_name("development")
-```
+```text
 
 ### Environment Variables
 
@@ -558,7 +558,7 @@ async def main():
         print(f"Unexpected error: {e}")
 
 asyncio.run(main())
-```
+```text
 
 ### Retry Logic
 
@@ -601,7 +601,7 @@ async def test_agent_run():
     agent = await Agent.create(provider="ollama")
     result = await agent.run("Say hello")
     assert "hello" in result.lower()
-```
+```text
 
 ### Mocking Providers
 
@@ -653,7 +653,7 @@ async def generate_code():
     print("Code generated successfully!")
 
 asyncio.run(generate_code())
-```
+```text
 
 ### Example 2: Code Review
 
@@ -701,7 +701,7 @@ async def run_workflow():
     print(f"Review complete: {result}")
 
 asyncio.run(run_workflow())
-```
+```text
 
 ### Example 4: Multi-Agent Task
 
@@ -751,7 +751,7 @@ async def stream_response():
     print("\nDone!")
 
 asyncio.run(stream_response())
-```
+```text
 
 ### Example 6: Tool Composition
 
@@ -795,7 +795,7 @@ async def main():
     print(result)
 
 asyncio.run(main())
-```
+```text
 
 **DON'T**:
 ```python
@@ -813,7 +813,7 @@ try:
 except VictorError as e:
     logger.error(f"Victor error: {e}")
     raise
-```
+```text
 
 **DON'T**:
 ```python
@@ -827,7 +827,7 @@ result = await agent.run("Task")  # May crash!
 ```python
 async for token in agent.astream("Long task"):
     print(token, end="", flush=True)
-```
+```text
 
 **DON'T**:
 ```python
@@ -844,7 +844,7 @@ agent = await Agent.create()
 result1 = await agent.run("Task 1")
 result2 = await agent.run("Task 2")
 result3 = await agent.run("Task 3")
-```
+```text
 
 **DON'T**:
 ```python
@@ -865,7 +865,7 @@ try:
     result = await agent.run("Task")
 finally:
     await agent.cleanup()  # Release resources
-```
+```text
 
 **DON'T**:
 ```python

@@ -45,7 +45,7 @@ class ConversationControllerProtocol(Protocol):
     def set_system_prompt(self, prompt: str) -> None:
         """Set the system prompt."""
         ...
-```
+```text
 
 ---
 
@@ -106,7 +106,7 @@ class MessageHistoryProtocol(Protocol):
     def clear(self) -> None:
         """Clear message history."""
         ...
-```
+```text
 
 ---
 
@@ -199,7 +199,7 @@ class StreamingControllerProtocol(Protocol):
     def get_active_session(self) -> Optional[Any]:
         """Get the currently active session."""
         ...
-```
+```text
 
 ---
 
@@ -266,7 +266,7 @@ class MetricsCollectorProtocol(Protocol):
     def on_streaming_session_complete(self, session: Any) -> None:
         """Record session completion metrics."""
         ...
-```
+```text
 
 
 **Reading Time:** 3 min

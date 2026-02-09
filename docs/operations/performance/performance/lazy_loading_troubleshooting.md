@@ -13,13 +13,13 @@ echo "VICTOR_VERTICAL_LOADING_MODE: $VICTOR_VERTICAL_LOADING_MODE"
 
 # Run with debug logging
 VICTOR_LOG_LEVEL=DEBUG victor chat --no-tui 2>&1 | grep -i "lazy"
-```
+```text
 
 Expected output when enabled:
 ```
 DEBUG:victor.core.verticals.lazy_extensions:Lazy loading extensions for vertical: coding
 DEBUG:victor.core.verticals.lazy_extensions:Successfully loaded extensions for vertical: coding
-```
+```text
 
 ### Check Current Mode
 
@@ -50,7 +50,7 @@ ext = CodingAssistant.get_extensions()
 print(f'Type: {type(ext).__name__}')
 print(f'Loaded: {ext.is_loaded() if hasattr(ext, \"is_loaded\") else \"N/A\"}')
 "
-```
+```text
 
 **Possible Causes**:
 
@@ -104,7 +104,7 @@ middleware_access = time.time() - start
 
 print(f"Get extensions: {first_access * 1000:.2f}ms")
 print(f"Access middleware: {middleware_access * 1000:.2f}ms")
-```
+```text
 
 **Possible Causes**:
 
@@ -142,7 +142,7 @@ def test_access():
 
 cProfile.run('test_access()', 'profile_stats')
 pstats.Stats('profile_stats').sort_stats('cumulative').print_stats(20)
-```
+```text
 
 ### Issue 3: Recursive Loading Detected
 
@@ -150,7 +150,7 @@ pstats.Stats('profile_stats').sort_stats('cumulative').print_stats(20)
 ```
 RuntimeError: Recursive loading detected for vertical 'coding'
 RuntimeError: Recursive loading detected for extensions of vertical 'coding'
-```
+```text
 
 **Diagnosis**:
 ```python
@@ -187,7 +187,7 @@ check_circular_imports('victor.coding.prompts')
        def __init_subclass__(cls, **kwargs):
            super().__init_subclass__(**kwargs)
            # Don't call get_extensions() here
-   ```
+```text
 
 2. **Extension imports its own vertical**
    ```python
@@ -240,7 +240,7 @@ print(f'Eager: {eager_mem:.2f}MB')
 print(f'Lazy: {lazy_mem:.2f}MB')
 print(f'Difference: {eager_mem - lazy_mem:.2f}MB')
 "
-```
+```text
 
 **Possible Causes**:
 
@@ -314,7 +314,7 @@ print(f"Safety: {extensions.safety_extensions}")
 # Check logs
 import logging
 logging.basicConfig(level=logging.DEBUG)
-```
+```text
 
 **Possible Causes**:
 
@@ -361,7 +361,7 @@ export VICTOR_LOG_LEVEL=DEBUG
 
 # Filter for lazy loading logs
 victor chat --no-tui 2>&1 | grep -i "lazy"
-```
+```text
 
 ### Profile Extension Loading
 
@@ -392,7 +392,7 @@ pip install memory_profiler
 
 # Profile memory usage
 python -m memory_profiler -m victor.ui.cli chat --no-tui
-```
+```text
 
 ### Check Extension Cache
 
@@ -418,7 +418,7 @@ for entry in stats.get('entries', []):
    ```bash
    export VICTOR_LAZY_EXTENSIONS=true
    victor chat --no-tui
-   ```
+```text
 
 2. **Preload critical extensions**
    ```python
@@ -431,7 +431,7 @@ for entry in stats.get('entries', []):
    ```bash
    # Only load coding vertical
    victor chat --vertical coding
-   ```
+```text
 
 ### Optimize First Access
 
@@ -459,7 +459,7 @@ for entry in stats.get('entries', []):
                result = self._do_expensive_work(arg)
                self._cache[arg] = result
            return self._cache[arg]
-   ```
+```text
 
 3. **Use lightweight initialization**
    ```python
