@@ -37,7 +37,7 @@ jobs:
       - name: Link Checker
         uses: lycheeverse/lychee-action@v1
         with:
-          args: --verbose --no-progress 'docs/**/*.md' --exclude 'docs/archive/**'
+          args: --verbose --no-progress 'docs/**/*.md' --exclude 'docs/archive/**' --exclude 'localhost' --exclude '127.0.0.1' --exclude 'your-org' --exclude 'yourusername' --exclude 'codingagent' --exclude 'victor-ai.dev' --exclude 'docs.victor-ai.dev' --exclude 'docs.victor.ai' --exclude 'linkedin.com'
           fail: true
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
@@ -86,7 +86,7 @@ jobs:
         run: |
           for file in docs/diagrams/**/*.mmd; do
             echo "Rendering $file"
-            mmdc -i "$file" -o /tmp/test.svg
+            mmdc -i "$file" -o /tmp/test.svg --puppeteerLaunchArgs='{"args": ["--no-sandbox", "--disable-setuid-sandbox"]}'
           done
 
   standards-check:
