@@ -28,8 +28,7 @@ from victor.agent.cache.backends.redis import RedisCacheBackend, aioredis
 
 # Skip all tests in this module if redis is not installed
 pytestmark = pytest.mark.skipif(
-    aioredis is None,
-    reason="redis.asyncio not installed (install with: pip install redis)"
+    aioredis is None, reason="redis.asyncio not installed (install with: pip install redis)"
 )
 
 

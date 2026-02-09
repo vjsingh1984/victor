@@ -39,6 +39,7 @@ from tests.factories import MockProviderFactory
 # Check if PIL is available
 try:
     from PIL import Image
+
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
@@ -128,7 +129,9 @@ class TestVisionAgentInit:
         assert agent._is_vision_capable() is False
 
 
-@pytest.mark.skipif(not PIL_AVAILABLE, reason="PIL not installed (install with: pip install Pillow)")
+@pytest.mark.skipif(
+    not PIL_AVAILABLE, reason="PIL not installed (install with: pip install Pillow)"
+)
 class TestImageEncoding:
     """Tests for image encoding functionality."""
 
