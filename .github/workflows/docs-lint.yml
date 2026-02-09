@@ -37,7 +37,7 @@ jobs:
       - name: Link Checker
         uses: lycheeverse/lychee-action@v1
         with:
-          args: --verbose --no-progress 'docs/**/*.md' --exclude 'docs/archive/**' --exclude 'localhost' --exclude '127.0.0.1' --exclude 'your-org' --exclude 'yourusername' --exclude 'codingagent' --exclude 'victor-ai.dev' --exclude 'docs.victor-ai.dev' --exclude 'docs.victor.ai' --exclude 'linkedin.com' --exclude 'github.com/vjsingh1984/victor/discussions' --exclude 'github.com/vjsingh1984/codingagent/discussions' --exclude 'github.com/anthropics/victor' --exclude 'owasp.org' --exclude 'platform.openai.com' --exclude 'console.mistral.ai' --exclude 'victor-ai.readthedocs.io' --exclude-missing
+          args: --verbose --no-progress 'docs/**/*.md' --exclude 'docs/archive/**' --exclude 'localhost' --exclude '127.0.0.1' --exclude 'your-org' --exclude 'yourusername' --exclude 'codingagent' --exclude 'victor-ai.dev' --exclude 'docs.victor-ai.dev' --exclude 'docs.victor.ai' --exclude 'linkedin.com' --exclude 'github.com/vjsingh1984/victor/discussions' --exclude 'github.com/vjsingh1984/codingagent/discussions' --exclude 'github.com/anthropics/victor' --exclude 'owasp.org' --exclude 'platform.openai.com' --exclude 'console.mistral.ai' --exclude 'victor-ai.readthedocs.io'
           fail: true
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
