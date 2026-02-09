@@ -24,7 +24,13 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from victor.agent.cache.backends.redis import RedisCacheBackend
+from victor.agent.cache.backends.redis import RedisCacheBackend, aioredis
+
+# Skip all tests in this module if redis is not installed
+pytestmark = pytest.mark.skipif(
+    aioredis is None,
+    reason="redis.asyncio not installed (install with: pip install redis)"
+)
 
 
 # =============================================================================

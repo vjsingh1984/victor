@@ -411,6 +411,7 @@ class TestToolExecutionCoordinatorHandleToolCalls:
                 success=True,
                 result="output",
                 error=None,
+                execution_time_ms=100.0,  # Simulate execution time for stats tracking
             )
         )
         return executor
@@ -870,7 +871,12 @@ class TestToolExecutionCoordinatorStatistics:
         """Create mock executor."""
         executor = AsyncMock()
         executor.execute = AsyncMock(
-            return_value=MagicMock(success=True, result="output", error=None)
+            return_value=MagicMock(
+                success=True,
+                result="output",
+                error=None,
+                execution_time_ms=100.0,  # Simulate execution time for stats tracking
+            )
         )
         return executor
 

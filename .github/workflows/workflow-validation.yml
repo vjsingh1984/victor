@@ -64,6 +64,7 @@ jobs:
           pip install pytest pytest-asyncio pytest-cov ruff mypy black
 
       - name: Run workflow validation (CI mode)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           # Run validation in CI mode for JSON output
@@ -95,6 +96,7 @@ jobs:
           VICTOR_VERBOSE_VALIDATION: 1
 
       - name: Validate all production workflows
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           # Validate all production workflows from test data

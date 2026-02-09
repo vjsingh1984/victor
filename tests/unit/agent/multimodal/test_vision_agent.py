@@ -36,6 +36,13 @@ ImageComparison = ComparisonResult
 from victor.core.errors import ValidationError
 from tests.factories import MockProviderFactory
 
+# Check if PIL is available
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+
 
 @pytest.fixture
 def mock_provider():
@@ -44,6 +51,7 @@ def mock_provider():
 
 
 @pytest.fixture
+@pytest.mark.skipif(not PIL_AVAILABLE, reason="PIL not installed")
 def sample_image_path(tmp_path):
     """Create a sample image file for testing."""
 
@@ -58,6 +66,7 @@ def sample_image_path(tmp_path):
 
 
 @pytest.fixture
+@pytest.mark.skipif(not PIL_AVAILABLE, reason="PIL not installed")
 def sample_jpg_path(tmp_path):
     """Create a sample JPG file for testing."""
     from PIL import Image
@@ -119,6 +128,7 @@ class TestVisionAgentInit:
         assert agent._is_vision_capable() is False
 
 
+@pytest.mark.skipif(not PIL_AVAILABLE, reason="PIL not installed (install with: pip install Pillow)")
 class TestImageEncoding:
     """Tests for image encoding functionality."""
 
