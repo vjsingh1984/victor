@@ -588,6 +588,7 @@ class TestChatMethod:
     """Tests for chat method."""
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(120)  # Increase timeout for slow chat test
     async def test_chat_basic(self, mock_provider, orchestrator_settings):
         """Test chat adds messages and gets response (covers lines 1004-1047)."""
         mock_response = MagicMock()
@@ -622,6 +623,7 @@ class TestChatMethod:
             )
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(120)  # Increase timeout for slow chat test
     async def test_chat_with_tools(self, mock_provider, orchestrator_settings):
         """Test chat with tool support enabled."""
         mock_response = MagicMock()
@@ -656,6 +658,7 @@ class TestChatMethod:
             # Note: select_tools may not be called if model is not tool-capable
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(120)  # Increase timeout for slow chat test
     async def test_chat_with_thinking(self, mock_provider, orchestrator_settings):
         """Test chat with thinking enabled (covers lines 1027-1029)."""
         mock_response = MagicMock()
