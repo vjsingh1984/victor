@@ -52,9 +52,10 @@ def mock_provider():
 
 
 @pytest.fixture
-@pytest.mark.skipif(not PIL_AVAILABLE, reason="PIL not installed")
 def sample_image_path(tmp_path):
     """Create a sample image file for testing."""
+    if not PIL_AVAILABLE:
+        pytest.skip("PIL not installed (install with: pip install Pillow)")
 
     # Create a minimal valid PNG file
     from PIL import Image
@@ -67,9 +68,12 @@ def sample_image_path(tmp_path):
 
 
 @pytest.fixture
-@pytest.mark.skipif(not PIL_AVAILABLE, reason="PIL not installed")
 def sample_jpg_path(tmp_path):
     """Create a sample JPG file for testing."""
+    if not PIL_AVAILABLE:
+        pytest.skip("PIL not installed (install with: pip install Pillow)")
+
+    # Create a minimal valid JPG file
     from PIL import Image
 
     img = Image.new("RGB", (10, 10), color="blue")
