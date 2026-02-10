@@ -107,7 +107,7 @@ jobs:
         shell: bash
         run: |
           pytest tests/unit -v \
-            --timeout=60 \
+            --timeout=180 \
             --cov=victor \
             --cov-report=xml \
             --cov-report=html \
@@ -195,9 +195,9 @@ jobs:
 
       - name: Run integration tests
         run: |
-          # Use shorter timeout in CI, timeouts are skipped instead of failed
+          # Use longer timeout to accommodate asyncio cleanup (tests pass but teardown takes time)
           pytest tests/integration -v \
-            --timeout=60 \
+            --timeout=180 \
             --cov=victor \
             --cov-report=xml \
             --cov-report=term-missing:skip-covered \

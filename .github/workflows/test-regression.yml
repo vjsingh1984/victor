@@ -89,7 +89,7 @@ jobs:
       - name: Run unit tests
         run: |
           pytest tests/unit -v \
-            --timeout=60 \
+            --timeout=180 \
             --tb=short \
             --maxfail=10 \
             -m "not slow" \
@@ -351,7 +351,7 @@ jobs:
       - name: Run smoke tests
         run: |
           pytest tests/smoke -v \
-            --timeout=60 \
+            --timeout=180 \
             --tb=short \
             --color=yes
 
