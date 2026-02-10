@@ -225,7 +225,7 @@ textual==7.1.0
 threadpoolctl==3.6.0
 tiktoken==0.12.0
 tokenizers==0.22.2
-tomli==2.4.0
+tomli==2.0.2
 tomli_w==1.2.0
 tomlkit==0.14.0
 torch==2.9.1
