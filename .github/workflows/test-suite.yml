@@ -91,8 +91,10 @@ jobs:
           pip install "pip>=25.2"
           # Install torch with CPU-only support
           pip install torch --index-url https://download.pytorch.org/whl/cpu || pip install torch
-          # Install dev dependencies
-          pip install -e ".[dev]"
+          # Install dev dependencies from requirements.txt to avoid pip resolver hanging
+          pip install -r requirements.txt
+          # Install victor in editable mode
+          pip install -e .
 
       - name: Run unit tests with coverage
         shell: bash

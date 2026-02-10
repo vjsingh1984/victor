@@ -242,7 +242,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install "pip>=25.2"
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -e ".[dev]"
+          # Install dev dependencies from requirements.txt to avoid pip resolver hanging
+          pip install -r requirements.txt
+          # Install victor in editable mode
+          pip install -e .
 
       - name: Validate YAML workflows
         run: |

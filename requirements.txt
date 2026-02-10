@@ -251,8 +251,6 @@ ujson==5.11.0
 urllib3==2.6.3
 uvicorn==0.30.1
 uvloop==0.22.1
--e git+ssh://git@github.com/vjsingh1984/victor.git@231369f2315de767832cee952860731a441ac3d9#egg=victor_ai
--e git+ssh://git@github.com/vjsingh1984/victor-invest.git@68f5ecde8b4da3c1b5fe43332e8fc240473027e2#egg=victor_invest
 vine==5.1.0
 watchdog==6.0.0
 watchfiles==1.1.1
