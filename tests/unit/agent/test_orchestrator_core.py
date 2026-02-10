@@ -588,7 +588,7 @@ class TestChatMethod:
     """Tests for chat method."""
 
     @pytest.mark.asyncio
-    @pytest.mark.timeout(120)  # Increase timeout for slow chat test
+    @pytest.mark.timeout(180)  # Increase timeout for slow chat test (includes cleanup)
     async def test_chat_basic(self, mock_provider, orchestrator_settings):
         """Test chat adds messages and gets response (covers lines 1004-1047)."""
         mock_response = MagicMock()
@@ -613,17 +613,21 @@ class TestChatMethod:
                 model="test-model",
             )
 
-            response = await orch.chat("Hello")
+            try:
+                response = await orch.chat("Hello")
 
-            # Response should contain our test content (may have metadata appended)
-            assert "Test response" in response.content
-            # User message should be added
-            assert any(
-                m.role == "user" and "Hello" in m.content for m in orch.conversation.messages
-            )
+                # Response should contain our test content (may have metadata appended)
+                assert "Test response" in response.content
+                # User message should be added
+                assert any(
+                    m.role == "user" and "Hello" in m.content for m in orch.conversation.messages
+                )
+            finally:
+                # Explicitly cleanup to prevent asyncio timeout during teardown
+                await orch.shutdown()
 
     @pytest.mark.asyncio
-    @pytest.mark.timeout(120)  # Increase timeout for slow chat test
+    @pytest.mark.timeout(180)  # Increase timeout for slow chat test (includes cleanup)
     async def test_chat_with_tools(self, mock_provider, orchestrator_settings):
         """Test chat with tool support enabled."""
         mock_response = MagicMock()
@@ -652,13 +656,17 @@ class TestChatMethod:
             orch.tool_selector.select_tools = AsyncMock(return_value=[])
             orch.tool_selector.prioritize_by_stage = MagicMock(return_value=[])
 
-            response = await orch.chat("Search for files")
+            try:
+                response = await orch.chat("Search for files")
 
-            assert "Using tools" in response.content
-            # Note: select_tools may not be called if model is not tool-capable
+                assert "Using tools" in response.content
+                # Note: select_tools may not be called if model is not tool-capable
+            finally:
+                # Explicitly cleanup to prevent asyncio timeout during teardown
+                await orch.shutdown()
 
     @pytest.mark.asyncio
-    @pytest.mark.timeout(120)  # Increase timeout for slow chat test
+    @pytest.mark.timeout(180)  # Increase timeout for slow chat test (includes cleanup)
     async def test_chat_with_thinking(self, mock_provider, orchestrator_settings):
         """Test chat with thinking enabled (covers lines 1027-1029)."""
         mock_response = MagicMock()
@@ -684,10 +692,14 @@ class TestChatMethod:
                 thinking=True,
             )
 
-            response = await orch.chat("Think about this")
+            try:
+                response = await orch.chat("Think about this")
 
-            # Verify response was received
-            assert response is not None
+                # Verify response was received
+                assert response is not None
+            finally:
+                # Explicitly cleanup to prevent asyncio timeout during teardown
+                await orch.shutdown()
 
 
 class TestAddMessage:
