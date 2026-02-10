@@ -94,7 +94,9 @@ jobs:
           # Install dev dependencies from requirements.txt to avoid pip resolver hanging
           # Skip uvloop on Windows as it's Unix-only
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            grep -v "uvloop" requirements.txt | pip install -r /dev/stdin
+            grep -v "uvloop" requirements.txt > requirements_temp.txt
+            pip install -r requirements_temp.txt
+            rm requirements_temp.txt
           else
             pip install -r requirements.txt
           fi
