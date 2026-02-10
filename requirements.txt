@@ -117,7 +117,7 @@ multidict==6.7.0
 multitasking==0.0.12
 mypy==1.19.1
 mypy_extensions==1.1.0
-networkx==3.6.1
+networkx==3.4.2  # Python 3.10 compatibility (3.5+ requires Python 3.11+)
 nltk==3.9.2
 numpy==2.4.1
 openai==2.15.0
