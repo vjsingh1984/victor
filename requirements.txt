@@ -204,7 +204,7 @@ safetensors==0.7.0
 safety==3.7.0
 safety-schemas==0.0.16
 scikit-learn==1.7.2  # Python 3.10 compatibility (1.8+ requires Python 3.11+)
-scipy==1.16.3
+scipy==1.15.2  # Python 3.10 compatibility (1.16+ requires Python 3.11+)
 secure-smtplib==0.1.1
 semgrep==1.79.0
 sentence-transformers==5.2.0
