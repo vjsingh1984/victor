@@ -145,7 +145,7 @@ pendulum==3.1.0
 pillow==12.1.0
 pip-api==0.0.34
 pip-requirements-parser==32.0.1
-pip_audit==2.10.0
+pip_audit==2.9.0
 platformdirs==4.5.1
 pluggy==1.6.0
 portalocker==3.2.0
