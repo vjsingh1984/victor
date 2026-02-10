@@ -131,8 +131,8 @@ opentelemetry-instrumentation-requests==0.60b1
 opentelemetry-instrumentation-threading==0.60b1
 opentelemetry-proto==1.37.0
 opentelemetry-sdk==1.37.0
-opentelemetry-semantic-conventions==0.58b0
-opentelemetry-util-http==0.58b0
+opentelemetry-semantic-conventions==0.60b1
+opentelemetry-util-http==0.60b1
 orjson==3.11.5
 packageurl-python==0.17.6
 packaging==25.0
