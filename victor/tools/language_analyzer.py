@@ -1550,7 +1550,7 @@ class BaseLanguageAnalyzer(ABC):
         # Initialize regex accelerator for 10-20x faster pattern matching
         if _REGEX_ACCELERATOR_AVAILABLE and get_regex_engine is not None:
             self._regex_accelerator = get_regex_engine()
-            if self._regex_accelerator.rust_available:
+            if self._regex_accelerator.is_rust_available:
                 logger.info(
                     f"Language analyzer ({self.__class__.__name__}): Using Rust accelerator "
                     "(10-20x faster pattern matching)"
