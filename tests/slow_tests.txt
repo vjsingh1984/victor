@@ -1,0 +1,13 @@
+# Slow test files to be skipped in CI
+- Benchmark tests
+tests/benchmark/test_performance_baselines.py
+tests/benchmark/test_tool_selection_performance.py
+tests/integration/native/test_ast_processor_accelerator.py
+tests/integration/providers/test_ollama_integration.py
+tests/integration/real_execution/test_real_tool_execution.py
+tests/integration/workflows/test_advanced_formations.py
+tests/integration/verticals/test_code_lifecycle_e2e.py
+tests/unit/embeddings/test_embeddings.py
+tests/load/test_load_scalability.py
+tests/performance/test_performance_baselines.py
+tests/performance/test_tool_selection_performance.py
