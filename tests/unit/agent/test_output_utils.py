@@ -14,7 +14,6 @@
 
 """Tests for output_utils module."""
 
-
 from victor.tools.output_utils import (
     grep_lines,
     filter_paths,

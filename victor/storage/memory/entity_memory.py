@@ -178,8 +178,7 @@ class EntityMemory:
         self._conn.row_factory = sqlite3.Row
 
         # Create tables
-        self._conn.executescript(
-            """
+        self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS entities (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -212,8 +211,7 @@ class EntityMemory:
             CREATE INDEX IF NOT EXISTS idx_entities_session ON entities(session_id);
             CREATE INDEX IF NOT EXISTS idx_relations_source ON relations(source_id);
             CREATE INDEX IF NOT EXISTS idx_relations_target ON relations(target_id);
-        """
-        )
+        """)
         self._conn.commit()
 
     async def store(self, entity: Entity) -> str:

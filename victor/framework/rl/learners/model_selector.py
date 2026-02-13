@@ -126,20 +126,17 @@ class ModelSelectorLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Global Q-values table (uses Tables constants)
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_MODEL_Q} (
                 provider TEXT PRIMARY KEY,
                 q_value REAL NOT NULL,
                 selection_count INTEGER DEFAULT 0,
                 last_updated TEXT
             )
-            """
-        )
+            """)
 
         # Task-specific Q-values table
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_MODEL_TASK} (
                 provider TEXT NOT NULL,
                 task_type TEXT NOT NULL,
@@ -148,26 +145,21 @@ class ModelSelectorLearner(BaseLearner):
                 last_updated TEXT,
                 PRIMARY KEY (provider, task_type)
             )
-            """
-        )
+            """)
 
         # State table (epsilon, total_selections)
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_MODEL_STATE} (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         # Indexes
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_rl_model_task
             ON {Tables.RL_MODEL_TASK}(provider, task_type)
-            """
-        )
+            """)
 
         self.db.commit()
         logger.debug("RL: model_selector tables ensured")

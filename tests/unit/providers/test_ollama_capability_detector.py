@@ -27,7 +27,6 @@ from victor.providers.ollama_capability_detector import (
     check_tool_support_sync,
 )
 
-
 # =============================================================================
 # MODEL TOOL SUPPORT DATACLASS TESTS
 # =============================================================================

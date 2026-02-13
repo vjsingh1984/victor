@@ -46,7 +46,6 @@ from victor.core.verticals.protocols.mode_provider import (
     ModeConfigProviderProtocol,
 )
 
-
 # =============================================================================
 # Config Extensions Protocol
 # =============================================================================

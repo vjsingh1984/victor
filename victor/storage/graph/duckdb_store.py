@@ -33,8 +33,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
     def _ensure_schema(self) -> None:
         conn = self._connect()
         try:
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS nodes (
                     node_id TEXT PRIMARY KEY,
                     type TEXT,
@@ -57,8 +56,7 @@ class DuckDBGraphStore(GraphStoreProtocol):
                 CREATE INDEX IF NOT EXISTS idx_nodes_file ON nodes(file);
                 CREATE INDEX IF NOT EXISTS idx_edges_src_type ON edges(src, type);
                 CREATE INDEX IF NOT EXISTS idx_edges_dst_type ON edges(dst, type);
-                """
-            )
+                """)
         finally:
             conn.close()
 

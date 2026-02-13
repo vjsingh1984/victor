@@ -45,7 +45,6 @@ from victor.agent.intelligent_pipeline import (
     PROVIDERS_WITH_REPETITION_ISSUES,
 )
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================

@@ -41,7 +41,6 @@ from typing import Dict, Protocol, runtime_checkable
 
 from victor.core.vertical_types import TaskTypeHint
 
-
 # =============================================================================
 # Prompt Contributor Protocol
 # =============================================================================

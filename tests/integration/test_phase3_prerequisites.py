@@ -32,7 +32,6 @@ from victor.framework.graph import StateGraph, END
 from victor.workflows.metrics import WorkflowMetricsCollector
 from victor.workflows.observability import ObservabilityEmitter
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================

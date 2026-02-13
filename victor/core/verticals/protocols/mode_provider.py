@@ -38,7 +38,6 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Dict, Protocol, runtime_checkable
 
-
 # =============================================================================
 # Data Types
 # =============================================================================

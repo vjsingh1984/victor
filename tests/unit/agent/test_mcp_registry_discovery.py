@@ -72,13 +72,11 @@ class TestMCPRegistryDiscovery:
     def test_discover_from_env_variable(self):
         """Test discovery from VICTOR_MCP_CONFIG environment variable."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write(
-                """
+            f.write("""
 servers:
   - name: env_server
     command: ["python", "-m", "env_server"]
-"""
-            )
+""")
             f.flush()
 
             with patch.dict("os.environ", {"VICTOR_MCP_CONFIG": f.name}):
@@ -94,13 +92,11 @@ servers:
             config_dir = Path(tmpdir) / ".victor"
             config_dir.mkdir()
             config_file = config_dir / "mcp.yaml"
-            config_file.write_text(
-                """
+            config_file.write_text("""
 servers:
   - name: local_server
     command: ["python", "-m", "local_server"]
-"""
-            )
+""")
 
             # Change to temp directory for test
             import os
@@ -123,25 +119,21 @@ servers:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create env config
             env_config = Path(tmpdir) / "env_mcp.yaml"
-            env_config.write_text(
-                """
+            env_config.write_text("""
 servers:
   - name: env_priority
     command: ["python", "-m", "env"]
-"""
-            )
+""")
 
             # Create local config
             local_dir = Path(tmpdir) / "local" / ".victor"
             local_dir.mkdir(parents=True)
             local_config = local_dir / "mcp.yaml"
-            local_config.write_text(
-                """
+            local_config.write_text("""
 servers:
   - name: local_server
     command: ["python", "-m", "local"]
-"""
-            )
+""")
 
             import os
 
@@ -220,8 +212,7 @@ class TestMCPRegistryFromConfig:
     def test_from_yaml_config(self):
         """Test loading from YAML config file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write(
-                """
+            f.write("""
 health_check_enabled: false
 default_health_interval: 60
 servers:
@@ -231,8 +222,7 @@ servers:
     tags:
       - test
       - yaml
-"""
-            )
+""")
             f.flush()
 
             registry = MCPRegistry.from_config(Path(f.name))

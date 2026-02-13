@@ -33,7 +33,6 @@ from victor.framework.rl.learners.cross_vertical import (
 from victor.framework.rl.base import RLOutcome
 from victor.core.schema import Tables
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -48,8 +47,7 @@ def db_connection():
     cursor = conn.cursor()
 
     # Create rl_outcome table (used by CrossVerticalLearner)
-    cursor.execute(
-        f"""
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS {Tables.RL_OUTCOME} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             learner TEXT NOT NULL,
@@ -59,8 +57,7 @@ def db_connection():
             metadata TEXT,
             created_at TEXT NOT NULL
         )
-    """
-    )
+    """)
 
     conn.commit()
     yield conn

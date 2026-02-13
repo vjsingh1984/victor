@@ -196,8 +196,7 @@ class FileChangeHistory:
             conn.commit()
 
         # Create tables with correct schema
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS change_groups (
                 id TEXT PRIMARY KEY,
                 session_id TEXT,
@@ -207,11 +206,9 @@ class FileChangeHistory:
                 undone INTEGER DEFAULT 0,
                 data TEXT
             )
-        """
-        )
+        """)
 
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS file_changes (
                 id TEXT PRIMARY KEY,
                 group_id TEXT,
@@ -226,29 +223,22 @@ class FileChangeHistory:
                 checksum_after TEXT,
                 FOREIGN KEY (group_id) REFERENCES change_groups(id)
             )
-        """
-        )
+        """)
 
-        conn.execute(
-            """
+        conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_groups_session
             ON change_groups(session_id)
-        """
-        )
+        """)
 
-        conn.execute(
-            """
+        conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_groups_timestamp
             ON change_groups(timestamp DESC)
-        """
-        )
+        """)
 
-        conn.execute(
-            """
+        conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_changes_path
             ON file_changes(file_path)
-        """
-        )
+        """)
 
         conn.commit()
 

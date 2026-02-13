@@ -38,7 +38,6 @@ from victor.tools.metadata import ToolMetadata, ToolMetadataRegistry
 # Import registry classes from separate module (for backward compatibility)
 from victor.tools.registry import Hook, HookError, ToolRegistry
 
-
 # NOTE: Enums (CostTier, Priority, AccessMode, ExecutionCategory, DangerLevel)
 # have been moved to victor/tools/enums.py and are imported above.
 # ToolMetadata and ToolMetadataRegistry have been moved to victor/tools/metadata.py

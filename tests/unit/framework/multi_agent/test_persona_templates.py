@@ -35,7 +35,6 @@ from victor.framework.multi_agent.personas import (
     ExpertiseLevel,
 )
 
-
 # =============================================================================
 # Researcher Template Tests
 # =============================================================================

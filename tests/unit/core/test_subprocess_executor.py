@@ -3,7 +3,6 @@
 
 """Tests for subprocess_executor module."""
 
-
 import pytest
 
 from victor.tools.subprocess_executor import (

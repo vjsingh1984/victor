@@ -23,7 +23,6 @@ from victor.config.secure_paths import (
 )
 from victor.config.api_keys import is_keyring_available, get_configured_providers
 
-
 security_app = typer.Typer(name="security", help="Security status and plugin trust management.")
 console = Console()
 

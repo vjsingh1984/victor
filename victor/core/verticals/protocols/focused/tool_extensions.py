@@ -39,7 +39,6 @@ from typing import Any, Dict, List, Optional, Protocol, Set, runtime_checkable
 from victor.core.tool_types import ToolDependency, ToolDependencyProviderProtocol
 from victor.core.vertical_types import MiddlewarePriority, MiddlewareResult
 
-
 # =============================================================================
 # Focused Tool Extensions Protocol
 # =============================================================================

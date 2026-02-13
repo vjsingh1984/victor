@@ -42,7 +42,6 @@ from victor.core.tool_dependency_loader import (
 from victor.core.tool_dependency_base import BaseToolDependencyProvider, ToolDependencyConfig
 from victor.core.tool_types import ToolDependency
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -306,13 +305,11 @@ class TestToolDependencyLoaderLoad:
     def test_load_schema_validation_error_missing_vertical(self, loader, tmp_path):
         """load() should raise ToolDependencyLoadError for missing required fields."""
         invalid_schema = tmp_path / "invalid_schema.yaml"
-        invalid_schema.write_text(
-            """
+        invalid_schema.write_text("""
 version: "1.0"
 # Missing required 'vertical' field
 transitions: {}
-"""
-        )
+""")
 
         with pytest.raises(ToolDependencyLoadError) as exc_info:
             loader.load(invalid_schema)

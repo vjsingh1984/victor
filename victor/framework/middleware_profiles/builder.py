@@ -39,7 +39,6 @@ from typing import Any, List, Optional
 
 from victor.framework.middleware_profiles.profiles import MiddlewareProfile
 
-
 # =============================================================================
 # Middleware Profile Builder
 # =============================================================================

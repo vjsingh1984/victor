@@ -26,7 +26,6 @@ from pathlib import Path
 from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
-
 # =============================================================================
 # Mock Workflow Providers for Testing
 # =============================================================================

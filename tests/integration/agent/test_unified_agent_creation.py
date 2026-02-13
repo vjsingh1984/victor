@@ -25,7 +25,6 @@ import pytest
 from victor.agent.config import UnifiedAgentConfig, AgentMode
 from victor.framework.config import AgentConfig
 
-
 # =============================================================================
 # Test UnifiedAgentConfig
 # =============================================================================

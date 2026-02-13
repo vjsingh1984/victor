@@ -14,7 +14,6 @@
 
 """Tests for agent/message_history module."""
 
-
 from victor.agent.message_history import MessageHistory
 
 

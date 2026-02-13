@@ -26,7 +26,6 @@ pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 from victor.core.container import ServiceContainer, ServiceLifetime
 
-
 # =============================================================================
 # Protocol Tests
 # =============================================================================

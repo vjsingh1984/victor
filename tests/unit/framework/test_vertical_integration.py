@@ -43,7 +43,6 @@ from victor.framework.vertical_integration import (
 )
 from victor.core.verticals.protocols import TaskTypeHint, SafetyPattern, ModeConfig
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -1247,8 +1246,7 @@ class TestVerticalIntegrationCaching:
 
         # Create a mock vertical with a temporary source file
         temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False)
-        temp_file.write(
-            """
+        temp_file.write("""
 class TempVertical:
     name = "temp_vertical"
 
@@ -1271,8 +1269,7 @@ class TempVertical:
     @classmethod
     def get_extensions(cls):
         return None
-"""
-        )
+""")
         temp_file.close()
 
         try:

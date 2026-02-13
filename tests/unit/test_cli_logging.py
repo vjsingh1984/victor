@@ -9,7 +9,6 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 from victor.ui.cli import app
 
-
 runner = CliRunner()
 
 

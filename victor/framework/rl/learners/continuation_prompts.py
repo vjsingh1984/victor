@@ -56,8 +56,7 @@ class ContinuationPromptLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Stats table: one row per provider:model:task_type
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_PROMPT_STAT} (
                 context_key TEXT PRIMARY KEY,
                 provider TEXT NOT NULL,
@@ -75,16 +74,13 @@ class ContinuationPromptLearner(BaseLearner):
                 prompts_sum REAL DEFAULT 0.0,
                 last_updated TEXT
             )
-            """
-        )
+            """)
 
         # Index for fast lookups
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_rl_prompt_stat_provider
             ON {Tables.RL_PROMPT_STAT}(provider, model, task_type)
-            """
-        )
+            """)
 
         self.db.commit()
         logger.debug("RL: continuation_prompts tables ensured")

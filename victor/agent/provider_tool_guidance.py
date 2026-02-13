@@ -192,27 +192,18 @@ IMPORTANT - Tool Usage Guidelines:
 """
 
         if task_type == "simple":
-            return (
-                base_guidance
-                + """
+            return base_guidance + """
 For this simple task, aim to complete with 1-2 tool calls.
 """
-            )
         elif task_type == "medium":
-            return (
-                base_guidance
-                + """
+            return base_guidance + """
 After 5 tool calls, pause to synthesize your findings before continuing.
 """
-            )
         else:  # complex
-            return (
-                base_guidance
-                + """
+            return base_guidance + """
 For complex tasks, regularly synthesize findings (every 5-7 tool calls).
 Focus on depth over breadth when exploring.
 """
-            )
 
     def should_consolidate_calls(self, tool_history: List[Dict[str, Any]]) -> bool:
         if len(tool_history) < 2:

@@ -25,7 +25,6 @@ from typing import Dict
 
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
 
-
 # Task-type-specific prompt hints for coding tasks
 # These guide the model's approach based on detected task type
 CODING_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {

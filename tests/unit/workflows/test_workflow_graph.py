@@ -24,7 +24,6 @@ from victor.workflows.graph import (
     GraphValidationError,
 )
 
-
 # Test fixtures
 
 

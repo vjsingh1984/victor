@@ -64,8 +64,7 @@ def temp_workspace():
     """Create a temporary workspace directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         workspace = Path(tmpdir)
-        (workspace / "main.py").write_text(
-            '''
+        (workspace / "main.py").write_text('''
 def hello():
     """Say hello."""
     return "Hello, World!"
@@ -76,10 +75,8 @@ def add(a, b):
 
 if __name__ == "__main__":
     print(hello())
-'''
-        )
-        (workspace / "test_main.py").write_text(
-            """
+''')
+        (workspace / "test_main.py").write_text("""
 import pytest
 from main import hello, add
 
@@ -88,14 +85,11 @@ def test_hello():
 
 def test_add():
     assert add(2, 3) == 5
-"""
-        )
-        (workspace / "buggy.py").write_text(
-            """
+""")
+        (workspace / "buggy.py").write_text("""
 def divide(a, b):
     return a / b  # BUG: No zero check!
-"""
-        )
+""")
         yield workspace
 
 

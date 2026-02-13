@@ -12,7 +12,6 @@ from victor.config.settings import load_settings
 # ToolDefinition is imported for type hinting, though not directly used in the logic
 from victor.providers.base import ToolDefinition  # noqa: F401
 
-
 tools_app = typer.Typer(name="tools", help="Manage Victor's integrated tools.")
 console = Console()
 

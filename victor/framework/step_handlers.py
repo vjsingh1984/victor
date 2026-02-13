@@ -140,7 +140,6 @@ from victor.core.verticals.prompt_adapter import PromptContributorAdapter
 
 from victor.framework.protocols import CapabilityRegistryProtocol
 
-
 logger = logging.getLogger(__name__)
 
 

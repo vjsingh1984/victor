@@ -43,7 +43,6 @@ from typing import Any, Dict, List
 # Import LearnerType from enum directly to avoid circular import
 from victor.framework.rl import LearnerType
 
-
 # Default patience map - shared across all verticals
 # These are reasonable defaults for continuation learning
 DEFAULT_PATIENCE_MAP: Dict[str, int] = {

@@ -3,7 +3,6 @@
 
 """Tests for shared_ast_utils module."""
 
-
 from victor.tools.shared_ast_utils import (
     calculate_cognitive_complexity,
     calculate_complexity,

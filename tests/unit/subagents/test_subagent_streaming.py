@@ -38,7 +38,6 @@ from victor.agent.subagents import (
 )
 from victor.providers.base import StreamChunk
 
-
 # =============================================================================
 # SubAgent.stream_execute() Tests
 # =============================================================================

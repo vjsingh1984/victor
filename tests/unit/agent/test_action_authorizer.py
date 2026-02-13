@@ -23,7 +23,6 @@ Tests intent detection for action authorization:
 - Safe actions filtering
 """
 
-
 from victor.agent.action_authorizer import (
     ActionIntent,
     ActionAuthorizer,

@@ -200,8 +200,7 @@ class TestCodebaseAnalyzerParsePythonFile:
         """Test parsing a simple Python file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             py_file = Path(tmpdir) / "test.py"
-            py_file.write_text(
-                '''"""Module docstring."""
+            py_file.write_text('''"""Module docstring."""
 
 class MyClass:
     """A test class."""
@@ -209,8 +208,7 @@ class MyClass:
 
 def my_function():
     pass
-'''
-            )
+''')
 
             analyzer = CodebaseAnalyzer(tmpdir)
             module_info = analyzer._parse_python_file(py_file, "test.py")
@@ -316,8 +314,7 @@ class TestCodebaseAnalyzerExtractEntryPoints:
         """Test extracting entry points from pyproject.toml."""
         with tempfile.TemporaryDirectory() as tmpdir:
             pyproject = Path(tmpdir) / "pyproject.toml"
-            pyproject.write_text(
-                """
+            pyproject.write_text("""
 [project]
 name = "myproject"
 
@@ -327,8 +324,7 @@ myapp2 = "mypackage.cli:other"
 
 [project.optional-dependencies]
 dev = ["pytest", "black", "ruff", "mypy"]
-"""
-            )
+""")
 
             analyzer = CodebaseAnalyzer(tmpdir)
             analyzer.analysis.main_package = "mypackage"
@@ -431,21 +427,17 @@ class TestCodebaseAnalyzerFullAnalyze:
             pkg_dir = Path(tmpdir) / "mypackage"
             pkg_dir.mkdir()
             (pkg_dir / "__init__.py").write_text("")
-            (pkg_dir / "main.py").write_text(
-                '''"""Main module."""
+            (pkg_dir / "main.py").write_text('''"""Main module."""
 
 class MyOrchestrator:
     """The main orchestrator."""
     pass
-'''
-            )
+''')
 
-            (Path(tmpdir) / "pyproject.toml").write_text(
-                """
+            (Path(tmpdir) / "pyproject.toml").write_text("""
 [project]
 name = "mypackage"
-"""
-            )
+""")
 
             (Path(tmpdir) / "tests").mkdir()
 
@@ -480,12 +472,10 @@ class TestGenerateSmartVictorMd:
             pkg_dir.mkdir()
             (pkg_dir / "__init__.py").write_text("")
 
-            (Path(tmpdir) / "README.md").write_text(
-                """# My Project
+            (Path(tmpdir) / "README.md").write_text("""# My Project
 
 This is an awesome project for doing things.
-"""
-            )
+""")
 
             result = generate_smart_victor_md(tmpdir)
 
@@ -513,12 +503,10 @@ class TestExtractReadmeDescription:
     def test_extract_description(self):
         """Test extracting description from README."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            (Path(tmpdir) / "README.md").write_text(
-                """# Project
+            (Path(tmpdir) / "README.md").write_text("""# Project
 
 This is the project description.
-"""
-            )
+""")
 
             desc = _extract_readme_description(Path(tmpdir))
             assert "project description" in desc
@@ -526,14 +514,12 @@ This is the project description.
     def test_skip_badges(self):
         """Test that badges are skipped."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            (Path(tmpdir) / "README.md").write_text(
-                """# Project
+            (Path(tmpdir) / "README.md").write_text("""# Project
 
 [![Badge](https://example.com/badge.svg)](url)
 
 The actual description.
-"""
-            )
+""")
 
             desc = _extract_readme_description(Path(tmpdir))
             assert "actual description" in desc
@@ -541,14 +527,12 @@ The actual description.
     def test_skip_headers(self):
         """Test that headers are skipped."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            (Path(tmpdir) / "README.md").write_text(
-                """# Project
+            (Path(tmpdir) / "README.md").write_text("""# Project
 
 ## Installation
 
 The real description here.
-"""
-            )
+""")
 
             desc = _extract_readme_description(Path(tmpdir))
             assert "real description" in desc
@@ -563,13 +547,11 @@ The real description here.
         """Test extracting from README.rst."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # RST uses blank lines between paragraphs
-            (Path(tmpdir) / "README.rst").write_text(
-                """Project
+            (Path(tmpdir) / "README.rst").write_text("""Project
 =======
 
 This is the RST description here.
-"""
-            )
+""")
 
             desc = _extract_readme_description(Path(tmpdir))
             # RST header lines are separate paragraphs, so "Project" with "======="
@@ -598,13 +580,11 @@ class TestCodebaseAnalyzerAnalyzePythonFiles:
             sub_dir = pkg_dir / "tools"
             sub_dir.mkdir()
             (sub_dir / "__init__.py").write_text("")
-            (sub_dir / "git_tool.py").write_text(
-                '''"""Git tool."""
+            (sub_dir / "git_tool.py").write_text('''"""Git tool."""
 
 class GitTool:
     pass
-'''
-            )
+''')
 
             analyzer = CodebaseAnalyzer(tmpdir)
             analyzer._detect_package_layout()
@@ -626,8 +606,7 @@ class TestCodebaseAnalyzerIdentifyKeyComponents:
             pkg_dir = Path(tmpdir) / "mypackage"
             pkg_dir.mkdir()
             (pkg_dir / "__init__.py").write_text("")
-            (pkg_dir / "orchestrator.py").write_text(
-                '''"""Orchestrator module."""
+            (pkg_dir / "orchestrator.py").write_text('''"""Orchestrator module."""
 
 class AgentOrchestrator:
     """Central orchestrator."""
@@ -636,8 +615,7 @@ class AgentOrchestrator:
 class BaseProvider:
     """Base provider class."""
     pass
-'''
-            )
+''')
 
             analyzer = CodebaseAnalyzer(tmpdir)
             analyzer._detect_package_layout()

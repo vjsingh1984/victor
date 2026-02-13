@@ -18,7 +18,6 @@ import pytest
 
 from victor.state.protocols import IStateManager, IStateObserver, StateScope
 
-
 # =============================================================================
 # Test StateScope Enum
 # =============================================================================

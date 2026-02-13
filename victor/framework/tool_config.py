@@ -39,7 +39,6 @@ from victor.framework.tools import ToolCategory, get_category_registry
 # Import capability helpers for protocol-based access
 from victor.framework.vertical_integration import _check_capability, _invoke_capability
 
-
 # =============================================================================
 # Protocols
 # =============================================================================

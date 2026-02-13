@@ -119,7 +119,6 @@ class MessageAdderProtocol(Protocol):
 # Uses **kwargs which accepts model, temperature, max_tokens
 from victor.core.protocols import ProviderProtocol
 
-
 # =============================================================================
 # Result Types
 # =============================================================================

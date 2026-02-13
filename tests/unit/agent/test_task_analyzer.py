@@ -14,7 +14,6 @@
 
 """Tests for the unified TaskAnalyzer."""
 
-
 from victor.agent.task_analyzer import (
     TaskAnalyzer,
     TaskAnalysis,

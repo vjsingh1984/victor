@@ -13,7 +13,6 @@ from victor.security.safety.pii import (
     get_safety_reminders as core_get_safety_reminders,
 )
 
-
 # Risk levels
 HIGH = "HIGH"
 MEDIUM = "MEDIUM"

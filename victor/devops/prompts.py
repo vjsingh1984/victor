@@ -4,7 +4,6 @@ from typing import Dict, Optional
 
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
 
-
 # DevOps-specific task type hints
 # Keys align with TaskTypeClassifier task types (infrastructure, ci_cd)
 # Also includes granular hints for specific technologies

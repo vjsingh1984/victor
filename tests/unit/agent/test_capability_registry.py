@@ -29,7 +29,6 @@ from victor.framework.protocols import (
 )
 from victor.agent.capability_registry import CapabilityRegistryMixin
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================

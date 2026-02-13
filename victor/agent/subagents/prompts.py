@@ -26,7 +26,6 @@ guiding the sub-agent to stay within its role boundaries.
 
 from victor.agent.subagents.base import SubAgentRole
 
-
 ROLE_PROMPTS = {
     SubAgentRole.RESEARCHER: """You are a RESEARCHER sub-agent with read-only access to the codebase.
 

@@ -31,7 +31,6 @@ from victor.integrations.protocol.interface import (
 )
 from victor.integrations.search_types import CodeSearchResult
 
-
 # =============================================================================
 # DIRECT PROTOCOL ADAPTER TESTS
 # =============================================================================

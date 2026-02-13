@@ -30,16 +30,14 @@ class TestSymbol:
     async def test_find_function(self, tmp_path):
         """Test finding a function definition."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def hello_world():
     print("Hello, World!")
     return True
 
 def another_function():
     pass
-"""
-        )
+""")
 
         result = await symbol(file_path=str(test_file), symbol_name="hello_world")
 
@@ -54,16 +52,14 @@ def another_function():
     async def test_find_class(self, tmp_path):
         """Test finding a class definition."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 class MyClass:
     def __init__(self):
         self.value = 0
 
     def method(self):
         return self.value
-"""
-        )
+""")
 
         result = await symbol(file_path=str(test_file), symbol_name="MyClass")
 
@@ -76,12 +72,10 @@ class MyClass:
     async def test_symbol_not_found(self, tmp_path):
         """Test searching for non-existent symbol."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def existing_function():
     pass
-"""
-        )
+""")
 
         result = await symbol(file_path=str(test_file), symbol_name="nonexistent")
 
@@ -109,14 +103,12 @@ def existing_function():
     async def test_find_nested_function(self, tmp_path):
         """Test finding nested function."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def outer_function():
     def inner_function():
         return "inner"
     return inner_function()
-"""
-        )
+""")
 
         result = await symbol(file_path=str(test_file), symbol_name="inner_function")
 
@@ -128,13 +120,11 @@ def outer_function():
     async def test_find_method_in_class(self, tmp_path):
         """Test finding a method inside a class."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 class TestClass:
     def test_method(self):
         pass
-"""
-        )
+""")
 
         result = await symbol(file_path=str(test_file), symbol_name="test_method")
 
@@ -170,21 +160,17 @@ class TestRefs:
         """Test finding references in directory."""
         # Create a directory with Python files
         test_file1 = tmp_path / "file1.py"
-        test_file1.write_text(
-            """
+        test_file1.write_text("""
 def target_function():
     return True
-"""
-        )
+""")
 
         test_file2 = tmp_path / "file2.py"
-        test_file2.write_text(
-            """
+        test_file2.write_text("""
 from file1 import target_function
 
 result = target_function()
-"""
-        )
+""")
 
         result = await refs(symbol_name="target_function", search_path=str(tmp_path))
 
@@ -195,12 +181,10 @@ result = target_function()
     async def test_refs_no_matches(self, tmp_path):
         """Test finding references when none exist."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def some_function():
     pass
-"""
-        )
+""")
 
         result = await refs(symbol_name="nonexistent_function", search_path=str(tmp_path))
 
@@ -232,14 +216,12 @@ def some_function():
 
         # Create a valid file
         good_file = tmp_path / "good.py"
-        good_file.write_text(
-            """
+        good_file.write_text("""
 def target_function():
     pass
 
 result = target_function()
-"""
-        )
+""")
 
         result = await refs(symbol_name="target_function", search_path=str(tmp_path))
 
@@ -272,13 +254,11 @@ class TestRename:
     async def test_rename_single_file(self, tmp_path):
         """Test renaming symbol in a single file."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """def old_func():
+        test_file.write_text("""def old_func():
     return True
 
 result = old_func()
-"""
-        )
+""")
 
         result = await rename(
             old_name="old_func",
@@ -514,13 +494,11 @@ result = old_func()
     async def test_rename_word_boundary_safety(self, tmp_path):
         """Test that rename uses word boundaries to avoid partial matches."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            """def get_user(): pass
+        test_file.write_text("""def get_user(): pass
 def get_username(): pass  # Should NOT be renamed
 user = get_user()
 username = get_username()  # Should NOT be renamed
-"""
-        )
+""")
 
         result = await rename(
             old_name="get_user",

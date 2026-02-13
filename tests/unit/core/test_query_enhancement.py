@@ -56,7 +56,6 @@ from victor.core.query_enhancement import (
     DecompositionStrategy,
 )
 
-
 # =============================================================================
 # EnhancedQuery Dataclass Tests
 # =============================================================================

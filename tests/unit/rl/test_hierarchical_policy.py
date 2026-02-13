@@ -39,7 +39,6 @@ from victor.framework.rl.hierarchical_policy import (
 )
 from victor.framework.rl.base import RLOutcome
 
-
 # =============================================================================
 # Option Framework Tests
 # =============================================================================

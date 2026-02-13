@@ -141,8 +141,7 @@ class EntityGraph:
         self._conn = sqlite3.connect(str(db_path))
         self._conn.row_factory = sqlite3.Row
 
-        self._conn.executescript(
-            """
+        self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS graph_entities (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -167,8 +166,7 @@ class EntityGraph:
             CREATE INDEX IF NOT EXISTS idx_graph_source ON graph_relations(source_id);
             CREATE INDEX IF NOT EXISTS idx_graph_target ON graph_relations(target_id);
             CREATE INDEX IF NOT EXISTS idx_graph_type ON graph_relations(relation_type);
-        """
-        )
+        """)
         self._conn.commit()
 
         # Load existing data into memory if in_memory mode

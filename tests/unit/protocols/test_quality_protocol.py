@@ -27,7 +27,6 @@ from victor.protocols.quality import (
     CompositeQualityAssessor,
 )
 
-
 # =============================================================================
 # QUALITY DIMENSION TESTS
 # =============================================================================

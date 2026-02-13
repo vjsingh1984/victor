@@ -21,7 +21,6 @@ rather than re-defining common patterns.
 
 from typing import Dict, Optional
 
-
 # =============================================================================
 # Common Task Budgets
 # =============================================================================

@@ -104,7 +104,6 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, TYPE_CHE
 
 import yaml
 
-
 # =============================================================================
 # Enums for controlled values (code maintenance)
 # =============================================================================

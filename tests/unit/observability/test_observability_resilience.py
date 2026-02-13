@@ -34,7 +34,6 @@ from victor.observability.resilience import (
 )
 from victor.providers.circuit_breaker import CircuitState
 
-
 # =============================================================================
 # Backoff Strategy Tests
 # =============================================================================

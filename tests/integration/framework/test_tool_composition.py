@@ -24,7 +24,6 @@ from typing import Any, Dict, List
 
 from victor.tools.composition import LazyToolRunnable, ToolCompositionBuilder
 
-
 # =============================================================================
 # Mock Tools for Testing
 # =============================================================================

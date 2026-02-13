@@ -104,8 +104,7 @@ class ABTestManager:
         cursor = conn.cursor()
 
         # Experiments table
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS experiments (
                 experiment_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -119,12 +118,10 @@ class ABTestManager:
                 paused_at REAL,
                 tags_json TEXT
             )
-        """
-        )
+        """)
 
         # Variants table
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS variants (
                 experiment_id TEXT NOT NULL,
                 variant_id TEXT NOT NULL,
@@ -139,12 +136,10 @@ class ABTestManager:
                 PRIMARY KEY (experiment_id, variant_id),
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id) ON DELETE CASCADE
             )
-        """
-        )
+        """)
 
         # Metrics table
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS metrics (
                 experiment_id TEXT NOT NULL,
                 metric_id TEXT NOT NULL,
@@ -157,12 +152,10 @@ class ABTestManager:
                 PRIMARY KEY (experiment_id, metric_id),
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id) ON DELETE CASCADE
             )
-        """
-        )
+        """)
 
         # Executions table
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS executions (
                 execution_id TEXT PRIMARY KEY,
                 experiment_id TEXT NOT NULL,
@@ -185,12 +178,10 @@ class ABTestManager:
                 workflow_type TEXT,
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id) ON DELETE CASCADE
             )
-        """
-        )
+        """)
 
         # Allocations table (for sticky allocation tracking)
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS allocations (
                 experiment_id TEXT NOT NULL,
                 user_id TEXT NOT NULL,
@@ -200,12 +191,10 @@ class ABTestManager:
                 PRIMARY KEY (experiment_id, user_id),
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id) ON DELETE CASCADE
             )
-        """
-        )
+        """)
 
         # Results table
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS results (
                 experiment_id TEXT PRIMARY KEY,
                 winning_variant_id TEXT,
@@ -221,8 +210,7 @@ class ABTestManager:
                 total_duration_seconds REAL NOT NULL DEFAULT 0.0,
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id) ON DELETE CASCADE
             )
-        """
-        )
+        """)
 
         # Create indexes for performance
         cursor.execute(

@@ -94,7 +94,6 @@ from victor.framework.event_registry import (
     get_event_registry,
 )
 
-
 # Wrapper functions - delegate to EventRegistry (single source of truth)
 # These are kept for backward compatibility with existing callers.
 

@@ -19,7 +19,6 @@ as the single source of truth. See test_metadata_registry.py for keyword-based
 selection tests.
 """
 
-
 from victor.agent.tool_selection import (
     get_critical_tools,
     get_tools_from_message,

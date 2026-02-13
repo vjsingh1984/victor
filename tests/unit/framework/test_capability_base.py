@@ -23,7 +23,6 @@ from typing import Dict, List
 
 from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
 
-
 # =============================================================================
 # CapabilityMetadata Tests
 # =============================================================================

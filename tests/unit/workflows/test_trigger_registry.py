@@ -42,7 +42,6 @@ from victor.workflows.trigger_registry import (
     _registry_instance,
 )
 
-
 # ============ Fixtures ============
 
 

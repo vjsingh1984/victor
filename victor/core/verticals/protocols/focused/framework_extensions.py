@@ -44,7 +44,6 @@ from victor.core.verticals.protocols.rl_provider import RLConfigProviderProtocol
 from victor.core.verticals.protocols.team_provider import TeamSpecProviderProtocol
 from victor.core.verticals.protocols.workflow_provider import WorkflowProviderProtocol
 
-
 # =============================================================================
 # Framework Extensions Protocol
 # =============================================================================

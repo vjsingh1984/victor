@@ -41,7 +41,6 @@ from victor.core.validation import (
     validate_provider_config,
 )
 
-
 # =============================================================================
 # ConfigValidationResult Tests
 # =============================================================================

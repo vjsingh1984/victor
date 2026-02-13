@@ -154,8 +154,7 @@ This is refinement iteration #{iteration + 1}. Previous attempts to fix this wor
         """Few-shot examples section."""
         sections = []
         for i, example in enumerate(examples, 1):
-            sections.append(
-                f"""## Example {i}
+            sections.append(f"""## Example {i}
 
 **Error:** {example['error']}
 
@@ -170,8 +169,7 @@ This is refinement iteration #{iteration + 1}. Previous attempts to fix this wor
 ```
 
 **Explanation:** {example.get('explanation', '(not provided)')}
-"""
-            )
+""")
 
         return "\n".join(sections)
 

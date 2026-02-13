@@ -34,7 +34,6 @@ import victor_native
 from victor.native.observability import InstrumentedAccelerator
 from victor.native.protocols import CoercedType, CoercedValue
 
-
 # Mapping from Rust type names to CoercedType enum
 _TYPE_MAP = {
     "string": CoercedType.STRING,

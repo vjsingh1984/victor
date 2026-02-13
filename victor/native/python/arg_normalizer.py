@@ -27,7 +27,6 @@ from typing import Optional, Tuple
 from victor.native.observability import InstrumentedAccelerator
 from victor.native.protocols import CoercedType, CoercedValue
 
-
 # Patterns for quote repair
 SINGLE_QUOTE_PATTERN = re.compile(r"(?<!\\)'")
 UNESCAPED_QUOTE_PATTERN = re.compile(r'(?<!\\)"(?=[^"]*"[^"]*$)')

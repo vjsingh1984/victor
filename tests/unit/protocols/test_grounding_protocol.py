@@ -31,7 +31,6 @@ from victor.protocols.grounding import (
     CompositeGroundingVerifier,
 )
 
-
 # =============================================================================
 # GROUNDING CLAIM TYPE TESTS
 # =============================================================================

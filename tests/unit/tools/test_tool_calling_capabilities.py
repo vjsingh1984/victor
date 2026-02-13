@@ -14,7 +14,6 @@
 
 """Tests for tool calling capability loader and adapters."""
 
-
 from victor.agent.tool_calling import (
     ModelCapabilityLoader,
     ToolCallingAdapterRegistry,

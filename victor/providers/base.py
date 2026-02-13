@@ -25,7 +25,6 @@ from victor.providers.circuit_breaker import (
 )
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
 
-
 # -----------------------------------------------------------------------------
 # Protocol classes for Interface Segregation (ISP)
 # These allow providers to optionally implement specific capabilities without

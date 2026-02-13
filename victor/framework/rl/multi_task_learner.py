@@ -179,8 +179,7 @@ class MultiTaskLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Vertical-specific Q-values
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS multi_task_vertical_q (
                 vertical TEXT NOT NULL,
                 context_key TEXT NOT NULL,
@@ -190,24 +189,20 @@ class MultiTaskLearner(BaseLearner):
                 last_updated TEXT NOT NULL,
                 PRIMARY KEY (vertical, context_key)
             )
-            """
-        )
+            """)
 
         # Global Q-values (shared)
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS multi_task_global_q (
                 context_key TEXT PRIMARY KEY,
                 q_value REAL NOT NULL,
                 sample_count INTEGER NOT NULL DEFAULT 0,
                 last_updated TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         # Transfer history
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS multi_task_transfers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 source_vertical TEXT NOT NULL,
@@ -218,16 +213,13 @@ class MultiTaskLearner(BaseLearner):
                 transfer_weight REAL NOT NULL,
                 timestamp TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         # Indexes
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_multi_task_vertical
             ON multi_task_vertical_q(vertical)
-            """
-        )
+            """)
 
         self.db.commit()
         logger.debug("RL: multi_task tables ensured")

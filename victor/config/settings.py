@@ -24,7 +24,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
 
-
 # =============================================================================
 # CENTRALIZED PATH CONFIGURATION
 # =============================================================================

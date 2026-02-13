@@ -38,7 +38,6 @@ from victor.workflows.metrics import (
 )
 from victor.workflows.streaming import WorkflowEventType, WorkflowStreamChunk
 
-
 # =============================================================================
 # Test: Node Metrics
 # =============================================================================

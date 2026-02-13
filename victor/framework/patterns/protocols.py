@@ -32,7 +32,6 @@ from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 from victor.framework.protocols import OrchestratorProtocol
 from victor.teams import TeamFormation
 
-
 # =============================================================================
 # Data Classes
 # =============================================================================

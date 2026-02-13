@@ -106,8 +106,7 @@ class ToolSelectorLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Global tool Q-values table (uses Tables constants)
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_TOOL_Q} (
                 tool_name TEXT PRIMARY KEY,
                 q_value REAL NOT NULL,
@@ -115,12 +114,10 @@ class ToolSelectorLearner(BaseLearner):
                 success_count INTEGER DEFAULT 0,
                 last_updated TEXT
             )
-            """
-        )
+            """)
 
         # Task-specific tool Q-values table
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_TOOL_TASK} (
                 tool_name TEXT NOT NULL,
                 task_type TEXT NOT NULL,
@@ -130,12 +127,10 @@ class ToolSelectorLearner(BaseLearner):
                 last_updated TEXT,
                 PRIMARY KEY (tool_name, task_type)
             )
-            """
-        )
+            """)
 
         # Tool execution outcomes table (for detailed analysis)
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_TOOL_OUTCOME} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tool_name TEXT NOT NULL,
@@ -146,22 +141,17 @@ class ToolSelectorLearner(BaseLearner):
                 metadata TEXT,
                 timestamp TEXT
             )
-            """
-        )
+            """)
 
         # Indexes
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_rl_tool_q_task
             ON {Tables.RL_TOOL_TASK}(tool_name, task_type)
-            """
-        )
-        cursor.execute(
-            f"""
+            """)
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_rl_tool_outcome_tool
             ON {Tables.RL_TOOL_OUTCOME}(tool_name, task_type)
-            """
-        )
+            """)
 
         self.db.commit()
         logger.debug("RL: tool_selector tables ensured")

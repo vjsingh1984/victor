@@ -174,8 +174,7 @@ class TestModuleLoading:
         """Test loading capabilities from a file path."""
         # Create a temporary capability module
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write(
-                """
+            f.write("""
 from victor.framework.protocols import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry
 
@@ -193,8 +192,7 @@ CAPABILITIES = [
         handler=my_handler,
     )
 ]
-"""
-            )
+""")
             temp_path = f.name
 
         try:

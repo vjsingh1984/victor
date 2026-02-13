@@ -39,7 +39,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Protocol, Tuple, TypeVar
 
-
 # =============================================================================
 # UNIFIED ID SCHEME
 # =============================================================================

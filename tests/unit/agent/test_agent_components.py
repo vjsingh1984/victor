@@ -28,7 +28,6 @@ from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================

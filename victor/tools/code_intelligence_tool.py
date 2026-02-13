@@ -21,7 +21,6 @@ from victor.coding.codebase.tree_sitter_manager import get_parser
 from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 
-
 # Tree-sitter queries to find function and class definitions in Python
 PYTHON_QUERIES = {
     "function": """

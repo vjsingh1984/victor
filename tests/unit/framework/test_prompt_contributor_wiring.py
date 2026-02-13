@@ -32,7 +32,6 @@ from victor.core.verticals.prompt_adapter import (
 from victor.core.verticals.protocols import TaskTypeHint
 from victor.framework.step_handlers import PromptStepHandler
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================

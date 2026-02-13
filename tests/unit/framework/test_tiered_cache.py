@@ -33,7 +33,6 @@ from victor.storage.cache.tiered_cache import (
 )
 from victor.storage.cache.manager import CacheManager
 
-
 # ============================================================================
 # TieredCache Tests
 # ============================================================================

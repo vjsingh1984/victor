@@ -26,7 +26,6 @@ from victor.coordination.formations import (
 from victor.coordination.formations.base import TeamContext
 from victor.teams.types import AgentMessage, MessageType, MemberResult
 
-
 # =============================================================================
 # Mock Agents
 # =============================================================================

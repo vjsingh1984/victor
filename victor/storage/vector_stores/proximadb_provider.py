@@ -45,7 +45,6 @@ from victor.storage.vector_stores.models import (
     create_embedding_model,
 )
 
-
 # Check if ProximaDB is available
 try:
     import httpx

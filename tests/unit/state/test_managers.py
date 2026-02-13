@@ -24,7 +24,6 @@ from victor.state.managers import (
 )
 from victor.state.protocols import IStateManager, IStateObserver, StateScope
 
-
 # =============================================================================
 # Mock Observer for Testing
 # =============================================================================
