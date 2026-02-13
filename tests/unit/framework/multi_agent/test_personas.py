@@ -27,7 +27,6 @@ from victor.framework.multi_agent.personas import (
     PersonaTraits,
 )
 
-
 # =============================================================================
 # CommunicationStyle Enum Tests
 # =============================================================================

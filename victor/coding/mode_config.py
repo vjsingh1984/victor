@@ -30,7 +30,6 @@ from victor.core.mode_config import (
     RegistryBasedModeConfigProvider,
 )
 
-
 # =============================================================================
 # Coding-Specific Modes (Registered with Central Registry)
 # =============================================================================

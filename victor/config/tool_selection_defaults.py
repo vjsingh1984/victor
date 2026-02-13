@@ -41,7 +41,6 @@ Usage:
 from dataclasses import dataclass
 from typing import Final, FrozenSet, List, Set
 
-
 # =============================================================================
 # Semantic Selector Defaults
 # =============================================================================

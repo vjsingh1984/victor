@@ -40,7 +40,6 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
-
 # =============================================================================
 # Team Spec Provider Protocol
 # =============================================================================

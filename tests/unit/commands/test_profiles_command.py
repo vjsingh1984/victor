@@ -35,7 +35,6 @@ from victor.ui.commands.profiles import (
     _save_profiles_yaml,
 )
 
-
 runner = CliRunner()
 
 

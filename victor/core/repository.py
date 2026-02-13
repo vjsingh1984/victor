@@ -581,8 +581,7 @@ class SQLiteRepository(Repository[T], Generic[T]):
     def _create_table(self) -> None:
         """Create the repository table if it doesn't exist."""
         with sqlite3.connect(self._db_path) as conn:
-            conn.execute(
-                f"""
+            conn.execute(f"""
                 CREATE TABLE IF NOT EXISTS {self._table_name} (
                     id TEXT PRIMARY KEY,
                     data TEXT NOT NULL,
@@ -590,14 +589,11 @@ class SQLiteRepository(Repository[T], Generic[T]):
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 )
-                """
-            )
-            conn.execute(
-                f"""
+                """)
+            conn.execute(f"""
                 CREATE INDEX IF NOT EXISTS idx_{self._table_name}_updated_at
                 ON {self._table_name}(updated_at)
-                """
-            )
+                """)
 
     async def add(self, entity: T) -> None:
         """Add entity to repository."""

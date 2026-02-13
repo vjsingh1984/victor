@@ -34,7 +34,6 @@ from victor.state.managers import (
 from victor.state.protocols import StateScope
 from victor.state.tracer import StateTracer
 
-
 # =============================================================================
 # Test GlobalStateManager
 # =============================================================================

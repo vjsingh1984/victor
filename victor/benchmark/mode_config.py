@@ -35,7 +35,6 @@ from victor.core.mode_config import (
     RegistryBasedModeConfigProvider,
 )
 
-
 # =============================================================================
 # Benchmark-Specific Modes (Registered with Central Registry)
 # =============================================================================

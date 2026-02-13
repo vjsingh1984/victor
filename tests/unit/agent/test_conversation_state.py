@@ -14,7 +14,6 @@
 
 """Tests for conversation_state module."""
 
-
 from victor.agent.conversation_state import (
     ConversationStage,
     ConversationState,

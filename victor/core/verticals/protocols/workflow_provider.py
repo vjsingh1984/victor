@@ -37,7 +37,6 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
-
 # =============================================================================
 # Workflow Provider Protocol
 # =============================================================================

@@ -22,7 +22,6 @@ import os
 from pathlib import Path
 from typing import List, Optional, Set
 
-
 # Directories to exclude when walking/searching codebases
 EXCLUDE_DIRS: Set[str] = {
     ".git",

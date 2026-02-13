@@ -33,7 +33,6 @@ from victor.agent.orchestrator_utils import (
 )
 from victor.agent.presentation import NullPresentationAdapter
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================

@@ -56,7 +56,6 @@ from victor.framework.personas import (
 )
 from victor.teams import UnifiedTeamCoordinator
 
-
 # =============================================================================
 # Test Agent Implementation with Capability Enforcement
 # =============================================================================

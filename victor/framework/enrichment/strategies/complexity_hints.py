@@ -38,7 +38,6 @@ from typing import Dict, Optional
 
 from victor.framework.task.protocols import TaskComplexity
 
-
 # Standard prompt hints per complexity level
 COMPLEXITY_HINTS: Dict[TaskComplexity, str] = {
     TaskComplexity.SIMPLE: "[SIMPLE] Quick query. Focus on relevant tools. Answer concisely.",

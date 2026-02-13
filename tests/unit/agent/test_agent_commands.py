@@ -54,7 +54,6 @@ from victor.core.agent_commands import (
 )
 from victor.core.event_sourcing import InMemoryEventStore, EventDispatcher
 
-
 # =============================================================================
 # Command Tests
 # =============================================================================

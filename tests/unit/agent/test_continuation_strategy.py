@@ -21,7 +21,6 @@ from victor.agent.continuation_strategy import ContinuationStrategy
 from victor.storage.embeddings.intent_classifier import IntentType
 from victor.storage.embeddings.question_classifier import QuestionType, QuestionClassificationResult
 
-
 # =============================================================================
 # DETECT MENTIONED TOOLS TESTS
 # =============================================================================

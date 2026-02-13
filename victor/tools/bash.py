@@ -23,7 +23,6 @@ from victor.config.timeouts import ProcessTimeouts
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
 from victor.tools.decorators import tool
 
-
 # Dangerous commands that should be blocked
 DANGEROUS_COMMANDS = {
     "rm -rf /",

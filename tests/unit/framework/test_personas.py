@@ -20,7 +20,6 @@ personality and communication styles for agents.
 
 import pytest
 
-
 # =============================================================================
 # Persona Dataclass Tests
 # =============================================================================

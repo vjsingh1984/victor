@@ -530,8 +530,7 @@ class HierarchicalPolicy(BaseLearner):
 
         cursor = self.db.cursor()
 
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {self.name}_q_table (
                 state_key TEXT NOT NULL,
                 option_name TEXT NOT NULL,
@@ -540,11 +539,9 @@ class HierarchicalPolicy(BaseLearner):
                 updated_at REAL DEFAULT (julianday('now')),
                 PRIMARY KEY (state_key, option_name)
             )
-            """
-        )
+            """)
 
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {self.name}_outcomes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 option_name TEXT NOT NULL,
@@ -552,8 +549,7 @@ class HierarchicalPolicy(BaseLearner):
                 reward REAL NOT NULL,
                 timestamp TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         self.db.commit()
 

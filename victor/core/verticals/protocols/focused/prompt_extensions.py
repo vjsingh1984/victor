@@ -49,7 +49,6 @@ from victor.core.verticals.protocols.prompt_provider import (
     TaskTypeHint,
 )
 
-
 # =============================================================================
 # Prompt Extensions Protocol
 # =============================================================================

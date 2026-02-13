@@ -277,18 +277,15 @@ class CurriculumController:
 
         cursor = self.db.cursor()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS curriculum_stages (
                 context_key TEXT PRIMARY KEY,
                 current_stage INTEGER NOT NULL,
                 last_updated TEXT NOT NULL
             )
-            """
-        )
+            """)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS curriculum_metrics (
                 context_key TEXT NOT NULL,
                 stage INTEGER NOT NULL,
@@ -300,11 +297,9 @@ class CurriculumController:
                 last_updated TEXT NOT NULL,
                 PRIMARY KEY (context_key, stage)
             )
-            """
-        )
+            """)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS curriculum_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 context_key TEXT NOT NULL,
@@ -313,8 +308,7 @@ class CurriculumController:
                 reason TEXT NOT NULL,
                 timestamp TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         self.db.commit()
 

@@ -45,7 +45,6 @@ from typing import Dict, Optional, Set, Type
 
 from victor.framework.agent_protocols import AgentCapability, IAgentRole
 
-
 # =============================================================================
 # Manager Role
 # =============================================================================

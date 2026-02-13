@@ -30,7 +30,6 @@ from victor.framework.multi_agent.persona_provider import (
 )
 from victor.framework.multi_agent.personas import PersonaTraits
 
-
 # =============================================================================
 # Fixture: Reset Provider Singleton
 # =============================================================================

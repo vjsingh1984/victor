@@ -32,7 +32,6 @@ from victor.agent.debug_logger import (
 )
 from victor.providers.base import Message
 
-
 # =============================================================================
 # TRACE LEVEL TESTS
 # =============================================================================

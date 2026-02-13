@@ -29,7 +29,6 @@ from victor.core.mode_config import (
     RegistryBasedModeConfigProvider,
 )
 
-
 # =============================================================================
 # RAG-Specific Modes (Registered with Central Registry)
 # =============================================================================

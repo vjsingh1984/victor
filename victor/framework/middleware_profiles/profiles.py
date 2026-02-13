@@ -40,7 +40,6 @@ from typing import Any, Dict, List, Optional
 
 import victor.framework.middleware as middleware_module
 
-
 # =============================================================================
 # Middleware Profile
 # =============================================================================

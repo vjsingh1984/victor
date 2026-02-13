@@ -30,7 +30,6 @@ import signal
 import sys
 import platform
 
-
 # Early skip for ARM CPUs (vLLM has known compatibility issues)
 _is_arm = platform.processor().startswith(("arm", "aarch64")) or platform.machine().startswith(
     ("arm", "aarch64")

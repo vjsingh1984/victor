@@ -37,7 +37,6 @@ from victor.framework.capabilities.privacy import (
     get_framework_privacy_capabilities,
 )
 
-
 # =============================================================================
 # Mock Orchestrator for Testing
 # =============================================================================

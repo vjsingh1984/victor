@@ -42,7 +42,6 @@ from typing import Dict, List, Protocol, runtime_checkable
 
 from victor.security.safety.types import SafetyPattern
 
-
 # =============================================================================
 # Safety Extension Protocol
 # =============================================================================

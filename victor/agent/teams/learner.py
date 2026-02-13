@@ -281,8 +281,7 @@ class TeamCompositionLearner:
         cursor = self.db.cursor()
 
         # Composition stats table (agent_team_config)
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.AGENT_TEAM_CONFIG} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 config_key TEXT UNIQUE NOT NULL,
@@ -296,12 +295,10 @@ class TeamCompositionLearner:
                 q_value REAL DEFAULT 0.5,
                 updated_at TEXT DEFAULT (datetime('now'))
             )
-            """
-        )
+            """)
 
         # Execution history table (agent_team_run)
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.AGENT_TEAM_RUN} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 team_id TEXT NOT NULL,
@@ -316,22 +313,17 @@ class TeamCompositionLearner:
                 duration_seconds REAL,
                 created_at TEXT DEFAULT (datetime('now'))
             )
-            """
-        )
+            """)
 
         # Indexes
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_team_config_category
             ON {Tables.AGENT_TEAM_CONFIG}(task_category)
-            """
-        )
-        cursor.execute(
-            f"""
+            """)
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_team_run_category
             ON {Tables.AGENT_TEAM_RUN}(task_category)
-            """
-        )
+            """)
 
         self.db.commit()
 
@@ -720,7 +712,7 @@ class TeamCompositionLearner:
             avg_quality = 0.5
             avg_duration = 0.0
         else:
-            (q_value, total_exec, successes, avg_quality, avg_duration) = row
+            q_value, total_exec, successes, avg_quality, avg_duration = row
 
         # Get max Q-value for this category (for Q-learning update)
         cursor.execute(
@@ -827,12 +819,10 @@ class TeamCompositionLearner:
                 (task_category.value,),
             )
         else:
-            cursor.execute(
-                f"""
+            cursor.execute(f"""
                 SELECT COUNT(*), SUM(execution_count), AVG(q_value)
                 FROM {Tables.AGENT_TEAM_CONFIG}
-                """
-            )
+                """)
 
         row = cursor.fetchone()
         composition_count, total_executions, avg_q = row
@@ -850,14 +840,12 @@ class TeamCompositionLearner:
                 (task_category.value,),
             )
         else:
-            cursor.execute(
-                f"""
+            cursor.execute(f"""
                 SELECT config_key, q_value, execution_count
                 FROM {Tables.AGENT_TEAM_CONFIG}
                 ORDER BY q_value DESC
                 LIMIT 5
-                """
-            )
+                """)
 
         top_compositions = [
             {"key": row[0], "q_value": row[1], "executions": row[2]} for row in cursor.fetchall()

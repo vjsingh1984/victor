@@ -39,7 +39,6 @@ from victor.security.safety.infrastructure import (
 from victor.security.safety.secrets import CREDENTIAL_PATTERNS, SecretScanner
 from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
 
-
 # Risk levels (kept for backward compatibility)
 HIGH = "HIGH"
 MEDIUM = "MEDIUM"

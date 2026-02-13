@@ -19,7 +19,6 @@ from victor.security.safety.content_patterns import (
     scan_content_warnings as _framework_scan_warnings,
 )
 
-
 # Risk levels
 HIGH = "HIGH"
 MEDIUM = "MEDIUM"

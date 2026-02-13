@@ -25,7 +25,6 @@ from typing import TypedDict
 
 from victor.framework.graph import StateGraph, END
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================

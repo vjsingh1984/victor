@@ -251,8 +251,7 @@ class ExperimentCoordinator:
 
         cursor = self.db.cursor()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS experiments (
                 experiment_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -262,11 +261,9 @@ class ExperimentCoordinator:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
-            """
-        )
+            """)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS experiment_metrics (
                 experiment_id TEXT NOT NULL,
                 variant_name TEXT NOT NULL,
@@ -278,11 +275,9 @@ class ExperimentCoordinator:
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (experiment_id, variant_name)
             )
-            """
-        )
+            """)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS experiment_assignments (
                 experiment_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
@@ -290,11 +285,9 @@ class ExperimentCoordinator:
                 assigned_at TEXT NOT NULL,
                 PRIMARY KEY (experiment_id, session_id)
             )
-            """
-        )
+            """)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS experiment_outcomes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 experiment_id TEXT NOT NULL,
@@ -306,8 +299,7 @@ class ExperimentCoordinator:
                 metrics TEXT,
                 recorded_at TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         self.db.commit()
 

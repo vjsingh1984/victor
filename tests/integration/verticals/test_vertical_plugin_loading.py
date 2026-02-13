@@ -29,7 +29,6 @@ import pytest
 
 from victor.core.verticals import VerticalBase, VerticalRegistry
 
-
 # =============================================================================
 # Test Fixtures and Helper Classes
 # =============================================================================

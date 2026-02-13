@@ -119,8 +119,7 @@ class CacheEvictionLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Q-values table
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_CACHE_Q} (
                 state_key TEXT NOT NULL,
                 action TEXT NOT NULL,
@@ -129,12 +128,10 @@ class CacheEvictionLearner(BaseLearner):
                 last_updated TEXT NOT NULL,
                 PRIMARY KEY (state_key, action)
             )
-            """
-        )
+            """)
 
         # Tool value estimates
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_CACHE_TOOL} (
                 tool_name TEXT PRIMARY KEY,
                 estimated_value REAL NOT NULL DEFAULT 0.5,
@@ -142,12 +139,10 @@ class CacheEvictionLearner(BaseLearner):
                 miss_count INTEGER NOT NULL DEFAULT 0,
                 last_updated TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         # Eviction history for analysis
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_CACHE_HISTORY} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 state_key TEXT NOT NULL,
@@ -157,16 +152,13 @@ class CacheEvictionLearner(BaseLearner):
                 hit_after INTEGER,
                 timestamp TEXT NOT NULL
             )
-            """
-        )
+            """)
 
         # Indexes
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_rl_cache_q_state
             ON {Tables.RL_CACHE_Q}(state_key)
-            """
-        )
+            """)
 
         self.db.commit()
         logger.debug("RL: cache_eviction tables ensured")

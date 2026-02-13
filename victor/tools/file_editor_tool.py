@@ -22,7 +22,6 @@ import logging
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 
-
 # =============================================================================
 # EDIT OPERATION NORMALIZATION
 # =============================================================================

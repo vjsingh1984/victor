@@ -32,7 +32,6 @@ from victor.framework.middleware import (
     LoggingMiddleware,
 )
 
-
 # =============================================================================
 # MiddlewareProfileBuilder Basic Tests
 # =============================================================================

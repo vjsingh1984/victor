@@ -53,7 +53,6 @@ from victor.core.tool_dependency_loader import (
 from victor.core.tool_types import ToolDependency
 from victor.tools.tool_graph import ToolExecutionGraph
 
-
 # Path to the YAML configuration file
 _YAML_CONFIG_PATH = Path(__file__).parent / "tool_dependencies.yaml"
 

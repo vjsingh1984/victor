@@ -74,7 +74,6 @@ from typing import (
 
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
-
 # =============================================================================
 # Validation Result Pattern
 # =============================================================================

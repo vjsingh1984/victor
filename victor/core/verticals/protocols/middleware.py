@@ -40,7 +40,6 @@ from typing import Any, Dict, Optional, Protocol, Set, runtime_checkable
 
 from victor.core.vertical_types import MiddlewarePriority, MiddlewareResult
 
-
 # =============================================================================
 # Middleware Protocol
 # =============================================================================

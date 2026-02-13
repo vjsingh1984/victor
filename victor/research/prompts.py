@@ -4,7 +4,6 @@ from typing import Dict, Optional
 
 from victor.core.verticals.protocols import PromptContributorProtocol, TaskTypeHint
 
-
 # Research-specific task type hints
 RESEARCH_TASK_TYPE_HINTS: Dict[str, TaskTypeHint] = {
     "fact_check": TaskTypeHint(

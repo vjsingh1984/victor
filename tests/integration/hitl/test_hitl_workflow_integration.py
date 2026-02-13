@@ -43,7 +43,6 @@ from victor.workflows.definition import (
     ConditionNode,
 )
 
-
 # =============================================================================
 # HITL Nodes in Workflow Graphs Tests
 # =============================================================================

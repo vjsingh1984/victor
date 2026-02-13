@@ -28,7 +28,6 @@ from victor.protocols.provider_adapter import (
     register_provider_adapter,
 )
 
-
 # =============================================================================
 # TOOL CALL FORMAT TESTS
 # =============================================================================

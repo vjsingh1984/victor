@@ -22,7 +22,6 @@ from typer.testing import CliRunner
 
 from victor.ui.commands.providers import providers_app, list_providers, console
 
-
 runner = CliRunner()
 
 

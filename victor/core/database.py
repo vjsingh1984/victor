@@ -372,12 +372,10 @@ class DatabaseManager:
 
         try:
             # Get tables from legacy database (excluding sqlite internal tables)
-            cursor = conn.execute(
-                f"""
+            cursor = conn.execute(f"""
                 SELECT name FROM legacy_{source_name}.sqlite_master
                 WHERE type='table' AND name NOT LIKE 'sqlite_%'
-            """
-            )
+            """)
             tables = [row[0] for row in cursor.fetchall()]
 
             migrated = 0
@@ -392,12 +390,10 @@ class DatabaseManager:
 
                     if source_count > 0 and target_count == 0:
                         # Copy data from source to existing target
-                        conn.execute(
-                            f"""
+                        conn.execute(f"""
                             INSERT INTO {table}
                             SELECT * FROM legacy_{source_name}.{table}
-                        """
-                        )
+                        """)
                         logger.debug(f"Copied {source_count} rows from legacy {table}")
                         migrated += 1
                     continue
@@ -420,12 +416,10 @@ class DatabaseManager:
                             raise
 
                     # Copy data
-                    conn.execute(
-                        f"""
+                    conn.execute(f"""
                         INSERT INTO {table}
                         SELECT * FROM legacy_{source_name}.{table}
-                    """
-                    )
+                    """)
 
                     # Copy indexes
                     idx_cursor = conn.execute(
@@ -795,15 +789,13 @@ class ProjectDatabaseManager:
         conn.execute("PRAGMA foreign_keys=ON")
 
         # Create metadata table
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS _project_metadata (
                 key TEXT PRIMARY KEY,
                 value TEXT,
                 updated_at TEXT
             )
-        """
-        )
+        """)
 
         # Create project-level tables (graph, etc.)
         for schema_sql in Schema.get_project_schemas():
@@ -942,12 +934,10 @@ class ProjectDatabaseManager:
 
         try:
             # Get tables from legacy database
-            cursor = conn.execute(
-                f"""
+            cursor = conn.execute(f"""
                 SELECT name FROM legacy_{source_name}.sqlite_master
                 WHERE type='table' AND name NOT LIKE 'sqlite_%'
-            """
-            )
+            """)
             tables = [row[0] for row in cursor.fetchall()]
 
             migrated = 0
@@ -977,12 +967,10 @@ class ProjectDatabaseManager:
                             raise
 
                     # Copy data
-                    conn.execute(
-                        f"""
+                    conn.execute(f"""
                         INSERT INTO {table}
                         SELECT * FROM legacy_{source_name}.{table}
-                    """
-                    )
+                    """)
 
                     migrated += 1
                     logger.debug(f"Migrated project table: {table}")

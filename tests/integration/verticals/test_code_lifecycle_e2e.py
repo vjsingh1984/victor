@@ -233,13 +233,11 @@ IMPORTANT: You must call the write_file tool to save the file. Do not just outpu
     print("=" * 70)
 
     # Phase 2: Enhance the script with additional features
-    response2 = await agent.chat(
-        f"""Read the file at {script_path} and enhance it by:
+    response2 = await agent.chat(f"""Read the file at {script_path} and enhance it by:
 1. Adding a 'multiply_all' function that takes a list of numbers and returns their product
 2. Update the main block to also test multiply_all([2, 3, 4]) and print the result
 
-Read the file first, then write the enhanced version."""
-    )
+Read the file first, then write the enhanced version.""")
 
     print(f"Agent response: {response2.content[:200]}...")
 
@@ -364,13 +362,11 @@ IMPORTANT: You must call the write_file tool to save the file."""
 
     if has_error:
         # Phase 3: Ask agent to fix the error
-        response3 = await agent.chat(
-            f"""The script at {script_path} produced this error:
+        response3 = await agent.chat(f"""The script at {script_path} produced this error:
 {result.stderr}
 
 Please read the file, fix the bug by adding proper error handling for division by zero,
-and write the corrected version."""
-        )
+and write the corrected version.""")
 
         print(f"Agent response: {response3.content[:200]}...")
 
@@ -482,12 +478,10 @@ if __name__ == "__main__":
     print("TESTING AGENT ENHANCEMENT")
     print("=" * 70)
 
-    response = await agent.chat(
-        f"""Read the Python file at {script_path}.
+    response = await agent.chat(f"""Read the Python file at {script_path}.
 Then add a new function called 'greet_formal' that takes a name and returns 'Good day, [name]'.
 Update the main block to also call greet_formal("Assistant") and print the result.
-Write the enhanced version back to the same file."""
-    )
+Write the enhanced version back to the same file.""")
 
     print(f"\nAgent response: {response.content[:300]}...")
 

@@ -235,8 +235,7 @@ class TestGroundingVerifier:
             root = Path(tmpdir)
 
             # Create test files
-            (root / "main.py").write_text(
-                '''
+            (root / "main.py").write_text('''
 """Main entry point."""
 
 def main():
@@ -246,28 +245,23 @@ def main():
 class Application:
     """Main application class."""
     pass
-'''
-            )
+''')
 
-            (root / "utils.py").write_text(
-                '''
+            (root / "utils.py").write_text('''
 """Utility functions."""
 
 def helper():
     """Helper function."""
     return 42
-'''
-            )
+''')
 
             (root / "src").mkdir()
-            (root / "src" / "module.py").write_text(
-                '''
+            (root / "src" / "module.py").write_text('''
 """A module."""
 
 class MyClass:
     pass
-'''
-            )
+''')
 
             yield root
 

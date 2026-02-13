@@ -22,7 +22,6 @@ from typer.testing import CliRunner
 
 from victor.ui.cli import app
 
-
 runner = CliRunner()
 
 

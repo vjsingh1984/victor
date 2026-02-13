@@ -27,7 +27,6 @@ Design Principles:
 from pathlib import Path
 from typing import Iterable, Optional, Set
 
-
 # Default directories to skip (non-hidden only)
 # Hidden directories (starting with '.') are excluded automatically by should_ignore_path()
 DEFAULT_SKIP_DIRS: Set[str] = {

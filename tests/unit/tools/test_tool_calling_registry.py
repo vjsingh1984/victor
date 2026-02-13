@@ -14,7 +14,6 @@
 
 """Tests for tool calling adapter registry."""
 
-
 from victor.agent.tool_calling.registry import ToolCallingAdapterRegistry
 from victor.agent.tool_calling.base import BaseToolCallingAdapter
 from victor.agent.tool_calling.adapters import (

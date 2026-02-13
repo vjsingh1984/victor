@@ -2445,16 +2445,14 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
         insights["message_count"] = cursor.fetchone()[0]
 
         # Extract common user queries (deduplicated, excluding benchmarks)
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT content FROM messages
             WHERE role = 'user'
               AND content NOT LIKE '%<TOOL_OUTPUT%'
               AND content NOT LIKE '%Complete this Python function%'
               AND content NOT LIKE '%Complete the following Python%'
               AND length(content) BETWEEN 20 AND 500
-        """
-        )
+        """)
 
         queries = [row[0] for row in cursor.fetchall()]
         query_counter = Counter()
@@ -2492,13 +2490,11 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
         insights["common_topics"] = query_counter.most_common(10)
 
         # Extract frequently referenced files from assistant responses
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT content FROM messages
             WHERE role = 'assistant'
               AND (content LIKE '%.py%' OR content LIKE '%.ts%' OR content LIKE '%.js%')
-        """
-        )
+        """)
 
         file_counter = Counter()
         file_pattern = re.compile(r"`([a-zA-Z_/]+\.(py|ts|js|go|rs))[:`]")
@@ -2514,21 +2510,18 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
         insights["hot_files"] = file_counter.most_common(15)
 
         # Get architectural patterns from patterns table
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT pattern_name, pattern_type, COUNT(*) as count
             FROM patterns
             GROUP BY pattern_type
             ORDER BY count DESC
-        """
-        )
+        """)
         insights["learned_patterns"] = [
             {"name": row[0], "type": row[1], "count": row[2]} for row in cursor.fetchall()
         ]
 
         # Extract FAQ-like questions (questions asked multiple times)
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT content, COUNT(*) as times
             FROM messages
             WHERE role = 'user'
@@ -2539,8 +2532,7 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
             HAVING times > 1
             ORDER BY times DESC
             LIMIT 5
-        """
-        )
+        """)
         insights["faq"] = [{"question": row[0], "times_asked": row[1]} for row in cursor.fetchall()]
 
         conn.close()
@@ -2644,8 +2636,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             insights["edge_gaps"] = sorted(list(expected_edges - set(edge_types.keys())))
 
             # Get high-connectivity nodes (hub classes) via SQL
-            cur = conn.execute(
-                """
+            cur = conn.execute("""
                 SELECT n.name, n.type, n.file, n.line,
                        (SELECT COUNT(*) FROM edges WHERE src = n.node_id) +
                        (SELECT COUNT(*) FROM edges WHERE dst = n.node_id) as degree
@@ -2653,8 +2644,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 WHERE n.type IN ('class', 'struct', 'interface')
                 ORDER BY degree DESC
                 LIMIT 5
-            """
-            )
+            """)
             hub_results = cur.fetchall()
             insights["hub_classes"] = [
                 {"name": r[0], "type": r[1], "file": r[2], "line": r[3], "degree": r[4]}
@@ -2663,8 +2653,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             ][:3]
 
             # Get most-called symbols (important functions)
-            cur = conn.execute(
-                """
+            cur = conn.execute("""
                 SELECT n.name, n.type, n.file, n.line,
                        (SELECT COUNT(*) FROM edges WHERE dst = n.node_id AND type = 'CALLS') as in_calls,
                        (SELECT COUNT(*) FROM edges WHERE src = n.node_id AND type = 'CALLS') as out_calls
@@ -2672,8 +2661,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                 WHERE n.type IN ('function', 'method', 'class')
                 ORDER BY in_calls DESC
                 LIMIT 8
-            """
-            )
+            """)
             important_results = cur.fetchall()
             insights["important_symbols"] = [
                 {
@@ -2761,8 +2749,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             # Use REFERENCES edges (imports/dependencies) for richer module relationships
             # CALLS edges are sparse as they only track explicit function calls
             # Note: Hidden directories (.*) and archive/ are filtered at index time
-            cur = conn.execute(
-                """
+            cur = conn.execute("""
                 SELECT
                     src_n.file as src_module,
                     dst_n.file as dst_module,
@@ -2778,8 +2765,7 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
                   AND dst_n.file NOT LIKE 'tests/%'
                 GROUP BY src_n.file, dst_n.file
                 HAVING ref_count >= 2
-                """
-            )
+                """)
             module_edges = cur.fetchall()
 
             if module_edges:

@@ -14,7 +14,6 @@
 
 """Tests for ToolSequenceTracker."""
 
-
 from victor.agent.tool_sequence_tracker import (
     COMMON_TOOL_SEQUENCES,
     WORKFLOW_PATTERNS,

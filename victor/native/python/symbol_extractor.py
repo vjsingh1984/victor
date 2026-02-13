@@ -27,7 +27,6 @@ from typing import Dict, List, Optional, Set
 from victor.native.observability import InstrumentedAccelerator
 from victor.native.protocols import Symbol, SymbolType
 
-
 # Standard library modules (Python 3.10+)
 # This should be kept in sync with the Rust implementation
 STDLIB_MODULES: frozenset[str] = frozenset(

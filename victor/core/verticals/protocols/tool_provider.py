@@ -41,7 +41,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol, Set, runtime_checkable
 
-
 # =============================================================================
 # Tool Selection Data Types
 # =============================================================================

@@ -27,7 +27,6 @@ from unittest.mock import MagicMock, patch
 import tempfile
 import os
 
-
 # =============================================================================
 # ModeAwareMixin Tests
 # =============================================================================

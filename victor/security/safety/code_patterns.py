@@ -51,7 +51,6 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from victor.security.safety.types import SafetyPattern
 
-
 # =============================================================================
 # Enumerations
 # =============================================================================

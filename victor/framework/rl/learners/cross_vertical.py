@@ -150,8 +150,7 @@ class CrossVerticalLearner(BaseLearner):
         cursor = self.db.cursor()
 
         # Table for storing discovered patterns
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_PATTERN} (
                 pattern_id TEXT PRIMARY KEY,
                 task_type TEXT NOT NULL,
@@ -165,12 +164,10 @@ class CrossVerticalLearner(BaseLearner):
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
-        """
-        )
+        """)
 
         # Table for tracking pattern applications
-        cursor.execute(
-            f"""
+        cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {Tables.RL_PATTERN_USE} (
                 application_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 pattern_id TEXT NOT NULL,
@@ -180,8 +177,7 @@ class CrossVerticalLearner(BaseLearner):
                 quality_score REAL,
                 feedback TEXT
             )
-        """
-        )
+        """)
 
         self.db.commit()
 
@@ -477,15 +473,13 @@ class CrossVerticalLearner(BaseLearner):
                 (target_vertical,),
             )
         else:
-            cursor.execute(
-                f"""
+            cursor.execute(f"""
                 SELECT
                     COUNT(*) as total,
                     SUM(success) as successes,
                     AVG(quality_score) as avg_quality
                 FROM {Tables.RL_PATTERN_USE}
-            """
-            )
+            """)
 
         row = cursor.fetchone()
         total = row[0] or 0

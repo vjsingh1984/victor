@@ -125,7 +125,7 @@ dev = [
     # Linting/Formatting
     "ruff>=0.5",
     "mypy>=1.10",
-    "black>=24.0",
+    "black==26.1.0",
 
     # Type stubs
     "types-pyyaml",

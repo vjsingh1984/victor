@@ -31,7 +31,6 @@ from textual.reactive import reactive
 
 from victor.core.events import MessagingEvent, ObservabilityBus, get_observability_bus
 
-
 # Color mapping for event categories (topic prefixes)
 CATEGORY_COLORS: Dict[str, str] = {
     "tool.": "cyan",

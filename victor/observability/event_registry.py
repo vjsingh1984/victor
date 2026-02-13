@@ -48,7 +48,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Optional, Set
 
-
 logger = logging.getLogger(__name__)
 
 # Built-in topic prefixes (canonical event system)

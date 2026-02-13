@@ -134,16 +134,14 @@ class TestGenerateDocs:
     async def test_generate_docs_file(self):
         """Test generating docs for a single file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write(
-                """
+            f.write("""
 def hello():
     print("hello")
 
 class MyClass:
     def method(self):
         pass
-"""
-            )
+""")
             temp_path = f.name
 
         try:
@@ -166,16 +164,14 @@ class TestAnalyzeDocs:
     async def test_analyze_docs(self):
         """Test analyzing documentation coverage."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-            f.write(
-                '''
+            f.write('''
 def documented():
     """This function is documented."""
     pass
 
 def undocumented():
     pass
-'''
-            )
+''')
             temp_path = f.name
 
         try:

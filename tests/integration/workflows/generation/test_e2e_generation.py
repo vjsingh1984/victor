@@ -29,7 +29,6 @@ from victor.workflows.generation.workflow_pipeline import (
 )
 from victor.framework.graph import StateGraph
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================

@@ -757,7 +757,6 @@ class TemplateLibrary:
 
 import copy
 
-
 __all__ = [
     "TemplateLibrary",
     "WorkflowTemplate",

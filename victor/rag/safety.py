@@ -48,7 +48,6 @@ from victor.security.safety.pii import (
     detect_pii_in_content,
 )
 
-
 # Risk levels
 HIGH = "HIGH"
 MEDIUM = "MEDIUM"

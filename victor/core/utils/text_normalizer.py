@@ -76,7 +76,6 @@ Performance Characteristics:
 import re
 from typing import Optional
 
-
 # Pre-compile regex patterns for performance
 # Pattern to match non-alphanumeric characters (except hyphens/underscores)
 _NON_ALPHANUMERIC_PATTERN = re.compile(r"[^a-zA-Z0-9\-_]")
