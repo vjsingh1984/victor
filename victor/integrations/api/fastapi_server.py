@@ -71,7 +71,7 @@ class HealthResponse(BaseModel):
     """Health check response."""
 
     status: str = "healthy"
-    version: str = "0.5.0"
+    version: str = "0.5.1"
 
 
 class StatusResponse(BaseModel):
@@ -375,7 +375,7 @@ class VictorFastAPIServer:
         self.app = FastAPI(
             title="Victor API",
             description="AI Coding Assistant API for IDE integrations",
-            version="0.5.0",
+            version="0.5.1",
             lifespan=self._lifespan,
         )
 
