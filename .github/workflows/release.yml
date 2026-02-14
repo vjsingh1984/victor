@@ -298,6 +298,16 @@ jobs:
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
           exit-code: '1'  # Fail on critical/high vulnerabilities
+          # Ensure latest vulnerability database
+          trivy-config: |
+            timeout:
+              10m
+            skip-dirs:
+              - /usr/local/lib/python*
+            db:
+              repository: 'ghcr.io/aquasecurity/trivy:latest'
+          # Use latest Trivy version and ignore outdated cache
+          cache: false
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
@@ -312,6 +322,16 @@ jobs:
           image-ref: 'vjsingh1984/victor-ai:${{ steps.version.outputs.VERSION }}'
           format: 'table'
           severity: 'CRITICAL,HIGH,MEDIUM'
+          # Ensure latest vulnerability database
+          trivy-config: |
+            timeout:
+              10m
+            skip-dirs:
+              - /usr/local/lib/python*
+            db:
+              repository: 'ghcr.io/aquasecurity/trivy:latest'
+          # Use latest Trivy version and ignore outdated cache
+          cache: false
 
   # ==========================================================================
   # Build and test VS Code extension
