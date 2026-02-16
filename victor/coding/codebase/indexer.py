@@ -1695,14 +1695,18 @@ class CodebaseIndex:
             return list(refs)
 
         try:
+            from tree_sitter import QueryCursor
+
             content = file_path.read_bytes()
             tree = parser.parse(content)
             query = Query(parser.language, query_src)
-            captures = query.captures(tree.root_node)
-            for node, _capture_name in captures:
-                text = node.text.decode("utf-8", errors="ignore")
-                if text:
-                    refs.add(text)
+            cursor = QueryCursor(query)
+            captures_dict = cursor.captures(tree.root_node)
+            for _capture_name, nodes in captures_dict.items():
+                for node in nodes:
+                    text = node.text.decode("utf-8", errors="ignore")
+                    if text:
+                        refs.add(text)
         except Exception:
             # Graceful degradation; fall back to existing refs
             pass
@@ -1890,7 +1894,18 @@ class CodebaseIndex:
             if edges:
                 return edges
 
-        query_src = INHERITS_QUERIES.get(language)
+        # PRIMARY: Get inheritance query from language plugin
+        query_src = None
+        try:
+            plugin = self._language_registry.get(language)
+            if plugin and plugin.tree_sitter_queries.inheritance:
+                query_src = plugin.tree_sitter_queries.inheritance
+        except Exception:
+            pass
+        # FALLBACK: Use legacy static dictionary
+        if not query_src:
+            query_src = INHERITS_QUERIES.get(language)
+
         parser = None
         try:
             from victor.coding.codebase.tree_sitter_manager import get_parser
@@ -1901,18 +1916,20 @@ class CodebaseIndex:
 
         if parser is not None and query_src:
             try:
+                from tree_sitter import QueryCursor
+
                 content = file_path.read_bytes()
                 tree = parser.parse(content)
                 query = Query(parser.language, query_src)
-                captures = query.captures(tree.root_node)
-                child = None
-                for node, capture_name in captures:
-                    text = node.text.decode("utf-8", errors="ignore")
-                    if capture_name == "child":
-                        child = text
-                    elif capture_name == "base" and child:
-                        edges.append((child, text))
-                        child = None
+                cursor = QueryCursor(query)
+                for _pat_idx, cap_dict in cursor.matches(tree.root_node):
+                    child_nodes = cap_dict.get("child", [])
+                    base_nodes = cap_dict.get("base", [])
+                    if child_nodes and base_nodes:
+                        child_text = child_nodes[0].text.decode("utf-8", errors="ignore")
+                        base_text = base_nodes[0].text.decode("utf-8", errors="ignore")
+                        if child_text and base_text:
+                            edges.append((child_text, base_text))
             except Exception:
                 pass
 
@@ -1931,7 +1948,17 @@ class CodebaseIndex:
     ) -> List[tuple[str, str]]:
         """Extract child->interface implements edges for typed languages."""
         edges: List[tuple[str, str]] = []
-        query_src = IMPLEMENTS_QUERIES.get(language)
+        # PRIMARY: Get implements query from language plugin
+        query_src = None
+        try:
+            plugin = self._language_registry.get(language)
+            if plugin and plugin.tree_sitter_queries.implements:
+                query_src = plugin.tree_sitter_queries.implements
+        except Exception:
+            pass
+        # FALLBACK: Use legacy static dictionary
+        if not query_src:
+            query_src = IMPLEMENTS_QUERIES.get(language)
         parser = None
         try:
             from victor.coding.codebase.tree_sitter_manager import get_parser
@@ -1942,18 +1969,20 @@ class CodebaseIndex:
 
         if parser is not None and query_src:
             try:
+                from tree_sitter import QueryCursor
+
                 content = file_path.read_bytes()
                 tree = parser.parse(content)
                 query = Query(parser.language, query_src)
-                captures = query.captures(tree.root_node)
-                child = None
-                for node, capture_name in captures:
-                    text = node.text.decode("utf-8", errors="ignore")
-                    if capture_name == "child":
-                        child = text
-                    elif capture_name in {"interface", "base"} and child:
-                        edges.append((child, text))
-                        child = None
+                cursor = QueryCursor(query)
+                for _pat_idx, cap_dict in cursor.matches(tree.root_node):
+                    child_nodes = cap_dict.get("child", [])
+                    iface_nodes = cap_dict.get("interface", []) or cap_dict.get("base", [])
+                    if child_nodes and iface_nodes:
+                        child_text = child_nodes[0].text.decode("utf-8", errors="ignore")
+                        iface_text = iface_nodes[0].text.decode("utf-8", errors="ignore")
+                        if child_text and iface_text:
+                            edges.append((child_text, iface_text))
             except Exception:
                 pass
 
@@ -1983,7 +2012,18 @@ class CodebaseIndex:
                     edges.extend(sym.composition)
             return edges
 
-        query_src = COMPOSITION_QUERIES.get(language)
+        # PRIMARY: Get composition query from language plugin
+        query_src = None
+        try:
+            plugin = self._language_registry.get(language)
+            if plugin and plugin.tree_sitter_queries.composition:
+                query_src = plugin.tree_sitter_queries.composition
+        except Exception:
+            pass
+        # FALLBACK: Use legacy static dictionary
+        if not query_src:
+            query_src = COMPOSITION_QUERIES.get(language)
+
         parser = None
         try:
             from victor.coding.codebase.tree_sitter_manager import get_parser
@@ -1994,18 +2034,20 @@ class CodebaseIndex:
 
         if parser is not None and query_src:
             try:
+                from tree_sitter import QueryCursor
+
                 content = file_path.read_bytes()
                 tree = parser.parse(content)
                 query = Query(parser.language, query_src)
-                captures = query.captures(tree.root_node)
-                owner = None
-                for node, capture_name in captures:
-                    text = node.text.decode("utf-8", errors="ignore")
-                    if capture_name == "owner":
-                        owner = text
-                    elif capture_name == "type" and owner:
-                        edges.append((owner, text))
-                # Do not clear owner on missing type; next owner will overwrite.
+                cursor = QueryCursor(query)
+                for _pat_idx, cap_dict in cursor.matches(tree.root_node):
+                    owner_nodes = cap_dict.get("owner", [])
+                    type_nodes = cap_dict.get("type", [])
+                    if owner_nodes and type_nodes:
+                        owner_text = owner_nodes[0].text.decode("utf-8", errors="ignore")
+                        type_text = type_nodes[0].text.decode("utf-8", errors="ignore")
+                        if owner_text and type_text:
+                            edges.append((owner_text, type_text))
             except Exception:
                 pass
 
@@ -2043,7 +2085,17 @@ class CodebaseIndex:
 
     def _find_enclosing_symbol_name(self, node, language: str) -> Optional[str]:
         """Best-effort caller lookup by walking ancestors."""
-        fields = ENCLOSING_NAME_FIELDS.get(language, [])
+        # PRIMARY: Get enclosing scopes from language plugin
+        fields = None
+        try:
+            plugin = self._language_registry.get(language)
+            if plugin and plugin.tree_sitter_queries.enclosing_scopes:
+                fields = plugin.tree_sitter_queries.enclosing_scopes
+        except Exception:
+            pass
+        # FALLBACK: Use legacy static dictionary
+        if not fields:
+            fields = ENCLOSING_NAME_FIELDS.get(language, [])
         current = node.parent
         method_name: Optional[str] = None
         class_name: Optional[str] = None
@@ -2053,6 +2105,12 @@ class CodebaseIndex:
                     field = current.child_by_field_name(field_name)
                     if not field:
                         continue
+                    # For C++ function_declarator, drill into nested declarator
+                    # to get the bare identifier (e.g. "main" not "main()")
+                    if field.type == "function_declarator":
+                        inner = field.child_by_field_name("declarator")
+                        if inner:
+                            field = inner
                     text = field.text.decode("utf-8", errors="ignore")
                     if node_type in (
                         "class_declaration",
@@ -2073,7 +2131,17 @@ class CodebaseIndex:
         self, file_path: Path, language: str
     ) -> List[tuple[str, str]]:
         """Extract caller->callee pairs using tree-sitter (non-Python)."""
-        query_src = CALL_QUERIES.get(language)
+        # PRIMARY: Get call query from language plugin
+        query_src = None
+        try:
+            plugin = self._language_registry.get(language)
+            if plugin and plugin.tree_sitter_queries.calls:
+                query_src = plugin.tree_sitter_queries.calls
+        except Exception:
+            pass
+        # FALLBACK: Use legacy static dictionary
+        if not query_src:
+            query_src = CALL_QUERIES.get(language)
         if not query_src:
             return []
         try:
@@ -2096,12 +2164,16 @@ class CodebaseIndex:
 
         call_edges: List[tuple[str, str]] = []
         try:
-            captures = query.captures(tree.root_node)
-            for node, _ in captures:
-                callee = node.text.decode("utf-8", errors="ignore")
-                caller = self._find_enclosing_symbol_name(node, language)
-                if caller and callee:
-                    call_edges.append((caller, callee))
+            from tree_sitter import QueryCursor
+
+            cursor = QueryCursor(query)
+            captures_dict = cursor.captures(tree.root_node)
+            for _capture_name, nodes in captures_dict.items():
+                for node in nodes:
+                    callee = node.text.decode("utf-8", errors="ignore")
+                    caller = self._find_enclosing_symbol_name(node, language)
+                    if caller and callee:
+                        call_edges.append((caller, callee))
         except Exception:
             call_edges = []
 
@@ -2126,6 +2198,70 @@ class CodebaseIndex:
                 if caller and callee and callee not in {"function", caller}:
                     call_edges.append((caller, callee))
         return call_edges
+
+    # Tree-sitter import queries for non-Python languages.
+    _IMPORT_QUERIES: Dict[str, str] = {
+        "javascript": """
+            (import_statement source: (string) @source)
+            (call_expression
+                function: (identifier) @_fn
+                arguments: (arguments (string) @source)
+                (#eq? @_fn "require"))
+        """,
+        "typescript": """
+            (import_statement source: (string) @source)
+            (call_expression
+                function: (identifier) @_fn
+                arguments: (arguments (string) @source)
+                (#eq? @_fn "require"))
+        """,
+        "rust": """
+            (use_declaration argument: (_) @source)
+        """,
+        "go": """
+            (import_spec path: (interpreted_string_literal) @source)
+        """,
+        "java": """
+            (import_declaration (scoped_identifier) @source)
+        """,
+    }
+
+    def _extract_imports_with_tree_sitter(
+        self, file_path: Path, language: str
+    ) -> List[str]:
+        """Extract import/require/use statements using tree-sitter (non-Python)."""
+        query_src = self._IMPORT_QUERIES.get(language)
+        if not query_src:
+            return []
+        try:
+            from victor.coding.codebase.tree_sitter_manager import get_parser
+        except Exception:
+            return []
+        try:
+            parser = get_parser(language)
+        except Exception:
+            return []
+        if parser is None:
+            return []
+
+        imports: List[str] = []
+        try:
+            from tree_sitter import QueryCursor
+
+            content = file_path.read_bytes()
+            tree = parser.parse(content)
+            query = Query(parser.language, query_src)
+            cursor = QueryCursor(query)
+            captures_dict = cursor.captures(tree.root_node)
+            for node in captures_dict.get("source", []):
+                text = node.text.decode("utf-8", errors="ignore")
+                # Strip quotes from string literals
+                cleaned = text.strip("'\"")
+                if cleaned:
+                    imports.append(cleaned)
+        except Exception:
+            pass
+        return imports
 
     async def _index_tree_sitter_file(self, file_path: Path, language: str) -> None:
         """Index a file using tier-aware symbol extraction.
@@ -2183,6 +2319,9 @@ class CodebaseIndex:
                             imports.append(node.module)
             except Exception as exc:
                 logger.debug(f"Failed to parse imports for {file_path}: {exc}")
+        else:
+            # Tree-sitter based import extraction for non-Python languages
+            imports = self._extract_imports_with_tree_sitter(file_path, language)
 
         metadata = FileMetadata(
             path=str(file_path.relative_to(self.root)),
