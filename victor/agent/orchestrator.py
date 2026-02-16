@@ -6658,7 +6658,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
     async def switch_provider(
         self,
-        provider: str,
+        provider_name: str,
         model: Optional[str] = None,
         on_switch: Optional[Any] = None,
     ) -> bool:
@@ -6668,9 +6668,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         for proper exception handling in async context (Phase 2 refactoring fix).
 
         Args:
-            provider: Target provider name
+            provider_name: Target provider name
             model: Optional specific model
-            on_switch: Optional callback(provider, model) after switch
+            on_switch: Optional callback(provider_name, model) after switch
 
         Returns:
             True if switch was successful, False otherwise
@@ -6679,7 +6679,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             ProviderNotFoundError: If provider not found
         """
         result = await self._provider_coordinator._manager.switch_provider(
-            provider_name=provider,
+            provider_name=provider_name,
             model=model,
         )
 
