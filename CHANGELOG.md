@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dead Code Pruning** - Removed unused code from graph stores and chunker modules
 - **Backward Compatibility Aliases** - Migrated to canonical names across codebase
 
+## [0.5.4] - 2026-02-16
+
+### Fixed
+- **Graph Insights** - `victor init` no longer fails with "no such table: nodes" — use canonical `graph_node`/`graph_edge` table names
+- **Profile Switch** - `/profile` and `/provider` commands no longer crash with TypeError — aligned async `switch_provider` param name
+- **ObservabilityBus** - Chat no longer crashes on max continuation prompts — added missing `emit_metric()` method
+
 ## [0.5.3] - 2026-02-15
 
 ### Changed
