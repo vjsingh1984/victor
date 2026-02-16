@@ -669,6 +669,38 @@ class ObservabilityBus:
             )
         )
 
+    def emit_metric(
+        self,
+        metric_name: str,
+        value: float,
+        unit: str = "",
+        tags: Optional[Dict[str, str]] = None,
+    ) -> None:
+        """Emit a metric event (fire-and-forget).
+
+        Convenience method that wraps emit() for metric data.
+
+        Args:
+            metric_name: Name of the metric (e.g., "latency", "token_count").
+            value: Metric value.
+            unit: Unit of measurement (e.g., "ms", "count").
+            tags: Optional key-value tags for the metric.
+        """
+        import asyncio
+
+        asyncio.create_task(
+            self.emit(
+                topic=f"metric.{metric_name}",
+                data={
+                    "metric_name": metric_name,
+                    "value": value,
+                    "unit": unit,
+                    "tags": tags or {},
+                },
+                source="observability",
+            )
+        )
+
 
 class AgentMessageBus:
     """Specialized event bus for cross-agent communication.

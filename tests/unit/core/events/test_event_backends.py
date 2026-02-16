@@ -346,6 +346,54 @@ class TestObservabilityBus:
         await asyncio.sleep(0.2)
         assert received[0].correlation_id == "trace_123"
 
+    @pytest.mark.asyncio
+    async def test_emit_metric(self, bus):
+        """emit_metric should publish a metric event (fire-and-forget)."""
+        received: List[MessagingEvent] = []
+
+        async def handler(event: MessagingEvent):
+            received.append(event)
+
+        await bus.subscribe("metric.*", handler)
+
+        bus.emit_metric(
+            metric_name="latency",
+            value=99.5,
+            unit="ms",
+            tags={"endpoint": "/api/chat"},
+        )
+
+        await asyncio.sleep(0.3)
+        assert len(received) == 1
+        assert received[0].topic == "metric.latency"
+        assert received[0].data["metric_name"] == "latency"
+        assert received[0].data["value"] == 99.5
+        assert received[0].data["unit"] == "ms"
+        assert received[0].data["tags"]["endpoint"] == "/api/chat"
+
+    @pytest.mark.asyncio
+    async def test_emit_metric_without_tags(self, bus):
+        """emit_metric should work without tags."""
+        received: List[MessagingEvent] = []
+
+        async def handler(event: MessagingEvent):
+            received.append(event)
+
+        await bus.subscribe("metric.*", handler)
+
+        bus.emit_metric(metric_name="token_count", value=42, unit="count")
+
+        await asyncio.sleep(0.3)
+        assert len(received) == 1
+        assert received[0].data["tags"] == {}
+
+    def test_emit_metric_method_exists(self):
+        """Regression: ObservabilityBus must have emit_metric method."""
+        assert hasattr(ObservabilityBus, "emit_metric"), (
+            "ObservabilityBus must have emit_metric() — "
+            "continuation_strategy.py and native/observability.py depend on it"
+        )
+
 
 # =============================================================================
 # AgentMessageBus Tests
