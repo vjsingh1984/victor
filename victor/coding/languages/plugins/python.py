@@ -21,6 +21,7 @@ from victor.coding.languages.base import (
     BaseLanguagePlugin,
     BuildSystem,
     CommentStyle,
+    DocCommentPattern,
     Formatter,
     LanguageCapabilities,
     LanguageConfig,
@@ -62,6 +63,7 @@ class PythonPlugin(BaseLanguagePlugin):
             language_server="pylsp",
             language_server_name="Python Language Server",
             tree_sitter_language="python",
+            doc_comment_pattern=DocCommentPattern(location="inside"),
         )
 
     def _create_capabilities(self) -> LanguageCapabilities:

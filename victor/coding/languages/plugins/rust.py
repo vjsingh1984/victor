@@ -21,6 +21,7 @@ from victor.coding.languages.base import (
     BaseLanguagePlugin,
     BuildSystem,
     CommentStyle,
+    DocCommentPattern,
     Formatter,
     LanguageCapabilities,
     LanguageConfig,
@@ -62,6 +63,9 @@ class RustPlugin(BaseLanguagePlugin):
             language_server="rust-analyzer",
             language_server_name="rust-analyzer",
             tree_sitter_language="rust",
+            doc_comment_pattern=DocCommentPattern(
+                line_prefixes=["///", "//!"],
+            ),
         )
 
     def _create_capabilities(self) -> LanguageCapabilities:

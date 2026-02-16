@@ -21,6 +21,7 @@ from victor.coding.languages.base import (
     BaseLanguagePlugin,
     BuildSystem,
     CommentStyle,
+    DocCommentPattern,
     Formatter,
     LanguageCapabilities,
     LanguageConfig,
@@ -62,6 +63,10 @@ class JavaPlugin(BaseLanguagePlugin):
             language_server="jdtls",
             language_server_name="Eclipse JDT Language Server",
             tree_sitter_language="java",
+            doc_comment_pattern=DocCommentPattern(
+                block_start="/**",
+                block_end="*/",
+            ),
         )
 
     def _create_capabilities(self) -> LanguageCapabilities:

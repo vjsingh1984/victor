@@ -33,10 +33,12 @@ References:
 - https://inference-docs.cerebras.ai/api-reference
 """
 
+import asyncio
 import json
 import logging
 import os
 import re
+import ssl
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
@@ -325,6 +327,34 @@ QWEN3_THINKING_PATTERNS = [
 ]
 
 
+_MAX_TRANSIENT_RETRIES = 2
+_TRANSIENT_BACKOFF_BASE = 1.0  # seconds
+
+
+def _is_transient_error(exc: Exception) -> bool:
+    """Check if an exception is a transient network error worth retrying.
+
+    Covers SSL record errors, connection resets, and other network-level
+    failures that are typically caused by infrastructure flakiness rather
+    than bad requests.
+    """
+    if isinstance(exc, ssl.SSLError):
+        return True
+    if isinstance(exc, (httpx.ConnectError, httpx.RemoteProtocolError)):
+        return True
+    if isinstance(exc, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
+        return True
+    # httpx wraps low-level errors — check the cause chain
+    cause = exc.__cause__
+    while cause is not None:
+        if isinstance(cause, ssl.SSLError):
+            return True
+        if isinstance(cause, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
+            return True
+        cause = getattr(cause, "__cause__", None)
+    return False
+
+
 def _is_thinking_model(model: str) -> bool:
     """Check if model outputs inline thinking content."""
     model_lower = model.lower()
@@ -476,30 +506,47 @@ class CerebrasProvider(BaseProvider):
         **kwargs: Any,
     ) -> CompletionResponse:
         """Send chat completion request to Cerebras."""
-        try:
-            payload = self._build_request_payload(
-                messages, model, temperature, max_tokens, tools, False, **kwargs
-            )
+        last_exc: Optional[Exception] = None
 
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/chat/completions", json=payload
-            )
-            response.raise_for_status()
+        for attempt in range(_MAX_TRANSIENT_RETRIES + 1):
+            try:
+                payload = self._build_request_payload(
+                    messages, model, temperature, max_tokens, tools, False, **kwargs
+                )
 
-            return self._parse_response(response.json(), model)
+                response = await self._execute_with_circuit_breaker(
+                    self.client.post, "/chat/completions", json=payload
+                )
+                response.raise_for_status()
 
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message=f"Cerebras request timed out after {self.timeout}s",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            error_body = e.response.text[:500] if e.response.text else ""
-            raise ProviderError(
-                message=f"Cerebras HTTP error {e.response.status_code}: {error_body}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+                return self._parse_response(response.json(), model)
+
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message=f"Cerebras request timed out after {self.timeout}s",
+                    provider=self.name,
+                ) from e
+            except httpx.HTTPStatusError as e:
+                error_body = e.response.text[:500] if e.response.text else ""
+                raise ProviderError(
+                    message=f"Cerebras HTTP error {e.response.status_code}: {error_body}",
+                    provider=self.name,
+                    status_code=e.response.status_code,
+                ) from e
+            except Exception as e:
+                if _is_transient_error(e) and attempt < _MAX_TRANSIENT_RETRIES:
+                    last_exc = e
+                    wait = _TRANSIENT_BACKOFF_BASE * (2**attempt)
+                    logger.warning(
+                        f"Cerebras transient error (attempt {attempt + 1}/"
+                        f"{_MAX_TRANSIENT_RETRIES + 1}), retrying in {wait:.1f}s: {e}"
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                raise
+
+        # Should not reach here, but satisfy type checker
+        raise last_exc  # type: ignore[misc]
 
     async def stream(
         self,
@@ -512,83 +559,122 @@ class CerebrasProvider(BaseProvider):
         **kwargs: Any,
     ) -> AsyncIterator[StreamChunk]:
         """Stream chat completion from Cerebras with thinking content filtering."""
-        try:
-            payload = self._build_request_payload(
-                messages, model, temperature, max_tokens, tools, True, **kwargs
-            )
+        last_exc: Optional[Exception] = None
 
-            # Initialize thinking filter for Qwen-3 models
-            thinking_filter = StreamingThinkingFilter(model=model)
-            accumulated_reasoning: str = ""
+        for attempt in range(_MAX_TRANSIENT_RETRIES + 1):
+            try:
+                async for chunk in self._stream_inner(
+                    messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
+                    **kwargs,
+                ):
+                    yield chunk
+                return  # Successful stream, exit retry loop
 
-            async with self.client.stream("POST", "/chat/completions", json=payload) as response:
-                response.raise_for_status()
-                accumulated_tool_calls: List[Dict[str, Any]] = []
+            except httpx.TimeoutException as e:
+                raise ProviderTimeoutError(
+                    message="Cerebras stream timed out",
+                    provider=self.name,
+                ) from e
+            except httpx.HTTPStatusError as e:
+                raise ProviderError(
+                    message=f"Cerebras streaming error {e.response.status_code}",
+                    provider=self.name,
+                    status_code=e.response.status_code,
+                ) from e
+            except Exception as e:
+                if _is_transient_error(e) and attempt < _MAX_TRANSIENT_RETRIES:
+                    last_exc = e
+                    wait = _TRANSIENT_BACKOFF_BASE * (2**attempt)
+                    logger.warning(
+                        f"Cerebras stream transient error (attempt {attempt + 1}/"
+                        f"{_MAX_TRANSIENT_RETRIES + 1}), retrying in {wait:.1f}s: {e}"
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                raise
 
-                async for line in response.aiter_lines():
-                    if not line.strip() or not line.startswith("data: "):
-                        continue
+        # Should not reach here, but satisfy type checker
+        raise last_exc  # type: ignore[misc]
 
-                    data_str = line[6:]
-                    if data_str.strip() == "[DONE]":
-                        # Finalize any buffered content
-                        remaining_content, final_metadata = thinking_filter.finalize()
-                        if final_metadata and "reasoning_content" in final_metadata:
-                            accumulated_reasoning = final_metadata["reasoning_content"]
+    async def _stream_inner(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        tools: Optional[List[ToolDefinition]] = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
+        """Inner streaming implementation (no retry logic)."""
+        payload = self._build_request_payload(
+            messages, model, temperature, max_tokens, tools, True, **kwargs
+        )
 
-                        # Emit final chunk with remaining content and metadata
-                        yield StreamChunk(
-                            content=remaining_content,
-                            tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
-                            stop_reason="stop",
-                            is_final=True,
-                            metadata=(
-                                {"reasoning_content": accumulated_reasoning}
-                                if accumulated_reasoning
-                                else None
-                            ),
+        # Initialize thinking filter for Qwen-3 models
+        thinking_filter = StreamingThinkingFilter(model=model)
+        accumulated_reasoning: str = ""
+
+        async with self.client.stream("POST", "/chat/completions", json=payload) as response:
+            response.raise_for_status()
+            accumulated_tool_calls: List[Dict[str, Any]] = []
+
+            async for line in response.aiter_lines():
+                if not line.strip() or not line.startswith("data: "):
+                    continue
+
+                data_str = line[6:]
+                if data_str.strip() == "[DONE]":
+                    # Finalize any buffered content
+                    remaining_content, final_metadata = thinking_filter.finalize()
+                    if final_metadata and "reasoning_content" in final_metadata:
+                        accumulated_reasoning = final_metadata["reasoning_content"]
+
+                    # Emit final chunk with remaining content and metadata
+                    yield StreamChunk(
+                        content=remaining_content,
+                        tool_calls=accumulated_tool_calls if accumulated_tool_calls else None,
+                        stop_reason="stop",
+                        is_final=True,
+                        metadata=(
+                            {"reasoning_content": accumulated_reasoning}
+                            if accumulated_reasoning
+                            else None
+                        ),
+                    )
+                    break
+
+                try:
+                    chunk_data = json.loads(data_str)
+                    raw_chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
+
+                    # Filter thinking content
+                    if raw_chunk.content:
+                        filtered_content, filter_metadata = thinking_filter.process_chunk(
+                            raw_chunk.content
                         )
-                        break
+                        if filter_metadata and "reasoning_content" in filter_metadata:
+                            accumulated_reasoning = filter_metadata["reasoning_content"]
 
-                    try:
-                        chunk_data = json.loads(data_str)
-                        raw_chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
-
-                        # Filter thinking content
-                        if raw_chunk.content:
-                            filtered_content, filter_metadata = thinking_filter.process_chunk(
-                                raw_chunk.content
+                        # Only yield if there's content to emit
+                        if filtered_content or raw_chunk.tool_calls:
+                            yield StreamChunk(
+                                content=filtered_content,
+                                tool_calls=raw_chunk.tool_calls,
+                                stop_reason=raw_chunk.stop_reason,
+                                is_final=raw_chunk.is_final,
+                                metadata=filter_metadata,
                             )
-                            if filter_metadata and "reasoning_content" in filter_metadata:
-                                accumulated_reasoning = filter_metadata["reasoning_content"]
+                    elif raw_chunk.tool_calls or raw_chunk.is_final:
+                        # Yield tool calls or final markers
+                        yield raw_chunk
 
-                            # Only yield if there's content to emit
-                            if filtered_content or raw_chunk.tool_calls:
-                                yield StreamChunk(
-                                    content=filtered_content,
-                                    tool_calls=raw_chunk.tool_calls,
-                                    stop_reason=raw_chunk.stop_reason,
-                                    is_final=raw_chunk.is_final,
-                                    metadata=filter_metadata,
-                                )
-                        elif raw_chunk.tool_calls or raw_chunk.is_final:
-                            # Yield tool calls or final markers
-                            yield raw_chunk
-
-                    except json.JSONDecodeError:
-                        pass
-
-        except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(
-                message="Cerebras stream timed out",
-                provider=self.name,
-            ) from e
-        except httpx.HTTPStatusError as e:
-            raise ProviderError(
-                message=f"Cerebras streaming error {e.response.status_code}",
-                provider=self.name,
-                status_code=e.response.status_code,
-            ) from e
+                except json.JSONDecodeError:
+                    pass
 
     def _build_request_payload(
         self, messages, model, temperature, max_tokens, tools, stream, **kwargs

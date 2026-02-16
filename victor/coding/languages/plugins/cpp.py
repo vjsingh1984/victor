@@ -21,6 +21,7 @@ from victor.coding.languages.base import (
     BaseLanguagePlugin,
     BuildSystem,
     CommentStyle,
+    DocCommentPattern,
     Formatter,
     LanguageCapabilities,
     LanguageConfig,
@@ -62,6 +63,11 @@ class CppPlugin(BaseLanguagePlugin):
             language_server="clangd",
             language_server_name="clangd",
             tree_sitter_language="cpp",
+            doc_comment_pattern=DocCommentPattern(
+                line_prefixes=["///"],
+                block_start="/**",
+                block_end="*/",
+            ),
         )
 
     def _create_capabilities(self) -> LanguageCapabilities:

@@ -21,6 +21,7 @@ from victor.coding.languages.base import (
     BaseLanguagePlugin,
     BuildSystem,
     CommentStyle,
+    DocCommentPattern,
     Formatter,
     LanguageCapabilities,
     LanguageConfig,
@@ -62,6 +63,9 @@ class GoPlugin(BaseLanguagePlugin):
             language_server="gopls",
             language_server_name="gopls",
             tree_sitter_language="go",
+            doc_comment_pattern=DocCommentPattern(
+                line_prefixes=["//"],
+            ),
         )
 
     def _create_capabilities(self) -> LanguageCapabilities:

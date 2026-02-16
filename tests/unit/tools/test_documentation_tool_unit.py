@@ -24,9 +24,12 @@ from victor.tools.documentation_tool import (
     _generate_class_docstring,
     _extract_api_info,
     _build_markdown_docs,
+    _has_doc_comment_before,
+    _extract_doc_comment_text,
     docs,
     docs_coverage,
 )
+from victor.coding.languages.base import DocCommentPattern
 
 
 class TestGenerateFunctionDocstring:
@@ -185,3 +188,172 @@ def undocumented():
         """Test analyzing nonexistent file."""
         result = await docs_coverage(path="/nonexistent/file.py")
         assert result["success"] is False
+
+
+class TestMultiLanguageDocsCoverage:
+    """Tests for multi-language documentation coverage."""
+
+    def test_rust_doc_coverage(self):
+        """Test detection of Rust /// doc comments."""
+        rust_pattern = DocCommentPattern(line_prefixes=["///", "//!"])
+        source = """\
+/// Documented function.
+/// With a second line.
+pub fn documented_func() {
+}
+
+pub fn undocumented_func() {
+}
+
+/// A documented struct.
+pub struct MyStruct {
+}
+"""
+        lines = source.split("\n")
+        # documented_func is on line 3
+        assert _has_doc_comment_before(lines, 3, rust_pattern) is True
+        # undocumented_func is on line 6
+        assert _has_doc_comment_before(lines, 6, rust_pattern) is False
+        # MyStruct is on line 10
+        assert _has_doc_comment_before(lines, 10, rust_pattern) is True
+
+    def test_rust_inner_doc_comments(self):
+        """Test detection of Rust //! inner doc comments."""
+        rust_pattern = DocCommentPattern(line_prefixes=["///", "//!"])
+        source = """\
+//! Module-level documentation.
+//! This describes the module.
+
+/// Function docs.
+pub fn my_func() {
+}
+"""
+        lines = source.split("\n")
+        # my_func is on line 5
+        assert _has_doc_comment_before(lines, 5, rust_pattern) is True
+
+    def test_python_still_works(self):
+        """Regression test: Python docstrings still detected via ast."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write('''\
+def documented():
+    """This function is documented."""
+    pass
+
+def undocumented():
+    pass
+
+class MyClass:
+    """A documented class."""
+    pass
+''')
+            temp_path = f.name
+
+        import asyncio
+
+        try:
+            result = asyncio.get_event_loop().run_until_complete(docs_coverage(path=temp_path))
+            assert result["success"] is True
+            assert result["total_items"] == 3  # 2 functions + 1 class
+            assert result["documented_items"] == 2  # documented() + MyClass
+            assert result["missing_count"] == 1
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_go_doc_coverage(self):
+        """Test detection of Go // doc comments."""
+        go_pattern = DocCommentPattern(line_prefixes=["//"])
+        source = """\
+// Documented is a helper function.
+func Documented() {
+}
+
+func Undocumented() {
+}
+
+// MyStruct represents a thing.
+type MyStruct struct {
+}
+"""
+        lines = source.split("\n")
+        # Documented is on line 2
+        assert _has_doc_comment_before(lines, 2, go_pattern) is True
+        # Undocumented is on line 5
+        assert _has_doc_comment_before(lines, 5, go_pattern) is False
+        # MyStruct is on line 9
+        assert _has_doc_comment_before(lines, 9, go_pattern) is True
+
+    def test_js_jsdoc_coverage(self):
+        """Test detection of JS /** */ JSDoc blocks."""
+        js_pattern = DocCommentPattern(line_prefixes=["///"], block_start="/**", block_end="*/")
+        source = """\
+/**
+ * A documented function.
+ * @param {string} name - The name.
+ */
+function documented(name) {
+}
+
+function undocumented() {
+}
+"""
+        lines = source.split("\n")
+        # documented is on line 5
+        assert _has_doc_comment_before(lines, 5, js_pattern) is True
+        # undocumented is on line 8
+        assert _has_doc_comment_before(lines, 8, js_pattern) is False
+
+    def test_unsupported_extension_skipped(self):
+        """Test that unsupported file extensions are gracefully skipped."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("Some random text content\n")
+            temp_path = f.name
+
+        import asyncio
+
+        try:
+            result = asyncio.get_event_loop().run_until_complete(docs_coverage(path=temp_path))
+            assert result["success"] is True
+            assert result["total_items"] == 0
+            assert result["documented_items"] == 0
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_extract_doc_comment_text_rust(self):
+        """Test extracting doc comment text for quality checks."""
+        rust_pattern = DocCommentPattern(line_prefixes=["///", "//!"])
+        source = """\
+/// Short.
+pub fn my_func() {
+}
+"""
+        lines = source.split("\n")
+        text = _extract_doc_comment_text(lines, 2, rust_pattern)
+        assert text == "Short."
+
+    def test_extract_doc_comment_text_jsdoc(self):
+        """Test extracting JSDoc block text."""
+        js_pattern = DocCommentPattern(line_prefixes=["///"], block_start="/**", block_end="*/")
+        source = """\
+/**
+ * Greet the user with a nice message.
+ */
+function greet() {
+}
+"""
+        lines = source.split("\n")
+        text = _extract_doc_comment_text(lines, 4, js_pattern)
+        assert "Greet the user" in text
+
+    def test_decorator_skipping(self):
+        """Test that decorators/attributes above doc comments are skipped."""
+        rust_pattern = DocCommentPattern(line_prefixes=["///", "//!"])
+        source = """\
+/// Documented despite attribute below.
+#[derive(Debug)]
+pub struct MyStruct {
+}
+"""
+        lines = source.split("\n")
+        # MyStruct is on line 3
+        assert _has_doc_comment_before(lines, 3, rust_pattern) is True

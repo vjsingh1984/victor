@@ -22,16 +22,38 @@ Features:
 - Analyze documentation coverage
 """
 
+from __future__ import annotations
+
 import ast
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
 import logging
+
+if TYPE_CHECKING:
+    from victor.coding.languages.base import DocCommentPattern
 
 from victor.tools.base import AccessMode, DangerLevel, Priority, ExecutionCategory
 from victor.tools.decorators import tool
 from victor.tools.common import gather_files_by_pattern
 
 logger = logging.getLogger(__name__)
+
+# Extension-to-language map for doc coverage analysis (only tested languages)
+_DOC_COVERAGE_EXTENSIONS = {
+    ".py": "python",
+    ".rs": "rust",
+    ".go": "go",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".java": "java",
+    ".cpp": "cpp",
+    ".cc": "cpp",
+    ".cxx": "cpp",
+    ".h": "cpp",
+    ".hpp": "cpp",
+}
 
 # Lazy-loaded presentation adapter for icon rendering
 _presentation = None
@@ -371,6 +393,232 @@ For complete API documentation, see [API Docs](docs/api.md).
 }
 
 
+def _has_doc_comment_before(
+    lines: List[str],
+    symbol_line: int,
+    pattern: "DocCommentPattern",
+) -> bool:
+    """Check if a doc comment exists immediately before a symbol.
+
+    Scans lines above the symbol's definition line (skipping blanks/decorators)
+    looking for doc comment patterns matching the language.
+
+    Args:
+        lines: All source lines (0-indexed).
+        symbol_line: 1-indexed line number where the symbol is defined.
+        pattern: The language's doc comment pattern.
+
+    Returns:
+        True if a doc comment was found immediately before the symbol.
+    """
+    from victor.coding.languages.base import DocCommentPattern  # noqa: F811
+
+    idx = symbol_line - 2  # Convert to 0-index, then go one line above
+    if idx < 0:
+        return False
+
+    # Skip blank lines and decorators (e.g., @decorator, #[attr])
+    while idx >= 0:
+        stripped = lines[idx].strip()
+        if not stripped:
+            idx -= 1
+            continue
+        if stripped.startswith("@") or stripped.startswith("#["):
+            idx -= 1
+            continue
+        break
+
+    if idx < 0:
+        return False
+
+    stripped = lines[idx].strip()
+
+    # Check line prefix match (e.g., "///", "//!", "//")
+    for prefix in pattern.line_prefixes:
+        if stripped.startswith(prefix):
+            return True
+
+    # Check block comment end (e.g., "*/"), then walk up to find "/**" start
+    if pattern.block_end and stripped.endswith(pattern.block_end):
+        # Walk upward to find the block start
+        search_idx = idx
+        while search_idx >= 0:
+            search_stripped = lines[search_idx].strip()
+            if pattern.block_start and search_stripped.startswith(pattern.block_start):
+                return True
+            # If we hit a non-comment line, stop
+            if not (
+                search_stripped.startswith("*")
+                or search_stripped.startswith(pattern.block_start or "")
+                or search_stripped.endswith(pattern.block_end)
+            ):
+                break
+            search_idx -= 1
+
+    return False
+
+
+def _extract_doc_comment_text(
+    lines: List[str],
+    symbol_line: int,
+    pattern: "DocCommentPattern",
+) -> str:
+    """Extract the text content of a doc comment preceding a symbol.
+
+    Used for quality checks (e.g., too-short doc comments).
+
+    Args:
+        lines: All source lines (0-indexed).
+        symbol_line: 1-indexed line number where the symbol is defined.
+        pattern: The language's doc comment pattern.
+
+    Returns:
+        Concatenated doc comment text, or empty string if none found.
+    """
+    idx = symbol_line - 2
+    if idx < 0:
+        return ""
+
+    # Skip blank lines and decorators
+    while idx >= 0:
+        stripped = lines[idx].strip()
+        if not stripped or stripped.startswith("@") or stripped.startswith("#["):
+            idx -= 1
+            continue
+        break
+
+    if idx < 0:
+        return ""
+
+    doc_lines: List[str] = []
+    stripped = lines[idx].strip()
+
+    # Collect line-prefix doc comments (e.g., ///, //!, //)
+    for prefix in pattern.line_prefixes:
+        if stripped.startswith(prefix):
+            # Walk upward collecting all consecutive doc comment lines
+            collect_idx = idx
+            while collect_idx >= 0:
+                line = lines[collect_idx].strip()
+                if line.startswith(prefix):
+                    doc_lines.append(line[len(prefix) :].strip())
+                    collect_idx -= 1
+                else:
+                    break
+            doc_lines.reverse()
+            return " ".join(doc_lines)
+
+    # Collect block doc comment (e.g., /** ... */)
+    if pattern.block_end and stripped.endswith(pattern.block_end):
+        collect_idx = idx
+        while collect_idx >= 0:
+            line = lines[collect_idx].strip()
+            doc_lines.append(line)
+            if pattern.block_start and line.startswith(pattern.block_start):
+                break
+            collect_idx -= 1
+        doc_lines.reverse()
+        # Clean up: remove /** */, and leading * on continuation lines
+        text_parts = []
+        for line in doc_lines:
+            cleaned = line
+            if pattern.block_start:
+                cleaned = cleaned.replace(pattern.block_start, "")
+            if pattern.block_end:
+                cleaned = cleaned.replace(pattern.block_end, "")
+            cleaned = cleaned.strip()
+            if cleaned.startswith("*"):
+                cleaned = cleaned[1:].strip()
+            if cleaned:
+                text_parts.append(cleaned)
+        return " ".join(text_parts)
+
+    return ""
+
+
+def _analyze_non_python_file(
+    file_obj: Path,
+    extractor: Any,
+    language: str,
+    pattern: "DocCommentPattern",
+    check_quality: bool = False,
+) -> Tuple[int, int, int, int, List[str], List[str]]:
+    """Analyze documentation coverage for a non-Python file.
+
+    Uses tree-sitter to extract symbols and text-based scanning to detect
+    doc comments.
+
+    Args:
+        file_obj: Path to the source file.
+        extractor: TreeSitterExtractor instance.
+        language: Language name.
+        pattern: The language's DocCommentPattern.
+        check_quality: Whether to check doc comment quality.
+
+    Returns:
+        Tuple of (total_functions, documented_functions, total_classes,
+        documented_classes, missing_items, quality_issues).
+    """
+    total_functions = 0
+    documented_functions = 0
+    total_classes = 0
+    documented_classes = 0
+    missing: List[str] = []
+    quality_issues: List[str] = []
+
+    try:
+        content = file_obj.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return 0, 0, 0, 0, [], []
+
+    lines = content.split("\n")
+    symbols = extractor.extract_symbols(file_obj, language)
+
+    for sym in symbols:
+        name = sym.name
+
+        # Skip private/unexported symbols
+        if name.startswith("_"):
+            continue
+        # Go: unexported symbols start with lowercase
+        if language == "go" and name[0].islower():
+            continue
+
+        is_class = sym.type == "class"
+        if is_class:
+            total_classes += 1
+        else:
+            total_functions += 1
+
+        has_doc = _has_doc_comment_before(lines, sym.line_number, pattern)
+
+        if has_doc:
+            if is_class:
+                documented_classes += 1
+            else:
+                documented_functions += 1
+
+            # Quality check
+            if check_quality:
+                doc_text = _extract_doc_comment_text(lines, sym.line_number, pattern)
+                if doc_text and len(doc_text) < 20:
+                    quality_issues.append(
+                        f"Short doc comment for {name} at {file_obj}:{sym.line_number}"
+                    )
+        else:
+            kind = "Struct/Trait/Enum" if is_class else "Function"
+            missing.append(f"{kind}: {name} ({file_obj}:{sym.line_number})")
+
+    return (
+        total_functions,
+        documented_functions,
+        total_classes,
+        documented_classes,
+        missing,
+        quality_issues,
+    )
+
+
 # Consolidated tools
 
 
@@ -621,20 +869,24 @@ async def docs_coverage(
     path: str,
     check_coverage: bool = True,
     check_quality: bool = False,
-    file_pattern: str = "*.py",
+    file_pattern: str = "*",
     max_files: int = 50,
 ) -> Dict[str, Any]:
     """
     Analyze documentation coverage and quality.
 
-    Checks documentation coverage (percentage of functions/classes with docstrings)
-    and optionally analyzes documentation quality.
+    Checks documentation coverage (percentage of functions/classes with
+    docstrings or doc comments) and optionally analyzes documentation quality.
+
+    Supports Python (ast.get_docstring), Rust (/// and //!), Go (//),
+    JavaScript/TypeScript (/** */ and ///), Java (/** */), and C++ (/** */ and ///).
 
     Args:
         path: File or directory path to analyze.
         check_coverage: Analyze documentation coverage (default: True).
         check_quality: Analyze docstring quality (default: False).
-        file_pattern: Glob pattern for files to analyze (default: *.py).
+        file_pattern: Glob pattern for files to analyze (default: * for all
+            supported languages).
         max_files: Maximum number of files to analyze (default: 50). Use to prevent
             context overflow on large codebases. Set to 0 for unlimited.
 
@@ -651,14 +903,14 @@ async def docs_coverage(
         - error: Error message if failed
 
     Examples:
-        # Check coverage only
-        analyze_docs("src/module.py")
+        # Check coverage of a Python file
+        docs_coverage("src/module.py")
 
-        # Check coverage and quality
-        analyze_docs("src/", check_coverage=True, check_quality=True)
+        # Check coverage of a Rust codebase
+        docs_coverage("src/", file_pattern="*.rs")
 
-        # Analyze specific file pattern
-        analyze_docs("src/", file_pattern="*_tool.py")
+        # Check all supported languages
+        docs_coverage("src/", check_coverage=True, check_quality=True)
     """
     if not path:
         return {"success": False, "error": "Missing required parameter: path"}
@@ -686,46 +938,98 @@ async def docs_coverage(
     documented_classes = 0
     missing = []
     quality_issues = []
+    has_non_python = False
+
+    # Lazy-init tree-sitter extractor only if non-Python files are present
+    _extractor = None
+
+    def _get_extractor():
+        nonlocal _extractor
+        if _extractor is None:
+            from victor.coding.codebase.tree_sitter_extractor import TreeSitterExtractor
+
+            _extractor = TreeSitterExtractor()
+        return _extractor
 
     for file_obj in files_to_analyze:
-        if not file_obj.suffix == ".py":
+        suffix = file_obj.suffix.lower()
+        language = _DOC_COVERAGE_EXTENSIONS.get(suffix)
+        if language is None:
             continue
 
-        content = file_obj.read_text()
+        # Python path: use ast.parse + ast.get_docstring (unchanged)
+        if language == "python":
+            content = file_obj.read_text()
 
-        try:
-            tree = ast.parse(content)
-        except SyntaxError:
-            continue
+            try:
+                tree = ast.parse(content)
+            except SyntaxError:
+                continue
 
-        # Analyze coverage
-        if check_coverage:
-            for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef):
-                    if not node.name.startswith("_"):
-                        total_functions += 1
+            if check_coverage:
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.FunctionDef):
+                        if not node.name.startswith("_"):
+                            total_functions += 1
+                            docstring = ast.get_docstring(node)
+                            if docstring:
+                                documented_functions += 1
+                                if check_quality and len(docstring) < 20:
+                                    quality_issues.append(
+                                        f"Short docstring in {node.name}"
+                                        f" at {file_obj}:{node.lineno}"
+                                    )
+                            else:
+                                missing.append(f"Function: {node.name} ({file_obj}:{node.lineno})")
+
+                    elif isinstance(node, ast.ClassDef):
+                        total_classes += 1
                         docstring = ast.get_docstring(node)
                         if docstring:
-                            documented_functions += 1
-                            # Check quality
+                            documented_classes += 1
                             if check_quality and len(docstring) < 20:
                                 quality_issues.append(
-                                    f"Short docstring in {node.name} at {file_obj}:{node.lineno}"
+                                    f"Short docstring in {node.name}"
+                                    f" at {file_obj}:{node.lineno}"
                                 )
                         else:
-                            missing.append(f"Function: {node.name} ({file_obj}:{node.lineno})")
+                            missing.append(f"Class: {node.name} ({file_obj}:{node.lineno})")
+            continue
 
-                elif isinstance(node, ast.ClassDef):
-                    total_classes += 1
-                    docstring = ast.get_docstring(node)
-                    if docstring:
-                        documented_classes += 1
-                        if check_quality and len(docstring) < 20:
-                            quality_issues.append(
-                                f"Short docstring in {node.name} at {file_obj}:{node.lineno}"
-                            )
-                    else:
-                        missing.append(f"Class: {node.name} ({file_obj}:{node.lineno})")
+        # Non-Python path: tree-sitter symbols + text-based doc detection
+        has_non_python = True
+        if not check_coverage:
+            continue
+
+        try:
+            from victor.coding.languages.registry import get_language_registry
+
+            registry = get_language_registry()
+            if not registry._plugins:
+                registry.discover_plugins()
+            plugin = registry.get(language)
+            doc_pattern = plugin.config.doc_comment_pattern
+        except (KeyError, Exception):
+            continue
+
+        if doc_pattern is None:
+            continue
+
+        extractor = _get_extractor()
+        (
+            f_total,
+            f_documented,
+            c_total,
+            c_documented,
+            f_missing,
+            f_quality,
+        ) = _analyze_non_python_file(file_obj, extractor, language, doc_pattern, check_quality)
+        total_functions += f_total
+        documented_functions += f_documented
+        total_classes += c_total
+        documented_classes += c_documented
+        missing.extend(f_missing)
+        quality_issues.extend(f_quality)
 
     # Calculate coverage
     total_items = total_functions + total_classes
@@ -765,7 +1069,8 @@ async def docs_coverage(
     report.append(f"Coverage: {coverage:.1f}%")
     report.append("")
     report.append(f"Functions: {documented_functions}/{total_functions} documented")
-    report.append(f"Classes: {documented_classes}/{total_classes} documented")
+    classes_label = "Classes/Structs/Traits" if has_non_python else "Classes"
+    report.append(f"{classes_label}: {documented_classes}/{total_classes} documented")
     report.append("")
 
     if missing:

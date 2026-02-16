@@ -151,6 +151,24 @@ class CommentStyle(Enum):
 
 
 @dataclass
+class DocCommentPattern:
+    """How documentation comments look for a language.
+
+    Attributes:
+        line_prefixes: Prefixes for doc comment lines (e.g., ["///", "//!"] for Rust)
+        block_start: Start marker for block doc comments (e.g., "/**")
+        block_end: End marker for block doc comments (e.g., "*/")
+        location: Where doc comments appear relative to the symbol:
+            "before" (Rust/Go/Java/JS) or "inside" (Python)
+    """
+
+    line_prefixes: List[str] = field(default_factory=list)
+    block_start: Optional[str] = None
+    block_end: Optional[str] = None
+    location: str = "before"
+
+
+@dataclass
 class LanguageConfig:
     """Configuration for a programming language.
 
@@ -190,6 +208,9 @@ class LanguageConfig:
 
     # Tree-sitter
     tree_sitter_language: Optional[str] = None  # tree-sitter grammar name
+
+    # Documentation comment pattern
+    doc_comment_pattern: Optional["DocCommentPattern"] = None
 
 
 @dataclass
