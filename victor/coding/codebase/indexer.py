@@ -150,6 +150,86 @@ STDLIB_MODULES = frozenset(
 )
 
 
+# =============================================================================
+# PRIMITIVE / CONTAINER TYPES (exclude from COMPOSED_OF phantom nodes)
+# =============================================================================
+# These are language-builtin or stdlib types that would create meaningless
+# composition edges (e.g. every struct with a String field → phantom node).
+_PRIMITIVE_TYPES = frozenset(
+    {
+        # Rust
+        "String",
+        "str",
+        "Vec",
+        "Option",
+        "Result",
+        "Box",
+        "Arc",
+        "Rc",
+        "HashMap",
+        "HashSet",
+        "BTreeMap",
+        "BTreeSet",
+        "VecDeque",
+        "i8",
+        "i16",
+        "i32",
+        "i64",
+        "i128",
+        "isize",
+        "u8",
+        "u16",
+        "u32",
+        "u64",
+        "u128",
+        "usize",
+        "f32",
+        "f64",
+        "bool",
+        "char",
+        "PathBuf",
+        "Duration",
+        "Instant",
+        "Cow",
+        # JS/TS
+        "string",
+        "number",
+        "boolean",
+        "any",
+        "void",
+        "null",
+        "undefined",
+        "Array",
+        "Map",
+        "Set",
+        "Promise",
+        "Date",
+        "RegExp",
+        "Error",
+        "Record",
+        "Partial",
+        "Required",
+        "Readonly",
+        # Java/C#
+        "int",
+        "long",
+        "float",
+        "double",
+        "byte",
+        "short",
+        "Integer",
+        "Long",
+        "Float",
+        "Double",
+        "Boolean",
+        "List",
+        "ArrayList",
+        "LinkedList",
+        "Object",
+    }
+)
+
+
 def _is_stdlib_module(module_name: str) -> bool:
     """Check if a module name is a standard library or common third-party module.
 
@@ -308,8 +388,7 @@ def _process_file_parallel(
                     _plugin = _reg.get(language)
                     if _plugin and _plugin.tree_sitter_queries.symbols:
                         query_defs = [
-                            (qp.symbol_type, qp.query)
-                            for qp in _plugin.tree_sitter_queries.symbols
+                            (qp.symbol_type, qp.query) for qp in _plugin.tree_sitter_queries.symbols
                         ]
                 except Exception:
                     pass
@@ -419,9 +498,7 @@ def _process_file_parallel(
                     cursor = QueryCursor(query)
                     for _pat_idx, cap_dict in cursor.matches(tree.root_node):
                         child_nodes = cap_dict.get("child", [])
-                        iface_nodes = (
-                            cap_dict.get("interface", []) or cap_dict.get("base", [])
-                        )
+                        iface_nodes = cap_dict.get("interface", []) or cap_dict.get("base", [])
                         if child_nodes and iface_nodes:
                             child_text = child_nodes[0].text.decode("utf-8", errors="ignore")
                             iface_text = iface_nodes[0].text.decode("utf-8", errors="ignore")
@@ -2417,9 +2494,7 @@ class CodebaseIndex:
         """,
     }
 
-    def _extract_imports_with_tree_sitter(
-        self, file_path: Path, language: str
-    ) -> List[str]:
+    def _extract_imports_with_tree_sitter(self, file_path: Path, language: str) -> List[str]:
         """Extract import/require/use statements using tree-sitter (non-Python)."""
         query_src = self._IMPORT_QUERIES.get(language)
         if not query_src:
@@ -2702,13 +2777,22 @@ class CodebaseIndex:
                 )
 
     def _resolve_cross_file_calls(self) -> None:
-        """Resolve pending CALLS edges across files by matching symbol names globally."""
-        if not self._pending_call_edges:
+        """Resolve pending cross-file edges (CALLS, INHERITS, IMPLEMENTS, COMPOSED_OF)."""
+        has_pending = (
+            self._pending_call_edges
+            or self._pending_inherit_edges
+            or self._pending_implements_edges
+            or self._pending_compose_edges
+        )
+        if not has_pending:
             return
 
         # Build resolver index from graph nodes - self.symbols keys are already unified IDs
         node_ids = list(self.symbols.keys())
         self._symbol_resolver.ingest(node_ids)
+
+        # Track deduplicated phantom nodes for external types
+        _seen_external: set[str] = set()
 
         # Cross-file CALLS resolution
         for caller_id, callee_name, file_path in self._pending_call_edges:
@@ -2729,7 +2813,7 @@ class CodebaseIndex:
                 )
             )
 
-        # INHERITS resolution
+        # INHERITS resolution — create phantom nodes for external base types
         for child_id, base_name, file_path in self._pending_inherit_edges:
             target_id = self._symbol_resolver.resolve(base_name, preferred_file=file_path)
             if not target_id:
@@ -2737,17 +2821,31 @@ class CodebaseIndex:
                     base_name.split(".")[-1], preferred_file=file_path
                 )
             if not target_id:
-                continue
+                target_id = f"external_type:{base_name}"
+                if target_id not in _seen_external:
+                    _seen_external.add(target_id)
+                    self._graph_nodes.append(
+                        GraphNode(
+                            node_id=target_id,
+                            type="external_type",
+                            name=base_name,
+                            file=file_path,
+                            metadata={"external": True},
+                        )
+                    )
             self._graph_edges.append(
                 GraphEdge(
                     src=child_id,
                     dst=target_id,
                     type="INHERITS",
-                    metadata={"path": file_path, "resolved": True},
+                    metadata={
+                        "path": file_path,
+                        "resolved": target_id.startswith("symbol:"),
+                    },
                 )
             )
 
-        # IMPLEMENTS resolution (interfaces/abstract types)
+        # IMPLEMENTS resolution — create phantom nodes for external traits/interfaces
         for child_id, base_name, file_path in self._pending_implements_edges:
             target_id = self._symbol_resolver.resolve(base_name, preferred_file=file_path)
             if not target_id:
@@ -2755,17 +2853,31 @@ class CodebaseIndex:
                     base_name.split(".")[-1], preferred_file=file_path
                 )
             if not target_id:
-                continue
+                target_id = f"external_type:{base_name}"
+                if target_id not in _seen_external:
+                    _seen_external.add(target_id)
+                    self._graph_nodes.append(
+                        GraphNode(
+                            node_id=target_id,
+                            type="external_type",
+                            name=base_name,
+                            file=file_path,
+                            metadata={"external": True},
+                        )
+                    )
             self._graph_edges.append(
                 GraphEdge(
                     src=child_id,
                     dst=target_id,
                     type="IMPLEMENTS",
-                    metadata={"path": file_path, "resolved": True},
+                    metadata={
+                        "path": file_path,
+                        "resolved": target_id.startswith("symbol:"),
+                    },
                 )
             )
 
-        # COMPOSES/has-a relationships resolution
+        # COMPOSES/has-a relationships — phantom nodes for non-primitive external types
         for owner_id, member_name, file_path in self._pending_compose_edges:
             target_id = self._symbol_resolver.resolve(member_name, preferred_file=file_path)
             if not target_id:
@@ -2773,13 +2885,30 @@ class CodebaseIndex:
                     member_name.split(".")[-1], preferred_file=file_path
                 )
             if not target_id:
-                continue
+                # Skip primitive/container types (too noisy for composition)
+                if member_name in _PRIMITIVE_TYPES:
+                    continue
+                target_id = f"external_type:{member_name}"
+                if target_id not in _seen_external:
+                    _seen_external.add(target_id)
+                    self._graph_nodes.append(
+                        GraphNode(
+                            node_id=target_id,
+                            type="external_type",
+                            name=member_name,
+                            file=file_path,
+                            metadata={"external": True},
+                        )
+                    )
             self._graph_edges.append(
                 GraphEdge(
                     src=owner_id,
                     dst=target_id,
                     type="COMPOSED_OF",
-                    metadata={"path": file_path, "resolved": True},
+                    metadata={
+                        "path": file_path,
+                        "resolved": target_id.startswith("symbol:"),
+                    },
                 )
             )
 
