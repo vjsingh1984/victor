@@ -24,11 +24,12 @@ Free Tier (La Plateforme):
 - Requires phone verification
 
 Supported Models:
-- mistral-large-latest: Most capable, 128K context
-- mistral-small-latest: Balanced performance
-- codestral-latest: Optimized for code
-- open-mistral-nemo: Open-weight, fast
-- ministral-8b-latest: Smallest, fastest
+- mistral-large-latest: Most capable (675B MoE), 256K context
+- mistral-medium-latest: Balanced performance, 128K context
+- mistral-small-latest: Efficient 24B, 128K context
+- codestral-latest: Optimized for code, 128K context
+- devstral-latest: Frontier agentic coder (123B), 256K context
+- open-mistral-nemo: Open-weight 12B, 128K context
 
 References:
 - https://docs.mistral.ai/
@@ -60,44 +61,51 @@ DEFAULT_BASE_URL = "https://api.mistral.ai/v1"
 # Available Mistral models
 MISTRAL_MODELS = {
     "mistral-large-latest": {
-        "description": "Most capable Mistral model, 128K context",
+        "description": "Mistral Large 3 (675B MoE, 41B active) - Most capable, 256K context",
+        "context_window": 262144,
+        "max_output": 32768,
+        "supports_tools": True,
+        "supports_parallel_tools": True,
+    },
+    "mistral-medium-latest": {
+        "description": "Mistral Medium 3.1 - Balanced quality/speed, 128K context",
         "context_window": 131072,
         "max_output": 32768,
         "supports_tools": True,
         "supports_parallel_tools": True,
     },
     "mistral-small-latest": {
-        "description": "Balanced performance, good for most tasks",
-        "context_window": 32768,
+        "description": "Mistral Small 3.2 (24B) - Efficient, 128K context",
+        "context_window": 131072,
         "max_output": 8192,
         "supports_tools": True,
         "supports_parallel_tools": True,
     },
     "codestral-latest": {
-        "description": "Optimized for code generation and understanding",
-        "context_window": 32768,
+        "description": "Codestral - Optimized for code, 128K context",
+        "context_window": 131072,
         "max_output": 8192,
         "supports_tools": True,
         "supports_parallel_tools": True,
     },
+    "devstral-latest": {
+        "description": "Devstral 2 (123B) - Frontier agentic coder, 256K context",
+        "context_window": 262144,
+        "max_output": 32768,
+        "supports_tools": True,
+        "supports_parallel_tools": True,
+    },
     "open-mistral-nemo": {
-        "description": "Open-weight 12B model, fast inference",
+        "description": "Open-weight 12B model, fast inference, 128K context",
         "context_window": 131072,
         "max_output": 8192,
         "supports_tools": True,
         "supports_parallel_tools": True,
     },
     "ministral-8b-latest": {
-        "description": "Smallest model, fastest inference",
-        "context_window": 32768,
+        "description": "Ministral 3 8B - Small and fast, 256K context",
+        "context_window": 262144,
         "max_output": 8192,
-        "supports_tools": True,
-        "supports_parallel_tools": False,
-    },
-    "ministral-3b-latest": {
-        "description": "Tiny model for simple tasks",
-        "context_window": 32768,
-        "max_output": 4096,
         "supports_tools": True,
         "supports_parallel_tools": False,
     },

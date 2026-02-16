@@ -93,13 +93,13 @@ class TestTogetherProviderModels:
         assert model["supports_tools"] is True
         assert model["context_window"] == 131072
 
-    def test_qwen_model_defined(self):
-        """Test Qwen 2.5 72B is defined."""
-        assert "Qwen/Qwen2.5-72B-Instruct-Turbo" in TOGETHER_MODELS
+    def test_gpt_oss_model_defined(self):
+        """Test GPT-OSS 120B is defined."""
+        assert "openai/gpt-oss-120b" in TOGETHER_MODELS
 
     def test_deepseek_model_defined(self):
-        """Test DeepSeek V3 is defined."""
-        assert "deepseek-ai/DeepSeek-V3" in TOGETHER_MODELS
+        """Test DeepSeek V3.1 is defined."""
+        assert "deepseek-ai/DeepSeek-V3.1" in TOGETHER_MODELS
 
 
 class TestTogetherProviderRequestPayload:

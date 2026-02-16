@@ -27,7 +27,9 @@ Features:
 Supported Models:
 - llama-3.3-70b-versatile: Best quality, 128K context
 - llama-3.1-8b-instant: Fast inference, 128K context
-- qwen/qwen3-32b: Qwen3 model with tool support (preview)
+- openai/gpt-oss-120b: GPT-OSS 120B, reasoning support
+- openai/gpt-oss-20b: GPT-OSS 20B, fast and efficient
+- meta-llama/llama-4-maverick-17b-128e-instruct: Llama 4 (preview)
 - moonshotai/kimi-k2-instruct-0905: Kimi K2 with 256K context (preview)
 
 References:
@@ -75,21 +77,21 @@ GROQ_MODELS = {
     "llama-3.1-8b-instant": {
         "description": "Llama 3.1 8B - Fast inference with tool support",
         "context_window": 131072,  # 128K
-        "max_output": 8192,
+        "max_output": 131072,
         "supports_tools": True,
         "supports_parallel_tools": True,
     },
     "openai/gpt-oss-120b": {
-        "description": "GPT-OSS 120B - Large open-source GPT model",
+        "description": "GPT-OSS 120B - Reasoning support, high quality",
         "context_window": 131072,
-        "max_output": 16384,
+        "max_output": 65536,
         "supports_tools": True,
         "supports_parallel_tools": False,
     },
     "openai/gpt-oss-20b": {
-        "description": "GPT-OSS 20B - Efficient open-source GPT model",
+        "description": "GPT-OSS 20B - Fast and efficient",
         "context_window": 131072,
-        "max_output": 8192,
+        "max_output": 65536,
         "supports_tools": True,
         "supports_parallel_tools": False,
     },
@@ -97,7 +99,7 @@ GROQ_MODELS = {
     "qwen/qwen3-32b": {
         "description": "Qwen3 32B - Strong reasoning with tool support (preview)",
         "context_window": 131072,
-        "max_output": 16384,
+        "max_output": 40960,
         "supports_tools": True,
         "supports_parallel_tools": True,
         "preview": True,
@@ -105,15 +107,23 @@ GROQ_MODELS = {
     "moonshotai/kimi-k2-instruct-0905": {
         "description": "Kimi K2 - Extended 256K context (preview)",
         "context_window": 262144,  # 256K
-        "max_output": 32768,
+        "max_output": 16384,
+        "supports_tools": True,
+        "supports_parallel_tools": True,
+        "preview": True,
+    },
+    "meta-llama/llama-4-maverick-17b-128e-instruct": {
+        "description": "Llama 4 Maverick 17B - Latest Llama MoE (preview)",
+        "context_window": 131072,
+        "max_output": 8192,
         "supports_tools": True,
         "supports_parallel_tools": True,
         "preview": True,
     },
     "meta-llama/llama-4-scout-17b-16e-instruct": {
-        "description": "Llama 4 Scout 17B - Latest Llama preview",
+        "description": "Llama 4 Scout 17B - Efficient MoE (preview)",
         "context_window": 131072,
-        "max_output": 16384,
+        "max_output": 8192,
         "supports_tools": True,
         "supports_parallel_tools": True,
         "preview": True,

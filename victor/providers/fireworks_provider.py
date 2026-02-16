@@ -60,28 +60,33 @@ FIREWORKS_MODELS = {
         "context_window": 131072,
         "supports_tools": True,
     },
-    "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct": {
-        "description": "Qwen3 Coder 480B - Large code model",
+    "accounts/fireworks/models/gpt-oss-120b": {
+        "description": "GPT-OSS 120B - OpenAI open-weight model",
         "context_window": 131072,
         "supports_tools": True,
     },
-    "accounts/fireworks/models/qwen3-235b-a22b-instruct-2507": {
-        "description": "Qwen3 235B - Strong reasoning",
-        "context_window": 131072,
+    "accounts/fireworks/models/glm-4p7": {
+        "description": "ZAI GLM 4.7 - Frontier coding and reasoning",
+        "context_window": 202752,
+        "supports_tools": True,
+    },
+    "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct": {
+        "description": "Qwen3 Coder 480B - Large code model",
+        "context_window": 262144,
         "supports_tools": True,
     },
     "accounts/fireworks/models/deepseek-v3p2": {
         "description": "DeepSeek V3.2 - Latest MoE",
-        "context_window": 131072,
+        "context_window": 163840,
         "supports_tools": True,
     },
-    "accounts/fireworks/models/deepseek-r1-0528": {
+    "accounts/fireworks/models/deepseek-r1": {
         "description": "DeepSeek R1 - Reasoning model",
-        "context_window": 131072,
+        "context_window": 163840,
         "supports_tools": True,
     },
     "accounts/fireworks/models/llama4-maverick-instruct-basic": {
-        "description": "Llama 4 Maverick - Latest Llama",
+        "description": "Llama 4 Maverick - 1M context MoE",
         "context_window": 131072,
         "supports_tools": True,
     },

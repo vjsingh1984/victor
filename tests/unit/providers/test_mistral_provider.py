@@ -132,7 +132,7 @@ class TestMistralModels:
     def test_mistral_large_latest(self):
         """Test mistral-large-latest model config."""
         model = MISTRAL_MODELS["mistral-large-latest"]
-        assert model["context_window"] == 131072
+        assert model["context_window"] == 262144
         assert model["supports_tools"] is True
         assert model["supports_parallel_tools"] is True
 

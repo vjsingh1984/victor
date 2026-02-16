@@ -166,8 +166,8 @@ class TestOpenRouterModels:
         assert len(free_models) >= 3  # Should have multiple free models
 
     def test_gemini_flash_free(self):
-        """Test Gemini 2.0 Flash is free with tools."""
-        model = OPENROUTER_MODELS.get("google/gemini-2.0-flash-exp:free")
+        """Test Gemini 2.5 Flash is free with tools."""
+        model = OPENROUTER_MODELS.get("google/gemini-2.5-flash:free")
         assert model is not None
         assert model.get("free") is True
         assert model.get("supports_tools") is True
@@ -498,7 +498,7 @@ class TestOpenRouterListModels:
 
             assert len(models) == len(OPENROUTER_MODELS)
             model_ids = [m["id"] for m in models]
-            assert "google/gemini-2.0-flash-exp:free" in model_ids
+            assert "google/gemini-2.5-flash:free" in model_ids
 
 
 class TestOpenRouterProviderCleanup:

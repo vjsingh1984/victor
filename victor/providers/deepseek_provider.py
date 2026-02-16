@@ -15,9 +15,9 @@
 """DeepSeek API provider for DeepSeek-V3 models.
 
 DeepSeek provides OpenAI-compatible API with special support for:
-- deepseek-chat: Non-thinking mode with function calling support
-- deepseek-reasoner: Thinking mode with Chain of Thought (no function calling)
-- 128k context window
+- deepseek-chat: Non-thinking mode (DeepSeek-V3.2) with function calling
+- deepseek-reasoner: Thinking mode (DeepSeek-V3.2) with Chain of Thought + function calling
+- 128K context window
 - Very competitive pricing (~10-30x cheaper than OpenAI)
 
 References:
@@ -58,10 +58,10 @@ DEEPSEEK_MODELS = {
         "supports_thinking": False,
     },
     "deepseek-reasoner": {
-        "description": "DeepSeek-V3.2 thinking mode with Chain of Thought",
+        "description": "DeepSeek-V3.2 thinking mode with CoT and function calling",
         "context_window": 131072,  # 128K
         "max_output": 65536,  # 64K (includes reasoning)
-        "supports_tools": False,  # No function calling in reasoner
+        "supports_tools": True,
         "supports_thinking": True,
     },
 }
@@ -71,7 +71,7 @@ class DeepSeekProvider(BaseProvider):
     """Provider for DeepSeek API (OpenAI-compatible).
 
     Features:
-    - Native tool calling support (deepseek-chat only)
+    - Native tool calling support (both deepseek-chat and deepseek-reasoner)
     - Reasoning/thinking trace extraction (deepseek-reasoner)
     - 128k context window
     - Streaming support

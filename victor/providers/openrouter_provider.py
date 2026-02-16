@@ -57,10 +57,10 @@ DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 # Free and popular models on OpenRouter
 OPENROUTER_MODELS = {
     # Free models
-    "google/gemma-2-9b-it:free": {
-        "description": "Gemma 2 9B - Free tier",
-        "context_window": 8192,
-        "supports_tools": False,
+    "meta-llama/llama-3.3-70b-instruct:free": {
+        "description": "Llama 3.3 70B - Free tier",
+        "context_window": 131072,
+        "supports_tools": True,
         "free": True,
     },
     "meta-llama/llama-3.2-3b-instruct:free": {
@@ -69,21 +69,21 @@ OPENROUTER_MODELS = {
         "supports_tools": False,
         "free": True,
     },
+    "google/gemini-2.5-flash:free": {
+        "description": "Gemini 2.5 Flash - Free tier",
+        "context_window": 1000000,
+        "supports_tools": True,
+        "free": True,
+    },
     "mistralai/mistral-7b-instruct:free": {
         "description": "Mistral 7B - Free tier",
         "context_window": 32768,
         "supports_tools": False,
         "free": True,
     },
-    "qwen/qwen-2-7b-instruct:free": {
-        "description": "Qwen 2 7B - Free tier",
-        "context_window": 32768,
-        "supports_tools": False,
-        "free": True,
-    },
     # Paid models with tool support
-    "anthropic/claude-3.5-sonnet": {
-        "description": "Claude 3.5 Sonnet via OpenRouter",
+    "anthropic/claude-sonnet-4.5": {
+        "description": "Claude Sonnet 4.5 via OpenRouter",
         "context_window": 200000,
         "supports_tools": True,
     },
@@ -92,12 +92,6 @@ OPENROUTER_MODELS = {
         "context_window": 128000,
         "supports_tools": True,
     },
-    "google/gemini-2.0-flash-exp:free": {
-        "description": "Gemini 2.0 Flash - Free experimental",
-        "context_window": 1000000,
-        "supports_tools": True,
-        "free": True,
-    },
     "meta-llama/llama-3.3-70b-instruct": {
         "description": "Llama 3.3 70B",
         "context_window": 131072,
@@ -105,6 +99,11 @@ OPENROUTER_MODELS = {
     },
     "deepseek/deepseek-chat": {
         "description": "DeepSeek V3",
+        "context_window": 131072,
+        "supports_tools": True,
+    },
+    "deepseek/deepseek-r1": {
+        "description": "DeepSeek R1 - Reasoning model",
         "context_window": 131072,
         "supports_tools": True,
     },

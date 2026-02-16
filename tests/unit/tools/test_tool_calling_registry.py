@@ -106,7 +106,7 @@ class TestToolCallingAdapterRegistry:
 
     def test_get_adapter_cerebras(self):
         """Test getting Cerebras adapter uses OpenAI format."""
-        adapter = ToolCallingAdapterRegistry.get_adapter("cerebras", model="llama-3.3-70b")
+        adapter = ToolCallingAdapterRegistry.get_adapter("cerebras", model="gpt-oss-120b")
         assert isinstance(adapter, OpenAIToolCallingAdapter)
 
     def test_get_adapter_unknown_provider(self):

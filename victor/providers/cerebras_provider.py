@@ -18,9 +18,9 @@ Cerebras provides extremely fast inference using their Wafer Scale Engine (WSE)
 hardware with a generous free tier.
 
 Free Tier:
-- 30-10 requests/min (varies by model)
-- 60,000-150,000 tokens/min
-- Access to Llama, Qwen, and GPT-OSS models
+- 10-30 requests/min (varies by model)
+- 60,000 tokens/min input
+- Access to Llama 3.1, GPT-OSS, Qwen 3, and ZAI GLM models
 
 Features:
 - Fastest inference available (1000+ tokens/sec)
@@ -265,56 +265,40 @@ class StreamingThinkingFilter:
 DEFAULT_BASE_URL = "https://api.cerebras.ai/v1"
 
 CEREBRAS_MODELS = {
-    "llama3.3-70b": {
-        "description": "Llama 3.3 70B - High quality, very fast",
-        "context_window": 131072,
-        "max_output": 8192,
-        "supports_tools": True,
-        "rate_limit": "30 req/min, 60K tokens/min",
-    },
-    "llama-3.3-70b": {
-        "description": "Llama 3.3 70B (alias)",
-        "context_window": 131072,
-        "max_output": 8192,
-        "supports_tools": True,
-    },
     "llama3.1-8b": {
         "description": "Llama 3.1 8B - Fast, efficient",
         "context_window": 131072,
         "max_output": 8192,
         "supports_tools": True,
-        "rate_limit": "30 req/min, 150K tokens/min",
-    },
-    "qwen-3-32b": {
-        "description": "Qwen 3 32B - Strong reasoning with thinking",
-        "context_window": 131072,
-        "max_output": 8192,
-        "supports_tools": True,
-        "has_thinking": True,
-    },
-    "qwen-3-235b-a22b-instruct-2507": {
-        "description": "Qwen 3 235B - Largest Qwen model",
-        "context_window": 131072,
-        "max_output": 8192,
-        "supports_tools": True,
-        "has_thinking": True,
+        "rate_limit": "30 req/min, 60K tokens/min",
     },
     "gpt-oss-120b": {
-        "description": "GPT-OSS 120B - Largest open model, clean output",
+        "description": "GPT-OSS 120B - Best general-purpose, reasoning support",
         "context_window": 131072,
-        "max_output": 8192,
+        "max_output": 32768,
         "supports_tools": True,
+        "rate_limit": "30 req/min, 60K tokens/min",
     },
-    "zai-glm-4.6": {
-        "description": "ZAI GLM 4.6 - Chinese/English bilingual",
+    "qwen-3-235b-a22b-instruct-2507": {
+        "description": "Qwen 3 235B - Strong multilingual and coding (preview)",
         "context_window": 131072,
-        "max_output": 8192,
+        "max_output": 32768,
         "supports_tools": True,
+        "has_thinking": False,
+        "preview": True,
+    },
+    "zai-glm-4.7": {
+        "description": "ZAI GLM 4.7 - Frontier coding and reasoning (preview)",
+        "context_window": 131072,
+        "max_output": 40960,
+        "supports_tools": True,
+        "has_reasoning": True,
+        "preview": True,
     },
 }
 
 # Models that output thinking/reasoning inline (need filtering)
-THINKING_MODELS = {"qwen-3-32b", "qwen-3-235b-a22b-instruct-2507"}
+THINKING_MODELS = {"qwen-3-235b-a22b-instruct-2507"}
 
 # Patterns that indicate start of thinking content in Qwen-3 models
 QWEN3_THINKING_PATTERNS = [

@@ -24,9 +24,10 @@ Free Tier:
 
 Supported Models (with tool calling):
 - meta-llama/Llama-3.3-70B-Instruct-Turbo
-- Qwen/Qwen2.5-72B-Instruct-Turbo
-- deepseek-ai/DeepSeek-V3
-- mistralai/Mixtral-8x22B-Instruct-v0.1
+- openai/gpt-oss-120b
+- deepseek-ai/DeepSeek-R1
+- deepseek-ai/DeepSeek-V3.1
+- moonshotai/Kimi-K2-Instruct-0905
 
 References:
 - https://docs.together.ai/
@@ -61,32 +62,38 @@ TOGETHER_MODELS = {
         "max_output": 8192,
         "supports_tools": True,
     },
-    "Qwen/Qwen2.5-72B-Instruct-Turbo": {
-        "description": "Qwen 2.5 72B - Strong reasoning and coding",
-        "context_window": 131072,
-        "max_output": 8192,
-        "supports_tools": True,
-    },
-    "deepseek-ai/DeepSeek-V3": {
-        "description": "DeepSeek V3 - 671B MoE model",
-        "context_window": 131072,
+    "openai/gpt-oss-120b": {
+        "description": "GPT-OSS 120B - OpenAI open-weight model",
+        "context_window": 128000,
         "max_output": 16384,
         "supports_tools": True,
     },
-    "mistralai/Mixtral-8x22B-Instruct-v0.1": {
-        "description": "Mixtral 8x22B - Large MoE model",
-        "context_window": 65536,
+    "deepseek-ai/DeepSeek-V3.1": {
+        "description": "DeepSeek V3.1 - 671B MoE model",
+        "context_window": 128000,
+        "max_output": 16384,
+        "supports_tools": True,
+    },
+    "deepseek-ai/DeepSeek-R1": {
+        "description": "DeepSeek R1 - Reasoning model",
+        "context_window": 163839,
+        "max_output": 16384,
+        "supports_tools": True,
+    },
+    "moonshotai/Kimi-K2-Instruct-0905": {
+        "description": "Kimi K2 - 256K context, strong reasoning",
+        "context_window": 262144,
+        "max_output": 16384,
+        "supports_tools": True,
+    },
+    "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8": {
+        "description": "Llama 4 Maverick - 1M context MoE",
+        "context_window": 1048576,
         "max_output": 8192,
         "supports_tools": True,
     },
-    "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo": {
-        "description": "Llama 3.1 405B - Largest open model",
-        "context_window": 131072,
-        "max_output": 8192,
-        "supports_tools": True,
-    },
-    "Qwen/Qwen2.5-Coder-32B-Instruct": {
-        "description": "Qwen 2.5 Coder 32B - Specialized for code",
+    "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo": {
+        "description": "Llama 3.1 8B Turbo - Fast and efficient",
         "context_window": 131072,
         "max_output": 8192,
         "supports_tools": True,

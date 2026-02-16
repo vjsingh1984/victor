@@ -17,7 +17,7 @@
 xAI provides an OpenAI-compatible API with support for:
 - Chat completions with streaming
 - Native function/tool calling
-- Multiple Grok models (grok-beta, grok-2, grok-code-fast-1, etc.)
+- Multiple Grok models (grok-4, grok-3, grok-code-fast-1, etc.)
 
 References:
 - https://docs.x.ai/docs/api-reference
@@ -52,33 +52,45 @@ DEFAULT_BASE_URL = "https://api.x.ai/v1"
 # Available xAI Grok models
 # Reference: https://docs.x.ai/docs/models
 XAI_MODELS = {
-    "grok-2": {
-        "description": "Grok-2 flagship model",
-        "context_window": 131072,  # 128K tokens
-        "max_output": 4096,
+    "grok-4-1-fast-reasoning": {
+        "description": "Grok 4.1 Fast - Best for tool calling, 2M context",
+        "context_window": 2000000,  # 2M tokens
+        "max_output": 16384,
         "supports_tools": True,
     },
-    "grok-2-mini": {
-        "description": "Grok-2 mini - faster, more efficient",
-        "context_window": 131072,  # 128K tokens
-        "max_output": 4096,
+    "grok-4-1-fast-non-reasoning": {
+        "description": "Grok 4.1 Fast (non-reasoning) - Fast tool calling, 2M context",
+        "context_window": 2000000,  # 2M tokens
+        "max_output": 16384,
+        "supports_tools": True,
+    },
+    "grok-4": {
+        "description": "Grok 4 - Flagship reasoning model, 256K context",
+        "context_window": 262144,  # 256K tokens
+        "max_output": 16384,
+        "supports_tools": True,
+    },
+    "grok-code-fast-1": {
+        "description": "Grok Code Fast - Specialized for coding, 256K context",
+        "context_window": 262144,  # 256K tokens
+        "max_output": 16384,
         "supports_tools": True,
     },
     "grok-3": {
-        "description": "Grok-3 next-gen model",
+        "description": "Grok-3 - High quality, 128K context",
         "context_window": 131072,  # 128K tokens
         "max_output": 16384,
         "supports_tools": True,
     },
     "grok-3-mini": {
-        "description": "Grok-3 mini - fast reasoning",
+        "description": "Grok-3 Mini - Fast reasoning, 128K context",
         "context_window": 131072,  # 128K tokens
         "max_output": 16384,
         "supports_tools": True,
     },
-    "grok-beta": {
-        "description": "Grok beta (legacy)",
-        "context_window": 131072,  # 128K tokens
+    "grok-2-vision-1212": {
+        "description": "Grok 2 Vision - Multimodal, 32K context",
+        "context_window": 32768,  # 32K tokens
         "max_output": 4096,
         "supports_tools": True,
     },
