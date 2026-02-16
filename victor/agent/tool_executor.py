@@ -421,9 +421,7 @@ class ToolExecutor:
                 # Strip unknown arguments so the tool function doesn't crash
                 for arg in unknown_args:
                     arguments.pop(arg, None)
-                logger.warning(
-                    "Stripped unknown arguments %s (lenient mode)", sorted(unknown_args)
-                )
+                logger.warning("Stripped unknown arguments %s (lenient mode)", sorted(unknown_args))
 
         try:
             validation = tool.validate_parameters_detailed(**arguments)
