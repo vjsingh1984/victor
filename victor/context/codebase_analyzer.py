@@ -2562,10 +2562,13 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
     from pathlib import Path
     from victor.tools.graph_tool import GraphAnalyzer, _load_graph
     from victor.coding.codebase.graph.registry import create_graph_store
+    from victor.core.schema import Tables
 
     root = Path(root_path).resolve() if root_path else Path.cwd()
     # Use consolidated project.db
     graph_db_path = root / ".victor" / "project.db"
+    _NT = Tables.GRAPH_NODE  # "graph_node"
+    _ET = Tables.GRAPH_EDGE  # "graph_edge"
 
     insights: Dict[str, Any] = {
         "has_graph": False,
@@ -2595,25 +2598,25 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
         conn = sqlite3.connect(graph_db_path)
         try:
             # Get basic stats
-            cur = conn.execute("SELECT COUNT(*) FROM nodes")
+            cur = conn.execute(f"SELECT COUNT(*) FROM {_NT}")
             total_nodes = cur.fetchone()[0]
 
             if total_nodes == 0:
                 return insights
 
-            cur = conn.execute("SELECT COUNT(*) FROM edges")
+            cur = conn.execute(f"SELECT COUNT(*) FROM {_ET}")
             total_edges = cur.fetchone()[0]
 
             # Get node type distribution
-            cur = conn.execute("SELECT type, COUNT(*) FROM nodes GROUP BY type")
+            cur = conn.execute(f"SELECT type, COUNT(*) FROM {_NT} GROUP BY type")
             node_types = dict(cur.fetchall())
 
             # Language coverage
-            cur = conn.execute("SELECT lang, COUNT(*) FROM nodes GROUP BY lang")
+            cur = conn.execute(f"SELECT lang, COUNT(*) FROM {_NT} GROUP BY lang")
             languages = [(row[0], row[1]) for row in cur.fetchall() if row[0]]
 
             # Get edge type distribution
-            cur = conn.execute("SELECT type, COUNT(*) FROM edges GROUP BY type")
+            cur = conn.execute(f"SELECT type, COUNT(*) FROM {_ET} GROUP BY type")
             edge_types = dict(cur.fetchall())
 
             insights["has_graph"] = True
@@ -2636,11 +2639,11 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             insights["edge_gaps"] = sorted(list(expected_edges - set(edge_types.keys())))
 
             # Get high-connectivity nodes (hub classes) via SQL
-            cur = conn.execute("""
+            cur = conn.execute(f"""
                 SELECT n.name, n.type, n.file, n.line,
-                       (SELECT COUNT(*) FROM edges WHERE src = n.node_id) +
-                       (SELECT COUNT(*) FROM edges WHERE dst = n.node_id) as degree
-                FROM nodes n
+                       (SELECT COUNT(*) FROM {_ET} WHERE src = n.node_id) +
+                       (SELECT COUNT(*) FROM {_ET} WHERE dst = n.node_id) as degree
+                FROM {_NT} n
                 WHERE n.type IN ('class', 'struct', 'interface')
                 ORDER BY degree DESC
                 LIMIT 5
@@ -2653,11 +2656,11 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             ][:3]
 
             # Get most-called symbols (important functions)
-            cur = conn.execute("""
+            cur = conn.execute(f"""
                 SELECT n.name, n.type, n.file, n.line,
-                       (SELECT COUNT(*) FROM edges WHERE dst = n.node_id AND type = 'CALLS') as in_calls,
-                       (SELECT COUNT(*) FROM edges WHERE src = n.node_id AND type = 'CALLS') as out_calls
-                FROM nodes n
+                       (SELECT COUNT(*) FROM {_ET} WHERE dst = n.node_id AND type = 'CALLS') as in_calls,
+                       (SELECT COUNT(*) FROM {_ET} WHERE src = n.node_id AND type = 'CALLS') as out_calls
+                FROM {_NT} n
                 WHERE n.type IN ('function', 'method', 'class')
                 ORDER BY in_calls DESC
                 LIMIT 8
@@ -2749,14 +2752,14 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             # Use REFERENCES edges (imports/dependencies) for richer module relationships
             # CALLS edges are sparse as they only track explicit function calls
             # Note: Hidden directories (.*) and archive/ are filtered at index time
-            cur = conn.execute("""
+            cur = conn.execute(f"""
                 SELECT
                     src_n.file as src_module,
                     dst_n.file as dst_module,
                     COUNT(*) as ref_count
-                FROM edges e
-                JOIN nodes src_n ON e.src = src_n.node_id
-                JOIN nodes dst_n ON e.dst = dst_n.node_id
+                FROM {_ET} e
+                JOIN {_NT} src_n ON e.src = src_n.node_id
+                JOIN {_NT} dst_n ON e.dst = dst_n.node_id
                 WHERE e.type = 'REFERENCES'
                   AND src_n.file != dst_n.file
                   AND src_n.file IS NOT NULL

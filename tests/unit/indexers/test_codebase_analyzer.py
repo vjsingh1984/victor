@@ -14,8 +14,11 @@
 
 """Tests for codebase_analyzer module."""
 
+import sqlite3
 import tempfile
 from pathlib import Path
+
+import pytest
 
 from victor.config.settings import VICTOR_CONTEXT_FILE
 from victor.context.codebase_analyzer import (
@@ -23,9 +26,11 @@ from victor.context.codebase_analyzer import (
     ModuleInfo,
     CodebaseAnalysis,
     CodebaseAnalyzer,
+    extract_graph_insights,
     generate_smart_victor_md,
     _extract_readme_description,
 )
+from victor.core.schema import Tables
 
 
 class TestClassInfo:
@@ -625,3 +630,135 @@ class BaseProvider:
             # Orchestrator should be identified
             component_names = [c.name for c in analyzer.analysis.key_components]
             assert "AgentOrchestrator" in component_names
+
+
+class TestExtractGraphInsights:
+    """Tests for extract_graph_insights — ensures canonical table names are used."""
+
+    def _create_graph_db(self, db_path: Path) -> None:
+        """Create a project.db with the canonical graph_node/graph_edge tables."""
+        conn = sqlite3.connect(db_path)
+        conn.executescript(f"""
+            CREATE TABLE IF NOT EXISTS {Tables.GRAPH_NODE} (
+                node_id TEXT PRIMARY KEY,
+                type TEXT,
+                name TEXT,
+                file TEXT,
+                line INTEGER,
+                end_line INTEGER,
+                lang TEXT,
+                signature TEXT,
+                docstring TEXT,
+                parent_id TEXT,
+                embedding_ref TEXT,
+                metadata TEXT
+            );
+            CREATE TABLE IF NOT EXISTS {Tables.GRAPH_EDGE} (
+                src TEXT,
+                dst TEXT,
+                type TEXT,
+                weight REAL,
+                metadata TEXT,
+                PRIMARY KEY (src, dst, type)
+            );
+        """)
+        # Insert sample nodes
+        conn.executemany(
+            f"INSERT INTO {Tables.GRAPH_NODE}"
+            " (node_id, type, name, file, line, lang) VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                ("cls_app", "class", "App", "app.py", 1, "python"),
+                ("fn_main", "function", "main", "main.py", 10, "python"),
+                ("fn_helper", "function", "helper", "utils.py", 5, "python"),
+            ],
+        )
+        # Insert sample edges
+        conn.executemany(
+            f"INSERT INTO {Tables.GRAPH_EDGE}" " (src, dst, type, weight) VALUES (?, ?, ?, ?)",
+            [
+                ("fn_main", "cls_app", "CALLS", 1.0),
+                ("fn_main", "fn_helper", "CALLS", 1.0),
+                ("fn_helper", "cls_app", "REFERENCES", 1.0),
+            ],
+        )
+        conn.commit()
+        conn.close()
+
+    @pytest.mark.asyncio
+    async def test_extracts_insights_from_canonical_tables(self):
+        """Graph insights should read from graph_node/graph_edge tables."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            victor_dir = Path(tmpdir) / ".victor"
+            victor_dir.mkdir()
+            db_path = victor_dir / "project.db"
+            self._create_graph_db(db_path)
+
+            insights = await extract_graph_insights(tmpdir)
+
+            assert insights["has_graph"] is True
+            assert insights["stats"]["total_nodes"] == 3
+            assert insights["stats"]["total_edges"] == 3
+            assert "function" in insights["stats"]["node_types"]
+            assert "CALLS" in insights["stats"]["edge_types"]
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_no_db(self):
+        """Should return empty insights when project.db doesn't exist."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            insights = await extract_graph_insights(tmpdir)
+            assert insights["has_graph"] is False
+            assert insights["stats"] == {}
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_tables_empty(self):
+        """Should return empty insights when tables exist but have no rows."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            victor_dir = Path(tmpdir) / ".victor"
+            victor_dir.mkdir()
+            db_path = victor_dir / "project.db"
+            conn = sqlite3.connect(db_path)
+            conn.executescript(f"""
+                CREATE TABLE {Tables.GRAPH_NODE} (
+                    node_id TEXT PRIMARY KEY, type TEXT, name TEXT,
+                    file TEXT, line INTEGER, lang TEXT
+                );
+                CREATE TABLE {Tables.GRAPH_EDGE} (
+                    src TEXT, dst TEXT, type TEXT, weight REAL,
+                    metadata TEXT, PRIMARY KEY (src, dst, type)
+                );
+            """)
+            conn.close()
+
+            insights = await extract_graph_insights(tmpdir)
+            assert insights["has_graph"] is False
+
+    @pytest.mark.asyncio
+    async def test_fails_with_wrong_table_names(self):
+        """Regression: queries must NOT use bare 'nodes'/'edges' table names."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            victor_dir = Path(tmpdir) / ".victor"
+            victor_dir.mkdir()
+            db_path = victor_dir / "project.db"
+
+            # Create tables with OLD (wrong) names only
+            conn = sqlite3.connect(db_path)
+            conn.executescript("""
+                CREATE TABLE nodes (
+                    node_id TEXT PRIMARY KEY, type TEXT, name TEXT,
+                    file TEXT, line INTEGER, lang TEXT
+                );
+                CREATE TABLE edges (
+                    src TEXT, dst TEXT, type TEXT, weight REAL,
+                    metadata TEXT, PRIMARY KEY (src, dst, type)
+                );
+            """)
+            conn.execute(
+                "INSERT INTO nodes (node_id, type, name, file, line, lang)"
+                " VALUES ('x', 'class', 'X', 'x.py', 1, 'python')"
+            )
+            conn.commit()
+            conn.close()
+
+            # Should NOT find data — it must use graph_node/graph_edge
+            insights = await extract_graph_insights(tmpdir)
+            assert insights["has_graph"] is False
