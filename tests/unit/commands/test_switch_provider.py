@@ -30,7 +30,6 @@ from rich.console import Console
 
 from victor.ui.slash.protocol import CommandContext
 
-
 # ---------------------------------------------------------------------------
 # Signature alignment tests — catch param name drift at import time
 # ---------------------------------------------------------------------------
@@ -59,9 +58,9 @@ class TestSwitchProviderSignatureAlignment:
         # The visible method must use 'provider_name' for all callers.
         sig = inspect.signature(AgentOrchestrator.switch_provider)
         params = list(sig.parameters.keys())
-        assert params[1] == "provider_name", (
-            f"First param after 'self' should be 'provider_name', got '{params[1]}'"
-        )
+        assert (
+            params[1] == "provider_name"
+        ), f"First param after 'self' should be 'provider_name', got '{params[1]}'"
 
     def test_switch_provider_does_not_use_bare_provider_param(self):
         """Regression guard: param must NOT be bare 'provider' (ambiguous)."""
@@ -90,10 +89,12 @@ class TestProfileCommandSwitchProvider:
         settings = MagicMock()
 
         if profiles is None:
+
             @dataclass
             class FakeProfile:
                 provider: str = "ollama"
                 model: str = "qwen3-coder-tools:30b-64K"
+
             profiles = {"default": FakeProfile()}
 
         settings.load_profiles.return_value = profiles
