@@ -2,7 +2,7 @@
 
 # Victor
 
-**Provider-agnostic coding assistant. Local or cloud, one CLI.**
+**Open-source agentic AI framework. Build, orchestrate, and evaluate AI agents across 22 providers.**
 
 [![PyPI version](https://badge.fury.io/py/victor-ai.svg)](https://pypi.org/project/victor-ai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -17,22 +17,39 @@
 
 ## Features
 
-- **21 LLM Providers** - Cloud (Anthropic, OpenAI, Google, Azure, AWS Bedrock) and local (Ollama, LM Studio, vLLM)
-- **55 Specialized Tools** - Across 5 domain verticals (Coding, DevOps, RAG, Data Analysis, Research)
-- **Air-Gapped Mode** - Full functionality with local models for secure, offline environments
-- **Semantic Codebase Search** - Context-aware code understanding with Tree-sitter and embeddings
-- **YAML Workflow DSL** - Define multi-step automation with StateGraph and checkpointing
-- **Multi-Agent Teams** - Coordinate specialized agents for complex tasks
-- **MCP Protocol Support** - Model Context Protocol for IDE integration
-- **Provider Switching** - Change models mid-conversation without losing context
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     VICTOR FRAMEWORK                        │
+│                                                             │
+│  Agents ─── Teams ─── Workflows ─── Evaluation              │
+│    │          │          │              │                    │
+│  run()    Sequential   StateGraph    SWE-bench              │
+│  stream()  Parallel    YAML DSL      Harnesses              │
+│  chat()   Hierarchical Checkpoints   Code Quality           │
+│           Pipeline                                          │
+│                                                             │
+│  22 Providers │ 33 Tool Modules │ 9 Verticals │ 4 Scopes   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- **22 LLM Providers** — Cloud (Anthropic, OpenAI, Google, Azure, Bedrock, Vertex) + local (Ollama, LM Studio, vLLM)
+- **33 Tool Modules** — File ops, git, shell, web, search, docker, testing, refactoring, analysis
+- **9 Domain Verticals** — Coding, DevOps, RAG, Data Analysis, Research, Security, IaC, Classification, Benchmark
+- **Multi-Agent Teams** — 4 formations: sequential, parallel, hierarchical, pipeline
+- **Stateful Workflows** — YAML DSL compiled to StateGraph with typed state and checkpointing
+- **Air-Gapped Mode** — Full functionality with local models for secure, offline environments
 
 ## At a glance
 
 ```
-[You] -> [Victor CLI/TUI] -> [Context + Orchestration] -> [Providers] -> [Tools + Workflows] -> [Results]
-                                      |                     |
-                                      |                     +--> Local: Ollama, LM Studio, vLLM
-                                      +--> Files, tests, git       Cloud: Anthropic, OpenAI, etc
+                              ┌─────────────────────────────────┐
+                              │       Agent Orchestrator        │
+                              │                                 │
+[You] ──▶ [CLI/TUI/API] ──▶  │  ProviderManager ──▶ 22 LLMs   │ ──▶ [Response]
+                              │  ToolPipeline    ──▶ 33 Tools   │
+                              │  TeamCoordinator ──▶ Agents     │
+                              │  StateManager    ──▶ 4 Scopes   │
+                              └─────────────────────────────────┘
 ```
 
 ## Choose your path
@@ -55,38 +72,15 @@
 
 ## Supported Providers
 
-Victor supports **21 LLM providers** for maximum flexibility:
+Victor supports **22 LLM providers** — switch mid-conversation without losing context.
 
-### Cloud Providers
-
-| Provider | Models | Tool Calling | Vision | Setup |
-|----------|--------|--------------|--------|-------|
-| **Anthropic** | Claude Sonnet 4, Claude 3.5, Opus, Haiku | Yes | Yes | `ANTHROPIC_API_KEY` |
-| **OpenAI** | GPT-4o, GPT-4, o1-preview, o1-mini | Yes | Yes | `OPENAI_API_KEY` |
-| **Google** | Gemini 2.0 Flash, Gemini 1.5 Pro (2M context) | Yes | Yes | `GOOGLE_API_KEY` |
-| **Azure OpenAI** | GPT-4, Claude (via Azure) | Yes | Yes | `AZURE_OPENAI_API_KEY` |
-| **AWS Bedrock** | Claude 3, Llama 3, Titan | Yes | Yes | AWS credentials |
-| **xAI** | Grok | Yes | No | `XAI_API_KEY` |
-| **DeepSeek** | DeepSeek-V3, DeepSeek Coder | Yes | No | `DEEPSEEK_API_KEY` |
-| **Mistral** | Mistral Large, Mistral Small | Yes | Partial | `MISTRAL_API_KEY` |
-| **Cohere** | Command R, Command R+ | Yes | No | `COHERE_API_KEY` |
-| **Groq** | Llama, Mistral (ultra-fast, 300+ tok/s) | Yes | No | `GROQ_API_KEY` |
-| **Together AI** | 100+ open models | Yes | Partial | `TOGETHER_API_KEY` |
-| **Fireworks AI** | 50+ open models | Yes | Partial | `FIREWORKS_API_KEY` |
-| **OpenRouter** | 200+ models (unified API) | Yes | Partial | `OPENROUTER_API_KEY` |
-| **Replicate** | 20,000+ models | Yes | Partial | `REPLICATE_API_TOKEN` |
-| **Hugging Face** | 100,000+ models | Partial | Partial | `HF_API_KEY` (optional) |
-| **Moonshot** | Moonshot v1 (8K/32K/128K) | Yes | No | `MOONSHOT_API_KEY` |
-| **Cerebras** | Llama, Mistral (500+ tok/s) | Yes | No | `CEREBRAS_API_KEY` |
-
-### Local Providers (No API Key Required)
-
-| Provider | Best For | Setup |
-|----------|----------|-------|
-| **Ollama** | Beginners, ease of use | `ollama pull qwen2.5-coder:7b` |
-| **LM Studio** | GUI model management, Windows | Download from lmstudio.ai |
-| **vLLM** | Production, high throughput | `pip install vllm` |
-| **llama.cpp** | CPU inference, minimal footprint | Build from source |
+| Category | Providers |
+|----------|-----------|
+| **Frontier Cloud** | Anthropic, OpenAI, Google Gemini, Azure OpenAI |
+| **Cloud Platforms** | AWS Bedrock, Google Vertex |
+| **Specialized** | xAI, DeepSeek, Mistral, Groq, Cerebras, Moonshot, ZAI |
+| **Aggregators** | OpenRouter, Together AI, Fireworks AI, Replicate, Hugging Face |
+| **Local (air-gapped)** | Ollama, LM Studio, vLLM, llama.cpp |
 
 [Full Provider Reference](docs/reference/providers/)
 
@@ -150,11 +144,14 @@ result = await compiled.invoke({"query": "AI trends 2025"})
 
 | Capability | What it means | Docs |
 |------------|---------------|------|
-| **Provider switching** | Change models mid-thread without losing context | [Provider switching](docs/user-guide/index.md#1-provider-switching) |
-| **Workflows** | YAML DSL for multi-step automation | [Workflow development](docs/guides/workflow-development/) |
-| **Multi-agent teams** | Coordinate specialized agents | [Multi-agent](docs/guides/multi-agent/) |
-| **Tooling** | File ops, git, tests, search, web | [Tool catalog](docs/reference/tools/) |
-| **Verticals** | Domain-focused assistants | [Verticals](docs/reference/verticals/) |
+| **Agent abstractions** | `run()`, `stream()`, `chat()`, `run_workflow()`, `run_team()` | [Framework](docs/development/architecture/) |
+| **22 Providers** | Cloud + local LLMs; switch mid-thread without losing context | [Providers](docs/reference/providers/) |
+| **33 Tool modules** | File ops, git, shell, web, search, docker, testing, analysis | [Tool catalog](docs/reference/tools/) |
+| **Workflows** | YAML DSL compiled to StateGraph with typed state + checkpointing | [Workflows](docs/guides/workflow-development/) |
+| **Multi-agent teams** | 4 formations: sequential, parallel, hierarchical, pipeline | [Multi-agent](docs/guides/multi-agent/) |
+| **State management** | 4 scopes: workflow, conversation, team, global | [State](docs/development/architecture/) |
+| **9 Verticals** | Domain-focused agents with tools, prompts, and workflows | [Verticals](docs/reference/verticals/) |
+| **Evaluation** | Agent harnesses, code quality analysis, SWE-bench integration | [Evaluation](docs/development/) |
 
 ## Command quick reference
 

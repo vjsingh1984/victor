@@ -1,6 +1,6 @@
 # Victor Quick Reference
 
-Essential commands, options, and configurations for Victor AI coding assistant.
+Essential commands, options, and configurations for the Victor agentic AI framework.
 
 ---
 

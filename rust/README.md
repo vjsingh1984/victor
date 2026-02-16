@@ -1,6 +1,6 @@
 # Victor Native Extensions
 
-High-performance Rust implementations of CPU-intensive operations for the Victor AI coding assistant.
+High-performance Rust implementations of CPU-intensive operations for the Victor agentic AI framework.
 
 ## Features
 

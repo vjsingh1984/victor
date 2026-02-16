@@ -1,6 +1,6 @@
 # Frequently Asked Questions
 
-Comprehensive FAQ for Victor AI Coding Assistant. Last updated: January 2026
+Comprehensive FAQ for Victor — agentic AI framework. Last updated: February 2026
 
 ## Table of Contents
 
@@ -17,19 +17,19 @@ Comprehensive FAQ for Victor AI Coding Assistant. Last updated: January 2026
 
 ### What is Victor?
 
-**Victor** is an open-source, provider-agnostic AI coding assistant that supports 21 LLM providers (both local and cloud) through a unified CLI/TUI interface. Unlike ChatGPT or Claude's web interfaces, Victor:
+**Victor** is an open-source agentic AI framework that supports 22 LLM providers (both local and cloud) through a unified CLI/TUI interface. Unlike ChatGPT or Claude's web interfaces, Victor:
 
 - **Works offline** with local models (Ollama, LM Studio, vLLM)
 - **Switches providers mid-conversation** without losing context
-- **Integrates with your codebase** through 55+ specialized tools
+- **Integrates with your codebase** through 33 tool modules
 - **Automates workflows** via YAML-based StateGraph DSL
-- **Supports 5 domain verticals**: Coding, DevOps, RAG, Data Analysis, Research
+- **Supports 9 domain verticals**: Coding, DevOps, RAG, Data Analysis, Research, Security, IaC, Classification, Benchmark
 
 ### How does Victor differ from ChatGPT/Claude?
 
 | Feature | Victor | ChatGPT/Claude Web |
 |---------|--------|-------------------|
-| **Provider Choice** | 21 providers, switchable | 1 provider |
+| **Provider Choice** | 22 providers, switchable | 1 provider |
 | **Local Models** | Full support (Ollama, vLLM) | No |
 | **Code Integration** | Deep (AST, LSP, git, tests) | Upload files only |
 | **Offline Use** | Yes (air-gapped mode) | No |
@@ -40,7 +40,7 @@ Comprehensive FAQ for Victor AI Coding Assistant. Last updated: January 2026
 
 ### What providers are supported?
 
-Victor supports **21 LLM providers**:
+Victor supports **22 LLM providers**:
 
 **Local (No API Key):**
 - Ollama, LM Studio, vLLM, llama.cpp
@@ -417,7 +417,7 @@ workflows:
 
 ### Can I use Victor with existing tools (git, pytest, etc.)?
 
-**Yes!** Victor has 55+ built-in tools:
+**Yes!** Victor has 33 built-in tool modules:
 
 **Git:**
 ```bash

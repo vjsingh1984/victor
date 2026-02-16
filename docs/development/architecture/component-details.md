@@ -45,7 +45,7 @@ Senior systems architect analysis of framework-vertical integration.
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │
 │  │ToolPipeline  │ │Conversation  │ │ Provider     │ │ StateGraph   │        │
 │  │ • execute    │ │ Controller   │ │ Manager      │ │ • nodes      │        │
-│  │ • cache      │ │ • history    │ │ • 21 LLMs    │ │ • edges      │        │
+│  │ • cache      │ │ • history    │ │ • 22 LLMs    │ │ • edges      │        │
 │  │ • analytics  │ │ • stages     │ │ • fallback   │ │ • checkpoints│        │
 │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘        │
 └──────────────────────────────────┬──────────────────────────────────────────┘
@@ -255,7 +255,7 @@ async def load_extensions_async(cls) -> VerticalExtensions:
 |-----------|:------------:|-----------|
 | **Graph DSL** | 9 | LangGraph-compatible with copy-on-write optimization, cyclic support, checkpoints; lacks visual editor |
 | **Multi-Agent** | 8 | 5 formations, team specs, personas; CrewAI has better role definitions, AutoGen has conversation patterns |
-| **Provider Agnostic** | 10 | 21 providers, context preserved across switches; unique USP |
+| **Provider Agnostic** | 10 | 22 providers, context preserved across switches; unique USP |
 | **Observability** | 9 | Protocol-based backends, sampling, backpressure; LangSmith integration would push to 10 |
 | **Extensibility** | 8 | 15+ ISP protocols, entry_points for plugins; LangChain's ecosystem is larger |
 

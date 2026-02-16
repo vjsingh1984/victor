@@ -212,7 +212,7 @@ async def demo_tool_calling():
 
     console.print("\n[bold]Response:[/bold]")
     if response.tool_calls:
-        console.print(f"[green]✓ Tool called![/green]")
+        console.print("[green]✓ Tool called![/green]")
         console.print(Markdown(f"```json\n{response.tool_calls}\n```"))
     else:
         console.print(response.content)
@@ -260,7 +260,7 @@ All demonstrations completed successfully! Victor is fully operational in Docker
 
 ---
 
-**Victor** - Open-source AI coding assistant
+**Victor** - Open-source agentic AI framework
 """
 
     report_file.write_text(report)
@@ -272,7 +272,7 @@ async def main():
     console.print(
         Panel.fit(
             "[bold magenta]Victor[/bold magenta]\n"
-            "[cyan]Open-source AI coding assistant[/cyan]\n"
+            "[cyan]Open-source agentic AI framework[/cyan]\n"
             "[dim]Docker Demo Suite[/dim]",
             border_style="magenta",
         )

@@ -146,7 +146,7 @@
     <g transform="translate(50, 50)">
       <rect x="0" y="0" width="250" height="100" rx="5" fill="url(#componentGradient)" stroke="#388E3C" stroke-width="2"/>
       <text x="125" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Providers</text>
-      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">21 LLM Providers</text>
+      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">22 LLM Providers</text>
       <text x="125" y="70" text-anchor="middle" font-size="10" fill="#888">Anthropic, OpenAI, Google,</text>
       <text x="125" y="85" text-anchor="middle" font-size="10" fill="#888">Ollama, vLLM, DeepSeek...</text>
     </g>
@@ -155,7 +155,7 @@
     <g transform="translate(350, 50)">
       <rect x="0" y="0" width="250" height="100" rx="5" fill="url(#componentGradient)" stroke="#388E3C" stroke-width="2"/>
       <text x="125" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Tools</text>
-      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">55+ Specialized Tools</text>
+      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">33 Tool Modules</text>
       <text x="125" y="70" text-anchor="middle" font-size="10" fill="#888">File, Git, Testing, Search,</text>
       <text x="125" y="85" text-anchor="middle" font-size="10" fill="#888">Web Scraping, Code Editing...</text>
     </g>
@@ -173,7 +173,7 @@
     <g transform="translate(950, 50)">
       <rect x="0" y="0" width="250" height="100" rx="5" fill="url(#componentGradient)" stroke="#388E3C" stroke-width="2"/>
       <text x="125" y="30" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">Verticals</text>
-      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">5 Domain Verticals</text>
+      <text x="125" y="50" text-anchor="middle" font-size="12" fill="#666">9 Domain Verticals</text>
       <text x="125" y="70" text-anchor="middle" font-size="10" fill="#888">Coding, DevOps, RAG,</text>
       <text x="125" y="85" text-anchor="middle" font-size="10" fill="#888">Data Analysis, Research</text>
     </g>

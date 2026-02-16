@@ -182,8 +182,8 @@ victor tools
 **Expected output:**
 ```
 Victor AI v0.x.x
-21 providers available
-55 tools available
+22 providers available
+33 tools available
 ```
 
 ### Step 3: Choose Your Model

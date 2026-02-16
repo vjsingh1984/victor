@@ -67,9 +67,9 @@ docs/
 | **Clients** | CLI, TUI, HTTP API, MCP | `victor/cli/`, `victor/integrations/` |
 | **Orchestrator** | AgentOrchestrator, Controllers | `victor/agent/` |
 | **Framework** | StateGraph, Workflows, Teams | `victor/framework/` |
-| **Verticals** | 5 built-in + custom | `victor/{vertical}/` |
-| **Providers** | 21 LLM providers | `victor/providers/` |
-| **Tools** | 55+ specialized tools | `victor/tools/` |
+| **Verticals** | 9 built-in + custom | `victor/{vertical}/` |
+| **Providers** | 22 LLM providers | `victor/providers/` |
+| **Tools** | 33 tool modules | `victor/tools/` |
 
 ### Verticals
 

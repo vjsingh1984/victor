@@ -7,7 +7,7 @@
 
 | Aspect | Value |
 |--------|-------|
-| Purpose | Open-source, provider-agnostic coding assistant |
+| Purpose | Open-source agentic AI framework |
 | Core Tools | Dozens of built-in tools |
 | Architecture | Layered protocol-first design |
 | Key Pattern | Facade (orchestrator delegates to specialized components) |

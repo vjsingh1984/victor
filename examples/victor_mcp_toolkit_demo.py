@@ -17,12 +17,16 @@
 This demo showcases how to run Victor as an MCP server toolkit, configure which
 tools to expose, and connect from external clients.
 
-Victor exposes 55+ tools across 5 domain verticals:
+Victor exposes 33 tool modules across 9 domain verticals:
 - Coding: file operations, git, code search, testing
 - DevOps: Docker, Terraform, CI/CD, Kubernetes
 - RAG: document ingestion, vector search, retrieval
 - Data Analysis: Pandas, visualization, statistics
 - Research: web search, summarization, citations
+- Security: vulnerability scanning, audit, compliance
+- IaC: infrastructure as code management
+- Classification: text/data classification pipelines
+- Benchmark: agent evaluation and benchmarking
 
 Usage:
     # Run demo showing MCP server capabilities
@@ -219,7 +223,7 @@ async def run_demo():
     print("Victor MCP Toolkit Demo")
     print("=" * 70)
     print()
-    print("Victor can be run as an MCP server, exposing its 55+ tools to external")
+    print("Victor can be run as an MCP server, exposing its 33 tool modules to external")
     print("clients like Claude Desktop, VS Code, or any MCP-compatible application.")
     print()
 
