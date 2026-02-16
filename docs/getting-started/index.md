@@ -4,14 +4,14 @@ Welcome to Victor! This guide will help you install, configure, and run Victor i
 
 ## What is Victor?
 
-**Victor** is a provider-agnostic AI coding assistant that supports 21 LLM providers (both local and cloud) through a unified CLI/TUI interface.
+**Victor** is an open-source agentic AI framework that supports 22 LLM providers (both local and cloud) through a unified CLI/TUI interface.
 
 **Key Features:**
-- **21 LLM Providers**: Cloud (Anthropic, OpenAI, Google) and local (Ollama, LM Studio, vLLM)
+- **22 LLM Providers**: Cloud (Anthropic, OpenAI, Google, Vertex) and local (Ollama, LM Studio, vLLM)
 - **Provider Switching**: Switch between any provider mid-conversation without losing context
 - **No API Key Required**: Use local models by default for privacy and cost savings
-- **55+ Tools**: File operations, code editing, git, testing, search, and more
-- **5 Domain Verticals**: Specialized assistants for Coding, DevOps, RAG, Data Analysis, Research
+- **33 Tool Modules**: File operations, code editing, git, testing, search, and more
+- **9 Domain Verticals**: Coding, DevOps, RAG, Data Analysis, Research, Security, IaC, Classification, Benchmark
 - **YAML Workflows**: Define multi-step automation with scheduling and versioning
 - **Multi-Agent Teams**: Coordinate specialized AI agents for complex tasks
 
@@ -132,8 +132,8 @@ Customize Victor for your needs:
 After getting started:
 
 1. **[User Guide](../user-guide/)** - Daily usage patterns and workflows
-2. **[Provider Reference](../reference/providers/)** - All 21 providers detailed
-3. **[Tool Catalog](../reference/tools/catalog.md)** - 55+ available tools
+2. **[Provider Reference](../reference/providers/)** - All 22 providers detailed
+3. **[Tool Catalog](../reference/tools/catalog.md)** - 33 tool modules
 4. **[Workflow DSL](../guides/workflow-development/dsl.md)** - YAML workflow automation
 
 ## Need Help?

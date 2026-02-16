@@ -6,17 +6,17 @@ Complete reference documentation for Victor AI Assistant.
 
 | Reference | Description |
 |-----------|-------------|
-| [**Providers**](providers/) | All 21 LLM providers with setup, models, and configuration |
-| [**Tools**](tools/) | 55+ tools organized by category |
+| [**Providers**](providers/) | All 22 LLM providers with setup, models, and configuration |
+| [**Tools**](tools/) | 33 tool modules organized by category |
 | [**Configuration**](configuration/) | Complete configuration reference (profiles, API keys, MCP) |
 | [**API**](api/) | HTTP API, MCP server, Python package API |
-| [**Verticals**](verticals/) | 5 domain-specific assistants |
+| [**Verticals**](verticals/) | 9 domain-specific assistants |
 
 ---
 
 ## Provider Reference
 
-Complete reference for all 21 supported LLM providers.
+Complete reference for all 22 supported LLM providers.
 
 ### Local Providers (No API Key Required)
 
@@ -35,7 +35,7 @@ Complete reference for all 21 supported LLM providers.
 | OpenAI | GPT-4, o1 | Pay-per-use | `export OPENAI_API_KEY=sk-...` |
 | Google | Gemini 2.0 | Pay-per-use | `export GOOGLE_API_KEY=...` |
 | Azure | Azure OpenAI | Pay-per-use | Azure portal setup |
-| And 17 more... | See full list | See full list | See full list |
+| And 14 more... | See full list | See full list | See full list |
 
 [**Full Provider Reference →**](providers/)
 
@@ -43,7 +43,7 @@ Complete reference for all 21 supported LLM providers.
 
 ## Tool Reference
 
-55+ tools organized by category for code operations, testing, search, and more.
+33 tool modules organized by category for code operations, testing, search, and more.
 
 ### Tool Categories
 

@@ -1,6 +1,6 @@
 # HTTP API Reference
 
-REST API for Victor's AI coding assistant capabilities.
+REST API for Victor's agentic AI framework capabilities.
 
 ## Overview
 

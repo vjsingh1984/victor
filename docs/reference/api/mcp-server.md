@@ -1,6 +1,6 @@
 # Victor as an MCP Server Toolkit
 
-This guide covers how to run Victor as a Model Context Protocol (MCP) server, enabling external clients like Claude Desktop to use Victor's 55+ specialized tools across 5 domain verticals.
+This guide covers how to run Victor as a Model Context Protocol (MCP) server, enabling external clients like Claude Desktop to use Victor's 33 tool modules across 9 domain verticals.
 
 ## Overview
 
@@ -82,7 +82,7 @@ In Claude Desktop, you should see Victor's tools available. Try asking:
 
 ## Available Tools
 
-Victor exposes 55+ tools across 5 domain verticals:
+Victor exposes 33 tool modules across 9 domain verticals:
 
 ### Coding Tools
 | Tool | Description |

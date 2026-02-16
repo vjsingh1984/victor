@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Command-line interface for Victor - Open-source AI coding assistant."""
+"""Command-line interface for Victor - Open-source agentic AI framework."""
 
 import typer
 from rich.console import Console
@@ -49,7 +49,7 @@ from victor.ui.commands.workflow import workflow_app
 
 app = typer.Typer(
     name="victor",
-    help="Victor - Open-source AI coding assistant with multi-provider support.",
+    help="Victor - Open-source agentic AI framework with multi-provider support.",
     add_completion=False,
 )
 
@@ -105,7 +105,7 @@ def callback(
         help="Show version and exit",
     ),
 ) -> None:
-    """Victor - Open-source AI coding assistant with multi-provider support."""
+    """Victor - Open-source agentic AI framework with multi-provider support."""
     if ctx.invoked_subcommand is None:
         _run_default_interactive()
 

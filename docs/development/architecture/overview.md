@@ -19,40 +19,61 @@ flowchart TB
         STRM["StreamingController"]
     end
 
-    subgraph Providers["PROVIDERS (21)"]
+    subgraph Providers["PROVIDERS (22)"]
         ANT["Anthropic"]
         OAI["OpenAI"]
         OLL["Ollama"]
         MORE["..."]
     end
 
-    subgraph Verticals["VERTICALS (5)"]
+    subgraph Verticals["VERTICALS (9)"]
         COD["Coding"]
-        RES["Research"]
         DEV["DevOps"]
-        DAT["Data"]
         RAG["RAG"]
+        DAT["Data Analysis"]
+        RES["Research"]
+        SEC["Security"]
+        IAC["IaC"]
+        CLS["Classification"]
+        BEN["Benchmark"]
     end
 
-    subgraph Tools["TOOLS (55)"]
+    subgraph Tools["TOOLS (33 modules)"]
         FILE["File Ops"]
         GIT["Git"]
         SHELL["Shell"]
         WEB["Web"]
         SEARCH["Search"]
-        MORE2["..."]
+    end
+
+    subgraph Teams["TEAMS"]
+        SEQ["Sequential"]
+        PAR["Parallel"]
+        HIER["Hierarchical"]
+        PIPE["Pipeline"]
+    end
+
+    subgraph State["STATE (4 scopes)"]
+        WFS["Workflow"]
+        CONVS["Conversation"]
+        TMS["Team"]
+        GLS["Global"]
     end
 
     Clients --> Core
     Core --> Providers
     Core --> Verticals
     Core --> Tools
+    Core --> Teams
+    Core --> State
 
     style Clients fill:#e0e7ff,stroke:#4f46e5
     style Core fill:#d1fae5,stroke:#10b981
     style Providers fill:#fef3c7,stroke:#f59e0b
     style Verticals fill:#fce7f3,stroke:#ec4899
     style Tools fill:#cffafe,stroke:#06b6d4
+    style Teams fill:#e0e7ff,stroke:#6366f1
+    style State fill:#f3e8ff,stroke:#a855f7
 ```
 
 ## Request Flow
@@ -72,7 +93,8 @@ flowchart TB
                                     ▼
                  ┌─────────────────────────────────────────────────────────┐
                  │                      VerticalBase                       │
-                 │  (Coding | Research | DevOps | DataAnalysis | RAG)      │
+                 │  Coding | DevOps | RAG | DataAnalysis | Research       │
+                 │  Security | IaC | Classification | Benchmark           │
                  └─────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -86,22 +108,28 @@ flowchart TB
 
 | Layer | Components | Purpose |
 |-------|------------|---------|
-| **Clients** | CLI, HTTP API, MCP Server | User interaction |
+| **Clients** | CLI, HTTP API, MCP Server, VS Code | User interaction |
 | **Orchestrator** | AgentOrchestrator, Controllers | Coordinate execution |
-| **Verticals** | 5 built-in + custom | Domain specialization |
-| **Providers** | 21 LLM providers | Model abstraction |
-| **Tools** | 55 specialized tools | Capability execution |
-| **Workflows** | StateGraph, YAML | Multi-step processes |
+| **Providers** | 22 LLM providers | Model abstraction |
+| **Tools** | 33 tool modules | Capability execution |
+| **Workflows** | StateGraph, YAML DSL | Multi-step processes |
+| **Teams** | 4 formations (seq/par/hier/pipe) | Multi-agent coordination |
+| **State** | 4 scopes (workflow/conv/team/global) | Unified state management |
+| **Verticals** | 9 built-in + custom | Domain specialization |
 
 ## Verticals Overview
 
-| Vertical | Tools | Stages | Use Case |
-|----------|-------|--------|----------|
-| **Coding** | 30+ | 7 | Code analysis, refactoring, testing |
-| **Research** | 9 | 4 | Web search, synthesis, citations |
-| **DevOps** | 13 | 8 | Docker, CI/CD, infrastructure |
-| **DataAnalysis** | 11 | 5 | Pandas, visualization, statistics |
-| **RAG** | 10 | 5 | Document retrieval, vector search |
+| Vertical | Use Case |
+|----------|----------|
+| **Coding** | Code analysis, refactoring, testing |
+| **DevOps** | Docker, CI/CD, infrastructure |
+| **RAG** | Document retrieval, vector search |
+| **DataAnalysis** | Pandas, visualization, statistics |
+| **Research** | Web search, synthesis, citations |
+| **Security** | Vulnerability scanning, audit, compliance |
+| **IaC** | Infrastructure as Code management |
+| **Classification** | Text/data classification pipelines |
+| **Benchmark** | Agent evaluation and benchmarking |
 
 ## Provider Support
 
@@ -113,6 +141,7 @@ flowchart TB
 | Ollama | ✅ | ✅ | ✅ |
 | LM Studio | ✅ | ✅ | ✅ |
 | vLLM | ✅ | ✅ | ✅ |
+| ...and 16 more | | | |
 
 ## Tool Categories
 

@@ -4,7 +4,7 @@ A comprehensive view of Victor's architecture, focusing on the new modular compo
 
 ## Overview
 
-Victor is a provider-agnostic coding assistant with a CLI/TUI front end, a core orchestrator, and modular tools/verticals. The architecture emphasizes:
+Victor is an agentic AI framework with a CLI/TUI front end, a core orchestrator, and modular tools/verticals. The architecture emphasizes:
 
 - **Lazy initialization** for faster startup
 - **SOLID principles** for maintainability
@@ -88,7 +88,7 @@ CLI/TUI  -->  Orchestrator  -->  Providers / Tools / Workflows / Verticals
 - **CLI/TUI**: User-facing entry point for chat and workflows
 - **Orchestrator**: Coordinates providers, tools, and workflows
 - **Providers**: Local or cloud LLM backends (21 supported)
-- **Tools**: File ops, git, testing, search, etc. (55 tools)
+- **Tools**: File ops, git, testing, search, etc. (33 tool modules)
 - **Verticals**: Domain presets (coding, research, devops, data, rag)
 
 ---

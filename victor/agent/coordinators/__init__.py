@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tool coordination package for Victor AI coding assistant.
+"""Tool coordination package for Victor agentic AI framework.
 
 This package contains coordinator classes that extract and consolidate
 specific coordination responsibilities from the AgentOrchestrator:

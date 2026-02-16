@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
+from rich.table import Table
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import load_settings, ProfileConfig
@@ -478,7 +479,6 @@ async def run_oneshot(
     start_time = time.time()
     session_id = str(uuid.uuid4())
     success = False
-    token_count = 0
     tool_calls_made = 0
     task_type: Optional[str] = None
 
@@ -570,8 +570,6 @@ async def run_oneshot(
             )
 
         success = True
-        if usage_stats:
-            token_count = getattr(usage_stats, "total_tokens", 0) or 0
         if hasattr(agent, "get_session_metrics"):
             metrics = agent.get_session_metrics()
             tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
@@ -788,7 +786,7 @@ async def _run_cli_repl(
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
     vertical_display = f"  [bold]Vertical:[/ ] [magenta]{vertical_name}[/]" if vertical_name else ""
     panel_content = (
-        f"[bold blue]Victor[/] - Open-source AI coding assistant\n\n"
+        f"[bold blue]Victor[/] - Open-source agentic AI framework\n\n"
         f"[bold]Provider:[/ ] [cyan]{profile_config.provider}[/]  "
         f"[bold]Model:[/ ] [cyan]{profile_config.model}[/]{vertical_display}\n\n"
         f"Type [bold]/help[/] for commands, [bold]/exit[/] or [bold]Ctrl+D[/] to quit."

@@ -296,7 +296,7 @@ Now that you have Victor running:
 1. **Configure profiles** - Create shortcuts for your favorite providers
    - [Configuration Guide](configuration.md)
 
-2. **Learn the tools** - Explore Victor's 55+ tools
+2. **Learn the tools** - Explore Victor's 33 tool modules
    - [Tool Catalog](../reference/tools/catalog.md)
 
 3. **Set up project context** - Teach Victor about your codebase

@@ -14,7 +14,6 @@
 | **vLLM** | ✅ Native | ✅ | Varies | ✅ | Free |
 | **Azure OpenAI** | ✅ Native | ✅ | 128K | ❌ | $$$ |
 | **AWS Bedrock** | ✅ Native | ✅ | Varies | ❌ | $$$ |
-| **Cohere** | ✅ Native | ✅ | 128K | ❌ | $$ |
 | **Mistral** | ✅ Native | ✅ | 32K | ❌ | $$ |
 
 ## Decision Tree
@@ -29,7 +28,7 @@ flowchart TD
     LOCAL -->|CPU/Any| OLLAMA["Ollama"]
     LOCAL -->|GUI| LMSTUDIO["LM Studio"]
 
-    CLOUD -->|Free| COHERE["Cohere Free"]
+    CLOUD -->|Free| GROQ["Groq Free Tier"]
     CLOUD -->|$$| GOOGLE["Gemini"]
     CLOUD -->|$$$| FEATURES{"Features?"}
 
@@ -117,7 +116,6 @@ victor chat --provider ollama --model llama3
 | **Anthropic** | $3.00 | $15.00 |
 | **OpenAI** | $5.00 | $15.00 |
 | **Google** | $0.50 | $1.50 |
-| **Cohere** | $0.50 | $1.50 |
 | **Ollama** | Free | Free |
 
 ## Performance

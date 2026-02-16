@@ -16,7 +16,7 @@ This document provides a comprehensive overview of Victor's architecture, coveri
 
 ## High-Level Architecture
 
-Victor is a provider-agnostic AI coding assistant supporting 21 LLM providers with 55+ specialized tools across 6 domain verticals. The architecture follows a layered design with clear separation of concerns.
+Victor is an open-source agentic AI framework supporting 22 LLM providers with 33 tool modules across 9 domain verticals. The architecture follows a layered design with clear separation of concerns.
 
 ### System Architecture Diagram
 
@@ -47,28 +47,35 @@ Victor is a provider-agnostic AI coding assistant supporting 21 LLM providers wi
          v                    v                    v
 +----------------+   +----------------+   +-------------------+
 |   PROVIDERS    |   |     TOOLS      |   |    WORKFLOWS      |
-|      (21)      |   |      (55+)     |   |    StateGraph     |
+|      (22)      |   |  (33 modules)  |   |    StateGraph     |
 |                |   |                |   |    + YAML         |
 | - Anthropic    |   | - File Ops     |   |                   |
 | - OpenAI       |   | - Git          |   | +---------------+ |
 | - Google       |   | - Shell        |   | |UnifiedCompiler| |
 | - Ollama       |   | - Web          |   | +---------------+ |
 | - DeepSeek     |   | - Search       |   |                   |
-| - 16 more...   |   | - Analysis     |   | +---------------+ |
+| - 17 more...   |   | - Analysis     |   | +---------------+ |
 +----------------+   +----------------+   | |WorkflowEngine | |
                                           | +---------------+ |
-         +--------------------------------+-------------------+
-         |
-         v
+    +-------------------------------------+-------------------+
+    |
+    v
 +-------------------------------------------------------------------------+
-|                           VERTICALS (6)                                  |
+| TEAMS                  | STATE (4 scopes)                                |
+| Sequential, Parallel   | Workflow, Conversation, Team, Global            |
+| Hierarchical, Pipeline |                                                 |
++-------------------------------------------------------------------------+
+    |
+    v
++-------------------------------------------------------------------------+
+|                           VERTICALS (9)                                  |
 |                                                                          |
 |   +----------+  +----------+  +------+  +-------------+  +----------+   |
 |   |  Coding  |  | DevOps   |  | RAG  |  |DataAnalysis |  | Research |   |
 |   +----------+  +----------+  +------+  +-------------+  +----------+   |
-|   +------------+                                                         |
-|   | Benchmark  |                                                         |
-|   +------------+                                                         |
+|   +----------+  +------+  +----------------+  +------------+            |
+|   | Security |  | IaC  |  | Classification |  | Benchmark  |            |
+|   +----------+  +------+  +----------------+  +------------+            |
 +-------------------------------------------------------------------------+
 ```
 
@@ -92,15 +99,15 @@ flowchart TB
         TR["ToolRegistrar"]
     end
 
-    subgraph Providers["PROVIDERS (21)"]
+    subgraph Providers["PROVIDERS (22)"]
         ANT["Anthropic"]
         OAI["OpenAI"]
         GGL["Google"]
         OLL["Ollama"]
-        MORE["..."]
+        MORE["+ 18 more"]
     end
 
-    subgraph Tools["TOOLS (55+)"]
+    subgraph Tools["TOOLS (33 modules)"]
         FILE["File Ops"]
         GIT["Git"]
         SHELL["Shell"]
@@ -114,12 +121,29 @@ flowchart TB
         UC["UnifiedCompiler"]
     end
 
-    subgraph Verticals["VERTICALS (6)"]
+    subgraph Teams["TEAMS"]
+        SEQ["Sequential"]
+        PAR["Parallel"]
+        HIER["Hierarchical"]
+        PIPE["Pipeline"]
+    end
+
+    subgraph State["STATE (4 scopes)"]
+        WFS["Workflow"]
+        CONVS["Conversation"]
+        TMS["Team"]
+        GLS["Global"]
+    end
+
+    subgraph Verticals["VERTICALS (9)"]
         COD["Coding"]
         DEV["DevOps"]
         RAG["RAG"]
         DATA["Data Analysis"]
         RES["Research"]
+        SEC["Security"]
+        IAC["IaC"]
+        CLS["Classification"]
         BENCH["Benchmark"]
     end
 
@@ -132,6 +156,8 @@ flowchart TB
     Orchestrator --> Providers
     Orchestrator --> Tools
     Orchestrator --> Workflows
+    Orchestrator --> Teams
+    Orchestrator --> State
     Orchestrator --> Verticals
 
     style Clients fill:#e0e7ff,stroke:#4f46e5
@@ -139,7 +165,9 @@ flowchart TB
     style Providers fill:#fef3c7,stroke:#f59e0b
     style Tools fill:#cffafe,stroke:#06b6d4
     style Workflows fill:#fce7f3,stroke:#ec4899
-    style Verticals fill:#f3e8ff,stroke:#a855f7
+    style Teams fill:#e0e7ff,stroke:#6366f1
+    style State fill:#f3e8ff,stroke:#a855f7
+    style Verticals fill:#fef9c3,stroke:#eab308
 ```
 
 ---
@@ -150,18 +178,7 @@ flowchart TB
 
 **Location:** `victor/agent/orchestrator.py`
 
-The AgentOrchestrator is the central **Facade** that coordinates all other components. It acts as a thin coordination layer, delegating work to specialized components.
-
-**Responsibilities:**
-- High-level chat flow coordination
-- Configuration loading and validation
-- Session lifecycle management
-- Provider/model switching hooks
-
-**Key Methods:**
-- `run()` - Main entry point for chat sessions
-- `process_message()` - Handle single message processing
-- `cancel()` - Graceful cancellation of operations
+Central **Facade** — thin coordination layer delegating to specialized components. Manages chat flow, configuration, session lifecycle, and provider switching.
 
 ```python
 from victor.agent.orchestrator import AgentOrchestrator
@@ -178,63 +195,25 @@ result = await orchestrator.process_message("Analyze this code")
 
 **Location:** `victor/agent/conversation_controller.py`
 
-Manages the conversation state, message history, and context tracking throughout a session.
-
-**Responsibilities:**
-- Message history management
-- Context window tracking
-- Stage-based state transitions
-- Context retrieval for prompts
-
-**Key Methods:**
-- `add_message()` - Add message to history
-- `get_context()` - Retrieve conversation context
-- `get_stage()` - Get current conversation stage
+Manages message history, context window tracking, stage-based state transitions, and context retrieval for prompts. Key methods: `add_message()`, `get_context()`, `get_stage()`.
 
 ### ToolPipeline
 
 **Location:** `victor/agent/tool_pipeline.py`
 
-Handles tool validation, selection, and execution with budget enforcement.
-
-**Responsibilities:**
-- Tool validation against schemas
-- Tool execution coordination
-- Budget tracking and enforcement
-- Result processing and formatting
-
-**Key Methods:**
-- `execute()` - Execute a tool call
-- `validate()` - Validate tool parameters
-- `get_available_tools()` - List tools for current context
+Validates, selects, and executes tools with budget enforcement. Key methods: `execute()`, `validate()`, `get_available_tools()`.
 
 ### ProviderManager
 
 **Location:** `victor/agent/provider_manager.py`
 
-Manages LLM provider initialization, switching, health checks, and fallback strategies.
-
-**Responsibilities:**
-- Provider initialization
-- Mid-conversation provider switching
-- Health monitoring and circuit breaker
-- Fallback provider selection
-
-**Key Methods:**
-- `get_provider()` - Get current provider instance
-- `switch()` - Switch to different provider/model
-- `check_health()` - Provider health check
+Manages 22 LLM provider adapters — initialization, mid-conversation switching, health monitoring with circuit breaker, and fallback selection. Key methods: `get_provider()`, `switch()`, `check_health()`.
 
 ### ServiceProvider
 
 **Location:** `victor/agent/service_provider.py`
 
-Implements dependency injection for component management.
-
-**Responsibilities:**
-- Component registration and resolution
-- Lifecycle management
-- Singleton pattern enforcement
+Dependency injection container for component registration, resolution, and lifecycle management.
 
 ```python
 from victor.agent.service_provider import ServiceProvider
@@ -247,13 +226,25 @@ tool_registry = provider.resolve(ToolRegistry)
 
 **Location:** `victor/agent/tool_registrar.py`
 
-Handles dynamic tool discovery, registration, and plugin integration.
+Dynamic tool discovery, registration, plugin loading, and MCP integration.
 
-**Responsibilities:**
-- Default tool registration
-- Plugin discovery and loading
-- MCP (Model Context Protocol) integration
-- Tool filtering and selection
+### Teams
+
+**Location:** `victor/teams/`
+
+Multi-agent coordination with 4 formation strategies: SEQUENTIAL, PARALLEL, HIERARCHICAL, PIPELINE. Agents are defined via `TeamMemberSpec` and coordinated by `AgentTeam`.
+
+### State Management
+
+**Location:** `victor/state/`
+
+Unified state management across 4 scopes: WORKFLOW, CONVERSATION, TEAM, GLOBAL. The `GlobalStateManager` facade provides a single entry point with copy-on-write optimization.
+
+### Events & CQRS
+
+**Location:** `victor/core/`
+
+Event sourcing with structured event types (THINKING, TOOL_CALL, TOOL_RESULT, CONTENT, ERROR, STREAM_END). CQRS via `CommandBus` and `QueryBus` with middleware pipeline.
 
 ---
 
@@ -278,11 +269,6 @@ The AgentOrchestrator implements the Facade pattern, providing a simplified inte
 |Controller        | |               | |                 |
 +------------------+ +---------------+ +-----------------+
 ```
-
-**Benefits:**
-- Simplified client interaction
-- Reduced coupling between subsystems
-- Easy to swap implementations
 
 ### Protocol-Based Design (ISP Compliance)
 
@@ -541,11 +527,11 @@ Victor's architecture adheres to SOLID principles:
 
 ### Provider Agnosticism
 
-Victor supports 21 LLM providers through a unified interface:
+Victor supports 22 LLM providers through a unified interface:
 
-- **Cloud Providers:** Anthropic, OpenAI, Google, Azure, AWS Bedrock, Cohere
-- **Local Providers:** Ollama, LM Studio, vLLM (air-gapped capable)
-- **Specialized:** Groq (fast inference), DeepSeek (thinking tags)
+- **Frontier Cloud:** Anthropic, OpenAI, Google, Azure, AWS Bedrock, Vertex
+- **Local (air-gapped):** Ollama, LM Studio, vLLM, llama.cpp
+- **Specialized:** Groq (fast inference), DeepSeek (thinking tags), Cerebras, ZAI
 
 Switch providers mid-conversation without losing context:
 ```
@@ -597,10 +583,12 @@ When `airgapped_mode=True`:
 | Aspect | Details |
 |--------|---------|
 | **Architecture Pattern** | Facade with extracted components |
-| **Provider Count** | 21 (cloud + local) |
-| **Tool Count** | 55+ specialized tools |
-| **Vertical Count** | 6 built-in (Coding, DevOps, RAG, Data Analysis, Research, Benchmark) |
+| **Provider Count** | 22 (cloud + local) |
+| **Tool Count** | 33 tool modules |
+| **Vertical Count** | 9 built-in (Coding, DevOps, RAG, Data Analysis, Research, Security, IaC, Classification, Benchmark) |
+| **Team Formations** | 4 (Sequential, Parallel, Hierarchical, Pipeline) |
+| **State Scopes** | 4 (Workflow, Conversation, Team, Global) |
 | **Key Entry Point** | `AgentOrchestrator.process_message()` |
 | **Configuration** | YAML profiles + Python settings |
 | **Extension Mechanism** | Entry points (`victor.verticals`, `victor.providers`) |
-| **Air-Gapped Support** | Yes (Ollama, LM Studio, vLLM) |
+| **Air-Gapped Support** | Yes (Ollama, LM Studio, vLLM, llama.cpp) |

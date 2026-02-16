@@ -25,7 +25,7 @@ victor logs --tail 50
 
 **Expected Output**:
 - Version should be latest: `victor 0.x.x`
-- Providers should list 21 providers
+- Providers should list 22 providers
 - Chat should respond successfully
 - Config should show your profiles
 - Logs should show recent activity
@@ -267,7 +267,7 @@ victor chat --provider together "Hello"
 ```bash
 victor providers
 
-# Should list 21 providers
+# Should list 22 providers
 ```
 
 **2. Install provider extras**:
