@@ -425,7 +425,7 @@ class GraphAnalyzer:
 
         return {
             "query": query,
-            "filters": {"node_type": node_type, "file_pattern": file_pattern},
+            "applied_filters": {"node_type": node_type, "file_pattern": file_pattern},
             "total_matches": len(matches),
             "matches": matches,
         }
@@ -1247,8 +1247,8 @@ async def graph(
         node: Symbol name or node ID (required for most modes except stats/pagerank/find)
         target: Target symbol for "path" mode
         query: Search query for "find" mode (pattern to match symbol names)
-            file: File path for "file_deps" mode, or filter for "find" mode
-            source: Alias for "file" in call_flow mode (source module)
+        file: File path for "file_deps" mode, or filter for "find" mode
+        source: Alias for "file" in call_flow mode (source module)
         node_type: Filter by node type ("function", "class", "module") for "find" mode
         edge_types: Filter by edge types. Options:
             - "CALLS": Function call relationships

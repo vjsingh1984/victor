@@ -418,7 +418,12 @@ class ToolExecutor:
             if self.validation_mode == ValidationMode.STRICT:
                 return False, ToolValidationResult.failure([error_msg])
             else:
-                logger.warning("Proceeding with unknown arguments (lenient mode)")
+                # Strip unknown arguments so the tool function doesn't crash
+                for arg in unknown_args:
+                    arguments.pop(arg, None)
+                logger.warning(
+                    "Stripped unknown arguments %s (lenient mode)", sorted(unknown_args)
+                )
 
         try:
             validation = tool.validate_parameters_detailed(**arguments)
