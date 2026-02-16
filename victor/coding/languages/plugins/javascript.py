@@ -120,7 +120,7 @@ class JavaScriptPlugin(BaseLanguagePlugin):
             inheritance="""
                 (class_declaration
                     name: (identifier) @child
-                    heritage: (class_heritage (identifier) @base))
+                    (class_heritage (identifier) @base))
             """,
             composition="""
                 (class_declaration

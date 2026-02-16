@@ -176,6 +176,72 @@ def _is_stdlib_module(module_name: str) -> bool:
 # This enables 3-8x speedup on multi-core systems.
 
 
+def _get_plugin_query(language: str, field: str) -> Optional[str]:
+    """Get a tree-sitter query from the language plugin, or None if unavailable.
+
+    Safe to call from subprocesses — imports the registry on demand and
+    discovers plugins if needed.
+    """
+    try:
+        from victor.coding.languages.registry import get_language_registry
+
+        registry = get_language_registry()
+        if not registry._plugins:
+            registry.discover_plugins()
+        plugin = registry.get(language)
+        if plugin:
+            value = getattr(plugin.tree_sitter_queries, field, None)
+            if value:
+                return value
+    except Exception:
+        pass
+    return None
+
+
+def _get_plugin_enclosing_scopes(language: str) -> List[Tuple[str, str]]:
+    """Get enclosing scope definitions from language plugin, or empty list."""
+    try:
+        from victor.coding.languages.registry import get_language_registry
+
+        registry = get_language_registry()
+        if not registry._plugins:
+            registry.discover_plugins()
+        plugin = registry.get(language)
+        if plugin and plugin.tree_sitter_queries.enclosing_scopes:
+            return plugin.tree_sitter_queries.enclosing_scopes
+    except Exception:
+        pass
+    return []
+
+
+# Tree-sitter import queries for non-Python languages (used by parallel path).
+_PARALLEL_IMPORT_QUERIES: Dict[str, str] = {
+    "javascript": """
+        (import_statement source: (string) @source)
+        (call_expression
+            function: (identifier) @_fn
+            arguments: (arguments (string) @source)
+            (#eq? @_fn "require"))
+    """,
+    "typescript": """
+        (import_statement source: (string) @source)
+        (call_expression
+            function: (identifier) @_fn
+            arguments: (arguments (string) @source)
+            (#eq? @_fn "require"))
+    """,
+    "rust": """
+        (use_declaration argument: (_) @source)
+    """,
+    "go": """
+        (import_spec path: (interpreted_string_literal) @source)
+    """,
+    "java": """
+        (import_declaration (scoped_identifier) @source)
+    """,
+}
+
+
 def _process_file_parallel(
     file_path_str: str,
     root_str: str,
@@ -185,6 +251,9 @@ def _process_file_parallel(
 
     This is a module-level function (not a method) so it can be pickled
     for use with ProcessPoolExecutor.
+
+    Uses plugin-first query lookup for all extraction types, falling back
+    to static dictionaries for languages not yet migrated to plugins.
 
     Args:
         file_path_str: Absolute path to the file
@@ -268,8 +337,10 @@ def _process_file_parallel(
                 except Exception:
                     continue
 
-            # Call edge extraction
-            call_query_src = CALL_QUERIES.get(language)
+            # Call edge extraction — plugin-first, then static fallback
+            call_query_src = _get_plugin_query(language, "calls")
+            if not call_query_src:
+                call_query_src = CALL_QUERIES.get(language)
             if call_query_src:
                 try:
                     query = Query(parser.language, call_query_src)
@@ -286,8 +357,10 @@ def _process_file_parallel(
                 except Exception:
                     pass
 
-            # Reference extraction
-            ref_query_src = REFERENCE_QUERIES.get(language)
+            # Reference extraction — plugin-first, then static fallback
+            ref_query_src = _get_plugin_query(language, "references")
+            if not ref_query_src:
+                ref_query_src = REFERENCE_QUERIES.get(language)
             if ref_query_src:
                 try:
                     query = Query(parser.language, ref_query_src)
@@ -300,6 +373,81 @@ def _process_file_parallel(
                                 references.append(ref)
                 except Exception:
                     pass
+
+            # Inheritance extraction — plugin-first, then static fallback
+            inherit_query_src = _get_plugin_query(language, "inheritance")
+            if not inherit_query_src:
+                inherit_query_src = INHERITS_QUERIES.get(language)
+            if inherit_query_src:
+                try:
+                    query = Query(parser.language, inherit_query_src)
+                    cursor = QueryCursor(query)
+                    for _pat_idx, cap_dict in cursor.matches(tree.root_node):
+                        child_nodes = cap_dict.get("child", [])
+                        base_nodes = cap_dict.get("base", [])
+                        if child_nodes and base_nodes:
+                            child_text = child_nodes[0].text.decode("utf-8", errors="ignore")
+                            base_text = base_nodes[0].text.decode("utf-8", errors="ignore")
+                            if child_text and base_text:
+                                inherit_edges.append((child_text, base_text))
+                except Exception:
+                    pass
+
+            # Implements extraction — plugin-first, then static fallback
+            impl_query_src = _get_plugin_query(language, "implements")
+            if not impl_query_src:
+                impl_query_src = IMPLEMENTS_QUERIES.get(language)
+            if impl_query_src:
+                try:
+                    query = Query(parser.language, impl_query_src)
+                    cursor = QueryCursor(query)
+                    for _pat_idx, cap_dict in cursor.matches(tree.root_node):
+                        child_nodes = cap_dict.get("child", [])
+                        iface_nodes = (
+                            cap_dict.get("interface", []) or cap_dict.get("base", [])
+                        )
+                        if child_nodes and iface_nodes:
+                            child_text = child_nodes[0].text.decode("utf-8", errors="ignore")
+                            iface_text = iface_nodes[0].text.decode("utf-8", errors="ignore")
+                            if child_text and iface_text:
+                                implements_edges.append((child_text, iface_text))
+                except Exception:
+                    pass
+
+            # Composition extraction — plugin-first, then static fallback
+            comp_query_src = _get_plugin_query(language, "composition")
+            if not comp_query_src:
+                comp_query_src = COMPOSITION_QUERIES.get(language)
+            if comp_query_src:
+                try:
+                    query = Query(parser.language, comp_query_src)
+                    cursor = QueryCursor(query)
+                    for _pat_idx, cap_dict in cursor.matches(tree.root_node):
+                        owner_nodes = cap_dict.get("owner", [])
+                        type_nodes = cap_dict.get("type", [])
+                        if owner_nodes and type_nodes:
+                            owner_text = owner_nodes[0].text.decode("utf-8", errors="ignore")
+                            type_text = type_nodes[0].text.decode("utf-8", errors="ignore")
+                            if owner_text and type_text:
+                                compose_edges.append((owner_text, type_text))
+                except Exception:
+                    pass
+
+            # Import extraction for non-Python (tree-sitter based)
+            if language != "python":
+                import_query_src = _PARALLEL_IMPORT_QUERIES.get(language)
+                if import_query_src:
+                    try:
+                        query = Query(parser.language, import_query_src)
+                        cursor = QueryCursor(query)
+                        captures_dict = cursor.captures(tree.root_node)
+                        for node in captures_dict.get("source", []):
+                            text = node.text.decode("utf-8", errors="ignore")
+                            cleaned = text.strip("'\"")
+                            if cleaned:
+                                imports.append(cleaned)
+                    except Exception:
+                        pass
     except Exception:
         pass
 
@@ -354,13 +502,34 @@ def _find_enclosing_function(node: Any, language: str) -> Optional[str]:
     """Find the enclosing function name for a node.
 
     Helper for parallel processing - walks up the tree to find parent function.
+    Uses plugin enclosing_scopes first, then falls back to static map.
     """
+    # PRIMARY: Get enclosing scope config from language plugin
+    plugin_scopes = _get_plugin_enclosing_scopes(language)
+    if plugin_scopes:
+        current = node.parent
+        while current:
+            for node_type, field_name in plugin_scopes:
+                if current.type == node_type:
+                    field = current.child_by_field_name(field_name)
+                    if field:
+                        # For C++ function_declarator, drill into nested declarator
+                        if field.type == "function_declarator":
+                            inner = field.child_by_field_name("declarator")
+                            if inner:
+                                field = inner
+                        return field.text.decode("utf-8", errors="ignore")
+            current = current.parent
+        return None
+
+    # FALLBACK: Static enclosing type map
     enclosing_types = {
         "python": ("function_definition",),
         "javascript": ("function_declaration", "method_definition", "arrow_function"),
         "typescript": ("function_declaration", "method_definition", "arrow_function"),
         "go": ("function_declaration", "method_declaration"),
         "java": ("method_declaration",),
+        "cpp": ("function_definition",),
     }
 
     types = enclosing_types.get(language, ("function_definition",))
@@ -369,7 +538,12 @@ def _find_enclosing_function(node: Any, language: str) -> Optional[str]:
         if current.type in types:
             # Find the name child
             for child in current.children:
-                if child.type in ("identifier", "property_identifier", "name"):
+                if child.type in (
+                    "identifier",
+                    "property_identifier",
+                    "name",
+                    "field_identifier",
+                ):
                     return child.text.decode("utf-8", errors="ignore")
         current = current.parent
     return None
@@ -525,12 +699,12 @@ INHERITS_QUERIES: Dict[str, str] = {
     "javascript": """
         (class_declaration
             name: (identifier) @child
-            heritage: (class_heritage (identifier) @base))
+            (class_heritage (identifier) @base))
     """,
     "typescript": """
         (class_declaration
             name: (identifier) @child
-            heritage: (class_heritage (identifier) @base))
+            (class_heritage (identifier) @base))
     """,
     "java": """
         (class_declaration
@@ -548,8 +722,9 @@ INHERITS_QUERIES: Dict[str, str] = {
 IMPLEMENTS_QUERIES: Dict[str, str] = {
     "typescript": """
         (class_declaration
-            name: (identifier) @child
-            (heritage_clause (identifier) @interface))
+            name: (type_identifier) @child
+            (class_heritage
+                (implements_clause (type_identifier) @interface)))
     """,
     "java": """
         (class_declaration

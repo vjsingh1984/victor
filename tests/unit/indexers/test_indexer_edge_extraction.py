@@ -24,7 +24,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from victor.coding.codebase.graph.registry import create_graph_store
-from victor.coding.codebase.indexer import CodebaseIndex
+from victor.coding.codebase.indexer import CodebaseIndex, _process_file_parallel
 
 
 def _skip_if_no_parser(language: str):
@@ -338,3 +338,94 @@ async def test_js_full_index_imports(tmp_path: Path):
     assert rel in index.files
     metadata = index.files[rel]
     assert "react" in metadata.imports, f"Expected 'react' in imports, got {metadata.imports}"
+
+
+# ---------------------------------------------------------------------------
+# 5. Parallel path tests — _process_file_parallel
+# ---------------------------------------------------------------------------
+
+
+class TestParallelPathExtraction:
+    """Verify that _process_file_parallel extracts all edge types (not just symbols)."""
+
+    def test_parallel_rust_call_edges(self, tmp_path: Path):
+        """Parallel path should extract Rust call edges via plugin queries."""
+        _skip_if_no_parser("rust")
+        src = tmp_path / "main.rs"
+        src.write_text("fn caller() {\n    callee();\n}\nfn callee() {}\n")
+
+        result = _process_file_parallel(str(src), str(tmp_path), "rust")
+        assert result is not None
+        callees = [callee for _, callee in result["call_edges"]]
+        assert "callee" in callees, f"Expected 'callee' in call_edges, got {result['call_edges']}"
+
+    def test_parallel_rust_implements_edges(self, tmp_path: Path):
+        """Parallel path should extract Rust implements edges."""
+        _skip_if_no_parser("rust")
+        src = tmp_path / "lib.rs"
+        src.write_text("trait Drawable {}\nstruct Circle;\nimpl Drawable for Circle {}\n")
+
+        result = _process_file_parallel(str(src), str(tmp_path), "rust")
+        assert result is not None
+        assert len(result["implements_edges"]) > 0, (
+            f"Expected implements_edges, got {result['implements_edges']}"
+        )
+
+    def test_parallel_rust_composition_edges(self, tmp_path: Path):
+        """Parallel path should extract Rust composition edges."""
+        _skip_if_no_parser("rust")
+        src = tmp_path / "model.rs"
+        src.write_text("struct Engine;\nstruct Car {\n    engine: Engine,\n}\n")
+
+        result = _process_file_parallel(str(src), str(tmp_path), "rust")
+        assert result is not None
+        assert len(result["compose_edges"]) > 0, (
+            f"Expected compose_edges, got {result['compose_edges']}"
+        )
+
+    def test_parallel_js_imports(self, tmp_path: Path):
+        """Parallel path should extract JS import statements."""
+        _skip_if_no_parser("javascript")
+        src = tmp_path / "app.js"
+        src.write_text("import { foo } from 'bar';\nconst x = require('lodash');\n")
+
+        result = _process_file_parallel(str(src), str(tmp_path), "javascript")
+        assert result is not None
+        assert "bar" in result["imports"], f"Expected 'bar' in imports, got {result['imports']}"
+        assert "lodash" in result["imports"], (
+            f"Expected 'lodash' in imports, got {result['imports']}"
+        )
+
+    def test_parallel_rust_imports(self, tmp_path: Path):
+        """Parallel path should extract Rust use declarations."""
+        _skip_if_no_parser("rust")
+        src = tmp_path / "lib.rs"
+        src.write_text("use std::collections::HashMap;\nuse crate::config;\n")
+
+        result = _process_file_parallel(str(src), str(tmp_path), "rust")
+        assert result is not None
+        assert len(result["imports"]) > 0, f"Expected imports, got {result['imports']}"
+
+    def test_parallel_rust_references(self, tmp_path: Path):
+        """Parallel path should extract Rust references via plugin queries."""
+        _skip_if_no_parser("rust")
+        src = tmp_path / "main.rs"
+        src.write_text("fn main() {\n    let x = HashMap::new();\n}\n")
+
+        result = _process_file_parallel(str(src), str(tmp_path), "rust")
+        assert result is not None
+        assert len(result["references"]) > 0, (
+            f"Expected references, got {result['references']}"
+        )
+
+    def test_parallel_js_inheritance(self, tmp_path: Path):
+        """Parallel path should extract JS inheritance edges."""
+        _skip_if_no_parser("javascript")
+        src = tmp_path / "cls.js"
+        src.write_text("class Animal {}\nclass Dog extends Animal {}\n")
+
+        result = _process_file_parallel(str(src), str(tmp_path), "javascript")
+        assert result is not None
+        assert len(result["inherit_edges"]) > 0, (
+            f"Expected inherit_edges, got {result['inherit_edges']}"
+        )

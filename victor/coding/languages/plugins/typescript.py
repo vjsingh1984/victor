@@ -129,12 +129,13 @@ class TypeScriptPlugin(BaseLanguagePlugin):
             inheritance="""
                 (class_declaration
                     name: (identifier) @child
-                    heritage: (class_heritage (identifier) @base))
+                    (class_heritage (identifier) @base))
             """,
             implements="""
                 (class_declaration
-                    name: (identifier) @child
-                    (heritage_clause (identifier) @interface))
+                    name: (type_identifier) @child
+                    (class_heritage
+                        (implements_clause (type_identifier) @interface)))
             """,
             composition="""
                 (class_declaration
