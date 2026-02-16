@@ -232,7 +232,8 @@ pub fn my_func() {
         # my_func is on line 5
         assert _has_doc_comment_before(lines, 5, rust_pattern) is True
 
-    def test_python_still_works(self):
+    @pytest.mark.asyncio
+    async def test_python_still_works(self):
         """Regression test: Python docstrings still detected via ast."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write('''\
@@ -249,10 +250,8 @@ class MyClass:
 ''')
             temp_path = f.name
 
-        import asyncio
-
         try:
-            result = asyncio.get_event_loop().run_until_complete(docs_coverage(path=temp_path))
+            result = await docs_coverage(path=temp_path)
             assert result["success"] is True
             assert result["total_items"] == 3  # 2 functions + 1 class
             assert result["documented_items"] == 2  # documented() + MyClass
@@ -303,16 +302,15 @@ function undocumented() {
         # undocumented is on line 8
         assert _has_doc_comment_before(lines, 8, js_pattern) is False
 
-    def test_unsupported_extension_skipped(self):
+    @pytest.mark.asyncio
+    async def test_unsupported_extension_skipped(self):
         """Test that unsupported file extensions are gracefully skipped."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Some random text content\n")
             temp_path = f.name
 
-        import asyncio
-
         try:
-            result = asyncio.get_event_loop().run_until_complete(docs_coverage(path=temp_path))
+            result = await docs_coverage(path=temp_path)
             assert result["success"] is True
             assert result["total_items"] == 0
             assert result["documented_items"] == 0
