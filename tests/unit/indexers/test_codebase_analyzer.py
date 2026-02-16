@@ -674,8 +674,7 @@ class TestExtractGraphInsights:
         )
         # Insert sample edges
         conn.executemany(
-            f"INSERT INTO {Tables.GRAPH_EDGE}"
-            " (src, dst, type, weight) VALUES (?, ?, ?, ?)",
+            f"INSERT INTO {Tables.GRAPH_EDGE}" " (src, dst, type, weight) VALUES (?, ?, ?, ?)",
             [
                 ("fn_main", "cls_app", "CALLS", 1.0),
                 ("fn_main", "fn_helper", "CALLS", 1.0),
