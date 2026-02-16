@@ -429,3 +429,15 @@ class TestParallelPathExtraction:
         assert len(result["inherit_edges"]) > 0, (
             f"Expected inherit_edges, got {result['inherit_edges']}"
         )
+
+    def test_parallel_rust_symbols_extracted(self, tmp_path: Path):
+        """Parallel path should extract Rust symbols via plugin queries."""
+        _skip_if_no_parser("rust")
+        src = tmp_path / "lib.rs"
+        src.write_text("struct Point { x: i32 }\nfn compute() {}\n")
+
+        result = _process_file_parallel(str(src), str(tmp_path), "rust")
+        assert result is not None
+        names = {s["name"] for s in result["symbols"]}
+        assert "Point" in names, f"Expected 'Point' in symbols, got {names}"
+        assert "compute" in names, f"Expected 'compute' in symbols, got {names}"

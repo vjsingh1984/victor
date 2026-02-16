@@ -294,9 +294,25 @@ def _process_file_parallel(
             content_bytes = file_path.read_bytes()
             tree = parser.parse(content_bytes)
 
-            # Symbol extraction
+            # Symbol extraction — plugin-first, then static fallback
             # Uses @name capture for symbol name/start_line, @def capture for end_line
             query_defs = SYMBOL_QUERIES.get(language, [])
+            if not query_defs:
+                # Try language plugin for symbol queries
+                try:
+                    from victor.coding.languages.registry import get_language_registry
+
+                    _reg = get_language_registry()
+                    if not _reg._plugins:
+                        _reg.discover_plugins()
+                    _plugin = _reg.get(language)
+                    if _plugin and _plugin.tree_sitter_queries.symbols:
+                        query_defs = [
+                            (qp.symbol_type, qp.query)
+                            for qp in _plugin.tree_sitter_queries.symbols
+                        ]
+                except Exception:
+                    pass
             for sym_type, query_src in query_defs:
                 try:
                     query = Query(parser.language, query_src)
