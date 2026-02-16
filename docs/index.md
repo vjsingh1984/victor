@@ -101,7 +101,7 @@ Domain-specific documentation.
 ## Project Information
 
 ### Version
-**Current Version:** v0.5.0 (see [CHANGELOG](../CHANGELOG.md))
+**Current Version:** v0.5.3 (see [CHANGELOG](../CHANGELOG.md))
 
 ### Links
 - **[GitHub Repository](https://github.com/vjsingh1984/victor)** - Source code and issues

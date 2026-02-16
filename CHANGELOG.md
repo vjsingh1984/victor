@@ -28,6 +28,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dead Code Pruning** - Removed unused code from graph stores and chunker modules
 - **Backward Compatibility Aliases** - Migrated to canonical names across codebase
 
+## [0.5.3] - 2026-02-15
+
+### Changed
+- **Identity Reframe** - Victor is now described as an "agentic AI framework" across all documentation (was "coding assistant")
+- **Correct Capability Counts** - Fixed counts across 36+ files: 22 providers (was 21), 33 tool modules (was 55+), 9 verticals (was 5-6)
+- **Single-Source Versioning** - `__version__` now reads from `pyproject.toml` via `importlib.metadata`, eliminating version drift
+- **Architecture Diagrams** - Added Teams, State, Events/CQRS, Evaluation subsystems to all architecture diagrams
+
+### Fixed
+- **Cohere Provider Reference** - Removed non-existent standalone Cohere provider from README and provider comparison docs
+- **Lint Errors** - Fixed pre-existing F541, F821, F841 ruff violations in `chat.py` and `provider-features.py`
+
+## [0.5.2] - 2026-02-13
+
+### Fixed
+- **Security** - Updated Trivy to use latest vulnerability database
+- **Dependencies** - Updated aiohttp from 3.13.2 to 3.13.3
+
 ## [0.4.0] - 2026-01-03
 
 ### Added

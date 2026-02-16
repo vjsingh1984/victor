@@ -1193,5 +1193,10 @@ try:
 except ImportError:
     _WORKFLOW_ENGINE_EXPORTS = []
 
-# Version of the framework API
-__version__ = "0.5.1"
+# Version sourced from pyproject.toml via importlib.metadata
+try:
+    from importlib.metadata import version as _get_version
+
+    __version__ = _get_version("victor-ai")
+except Exception:
+    __version__ = "0.0.0"

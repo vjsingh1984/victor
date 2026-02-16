@@ -40,7 +40,12 @@ For coding-specific features:
     from victor.coding.codebase import CodebaseIndex
 """
 
-__version__ = "0.5.1"
+try:
+    from importlib.metadata import version as _get_version
+
+    __version__ = _get_version("victor-ai")
+except Exception:
+    __version__ = "0.0.0"  # fallback for editable installs without metadata
 __author__ = "Vijaykumar Singh"
 __email__ = "singhvjd@gmail.com"
 __license__ = "Apache-2.0"
