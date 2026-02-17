@@ -57,11 +57,12 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.session_state_manager import SessionStateManager
@@ -653,6 +654,102 @@ class SessionCoordinator:
             if messages:
                 return [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
             return []
+
+    # ========================================================================
+    # Embedding Store Initialization
+    # ========================================================================
+
+    @staticmethod
+    def init_conversation_embedding_store(
+        memory_manager: Any,
+    ) -> Tuple[Optional[Any], Optional[Any]]:
+        """Initialize LanceDB embedding store for semantic conversation retrieval.
+
+        Uses the module-level singleton to prevent duplicate initialization.
+        The singleton pattern ensures that intelligent_prompt_builder and other
+        components share the same instance.
+
+        Args:
+            memory_manager: Memory manager to wire the embedding store to
+
+        Returns:
+            Tuple of (conversation_embedding_store, pending_semantic_cache).
+            Either or both may be None if initialization fails.
+        """
+        if memory_manager is None:
+            return None, None
+
+        conversation_embedding_store = None
+        pending_semantic_cache = None
+
+        try:
+            from victor.storage.embeddings.service import EmbeddingService
+            from victor.agent.conversation_embedding_store import (
+                ConversationEmbeddingStore,
+            )
+            import victor.agent.conversation_embedding_store as ces_module
+
+            # Get the shared embedding service
+            embedding_service = EmbeddingService.get_instance()
+
+            # Use singleton pattern - check if already exists
+            if ces_module._embedding_store is not None:
+                conversation_embedding_store = ces_module._embedding_store
+                logger.debug("Reusing existing ConversationEmbeddingStore singleton")
+            else:
+                # Create new instance and register as singleton
+                conversation_embedding_store = ConversationEmbeddingStore(
+                    embedding_service=embedding_service,
+                )
+                ces_module._embedding_store = conversation_embedding_store
+                logger.debug("Created ConversationEmbeddingStore singleton")
+
+            # Wire it to the memory manager for automatic sync
+            memory_manager.set_embedding_store(conversation_embedding_store)
+
+            # Also set the embedding service for fallback
+            memory_manager.set_embedding_service(embedding_service)
+
+            # Initialize async (fire and forget for faster startup).
+            # If there's no running event loop (e.g., unit tests), fall back
+            # to synchronous initialization to avoid 'coroutine was never awaited' warnings.
+            if not conversation_embedding_store.is_initialized:
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(conversation_embedding_store.initialize())
+                except RuntimeError:
+                    try:
+                        asyncio.run(conversation_embedding_store.initialize())
+                    except Exception as e:
+                        logger.debug(
+                            "Failed to run ConversationEmbeddingStore.initialize() "
+                            "synchronously: %s",
+                            e,
+                        )
+
+            logger.info(
+                "ConversationEmbeddingStore configured. " "Message embeddings will sync to LanceDB."
+            )
+
+            # Set up semantic tool result cache using the embedding service
+            # This enables FAISS-based semantic caching with mtime invalidation
+            try:
+                from victor.agent.tool_result_cache import ToolResultCache
+
+                pending_semantic_cache = ToolResultCache(
+                    embedding_service=embedding_service,
+                    max_entries=500,
+                    cleanup_interval=60.0,
+                )
+                logger.debug("Semantic tool cache created, pending wire to pipeline")
+            except Exception as e:
+                logger.warning(f"Failed to initialize semantic tool cache: {e}")
+
+        except Exception as e:
+            logger.warning(f"Failed to initialize ConversationEmbeddingStore: {e}")
+            conversation_embedding_store = None
+
+        return conversation_embedding_store, pending_semantic_cache
 
     # ========================================================================
     # String Representation

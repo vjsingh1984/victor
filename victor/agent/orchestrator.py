@@ -1098,78 +1098,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._send_rl_reward_signal(session)
 
     def _send_rl_reward_signal(self, session: StreamingSession) -> None:
-        """Send reward signal to RL model selector for Q-value updates.
-
-        Converts StreamingSession data into RLOutcome and updates Q-values
-        based on session outcome (success, latency, throughput, tool usage).
-        """
-        try:
-            from victor.framework.rl.coordinator import get_rl_coordinator
-            from victor.framework.rl.base import RLOutcome
-
-            if not self._rl_coordinator:
-                return
-
-            # Extract metrics from session
-            token_count = 0
-            if session.metrics:
-                # Estimate tokens from chunks (streaming metrics)
-                token_count = session.metrics.total_chunks or 0
-
-            # Get tool execution count from metrics collector
-            tool_calls_made = 0
-            if hasattr(self, "_metrics_collector") and self._metrics_collector:
-                tool_calls_made = self._metrics_collector._selection_stats.total_tools_executed
-
-            # Determine success: no error and not cancelled
-            success = session.error is None and not session.cancelled
-
-            # Compute quality score (0-1) based on success and metrics
-            quality_score = 0.5
-            if success:
-                quality_score = 0.8
-                # Bonus for fast responses
-                if session.duration < 10:
-                    quality_score += 0.1
-                # Bonus for tool usage
-                if tool_calls_made > 0:
-                    quality_score += 0.1
-            quality_score = min(1.0, quality_score)
-
-            # Create outcome
-            outcome = RLOutcome(
-                provider=session.provider,
-                model=session.model,
-                task_type=getattr(session, "task_type", "unknown"),
-                success=success,
-                quality_score=quality_score,
-                metadata={
-                    "latency_seconds": session.duration,
-                    "token_count": token_count,
-                    "tool_calls_made": tool_calls_made,
-                    "session_id": session.session_id,
-                },
-                vertical=getattr(self._vertical_context, "vertical_name", None) or "default",
-            )
-
-            # Record outcome for model selector - use vertical from context
-            vertical_name = getattr(self._vertical_context, "vertical_name", None) or "default"
-            self._rl_coordinator.record_outcome("model_selector", outcome, vertical_name)
-
-            logger.debug(
-                f"RL feedback: provider={session.provider} success={success} "
-                f"quality={quality_score:.2f} duration={session.duration:.1f}s"
-            )
-
-        except ImportError:
-            # RL module not available - skip silently
-            pass
-        except (KeyError, AttributeError) as e:
-            # RL coordinator not properly initialized
-            logger.debug(f"RL reward signal skipped (not configured): {e}")
-        except (ValueError, TypeError) as e:
-            # Invalid reward data
-            logger.warning(f"Failed to send RL reward signal (invalid data): {e}")
+        """Send reward signal to RL model selector. Delegates to MetricsCoordinator."""
+        self._metrics_coordinator.send_rl_reward_signal(
+            session=session,
+            rl_coordinator=self._rl_coordinator,
+            vertical_context=self._vertical_context,
+        )
 
     @property
     def conversation_controller(self) -> "ConversationController":
@@ -2194,90 +2128,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._context_manager.get_context_metrics()
 
     def _init_conversation_embedding_store(self) -> None:
-        """Initialize LanceDB embedding store for semantic conversation retrieval.
+        """Initialize embedding store. Delegates to SessionCoordinator."""
+        from victor.agent.coordinators.session_coordinator import SessionCoordinator
 
-        Uses the module-level singleton to prevent duplicate initialization.
-        The singleton pattern ensures that intelligent_prompt_builder and other
-        components share the same instance.
-
-        The ConversationEmbeddingStore provides:
-        - Pre-computed message embeddings in LanceDB
-        - O(log n) vector search instead of O(n) on-the-fly embedding
-        - Automatic sync when messages are added to ConversationStore
-        """
-        if self.memory_manager is None:
-            return
-
-        try:
-            from victor.storage.embeddings.service import EmbeddingService
-            import victor.agent.conversation_embedding_store as ces_module
-
-            # Get the shared embedding service
-            embedding_service = EmbeddingService.get_instance()
-
-            # Use singleton pattern - check if already exists
-            if ces_module._embedding_store is not None:
-                self._conversation_embedding_store = ces_module._embedding_store
-                logger.debug(
-                    "[AgentOrchestrator] Reusing existing ConversationEmbeddingStore singleton"
-                )
-            else:
-                # Create new instance and register as singleton
-                self._conversation_embedding_store = ConversationEmbeddingStore(
-                    embedding_service=embedding_service,
-                )
-                ces_module._embedding_store = self._conversation_embedding_store
-                logger.debug("[AgentOrchestrator] Created ConversationEmbeddingStore singleton")
-
-            # Wire it to the memory manager for automatic sync
-            self.memory_manager.set_embedding_store(self._conversation_embedding_store)
-
-            # Also set the embedding service for fallback
-            self.memory_manager.set_embedding_service(embedding_service)
-
-            # Initialize async (fire and forget for faster startup).
-            # If there's no running event loop (e.g., unit tests), fall back
-            # to synchronous initialization to avoid 'coroutine was never awaited' warnings.
-            if not self._conversation_embedding_store.is_initialized:
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.create_task(self._conversation_embedding_store.initialize())
-                except RuntimeError:
-                    try:
-                        asyncio.run(self._conversation_embedding_store.initialize())
-                    except Exception as e:
-                        logger.debug(
-                            "Failed to run ConversationEmbeddingStore.initialize() synchronously: %s",
-                            e,
-                        )
-
-            logger.info(
-                "[AgentOrchestrator] ConversationEmbeddingStore configured. "
-                "Message embeddings will sync to LanceDB."
-            )
-
-            # Set up semantic tool result cache using the embedding service
-            # This enables FAISS-based semantic caching with mtime invalidation
-            try:
-                from victor.agent.tool_result_cache import ToolResultCache
-
-                semantic_cache = ToolResultCache(
-                    embedding_service=embedding_service,
-                    max_entries=500,
-                    cleanup_interval=60.0,
-                )
-                # Store semantic cache for later wiring to tool pipeline
-                # (tool pipeline is created after this method runs)
-                self._pending_semantic_cache = semantic_cache
-                logger.debug(
-                    "[AgentOrchestrator] Semantic tool cache created, pending wire to pipeline"
-                )
-            except Exception as e:
-                logger.warning(f"Failed to initialize semantic tool cache: {e}")
-
-        except Exception as e:
-            logger.warning(f"Failed to initialize ConversationEmbeddingStore: {e}")
-            self._conversation_embedding_store = None
+        store, cache = SessionCoordinator.init_conversation_embedding_store(
+            memory_manager=self.memory_manager,
+        )
+        self._conversation_embedding_store = store
+        if cache is not None:
+            self._pending_semantic_cache = cache
 
     def _finalize_stream_metrics(
         self, usage_data: Optional[Dict[str, int]] = None
@@ -2497,70 +2356,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         elapsed_ms: float,
         error_type: Optional[str] = None,
     ) -> None:
-        """Record tool execution statistics.
-
-        Args:
-            tool_name: Name of the tool executed
-            success: Whether execution succeeded
-            elapsed_ms: Execution time in milliseconds
-            error_type: Type of error if execution failed
-        """
-        self._metrics_collector.record_tool_execution(tool_name, success, elapsed_ms)
-
-        # Also record to UsageAnalytics for data-driven optimization
-        if hasattr(self, "_usage_analytics") and self._usage_analytics:
-            context_metrics = self._conversation_controller.get_context_metrics()
-            self._usage_analytics.record_tool_execution(
-                tool_name=tool_name,
-                success=success,
-                execution_time_ms=elapsed_ms,
-                error_type=error_type,
-                context_tokens=context_metrics.estimated_tokens,
-            )
-
-        # Record to ToolSequenceTracker for intelligent next-tool suggestions
-        if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
-            self._sequence_tracker.record_execution(
-                tool_name=tool_name,
-                success=success,
-                execution_time=elapsed_ms / 1000.0,  # Convert to seconds
-            )
-
-        # Also record to SemanticToolSelector's internal tracker for confidence boosting
-        # This enables the 15-20% accuracy improvement via workflow pattern detection
-        if hasattr(self, "tool_selector") and hasattr(self.tool_selector, "record_tool_execution"):
-            self.tool_selector.record_tool_execution(tool_name, success=success)
-
-        # Record to RL tool_selector learner for Q-learning optimization
-        if self._rl_coordinator:
-            try:
-                from victor.framework.rl.base import RLOutcome
-
-                # Get current context
-                provider_name = getattr(self.current_provider, "name", "unknown")
-                model_name = getattr(self, "_current_model", "unknown")
-                task_type = getattr(self, "_task_type", "general")
-                vertical_name = getattr(self, "_vertical_name", None)
-
-                tool_outcome = RLOutcome(
-                    success=success,
-                    quality_score=1.0 if success else 0.0,
-                    provider=provider_name,
-                    model=model_name,
-                    task_type=task_type,
-                    metadata={
-                        "tool_name": tool_name,
-                        "execution_time_ms": elapsed_ms,
-                        "error_type": error_type,
-                    },
-                )
-                self._rl_coordinator.record_outcome("tool_selector", tool_outcome, vertical_name)
-            except ImportError:
-                logger.debug("RLOutcome not available, skipping RL recording")
-            except KeyError as e:
-                logger.debug(f"RL learner not registered: {e}")
-            except ValueError as e:
-                logger.warning(f"Invalid outcome data for RL recording: {e}")
+        """Record tool execution statistics. Delegates to MetricsCoordinator."""
+        self._metrics_coordinator.record_tool_execution_full(
+            tool_name=tool_name,
+            success=success,
+            elapsed_ms=elapsed_ms,
+            error_type=error_type,
+            usage_analytics=getattr(self, "_usage_analytics", None),
+            sequence_tracker=getattr(self, "_sequence_tracker", None),
+            tool_selector=getattr(self, "tool_selector", None),
+            rl_coordinator=self._rl_coordinator,
+            conversation_controller=getattr(self, "_conversation_controller", None),
+            provider_name=getattr(self.current_provider, "name", "unknown"),
+            model_name=getattr(self, "_current_model", "unknown"),
+            task_type=getattr(self, "_task_type", "general"),
+            vertical_name=getattr(self, "_vertical_name", None),
+        )
 
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics.
@@ -2632,61 +2443,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
     def flush_analytics(self) -> Dict[str, bool]:
-        """Flush all analytics and cached data to persistent storage.
-
-        Call this method before shutdown or when you need to ensure
-        all analytics data is persisted to disk. Useful for graceful
-        shutdown scenarios.
-
-        Returns:
-            Dictionary indicating success/failure for each component:
-            - usage_analytics: Whether analytics were flushed
-            - sequence_tracker: Whether patterns were saved
-            - tool_cache: Whether cache was flushed
-        """
-        results: Dict[str, bool] = {}
-
-        # Flush usage analytics
-        if hasattr(self, "_usage_analytics") and self._usage_analytics:
-            try:
-                self._usage_analytics.flush()
-                results["usage_analytics"] = True
-                logger.debug("UsageAnalytics flushed to disk")
-            except Exception as e:
-                logger.warning(f"Failed to flush usage analytics: {e}")
-                results["usage_analytics"] = False
-        else:
-            results["usage_analytics"] = False
-
-        # Flush sequence tracker patterns
-        if hasattr(self, "_sequence_tracker") and self._sequence_tracker:
-            try:
-                # SequenceTracker learns patterns in memory; no explicit flush needed
-                # but we capture statistics for reporting
-                stats = self._sequence_tracker.get_statistics()
-                results["sequence_tracker"] = True
-                logger.debug(
-                    f"SequenceTracker has {stats.get('unique_transitions', 0)} learned patterns"
-                )
-            except Exception as e:
-                logger.warning(f"Failed to get sequence tracker stats: {e}")
-                results["sequence_tracker"] = False
-        else:
-            results["sequence_tracker"] = False
-
-        # Flush tool cache
-        if hasattr(self, "tool_cache") and self.tool_cache:
-            try:
-                # Tool cache is already persistent; just report status
-                results["tool_cache"] = True
-            except Exception as e:
-                logger.warning(f"Failed to access tool cache: {e}")
-                results["tool_cache"] = False
-        else:
-            results["tool_cache"] = False
-
-        logger.info(f"Analytics flush complete: {results}")
-        return results
+        """Flush all analytics and cached data. Delegates to MetricsCoordinator."""
+        return self._metrics_coordinator.flush_analytics(
+            usage_analytics=getattr(self, "_usage_analytics", None),
+            sequence_tracker=getattr(self, "_sequence_tracker", None),
+            tool_cache=getattr(self, "tool_cache", None),
+        )
 
     async def start_health_monitoring(self) -> bool:
         """Start background provider health monitoring.
@@ -2852,71 +2614,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         return info
-
-    def _apply_post_switch_hooks(self, respect_sticky_budget: bool = False) -> None:
-        """Apply post-switch hooks after provider/model switch.
-
-        Consolidates common post-switch logic used by both switch_provider()
-        and switch_model() methods:
-        - Apply model-specific exploration settings to unified tracker
-        - Reinitialize prompt builder with new capabilities
-        - Rebuild system prompt
-        - Update tool budget
-
-        Args:
-            respect_sticky_budget: If True, don't reset tool budget when user
-                override is sticky (used by switch_provider).
-
-        Note:
-            This method assumes self.model, self.provider_name, self.tool_adapter,
-            and self.tool_calling_caps are already updated before calling.
-        """
-        # Apply model-specific exploration settings to unified tracker
-        self.unified_tracker.set_model_exploration_settings(
-            exploration_multiplier=self.tool_calling_caps.exploration_multiplier,
-            continuation_patience=self.tool_calling_caps.continuation_patience,
-        )
-
-        # Get prompt contributors from vertical extensions
-        prompt_contributors = []
-        try:
-            from victor.core.verticals.protocols import VerticalExtensions
-
-            extensions = self._container.get_optional(VerticalExtensions)
-            if extensions and extensions.prompt_contributors:
-                prompt_contributors = extensions.prompt_contributors
-        except ImportError:
-            logger.debug("VerticalExtensions module not available")
-        except AttributeError as e:
-            logger.warning(f"VerticalExtensions missing expected attributes: {e}")
-
-        # Reinitialize prompt builder
-        self.prompt_builder = SystemPromptBuilder(
-            provider_name=self.provider_name,
-            model=self.model,
-            tool_adapter=self.tool_adapter,
-            capabilities=self.tool_calling_caps,
-            prompt_contributors=prompt_contributors,
-        )
-
-        # Rebuild system prompt with new adapter hints
-        base_system_prompt = self._build_system_prompt_with_adapter()
-        if self.project_context.content:
-            self._system_prompt = (
-                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
-            )
-        else:
-            self._system_prompt = base_system_prompt
-
-        # Update tool budget based on new adapter's recommendation
-        if respect_sticky_budget:
-            sticky_budget = getattr(self.unified_tracker, "_sticky_user_budget", False)
-            if sticky_budget:
-                logger.debug("Skipping tool budget reset on provider switch (sticky user override)")
-                return
-
-        default_budget = max(self.tool_calling_caps.recommended_tool_budget, 50)
-        self.tool_budget = getattr(self.settings, "tool_call_budget", default_budget)
 
     def _parse_tool_calls_with_adapter(
         self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None

@@ -443,6 +443,239 @@ class MetricsCoordinator:
         """Reset all statistics (e.g., after conversation reset)."""
         self._metrics_collector.reset_stats()
 
+    def record_tool_execution_full(
+        self,
+        tool_name: str,
+        success: bool,
+        elapsed_ms: float,
+        error_type: Optional[str] = None,
+        usage_analytics: Optional[Any] = None,
+        sequence_tracker: Optional[Any] = None,
+        tool_selector: Optional[Any] = None,
+        rl_coordinator: Optional[Any] = None,
+        conversation_controller: Optional[Any] = None,
+        provider_name: str = "unknown",
+        model_name: str = "unknown",
+        task_type: str = "general",
+        vertical_name: Optional[str] = None,
+    ) -> None:
+        """Record tool execution across all analytics subsystems.
+
+        Fans out to metrics collector, usage analytics, sequence tracker,
+        tool selector, and RL coordinator.
+
+        Args:
+            tool_name: Name of the tool executed
+            success: Whether execution succeeded
+            elapsed_ms: Execution time in milliseconds
+            error_type: Type of error if execution failed
+            usage_analytics: Optional UsageAnalytics for data-driven optimization
+            sequence_tracker: Optional ToolSequenceTracker for pattern learning
+            tool_selector: Optional SemanticToolSelector for confidence boosting
+            rl_coordinator: Optional RLCoordinator for Q-learning
+            conversation_controller: Optional ConversationController for context metrics
+            provider_name: Current provider name for RL context
+            model_name: Current model name for RL context
+            task_type: Current task type for RL context
+            vertical_name: Current vertical name for RL context
+        """
+        # Core metrics recording
+        self._metrics_collector.record_tool_execution(tool_name, success, elapsed_ms)
+
+        # Record to UsageAnalytics for data-driven optimization
+        if usage_analytics:
+            context_tokens = 0
+            if conversation_controller:
+                context_metrics = conversation_controller.get_context_metrics()
+                context_tokens = context_metrics.estimated_tokens
+            usage_analytics.record_tool_execution(
+                tool_name=tool_name,
+                success=success,
+                execution_time_ms=elapsed_ms,
+                error_type=error_type,
+                context_tokens=context_tokens,
+            )
+
+        # Record to ToolSequenceTracker for intelligent next-tool suggestions
+        if sequence_tracker:
+            sequence_tracker.record_execution(
+                tool_name=tool_name,
+                success=success,
+                execution_time=elapsed_ms / 1000.0,  # Convert to seconds
+            )
+
+        # Record to SemanticToolSelector for confidence boosting
+        # Enables 15-20% accuracy improvement via workflow pattern detection
+        if tool_selector and hasattr(tool_selector, "record_tool_execution"):
+            tool_selector.record_tool_execution(tool_name, success=success)
+
+        # Record to RL tool_selector learner for Q-learning optimization
+        if rl_coordinator:
+            try:
+                from victor.framework.rl.base import RLOutcome
+
+                tool_outcome = RLOutcome(
+                    success=success,
+                    quality_score=1.0 if success else 0.0,
+                    provider=provider_name,
+                    model=model_name,
+                    task_type=task_type,
+                    metadata={
+                        "tool_name": tool_name,
+                        "execution_time_ms": elapsed_ms,
+                        "error_type": error_type,
+                    },
+                )
+                rl_coordinator.record_outcome("tool_selector", tool_outcome, vertical_name)
+            except ImportError:
+                logger.debug("RLOutcome not available, skipping RL recording")
+            except KeyError as e:
+                logger.debug(f"RL learner not registered: {e}")
+            except ValueError as e:
+                logger.warning(f"Invalid outcome data for RL recording: {e}")
+
+    def send_rl_reward_signal(
+        self,
+        session: Any,
+        rl_coordinator: Optional[Any] = None,
+        vertical_context: Optional[Any] = None,
+    ) -> None:
+        """Send reward signal to RL model selector for Q-value updates.
+
+        Converts streaming session data into RLOutcome and updates Q-values
+        based on session outcome (success, latency, throughput, tool usage).
+
+        Args:
+            session: StreamingSession with metrics/outcome data
+            rl_coordinator: Optional RLCoordinator for recording outcomes
+            vertical_context: Optional vertical context for vertical name
+        """
+        try:
+            from victor.framework.rl.base import RLOutcome
+
+            if not rl_coordinator:
+                return
+
+            # Extract metrics from session
+            token_count = 0
+            if session.metrics:
+                token_count = session.metrics.total_chunks or 0
+
+            # Get tool execution count from metrics collector
+            tool_calls_made = 0
+            if self._metrics_collector:
+                tool_calls_made = self._metrics_collector._selection_stats.total_tools_executed
+
+            # Determine success: no error and not cancelled
+            success = session.error is None and not session.cancelled
+
+            # Compute quality score (0-1) based on success and metrics
+            quality_score = 0.5
+            if success:
+                quality_score = 0.8
+                # Bonus for fast responses
+                if session.duration < 10:
+                    quality_score += 0.1
+                # Bonus for tool usage
+                if tool_calls_made > 0:
+                    quality_score += 0.1
+            quality_score = min(1.0, quality_score)
+
+            # Create outcome
+            outcome = RLOutcome(
+                provider=session.provider,
+                model=session.model,
+                task_type=getattr(session, "task_type", "unknown"),
+                success=success,
+                quality_score=quality_score,
+                metadata={
+                    "latency_seconds": session.duration,
+                    "token_count": token_count,
+                    "tool_calls_made": tool_calls_made,
+                    "session_id": session.session_id,
+                },
+                vertical=getattr(vertical_context, "vertical_name", None) or "default",
+            )
+
+            # Record outcome for model selector
+            vertical_name = getattr(vertical_context, "vertical_name", None) or "default"
+            rl_coordinator.record_outcome("model_selector", outcome, vertical_name)
+
+            logger.debug(
+                f"RL feedback: provider={session.provider} success={success} "
+                f"quality={quality_score:.2f} duration={session.duration:.1f}s"
+            )
+
+        except ImportError:
+            # RL module not available - skip silently
+            pass
+        except (KeyError, AttributeError) as e:
+            # RL coordinator not properly initialized
+            logger.debug(f"RL reward signal skipped (not configured): {e}")
+        except (ValueError, TypeError) as e:
+            # Invalid reward data
+            logger.warning(f"Failed to send RL reward signal (invalid data): {e}")
+
+    def flush_analytics(
+        self,
+        usage_analytics: Optional[Any] = None,
+        sequence_tracker: Optional[Any] = None,
+        tool_cache: Optional[Any] = None,
+    ) -> Dict[str, bool]:
+        """Flush all analytics and cached data to persistent storage.
+
+        Call this method before shutdown or when you need to ensure
+        all analytics data is persisted to disk.
+
+        Args:
+            usage_analytics: Optional UsageAnalytics instance
+            sequence_tracker: Optional ToolSequenceTracker instance
+            tool_cache: Optional tool cache instance
+
+        Returns:
+            Dictionary indicating success/failure for each component
+        """
+        results: Dict[str, bool] = {}
+
+        # Flush usage analytics
+        if usage_analytics:
+            try:
+                usage_analytics.flush()
+                results["usage_analytics"] = True
+                logger.debug("UsageAnalytics flushed to disk")
+            except Exception as e:
+                logger.warning(f"Failed to flush usage analytics: {e}")
+                results["usage_analytics"] = False
+        else:
+            results["usage_analytics"] = False
+
+        # Flush sequence tracker patterns
+        if sequence_tracker:
+            try:
+                stats = sequence_tracker.get_statistics()
+                results["sequence_tracker"] = True
+                logger.debug(
+                    f"SequenceTracker has {stats.get('unique_transitions', 0)} learned patterns"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get sequence tracker stats: {e}")
+                results["sequence_tracker"] = False
+        else:
+            results["sequence_tracker"] = False
+
+        # Flush tool cache
+        if tool_cache:
+            try:
+                results["tool_cache"] = True
+            except Exception as e:
+                logger.warning(f"Failed to access tool cache: {e}")
+                results["tool_cache"] = False
+        else:
+            results["tool_cache"] = False
+
+        logger.info(f"Analytics flush complete: {results}")
+        return results
+
 
 def create_metrics_coordinator(
     metrics_collector: "MetricsCollector",
