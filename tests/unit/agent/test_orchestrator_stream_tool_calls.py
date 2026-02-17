@@ -65,7 +65,10 @@ class DummyTool(BaseTool):
 
     name = "dummy_tool"
     description = "A dummy tool"
-    parameters: Dict[str, Any] = {"type": "object", "properties": {}}
+    parameters: Dict[str, Any] = {
+        "type": "object",
+        "properties": {"echo": {"type": "string", "description": "Value to echo back"}},
+    }
 
     def __init__(self) -> None:
         super().__init__()
